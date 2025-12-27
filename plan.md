@@ -358,5 +358,593 @@ The smoke suite uses existing Playwright mocks and helpers:
 
 ---
 
+## CI Starter Harness for Featured Email + Promotions
+
+**Status:** ✅ Completed (2025-01-31)
+
+### Overview
+
+A minimal CI "starter harness" for the Promoted Listings + Weekly Featured Email system has been added to lock in selection/eligibility promises and safety guards before implementing the full feature set.
+
+### Coverage
+
+**Featured Selection Logic Tests (`tests/integration/featured-email/selection.test.ts`):**
+- ✅ Returns exactly 12 sales when enough candidates exist
+- ✅ Excludes recipient-owned sales
+- ✅ Excludes `hidden_by_admin` and archived sales
+- ✅ Respects next-7-days window
+- ✅ Promoted priority rules:
+  - If >=12 promoted nearby → all 12 selected are promoted
+  - If <12 promoted nearby → includes all promoted + remaining are top "high-view" organic candidates
+- ✅ Deterministic selection using seeded randomness (recipient_id + week key)
+
+**Promoted Inclusion Tracking Contract Test (`tests/integration/featured-email/inclusion-tracking.test.ts`):**
+- ✅ Does not double-count unique recipients for the same promotion
+- ✅ Increments total inclusions appropriately
+- ✅ Handles multiple promotions and different weeks correctly
+
+**Payments Disabled Safety Guard (`tests/integration/featured-email/payments-guard.test.ts`):**
+- ✅ Blocks checkout creation when `PAYMENTS_ENABLED` is not set or false
+- ✅ Allows checkout only when `PAYMENTS_ENABLED=true`
+- ✅ Ensures no Stripe calls occur when payments are disabled
+
+**Dry-Run Endpoint (`/api/admin/featured-email/dry-run`):**
+- ✅ Admin-only endpoint for synthetic E2E smoke checks
+- ✅ Returns exactly 12 sales IDs (deterministic fixture data)
+- ✅ Does NOT send email
+- ✅ Does NOT require Stripe
+- ✅ Protected by `ENABLE_DEBUG_ENDPOINTS` flag (disabled by default in production)
+
+### Test Patterns
+
+- Uses deterministic timestamps (Thursday 2025-01-16 09:00:00 UTC base)
+- Seeded randomness for stable test results (recipient_id + week key)
+- Contract tests validate interfaces before full implementation
+- Safety guards ensure no accidental charges
+
+### What It Does NOT Yet Cover
+
+**Not Yet Implemented:**
+- Actual selection algorithm implementation (tests define contract only)
+- Actual inclusion tracking database tables/logic (contract test only)
+- Actual Stripe checkout session creation (guard test only)
+- Full weekly email job processor
+- Email template for featured sales
+- Geographic proximity filtering (nearby sales)
+- View analytics aggregation for organic selection
+- Promotion payment processing
+
+**Removal/Transition Plan:**
+- The dry-run endpoint (`/api/admin/featured-email/dry-run`) is temporary and should be removed or disabled once the full featured email system is implemented and tested.
+- Contract tests will be updated to use actual implementations once they are built.
+
+### Test Execution
+
+Run the starter harness tests:
+```bash
+npm run test -- tests/integration/featured-email/
+```
+
+### Synthetic E2E Smoke Check
+
+The dry-run endpoint is integrated into the synthetic E2E workflow (`.github/workflows/synthetic-e2e.yml`).
+
+**Access Methods:**
+1. **CI Secret Header** (for automated tests):
+   - Requires `ENABLE_DEBUG_ENDPOINTS=true` and `FEATURED_EMAIL_DRYRUN_SECRET` env var
+   - Request must include header: `X-LootAura-DryRun-Secret: <secret>`
+   - Does NOT require admin authentication
+   - Returns fixture data (no real DB queries)
+
+2. **Admin Authentication** (for Owner manual testing):
+   - Requires admin authentication via `assertAdminOrThrow`
+   - Works when `ENABLE_DEBUG_ENDPOINTS=true` OR in non-production environments
+   - Returns fixture data (no real DB queries)
+
+**CI Integration:**
+- The synthetic E2E workflow sets `ENABLE_DEBUG_ENDPOINTS=true` and `FEATURED_EMAIL_DRYRUN_SECRET` from GitHub Actions secrets
+- **Required GitHub Actions Secret:** `FEATURED_EMAIL_DRYRUN_SECRET`
+  - Must be configured in repository secrets for synthetic-e2e workflow to pass
+  - Generate using: `openssl rand -hex 32` (or similar secure random string generator)
+  - Must match what the endpoint expects in CI (used in `X-LootAura-DryRun-Secret` header)
+  - **CI-only secret** - should not be reused elsewhere or exposed
+  - If missing, the synthetic-e2e workflow will fail with a clear error message
+- The workflow validates:
+  - HTTP 200 response
+  - `ok: true`
+  - `count === 12`
+  - `selectedSales` is an array of length 12
+  - All elements in `selectedSales` are non-empty strings (IDs only)
+
+**Expected Response:**
+```json
+{
+  "ok": true,
+  "count": 12,
+  "selectedSales": [
+    "test-sale-1",
+    "test-sale-2",
+    ...
+  ],
+  "source": "fixture"
+}
+```
+
+**Response Shape:**
+- `selectedSales`: Array of sale IDs (strings only, no objects, no PII)
+- No promotion status, titles, owner IDs, or location data
+
+**Security:**
+- Endpoint is disabled in production unless `ENABLE_DEBUG_ENDPOINTS=true`
+- CI secret header uses constant-time comparison to prevent timing attacks
+- No PII is returned (only sale IDs and promotion status)
+- Secrets are never logged or exposed in error messages
+
+**Removal Checklist (once full system is implemented):**
+- [ ] Remove `/api/admin/featured-email/dry-run` route
+- [ ] Remove `FEATURED_EMAIL_DRYRUN_SECRET` from GitHub Actions secrets
+- [ ] Remove dry-run step from `synthetic-e2e.yml` or point to real job validation endpoint
+- [ ] Remove `ENABLE_DEBUG_ENDPOINTS` requirement for this endpoint (if still needed for other debug endpoints)
+
+---
+
+## Milestone 2: Featured Email Data Foundations
+
+**Status:** ✅ Completed (2025-12-15)
+
+### Overview
+
+Milestone 2 builds the data foundations for the Weekly Featured Sales email system, including ZIP usage tracking, email preferences, inclusion analytics, and a real selection engine. This milestone does NOT implement Stripe promotions or actual email sending yet.
+
+### Data Model
+
+**Migrations:**
+- `119_add_featured_email_foundations.sql`: Creates `profile_zip_usage` table and adds `email_featured_weekly_enabled` column to profiles
+- `120_add_featured_inclusion_tracking.sql`: Creates `featured_inclusions` (recipient-level) and `featured_inclusion_rollups` (sale-level aggregates) tables
+- `121_update_profiles_v2_view_featured_preference.sql`: Updates `profiles_v2` view to include featured email preference
+
+**Tables:**
+1. **`profile_zip_usage`**: Tracks most-used ZIP codes per user
+   - `profile_id`, `zip`, `use_count`, `last_seen_at`
+   - Primary ZIP = highest `use_count`, tie-break by `last_seen_at` DESC
+   - RLS: Self-only read/write for authenticated users
+
+2. **`featured_inclusions`**: Recipient-level exposure tracking (fairness rotation)
+   - `sale_id`, `recipient_profile_id`, `week_key`, `times_shown`, `last_shown_at`
+   - Unique constraint: `(recipient_profile_id, sale_id, week_key)`
+   - RLS: Deny all direct access (service_role only) - privacy protection
+
+3. **`featured_inclusion_rollups`**: Sale-level aggregates (seller reporting)
+   - `sale_id`, `unique_recipients_total`, `total_inclusions_total`, `last_featured_at`
+   - RLS: Sellers can read aggregates for their own sales only
+
+**Preferences:**
+- `email_featured_weekly_enabled` (boolean, default `true`) in `profiles` table
+- Integrated with existing notification preferences pattern
+- Default ON for new users (opt-out model)
+
+### Selection Engine
+
+**Module:** `lib/featured-email/selection.ts`
+
+**Input:**
+- `recipientProfileId`: User profile ID
+- `primaryZip`: Most-used ZIP code (from `profile_zip_usage`)
+- `now`: Current timestamp
+- `weekKey`: ISO week format (e.g., "2025-W03")
+- `radiusKm`: Search radius (default: 50km)
+
+**Output:**
+- `selectedSales`: Array of exactly 12 sale IDs
+- `totalPromoted`: Number of promoted sales selected
+- `totalOrganic`: Number of organic (high-view) sales selected
+
+**Selection Rules:**
+1. **Window**: Next 7 days only (`date_start` within next 7 days)
+2. **Exclusions**:
+   - Recipient's own sales (`owner_id !== recipientProfileId`)
+   - `moderation_status = 'hidden_by_admin'`
+   - `archived_at IS NOT NULL`
+   - `status != 'published'`
+3. **Promoted Priority**:
+   - If >=12 promoted nearby → all 12 selected are promoted
+   - If <12 promoted nearby → includes all promoted + remaining are high-view organic
+4. **Fairness Rotation**:
+   - Promoted sales sorted by least-shown first (using `featured_inclusions.times_shown`)
+   - Tie-break with seeded randomness (seed = `recipientProfileId + weekKey`)
+5. **High-View Backfill**:
+   - Organic sales sorted by view count (last 30 days from `analytics_events_v2`)
+   - Tie-break with seeded randomness
+6. **Deterministic Seeding**:
+   - Uses `seededShuffle()` with `recipientProfileId + weekKey` as seed
+   - Ensures stable results for same recipient/week combination
+
+**Current Limitations:**
+- Uses `is_featured` flag as placeholder for "promoted" (will be replaced with promotions table in future milestone)
+- Location filtering (ZIP-based radius) is not yet implemented (fetches all candidates, filters in memory)
+- PostGIS spatial queries will be added in future optimization
+
+**Stabilization Notes:**
+- Migration 122: Fixed `profiles_v2` view to use SECURITY INVOKER (consistent with migration 112)
+- ZIP usage throttling: 24-hour minimum between increments per user per ZIP
+- Dry-run endpoint: Does NOT write inclusion tracking (maintains CI compatibility, does not affect seller reporting)
+- `is_featured` safety: Not settable by public endpoints (only test/admin endpoints set to `false`)
+
+### ZIP Usage Tracking
+
+**Module:** `lib/data/zipUsage.ts`
+
+**Functions:**
+- `incrementZipUsage(profileId, zip)`: Increments use count for a ZIP (rate-limited: max once per 24 hours per user per ZIP)
+- `getPrimaryZip(profileId)`: Returns primary ZIP (highest use_count, tie-break by last_seen_at)
+
+**Integration:**
+- Hooked into `/api/geocoding/zip` endpoint (non-blocking, fire-and-forget)
+- Tracks ZIP usage when authenticated users look up ZIP codes
+- Privacy: No raw lat/lng history stored, only ZIP codes
+
+### Inclusion Tracking
+
+**Module:** `lib/featured-email/inclusionTracking.ts`
+
+**Functions:**
+- `recordInclusions(inclusions[])`: Records featured inclusions (updates both recipient-level and rollup tables)
+- `getInclusionRollup(saleId)`: Returns aggregate metrics for a sale (for seller reporting)
+
+**Privacy:**
+- Recipient-level rows are NOT readable by sellers (RLS denies all direct access)
+- Only service_role (backend jobs) can access recipient-level data
+- Sellers can only see aggregate counts (`unique_recipients_total`, `total_inclusions_total`)
+
+### Milestone 2 Security Checks
+
+**RLS Policies:**
+- ✅ `profile_zip_usage`: Self-only read/write for authenticated users; service_role full access; no anon access
+- ✅ `featured_inclusions`: Deny all direct access (service_role only); sellers cannot read recipient-level rows
+- ✅ `featured_inclusion_rollups`: Sellers can read aggregates for own sales only (via EXISTS subquery on sales.owner_id); service_role full access; no anon access
+
+**View Security:**
+- ✅ `profiles_v2` view uses SECURITY INVOKER (migration 122); RLS policies on base table apply
+- ⚠️ Email preferences (`email_featured_weekly_enabled`, etc.) are exposed in view but protected by RLS (users can only read their own preferences); consistent with existing `email_favorites_digest_enabled` pattern
+
+**Endpoint Security:**
+- ✅ No endpoint response includes ZIP codes, recipient IDs, or inclusion-tracking data
+- ✅ Dry-run endpoint returns only sale IDs (no PII)
+- ✅ ZIP usage tracking is non-blocking (failures don't break geocoding)
+
+**Cost Discipline:**
+- ✅ ZIP usage writes throttled: at most once per 24 hours per user per ZIP
+- ✅ ZIP usage tracking only for authenticated users
+- ✅ Non-blocking implementation (fire-and-forget)
+
+**Selection Engine Safety:**
+- ✅ `is_featured` is not settable by any public/seller mutation endpoints (only set to `false` in test/admin endpoints)
+- ✅ Selection engine uses `is_featured` as placeholder read flag only
+- ✅ Dry-run endpoint does NOT write inclusion tracking (dry-run does not count toward seller reporting)
+
+**Fairness & Inclusion Tracking:**
+- ✅ Selection engine consults `featured_inclusions` to de-prioritize previously-shown items
+- ✅ Inclusion tracking updates both recipient-level and rollup tables
+- ✅ Unique recipients count: increments once per sale per recipient total (across all weeks)
+- ✅ Total inclusions count: increments per send (sum of `times_shown`)
+- ✅ Selection engine uses service_role (admin client) to read inclusion data (no public exposure)
+
+### Dry-Run Endpoint Updates
+
+**Endpoint:** `/api/admin/featured-email/dry-run`
+
+**Changes:**
+- Now uses real selection engine (`selectFeaturedSales`) when data is available
+- Falls back to fixture mode if:
+  - Selection engine returns <12 sales
+  - Selection engine throws an error
+  - No real data available (CI/test environments)
+- Response includes `source: "real" | "fixture"` to indicate which path was used
+- Maintains CI compatibility (always returns 12 IDs)
+
+### What's Still Not Implemented
+
+**Not Yet Implemented:**
+- Stripe promotion payment processing
+- Actual promotions table (using `is_featured` as placeholder)
+- PostGIS spatial queries for ZIP-based radius filtering
+- Full weekly email job processor (scheduled send)
+- Email template for featured sales
+- Geographic proximity filtering optimization
+- Promotion checkout/webhook handlers
+
+**Next Milestones:**
+- Milestone 3: Weekly email job (scheduled send, email template) ✅ **COMPLETE**
+- Milestone 4: Stripe promotions (payment processing, promotions table)
+- Milestone 5: Performance optimization (PostGIS queries, caching)
+
+## Milestone 3: Weekly Featured Sales Email Job
+
+**Status:** ✅ **COMPLETE**
+
+Milestone 3 implements the weekly featured sales email job pipeline with safety gates, recipient selection, email sending, and inclusion tracking writeback. This milestone does NOT implement Stripe promotions yet (still using `is_featured` as placeholder).
+
+### Implementation Summary
+
+**Cron Endpoint:**
+- `/api/cron/weekly-featured-sales` (GET/POST)
+- Protected by `CRON_SECRET` Bearer token authentication
+- Recommended schedule: Weekly on Thursdays at 09:00 UTC
+
+**Safety Gates:**
+- `FEATURED_EMAIL_ENABLED`: Must be `"true"` to run (default: `false`)
+- `FEATURED_EMAIL_SEND_MODE`: 
+  - `"compute-only"` (default): Compute selections and write inclusion tracking ONLY for allowlisted recipients; if allowlist is empty, no-op
+  - `"allowlist-send"`: Send emails only to allowlisted recipients
+  - `"full-send"`: Send to all eligible recipients
+- `FEATURED_EMAIL_ALLOWLIST`: Comma-separated emails or profile IDs (for compute-only/allowlist-send modes)
+
+**Recipient Selection:**
+- Only users with `email_featured_weekly_enabled = true` (default ON)
+- Excludes fully unsubscribed users (both `email_favorites_digest_enabled` and `email_seller_weekly_enabled` are `false`)
+- Must have a deliverable email address
+- Must have a primary ZIP code (v1: skip if no ZIP; broader fallback can be added later)
+- Does not require favorites to receive this email
+
+**Email Template:**
+- `FeaturedSalesEmail` template with 12 sale cards
+- Each card includes: title, date range, address (if available), cover image (if available), "View Sale" button
+- Uses unified unsubscribe footer system
+- Robust to missing images
+
+**Send Pipeline:**
+- Uses existing `sendEmail` infrastructure (Resend integration)
+- Non-blocking error handling (per-recipient errors don't kill the whole job)
+- Returns summarized job result (counts only, no PII)
+- Respects `LOOTAURA_ENABLE_EMAILS` global toggle
+
+**Inclusion Tracking Writeback:**
+- Records inclusion tracking when emails are actually sent
+- Updates both `featured_inclusions` (recipient-level) and `featured_inclusion_rollups` (aggregates)
+- For `compute-only` mode:
+  - If allowlist is set: treats as "sent" for allowlisted recipients (records inclusions)
+  - If allowlist is empty: does NOT record inclusions (no-op)
+- Does NOT record inclusions for dry-run endpoint
+
+**Job Processor:**
+- `processWeeklyFeaturedSalesJob()` in `lib/jobs/processor.ts`
+- Queries eligible recipients, selects 12 sales per recipient, sends emails, records inclusions
+- Handles errors gracefully (continues processing other recipients on failure)
+
+### Rollout Procedure
+
+**Step 1: Deploy with feature disabled**
+- Set `FEATURED_EMAIL_ENABLED=false` (default)
+- Verify cron endpoint returns `skipped: true`
+- No emails sent, no inclusions recorded
+
+**Step 2: Enable compute-only with allowlist**
+- Set `FEATURED_EMAIL_ENABLED=true`
+- Set `FEATURED_EMAIL_SEND_MODE=compute-only`
+- Set `FEATURED_EMAIL_ALLOWLIST=<your-email>`
+- Trigger cron endpoint manually (with `CRON_SECRET`)
+- Verify:
+  - No emails sent (compute-only mode)
+  - Inclusions recorded for allowlisted recipient
+  - Selection engine returns 12 sales
+
+**Step 3: Switch to allowlist-send**
+- Set `FEATURED_EMAIL_SEND_MODE=allowlist-send`
+- Keep `FEATURED_EMAIL_ALLOWLIST=<your-email>`
+- Trigger cron endpoint
+- Verify:
+  - Email received with 12 sales
+  - Unsubscribe link works
+  - Inclusions recorded
+
+**Step 4: Switch to full-send (production)**
+- Set `FEATURED_EMAIL_SEND_MODE=full-send`
+- Clear or remove `FEATURED_EMAIL_ALLOWLIST`
+- Schedule cron job (weekly on Thursdays at 09:00 UTC)
+- Monitor:
+  - Email send counts
+  - Error rates
+  - Inclusion tracking accuracy
+
+### Safety & Privacy
+
+**No PII Leakage:**
+- No ZIP codes, recipient IDs, or inclusion data in endpoint responses
+- No PII in logs (emails, user IDs, tokens)
+- Structured logging only (counts, error messages)
+
+**Opt-Out Respect:**
+- Fully unsubscribed users (both preferences `false`) are excluded
+- Users with `email_featured_weekly_enabled=false` are excluded
+- Unsubscribe link in email footer uses unified system
+
+**Error Handling:**
+- Per-recipient errors don't kill the whole job
+- Errors are logged but don't throw
+- Job returns summary (counts only)
+
+### Testing
+
+**Integration Tests:**
+- Cron auth (missing/invalid `CRON_SECRET` returns 401)
+- Safety gates (`FEATURED_EMAIL_ENABLED=false` returns skipped)
+- Recipient selection (respects preferences, excludes unsubscribed, requires ZIP)
+- Correctness (generates 12 sales, records inclusions)
+- Opt-out behavior (excludes users with preferences disabled)
+
+**Manual Testing:**
+- Set `FEATURED_EMAIL_ENABLED=true` and `FEATURED_EMAIL_SEND_MODE=allowlist-send` in non-prod
+- Add your email to `FEATURED_EMAIL_ALLOWLIST`
+- Trigger cron endpoint manually (with `CRON_SECRET`)
+- Verify email received with 12 sales and working unsubscribe link
+
+### What's Still Not Implemented
+
+**Not Yet Implemented:**
+- Stripe promotion payment processing
+- Actual promotions table (using `is_featured` as placeholder)
+- PostGIS spatial queries for ZIP-based radius filtering (using approximate radius for now)
+- Geographic proximity filtering optimization
+
+**Next Milestones:**
+- Milestone 4: Stripe promotions (payment processing, promotions table)
+- Milestone 5: Performance optimization (PostGIS queries, caching)
+
+### Milestone 2 Security Checks
+
+**RLS Policies:**
+- ✅ `profile_zip_usage`: Self-only read/write for authenticated users; service_role full access; no anon access
+- ✅ `featured_inclusions`: Deny all direct access (service_role only); sellers cannot read recipient-level rows
+- ✅ `featured_inclusion_rollups`: Sellers can read aggregates for own sales only (via EXISTS subquery on sales.owner_id); service_role full access; no anon access
+
+**View Security:**
+- ✅ `profiles_v2` view uses SECURITY INVOKER (migration 122); RLS policies on base table apply
+- ⚠️ Email preferences (`email_featured_weekly_enabled`, etc.) are exposed in view but protected by RLS (users can only read their own preferences); consistent with existing `email_favorites_digest_enabled` pattern
+
+**Endpoint Security:**
+- ✅ No endpoint response includes ZIP codes, recipient IDs, or inclusion-tracking data
+- ✅ Dry-run endpoint returns only sale IDs (no PII)
+- ✅ ZIP usage tracking is non-blocking (failures don't break geocoding)
+
+**Cost Discipline:**
+- ✅ ZIP usage writes throttled: at most once per 24 hours per user per ZIP
+- ✅ ZIP usage tracking only for authenticated users
+- ✅ Non-blocking implementation (fire-and-forget)
+
+**Selection Engine Safety:**
+- ✅ `is_featured` is not settable by any public/seller mutation endpoints (only set to `false` in test/admin endpoints)
+- ✅ Selection engine uses `is_featured` as placeholder read flag only
+- ✅ Dry-run endpoint does NOT write inclusion tracking (dry-run does not count toward seller reporting)
+
+**Fairness & Inclusion Tracking:**
+- ✅ Selection engine consults `featured_inclusions` to de-prioritize previously-shown items
+- ✅ Inclusion tracking updates both recipient-level and rollup tables
+- ✅ Unique recipients count: increments once per sale per recipient total (across all weeks)
+- ✅ Total inclusions count: increments per send (sum of `times_shown`)
+- ✅ Selection engine uses service_role (admin client) to read inclusion data (no public exposure)
+
+### Security & Privacy
+
+**RLS Policies:**
+- `profile_zip_usage`: Self-only read/write
+- `featured_inclusions`: Deny all direct access (service_role only)
+- `featured_inclusion_rollups`: Sellers can read aggregates for own sales only
+
+**Data Minimization:**
+- No raw lat/lng history stored (only ZIP codes)
+- No PII in inclusion tracking (only sale IDs and recipient profile IDs)
+- No debug logging of ZIP codes or user identifiers
+
+**Access Control:**
+- Dry-run endpoint requires admin auth OR CI secret header
+- Debug endpoints disabled in production by default (`ENABLE_DEBUG_ENDPOINTS` flag)
+
+---
+
 **Note**: This plan is a living document and should be updated as the project evolves.
 
+---
+
+## Milestone 5A: Seller-Facing Promote CTAs (Promoted Listings)
+
+**Status:** ✅ Implemented (pending rollout)
+
+### Overview
+
+Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stripe-based promotions infrastructure from Milestone 4, with strict gating and a batch status endpoint to avoid N+1 queries.
+
+### CTA Locations
+
+- **Sell Wizard (Review step)**  
+  - Location: Review/Publish step of `SellWizardClient` (`app/sell/new/SellWizardClient.tsx`).  
+  - When `PROMOTIONS_ENABLED=true`, shows a **“Feature your sale”** section with:  
+    - Title: “Feature your sale”  
+    - Copy: “Get more visibility by featuring your sale in weekly emails and discovery.”  
+    - Toggle: “Feature this sale” (local-only `wantsPromotion` state; **no DB writes**).  
+    - Note: “You can also promote later from your dashboard.”  
+  - After a successful publish, if the seller opted in and `PROMOTIONS_ENABLED=true`:  
+    - The confirmation modal shows a **“Promote now”** CTA.  
+    - If `PAYMENTS_ENABLED=false`: CTA is disabled with a friendly message and **does not call checkout**.  
+    - If `PAYMENTS_ENABLED=true`: calls `POST /api/promotions/checkout` with CSRF headers and redirects to `checkoutUrl`, with friendly error messages for account-locked / ineligible / disabled cases.
+
+- **Dashboard (Seller-owned sales)**  
+  - Location: Actions row on each seller-owned sale card in the dashboard (`DashboardSaleCard`).  
+  - When `PROMOTIONS_ENABLED=true`, shows a **“Promote”** button next to `Edit`, wired to `POST /api/promotions/checkout` using the shared CSRF helper and structured error handling.  
+  - When a promotion is active for the sale, the CTA renders as a disabled **“Promoted • Ends <date>”** pill (no extra fetches).  
+  - When `PAYMENTS_ENABLED=false`, the button is disabled and labeled “Promotions unavailable”; the handler short-circuits before calling checkout.
+
+- **Sale Detail Page (Seller view)**  
+  - Location: Seller sidebar on sale detail (`SaleDetailClient`).  
+  - Visible **only** when:  
+    - User is authenticated **and** is the sale owner.  
+    - `PROMOTIONS_ENABLED=true`.  
+  - States:  
+    - Active promotion: “Promoted” + “Ends <date>” (non-interactive).  
+    - Inactive: “Promote this sale” card with a CTA button:  
+      - `PAYMENTS_ENABLED=false` → disabled CTA + friendly message, no checkout call.  
+      - `PAYMENTS_ENABLED=true` → calls `POST /api/promotions/checkout` and redirects to `checkoutUrl`, with user-friendly error handling for all guarded error codes.
+
+### Gating & Environment Flags
+
+- **Visibility gate (`PROMOTIONS_ENABLED`)**  
+  - Server-only env flag (`PROMOTIONS_ENABLED=true`):  
+    - `DashboardPage`, `SaleDetailPage`, and `SellNewPage` read the flag and pass `promotionsEnabled` into their client components.  
+  - When `PROMOTIONS_ENABLED=false`:  
+    - Dashboard promote buttons are hidden.  
+    - Wizard’s “Feature your sale” section is not rendered.  
+    - Sale detail Promote panel is not shown, even to the owner.
+
+- **Checkout gate (`PAYMENTS_ENABLED`)**  
+  - Server-only env flag (`PAYMENTS_ENABLED=true`) enforced in **two layers**:  
+    1. **Global Stripe client gate**: `getStripeClient()` returns `null` when `PAYMENTS_ENABLED !== 'true'`.  
+    2. **Route-level guard**: `POST /api/promotions/checkout` calls `isPaymentsEnabled()` and returns `403 PAYMENTS_DISABLED` *before* touching Stripe or the database when disabled.  
+  - UI behavior when `PAYMENTS_ENABLED=false`:  
+    - Dashboard CTA and Sale Detail CTA render as disabled with “Promotions unavailable” copy and never call checkout.  
+    - Sell wizard confirmation modal disables “Promote now” and shows a toast message instead of calling checkout.
+
+### Batch Status Endpoint (No N+1)
+
+- **Endpoint:** `GET /api/promotions/status?sale_ids=<comma-separated>`  
+  - Location: `app/api/promotions/status/route.ts`.  
+  - Auth required (`supabase.auth.getUser()`); non-authenticated requests return `401 AUTH_REQUIRED`.  
+  - Non-admin callers only see promotions where `owner_profile_id === user.id`; admins use `assertAdminOrThrow` to bypass the owner filter.  
+  - Input safety:  
+    - `MAX_SALE_IDS = 100` (deduplicated and sliced).  
+    - `MAX_SALE_IDS_PARAM_LENGTH = 4000` (rejects overly long query strings with `400 INVALID_REQUEST`).  
+  - Response shape (minimal, no PII):  
+    - `{ statuses: Array<{ sale_id, is_active, ends_at, tier }> }`.  
+    - `is_active` is computed in-process based on `status` and `ends_at` relative to `now`.
+
+- **Dashboard usage (no N+1):**  
+  - `SalesPanel` computes the list of live sale IDs once per render and issues a single `fetch('/api/promotions/status?sale_ids=…')`.  
+  - A `promotionStatuses` map is built from the response and passed into each `DashboardSaleCard`.  
+  - Tests assert that the status endpoint is called **once per panel load** and that cards do not perform per-card fetches.
+
+### Rollout Checklist (Promote CTAs)
+
+1. **Deploy with promotions disabled**  
+   - Set `PROMOTIONS_ENABLED=false` and `PAYMENTS_ENABLED=false`.  
+   - Verify that:  
+     - Dashboard, Sell Wizard, and Sale Detail show **no** promotion CTAs.  
+     - `/api/promotions/status` returns `401 AUTH_REQUIRED` for unauthenticated calls and `200` with an empty `statuses` array for authenticated owners.
+
+2. **Enable promotions UI only**  
+   - Set `PROMOTIONS_ENABLED=true`, keep `PAYMENTS_ENABLED=false`.  
+   - Verify:  
+     - CTAs render in all three locations but are disabled and show “Promotions unavailable” copy.  
+     - `POST /api/promotions/checkout` returns `403 PAYMENTS_DISABLED` and **never instantiates Stripe** (enforced and tested via `payments-guard`).
+
+3. **Enable full checkout flow in staging**  
+   - Set `PAYMENTS_ENABLED=true` and configure Stripe secrets + `STRIPE_PRICE_ID_FEATURED_WEEK` for staging.  
+   - Manually test:  
+     - Dashboard → Promote.  
+     - Sell Wizard → “Feature your sale” toggle + “Promote now” path from the confirmation modal.  
+     - Sale Detail → seller Promote panel.  
+   - Confirm that webhooks activate/cancel/refund promotions correctly and that no PII is logged.
+
+4. **Production rollout**  
+   - Gradually enable `PROMOTIONS_ENABLED` and `PAYMENTS_ENABLED` in production once CI and staging validation are green.  
+   - Monitor:  
+     - CI tests (including payments-guard + CTA gating + batch-status tests).  
+     - Stripe dashboard for checkout/session anomalies.  
+     - Application logs for promotion-related errors (without PII).

@@ -94,6 +94,30 @@ export async function getLatestDraftServer(): Promise<ApiResponse<{ id: string; 
 }
 
 /**
+ * Get a specific draft by draft_key from server (for authenticated users)
+ */
+export async function getDraftByKeyServer(draftKey: string): Promise<ApiResponse<{ id: string; draft_key: string; payload: SaleDraftPayload } | null>> {
+  try {
+    const response = await fetch(`/api/drafts?draftKey=${encodeURIComponent(draftKey)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('[DRAFT_CLIENT] Error fetching draft by key:', error)
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch draft',
+      code: 'NETWORK_ERROR'
+    }
+  }
+}
+
+/**
  * Delete draft from server (for authenticated users)
  */
 export async function deleteDraftServer(draftKey: string): Promise<ApiResponse<{}>> {

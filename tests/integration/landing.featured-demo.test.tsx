@@ -115,6 +115,12 @@ describe('FeaturedSalesSection with demo sales', () => {
           json: async () => ({ ok: true, lat: '38.2527', lng: '-85.7585', zip: '40204' }),
         } as Response)
       }
+      if (url.includes('/api/geolocation/ip')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({}),
+        } as Response)
+      }
       if (url.includes('/api/sales')) {
         return Promise.resolve({
           ok: true,

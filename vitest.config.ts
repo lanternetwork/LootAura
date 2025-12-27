@@ -9,6 +9,7 @@ export default defineConfig({
     setupFiles: [
       path.resolve(__dirname, 'tests/setup/msw.server.ts'),
       path.resolve(__dirname, 'tests/setup.ts'),
+      path.resolve(__dirname, 'tests/setup/teardown.ts'),
     ],
     globals: true,
     exclude: [
@@ -22,12 +23,13 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Ensure jsdom environment is available to tests
-    pool: 'threads',
+    // Use forks instead of threads for better memory isolation
+    // Each fork gets its own heap and inherits NODE_OPTIONS properly
+    pool: 'forks',
     // Reduce memory usage
     maxConcurrency: 1,
-    // Constrain worker count to prevent OOMs
-    maxWorkers: 4,
+    // Constrain worker count to prevent OOMs (reduced to 1 for CI stability)
+    maxWorkers: 1,
     minWorkers: 1,
   },
   resolve: {

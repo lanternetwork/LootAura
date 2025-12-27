@@ -219,3 +219,4 @@ COMMENT ON POLICY "favorites_owner_insert" ON lootaura_v2.favorites IS
 COMMENT ON POLICY "favorites_owner_delete" ON lootaura_v2.favorites IS 
     'Security hardening: Explicit TO authenticated clause added for clarity.';
 
+

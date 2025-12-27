@@ -47,6 +47,7 @@ export const CSRF_EXEMPT_ROUTES = [
   '/api/auth/reset-password', // Supabase handles auth
   '/api/auth/update-password', // Supabase handles auth
   '/api/auth/resend', // Supabase handles auth
+  '/api/webhooks/stripe', // Stripe webhook (uses signature verification)
 ] as const
 
 /**

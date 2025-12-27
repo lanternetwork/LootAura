@@ -89,6 +89,10 @@ const serverSchema = z.object({
     },
     z.string().email()
   ),
+  // Stripe configuration (optional - only required when PAYMENTS_ENABLED=true)
+  STRIPE_SECRET_KEY: z.string().startsWith('sk_').optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(10).optional(),
+  STRIPE_PRICE_ID_FEATURED_WEEK: z.string().optional(),
 })
 
 // Validate public environment variables
@@ -123,6 +127,9 @@ function getEnvServer() {
       UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
       MAX_UPLOAD_SIZE_BYTES: process.env.MAX_UPLOAD_SIZE_BYTES,
       NOMINATIM_APP_EMAIL: process.env.NOMINATIM_APP_EMAIL,
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+      STRIPE_PRICE_ID_FEATURED_WEEK: process.env.STRIPE_PRICE_ID_FEATURED_WEEK,
     })
   }
   return _ENV_SERVER

@@ -86,6 +86,9 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     { name: sale.title || 'Sale', url: `/sales/${sale.id}` },
   ])
 
+  const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'
+  const paymentsEnabled = process.env.PAYMENTS_ENABLED === 'true'
+
   return (
     <div className="min-h-screen bg-gray-50">
       <script
@@ -103,6 +106,8 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
           items={items} 
           nearbySales={nearbySales}
           currentUserRating={currentUserRating}
+          promotionsEnabled={promotionsEnabled}
+          paymentsEnabled={paymentsEnabled}
         />
       </Suspense>
     </div>

@@ -45,10 +45,12 @@ vi.mock('@/lib/location/useLocation', () => ({
 }))
 
 // Mock useAuth and useFavorites
+const mockUseAuth = vi.fn(() => ({
+  data: null,
+}))
+
 vi.mock('@/lib/hooks/useAuth', () => ({
-  useAuth: vi.fn(() => ({
-    data: null,
-  })),
+  useAuth: () => mockUseAuth(),
   useFavorites: vi.fn(() => ({
     data: [],
   })),
@@ -117,6 +119,7 @@ const mockSale = {
 describe('Sale Details Categories', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseAuth.mockReturnValue({ data: null })
   })
 
   it('should display union of sale tags and item categories', async () => {

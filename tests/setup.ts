@@ -109,13 +109,13 @@ process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@examp
 // The same instance is reused across all renders - no per-render recreation
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
-  // Create a stable resolved promise that never changes
+  // Create a stable result object that never changes
   const getUserResult = { data: { user: { id: 'test-user' } }, error: null }
-  const getUserPromise = Promise.resolve(getUserResult)
   
-  // Create a plain function (NOT vi.fn()) that always returns the resolved promise
+  // Create a plain function (NOT vi.fn()) that always returns a NEW resolved promise
   // This is immune to vi.clearAllMocks() because it's not a mock function
-  const stableGetUser = () => getUserPromise
+  // Each call returns a fresh promise to avoid any potential promise reuse issues
+  const stableGetUser = () => Promise.resolve(getUserResult)
   
   // Create stable object literal for auth methods
   // Use plain functions, not vi.fn(), to avoid clearAllMocks() issues

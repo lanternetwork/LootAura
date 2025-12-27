@@ -8,7 +8,8 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SellWizardClient from '@/app/sell/new/SellWizardClient'
 
@@ -74,24 +75,24 @@ describe('Sell Wizard Promote CTA', () => {
   }
 
   const goToReviewStep = async () => {
+    const user = userEvent.setup()
     // Move from Details → Photos → Items → Review
-    const nextButton = screen.getByRole('button', { name: /next/i })
     // Details (validated)
-    fireEvent.click(nextButton)
+    await user.click(screen.getByRole('button', { name: /next/i }))
     // Photos
     await waitFor(() => {
       expect(screen.getByTestId('image-upload')).toBeInTheDocument()
     })
     // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
     await new Promise(resolve => setTimeout(resolve, 600))
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
     // Items
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add item/i })).toBeInTheDocument()
     })
     // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
     await new Promise(resolve => setTimeout(resolve, 600))
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
     // Review - wait for the step to change by checking for Review step content
     // The Review step renders "Review Your Sale" heading, which is more reliable than waiting for the button
     await waitFor(() => {

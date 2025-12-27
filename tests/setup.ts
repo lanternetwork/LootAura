@@ -104,34 +104,56 @@ process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://
 process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@example.com'
 
 // Supabase client mock used by tests
+// Create stable mock functions that are reused across all client instances
+// This prevents hanging when createSupabaseBrowserClient() is called multiple times (e.g., on re-renders)
+// The mock functions are resilient to vi.clearAllMocks() - they always resolve predictably
 // @ts-ignore vitest mock hoisting in test env
-vi.mock('@/lib/supabase/client', () => ({
-  createSupabaseBrowserClient: () => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: {
-          subscription: {
-            unsubscribe: vi.fn(),
-          },
-        },
-      })),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
+vi.mock('@/lib/supabase/client', () => {
+  // Create stable mock functions that always resolve predictably
+  // Use a function that always returns a resolved promise, even after clearAllMocks()
+  const getUserResult = { data: { user: { id: 'test-user' } }, error: null }
+  const stableGetUser = vi.fn(async () => getUserResult)
+  // Ensure mockResolvedValue is set so it works as a mock
+  stableGetUser.mockResolvedValue(getUserResult)
+  
+  const stableOnAuthStateChange = vi.fn(() => ({
+    data: {
+      subscription: {
+        unsubscribe: vi.fn(),
+      },
     },
-    from: vi.fn(() => {
-      const chain: any = {}
-      chain.select = vi.fn(() => chain)
-      chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
-      chain.update = vi.fn(() => chain)
-      chain.delete = vi.fn(() => chain)
-      chain.eq = vi.fn(() => chain)
-      chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
-      return chain
-    }),
-  }),
-}))
+  }))
+  const stableSignInWithPassword = vi.fn()
+  const stableSignUp = vi.fn()
+  const stableSignOut = vi.fn()
+  
+  return {
+    createSupabaseBrowserClient: () => {
+      // Re-establish mockResolvedValue if it was cleared by clearAllMocks()
+      // This ensures getUser() always resolves, preventing test hangs
+      stableGetUser.mockResolvedValue(getUserResult)
+      return {
+        auth: {
+          getUser: stableGetUser, // Reuse the same mock function instance
+          onAuthStateChange: stableOnAuthStateChange,
+          signInWithPassword: stableSignInWithPassword,
+          signUp: stableSignUp,
+          signOut: stableSignOut,
+        },
+        from: vi.fn(() => {
+          const chain: any = {}
+          chain.select = vi.fn(() => chain)
+          chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
+          chain.update = vi.fn(() => chain)
+          chain.delete = vi.fn(() => chain)
+          chain.eq = vi.fn(() => chain)
+          chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+          return chain
+        }),
+      }
+    },
+  }
+})
 
 // Supabase server mock used by tests - stable and non-clearable
 // @ts-ignore vitest mock hoisting in test env

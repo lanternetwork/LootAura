@@ -190,6 +190,7 @@ jobs:
   test-integration:
     name: test-integration (batch ${{ matrix.batch }}/43)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

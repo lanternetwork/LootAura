@@ -185,16 +185,15 @@ jobs:
             test-results.xml
             coverage/
 
-  # Integration tests are memory-spiky.
-  # We hard-cap each job to ≤3 files to prevent OOM.
-  # This is intentional and required for stability.
+  # Integration tests run one file per Node process to prevent OOM.
+  # Each CI job runs a batch of 2 files sequentially.
   test-integration:
-    name: test-integration (shard ${{ matrix.shard }}/18)
+    name: test-integration (batch ${{ matrix.batch }}/43)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+        batch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
     
     steps:
       - name: Checkout repository
@@ -235,11 +234,10 @@ jobs:
           done
 
       - name: Run integration tests
-        run: node scripts/run-integration-shard.js
+        run: node scripts/run-integration-batch.js
         env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_COUNT: 18
-          NODE_OPTIONS: '--max-old-space-size=8192 --expose-gc'
+          BATCH_INDEX: ${{ matrix.batch }}
+          TOTAL_BATCHES: 43
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}

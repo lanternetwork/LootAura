@@ -110,11 +110,9 @@ process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@examp
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
   // Create stable mock functions that always resolve predictably
-  // Use a function that always returns a resolved promise, even after clearAllMocks()
+  // Use mockResolvedValue to ensure the function always returns a resolved promise
   const getUserResult = { data: { user: { id: 'test-user' } }, error: null }
-  const stableGetUser = vi.fn(async () => getUserResult)
-  // Ensure mockResolvedValue is set so it works as a mock
-  stableGetUser.mockResolvedValue(getUserResult)
+  const stableGetUser = vi.fn().mockResolvedValue(getUserResult)
   
   const stableOnAuthStateChange = vi.fn(() => ({
     data: {

@@ -7,9 +7,8 @@
  * 3. Clear event listeners and storage
  * 4. Force GC in CI (if available)
  * 
- * With `vmMemoryLimit: 2GB`, workers are recycled after ~10-15 test files.
- * This hook runs during worker shutdown, ensuring cleanup before the next
- * worker starts with a fresh heap.
+ * This hook runs after all tests in each file complete, ensuring cleanup
+ * between test files to prevent memory accumulation.
  */
 
 import { afterAll } from 'vitest'
@@ -58,10 +57,16 @@ function resetDOM() {
     
     // Clear any intervals/timeouts that might be lingering
     // Note: This is aggressive but necessary for memory cleanup
-    let highestId = setTimeout(() => {}, 0)
-    for (let i = 0; i < highestId; i++) {
-      clearTimeout(i)
-      clearInterval(i)
+    // In Node.js, setTimeout returns a Timeout object, not a number
+    // We use a reasonable upper bound to clear timers
+    const maxTimerId = 10000
+    for (let i = 0; i < maxTimerId; i++) {
+      try {
+        clearTimeout(i as any)
+        clearInterval(i as any)
+      } catch (e) {
+        // Ignore errors for invalid timer IDs
+      }
     }
   }
 }

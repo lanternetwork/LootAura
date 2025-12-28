@@ -432,7 +432,8 @@ jobs:
     name: migration-verify
     runs-on: ubuntu-latest
     
-    if: contains(github.event.head_commit.modified, '**/*.sql') || contains(github.event.head_commit.added, '**/*.sql')
+    # Always run the job, but check for SQL files in a step
+    # This ensures the job runs for all event types and we can check files properly
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -471,7 +472,30 @@ jobs:
             fi
           done
 
+      - name: Check for SQL file changes
+        id: check-sql
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            # For push events, check if any .sql files were modified
+            if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q '\.sql$'; then
+              echo "sql_changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "sql_changed=false" >> $GITHUB_OUTPUT
+            fi
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PR events, check if any .sql files were changed
+            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '\.sql$'; then
+              echo "sql_changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "sql_changed=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For workflow_dispatch, always check
+            echo "sql_changed=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Verify migration
+        if: steps.check-sql.outputs.sql_changed == 'true'
         run: node scripts/verify-migration.js
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

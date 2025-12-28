@@ -56,9 +56,9 @@ const renderWithQueryClient = (component: React.ReactElement) => {
 
 describe('Sell Wizard Promote CTA', () => {
   beforeEach(() => {
-    // Clear mocks but preserve the Supabase mock's resolved values
-    // The Supabase mock from tests/setup.ts must remain functional
-    vi.clearAllMocks()
+    // DO NOT call vi.clearAllMocks() - it may interfere with the module-level Supabase mock
+    // The Supabase mock from tests/setup.ts is a constant object literal and should be immune,
+    // but to be safe, we avoid clearing mocks that might affect module-level mocks
   })
 
   const baseInitialData = {

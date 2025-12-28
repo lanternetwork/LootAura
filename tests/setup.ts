@@ -110,9 +110,11 @@ process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@examp
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
   // Module-level constant - created once, never changes, no closures, no dynamic state
+  // Pre-create the resolved promise to ensure immediate resolution
+  const RESOLVED_USER_PROMISE = Promise.resolve({ data: { user: { id: 'test-user' } }, error: null })
   const MOCK_CLIENT = {
     auth: {
-      getUser: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
+      getUser: () => RESOLVED_USER_PROMISE,
       onAuthStateChange: () => ({
         data: {
           subscription: {

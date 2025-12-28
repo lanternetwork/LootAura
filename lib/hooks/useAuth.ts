@@ -175,11 +175,14 @@ export function useFavorites() {
       const ids = (favRows || []).map((r: any) => r.sale_id)
       if (ids.length === 0) return []
 
-      // Step 2: fetch sales from public view
+      // Step 2: fetch sales from public view, excluding archived sales
       const { data: salesRows, error: salesErr } = await sb
         .from('sales_v2')
         .select('*')
         .in('id', ids)
+        // Exclude archived sales from favorites
+        .in('status', ['published', 'active'])
+        .is('archived_at', null)
 
       if (salesErr) throw new Error(salesErr.message)
 

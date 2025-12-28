@@ -223,9 +223,11 @@ beforeAll(() => {
 })
 
 afterEach(() => {
+  // Reset handlers after each test to prevent state accumulation
   server.resetHandlers()
 })
 
 afterAll(() => {
+  // Ensure server is properly closed after all tests in a file
   server.close()
 })

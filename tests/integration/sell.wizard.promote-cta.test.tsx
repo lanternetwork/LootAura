@@ -18,8 +18,8 @@ import SellWizardClient from '@/app/sell/new/SellWizardClient'
 // Mock wizard-only heavy child components to keep tests focused and fast
 // AddressAutocomplete mock must call onPlaceSelected to set lat/lng required for validation
 // @ts-ignore vitest mock hoisting in test env
-vi.mock('@/components/location/AddressAutocomplete', () => ({
-  default: ({ onPlaceSelected, value, onChange }: any) => {
+vi.mock('@/components/location/AddressAutocomplete', () => {
+  const MockAddressAutocomplete = ({ onPlaceSelected, value, onChange }: any) => {
     // Call onPlaceSelected on mount to set lat/lng coordinates required for validation
     React.useEffect(() => {
       if (onPlaceSelected) {
@@ -32,10 +32,14 @@ vi.mock('@/components/location/AddressAutocomplete', () => ({
           lng: -85.75,
         })
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
-    return <div data-testid="address-autocomplete">Address Autocomplete</div>
-  },
-}))
+    return React.createElement('div', { 'data-testid': 'address-autocomplete' }, 'Address Autocomplete')
+  }
+  return {
+    default: MockAddressAutocomplete,
+  }
+})
 
 vi.mock('@/components/TimePicker30', () => ({
   default: () => <div data-testid="time-picker">Time Picker</div>,

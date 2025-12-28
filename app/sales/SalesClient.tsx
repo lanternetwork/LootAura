@@ -124,6 +124,8 @@ export default function SalesClient({
   
   // Track deleted sale IDs to filter them out immediately
   const deletedSaleIdsRef = useRef<Set<string>>(new Set())
+  // Track pending create events that arrived before viewport was initialized
+  const pendingCreateEventsRef = useRef<Array<{ id: string; lat?: number; lng?: number }>>([])
   const [zipError, setZipError] = useState<string | null>(null)
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -134,7 +136,7 @@ export default function SalesClient({
   // Track window width for mobile detection
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
   
-  // Listen for sales:mutated events to filter out deleted sales
+  // Listen for sales:mutated events to filter out deleted sales and refetch on create
   useEffect(() => {
     const handleSalesMutated = (event: CustomEvent) => {
       const detail = event.detail
@@ -146,6 +148,45 @@ export default function SalesClient({
       } else if (detail?.type === 'create' && detail?.id) {
         // Remove from deleted set if it was recreated
         deletedSaleIdsRef.current.delete(detail.id)
+        
+        // Store the create event for processing when viewport is ready
+        const createEvent = {
+          id: detail.id,
+          lat: detail.lat ? (typeof detail.lat === 'number' ? detail.lat : parseFloat(detail.lat)) : undefined,
+          lng: detail.lng ? (typeof detail.lng === 'number' ? detail.lng : parseFloat(detail.lng)) : undefined,
+        }
+        pendingCreateEventsRef.current.push(createEvent)
+        
+        // If we have viewport bounds, check if we should refetch immediately
+        if (viewportBounds && bufferedBounds) {
+          let shouldRefetch = false
+          
+          if (createEvent.lat && createEvent.lng) {
+            // Check if sale is within current viewport bounds
+            const isWithinViewport = 
+              createEvent.lat >= viewportBounds.south &&
+              createEvent.lat <= viewportBounds.north &&
+              createEvent.lng >= viewportBounds.west &&
+              createEvent.lng <= viewportBounds.east
+            
+            if (isWithinViewport) {
+              shouldRefetch = true
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[SALES] New sale created within viewport, refetching:', { saleId: createEvent.id, lat: createEvent.lat, lng: createEvent.lng })
+              }
+            }
+          } else {
+            // Location not provided - refetch to be safe
+            shouldRefetch = true
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SALES] New sale created (location unknown), refetching to be safe:', { saleId: createEvent.id })
+            }
+          }
+          
+          if (shouldRefetch) {
+            fetchMapSales(bufferedBounds)
+          }
+        }
       }
     }
     
@@ -153,7 +194,7 @@ export default function SalesClient({
     return () => {
       window.removeEventListener('sales:mutated', handleSalesMutated as EventListener)
     }
-  }, [])
+  }, [viewportBounds, bufferedBounds, fetchMapSales])
   
   // Filter out deleted sales from any fetched data
   const filterDeletedSales = useCallback((sales: Sale[]) => {
@@ -177,6 +218,35 @@ export default function SalesClient({
       }
     }
   }, [initialSales.length, mapView?.bounds, bufferedBounds])
+
+  // Process pending create events when viewport becomes available
+  useEffect(() => {
+    if (viewportBounds && bufferedBounds && pendingCreateEventsRef.current.length > 0) {
+      const pendingEvents = [...pendingCreateEventsRef.current]
+      pendingCreateEventsRef.current = []
+      
+      // Check if any pending events are within viewport
+      const shouldRefetch = pendingEvents.some(event => {
+        if (event.lat && event.lng) {
+          return (
+            event.lat >= viewportBounds.south &&
+            event.lat <= viewportBounds.north &&
+            event.lng >= viewportBounds.west &&
+            event.lng <= viewportBounds.east
+          )
+        }
+        // If location unknown, assume it might be in viewport
+        return true
+      })
+      
+      if (shouldRefetch) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES] Processing pending create events, refetching:', { count: pendingEvents.length })
+        }
+        fetchMapSales(bufferedBounds)
+      }
+    }
+  }, [viewportBounds, bufferedBounds, fetchMapSales])
   
   useEffect(() => {
     const handleResize = () => {

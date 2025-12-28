@@ -923,6 +923,18 @@ export default function SellWizardClient({
       // so getDraftKey() will generate a new one on next access
       draftKeyRef.current = null
 
+      // Dispatch sales:mutated event with sale location so SalesClient can refetch if needed
+      if (typeof window !== 'undefined' && sale.lat && sale.lng) {
+        window.dispatchEvent(new CustomEvent('sales:mutated', {
+          detail: {
+            type: 'create',
+            id: saleId,
+            lat: sale.lat,
+            lng: sale.lng
+          }
+        }))
+      }
+
       // Show confirmation modal
       setCreatedSaleId(saleId)
       setConfirmationModalOpen(true)
@@ -1098,6 +1110,18 @@ export default function SellWizardClient({
         // Reset publishing flag since publish completed successfully
         // The draft is deleted, so autosave won't recreate it anyway
         isPublishingRef.current = false
+
+        // Dispatch sales:mutated event with sale location so SalesClient can refetch if needed
+        if (typeof window !== 'undefined' && formData.lat && formData.lng) {
+          window.dispatchEvent(new CustomEvent('sales:mutated', {
+            detail: {
+              type: 'create',
+              id: saleId,
+              lat: formData.lat,
+              lng: formData.lng
+            }
+          }))
+        }
 
         // Show confirmation modal
         setCreatedSaleId(saleId)

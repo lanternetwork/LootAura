@@ -112,7 +112,7 @@ vi.mock('@/lib/supabase/client', () => {
   // Module-level constant - created once, never changes, no closures, no dynamic state
   const MOCK_CLIENT = {
     auth: {
-      getUser: () => Promise.resolve({ data: { user: { id: 'test-user' } }, error: null }),
+      getUser: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
       onAuthStateChange: () => ({
         data: {
           subscription: {

@@ -27,11 +27,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const requestedStatus = body.status || 'archived'
   
   // Ensure we use 'archived' status (not 'completed')
-  const status = requestedStatus === 'completed' ? 'archived' : requestedStatus
+  // Type assertion: we know this will be a valid status after the conversion
+  const status: 'draft' | 'published' | 'archived' | 'active' = 
+    requestedStatus === 'completed' ? 'archived' : 
+    (requestedStatus === 'draft' || requestedStatus === 'published' || requestedStatus === 'archived' || requestedStatus === 'active')
+      ? requestedStatus as 'draft' | 'published' | 'archived' | 'active'
+      : 'archived'
   
   // Write to base table using schema-scoped client
   const db = getRlsDb()
-  const updateData: { status: string; archived_at?: string } = { status }
+  const updateData: { status: 'draft' | 'published' | 'archived' | 'active'; archived_at?: string } = { status }
   
   // Set archived_at timestamp when archiving
   if (status === 'archived') {

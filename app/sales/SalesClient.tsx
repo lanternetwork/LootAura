@@ -135,6 +135,17 @@ export default function SalesClient({
   
   // Track window width for mobile detection
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
+
+  // Compute viewport bounds object for buffer utilities (declared early for use in useEffect)
+  const viewportBounds = useMemo((): Bounds | null => {
+    if (!mapView?.bounds) return null
+    return {
+      west: mapView.bounds.west,
+      south: mapView.bounds.south,
+      east: mapView.bounds.east,
+      north: mapView.bounds.north
+    }
+  }, [mapView?.bounds])
   
   // Listen for sales:mutated events to filter out deleted sales and refetch on create
   useEffect(() => {
@@ -292,16 +303,6 @@ export default function SalesClient({
     }
   }, [mapView?.bounds, mapView?.zoom])
 
-  // Compute viewport bounds object for buffer utilities
-  const viewportBounds = useMemo((): Bounds | null => {
-    if (!mapView?.bounds) return null
-    return {
-      west: mapView.bounds.west,
-      south: mapView.bounds.south,
-      east: mapView.bounds.east,
-      north: mapView.bounds.north
-    }
-  }, [mapView?.bounds])
 
   // Derive visibleSales from fetchedSales filtered by current viewport
   // This is the key to smooth panning - we filter locally without refetching

@@ -131,7 +131,7 @@ vi.mock('@/lib/supabase/client', () => {
       chain.update = () => chain
       chain.delete = () => chain
       chain.eq = () => chain
-      chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+      chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null })
       return chain
     },
   }

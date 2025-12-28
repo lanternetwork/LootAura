@@ -212,63 +212,6 @@ export default function SalesClient({
     return sales.filter((sale) => !deletedSaleIdsRef.current.has(sale.id))
   }, [])
   
-  // Initialize bufferedBounds if we have initial sales and map view
-  // This prevents unnecessary refetch on first viewport change
-  useEffect(() => {
-    if (initialSales.length > 0 && mapView?.bounds && !bufferedBounds) {
-      // Estimate that initial sales were fetched for a buffered area around initial viewport
-      const initialBufferedBounds = expandBounds({
-        west: mapView.bounds.west,
-        south: mapView.bounds.south,
-        east: mapView.bounds.east,
-        north: mapView.bounds.north
-      }, MAP_BUFFER_FACTOR)
-      setBufferedBounds(initialBufferedBounds)
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[BUFFER] Initialized bufferedBounds from initial sales:', initialBufferedBounds)
-      }
-    }
-  }, [initialSales.length, mapView?.bounds, bufferedBounds])
-
-  // Process pending create events when viewport becomes available
-  useEffect(() => {
-    if (viewportBounds && bufferedBounds && pendingCreateEventsRef.current.length > 0) {
-      const pendingEvents = [...pendingCreateEventsRef.current]
-      pendingCreateEventsRef.current = []
-      
-      // Check if any pending events are within viewport
-      const shouldRefetch = pendingEvents.some(event => {
-        if (event.lat && event.lng) {
-          return (
-            event.lat >= viewportBounds.south &&
-            event.lat <= viewportBounds.north &&
-            event.lng >= viewportBounds.west &&
-            event.lng <= viewportBounds.east
-          )
-        }
-        // If location unknown, assume it might be in viewport
-        return true
-      })
-      
-      if (shouldRefetch) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES] Processing pending create events, refetching:', { count: pendingEvents.length })
-        }
-        fetchMapSales(bufferedBounds)
-      }
-    }
-  }, [viewportBounds, bufferedBounds, fetchMapSales])
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth)
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-  
-  const isMobile = windowWidth < 768
-
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
     const seen = new Set<string>()
@@ -287,75 +230,6 @@ export default function SalesClient({
     
     return unique
   }, [])
-
-  // Hybrid system: Get current viewport for clustering
-  const currentViewport = useMemo(() => {
-    if (!mapView || !mapView.bounds) return null
-    
-        return {
-      bounds: [
-        mapView.bounds.west,
-        mapView.bounds.south,
-        mapView.bounds.east,
-        mapView.bounds.north
-      ] as [number, number, number, number],
-      zoom: mapView.zoom
-    }
-  }, [mapView?.bounds, mapView?.zoom])
-
-
-  // Derive visibleSales from fetchedSales filtered by current viewport
-  // This is the key to smooth panning - we filter locally without refetching
-  const visibleSales = useMemo(() => {
-    if (!viewportBounds || fetchedSales.length === 0) {
-      return []
-    }
-    return filterSalesForViewport(fetchedSales, viewportBounds)
-  }, [fetchedSales, viewportBounds])
-
-  // Hybrid system: Create location groups and apply clustering
-  const hybridResult = useMemo(() => {
-    // Early return for empty sales - no need to run clustering
-    if (!currentViewport || visibleSales.length === 0) {
-      return {
-        type: 'individual' as const,
-        pins: [],
-        locations: [],
-        clusters: []
-      }
-    }
-    
-    // Do not hide pins during fetch; always render using last-known fetchedSales
-    
-    // Allow clustering regardless of small dataset size to prevent initial pin gaps
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
-    }
-    
-    // Only run clustering on visible sales - touch-only clustering
-    // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
-    const result = createHybridPins(visibleSales, currentViewport, {
-      coordinatePrecision: 6, // high precision to avoid accidental grouping
-      clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
-      minClusterSize: 2, // allow clustering for 2+ points
-      maxZoom: 16,
-      enableLocationGrouping: true,
-      enableVisualClustering: true
-    })
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[HYBRID] Clustering completed:', {
-        type: result.type,
-        pinsCount: result.pins.length,
-        locationsCount: result.locations.length,
-        visibleSalesCount: visibleSales.length,
-        totalFetchedCount: fetchedSales.length
-      })
-    }
-    
-    return result
-  }, [visibleSales, currentViewport, fetchedSales.length])
 
   // Request cancellation for preventing race conditions
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -527,6 +401,132 @@ export default function SalesClient({
       }
     }
   }, [filters.dateRange, filters.categories, deduplicateSales, filterDeletedSales, fetchedSales.length])
+  
+  // Initialize bufferedBounds if we have initial sales and map view
+  // This prevents unnecessary refetch on first viewport change
+  useEffect(() => {
+    if (initialSales.length > 0 && mapView?.bounds && !bufferedBounds) {
+      // Estimate that initial sales were fetched for a buffered area around initial viewport
+      const initialBufferedBounds = expandBounds({
+        west: mapView.bounds.west,
+        south: mapView.bounds.south,
+        east: mapView.bounds.east,
+        north: mapView.bounds.north
+      }, MAP_BUFFER_FACTOR)
+      setBufferedBounds(initialBufferedBounds)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[BUFFER] Initialized bufferedBounds from initial sales:', initialBufferedBounds)
+      }
+    }
+  }, [initialSales.length, mapView?.bounds, bufferedBounds])
+
+  // Process pending create events when viewport becomes available
+  useEffect(() => {
+    if (viewportBounds && bufferedBounds && pendingCreateEventsRef.current.length > 0) {
+      const pendingEvents = [...pendingCreateEventsRef.current]
+      pendingCreateEventsRef.current = []
+      
+      // Check if any pending events are within viewport
+      const shouldRefetch = pendingEvents.some(event => {
+        if (event.lat && event.lng) {
+          return (
+            event.lat >= viewportBounds.south &&
+            event.lat <= viewportBounds.north &&
+            event.lng >= viewportBounds.west &&
+            event.lng <= viewportBounds.east
+          )
+        }
+        // If location unknown, assume it might be in viewport
+        return true
+      })
+      
+      if (shouldRefetch) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES] Processing pending create events, refetching:', { count: pendingEvents.length })
+        }
+        fetchMapSales(bufferedBounds)
+      }
+    }
+  }, [viewportBounds, bufferedBounds, fetchMapSales])
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  
+  const isMobile = windowWidth < 768
+
+  // Hybrid system: Get current viewport for clustering
+  const currentViewport = useMemo(() => {
+    if (!mapView || !mapView.bounds) return null
+    
+        return {
+      bounds: [
+        mapView.bounds.west,
+        mapView.bounds.south,
+        mapView.bounds.east,
+        mapView.bounds.north
+      ] as [number, number, number, number],
+      zoom: mapView.zoom
+    }
+  }, [mapView?.bounds, mapView?.zoom])
+
+
+  // Derive visibleSales from fetchedSales filtered by current viewport
+  // This is the key to smooth panning - we filter locally without refetching
+  const visibleSales = useMemo(() => {
+    if (!viewportBounds || fetchedSales.length === 0) {
+      return []
+    }
+    return filterSalesForViewport(fetchedSales, viewportBounds)
+  }, [fetchedSales, viewportBounds])
+
+  // Hybrid system: Create location groups and apply clustering
+  const hybridResult = useMemo(() => {
+    // Early return for empty sales - no need to run clustering
+    if (!currentViewport || visibleSales.length === 0) {
+      return {
+        type: 'individual' as const,
+        pins: [],
+        locations: [],
+        clusters: []
+      }
+    }
+    
+    // Do not hide pins during fetch; always render using last-known fetchedSales
+    
+    // Allow clustering regardless of small dataset size to prevent initial pin gaps
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
+    }
+    
+    // Only run clustering on visible sales - touch-only clustering
+    // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
+    const result = createHybridPins(visibleSales, currentViewport, {
+      coordinatePrecision: 6, // high precision to avoid accidental grouping
+      clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
+      minClusterSize: 2, // allow clustering for 2+ points
+      maxZoom: 16,
+      enableLocationGrouping: true,
+      enableVisualClustering: true
+    })
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[HYBRID] Clustering completed:', {
+        type: result.type,
+        pinsCount: result.pins.length,
+        locationsCount: result.locations.length,
+        visibleSalesCount: visibleSales.length,
+        totalFetchedCount: fetchedSales.length
+      })
+    }
+    
+    return result
+  }, [visibleSales, currentViewport, fetchedSales.length])
 
   // Preloaded bounds - track the area we've already loaded sales for
   const preloadedBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)

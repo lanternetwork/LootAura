@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock Supabase client for this test file - allows per-test customization
 // Each instance gets its own vi.fn() for getUser so tests can customize it
+// @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => ({
   createSupabaseBrowserClient: () => ({
     auth: {

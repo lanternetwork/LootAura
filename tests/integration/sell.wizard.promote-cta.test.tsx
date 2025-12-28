@@ -17,6 +17,7 @@ import SellWizardClient from '@/app/sell/new/SellWizardClient'
 
 // Mock wizard-only heavy child components to keep tests focused and fast
 // AddressAutocomplete mock must call onPlaceSelected to set lat/lng required for validation
+// @ts-ignore vitest mock hoisting in test env
 vi.mock('@/components/location/AddressAutocomplete', () => ({
   default: ({ onPlaceSelected, value, onChange }: any) => {
     // Call onPlaceSelected on mount to set lat/lng coordinates required for validation

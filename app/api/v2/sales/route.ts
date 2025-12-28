@@ -103,6 +103,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Inappropriate language in ${cleanCheck.field}` }, { status: 400 })
     }
 
+    // Validate and normalize status
+    const validStatuses = ['draft', 'published', 'archived', 'active'] as const
+    const requestedStatus = body.status || 'draft'
+    const status: 'draft' | 'published' | 'archived' | 'active' = 
+      validStatuses.includes(requestedStatus as typeof validStatuses[number]) 
+        ? (requestedStatus as 'draft' | 'published' | 'archived' | 'active')
+        : 'draft'
+
     const { data: sale, error } = await supabase
       .from(T.sales)
       .insert({
@@ -121,7 +129,7 @@ export async function POST(request: NextRequest) {
         time_end: body.time_end,
         cover_image_url: body.cover_image_url ?? (Array.isArray(body.images) && body.images.length > 0 ? body.images[0] : null),
         images: Array.isArray(body.images) ? body.images : null,
-        status: body.status || 'draft',
+        status,
         privacy_mode: body.privacy_mode || 'exact'
       })
       .select()

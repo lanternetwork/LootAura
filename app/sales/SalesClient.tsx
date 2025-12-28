@@ -147,66 +147,6 @@ export default function SalesClient({
     }
   }, [mapView?.bounds])
   
-  // Listen for sales:mutated events to filter out deleted sales and refetch on create
-  useEffect(() => {
-    const handleSalesMutated = (event: CustomEvent) => {
-      const detail = event.detail
-      if (detail?.type === 'delete' && detail?.id) {
-        // Mark sale as deleted
-        deletedSaleIdsRef.current.add(detail.id)
-        // Remove from fetchedSales immediately
-        setFetchedSales((prev) => prev.filter((s) => s.id !== detail.id))
-      } else if (detail?.type === 'create' && detail?.id) {
-        // Remove from deleted set if it was recreated
-        deletedSaleIdsRef.current.delete(detail.id)
-        
-        // Store the create event for processing when viewport is ready
-        const createEvent = {
-          id: detail.id,
-          lat: detail.lat ? (typeof detail.lat === 'number' ? detail.lat : parseFloat(detail.lat)) : undefined,
-          lng: detail.lng ? (typeof detail.lng === 'number' ? detail.lng : parseFloat(detail.lng)) : undefined,
-        }
-        pendingCreateEventsRef.current.push(createEvent)
-        
-        // If we have viewport bounds, check if we should refetch immediately
-        if (viewportBounds && bufferedBounds) {
-          let shouldRefetch = false
-          
-          if (createEvent.lat && createEvent.lng) {
-            // Check if sale is within current viewport bounds
-            const isWithinViewport = 
-              createEvent.lat >= viewportBounds.south &&
-              createEvent.lat <= viewportBounds.north &&
-              createEvent.lng >= viewportBounds.west &&
-              createEvent.lng <= viewportBounds.east
-            
-            if (isWithinViewport) {
-              shouldRefetch = true
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[SALES] New sale created within viewport, refetching:', { saleId: createEvent.id, lat: createEvent.lat, lng: createEvent.lng })
-              }
-            }
-          } else {
-            // Location not provided - refetch to be safe
-            shouldRefetch = true
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALES] New sale created (location unknown), refetching to be safe:', { saleId: createEvent.id })
-            }
-          }
-          
-          if (shouldRefetch) {
-            fetchMapSales(bufferedBounds)
-          }
-        }
-      }
-    }
-    
-    window.addEventListener('sales:mutated', handleSalesMutated as EventListener)
-    return () => {
-      window.removeEventListener('sales:mutated', handleSalesMutated as EventListener)
-    }
-  }, [viewportBounds, bufferedBounds, fetchMapSales])
-  
   // Filter out deleted sales from any fetched data
   const filterDeletedSales = useCallback((sales: Sale[]) => {
     return sales.filter((sale) => !deletedSaleIdsRef.current.has(sale.id))
@@ -401,6 +341,66 @@ export default function SalesClient({
       }
     }
   }, [filters.dateRange, filters.categories, deduplicateSales, filterDeletedSales, fetchedSales.length])
+  
+  // Listen for sales:mutated events to filter out deleted sales and refetch on create
+  useEffect(() => {
+    const handleSalesMutated = (event: CustomEvent) => {
+      const detail = event.detail
+      if (detail?.type === 'delete' && detail?.id) {
+        // Mark sale as deleted
+        deletedSaleIdsRef.current.add(detail.id)
+        // Remove from fetchedSales immediately
+        setFetchedSales((prev) => prev.filter((s) => s.id !== detail.id))
+      } else if (detail?.type === 'create' && detail?.id) {
+        // Remove from deleted set if it was recreated
+        deletedSaleIdsRef.current.delete(detail.id)
+        
+        // Store the create event for processing when viewport is ready
+        const createEvent = {
+          id: detail.id,
+          lat: detail.lat ? (typeof detail.lat === 'number' ? detail.lat : parseFloat(detail.lat)) : undefined,
+          lng: detail.lng ? (typeof detail.lng === 'number' ? detail.lng : parseFloat(detail.lng)) : undefined,
+        }
+        pendingCreateEventsRef.current.push(createEvent)
+        
+        // If we have viewport bounds, check if we should refetch immediately
+        if (viewportBounds && bufferedBounds) {
+          let shouldRefetch = false
+          
+          if (createEvent.lat && createEvent.lng) {
+            // Check if sale is within current viewport bounds
+            const isWithinViewport = 
+              createEvent.lat >= viewportBounds.south &&
+              createEvent.lat <= viewportBounds.north &&
+              createEvent.lng >= viewportBounds.west &&
+              createEvent.lng <= viewportBounds.east
+            
+            if (isWithinViewport) {
+              shouldRefetch = true
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[SALES] New sale created within viewport, refetching:', { saleId: createEvent.id, lat: createEvent.lat, lng: createEvent.lng })
+              }
+            }
+          } else {
+            // Location not provided - refetch to be safe
+            shouldRefetch = true
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SALES] New sale created (location unknown), refetching to be safe:', { saleId: createEvent.id })
+            }
+          }
+          
+          if (shouldRefetch) {
+            fetchMapSales(bufferedBounds)
+          }
+        }
+      }
+    }
+    
+    window.addEventListener('sales:mutated', handleSalesMutated as EventListener)
+    return () => {
+      window.removeEventListener('sales:mutated', handleSalesMutated as EventListener)
+    }
+  }, [viewportBounds, bufferedBounds, fetchMapSales])
   
   // Initialize bufferedBounds if we have initial sales and map view
   // This prevents unnecessary refetch on first viewport change

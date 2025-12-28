@@ -181,12 +181,12 @@ export async function getUserMetrics7d(
       })
     }
 
-    // Query fulfilled sales (completed sales) from the last 7 days
+    // Query fulfilled sales (archived sales) from the last 7 days
     const { data: sales, error: salesError } = await supabase
       .from('sales_v2')
       .select('id, updated_at')
       .eq('owner_id', userId)
-      .eq('status', 'completed')
+      .eq('status', 'archived')
       .gte('updated_at', from.toISOString())
       .lte('updated_at', to.toISOString())
 

@@ -175,18 +175,25 @@ export function useFavorites() {
       const ids = (favRows || []).map((r: any) => r.sale_id)
       if (ids.length === 0) return []
 
-      // Step 2: fetch sales from public view, excluding archived sales
+      // Step 2: fetch sales from public view, then filter out archived sales client-side
       const { data: salesRows, error: salesErr } = await sb
         .from('sales_v2')
         .select('*')
         .in('id', ids)
-        // Exclude archived sales from favorites
-        .in('status', ['published', 'active'])
-        .is('archived_at', null)
 
       if (salesErr) throw new Error(salesErr.message)
 
-      return salesRows as Sale[]
+      // Filter out archived sales from favorites client-side
+      const activeSales = (salesRows || []).filter((sale: Sale) => {
+        // Exclude archived sales
+        if (sale.status === 'archived' || sale.archived_at) {
+          return false
+        }
+        // Only include published or active sales
+        return sale.status === 'published' || sale.status === 'active'
+      })
+
+      return activeSales as Sale[]
     },
     enabled: !!user,
   })

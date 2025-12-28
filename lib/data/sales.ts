@@ -19,7 +19,7 @@ const SaleInputSchema = z.object({
   duration_hours: z.number().min(1).max(24).optional(),
   price: z.number().optional(),
   tags: z.array(z.string()).optional(),
-  status: z.enum(['draft', 'published', 'completed', 'cancelled', 'archived']).default('draft'),
+  status: z.enum(['draft', 'published', 'archived', 'active']).default('draft'),
   privacy_mode: z.enum(['exact', 'block_until_24h']).default('exact'),
   is_featured: z.boolean().default(false),
   pricing_mode: z.enum(['negotiable', 'firm', 'best_offer', 'ask']).optional(),

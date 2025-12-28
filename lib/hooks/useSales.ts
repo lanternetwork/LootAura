@@ -248,7 +248,7 @@ export function useFavorites() {
           if (sale.status === 'archived' || sale.archived_at) {
             return false
           }
-          // Only include published sales (status can be 'draft', 'published', 'completed', 'cancelled', or 'archived')
+          // Only include published sales (status can be 'draft', 'published', 'archived', or 'active')
           return sale.status === 'published'
         }) as Sale[]
     },

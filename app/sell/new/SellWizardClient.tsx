@@ -79,7 +79,8 @@ export default function SellWizardClient({
   const [user, setUser] = useState<any>(null)
   // Normalize tags to ensure it's always an array
   // Also normalize case to match checkbox format (capitalize first letter)
-  const normalizeTags = (tags: any): string[] => {
+  // Memoize to prevent useEffect from running on every render
+  const normalizeTags = useCallback((tags: any): string[] => {
     const categoryList = [
       'Furniture', 'Electronics', 'Clothing', 'Toys',
       'Books', 'Tools', 'Kitchen', 'Sports',
@@ -100,7 +101,7 @@ export default function SellWizardClient({
       const matched = categoryList.find(cat => cat.toLowerCase() === trimmed.toLowerCase())
       return matched || trimmed // Use matched format, or keep original if no match
     }).filter(Boolean)
-  }
+  }, [])
 
   const [formData, setFormData] = useState<Partial<SaleInput>>({
     title: initialData?.title || '',
@@ -336,8 +337,21 @@ export default function SellWizardClient({
 
   // Ensure tags are properly set when initialData is provided (edit mode)
   // This runs on mount and whenever initialData.tags changes
+  // Only run when initialData actually changes, not on every render
   useEffect(() => {
-    const tagsFromInitialData = initialData?.tags
+    // Only update tags from initialData if we're in edit mode or if formData.tags is empty
+    // This prevents overwriting user selections during sale creation
+    if (!_isEdit && formData.tags && formData.tags.length > 0) {
+      // User has already selected tags, don't overwrite
+      return
+    }
+    
+    // Only process if initialData has tags
+    if (!initialData?.tags) {
+      return
+    }
+    
+    const tagsFromInitialData = initialData.tags
     const normalized = normalizeTags(tagsFromInitialData)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] Tags useEffect:', {
@@ -347,7 +361,7 @@ export default function SellWizardClient({
         isEdit: _isEdit
       })
     }
-    // Always update tags from initialData if provided (for edit mode)
+    // Only update tags from initialData if provided (for edit mode)
     // Only update if tags are different to avoid unnecessary re-renders
     const currentTags = formData.tags || []
     const currentSorted = [...currentTags].sort()
@@ -358,8 +372,7 @@ export default function SellWizardClient({
       }
       setFormData(prev => ({ ...prev, tags: normalized }))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData, _isEdit, normalizeTags]) // Run when initialData changes or isEdit changes
+  }, [initialData?.tags, _isEdit, normalizeTags]) // normalizeTags is now memoized, so it's stable
 
   // Resume draft on mount (priority: server > local)
   useEffect(() => {

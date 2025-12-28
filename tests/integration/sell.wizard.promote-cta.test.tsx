@@ -16,8 +16,24 @@ import SellWizardClient from '@/app/sell/new/SellWizardClient'
 // Reuse global supabase browser client mock from tests/setup.ts
 
 // Mock wizard-only heavy child components to keep tests focused and fast
+// AddressAutocomplete mock must call onPlaceSelected to set lat/lng required for validation
 vi.mock('@/components/location/AddressAutocomplete', () => ({
-  default: () => <div data-testid="address-autocomplete">Address Autocomplete</div>,
+  default: ({ onPlaceSelected, value, onChange }: any) => {
+    // Call onPlaceSelected on mount to set lat/lng coordinates required for validation
+    React.useEffect(() => {
+      if (onPlaceSelected) {
+        onPlaceSelected({
+          address: value || '123 Test St',
+          city: 'Test City',
+          state: 'TS',
+          zip: '40201',
+          lat: 38.25,
+          lng: -85.75,
+        })
+      }
+    }, [])
+    return <div data-testid="address-autocomplete">Address Autocomplete</div>
+  },
 }))
 
 vi.mock('@/components/TimePicker30', () => ({
@@ -77,7 +93,11 @@ describe('Sell Wizard Promote CTA', () => {
   const goToReviewStep = async () => {
     const user = userEvent.setup()
     // Move from Details → Photos → Items → Review
-    // Details (validated)
+    // Wait for form to be ready (AddressAutocomplete mock sets lat/lng via useEffect)
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Test Sale')).toBeInTheDocument()
+    })
+    // Details (validated) - all required fields are populated via initialData and AddressAutocomplete mock
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Photos - await progression with findByTestId
     await screen.findByTestId('image-upload')

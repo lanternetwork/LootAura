@@ -193,9 +193,9 @@ export function WeekendStats() {
     : null
   
   // Determine what to display: number if we have valid stats, "---" if loading/error/no data
-  const displayCount = displayStats && typeof displayStats.activeSales === 'number' 
-    ? displayStats.activeSales 
-    : '---'
+  const displayCount = (loading || error || !displayStats || typeof displayStats.activeSales !== 'number')
+    ? '---'
+    : displayStats.activeSales
   
   // Decode URL-encoded city name if present (safe decode)
   const cityName = (() => {

@@ -72,6 +72,12 @@ export function WeekendStats() {
         // Invalid response format
         throw new Error('Invalid response format: expected object')
       }
+      
+      // At this point, weekendCount must be a number (all error cases throw)
+      if (weekendCount === null) {
+        throw new Error('Unexpected: weekendCount is null after validation')
+      }
+      
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[WeekendStats] Weekend sales count response:', {
           ok: countRes.ok,
@@ -82,7 +88,7 @@ export function WeekendStats() {
       }
 
       // Calculate stats - weekendCount is guaranteed to be a number here
-      const activeSales = weekendCount
+      const activeSales: number = weekendCount
 
       // Update stats based on location type:
       // - Real location: always update (even if 0, that's the actual count)

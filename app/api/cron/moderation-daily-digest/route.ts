@@ -2,8 +2,8 @@
  * GET /api/cron/moderation-daily-digest
  * POST /api/cron/moderation-daily-digest
  * 
- * Daily cron endpoint that sends a moderation digest email to admins
- * with a summary of new sale reports from the last 24 hours.
+ * Weekly cron endpoint that sends a moderation digest email to admins
+ * with a summary of new sale reports from the last 7 days.
  * 
  * This endpoint is protected by CRON_SECRET Bearer token authentication.
  * 
@@ -12,8 +12,9 @@
  * - Environment variable: CRON_SECRET (server-only)
  * 
  * Schedule recommendation:
- * - Daily at 08:00 UTC
- * - Purpose: Send daily moderation digest to admins
+ * - Weekly on Thursday evenings at 8 PM ET (1 AM UTC Friday)
+ * - Cron schedule: 0 1 * * 5 (1 AM UTC on Friday = Thursday 8 PM ET)
+ * - Purpose: Send weekly moderation digest to admins
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -52,20 +53,20 @@ async function handleRequest(request: NextRequest) {
       throw error
     }
 
-    logger.info('Moderation daily digest cron job triggered', withOpId({
+    logger.info('Moderation weekly digest cron job triggered', withOpId({
       component: 'api/cron/moderation-daily-digest',
       runAt,
       env,
     }))
 
-    // Calculate 24-hour window (yesterday to now in UTC)
+    // Calculate 7-day window (last week to now in UTC)
     const now = new Date()
-    const yesterday = new Date(now)
-    yesterday.setUTCHours(yesterday.getUTCHours() - 24)
+    const lastWeek = new Date(now)
+    lastWeek.setUTCDate(lastWeek.getUTCDate() - 7)
 
     const adminDb = getAdminDb()
 
-    // Query for new reports in the last 24 hours
+    // Query for new reports in the last 7 days
     // Focus on 'open' status, but can include others if needed
     const { data: reports, error: reportsError } = await fromBase(adminDb, 'sale_reports')
       .select(`
@@ -82,7 +83,7 @@ async function handleRequest(request: NextRequest) {
           state
         )
       `)
-      .gte('created_at', yesterday.toISOString())
+      .gte('created_at', lastWeek.toISOString())
       .order('created_at', { ascending: false })
 
     if (reportsError) {
@@ -114,8 +115,8 @@ async function handleRequest(request: NextRequest) {
       }
     })
 
-    // Format date window for email
-    const dateWindow = yesterday.toLocaleDateString('en-US', {
+    // Format date window for email (last 7 days)
+    const dateWindow = lastWeek.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -144,7 +145,7 @@ async function handleRequest(request: NextRequest) {
       }, { status: 500 })
     }
 
-    logger.info('Moderation daily digest sent successfully', withOpId({
+    logger.info('Moderation weekly digest sent successfully', withOpId({
       component: 'api/cron/moderation-daily-digest',
       operation: 'send_email',
       reportCount: reportItems.length,
@@ -159,7 +160,7 @@ async function handleRequest(request: NextRequest) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     
-    logger.error('Unexpected error in moderation daily digest cron', error instanceof Error ? error : new Error(errorMessage), withOpId({
+    logger.error('Unexpected error in moderation weekly digest cron', error instanceof Error ? error : new Error(errorMessage), withOpId({
       component: 'api/cron/moderation-daily-digest',
       operation: 'unexpected_error',
     }))

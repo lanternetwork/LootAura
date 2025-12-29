@@ -22,9 +22,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized } from '@/lib/auth/cron'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
-import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
-import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,20 +128,6 @@ async function handleRequest(request: NextRequest) {
       }
     }
 
-    // Task 3: Send moderation daily digest email
-    try {
-      const moderationResult = await sendModerationDailyDigest(withOpId)
-      results.tasks.moderationDigest = moderationResult
-    } catch (error) {
-      logger.error('Moderation digest task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
-        component: 'api/cron/daily',
-        task: 'moderation-digest',
-      }))
-      results.tasks.moderationDigest = {
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
 
     // Determine overall success (at least one task must succeed)
     const hasSuccess = Object.values(results.tasks).some((task: any) => task.ok === true)
@@ -337,110 +321,6 @@ async function archiveEndedSales(
     ok: true,
     archived: archivedCount,
     errors: 0,
-  }
-}
-
-async function sendModerationDailyDigest(
-  withOpId: (context?: any) => any
-): Promise<any> {
-  logger.info('Starting moderation daily digest task', withOpId({
-    component: 'api/cron/daily',
-    task: 'moderation-digest',
-  }))
-
-  // Calculate 24-hour window (yesterday to now in UTC)
-  const now = new Date()
-  const yesterday = new Date(now)
-  yesterday.setUTCHours(yesterday.getUTCHours() - 24)
-
-  const adminDb = getAdminDb()
-
-  // Query for new reports in the last 24 hours
-  // Focus on 'open' status, but can include others if needed
-  const { data: reports, error: reportsError } = await fromBase(adminDb, 'sale_reports')
-    .select(`
-      id,
-      sale_id,
-      reporter_profile_id,
-      reason,
-      created_at,
-      sales:sale_id (
-        id,
-        title,
-        address,
-        city,
-        state
-      )
-    `)
-    .gte('created_at', yesterday.toISOString())
-    .order('created_at', { ascending: false })
-
-  if (reportsError) {
-    logger.error('Failed to fetch reports for digest', reportsError instanceof Error ? reportsError : new Error(String(reportsError)), withOpId({
-      component: 'api/cron/daily',
-      task: 'moderation-digest',
-    }))
-    return {
-      ok: false,
-      error: 'Failed to fetch reports',
-    }
-  }
-
-  // Transform reports for email template
-  const reportItems: ReportDigestItem[] = (reports || []).map((report: any) => {
-    const sale = report.sales || {}
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
-    
-    return {
-      reportId: report.id,
-      saleId: report.sale_id,
-      saleTitle: sale.title || 'Untitled Sale',
-      saleAddress: sale.address ? `${sale.address}, ${sale.city || ''}, ${sale.state || ''}`.trim() : 'Address not available',
-      reason: report.reason,
-      createdAt: report.created_at,
-      reporterId: report.reporter_profile_id,
-      adminViewUrl: `${baseUrl}/admin/tools/reports?reportId=${report.id}`,
-    }
-  })
-
-  // Format date window for email
-  const dateWindow = yesterday.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }) + ' - ' + now.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
-
-  // Send email if there are reports (or send empty digest if configured)
-  const emailResult = await sendModerationDailyDigestEmail({
-    reports: reportItems,
-    dateWindow,
-  })
-
-  if (!emailResult.ok) {
-    logger.error('Failed to send moderation digest email', new Error(emailResult.error || 'Unknown error'), withOpId({
-      component: 'api/cron/daily',
-      task: 'moderation-digest',
-      reportCount: reportItems.length,
-    }))
-    return {
-      ok: false,
-      error: emailResult.error || 'Failed to send email',
-    }
-  }
-
-  logger.info('Moderation daily digest sent successfully', withOpId({
-    component: 'api/cron/daily',
-    task: 'moderation-digest',
-    reportCount: reportItems.length,
-  }))
-
-  return {
-    ok: true,
-    reportCount: reportItems.length,
   }
 }
 

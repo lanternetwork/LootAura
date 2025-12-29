@@ -1,5 +1,5 @@
 /**
- * Moderation daily digest email sending function
+ * Moderation weekly digest email sending function
  * Server-only module
  */
 
@@ -7,6 +7,7 @@ import React from 'react'
 import { sendEmail } from './sendEmail'
 import { ModerationDailyDigestEmail, buildModerationDigestSubject, type ReportDigestItem } from './templates/ModerationDailyDigestEmail'
 import { recordEmailSend } from './emailLog'
+import { getWeekKey } from '@/lib/featured-email/selection'
 
 export interface SendModerationDailyDigestEmailParams {
   reports: ReportDigestItem[]
@@ -15,7 +16,7 @@ export interface SendModerationDailyDigestEmailParams {
 }
 
 /**
- * Send moderation daily digest email to admin
+ * Send moderation weekly digest email to admin
  * @param params - Email parameters
  * @returns Result with ok status and optional error
  */
@@ -50,7 +51,7 @@ export async function sendModerationDailyDigestEmail(
       emailType: 'moderation_daily_digest',
       toEmail,
       subject,
-      dedupeKey: `moderation_digest_${new Date().toISOString().split('T')[0]}`, // One per day
+      dedupeKey: `moderation_digest_${getWeekKey(new Date())}`, // One per week
       deliveryStatus: result.ok ? 'sent' : 'failed',
       errorMessage: result.error,
       meta: {
@@ -68,7 +69,7 @@ export async function sendModerationDailyDigestEmail(
       emailType: 'moderation_daily_digest',
       toEmail,
       subject,
-      dedupeKey: `moderation_digest_${new Date().toISOString().split('T')[0]}`,
+      dedupeKey: `moderation_digest_${getWeekKey(new Date())}`,
       deliveryStatus: 'failed',
       errorMessage,
       meta: {

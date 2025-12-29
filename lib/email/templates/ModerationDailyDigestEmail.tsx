@@ -1,6 +1,6 @@
 /**
- * Moderation Daily Digest Email Template
- * Sent daily to admins with a summary of new sale reports
+ * Moderation Weekly Digest Email Template
+ * Sent weekly to admins with a summary of new sale reports
  */
 
 import {
@@ -39,7 +39,7 @@ export function ModerationDailyDigestEmail({
 
   return (
     <BaseLayout previewText={previewText} baseUrl={baseUrl}>
-      <Heading style={headingStyle}>Moderation Daily Digest</Heading>
+      <Heading style={headingStyle}>Moderation Weekly Digest</Heading>
       
       <Text style={textStyle}>
         Summary of new sale reports for {dateWindow}
@@ -47,7 +47,7 @@ export function ModerationDailyDigestEmail({
 
       {reports.length === 0 ? (
         <Text style={textStyle}>
-          No new reports in the last 24 hours.
+          No new reports in the last 7 days.
         </Text>
       ) : (
         <>

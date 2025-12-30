@@ -1,0 +1,68 @@
+name: EAS Build Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_profile:
+        description: 'Build profile to use'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+  push:
+    branches:
+      - main
+      - test/**
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/eas-build-android.yml'
+
+jobs:
+  build-android:
+    name: Build Android AAB
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Initialize EAS (if needed)
+        working-directory: ./mobile
+        run: |
+          # Check if projectId exists in app.json
+          if ! grep -q '"projectId":' app.json || grep -q '<INSERT_EAS_PROJECT_ID>' app.json; then
+            echo "Initializing EAS project..."
+            eas init --id --non-interactive || true
+          else
+            echo "EAS project already initialized"
+          fi
+
+      - name: Build Android AAB
+        working-directory: ./mobile
+        run: |
+          eas build --platform android --profile ${{ github.event.inputs.build_profile || 'production' }} --non-interactive --no-wait
+
+      - name: Get build status
+        working-directory: ./mobile
+        run: |
+          echo "Build submitted. Check status with:"
+          echo "eas build:list --platform android --limit 1"

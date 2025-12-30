@@ -1,0 +1,138 @@
+name: EAS Initialize and Build Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - test/ci-featured-email-starter-harness
+    paths:
+      - '.github/workflows/eas-init-and-build.yml'
+
+jobs:
+  eas-init-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: |
+          npm ci
+
+      - name: Install EAS CLI
+        working-directory: mobile
+        run: |
+          npm install -g eas-cli@latest
+
+      - name: Authenticate with Expo
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas login --non-interactive
+
+      - name: Initialize EAS project
+        working-directory: mobile
+        id: eas-init
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          # Initialize EAS project (non-interactive)
+          eas init --id-only --non-interactive || true
+          
+          # Extract projectId from app.json
+          PROJECT_ID=$(node -e "const app = require('./app.json'); console.log(app.expo.extra?.eas?.projectId || '')")
+          
+          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" == "<INSERT_EAS_PROJECT_ID>" ]; then
+            echo "Project ID not found or is placeholder, initializing..."
+            # Force initialization
+            eas init --non-interactive --force
+            PROJECT_ID=$(node -e "const app = require('./app.json'); console.log(app.expo.extra?.eas?.projectId || '')")
+          fi
+          
+          echo "projectId=$PROJECT_ID" >> $GITHUB_OUTPUT
+          echo "EAS Project ID: $PROJECT_ID"
+
+      - name: Update app.json with projectId
+        working-directory: mobile
+        if: steps.eas-init.outputs.projectId != '' && steps.eas-init.outputs.projectId != '<INSERT_EAS_PROJECT_ID>'
+        run: |
+          PROJECT_ID="${{ steps.eas-init.outputs.projectId }}"
+          node -e "
+            const fs = require('fs');
+            const app = require('./app.json');
+            app.expo.extra.eas.projectId = '$PROJECT_ID';
+            fs.writeFileSync('./app.json', JSON.stringify(app, null, 2) + '\n');
+          "
+
+      - name: Commit projectId change
+        if: steps.eas-init.outputs.projectId != '' && steps.eas-init.outputs.projectId != '<INSERT_EAS_PROJECT_ID>'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add mobile/app.json
+          git commit -m "Initialize EAS project and set projectId" || exit 0
+          git push origin HEAD:test/ci-featured-email-starter-harness || exit 0
+
+      - name: Build Android AAB
+        working-directory: mobile
+        id: eas-build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          # Build Android AAB
+          eas build --platform android --profile production --non-interactive --no-wait
+          
+          # Get the latest build ID
+          BUILD_ID=$(eas build:list --platform android --limit 1 --json | node -e "
+            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            console.log(data[0]?.id || '');
+          ")
+          
+          echo "buildId=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "Android Build ID: $BUILD_ID"
+          
+          # Wait for build to complete
+          echo "Waiting for build to complete..."
+          eas build:wait --id "$BUILD_ID" --timeout 3600
+          
+          # Get build details
+          BUILD_URL=$(eas build:view --id "$BUILD_ID" --json | node -e "
+            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            console.log(data.artifacts?.buildUrl || '');
+          ")
+          
+          echo "buildUrl=$BUILD_URL" >> $GITHUB_OUTPUT
+          echo "AAB Download URL: $BUILD_URL"
+
+      - name: Report results
+        run: |
+          echo "## EAS Initialization and Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### EAS Project ID" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.eas-init.outputs.projectId }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Android Build ID" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.eas-build.outputs.buildId }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### AAB Download URL" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.eas-build.outputs.buildUrl }}" >> $GITHUB_STEP_SUMMARY
+          
+          echo "EAS Project ID: ${{ steps.eas-init.outputs.projectId }}"
+          echo "Android Build ID: ${{ steps.eas-build.outputs.buildId }}"
+          echo "AAB Download URL: ${{ steps.eas-build.outputs.buildUrl }}"

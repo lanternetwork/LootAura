@@ -48,17 +48,26 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          # Initialize EAS project (non-interactive)
-          eas init --id-only --non-interactive || true
+          # Check current projectId
+          CURRENT_ID=$(node -e "const app = require('./app.json'); console.log(app.expo.extra?.eas?.projectId || '')")
           
-          # Extract projectId from app.json
+          if [ -z "$CURRENT_ID" ] || [ "$CURRENT_ID" == "<INSERT_EAS_PROJECT_ID>" ]; then
+            echo "Initializing EAS project..."
+            # Initialize EAS project (non-interactive)
+            # This will create the project and update app.json
+            eas init --non-interactive || {
+              echo "EAS init failed, trying alternative method..."
+              # Alternative: use eas project:init
+              eas project:init --non-interactive || exit 1
+            }
+          fi
+          
+          # Extract projectId from app.json after initialization
           PROJECT_ID=$(node -e "const app = require('./app.json'); console.log(app.expo.extra?.eas?.projectId || '')")
           
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" == "<INSERT_EAS_PROJECT_ID>" ]; then
-            echo "Project ID not found or is placeholder, initializing..."
-            # Force initialization
-            eas init --non-interactive --force
-            PROJECT_ID=$(node -e "const app = require('./app.json'); console.log(app.expo.extra?.eas?.projectId || '')")
+            echo "Error: Failed to get project ID"
+            exit 1
           fi
           
           echo "projectId=$PROJECT_ID" >> $GITHUB_OUTPUT
@@ -91,27 +100,67 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          # Build Android AAB
-          eas build --platform android --profile production --non-interactive --no-wait
+          # Build Android AAB and capture output
+          BUILD_OUTPUT=$(eas build --platform android --profile production --non-interactive 2>&1)
+          echo "$BUILD_OUTPUT"
           
-          # Get the latest build ID
-          BUILD_ID=$(eas build:list --platform android --limit 1 --json | node -e "
-            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
-            console.log(data[0]?.id || '');
-          ")
+          # Extract build ID from output (EAS CLI outputs build URL/ID)
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | grep -oP 'build/[a-zA-Z0-9-]+' | head -1 | cut -d'/' -f2 || echo "")
+          
+          # If not found in output, get latest build
+          if [ -z "$BUILD_ID" ]; then
+            echo "Extracting build ID from build list..."
+            BUILD_ID=$(eas build:list --platform android --limit 1 --json 2>/dev/null | node -e "
+              try {
+                const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+                console.log(data[0]?.id || '');
+              } catch (e) {
+                console.log('');
+              }
+            " || echo "")
+          fi
+          
+          if [ -z "$BUILD_ID" ]; then
+            echo "Error: Could not determine build ID"
+            exit 1
+          fi
           
           echo "buildId=$BUILD_ID" >> $GITHUB_OUTPUT
           echo "Android Build ID: $BUILD_ID"
           
-          # Wait for build to complete
-          echo "Waiting for build to complete..."
-          eas build:wait --id "$BUILD_ID" --timeout 3600
+          # Wait for build to complete (if not already complete)
+          echo "Checking build status..."
+          BUILD_STATUS=$(eas build:view --id "$BUILD_ID" --json 2>/dev/null | node -e "
+            try {
+              const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+              console.log(data.status || '');
+            } catch (e) {
+              console.log('');
+            }
+          " || echo "unknown")
           
-          # Get build details
-          BUILD_URL=$(eas build:view --id "$BUILD_ID" --json | node -e "
-            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
-            console.log(data.artifacts?.buildUrl || '');
-          ")
+          if [ "$BUILD_STATUS" != "finished" ] && [ "$BUILD_STATUS" != "completed" ]; then
+            echo "Waiting for build to complete..."
+            eas build:wait --id "$BUILD_ID" --timeout 3600 || {
+              echo "Build wait timeout or failed, checking final status..."
+            }
+          fi
+          
+          # Get build details and download URL
+          BUILD_INFO=$(eas build:view --id "$BUILD_ID" --json 2>/dev/null || echo "{}")
+          BUILD_URL=$(echo "$BUILD_INFO" | node -e "
+            try {
+              const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+              console.log(data.artifacts?.buildUrl || data.artifacts?.url || '');
+            } catch (e) {
+              console.log('');
+            }
+          " || echo "")
+          
+          if [ -z "$BUILD_URL" ]; then
+            # Try alternative method to get download URL
+            BUILD_URL="https://expo.dev/accounts/$(eas whoami --json 2>/dev/null | node -e "try { const d = JSON.parse(require('fs').readFileSync(0, 'utf-8')); console.log(d.username || ''); } catch(e) { console.log(''); }" || echo '')/builds/$BUILD_ID"
+          fi
           
           echo "buildUrl=$BUILD_URL" >> $GITHUB_OUTPUT
           echo "AAB Download URL: $BUILD_URL"

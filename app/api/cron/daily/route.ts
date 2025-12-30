@@ -4,7 +4,9 @@
  * 
  * Unified daily cron endpoint that handles multiple daily tasks:
  * 1. Auto-archive sales that have ended
- * 2. Send favorite sales starting soon emails
+ * 2. Expire promotions that have ended
+ * 3. Send favorite sales starting soon emails
+ * 4. Send weekly moderation digest (Fridays only)
  * 
  * This endpoint is protected by CRON_SECRET Bearer token authentication.
  * It should be called by a scheduled job (Vercel Cron, Supabase Cron, etc.)
@@ -22,7 +24,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized } from '@/lib/auth/cron'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
+import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
+import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
 
@@ -125,6 +129,30 @@ async function handleRequest(request: NextRequest) {
       results.tasks.favoritesStartingSoon = {
         ok: false,
         error: error instanceof Error ? error.message : String(error),
+      }
+    }
+
+    // Task 4: Send weekly moderation digest (only on Fridays)
+    const currentDay = new Date().getUTCDay() // 0 = Sunday, 5 = Friday
+    if (currentDay === 5) {
+      try {
+        const moderationResult = await sendWeeklyModerationDigest(withOpId)
+        results.tasks.moderationDigest = moderationResult
+      } catch (error) {
+        logger.error('Moderation digest task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+          component: 'api/cron/daily',
+          task: 'moderation-digest',
+        }))
+        results.tasks.moderationDigest = {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      }
+    } else {
+      results.tasks.moderationDigest = {
+        ok: true,
+        skipped: true,
+        reason: 'not_friday',
       }
     }
 
@@ -400,6 +428,106 @@ async function expireEndedPromotions(
   return {
     ok: true,
     expiredCount: expiredPromotions.length,
+  }
+}
+
+async function sendWeeklyModerationDigest(
+  withOpId: (context?: any) => any
+): Promise<any> {
+  logger.info('Starting weekly moderation digest task', withOpId({
+    component: 'api/cron/daily',
+    task: 'moderation-digest',
+  }))
+
+  // Calculate 7-day window (last week to now in UTC)
+  const now = new Date()
+  const lastWeek = new Date(now)
+  lastWeek.setUTCDate(lastWeek.getUTCDate() - 7)
+
+  const adminDb = getAdminDb()
+
+  // Query for new reports in the last 7 days
+  const { data: reports, error: reportsError } = await fromBase(adminDb, 'sale_reports')
+    .select(`
+      id,
+      sale_id,
+      reporter_profile_id,
+      reason,
+      created_at,
+      sales:sale_id (
+        id,
+        title,
+        address,
+        city,
+        state
+      )
+    `)
+    .gte('created_at', lastWeek.toISOString())
+    .order('created_at', { ascending: false })
+
+  if (reportsError) {
+    logger.error('Failed to fetch reports for digest', reportsError instanceof Error ? reportsError : new Error(String(reportsError)), withOpId({
+      component: 'api/cron/daily',
+      task: 'moderation-digest',
+      operation: 'fetch_reports',
+    }))
+    throw new Error('Failed to fetch reports')
+  }
+
+  // Transform reports for email template
+  const reportItems: ReportDigestItem[] = (reports || []).map((report: any) => {
+    const sale = report.sales || {}
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+    
+    return {
+      reportId: report.id,
+      saleId: report.sale_id,
+      saleTitle: sale.title || 'Untitled Sale',
+      saleAddress: sale.address ? `${sale.address}, ${sale.city || ''}, ${sale.state || ''}`.trim() : 'Address not available',
+      reason: report.reason,
+      createdAt: report.created_at,
+      reporterId: report.reporter_profile_id,
+      adminViewUrl: `${baseUrl}/admin/tools/reports?reportId=${report.id}`,
+    }
+  })
+
+  // Format date window for email (last 7 days)
+  const dateWindow = lastWeek.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }) + ' - ' + now.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
+  // Send email
+  const emailResult = await sendModerationDailyDigestEmail({
+    reports: reportItems,
+    dateWindow,
+  })
+
+  if (!emailResult.ok) {
+    logger.error('Failed to send moderation digest email', new Error(emailResult.error || 'Unknown error'), withOpId({
+      component: 'api/cron/daily',
+      task: 'moderation-digest',
+      operation: 'send_email',
+      reportCount: reportItems.length,
+    }))
+    throw new Error('Failed to send email')
+  }
+
+  logger.info('Weekly moderation digest sent successfully', withOpId({
+    component: 'api/cron/daily',
+    task: 'moderation-digest',
+    operation: 'send_email',
+    reportCount: reportItems.length,
+  }))
+
+  return {
+    ok: true,
+    reportCount: reportItems.length,
   }
 }
 

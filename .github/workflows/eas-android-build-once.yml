@@ -28,6 +28,15 @@ jobs:
         working-directory: mobile
         run: npm install -g eas-cli@latest
 
+      - name: Setup Android credentials
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          echo "Checking Android credentials..."
+          # Try to setup credentials if they don't exist
+          eas credentials --platform android --non-interactive || echo "Credentials check completed"
+          
       - name: Build Android AAB
         working-directory: mobile
         id: build
@@ -35,9 +44,13 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           echo "Starting Android AAB build..."
-          eas build --platform android --profile production --non-interactive --wait
+          # Use --no-wait first to get build ID, then wait
+          eas build --platform android --profile production --non-interactive --no-wait
           
-          # Get the latest build ID
+          # Wait a moment for build to be registered
+          sleep 5
+          
+          # Get the latest build ID (the one we just started)
           BUILD_ID=$(eas build:list --platform android --limit 1 --json | node -e "
             try {
               const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
@@ -75,6 +88,26 @@ jobs:
           
           echo "buildUrl=$BUILD_URL" >> $GITHUB_OUTPUT
           echo "AAB Download URL: $BUILD_URL"
+          
+          # Wait for build to complete
+          echo "Waiting for build to complete..."
+          eas build:wait --id "$BUILD_ID" --timeout 3600
+          
+          # Get final build status and URL
+          BUILD_INFO=$(eas build:view --id "$BUILD_ID" --json 2>/dev/null || echo "{}")
+          FINAL_URL=$(echo "$BUILD_INFO" | node -e "
+            try {
+              const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+              console.log(data.artifacts?.buildUrl || data.artifacts?.url || data.url || '');
+            } catch (e) {
+              console.log('');
+            }
+          ")
+          
+          if [ -n "$FINAL_URL" ] && [ "$FINAL_URL" != "$BUILD_URL" ]; then
+            echo "buildUrl=$FINAL_URL" >> $GITHUB_OUTPUT
+            echo "Final AAB Download URL: $FINAL_URL"
+          fi
 
       - name: Report results
         run: |

@@ -32,7 +32,7 @@ jobs:
         run: npm install -g eas-cli
 
       - name: EAS Login
-        run: eas login --non-interactive
+        run: eas login
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 

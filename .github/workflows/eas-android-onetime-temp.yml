@@ -1,0 +1,112 @@
+name: EAS Android One-Time Build (Temporary)
+
+on:
+  push:
+    branches:
+      - test/ci-featured-email-starter-harness
+    paths:
+      - '.github/workflows/eas-android-onetime-temp.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  initialize-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install mobile dependencies
+        run: npm install
+        working-directory: mobile/
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Initialize EAS Project
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        id: init_eas
+        run: |
+          cd mobile
+          # Initialize EAS project (creates if doesn't exist, updates app.json)
+          eas project:init --non-interactive --id
+          
+          # Extract projectId from app.json
+          PROJECT_ID=$(node -e "const app = require('./app.json'); const id = app.expo?.extra?.eas?.projectId || ''; console.log(id);")
+          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "<INSERT_EAS_PROJECT_ID>" ]; then
+            echo "Error: Failed to initialize EAS project or projectId is still placeholder"
+            exit 1
+          fi
+          echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+          echo "EAS Project ID: $PROJECT_ID"
+
+      - name: Commit projectId update
+        if: steps.init_eas.outputs.project_id != '' && steps.init_eas.outputs.project_id != '<INSERT_EAS_PROJECT_ID>'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add mobile/app.json
+          if ! git diff --staged --quiet; then
+            git commit -m "Initialize EAS projectId for Android builds"
+            git push origin ${{ github.ref_name }}
+            echo "✅ Committed and pushed projectId update"
+          else
+            echo "ℹ️ No changes to commit (projectId already set)"
+          fi
+
+      - name: Build Android App Bundle
+        id: build_android
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          cd mobile
+          # Trigger Android production build (AAB)
+          eas build --platform android --profile production --non-interactive --wait
+          
+          # Get build details
+          BUILD_JSON=$(eas build:list --platform android --profile production --limit 1 --json --non-interactive)
+          BUILD_ID=$(echo "$BUILD_JSON" | jq -r '.[0].id // empty')
+          BUILD_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl // empty')
+          
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "build_url=$BUILD_URL" >> $GITHUB_OUTPUT
+          
+          if [ -z "$BUILD_ID" ]; then
+            echo "Error: Build ID not found"
+            exit 1
+          fi
+          
+          echo "Android Build ID: $BUILD_ID"
+          echo "Download URL: $BUILD_URL"
+
+      - name: Report Build Results
+        if: success()
+        run: |
+          echo "## EAS Android Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**EAS Project ID:** \`${{ steps.init_eas.outputs.project_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build ID:** \`${{ steps.build_android.outputs.build_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifact URL:** ${{ steps.build_android.outputs.build_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Android App Bundle (AAB) build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Build is signed and ready for Google Play Internal Testing" >> $GITHUB_STEP_SUMMARY
+
+      - name: Self-delete workflow
+        if: always()
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git rm .github/workflows/eas-android-onetime-temp.yml
+          git commit -m "Remove temporary EAS one-time build workflow" || echo "No changes to commit"
+          git push origin ${{ github.ref_name }} || echo "Push skipped (workflow already deleted or no changes)"

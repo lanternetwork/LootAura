@@ -38,7 +38,8 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          eas login --non-interactive
+          # Verify authentication (EXPO_TOKEN is automatically used by EAS CLI)
+          eas whoami
 
       - name: Initialize EAS project
         working-directory: mobile

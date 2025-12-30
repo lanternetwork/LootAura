@@ -53,6 +53,15 @@ jobs:
           CURRENT_ID=$(node -e "const app = require('./app.json'); console.log(app.expo.extra?.eas?.projectId || '')")
           
           if [ -z "$CURRENT_ID" ] || [ "$CURRENT_ID" == "<INSERT_EAS_PROJECT_ID>" ]; then
+            echo "Removing placeholder projectId before initialization..."
+            # Remove placeholder projectId to allow EAS to create a new one
+            node -e "
+              const fs = require('fs');
+              const app = require('./app.json');
+              delete app.expo.extra.eas.projectId;
+              fs.writeFileSync('./app.json', JSON.stringify(app, null, 2) + '\n');
+            "
+            
             echo "Initializing EAS project..."
             # Initialize EAS project (non-interactive)
             # This will create the project and update app.json

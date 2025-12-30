@@ -1,5 +1,7 @@
 name: EAS Initialize and Build Android
 
+# Temporary workflow for one-time EAS initialization and Android build
+
 on:
   workflow_dispatch:
   push:

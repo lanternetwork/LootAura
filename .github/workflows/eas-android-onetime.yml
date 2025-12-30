@@ -31,12 +31,9 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
-      - name: EAS Login
-        run: eas login
+      - name: Initialize EAS Project
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Initialize EAS Project
         id: init_eas
         run: |
           cd mobile
@@ -68,6 +65,8 @@ jobs:
 
       - name: Build Android App Bundle
         id: build_android
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           cd mobile
           # Trigger Android production build (AAB)

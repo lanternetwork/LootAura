@@ -65,10 +65,10 @@ jobs:
             echo "Initializing EAS project..."
             # Initialize EAS project (non-interactive)
             # This will create the project and update app.json
-            eas init --non-interactive || {
+            eas init --non-interactive --force || {
               echo "EAS init failed, trying alternative method..."
-              # Alternative: use eas project:init
-              eas project:init --non-interactive || exit 1
+              # Alternative: use eas project:init with --force
+              eas project:init --non-interactive --force || exit 1
             }
           fi
           

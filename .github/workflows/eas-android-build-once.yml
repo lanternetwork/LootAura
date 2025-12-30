@@ -2,6 +2,11 @@ name: EAS Android Build (One-Time)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - test/ci-featured-email-starter-harness
+    paths:
+      - '.github/workflows/eas-android-build-once.yml'
 
 jobs:
   build-android:

@@ -90,7 +90,9 @@ class Logger {
   }
 
   debug(message: string, context?: LogContext): void {
-    if (this.isDebug) {
+    // In test runs, excessive debug logging can cause Vitest to retain large console buffers and trigger OOM in CI.
+    // Keep debug logging enabled for dev/prod only.
+    if (this.isDebug && !this.isTest) {
       console.debug(this.formatMessage('DEBUG', message, context))
     }
   }

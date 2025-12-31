@@ -88,6 +88,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Inappropriate language in ${cleanCheck.field}` }, { status: 400 })
     }
 
+    // Validate and normalize status
+    const validStatuses = ['draft', 'published', 'archived', 'active'] as const
+    const requestedStatus = body.status || 'draft'
+    const status: 'draft' | 'published' | 'archived' | 'active' = 
+      validStatuses.includes(requestedStatus as typeof validStatuses[number]) 
+        ? (requestedStatus as 'draft' | 'published' | 'archived' | 'active')
+        : 'draft'
+
     // Write to base table using schema-scoped client
     const db = getRlsDb()
     const { data: sale, error } = await fromBase(db, 'sales')
@@ -105,7 +113,7 @@ export async function POST(request: NextRequest) {
         time_start: body.time_start,
         date_end: body.date_end,
         time_end: body.time_end,
-        status: body.status || 'draft',
+        status,
         privacy_mode: body.privacy_mode || 'exact'
       })
       .select()

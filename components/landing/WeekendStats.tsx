@@ -21,10 +21,13 @@ export function WeekendStats() {
   const [location, setLocation] = useState<LocationState | null>(null)
   const [stats, setStats] = useState<WeekendStatsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<boolean>(false)
   const [isDefaultLocation, setIsDefaultLocation] = useState(false)
 
   // Fetch stats with a given location
   const fetchStatsForLocation = useCallback(async (loc: LocationState, isDefault = false) => {
+    // Clear error state when starting a new fetch
+    setError(false)
     try {
       const params = new URLSearchParams()
       
@@ -52,7 +55,29 @@ export function WeekendStats() {
         throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
       }
       const countData = await countRes.json()
-      const weekendCount = countData.count || 0
+      // Validate response format - handle both success and error response formats
+      // API may return { ok: true, count: number } or { ok: false, error: string } or { count: number }
+      let weekendCount: number | null = null
+      if (countData && typeof countData === 'object') {
+        if (countData.ok === false) {
+          // Error response format - mark as error, don't set count
+          throw new Error(`API returned error: ${countData.error || 'Unknown error'}`)
+        } else if (typeof countData.count === 'number') {
+          weekendCount = countData.count
+        } else {
+          // Invalid response format - mark as error
+          throw new Error('Invalid response format: count is not a number')
+        }
+      } else {
+        // Invalid response format
+        throw new Error('Invalid response format: expected object')
+      }
+      
+      // At this point, weekendCount must be a number (all error cases throw)
+      if (weekendCount === null) {
+        throw new Error('Unexpected: weekendCount is null after validation')
+      }
+      
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[WeekendStats] Weekend sales count response:', {
           ok: countRes.ok,
@@ -62,21 +87,22 @@ export function WeekendStats() {
         })
       }
 
-      // Calculate stats
-      const activeSales = weekendCount
+      // Calculate stats - weekendCount is guaranteed to be a number here
+      const activeSales: number = weekendCount
 
       // Update stats based on location type:
       // - Real location: always update (even if 0, that's the actual count)
       // - Default location with > 0: update immediately
       // - Default location with 0: don't update, wait for real location
       if (!isDefault) {
-        // Real location resolved - always update
+        // Real location resolved - always update (including 0, that's valid data)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[WeekendStats] Updating stats from real location - Active sales:', activeSales)
         }
         setStats({ activeSales })
         setLoading(false)
         setIsDefaultLocation(false)
+        setError(false) // Clear error on successful fetch
       } else if (activeSales > 0) {
         // Default location has sales - show immediately
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -84,6 +110,7 @@ export function WeekendStats() {
         }
         setStats({ activeSales })
         setLoading(false)
+        setError(false) // Clear error on successful fetch
       } else {
         // Default location returned 0 - wait for real location
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -94,9 +121,10 @@ export function WeekendStats() {
       }
     } catch (error) {
       console.error('[WeekendStats] Error fetching stats:', error)
-      // Only set stats to null if we don't have any stats yet
+      // On error, mark as error state - will show "---" instead of a number
+      // Only set error if we don't have any stats yet (don't overwrite valid data)
       if (!stats) {
-        setStats(null)
+        setError(true)
         setLoading(false)
       }
     }
@@ -159,10 +187,15 @@ export function WeekendStats() {
   }, [searchParams])
 
   // Show fallback values while loading, on error, or if we only have a 0 from default location
-  // IMPORTANT: never hardcode a non-zero count; fallback should be neutral (0) when we don't have real data
+  // IMPORTANT: never hardcode a non-zero count; fallback should be neutral when we don't have real data
   const displayStats = (stats && (!isDefaultLocation || stats.activeSales > 0)) 
     ? stats 
-    : { activeSales: 0 }
+    : null
+  
+  // Determine what to display: number if we have valid stats, "---" if loading/error/no data
+  const displayCount = (loading || error || !displayStats || typeof displayStats.activeSales !== 'number')
+    ? '---'
+    : displayStats.activeSales
   
   // Decode URL-encoded city name if present (safe decode)
   const cityName = (() => {
@@ -210,7 +243,7 @@ export function WeekendStats() {
       <div className="bg-white/50 rounded-xl p-4 border border-white/30">
         <p className="text-xs text-[#3A2268]/60 mb-2">Active sales</p>
         <p className="text-2xl font-semibold text-[#3A2268]">
-          {loading ? '...' : displayStats.activeSales}
+          {displayCount}
         </p>
       </div>
 

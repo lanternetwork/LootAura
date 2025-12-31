@@ -103,28 +103,45 @@ process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-s
 process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
 process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@example.com'
 
-// Supabase client mock used by tests
+// Supabase client mock - module-level constant object literal
+// This ensures auth.getUser() ALWAYS resolves immediately, preventing navigation hangs
+// The same instance is returned on every createSupabaseBrowserClient() call
+// Immune to vi.clearAllMocks() because it uses no spies or mock functions
 // @ts-ignore vitest mock hoisting in test env
-vi.mock('@/lib/supabase/client', () => ({
-  createSupabaseBrowserClient: () => ({
+vi.mock('@/lib/supabase/client', () => {
+  // Module-level constant - created once, never changes, no closures, no dynamic state
+  // Pre-create the resolved promise to ensure immediate resolution
+  const RESOLVED_USER_PROMISE = Promise.resolve({ data: { user: { id: 'test-user' } }, error: null })
+  const MOCK_CLIENT = {
     auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
+      getUser: () => RESOLVED_USER_PROMISE,
+      onAuthStateChange: () => ({
+        data: {
+          subscription: {
+            unsubscribe: () => {},
+          },
+        },
+      }),
+      signInWithPassword: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
+      signUp: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
+      signOut: async () => ({ error: null }),
     },
-    from: vi.fn(() => {
+    from: () => {
       const chain: any = {}
-      chain.select = vi.fn(() => chain)
-      chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
-      chain.update = vi.fn(() => chain)
-      chain.delete = vi.fn(() => chain)
-      chain.eq = vi.fn(() => chain)
-      chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+      chain.select = () => chain
+      chain.insert = (rows: any[]) => ({ data: rows, error: null })
+      chain.update = () => chain
+      chain.delete = () => chain
+      chain.eq = () => chain
+      chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null })
       return chain
-    }),
-  }),
-}))
+    },
+  }
+  
+  return {
+    createSupabaseBrowserClient: () => MOCK_CLIENT,
+  }
+})
 
 // Supabase server mock used by tests - stable and non-clearable
 // @ts-ignore vitest mock hoisting in test env

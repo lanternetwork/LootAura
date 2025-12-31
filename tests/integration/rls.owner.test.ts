@@ -1,5 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Mock Supabase client for this test file - allows per-test customization
+// Each instance gets its own vi.fn() for getUser so tests can customize it
+// @ts-ignore vitest mock hoisting in test env
+vi.mock('@/lib/supabase/client', () => ({
+  createSupabaseBrowserClient: () => ({
+    auth: {
+      getUser: vi.fn(),
+      onAuthStateChange: () => ({
+        data: {
+          subscription: {
+            unsubscribe: () => {},
+          },
+        },
+      }),
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    },
+    from: () => {
+      const chain: any = {}
+      chain.select = () => chain
+      chain.insert = (rows: any[]) => ({ data: rows, error: null })
+      chain.update = () => chain
+      chain.delete = () => chain
+      chain.eq = () => chain
+      chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null })
+      return chain
+    },
+  }),
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
 })

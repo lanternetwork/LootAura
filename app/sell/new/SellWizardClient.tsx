@@ -15,7 +15,7 @@ import Toast from '@/components/sales/Toast'
 import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
 import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
-import { saveDraftServer, getLatestDraftServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
+import { saveDraftServer, getLatestDraftServer, getDraftByKeyServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
@@ -56,14 +56,31 @@ const WIZARD_STEPS: WizardStep[] = [
   }
 ]
 
-export default function SellWizardClient({ initialData, isEdit: _isEdit = false, saleId: _saleId, userLat, userLng }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string; userLat?: number; userLng?: number }) {
+export default function SellWizardClient({
+  initialData,
+  isEdit: _isEdit = false,
+  saleId: _saleId,
+  userLat,
+  userLng,
+  promotionsEnabled = false,
+  paymentsEnabled = false,
+}: {
+  initialData?: Partial<SaleInput>
+  isEdit?: boolean
+  saleId?: string
+  userLat?: number
+  userLng?: number
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
+}) {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
   // Normalize tags to ensure it's always an array
   // Also normalize case to match checkbox format (capitalize first letter)
-  const normalizeTags = (tags: any): string[] => {
+  // Memoize to prevent useEffect from running on every render
+  const normalizeTags = useCallback((tags: any): string[] => {
     const categoryList = [
       'Furniture', 'Electronics', 'Clothing', 'Toys',
       'Books', 'Tools', 'Kitchen', 'Sports',
@@ -84,7 +101,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       const matched = categoryList.find(cat => cat.toLowerCase() === trimmed.toLowerCase())
       return matched || trimmed // Use matched format, or keep original if no match
     }).filter(Boolean)
-  }
+  }, [])
 
   const [formData, setFormData] = useState<Partial<SaleInput>>({
     title: initialData?.title || '',
@@ -109,6 +126,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
+  const [wantsPromotion, setWantsPromotion] = useState(false)
+  const [isPromoting, setIsPromoting] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -116,6 +135,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isPublishingRef = useRef<boolean>(false) // Flag to prevent autosave during/after publish
+  const isRestoringDraftRef = useRef<boolean>(false) // Flag to prevent autosave during draft restoration
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
   const searchParams = useSearchParams()
@@ -234,6 +254,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       return
     }
     
+    // Don't autosave if we're currently restoring a draft (prevents creating new version on open)
+    if (isRestoringDraftRef.current) {
+      return
+    }
+    
     // Clear existing timeout
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
@@ -312,8 +337,21 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   // Ensure tags are properly set when initialData is provided (edit mode)
   // This runs on mount and whenever initialData.tags changes
+  // Only run when initialData actually changes, not on every render
   useEffect(() => {
-    const tagsFromInitialData = initialData?.tags
+    // Only update tags from initialData if we're in edit mode or if formData.tags is empty
+    // This prevents overwriting user selections during sale creation
+    if (!_isEdit && formData.tags && formData.tags.length > 0) {
+      // User has already selected tags, don't overwrite
+      return
+    }
+    
+    // Only process if initialData has tags
+    if (!initialData?.tags) {
+      return
+    }
+    
+    const tagsFromInitialData = initialData.tags
     const normalized = normalizeTags(tagsFromInitialData)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] Tags useEffect:', {
@@ -323,7 +361,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         isEdit: _isEdit
       })
     }
-    // Always update tags from initialData if provided (for edit mode)
+    // Only update tags from initialData if provided (for edit mode)
     // Only update if tags are different to avoid unnecessary re-renders
     const currentTags = formData.tags || []
     const currentSorted = [...currentTags].sort()
@@ -334,8 +372,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       }
       setFormData(prev => ({ ...prev, tags: normalized }))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData, _isEdit, normalizeTags]) // Run when initialData changes or isEdit changes
+  }, [initialData?.tags, _isEdit, normalizeTags]) // normalizeTags is now memoized, so it's stable
 
   // Resume draft on mount (priority: server > local)
   useEffect(() => {
@@ -347,15 +384,37 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       
       let draftToRestore: SaleDraftPayload | null = null
       let source: 'server' | 'local' | null = null
+      let restoredDraftKey: string | null = null
 
       // Priority 1: If authenticated, try server draft
       if (user) {
-        const serverResult = await getLatestDraftServer()
-        if (serverResult.ok && serverResult.data?.payload) {
-          draftToRestore = serverResult.data.payload
-          source = 'server'
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SELL_WIZARD] Found server draft')
+        // Check if a specific draft_key was provided in sessionStorage (from dashboard "Continue" button)
+        const specificDraftKey = typeof window !== 'undefined' ? sessionStorage.getItem('draft:key') : null
+        
+        if (specificDraftKey) {
+          // Load the specific draft by key
+          const serverResult = await getDraftByKeyServer(specificDraftKey)
+          if (serverResult.ok && serverResult.data?.payload) {
+            draftToRestore = serverResult.data.payload
+            restoredDraftKey = serverResult.data.draft_key
+            source = 'server'
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Found specific server draft by key:', specificDraftKey)
+            }
+            // Clear the sessionStorage key after using it
+            sessionStorage.removeItem('draft:key')
+          }
+        }
+        
+        // If no specific draft was found, try latest draft
+        if (!draftToRestore) {
+          const serverResult = await getLatestDraftServer()
+          if (serverResult.ok && serverResult.data?.payload) {
+            draftToRestore = serverResult.data.payload
+            source = 'server'
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Found latest server draft')
+            }
           }
         }
       }
@@ -407,6 +466,22 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       // Restore draft if found
       if (draftToRestore) {
         hasResumedRef.current = true
+        isRestoringDraftRef.current = true // Prevent autosave during restoration
+        
+        // Set draftKeyRef to the restored draft's key (critical: prevents creating new draft on autosave)
+        if (restoredDraftKey) {
+          draftKeyRef.current = restoredDraftKey
+          // Also update localStorage to persist the draft key
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('draft:key', restoredDraftKey)
+          }
+        } else if (source === 'server' && typeof window !== 'undefined') {
+          // If we got a server draft but no explicit key, try to get it from localStorage
+          const storedKey = localStorage.getItem('draft:key')
+          if (storedKey) {
+            draftKeyRef.current = storedKey
+          }
+        }
         
         // Restore form data
         if (draftToRestore.formData) {
@@ -452,6 +527,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             // Silent fail - already saved locally
           })
         }
+        
+        // Clear restoration flag after autosave debounce period (2s to be safe)
+        // This allows state to settle before autosave can trigger
+        setTimeout(() => {
+          isRestoringDraftRef.current = false
+        }, 2000)
       } else if (isReviewResume) {
         // Draft not found but resume=review - still go to Review step
         setCurrentStep(STEPS.REVIEW)
@@ -842,6 +923,18 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       // so getDraftKey() will generate a new one on next access
       draftKeyRef.current = null
 
+      // Dispatch sales:mutated event with sale location so SalesClient can refetch if needed
+      if (typeof window !== 'undefined' && sale.lat && sale.lng) {
+        window.dispatchEvent(new CustomEvent('sales:mutated', {
+          detail: {
+            type: 'create',
+            id: saleId,
+            lat: sale.lat,
+            lng: sale.lng
+          }
+        }))
+      }
+
       // Show confirmation modal
       setCreatedSaleId(saleId)
       setConfirmationModalOpen(true)
@@ -1018,6 +1111,18 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         // The draft is deleted, so autosave won't recreate it anyway
         isPublishingRef.current = false
 
+        // Dispatch sales:mutated event with sale location so SalesClient can refetch if needed
+        if (typeof window !== 'undefined' && formData.lat && formData.lng) {
+          window.dispatchEvent(new CustomEvent('sales:mutated', {
+            detail: {
+              type: 'create',
+              id: saleId,
+              lat: formData.lat,
+              lng: formData.lng
+            }
+          }))
+        }
+
         // Show confirmation modal
         setCreatedSaleId(saleId)
         setConfirmationModalOpen(true)
@@ -1099,7 +1204,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
       case STEPS.REVIEW:
-        return <ReviewStep formData={formData} photos={photos} items={items} onPublish={handleSubmit} loading={loading} submitError={submitError} />
+        return (
+          <ReviewStep
+            formData={formData}
+            photos={photos}
+            items={items}
+            onPublish={handleSubmit}
+            loading={loading}
+            submitError={submitError}
+            promotionsEnabled={promotionsEnabled}
+            wantsPromotion={wantsPromotion}
+            onTogglePromotion={setWantsPromotion}
+          />
+        )
       default:
         return null
     }
@@ -1282,6 +1399,108 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             setConfirmationModalOpen(false)
           }}
           saleId={createdSaleId}
+          showPromoteCta={promotionsEnabled && wantsPromotion}
+          isPromoting={isPromoting}
+          promoteDisabledReason={
+            promotionsEnabled && wantsPromotion && !paymentsEnabled
+              ? 'Promotions are not available right now. You can try again later from your dashboard.'
+              : null
+          }
+          onPromoteNow={async () => {
+            if (!createdSaleId || !promotionsEnabled) {
+              return
+            }
+
+            if (!paymentsEnabled) {
+              setToastMessage('Promotions are not available right now. Please check back later.')
+              setShowToast(true)
+              return
+            }
+
+            if (isPromoting) {
+              return
+            }
+
+            setIsPromoting(true)
+            try {
+              const response = await fetch('/api/promotions/checkout', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...getCsrfHeaders(),
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  sale_id: createdSaleId,
+                  tier: 'featured_week',
+                }),
+              })
+
+              const data = await response.json().catch(() => ({}))
+
+              if (!response.ok) {
+                const code = data?.code
+
+                if (code === 'PAYMENTS_DISABLED') {
+                  setToastMessage(
+                    data?.details?.message ||
+                      'Promotions are not available right now. Please check back later.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                if (code === 'PROMOTIONS_DISABLED') {
+                  setToastMessage(
+                    data?.details?.message ||
+                      'Promotions are currently disabled. Please check back later.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                if (code === 'ACCOUNT_LOCKED') {
+                  setToastMessage(
+                    data?.details?.message ||
+                      'Your account is locked. Please contact support if you believe this is an error.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                if (code === 'SALE_NOT_ELIGIBLE') {
+                  setToastMessage(
+                    data?.message || 'This sale is not eligible for promotion at this time.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                setToastMessage(
+                  data?.message || 'Failed to start promotion checkout. Please try again.'
+                )
+                setShowToast(true)
+                return
+              }
+
+              if (data?.checkoutUrl) {
+                window.location.href = data.checkoutUrl
+              } else {
+                setToastMessage(
+                  'Unexpected response from promotion checkout. Please try again.'
+                )
+                setShowToast(true)
+              }
+            } catch (error: any) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.error('[SELL_WIZARD] Error starting promotion checkout:', error)
+              }
+              setToastMessage('Failed to start promotion checkout. Please try again.')
+              setShowToast(true)
+            } finally {
+              setIsPromoting(false)
+            }
+          }}
         />
       )}
 
@@ -1738,13 +1957,28 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
-  formData: Partial<SaleInput>,
-  photos: string[],
-  items: Array<{ id?: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>,
-  onPublish: () => void,
-  loading: boolean,
+function ReviewStep({ 
+  formData, 
+  photos,
+  items,
+  onPublish,
+  loading,
+  submitError,
+  promotionsEnabled,
+  paymentsEnabled: _paymentsEnabled,
+  wantsPromotion,
+  onTogglePromotion,
+}: {
+  formData: Partial<SaleInput>
+  photos: string[]
+  items: Array<{ id?: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>
+  onPublish: () => void
+  loading: boolean
   submitError?: string | null
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
+  wantsPromotion?: boolean
+  onTogglePromotion?: (next: boolean) => void
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -1842,18 +2076,48 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
         )}
       </div>
 
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <div className="flex">
-          <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h4 className="font-medium text-purple-800">Ready to publish?</h4>
-            <p className="text-sm text-purple-700 mt-1">
-              Your sale will be visible to buyers in your area. You can edit it later from your account.
-            </p>
+      <div className="space-y-3">
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex">
+            <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h4 className="font-medium text-purple-800">Ready to publish?</h4>
+              <p className="text-sm text-purple-700 mt-1">
+                Your sale will be visible to buyers in your area. You can edit it later from your account.
+              </p>
+            </div>
           </div>
         </div>
+
+        {promotionsEnabled && (
+          <div className="bg-white border border-purple-200 rounded-lg p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
+                <p className="text-sm text-[#3A2268] mt-1">
+                  Get more visibility by featuring your sale in weekly emails and discovery.
+                </p>
+                <p className="mt-1 text-xs text-[#3A2268]">
+                  You can also promote later from your dashboard.
+                </p>
+              </div>
+              <div className="flex items-center justify-start sm:justify-end">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!wantsPromotion}
+                    onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                    className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                    data-testid="review-feature-toggle"
+                  />
+                  <span className="text-sm text-[#3A2268]">Feature this sale</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="mt-6 mb-6">

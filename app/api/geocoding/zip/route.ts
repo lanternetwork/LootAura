@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -185,6 +186,28 @@ async function zipHandler(request: NextRequest) {
       
       // Cache the result
       setCachedZip(normalizedZip, result)
+      
+      // Track ZIP usage for authenticated users (non-blocking)
+      // This helps determine primary ZIP for featured email selection
+      try {
+        const supabase = createSupabaseServerClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Increment ZIP usage (fire and forget - don't block response)
+          const { incrementZipUsage } = await import('@/lib/data/zipUsage')
+          incrementZipUsage(user.id, normalizedZip).catch((err) => {
+            // Silently fail - ZIP tracking is non-critical
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.warn('[ZIP] Failed to track ZIP usage:', err)
+            }
+          })
+        }
+      } catch (trackingError) {
+        // Silently fail - ZIP tracking is non-critical
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[ZIP] Failed to track ZIP usage:', trackingError)
+        }
+      }
       
       return NextResponse.json(result, {
         headers: {

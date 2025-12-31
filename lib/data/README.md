@@ -123,7 +123,7 @@ type Sale = {
   time_end?: string
   price?: number
   tags?: string[]
-  status: 'draft' | 'published' | 'completed' | 'cancelled'
+  status: 'draft' | 'published' | 'archived' | 'active'
   privacy_mode: 'exact' | 'block_until_24h'
   is_featured: boolean
   created_at: string

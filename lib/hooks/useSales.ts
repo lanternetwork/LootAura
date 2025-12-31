@@ -240,7 +240,17 @@ export function useFavorites() {
         throw new Error(error.message)
       }
 
-      return data?.map((fav: any) => fav.sales_v2).filter(Boolean) as Sale[]
+      // Filter out archived sales from favorites
+      return data?.map((fav: any) => fav.sales_v2)
+        .filter(Boolean)
+        .filter((sale: Sale) => {
+          // Exclude archived sales
+          if (sale.status === 'archived' || sale.archived_at) {
+            return false
+          }
+          // Only include published sales (status can be 'draft', 'published', 'archived', or 'active')
+          return sale.status === 'published'
+        }) as Sale[]
     },
   })
 }

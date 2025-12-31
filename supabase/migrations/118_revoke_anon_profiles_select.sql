@@ -22,3 +22,4 @@ REVOKE SELECT ON lootaura_v2.profiles FROM anon;
 COMMENT ON TABLE lootaura_v2.profiles IS 
     'Profiles table with RLS enabled. Anon users cannot SELECT base table (use profiles_v2 view). Authenticated users can SELECT/UPDATE their own profiles. Public profile reads use profiles_v2 view only.';
 
+

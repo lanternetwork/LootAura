@@ -41,9 +41,12 @@
     },
     "extra": {
       "eas": {
-        "projectId": "<INSERT_EAS_PROJECT_ID>"
+        "projectId": "07dcac78-a086-4c00-9174-07984586ab86"
+      },
+      "router": {
+        "origin": false
       }
-    }
+    },
+    "owner": "lanternetwork"
   }
 }
-

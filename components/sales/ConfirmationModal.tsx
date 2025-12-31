@@ -8,13 +8,22 @@ interface ConfirmationModalProps {
   onClose: () => void
   saleId: string
   onViewSale?: () => void
+  // Optional promote CTA (used when a newly created sale is eligible for promotion)
+  showPromoteCta?: boolean
+  isPromoting?: boolean
+  onPromoteNow?: () => void
+  promoteDisabledReason?: string | null
 }
 
 export default function ConfirmationModal({
   open,
   onClose,
   saleId,
-  onViewSale
+  onViewSale,
+  showPromoteCta = false,
+  isPromoting = false,
+  onPromoteNow,
+  promoteDisabledReason,
 }: ConfirmationModalProps) {
   const router = useRouter()
 
@@ -84,11 +93,37 @@ export default function ConfirmationModal({
         >
           Sale posted!
         </h2>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 mb-4">
           Your sale is live. What next?
         </p>
 
+        {showPromoteCta && (
+          <div className="mb-4 rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm">
+            <div className="font-medium text-purple-900 mb-1">Feature your sale</div>
+            <p className="text-purple-800">
+              Get more visibility by featuring your sale in weekly emails and discovery.
+            </p>
+            {promoteDisabledReason && (
+              <p className="mt-2 text-xs text-purple-900">
+                {promoteDisabledReason}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row gap-3">
+          {showPromoteCta && (
+            <button
+              type="button"
+              onClick={onPromoteNow}
+              disabled={isPromoting || !onPromoteNow || !!promoteDisabledReason}
+              className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-label="Promote sale now"
+              data-testid="confirmation-promote-button"
+            >
+              {isPromoting ? 'Starting promotion…' : 'Promote now'}
+            </button>
+          )}
           <button
             onClick={handleViewSale}
             className="flex-1 px-4 py-2 btn-accent min-h-[44px]"

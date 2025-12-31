@@ -1,6 +1,6 @@
 /**
- * Integration tests for moderation daily digest cron endpoint
- * Tests GET /api/cron/moderation-daily-digest
+ * Integration tests for moderation weekly digest cron endpoint
+ * Tests GET /api/cron/moderation-daily-digest (weekly schedule)
  */
 
 import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
@@ -135,7 +135,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
   })
 
   describe('Digest content scope', () => {
-    it('includes only reports from last 24 hours', async () => {
+    it('includes only reports from last 7 days', async () => {
       const recentReport = {
         id: 'report-1',
         sale_id: 'sale-1',
@@ -156,7 +156,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
         sale_id: 'sale-2',
         reporter_profile_id: 'reporter-002',
         reason: 'inappropriate',
-        created_at: new Date(MOCK_BASE_DATE.getTime() - 48 * 60 * 60 * 1000).toISOString(), // 48 hours ago
+        created_at: new Date(MOCK_BASE_DATE.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString(), // 8 days ago (outside 7-day window)
         sales: {
           id: 'sale-2',
           title: 'Old Sale',
@@ -166,7 +166,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
         },
       }
 
-      // Mock reports query - should filter by created_at >= 24 hours ago
+      // Mock reports query - should filter by created_at >= 7 days ago
       mockAdminDb.from.mockReset()
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sale_reports') {
@@ -186,10 +186,10 @@ describe('GET /api/cron/moderation-daily-digest', () => {
           }
           const gteChain = {
             gte: vi.fn((field: string, value: string) => {
-              // Verify it's filtering by created_at >= 24 hours ago
+              // Verify it's filtering by created_at >= 7 days ago
               expect(field).toBe('created_at')
               const cutoffDate = new Date(value)
-              const expectedCutoff = new Date(MOCK_BASE_DATE.getTime() - 24 * 60 * 60 * 1000)
+              const expectedCutoff = new Date(MOCK_BASE_DATE.getTime() - 7 * 24 * 60 * 60 * 1000)
               expect(cutoffDate.getTime()).toBeCloseTo(expectedCutoff.getTime(), -3) // Within 1 second
               return orderChain
             }),
@@ -250,7 +250,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
       )
     })
 
-    it('sends empty digest when no reports in last 24 hours', async () => {
+    it('sends empty digest when no reports in last 7 days', async () => {
       // Mock reports query (empty)
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sale_reports') {

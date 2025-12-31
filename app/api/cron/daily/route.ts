@@ -4,7 +4,9 @@
  * 
  * Unified daily cron endpoint that handles multiple daily tasks:
  * 1. Auto-archive sales that have ended
- * 2. Send favorite sales starting soon emails
+ * 2. Expire promotions that have ended
+ * 3. Send favorite sales starting soon emails
+ * 4. Send weekly moderation digest (Fridays only)
  * 
  * This endpoint is protected by CRON_SECRET Bearer token authentication.
  * It should be called by a scheduled job (Vercel Cron, Supabase Cron, etc.)
@@ -84,7 +86,22 @@ async function handleRequest(request: NextRequest) {
       }
     }
 
-    // Task 2: Send favorite sales starting soon emails
+    // Task 2: Expire promotions that have ended
+    try {
+      const expireResult = await expireEndedPromotions(withOpId)
+      results.tasks.expirePromotions = expireResult
+    } catch (error) {
+      logger.error('Expire promotions task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+        component: 'api/cron/daily',
+        task: 'expire-promotions',
+      }))
+      results.tasks.expirePromotions = {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+
+    // Task 3: Send favorite sales starting soon emails
     try {
       const emailsEnabled = process.env.LOOTAURA_ENABLE_EMAILS === 'true'
       if (!emailsEnabled) {
@@ -115,20 +132,30 @@ async function handleRequest(request: NextRequest) {
       }
     }
 
-    // Task 3: Send moderation daily digest email
-    try {
-      const moderationResult = await sendModerationDailyDigest(withOpId)
-      results.tasks.moderationDigest = moderationResult
-    } catch (error) {
-      logger.error('Moderation digest task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
-        component: 'api/cron/daily',
-        task: 'moderation-digest',
-      }))
+    // Task 4: Send weekly moderation digest (only on Fridays)
+    const currentDay = new Date().getUTCDay() // 0 = Sunday, 5 = Friday
+    if (currentDay === 5) {
+      try {
+        const moderationResult = await sendWeeklyModerationDigest(withOpId)
+        results.tasks.moderationDigest = moderationResult
+      } catch (error) {
+        logger.error('Moderation digest task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+          component: 'api/cron/daily',
+          task: 'moderation-digest',
+        }))
+        results.tasks.moderationDigest = {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      }
+    } else {
       results.tasks.moderationDigest = {
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        ok: true,
+        skipped: true,
+        reason: 'not_friday',
       }
     }
+
 
     // Determine overall success (at least one task must succeed)
     const hasSuccess = Object.values(results.tasks).some((task: any) => task.ok === true)
@@ -325,23 +352,101 @@ async function archiveEndedSales(
   }
 }
 
-async function sendModerationDailyDigest(
+async function expireEndedPromotions(
   withOpId: (context?: any) => any
 ): Promise<any> {
-  logger.info('Starting moderation daily digest task', withOpId({
+  logger.info('Starting expire promotions task', withOpId({
+    component: 'api/cron/daily',
+    task: 'expire-promotions',
+  }))
+
+  const db = getAdminDb()
+  const now = new Date().toISOString()
+
+  // Find promotions that should be expired:
+  // - status is 'active'
+  // - ends_at < now
+  const { data: expiredPromotions, error: queryError } = await fromBase(db, 'promotions')
+    .select('id, sale_id, ends_at')
+    .eq('status', 'active')
+    .lt('ends_at', now)
+
+  if (queryError) {
+    const errorMessage = queryError && typeof queryError === 'object' && 'message' in queryError
+      ? String(queryError.message)
+      : String(queryError)
+    logger.error('Failed to query promotions for expiry', new Error(errorMessage), withOpId({
+      component: 'api/cron/daily',
+      task: 'expire-promotions',
+      error: queryError,
+    }))
+    throw new Error('Failed to query promotions')
+  }
+
+  if (!expiredPromotions || expiredPromotions.length === 0) {
+    logger.info('No promotions to expire', withOpId({
+      component: 'api/cron/daily',
+      task: 'expire-promotions',
+      count: 0,
+    }))
+    return {
+      ok: true,
+      expiredCount: 0,
+    }
+  }
+
+  // Update all expired promotions to 'expired' status
+  const promotionIds = expiredPromotions.map((p) => p.id)
+  const { error: updateError } = await fromBase(db, 'promotions')
+    .update({
+      status: 'expired',
+      updated_at: now,
+    })
+    .in('id', promotionIds)
+    .eq('status', 'active') // Only update if still active (idempotent)
+
+  if (updateError) {
+    const errorMessage = updateError && typeof updateError === 'object' && 'message' in updateError
+      ? String(updateError.message)
+      : String(updateError)
+    logger.error('Failed to expire promotions', new Error(errorMessage), withOpId({
+      component: 'api/cron/daily',
+      task: 'expire-promotions',
+      error: updateError,
+      count: promotionIds.length,
+    }))
+    throw new Error('Failed to expire promotions')
+  }
+
+  logger.info('Promotions expired successfully', withOpId({
+    component: 'api/cron/daily',
+    task: 'expire-promotions',
+    expiredCount: expiredPromotions.length,
+    promotionIds: expiredPromotions.map((p) => p.id),
+  }))
+
+  return {
+    ok: true,
+    expiredCount: expiredPromotions.length,
+  }
+}
+
+async function sendWeeklyModerationDigest(
+  withOpId: (context?: any) => any
+): Promise<any> {
+  logger.info('Starting weekly moderation digest task', withOpId({
     component: 'api/cron/daily',
     task: 'moderation-digest',
   }))
 
-  // Calculate 24-hour window (yesterday to now in UTC)
+  // Calculate 7-day window (last week to now in UTC)
   const now = new Date()
-  const yesterday = new Date(now)
-  yesterday.setUTCHours(yesterday.getUTCHours() - 24)
+  const lastWeek = new Date(now)
+  lastWeek.setUTCDate(lastWeek.getUTCDate() - 7)
 
   const adminDb = getAdminDb()
 
-  // Query for new reports in the last 24 hours
-  // Focus on 'open' status, but can include others if needed
+  // Query for new reports in the last 7 days
   const { data: reports, error: reportsError } = await fromBase(adminDb, 'sale_reports')
     .select(`
       id,
@@ -357,18 +462,16 @@ async function sendModerationDailyDigest(
         state
       )
     `)
-    .gte('created_at', yesterday.toISOString())
+    .gte('created_at', lastWeek.toISOString())
     .order('created_at', { ascending: false })
 
   if (reportsError) {
     logger.error('Failed to fetch reports for digest', reportsError instanceof Error ? reportsError : new Error(String(reportsError)), withOpId({
       component: 'api/cron/daily',
       task: 'moderation-digest',
+      operation: 'fetch_reports',
     }))
-    return {
-      ok: false,
-      error: 'Failed to fetch reports',
-    }
+    throw new Error('Failed to fetch reports')
   }
 
   // Transform reports for email template
@@ -388,8 +491,8 @@ async function sendModerationDailyDigest(
     }
   })
 
-  // Format date window for email
-  const dateWindow = yesterday.toLocaleDateString('en-US', {
+  // Format date window for email (last 7 days)
+  const dateWindow = lastWeek.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -399,7 +502,7 @@ async function sendModerationDailyDigest(
     year: 'numeric',
   })
 
-  // Send email if there are reports (or send empty digest if configured)
+  // Send email
   const emailResult = await sendModerationDailyDigestEmail({
     reports: reportItems,
     dateWindow,
@@ -409,17 +512,16 @@ async function sendModerationDailyDigest(
     logger.error('Failed to send moderation digest email', new Error(emailResult.error || 'Unknown error'), withOpId({
       component: 'api/cron/daily',
       task: 'moderation-digest',
+      operation: 'send_email',
       reportCount: reportItems.length,
     }))
-    return {
-      ok: false,
-      error: emailResult.error || 'Failed to send email',
-    }
+    throw new Error('Failed to send email')
   }
 
-  logger.info('Moderation daily digest sent successfully', withOpId({
+  logger.info('Weekly moderation digest sent successfully', withOpId({
     component: 'api/cron/daily',
     task: 'moderation-digest',
+    operation: 'send_email',
     reportCount: reportItems.length,
   }))
 

@@ -16,6 +16,8 @@ interface DashboardClientProps {
   initialProfile?: ProfileData | null
   initialMetrics?: Metrics7d | null
   initialArchivedCount?: number
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
 }
 
 export default function DashboardClient({
@@ -24,6 +26,8 @@ export default function DashboardClient({
   initialProfile,
   initialMetrics,
   initialArchivedCount = 0,
+  promotionsEnabled = false,
+  paymentsEnabled = false,
 }: DashboardClientProps) {
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
@@ -130,6 +134,8 @@ export default function DashboardClient({
           drafts={drafts}
           isLoadingDrafts={draftsLoading}
           draftsError={draftsError}
+          promotionsEnabled={promotionsEnabled}
+          paymentsEnabled={paymentsEnabled}
           onSaleDelete={(saleId) => {
             setSales((prev) => prev.filter((s) => s.id !== saleId))
           }}

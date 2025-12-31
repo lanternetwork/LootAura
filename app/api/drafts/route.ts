@@ -18,9 +18,10 @@ export async function GET(_request: NextRequest) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
-    // Check if we should return all drafts or just the latest
+    // Check if we should return all drafts, a specific draft, or just the latest
     const { searchParams } = new URL(_request.url)
     const allDrafts = searchParams.get('all') === 'true'
+    const draftKey = searchParams.get('draftKey')
 
     if (allDrafts) {
       // Return all active drafts for user (read from base table via schema-scoped client)
@@ -39,6 +40,37 @@ export async function GET(_request: NextRequest) {
     }
 
     return ok({ data: drafts || [] })
+    }
+
+    // If draftKey is provided, fetch that specific draft
+    if (draftKey) {
+      const db = getRlsDb()
+      const { data: draft, error } = await fromBase(db, 'sale_drafts')
+        .select('id, draft_key, payload, updated_at')
+        .eq('user_id', user.id)
+        .eq('draft_key', draftKey)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (error) {
+        console.error('[DRAFTS/GET] supabase error:', error)
+        Sentry.captureException(error, { tags: { operation: 'getDraftByKey' } })
+        return fail(500, 'FETCH_ERROR', 'Failed to fetch draft', error)
+      }
+
+      if (!draft) {
+        return ok({ data: null })
+      }
+
+      // Validate payload
+      const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
+      if (!validationResult.success) {
+        console.error('[DRAFTS] Invalid draft payload:', validationResult.error)
+        // Return null rather than error - draft may be corrupted but don't break the flow
+        return ok({ data: null })
+      }
+
+      return ok({ data: { id: draft.id, draft_key: draft.draft_key, payload: validationResult.data } })
     }
 
     // Fetch latest active draft for user (read from base table via schema-scoped client)

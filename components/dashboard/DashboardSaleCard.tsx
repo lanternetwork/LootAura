@@ -14,12 +14,128 @@ import { getCsrfHeaders } from '@/lib/csrf-client'
 interface DashboardSaleCardProps {
   sale: Sale
   onDelete?: (saleId: string) => void
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
+  promotionStatus?: {
+    sale_id: string
+    is_active: boolean
+    ends_at: string | null
+    tier: string | null
+  }
+  isPromotionLoading?: boolean
 }
 
-export default function DashboardSaleCard({ sale, onDelete }: DashboardSaleCardProps) {
+export default function DashboardSaleCard({
+  sale,
+  onDelete,
+  promotionsEnabled = false,
+  paymentsEnabled = false,
+  promotionStatus,
+  isPromotionLoading = false,
+}: DashboardSaleCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isPromoting, setIsPromoting] = useState(false)
   const cover = getSaleCoverUrl(sale)
+
+  const isPromotionActive = promotionStatus?.is_active && !!promotionStatus.ends_at
+
+  const formatPromotionEndDate = (endsAt: string | null) => {
+    if (!endsAt) return ''
+    const date = new Date(endsAt)
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  const handlePromote = async () => {
+    if (!promotionsEnabled) {
+      return
+    }
+
+    if (!paymentsEnabled) {
+      toast.info('Promotions are not available right now. Please check back later.')
+      return
+    }
+
+    if (isPromoting || isPromotionLoading) {
+      return
+    }
+
+    setIsPromoting(true)
+
+    try {
+      const response = await fetch('/api/promotions/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          sale_id: sale.id,
+          tier: 'featured_week',
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const code = data?.code
+
+        if (code === 'PAYMENTS_DISABLED') {
+          toast.info(
+            data?.details?.message ||
+              'Promotions are not available right now. Please check back later.'
+          )
+          return
+        }
+
+        if (code === 'PROMOTIONS_DISABLED') {
+          toast.info(
+            data?.details?.message ||
+              'Promotions are currently disabled. Please check back later.'
+          )
+          return
+        }
+
+        if (code === 'ACCOUNT_LOCKED') {
+          toast.error(
+            data?.details?.message ||
+              'Your account is locked. Please contact support if you believe this is an error.'
+          )
+          return
+        }
+
+        if (code === 'SALE_NOT_ELIGIBLE') {
+          toast.error(
+            data?.message || 'This sale is not eligible for promotion at this time.'
+          )
+          return
+        }
+
+        toast.error(
+          data?.message || 'Failed to start promotion checkout. Please try again.'
+        )
+        return
+      }
+
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl
+      } else {
+        toast.error('Unexpected response from promotion checkout. Please try again.')
+      }
+    } catch (error: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[DASHBOARD_SALE_CARD] Error starting promotion checkout:', error)
+      }
+      toast.error('Failed to start promotion checkout. Please try again.')
+    } finally {
+      setIsPromoting(false)
+    }
+  }
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -162,6 +278,32 @@ export default function DashboardSaleCard({ sale, onDelete }: DashboardSaleCardP
               <FaEdit className="w-3 h-3" />
               Edit
             </Link>
+            {promotionsEnabled && (
+              <button
+                type="button"
+                onClick={isPromotionActive ? undefined : handlePromote}
+                disabled={
+                  isPromoting || isPromotionLoading || isPromotionActive || !paymentsEnabled
+                }
+                className={`flex items-center justify-center gap-1 px-3 py-1.5 text-sm rounded transition-colors ${
+                  isPromotionActive
+                    ? 'text-green-700 bg-green-50 cursor-default'
+                    : paymentsEnabled
+                      ? 'text-blue-600 hover:bg-blue-50'
+                      : 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                } disabled:opacity-60`}
+                aria-label={isPromotionActive ? 'Sale is promoted' : 'Promote sale'}
+                data-testid="dashboard-promote-button"
+              >
+                {isPromotionActive
+                  ? `Promoted${promotionStatus?.ends_at ? ` • Ends ${formatPromotionEndDate(promotionStatus.ends_at)}` : ''}`
+                  : isPromoting || isPromotionLoading
+                    ? 'Promoting...'
+                    : paymentsEnabled
+                      ? 'Promote'
+                      : 'Promotions unavailable'}
+              </button>
+            )}
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}

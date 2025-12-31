@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   
   let query = supabase
     .from('sales_v2')
-    .select('id, title, cover_url, address, status, owner_id, archived_at, date_end', { count: 'exact' })
+    .select('id, title, cover_image_url, images, address, status, owner_id, archived_at, date_end', { count: 'exact' })
     .eq('owner_id', user.id)
     .eq('status', dbStatus)
   

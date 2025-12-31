@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import SaleDetailClient from '@/app/sales/[id]/SaleDetailClient'
 import { getSaleWithItems } from '@/lib/data/salesAccess'
 import type { SaleItem } from '@/lib/types'
@@ -45,10 +45,12 @@ vi.mock('@/lib/location/useLocation', () => ({
 }))
 
 // Mock useAuth and useFavorites
+const mockUseAuth = vi.fn(() => ({
+  data: null,
+}))
+
 vi.mock('@/lib/hooks/useAuth', () => ({
-  useAuth: vi.fn(() => ({
-    data: null,
-  })),
+  useAuth: () => mockUseAuth(),
   useFavorites: vi.fn(() => ({
     data: [],
   })),
@@ -159,6 +161,7 @@ const STOCK_ITEM_NAMES = [
 describe('Sale Details Items Display', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseAuth.mockReturnValue({ data: null })
   })
 
   it('should display real items from the database', () => {
@@ -183,6 +186,109 @@ describe('Sale Details Items Display', () => {
     expect(goodElements.length).toBeGreaterThan(0)
     const excellentElements = screen.getAllByText('Excellent')
     expect(excellentElements.length).toBeGreaterThan(0)
+  })
+
+  it('does not show promote CTA for non-owners when promotions are enabled', () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'someone-else', email: 'other@example.test' } } as any)
+
+    render(
+      <SaleDetailClient 
+        sale={mockSale} 
+        displayCategories={['furniture']}
+        items={mockItems}
+        promotionsEnabled={true}
+        paymentsEnabled={true}
+      />
+    )
+
+    expect(screen.queryByTestId('sale-detail-promote-button')).not.toBeInTheDocument()
+  })
+
+  it('shows promote panel for owner when promotions are enabled', () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    render(
+      <SaleDetailClient 
+        sale={mockSale} 
+        displayCategories={['furniture']}
+        items={mockItems}
+        promotionsEnabled={true}
+        paymentsEnabled={true}
+      />
+    )
+
+    expect(screen.getByText('Promote this sale')).toBeInTheDocument()
+  })
+
+  it('shows active promotion state with ends date when promotion is active', async () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    // Mock fetch to return active promotion status (matching API response format)
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        statuses: [{
+          sale_id: mockSale.id,
+          is_active: true,
+          ends_at: '2030-01-01T00:00:00.000Z',
+          tier: 'featured_week',
+        }],
+      }),
+    })
+    ;(global as any).fetch = mockFetch
+
+    render(
+      <SaleDetailClient 
+        sale={mockSale} 
+        displayCategories={['furniture']}
+        items={mockItems}
+        promotionsEnabled={true}
+        paymentsEnabled={true}
+      />
+    )
+
+    // Wait for the promotion status to be fetched and rendered
+    const active = await screen.findByTestId('sale-detail-promote-active')
+    expect(active.textContent).toContain('Promoted')
+    expect(active.textContent).toMatch(/Ends/)
+  })
+
+  it('does not call checkout when payments are disabled (seller view)', async () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    const originalFetch = global.fetch
+    const mockFetch = vi.fn()
+    ;(global as any).fetch = mockFetch
+
+    try {
+      render(
+        <SaleDetailClient 
+          sale={mockSale} 
+          displayCategories={['furniture']}
+          items={mockItems}
+          promotionsEnabled={true}
+          paymentsEnabled={false}
+        />
+      )
+
+      const button = screen.getByTestId('sale-detail-promote-button')
+      expect(button).toBeDisabled()
+
+      // Even if clicked programmatically, paymentsEnabled=false should guard before fetch
+      button.click()
+
+      await Promise.resolve()
+
+      const calls = mockFetch.mock.calls.filter(
+        (args) =>
+          typeof args[0] === 'string' &&
+          (args[0] as string).includes('/api/promotions/checkout')
+      )
+      expect(calls.length).toBe(0)
+    } finally {
+      (global as any).fetch = originalFetch
+    }
   })
 
   it('should display item categories when available', () => {

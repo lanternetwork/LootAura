@@ -38,6 +38,19 @@ export default function LocationPin({
     }
   }, [])
 
+  // Hide tooltip when pin becomes selected (card is visible)
+  useEffect(() => {
+    if (isSelected && showTooltip) {
+      // Clear any pending show timeout
+      if (showTimeoutRef.current) {
+        clearTimeout(showTimeoutRef.current)
+        showTimeoutRef.current = null
+      }
+      // Hide tooltip immediately
+      setShowTooltip(false)
+    }
+  }, [isSelected, showTooltip])
+
   const handleClick = useCallback((event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -45,7 +58,7 @@ export default function LocationPin({
   }, [location.id, onClick])
 
   const handleMouseEnter = useCallback(() => {
-    if (isMobile) return
+    if (isMobile || isSelected) return // Don't show tooltip on mobile or when card is already visible
     
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
@@ -62,7 +75,7 @@ export default function LocationPin({
     showTimeoutRef.current = setTimeout(() => {
       setShowTooltip(true)
     }, 200)
-  }, [isMobile])
+  }, [isMobile, isSelected])
 
   const handleMouseLeave = useCallback(() => {
     // Clear any pending show timeout
@@ -141,7 +154,8 @@ export default function LocationPin({
         </div>
       </Marker>
       {/* Hover tooltip using Popup for proper z-index handling (desktop only) */}
-      {showTooltip && !isMobile && (
+      {/* Don't show tooltip when pin is selected (card is visible) to avoid overlap */}
+      {showTooltip && !isMobile && !isSelected && (
         <Popup
           longitude={location.lng}
           latitude={location.lat}

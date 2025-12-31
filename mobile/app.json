@@ -1,4 +1,5 @@
 {
+  "packageManager": "npm@10.2.4",
   "expo": {
     "name": "LootAura",
     "slug": "LootAura",

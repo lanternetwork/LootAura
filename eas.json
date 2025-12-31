@@ -2,7 +2,8 @@
   "build": {
     "production": {
       "env": {
-        "npm_config_legacy_peer_deps": "false"
+        "npm_config_legacy_peer_deps": "false",
+        "EXPO_USE_NPM": "true"
       }
     }
   }

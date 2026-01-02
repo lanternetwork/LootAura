@@ -1,7 +1,9 @@
 {
   "build": {
     "production": {
-      "env": {}
+      "env": {
+        "npm_config_legacy_peer_deps": "false"
+      }
     }
   }
 }

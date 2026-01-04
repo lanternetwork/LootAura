@@ -80,28 +80,81 @@ export default function SalesClient({
     return 8 // Default for 100+ miles
   }
 
+  // Helper to get persisted map view from sessionStorage (defined as function, not callback)
+  const getPersistedMapView = (): MapViewState | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      const stored = sessionStorage.getItem('sales_map_view')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.center?.lat && parsed?.center?.lng && parsed?.zoom) {
+          return parsed
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    return null
+  }
+
+  // Helper to persist map view to sessionStorage (defined as function, not callback)
+  const persistMapView = (view: MapViewState | null) => {
+    if (typeof window === 'undefined' || !view) return
+    try {
+      sessionStorage.setItem('sales_map_view', JSON.stringify(view))
+    } catch (e) {
+      // Ignore storage errors (e.g., quota exceeded)
+    }
+  }
+
   // Map view state - single source of truth
   // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
   // Otherwise, use effectiveCenter which should have been resolved server-side
+  // Priority: URL params > sessionStorage > initialCenter > default
   const [mapView, setMapView] = useState<MapViewState | null>(() => {
     if (zipNeedsResolution) {
       // ZIP needs client-side resolution - don't show map yet
       return null
     }
     
-    // Calculate initial zoom from default distance filter (10 miles = zoom 12)
-    // Or use URL zoom if provided, or fallback to 12
-    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
-    const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(defaultDistance)
+    // First priority: URL params (when returning from sale detail)
+    if (urlLat && urlLng) {
+      const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(10)
+      const zoomLevel = calculatedZoom
+      const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
+      const lngRange = latRange * Math.cos(parseFloat(urlLat) * Math.PI / 180)
+      
+      const view = {
+        center: { lat: parseFloat(urlLat), lng: parseFloat(urlLng) },
+        bounds: {
+          west: parseFloat(urlLng) - lngRange / 2,
+          south: parseFloat(urlLat) - latRange / 2,
+          east: parseFloat(urlLng) + lngRange / 2,
+          north: parseFloat(urlLat) + latRange / 2
+        },
+        zoom: calculatedZoom
+      }
+      // Persist immediately
+      if (typeof window !== 'undefined') {
+        persistMapView(view)
+      }
+      return view
+    }
     
-    // Calculate bounds based on zoom level (approximate)
-    // For zoom 12 (10 miles), use approximately 0.11 degree range (roughly 10 miles at mid-latitudes)
+    // Second priority: sessionStorage (when navigating back without URL params)
+    const persisted = getPersistedMapView()
+    if (persisted) {
+      return persisted
+    }
+    
+    // Third priority: initialCenter or default
+    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
+    const calculatedZoom = distanceToZoom(defaultDistance)
     const zoomLevel = calculatedZoom
     const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
     const lngRange = latRange * (effectiveCenter?.lat ? Math.cos(effectiveCenter.lat * Math.PI / 180) : 1)
     
-    // ZIP already resolved server-side or no ZIP - show map with correct location
-    return {
+    const view = {
       center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
       bounds: { 
         west: (effectiveCenter?.lng || -98.5795) - lngRange / 2, 
@@ -111,6 +164,13 @@ export default function SalesClient({
       },
       zoom: calculatedZoom
     }
+    
+    // Persist initial view
+    if (typeof window !== 'undefined') {
+      persistMapView(view)
+    }
+    
+    return view
   })
 
   // Sales data state - map is source of truth
@@ -402,6 +462,51 @@ export default function SalesClient({
     }
   }, [viewportBounds, bufferedBounds, fetchMapSales])
   
+  // Update mapView when URL params change (e.g., when navigating back from sale detail)
+  // This ensures map position persists across navigation
+  useEffect(() => {
+    // Only update if we have valid URL params and they differ from current mapView
+    if (urlLat && urlLng) {
+      const newLat = parseFloat(urlLat)
+      const newLng = parseFloat(urlLng)
+      const newZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(10)
+      
+      // Use functional update to compare with current state
+      setMapView(prev => {
+        // Check if URL params differ from current mapView
+        const centerChanged = !prev?.center || 
+          Math.abs(prev.center.lat - newLat) > 0.0001 || 
+          Math.abs(prev.center.lng - newLng) > 0.0001
+        const zoomChanged = !prev || Math.abs(prev.zoom - newZoom) > 0.01
+        
+        if (!centerChanged && !zoomChanged) {
+          // No change needed, return current state
+          return prev
+        }
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[MAP_VIEW] Updating mapView from URL params:', { newLat, newLng, newZoom })
+        }
+        
+        // Calculate bounds based on zoom level
+        const zoomLevel = newZoom
+        const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
+        const lngRange = latRange * Math.cos(newLat * Math.PI / 180)
+        
+        return {
+          center: { lat: newLat, lng: newLng },
+          bounds: {
+            west: newLng - lngRange / 2,
+            south: newLat - latRange / 2,
+            east: newLng + lngRange / 2,
+            north: newLat + latRange / 2
+          },
+          zoom: newZoom
+        }
+      })
+    }
+  }, [urlLat, urlLng, urlZoom])
+
   // Initialize bufferedBounds if we have initial sales and map view
   // This prevents unnecessary refetch on first viewport change
   useEffect(() => {
@@ -597,6 +702,14 @@ export default function SalesClient({
     })
   }, [])
 
+  // Persist map view to sessionStorage whenever it changes (for browser back button)
+  // Don't update URL params here to avoid conflicts with URL param restoration
+  useEffect(() => {
+    if (mapView) {
+      persistMapView(mapView)
+    }
+  }, [mapView])
+
   // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
   // Core buffer logic: only fetch when viewport exits buffered area
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
@@ -671,8 +784,8 @@ export default function SalesClient({
     }
 
     // Update map view state
-    setMapView(prev => {
-      if (!prev) {
+    const newMapView: MapViewState = (() => {
+      if (!mapView) {
         // If mapView is null, create a new view with the provided center
         const radiusKm = 16.09 // 10 miles
         const latRange = radiusKm / 111.0
@@ -689,12 +802,23 @@ export default function SalesClient({
         }
       }
       return {
-        ...prev,
+        ...mapView,
         center,
         zoom,
         bounds
       }
-    })
+    })()
+    
+    setMapView(newMapView)
+    
+    // Update URL params to keep them in sync (for browser back button)
+    // Only update if this is a user-initiated change (not from URL param restoration)
+    const params = new URLSearchParams(searchParams?.toString() || '')
+    params.set('lat', center.lat.toFixed(6))
+    params.set('lng', center.lng.toFixed(6))
+    params.set('zoom', zoom.toFixed(2))
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
+    router.replace(newUrl, { scroll: false })
 
     // Buffer-based fetch logic: only fetch when viewport exits buffered area
     // Clear existing timer

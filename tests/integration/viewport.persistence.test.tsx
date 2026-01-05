@@ -21,11 +21,11 @@ import {
   requestGeolocation
 } from '@/lib/map/geolocation'
 
-// Mock navigator.geolocation
-const mockGeolocation = {
-  getCurrentPosition: vi.fn(),
-  watchPosition: vi.fn(),
-  clearWatch: vi.fn()
+// Mock navigator.geolocation - create fresh mock in beforeEach to avoid state leakage
+let mockGeolocation: {
+  getCurrentPosition: ReturnType<typeof vi.fn>
+  watchPosition: ReturnType<typeof vi.fn>
+  clearWatch: ReturnType<typeof vi.fn>
 }
 
 beforeEach(() => {
@@ -34,8 +34,12 @@ beforeEach(() => {
     localStorage.clear()
   }
   
-  // Reset mocks
-  vi.clearAllMocks()
+  // Create fresh mock for each test to avoid state leakage
+  mockGeolocation = {
+    getCurrentPosition: vi.fn(),
+    watchPosition: vi.fn(),
+    clearWatch: vi.fn()
+  }
   
   // Mock navigator.geolocation (navigator exists in jsdom, not global.navigator)
   if (typeof navigator !== 'undefined') {

@@ -289,11 +289,14 @@ describe('Geolocation utilities', () => {
     it('should handle permission denied error', async () => {
       const mockError = {
         code: 1, // PERMISSION_DENIED
-        message: 'User denied geolocation'
+        message: 'User denied geolocation',
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3
       }
       
       mockGeolocation.getCurrentPosition.mockImplementation((_success, error) => {
-        error(mockError)
+        error(mockError as any)
       })
       
       await expect(requestGeolocation()).rejects.toMatchObject({
@@ -308,11 +311,14 @@ describe('Geolocation utilities', () => {
     it('should handle timeout error', async () => {
       const mockError = {
         code: 3, // TIMEOUT
-        message: 'Geolocation request timed out'
+        message: 'Geolocation request timed out',
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3
       }
       
       mockGeolocation.getCurrentPosition.mockImplementation((_success, error) => {
-        error(mockError)
+        error(mockError as any)
       })
       
       await expect(requestGeolocation()).rejects.toMatchObject({

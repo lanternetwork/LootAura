@@ -24,6 +24,8 @@ export interface PersistedState {
 
 const STORAGE_KEY = 'yard-sale-map-state'
 const SCHEMA_VERSION = '1.0.0'
+// Staleness policy: persisted state is valid for 30 days
+const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days in ms
 
 /**
  * Save viewport and filter state to localStorage
@@ -62,10 +64,11 @@ export function loadViewportState(): { viewport: ViewportState; filters: FilterS
       return null
     }
     
-    // Check if state is too old (7 days)
-    const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 days in ms
-    if (Date.now() - state.timestamp > maxAge) {
-      console.log('[MAP:PERSISTENCE] State too old, clearing')
+    // Check if state is too old (30 days)
+    if (Date.now() - state.timestamp > MAX_AGE_MS) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MAP:PERSISTENCE] State too old, clearing')
+      }
       clearViewportState()
       return null
     }

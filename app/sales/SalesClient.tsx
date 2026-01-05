@@ -25,6 +25,10 @@ import {
   MAP_BUFFER_FACTOR,
   MAP_BUFFER_SAFETY_FACTOR
 } from '@/lib/map/bounds'
+import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
+import { saveViewportState } from '@/lib/map/viewportPersistence'
+import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable, isMobileBreakpoint } from '@/lib/map/geolocation'
+import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -47,20 +51,16 @@ export default function SalesClient({
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { filters, updateFilters, clearFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
-    initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
-  )
-
-  // Check for URL parameters on client side as backup
+  
+  // Track user interaction to prevent surprise recentering
+  const userInteractedRef = useRef(false)
+  const geolocationAttemptedRef = useRef(false)
+  
+  // Check for URL parameters
   const urlLat = searchParams.get('lat')
   const urlLng = searchParams.get('lng')
   const urlZoom = searchParams.get('zoom')
   
-  // Use URL parameters if available, otherwise use initialCenter
-  const effectiveCenter = urlLat && urlLng 
-    ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) }
-    : initialCenter
-
   // Check if ZIP in URL needs client-side resolution
   const urlZip = searchParams.get('zip')
   const zipNeedsResolution = urlZip && !urlLat && !urlLng && 
@@ -80,97 +80,88 @@ export default function SalesClient({
     return 8 // Default for 100+ miles
   }
 
-  // Helper to get persisted map view from sessionStorage (defined as function, not callback)
-  const getPersistedMapView = (): MapViewState | null => {
-    if (typeof window === 'undefined') return null
-    try {
-      const stored = sessionStorage.getItem('sales_map_view')
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed?.center?.lat && parsed?.center?.lng && parsed?.zoom) {
-          return parsed
-        }
-      }
-    } catch (e) {
-      // Ignore parse errors
-    }
-    return null
-  }
+  // Resolve initial viewport using deterministic precedence
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
+  const isMobile = windowWidth < 768
+  
+  const resolvedViewport = useMemo(() => {
+    return resolveInitialViewport({
+      urlLat,
+      urlLng,
+      urlZoom,
+      initialCenter,
+      isMobile,
+      userInteracted: userInteractedRef.current
+    })
+  }, [urlLat, urlLng, urlZoom, initialCenter, isMobile])
 
-  // Helper to persist map view to sessionStorage (defined as function, not callback)
-  const persistMapView = (view: MapViewState | null) => {
-    if (typeof window === 'undefined' || !view) return
-    try {
-      sessionStorage.setItem('sales_map_view', JSON.stringify(view))
-    } catch (e) {
-      // Ignore storage errors (e.g., quota exceeded)
-    }
-  }
+  // Use resolved viewport to determine effective center
+  const effectiveCenter = resolvedViewport.center || initialCenter
+
+  // Initialize filters with resolved center
+  const { filters, updateFilters, clearFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
+    effectiveCenter?.lat && effectiveCenter?.lng ? { lat: effectiveCenter.lat, lng: effectiveCenter.lng } : undefined
+  )
 
   // Map view state - single source of truth
   // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
-  // Otherwise, use effectiveCenter which should have been resolved server-side
-  // Priority: URL params > sessionStorage > initialCenter > default
+  // Otherwise, use resolved viewport
   const [mapView, setMapView] = useState<MapViewState | null>(() => {
     if (zipNeedsResolution) {
       // ZIP needs client-side resolution - don't show map yet
       return null
     }
     
-    // First priority: URL params (when returning from sale detail)
-    if (urlLat && urlLng) {
-      const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(10)
+    // Use resolved viewport if available
+    if (resolvedViewport.viewport) {
+      const { viewport } = resolvedViewport
+      const zoomLevel = viewport.zoom
+      const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
+      const lngRange = latRange * (viewport.lat ? Math.cos(viewport.lat * Math.PI / 180) : 1)
+      
+      return {
+        center: { lat: viewport.lat, lng: viewport.lng },
+        bounds: {
+          west: viewport.lng - lngRange / 2,
+          south: viewport.lat - latRange / 2,
+          east: viewport.lng + lngRange / 2,
+          north: viewport.lat + latRange / 2
+        },
+        zoom: viewport.zoom
+      }
+    }
+    
+    // Fallback: calculate from center and default zoom
+    if (effectiveCenter) {
+      const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
+      const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(defaultDistance)
       const zoomLevel = calculatedZoom
       const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
-      const lngRange = latRange * Math.cos(parseFloat(urlLat) * Math.PI / 180)
+      const lngRange = latRange * (effectiveCenter.lat ? Math.cos(effectiveCenter.lat * Math.PI / 180) : 1)
       
-      const view = {
-        center: { lat: parseFloat(urlLat), lng: parseFloat(urlLng) },
+      return {
+        center: effectiveCenter,
         bounds: {
-          west: parseFloat(urlLng) - lngRange / 2,
-          south: parseFloat(urlLat) - latRange / 2,
-          east: parseFloat(urlLng) + lngRange / 2,
-          north: parseFloat(urlLat) + latRange / 2
+          west: effectiveCenter.lng - lngRange / 2,
+          south: effectiveCenter.lat - latRange / 2,
+          east: effectiveCenter.lng + lngRange / 2,
+          north: effectiveCenter.lat + latRange / 2
         },
         zoom: calculatedZoom
       }
-      // Persist immediately
-      if (typeof window !== 'undefined') {
-        persistMapView(view)
-      }
-      return view
     }
     
-    // Second priority: sessionStorage (when navigating back without URL params)
-    const persisted = getPersistedMapView()
-    if (persisted) {
-      return persisted
-    }
-    
-    // Third priority: initialCenter or default
-    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
-    const calculatedZoom = distanceToZoom(defaultDistance)
-    const zoomLevel = calculatedZoom
-    const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
-    const lngRange = latRange * (effectiveCenter?.lat ? Math.cos(effectiveCenter.lat * Math.PI / 180) : 1)
-    
-    const view = {
-      center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
-      bounds: { 
-        west: (effectiveCenter?.lng || -98.5795) - lngRange / 2, 
-        south: (effectiveCenter?.lat || 39.8283) - latRange / 2, 
-        east: (effectiveCenter?.lng || -98.5795) + lngRange / 2, 
-        north: (effectiveCenter?.lat || 39.8283) + latRange / 2
+    // Ultimate fallback
+    return {
+      center: { lat: 39.8283, lng: -98.5795 },
+      bounds: {
+        west: -98.5795 - 0.5,
+        south: 39.8283 - 0.5,
+        east: -98.5795 + 0.5,
+        north: 39.8283 + 0.5
       },
-      zoom: calculatedZoom
+      zoom: 10
     }
-    
-    // Persist initial view
-    if (typeof window !== 'undefined') {
-      persistMapView(view)
-    }
-    
-    return view
   })
 
   // Sales data state - map is source of truth
@@ -193,8 +184,7 @@ export default function SalesClient({
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
   const [_isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
   
-  // Track window width for mobile detection
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
+  // Track window width for mobile detection (already declared above)
 
   // Compute viewport bounds object for buffer utilities (declared early for use in useEffect)
   const viewportBounds = useMemo((): Bounds | null => {
@@ -564,6 +554,92 @@ export default function SalesClient({
   
   const isMobile = windowWidth < 768
 
+  // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
+  useEffect(() => {
+    // Only attempt on mobile, if resolver indicated geolocation should be attempted
+    if (!isMobile || resolvedViewport.source !== 'geo') {
+      return
+    }
+
+    // Don't attempt if already attempted or user has interacted
+    if (geolocationAttemptedRef.current || userInteractedRef.current) {
+      return
+    }
+
+    // Don't attempt if geolocation is denied
+    if (isGeolocationDenied()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[GEO] Skipping geolocation - previously denied')
+      }
+      return
+    }
+
+    // Don't attempt if geolocation API not available
+    if (!isGeolocationAvailable()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[GEO] Skipping geolocation - API not available')
+      }
+      return
+    }
+
+    // Mark as attempted to prevent duplicate requests
+    geolocationAttemptedRef.current = true
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[GEO] Attempting mobile geolocation')
+    }
+
+    requestGeolocation({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 300000 // 5 minutes
+    })
+      .then((location) => {
+        // Only recenter if user hasn't interacted yet
+        if (!userInteractedRef.current && mapView) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[GEO] Location found, recentering map:', location)
+          }
+
+          const defaultDistance = 10
+          const calculatedZoom = distanceToZoom(defaultDistance)
+          const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
+          const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
+
+          setMapView({
+            center: { lat: location.lat, lng: location.lng },
+            bounds: {
+              west: location.lng - lngRange / 2,
+              south: location.lat - latRange / 2,
+              east: location.lng + lngRange / 2,
+              north: location.lat + latRange / 2
+            },
+            zoom: calculatedZoom
+          })
+
+          // Persist the new viewport (map distance to radius for persistence schema)
+          saveViewportState(
+            { lat: location.lat, lng: location.lng, zoom: calculatedZoom },
+            {
+              dateRange: filters.dateRange || 'any',
+              categories: filters.categories || [],
+              radius: filters.distance || 10
+            }
+          )
+        } else {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[GEO] Location found but user has interacted, not recentering')
+          }
+        }
+      })
+      .catch((error) => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[GEO] Geolocation error:', error)
+        }
+        // Error handling (denial tracking) is done in requestGeolocation
+      })
+  }, [isMobile, resolvedViewport.source, mapView, filters.dateRange, filters.categories, filters.distance])
+
   // Hybrid system: Get current viewport for clustering
   const currentViewport = useMemo(() => {
     if (!mapView || !mapView.bounds) return null
@@ -674,6 +750,9 @@ export default function SalesClient({
   // Handle live viewport updates during map drag (onMove) - updates rendering only, no fetch
   // NOTE: Do NOT clear selection here - it blocks map dragging. Clear only on moveEnd.
   const handleViewportMove = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
+    // Mark user interaction on any map movement
+    userInteractedRef.current = true
+    
     // Update map view state immediately for live rendering
     // This triggers viewportBounds and visibleSales recomputation via useMemo
     // Do NOT clear selection here - it causes blocking during drag
@@ -853,10 +932,34 @@ export default function SalesClient({
         }
       }
       
+      // Persist viewport state (debounced to avoid localStorage churn)
+      // Only persist if viewport is valid and user has interacted (not initial load)
+      if (!initialLoadRef.current && center && zoom && bounds) {
+        try {
+          // Map distance to radius for persistence schema compatibility
+          saveViewportState(
+            { lat: center.lat, lng: center.lng, zoom },
+            {
+              dateRange: filters.dateRange || 'any',
+              categories: filters.categories || [],
+              radius: filters.distance || 10
+            }
+          )
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[PERSISTENCE] Saved viewport state:', { lat: center.lat, lng: center.lng, zoom })
+          }
+        } catch (error) {
+          // Silently fail - persistence errors are handled in saveViewportState
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[PERSISTENCE] Failed to save viewport:', error)
+          }
+        }
+      }
+      
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
     }, 200)
-  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds])
+  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
@@ -1480,6 +1583,39 @@ export default function SalesClient({
     handleViewportChange(args)
   }, [handleViewportChange])
 
+  // Handle "Use my location" button click (desktop)
+  const handleUseMyLocation = useCallback((lat: number, lng: number) => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[USE_MY_LOCATION] Centering map on:', { lat, lng })
+    }
+
+    const defaultDistance = 10
+    const calculatedZoom = distanceToZoom(defaultDistance)
+    const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
+    const lngRange = latRange * Math.cos(lat * Math.PI / 180)
+
+    setMapView({
+      center: { lat, lng },
+      bounds: {
+        west: lng - lngRange / 2,
+        south: lat - latRange / 2,
+        east: lng + lngRange / 2,
+        north: lat + latRange / 2
+      },
+      zoom: calculatedZoom
+    })
+
+          // Persist the new viewport (map distance to radius for persistence schema)
+          saveViewportState(
+            { lat, lng, zoom: calculatedZoom },
+            {
+              dateRange: filters.dateRange || 'any',
+              categories: filters.categories || [],
+              radius: filters.distance || 10
+            }
+          )
+  }, [filters.dateRange, filters.categories, filters.distance])
+
 
   return (
     <>
@@ -1556,6 +1692,17 @@ export default function SalesClient({
               aria-label="Interactive map showing yard sales locations"
               onClick={handleDesktopMapClick}
             >
+              {/* Desktop "Use my location" button */}
+              <div className="absolute top-4 right-4 z-10">
+                <UseMyLocationButton
+                  onLocationFound={handleUseMyLocation}
+                  onError={(error) => {
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[USE_MY_LOCATION] Error:', error)
+                    }
+                  }}
+                />
+              </div>
               <div className="w-full h-full">
                 {mapView ? (
                   <SimpleMap

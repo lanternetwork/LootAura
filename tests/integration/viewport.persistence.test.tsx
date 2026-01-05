@@ -281,7 +281,10 @@ describe('Geolocation utilities', () => {
       }
       
       mockGeolocation.getCurrentPosition.mockImplementation((success, _error, _options) => {
-        success(mockPosition as any)
+        // Call success callback asynchronously to match browser behavior
+        setTimeout(() => {
+          success(mockPosition as any)
+        }, 0)
       })
       
       const location = await requestGeolocation()
@@ -301,8 +304,11 @@ describe('Geolocation utilities', () => {
       }
       
       mockGeolocation.getCurrentPosition.mockImplementation((_success, error, _options) => {
+        // Call error callback asynchronously to match browser behavior
         if (error) {
-          error(mockError as any)
+          setTimeout(() => {
+            error(mockError as any)
+          }, 0)
         }
       })
       
@@ -325,8 +331,11 @@ describe('Geolocation utilities', () => {
       }
       
       mockGeolocation.getCurrentPosition.mockImplementation((_success, error, _options) => {
+        // Call error callback asynchronously to match browser behavior
         if (error) {
-          error(mockError as any)
+          setTimeout(() => {
+            error(mockError as any)
+          }, 0)
         }
       })
       

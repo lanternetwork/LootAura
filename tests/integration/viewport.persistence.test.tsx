@@ -280,7 +280,7 @@ describe('Geolocation utilities', () => {
         timestamp: Date.now()
       }
       
-      mockGeolocation.getCurrentPosition.mockImplementation((success) => {
+      mockGeolocation.getCurrentPosition.mockImplementation((success, _error, _options) => {
         success(mockPosition as any)
       })
       
@@ -300,8 +300,10 @@ describe('Geolocation utilities', () => {
         TIMEOUT: 3
       }
       
-      mockGeolocation.getCurrentPosition.mockImplementation((_success, error) => {
-        error(mockError as any)
+      mockGeolocation.getCurrentPosition.mockImplementation((_success, error, _options) => {
+        if (error) {
+          error(mockError as any)
+        }
       })
       
       await expect(requestGeolocation()).rejects.toMatchObject({
@@ -322,8 +324,10 @@ describe('Geolocation utilities', () => {
         TIMEOUT: 3
       }
       
-      mockGeolocation.getCurrentPosition.mockImplementation((_success, error) => {
-        error(mockError as any)
+      mockGeolocation.getCurrentPosition.mockImplementation((_success, error, _options) => {
+        if (error) {
+          error(mockError as any)
+        }
       })
       
       await expect(requestGeolocation()).rejects.toMatchObject({

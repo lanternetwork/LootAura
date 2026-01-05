@@ -23,9 +23,9 @@ import {
 
 // Mock navigator.geolocation - create fresh mock in beforeEach to avoid state leakage
 let mockGeolocation: {
-  getCurrentPosition: ReturnType<typeof vi.fn>
-  watchPosition: ReturnType<typeof vi.fn>
-  clearWatch: ReturnType<typeof vi.fn>
+  getCurrentPosition: any
+  watchPosition: any
+  clearWatch: any
 }
 
 beforeEach(() => {

@@ -48,9 +48,12 @@ export function isGeolocationDenied(): boolean {
         }
         // Cooldown expired, clear denial flag
         clearGeolocationDenial()
+        return false
       }
     }
 
+    // If flag is set but no valid timestamp, still consider it denied
+    // (backwards compatibility for old denial state)
     return true
   } catch {
     return false

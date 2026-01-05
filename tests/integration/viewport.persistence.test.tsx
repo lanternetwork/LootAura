@@ -271,12 +271,17 @@ describe('Geolocation utilities', () => {
         coords: {
           latitude: 38.2527,
           longitude: -85.7585,
-          accuracy: 10
-        }
+          accuracy: 10,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null
+        },
+        timestamp: Date.now()
       }
       
       mockGeolocation.getCurrentPosition.mockImplementation((success) => {
-        success(mockPosition)
+        success(mockPosition as any)
       })
       
       const location = await requestGeolocation()

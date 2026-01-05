@@ -59,7 +59,9 @@ export function loadViewportState(): { viewport: ViewportState; filters: FilterS
     
     // Check version compatibility
     if (state.version !== SCHEMA_VERSION) {
-      console.log('[MAP:PERSISTENCE] Version mismatch, clearing state')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MAP:PERSISTENCE] Version mismatch, clearing state')
+      }
       clearViewportState()
       return null
     }

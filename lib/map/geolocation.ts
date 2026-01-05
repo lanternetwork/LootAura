@@ -147,7 +147,8 @@ export function requestGeolocation(
         }
 
         // Track denial for permission denied errors
-        if (error.code === error.PERMISSION_DENIED) {
+        // Use numeric constant (1) instead of error.PERMISSION_DENIED for reliability
+        if (error.code === 1) {
           setGeolocationDenied()
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[GEO] Permission denied, tracking denial state')

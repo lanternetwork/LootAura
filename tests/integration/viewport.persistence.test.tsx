@@ -37,19 +37,24 @@ beforeEach(() => {
   // Reset mocks
   vi.clearAllMocks()
   
-  // Mock navigator.geolocation
-  Object.defineProperty(global.navigator, 'geolocation', {
-    value: mockGeolocation,
-    writable: true,
-    configurable: true
-  })
+  // Mock navigator.geolocation (navigator exists in jsdom, not global.navigator)
+  if (typeof navigator !== 'undefined') {
+    Object.defineProperty(navigator, 'geolocation', {
+      value: mockGeolocation,
+      writable: true,
+      configurable: true,
+      enumerable: true
+    })
+  }
   
   // Mock window.innerWidth for mobile detection
-  Object.defineProperty(window, 'innerWidth', {
-    writable: true,
-    configurable: true,
-    value: 1024 // Desktop by default
-  })
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1024 // Desktop by default
+    })
+  }
 })
 
 afterEach(() => {

@@ -26,6 +26,10 @@ let mockGeolocation: {
   getCurrentPosition: ReturnType<typeof vi.fn>
   watchPosition: ReturnType<typeof vi.fn>
   clearWatch: ReturnType<typeof vi.fn>
+} = {
+  getCurrentPosition: vi.fn(),
+  watchPosition: vi.fn(),
+  clearWatch: vi.fn()
 }
 
 beforeEach(() => {

@@ -33,9 +33,6 @@ let mockGeolocation: {
 }
 
 beforeEach(() => {
-  // Clear all mocks to prevent state leakage between tests
-  vi.clearAllMocks()
-  
   // Clear localStorage
   if (typeof localStorage !== 'undefined') {
     localStorage.clear()
@@ -56,25 +53,8 @@ beforeEach(() => {
     } catch {
       // Ignore if delete fails
     }
-    // Define property with enumerable: true so 'geolocation' in navigator returns true
-    try {
-      Object.defineProperty(navigator, 'geolocation', {
-        value: mockGeolocation,
-        writable: true,
-        configurable: true,
-        enumerable: true
-      })
-      // Verify the property was set correctly
-      if (!('geolocation' in navigator)) {
-        // Fallback: assign directly if defineProperty didn't work
-        ;(navigator as any).geolocation = mockGeolocation
-      }
-    } catch {
-      // Fallback: assign directly if defineProperty fails
-      ;(navigator as any).geolocation = mockGeolocation
-    }
-    // Ensure navigator.geolocation points to the current mockGeolocation object
-    // This is critical: after reassigning mockGeolocation, we must update navigator.geolocation
+    // Assign directly - this ensures 'geolocation' in navigator returns true
+    // and navigator.geolocation points to our mock
     ;(navigator as any).geolocation = mockGeolocation
   }
   
@@ -86,6 +66,9 @@ beforeEach(() => {
       value: 1024 // Desktop by default
     })
   }
+  
+  // Clear all mocks AFTER setup to reset call history
+  vi.clearAllMocks()
 })
 
 afterEach(() => {

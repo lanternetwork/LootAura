@@ -33,6 +33,9 @@ let mockGeolocation: {
 }
 
 beforeEach(() => {
+  // Clear all mocks to prevent state leakage between tests
+  vi.clearAllMocks()
+  
   // Clear localStorage
   if (typeof localStorage !== 'undefined') {
     localStorage.clear()
@@ -70,6 +73,9 @@ beforeEach(() => {
       // Fallback: assign directly if defineProperty fails
       ;(navigator as any).geolocation = mockGeolocation
     }
+    // Ensure navigator.geolocation points to the current mockGeolocation object
+    // This is critical: after reassigning mockGeolocation, we must update navigator.geolocation
+    ;(navigator as any).geolocation = mockGeolocation
   }
   
   // Mock window.innerWidth for mobile detection

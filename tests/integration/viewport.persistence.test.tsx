@@ -46,7 +46,7 @@ beforeEach(() => {
   }
   
   // Mock navigator.geolocation (navigator exists in jsdom, not global.navigator)
-  if (typeof navigator !== 'undefined') {
+  if (typeof navigator !== 'undefined' && navigator !== null) {
     // Delete existing property first to ensure clean state
     try {
       delete (navigator as any).geolocation
@@ -54,12 +54,22 @@ beforeEach(() => {
       // Ignore if delete fails
     }
     // Define property with enumerable: true so 'geolocation' in navigator returns true
-    Object.defineProperty(navigator, 'geolocation', {
-      value: mockGeolocation,
-      writable: true,
-      configurable: true,
-      enumerable: true
-    })
+    try {
+      Object.defineProperty(navigator, 'geolocation', {
+        value: mockGeolocation,
+        writable: true,
+        configurable: true,
+        enumerable: true
+      })
+      // Verify the property was set correctly
+      if (!('geolocation' in navigator)) {
+        // Fallback: assign directly if defineProperty didn't work
+        ;(navigator as any).geolocation = mockGeolocation
+      }
+    } catch {
+      // Fallback: assign directly if defineProperty fails
+      ;(navigator as any).geolocation = mockGeolocation
+    }
   }
   
   // Mock window.innerWidth for mobile detection

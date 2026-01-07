@@ -104,6 +104,7 @@ export default function MobileSalesShell({
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
+  const [isDragging, setIsDragging] = useState(false) // State version for visibility calculation
   const [mapLoaded, setMapLoaded] = useState(false)
   
   // Sync mode to URL params
@@ -274,12 +275,14 @@ export default function MobileSalesShell({
   }, [onViewportChange])
 
   // Calculate visibility of recenter button - only show when user location is outside viewport
+  // Hide during map dragging to prevent flickering
   const shouldShowRecenterButton = useMemo(() => {
     if (!userLocation || !mapView?.bounds) return false
+    if (isDragging) return false // Hide during active dragging
     
     const point: [number, number] = [userLocation.lng, userLocation.lat]
     return !isPointInsideBounds(point, mapView.bounds)
-  }, [userLocation, mapView?.bounds])
+  }, [userLocation, mapView?.bounds, isDragging])
 
   // Handle re-center - animate map to user location using mapRef
   const handleRecenter = useCallback(() => {
@@ -359,6 +362,7 @@ export default function MobileSalesShell({
   }) => {
     // Clear dragging flag on moveEnd
     isDraggingRef.current = false
+    setIsDragging(false)
     // Don't close callout on moveEnd - let user drag map freely
     // Callout will close when user taps outside or explicitly dismisses
     onViewportChange(args)
@@ -450,6 +454,7 @@ export default function MobileSalesShell({
               onDragStart={() => {
                 // Set dragging flag to prevent pinPosition updates during drag
                 isDraggingRef.current = true
+                setIsDragging(true)
               }}
               onCenteringStart={onCenteringStart}
               onCenteringEnd={onCenteringEnd}

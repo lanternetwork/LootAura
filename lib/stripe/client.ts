@@ -33,7 +33,7 @@ export function getStripeClient(): Stripe | null {
 
   try {
     stripeClient = new Stripe(secretKey, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2023-10-16',
     })
     return stripeClient
   } catch (error) {

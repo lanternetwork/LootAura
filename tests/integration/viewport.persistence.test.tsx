@@ -54,15 +54,13 @@ beforeEach(() => {
       // Ignore if delete fails
     }
     // Use Object.defineProperty with enumerable: true to ensure 'geolocation' in navigator returns true
+    // writable: true allows the property to be reassigned if needed
     Object.defineProperty(navigator, 'geolocation', {
       value: mockGeolocation,
       writable: true,
       configurable: true,
       enumerable: true
     })
-    // Ensure navigator.geolocation points to the current mockGeolocation object
-    // This is critical: after reassigning mockGeolocation, we must update navigator.geolocation
-    ;(navigator as any).geolocation = mockGeolocation
   }
   
   // Mock window.innerWidth for mobile detection

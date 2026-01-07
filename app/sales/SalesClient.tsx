@@ -28,6 +28,7 @@ import {
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
 import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable } from '@/lib/map/geolocation'
+import { flipToUserAuthority, isUserAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 
 // Simplified map-as-source types
@@ -593,8 +594,9 @@ export default function SalesClient({
       maximumAge: 300000 // 5 minutes
     })
       .then((location) => {
-        // Only recenter if user hasn't interacted yet
-        if (!userInteractedRef.current && mapView) {
+        // Only recenter if authority is still system (user hasn't taken control)
+        // Check both userInteractedRef and authority to be safe
+        if (!isUserAuthority() && !userInteractedRef.current && mapView) {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[GEO] Location found, recentering map:', location)
           }
@@ -626,7 +628,7 @@ export default function SalesClient({
           )
         } else {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[GEO] Location found but user has interacted, not recentering')
+            console.log('[GEO] Location found but authority is user or user has interacted, not recentering')
           }
         }
       })
@@ -748,8 +750,9 @@ export default function SalesClient({
   // Handle live viewport updates during map drag (onMove) - updates rendering only, no fetch
   // NOTE: Do NOT clear selection here - it blocks map dragging. Clear only on moveEnd.
   const handleViewportMove = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
-    // Mark user interaction on any map movement
+    // Mark user interaction on any map movement and flip authority to user
     userInteractedRef.current = true
+    flipToUserAuthority()
     
     // Update map view state immediately for live rendering
     // This triggers viewportBounds and visibleSales recomputation via useMemo
@@ -968,6 +971,8 @@ export default function SalesClient({
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
+    // ZIP search is explicit user intent - flip authority to user immediately
+    flipToUserAuthority()
     setZipError(null)
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
     // Don't show transition overlay - just update map directly
@@ -1104,6 +1109,8 @@ export default function SalesClient({
   const handleFiltersChange = (newFilters: any) => {
     // Check if this is a distance change
     if (newFilters.distance && newFilters.distance !== filters.distance) {
+      // Distance filter change that recenters the map is user intent
+      flipToUserAuthority()
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[DISTANCE] Distance filter changed:', { 
           oldDistance: filters.distance, 
@@ -1590,6 +1597,8 @@ export default function SalesClient({
 
   // Handle "Use my location" button click (desktop)
   const handleUseMyLocation = useCallback((lat: number, lng: number) => {
+    // "Use my location" is explicit user intent - flip authority to user
+    flipToUserAuthority()
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[USE_MY_LOCATION] Centering map on:', { lat, lng })
     }

@@ -52,6 +52,12 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
   const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
   const baseUrl = host ? `${protocol}${host}` : ''
+  
+  // Check if this is a mobile request (best-effort detection via user agent)
+  // Note: Client-side will have accurate viewport width, but server-side we can only guess
+  // On mobile, we want GPS-first on cold start, so reduce server-side overrides
+  const userAgent = headersList.get('user-agent') || ''
+  const isMobileRequest = /Mobile|Android|iPhone|iPad/i.test(userAgent)
 
   let initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null = null
 
@@ -116,8 +122,10 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     }
   }
 
-  // 1) la_loc cookie (only if no URL params)
-  if (!initialCenter) {
+  // 1) la_loc cookie (only if no URL params, and not mobile cold start)
+  // On mobile cold start, we want GPS-first, so skip cookie
+  // Cookie is still useful for desktop and mobile navigation (non-cold-start)
+  if (!initialCenter && !isMobileRequest) {
     try {
       const c = cookieStore.get('la_loc')?.value
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -143,8 +151,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     }
   }
 
-  // 2) user profile.home_zip → lookup zip
-  if (!initialCenter && user) {
+  // 2) user profile.home_zip → lookup zip (only if not mobile cold start)
+  // On mobile cold start, we want GPS-first, so skip profile home_zip
+  if (!initialCenter && user && !isMobileRequest) {
     try {
       // Try profiles_v2 view first
       const { data: profile } = await supabase
@@ -167,6 +176,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   }
 
   // 3) IP geolocation - try direct approach first, then API
+  // On mobile cold start, IP is fallback after GPS fails
+  // On desktop or non-cold-start, IP is normal fallback
   if (!initialCenter) {
     try {
       // Try Vercel headers directly first

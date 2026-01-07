@@ -173,8 +173,18 @@ async function checkoutHandler(request: NextRequest) {
     return fail(500, 'DATABASE_ERROR', 'Failed to create promotion record')
   }
 
+  // Validate site URL is configured (required for checkout redirects)
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  if (!siteUrl || !siteUrl.startsWith('http')) {
+    logger.error('NEXT_PUBLIC_SITE_URL not configured or invalid', new Error('NEXT_PUBLIC_SITE_URL missing'), {
+      component: 'promotions/checkout',
+      operation: 'create_checkout',
+      sale_id,
+    })
+    return fail(500, 'CONFIG_ERROR', 'Site URL is not configured. Please contact support.')
+  }
+
   // Create Stripe Checkout Session
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
   let checkoutSession
   try {
     checkoutSession = await stripe.checkout.sessions.create({

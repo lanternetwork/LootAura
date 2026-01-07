@@ -12,6 +12,8 @@ import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { isPointInsideBounds } from '@/lib/map/bounds'
+import { flipToUserAuthority } from '@/lib/map/authority'
+import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -102,6 +104,7 @@ export default function MobileSalesShell({
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
+  const [isDragging, setIsDragging] = useState(false) // State version for visibility calculation
   const [mapLoaded, setMapLoaded] = useState(false)
   
   // Sync mode to URL params
@@ -222,13 +225,64 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
+  // Handle "Use my location" button (mobile, icon-only)
+  const [isLocationLoading, setIsLocationLoading] = useState(false)
+  const handleUseMyLocation = useCallback(async () => {
+    if (!isGeolocationAvailable()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: Geolocation not available')
+      }
+      return
+    }
+
+    setIsLocationLoading(true)
+
+    try {
+      const location = await requestGeolocation({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes
+      })
+
+      // "Use my location" is explicit user intent - flip authority to user
+      flipToUserAuthority()
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: Centering map on:', location)
+      }
+      
+      // Calculate zoom and bounds (matches desktop logic)
+      const DEFAULT_ZOOM = 12
+      const latRange = 0.11 // ~10 miles at mid-latitudes
+      const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
+      
+      onViewportChange({
+        center: { lat: location.lat, lng: location.lng },
+        zoom: DEFAULT_ZOOM,
+        bounds: {
+          west: location.lng - lngRange / 2,
+          south: location.lat - latRange / 2,
+          east: location.lng + lngRange / 2,
+          north: location.lat + latRange / 2
+        }
+      })
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile error:', error)
+      }
+    } finally {
+      setIsLocationLoading(false)
+    }
+  }, [onViewportChange])
+
   // Calculate visibility of recenter button - only show when user location is outside viewport
+  // Hide during map dragging to prevent flickering
   const shouldShowRecenterButton = useMemo(() => {
     if (!userLocation || !mapView?.bounds) return false
+    if (isDragging) return false // Hide during active dragging
     
     const point: [number, number] = [userLocation.lng, userLocation.lat]
     return !isPointInsideBounds(point, mapView.bounds)
-  }, [userLocation, mapView?.bounds])
+  }, [userLocation, mapView?.bounds, isDragging])
 
   // Handle re-center - animate map to user location using mapRef
   const handleRecenter = useCallback(() => {
@@ -308,6 +362,7 @@ export default function MobileSalesShell({
   }) => {
     // Clear dragging flag on moveEnd
     isDraggingRef.current = false
+    setIsDragging(false)
     // Don't close callout on moveEnd - let user drag map freely
     // Callout will close when user taps outside or explicitly dismisses
     onViewportChange(args)
@@ -399,6 +454,7 @@ export default function MobileSalesShell({
               onDragStart={() => {
                 // Set dragging flag to prevent pinPosition updates during drag
                 isDraggingRef.current = true
+                setIsDragging(true)
               }}
               onCenteringStart={onCenteringStart}
               onCenteringEnd={onCenteringEnd}
@@ -431,6 +487,27 @@ export default function MobileSalesShell({
                 </svg>
                 {hasActiveFilters && (
                   <span className="absolute top-1 right-1 w-2 h-2 bg-[#F4B63A] rounded-full"></span>
+                )}
+              </button>
+              
+              {/* "Use my location" button - Icon only, above mode toggle (Mobile) */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleUseMyLocation()
+                }}
+                disabled={isLocationLoading}
+                className="absolute bottom-36 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Use my location"
+                title="Center map on your current location"
+              >
+                {isLocationLoading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
                 )}
               </button>
               

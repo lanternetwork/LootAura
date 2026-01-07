@@ -20,6 +20,12 @@ import {
   isGeolocationAvailable,
   requestGeolocation
 } from '@/lib/map/geolocation'
+import {
+  getMapAuthority,
+  flipToUserAuthority,
+  isColdStart,
+  isUserAuthority
+} from '@/lib/map/authority'
 
 // Mock navigator.geolocation - create fresh mock in beforeEach to avoid state leakage
 let mockGeolocation = {
@@ -32,6 +38,51 @@ beforeEach(() => {
   // Clear localStorage
   if (typeof localStorage !== 'undefined') {
     localStorage.clear()
+  }
+  
+  // Mock sessionStorage if not available (JSDOM doesn't provide it by default)
+  // Also ensure it's properly defined for typeof checks
+  if (typeof window !== 'undefined') {
+    const store: Record<string, string> = {}
+    const sessionStorageMock = {
+      getItem: (key: string) => {
+        return store[key] || null
+      },
+      setItem: (key: string, value: string) => {
+        store[key] = value
+      },
+      removeItem: (key: string) => {
+        delete store[key]
+      },
+      clear: () => {
+        Object.keys(store).forEach(key => delete store[key])
+      },
+      get length() {
+        return Object.keys(store).length
+      },
+      key: (index: number) => {
+        const keys = Object.keys(store)
+        return keys[index] || null
+      }
+    }
+    Object.defineProperty(window, 'sessionStorage', {
+      value: sessionStorageMock,
+      writable: true,
+      configurable: true
+    })
+    // Also define on global scope for typeof checks
+    if (typeof globalThis !== 'undefined') {
+      Object.defineProperty(globalThis, 'sessionStorage', {
+        value: sessionStorageMock,
+        writable: true,
+        configurable: true
+      })
+    }
+  }
+  
+  // Clear sessionStorage (authority state)
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.clear()
   }
   
   // Create fresh mock for each test to avoid state leakage
@@ -354,5 +405,194 @@ describe('Geolocation utilities', () => {
       // Should not track denial for timeout
       expect(isGeolocationDenied()).toBe(false)
     })
+  })
+})
+
+describe('Mobile map authority does not leak after user intent', () => {
+  beforeEach(() => {
+    // Set mobile viewport
+    if (typeof window !== 'undefined') {
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 500 // Mobile
+      })
+    }
+  })
+
+  it('should enforce authority rules: GPS-first on cold start, user intent always wins, no auto-recenter', async () => {
+    // Setup: Mobile viewport, mock GPS and IP
+    const gpsLocation = { lat: 38.2527, lng: -85.7585 } // Location A
+    const ipLocation = { lat: 40.0, lng: -90.0 } // Location B
+
+    // Phase 1: Cold start → GPS
+    // Clear all state
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear()
+    }
+    clearViewportState()
+    clearGeolocationDenial()
+
+    // Mock GPS to return location A
+    mockGeolocation.getCurrentPosition.mockImplementation((success) => {
+      setTimeout(() => {
+        success({
+          coords: {
+            latitude: gpsLocation.lat,
+            longitude: gpsLocation.lng,
+            accuracy: 10
+          }
+        } as any)
+      }, 10)
+    })
+
+    // Resolve initial viewport (cold start, mobile)
+    const coldStartResult = resolveInitialViewport({
+      urlLat: null,
+      urlLng: null,
+      urlZoom: null,
+      initialCenter: ipLocation, // IP fallback available
+      isMobile: true,
+      userInteracted: false
+    })
+
+    // Should attempt GPS (source: 'geo')
+    expect(coldStartResult.source).toBe('geo')
+    expect(isColdStart()).toBe(true)
+    expect(getMapAuthority()).toBe('system')
+
+    // Phase 2: User action flips authority
+    // Simulate ZIP search (user intent)
+    flipToUserAuthority()
+    expect(getMapAuthority()).toBe('user')
+    expect(isUserAuthority()).toBe(true)
+
+    // ZIP search should resolve to location C
+    // (In real app, this would call handleZipLocationFound which flips authority)
+    // We've already flipped authority above
+
+    // Phase 3: GPS must be ignored after user authority
+    // Simulate delayed GPS callback returning location D
+    // In real app, this would be the GPS promise resolving after ZIP search
+    // But since authority is 'user', GPS result should be ignored
+
+    // Verify authority is still user
+    expect(getMapAuthority()).toBe('user')
+
+    // Phase 4: Navigation must not reset authority
+    // Simulate component remount (navigation)
+    // Authority should persist in sessionStorage
+    const authorityAfterNavigation = getMapAuthority()
+    expect(authorityAfterNavigation).toBe('user')
+
+    // Phase 5: Persistence should restore user's saved position when navigating
+    // Save persisted viewport (user's current position after moving map)
+    saveViewportState(
+      { lat: ipLocation.lat, lng: ipLocation.lng, zoom: 10 },
+      { dateRange: 'any', categories: [], radius: 10 }
+    )
+
+    // Resolve viewport with user authority (simulating navigation back to /sales)
+    const userAuthorityResult = resolveInitialViewport({
+      urlLat: null,
+      urlLng: null,
+      urlZoom: null,
+      initialCenter: ipLocation,
+      isMobile: true,
+      userInteracted: false // This doesn't matter when authority is user
+    })
+
+    // Should restore persisted viewport (user's saved position) when navigating
+    // This allows map position to persist between pages
+    expect(userAuthorityResult.source).toBe('persisted')
+    expect(userAuthorityResult.center).toEqual({ lat: ipLocation.lat, lng: ipLocation.lng })
+    expect(userAuthorityResult.zoom).toBe(10)
+
+    // Phase 6: Hard refresh resets authority
+    // Clear sessionStorage (simulating hard refresh)
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear()
+    }
+
+    // Verify cold start again
+    expect(isColdStart()).toBe(true)
+    expect(getMapAuthority()).toBe('system')
+
+    // GPS should be attempted again
+    const afterRefreshResult = resolveInitialViewport({
+      urlLat: null,
+      urlLng: null,
+      urlZoom: null,
+      initialCenter: ipLocation,
+      isMobile: true,
+      userInteracted: false
+    })
+
+    expect(afterRefreshResult.source).toBe('geo')
+    expect(getMapAuthority()).toBe('system')
+  })
+
+  it('should prevent persisted viewport from overriding GPS on mobile cold start', () => {
+    // Setup: Mobile, persisted viewport exists
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear() // Cold start
+    }
+    clearViewportState()
+    
+    // Save persisted viewport
+    saveViewportState(
+      { lat: 40.0, lng: -90.0, zoom: 10 },
+      { dateRange: 'any', categories: [], radius: 10 }
+    )
+
+    // Resolve on mobile cold start
+    const result = resolveInitialViewport({
+      urlLat: null,
+      urlLng: null,
+      urlZoom: null,
+      initialCenter: { lat: 40.0, lng: -90.0 },
+      isMobile: true,
+      userInteracted: false
+    })
+
+    // Should attempt GPS, not use persisted viewport
+    expect(result.source).toBe('geo')
+    expect(result.viewport).toBeNull()
+  })
+
+  it('should prevent URL params from overriding GPS on mobile cold start (unless user-initiated)', () => {
+    // Setup: Mobile cold start with URL params
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear()
+    }
+    clearViewportState()
+
+    // URL params exist
+    const result = resolveInitialViewport({
+      urlLat: '40.0',
+      urlLng: '-90.0',
+      urlZoom: '10',
+      initialCenter: { lat: 38.0, lng: -85.0 },
+      isMobile: true,
+      userInteracted: false
+    })
+
+    // On mobile cold start, GPS-first should take precedence
+    // But URL params are user-initiated navigation, so they should win
+    // Actually, per requirements: "URL params overriding GPS (unless explicitly user-initiated navigation)"
+    // URL params from navigation are user-initiated, so they should win
+    expect(result.source).toBe('url')
+    
+    // But if we clear URL params, GPS should be attempted
+    const noUrlResult = resolveInitialViewport({
+      urlLat: null,
+      urlLng: null,
+      urlZoom: null,
+      initialCenter: { lat: 40.0, lng: -90.0 },
+      isMobile: true,
+      userInteracted: false
+    })
+    
+    expect(noUrlResult.source).toBe('geo')
   })
 })

@@ -6,15 +6,16 @@
  * This module fails gracefully if Stripe is not configured.
  */
 
+import Stripe from 'stripe'
 import { ENV_SERVER } from '@/lib/env'
 
-let stripeClient: any = null
+let stripeClient: Stripe | null = null
 
 /**
  * Get Stripe client instance (lazy initialization)
  * Returns null if Stripe is not configured
  */
-export function getStripeClient() {
+export function getStripeClient(): Stripe | null {
   if (stripeClient) {
     return stripeClient
   }
@@ -31,10 +32,8 @@ export function getStripeClient() {
   }
 
   try {
-    // Dynamic import to avoid build errors if stripe package is not installed
-    const Stripe = require('stripe')
     stripeClient = new Stripe(secretKey, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2023-10-16',
     })
     return stripeClient
   } catch (error) {

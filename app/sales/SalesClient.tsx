@@ -1707,7 +1707,7 @@ export default function SalesClient({
               onClick={handleDesktopMapClick}
             >
               {/* Desktop "Use my location" button */}
-              <div className="absolute top-4 right-4 z-10">
+              <div className="absolute top-4 right-4 z-[110]">
                 <UseMyLocationButton
                   onLocationFound={handleUseMyLocation}
                   onError={(error) => {

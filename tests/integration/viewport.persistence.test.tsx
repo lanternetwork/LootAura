@@ -22,7 +22,6 @@ import {
 } from '@/lib/map/geolocation'
 import {
   getMapAuthority,
-  setMapAuthority,
   flipToUserAuthority,
   isColdStart,
   isUserAuthority
@@ -385,8 +384,6 @@ describe('Mobile map authority does not leak after user intent', () => {
     // Setup: Mobile viewport, mock GPS and IP
     const gpsLocation = { lat: 38.2527, lng: -85.7585 } // Location A
     const ipLocation = { lat: 40.0, lng: -90.0 } // Location B
-    const zipLocation = { lat: 34.0522, lng: -118.2437 } // Location C (90210)
-    const delayedGpsLocation = { lat: 37.7749, lng: -122.4194 } // Location D
 
     // Phase 1: Cold start → GPS
     // Clear all state

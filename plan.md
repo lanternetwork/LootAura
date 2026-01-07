@@ -67,12 +67,67 @@
 - Production hardening (error handling, logging, rate limiting, bbox validation)
 - Security lint resolution (Supabase Security Advisor)
 - Performance optimization (query latency, map rendering)
+- Map persistence and geolocation (implementation → validation)
 
 ### Future Enhancements
 - Advanced search filters
 - User notifications
 - Seller analytics dashboard
 - Mobile app improvements
+
+---
+
+## Map Persistence & Geolocation (2025-01-31)
+
+**Status:** Implementation → Validation
+
+**Goal:** Enterprise-grade map persistence with deterministic initial viewport resolution and accurate location behavior across mobile/desktop.
+
+**Implementation:**
+
+1. **InitialViewportResolver** (`lib/map/initialViewportResolver.ts`)
+   - Deterministic precedence: URL params → localStorage → (mobile) geolocation → IP fallback
+   - Consolidated all viewport resolution logic in one place
+
+2. **Geolocation utilities** (`lib/map/geolocation.ts`)
+   - Mobile/desktop gating with denial tracking
+   - 30-day cooldown after denial to prevent repeated prompts
+   - Respects user interaction to prevent surprise recentering
+
+3. **Viewport persistence** (`lib/map/viewportPersistence.ts`)
+   - Updated staleness policy to 30 days (from 7 days)
+   - Debounced persistence writes to avoid localStorage churn
+   - Only persists after user interaction (not initial load)
+
+4. **Desktop "Use my location" button** (`components/map/UseMyLocationButton.tsx`)
+   - Discreet control in map overlay
+   - Shows loading state and error messages
+   - Non-blocking error handling
+
+5. **Mobile geolocation prompting**
+   - Only prompts when: no URL params, no persisted viewport, not denied, user hasn't interacted
+   - Tracks user interaction to prevent surprise recentering
+   - Persists result if granted
+
+6. **Integration** (`app/sales/SalesClient.tsx`)
+   - Replaced scattered viewport resolution with resolver
+   - Added persistence on debounced viewport changes
+   - Added user interaction tracking
+   - Integrated mobile geolocation prompting
+   - Added desktop location button
+
+**Tests:** `tests/integration/viewport.persistence.test.tsx`
+- Precedence rules (URL > persisted > geo > IP)
+- Persistence save/load with staleness handling
+- Geolocation denial tracking
+- Error handling
+
+**Validation Checklist:**
+- [ ] Desktop: open /sales → no location prompt; click "Use my location" → centers accurately; refresh → persists
+- [ ] Desktop: deny prompt → no repeated prompts; button still available
+- [ ] Mobile: first open /sales → prompt occurs once (if no persisted); accept → centers; refresh → persists without re-prompt
+- [ ] Mobile: pan immediately on load → map must NOT snap back after permission resolves
+- [ ] Navigate list → detail → back → viewport preserved via URL params
 
 ---
 

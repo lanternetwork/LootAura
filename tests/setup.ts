@@ -194,6 +194,10 @@ const originalConsoleWarn = console.warn
 const ALLOWED_PATTERNS = [
   // Debug logging (tests/setup.ts, lib/map/viewportFetchManager.ts)
   /^\[MAP:DEBOUNCE\]/, // Debug logging from debounce manager - tests/integration/map.debounce-cancel.test.ts
+  /^\[MAP:PERSISTENCE\]/, // Viewport persistence error logging - tests/integration/viewport.persistence.test.tsx
+  /^\[GEO\]/, // Geolocation error logging - tests/integration/viewport.persistence.test.tsx
+  /^\[VIEWPORT_RESOLVER\]/, // Viewport resolver debug logging - tests/integration/viewport.persistence.test.tsx
+  /^\[USE_MY_LOCATION\]/, // Use my location button debug logging - tests/integration/viewport.persistence.test.tsx
   /^\[usage\]/, // Usage logging - tests/unit/usage-logs.test.ts
   /^\[CATEGORY CONTRACT\]/, // Category contract logging - tests/unit/category-parse-url.test.ts
   /^\[CACHE\]/, // Cache logging - tests/unit/cache.db.test.ts, tests/integration/map.prefetch-offline.test.tsx

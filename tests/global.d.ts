@@ -60,6 +60,9 @@ declare global {
   interface GeolocationPositionError {
     code: number
     message: string
+    PERMISSION_DENIED: number
+    POSITION_UNAVAILABLE: number
+    TIMEOUT: number
   }
 }
 

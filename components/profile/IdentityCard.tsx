@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/lib/hooks/useAuth'
-import Link from 'next/link'
 
 type IdentityCardProps = {
   profile: {
@@ -21,7 +19,6 @@ type IdentityCardProps = {
 }
 
 export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: IdentityCardProps) {
-  const { data: currentUser } = useAuth()
   const [copied, setCopied] = useState(false)
 
   const handleCopyLink = async () => {
@@ -78,15 +75,6 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
           </div>
           {mode === 'public' && (
             <div className="hidden sm:flex gap-2 flex-wrap">
-              {currentUser ? (
-                <Link href={`/messages?to=${profile.username}`} className="btn-accent text-sm">
-                  Message Seller
-                </Link>
-              ) : (
-                <Link href={`/auth/signin?redirectTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} className="btn-accent-secondary text-sm">
-                  Message Seller
-                </Link>
-              )}
               <button
                 type="button"
                 onClick={handleCopyLink}
@@ -112,21 +100,12 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
         </div>
         {mode === 'public' && (
           <div className="sm:hidden flex gap-2 mt-4 px-6 pb-6">
-            {currentUser ? (
-              <Link href={`/messages?to=${profile.username}`} className="btn-accent text-sm flex-1 text-center">
-                Message Seller
-              </Link>
-            ) : (
-              <Link href={`/auth/signin?redirectTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} className="btn-accent-secondary text-sm flex-1 text-center">
-                Message Seller
-              </Link>
-            )}
             <button
               type="button"
               onClick={handleCopyLink}
-              className="rounded px-4 py-2 border text-sm hover:bg-neutral-50"
+              className="rounded px-4 py-2 border text-sm hover:bg-neutral-50 flex-1"
             >
-              {copied ? '✓' : 'Copy'}
+              {copied ? '✓ Copied!' : 'Copy Link'}
             </button>
           </div>
         )}

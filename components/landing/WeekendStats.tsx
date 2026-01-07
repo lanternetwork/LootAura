@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -23,6 +23,7 @@ export function WeekendStats() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<boolean>(false)
   const [isDefaultLocation, setIsDefaultLocation] = useState(false)
+  const hasRealLocationStatsRef = useRef(false) // Track if we've received stats from a real location
 
   // Fetch stats with a given location
   const fetchStatsForLocation = useCallback(async (loc: LocationState, isDefault = false) => {
@@ -52,9 +53,14 @@ export function WeekendStats() {
       }
       const countRes = await fetch(countUrl)
       if (!countRes.ok) {
-        throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
+        const errorText = await countRes.text().catch(() => 'Unknown error')
+        throw new Error(`Failed to fetch weekend sales count: ${countRes.status} - ${errorText}`)
       }
       const countData = await countRes.json()
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[WeekendStats] API response:', countData)
+      }
       // Validate response format - handle both success and error response formats
       // API may return { ok: true, count: number } or { ok: false, error: string } or { count: number }
       let weekendCount: number | null = null
@@ -92,41 +98,55 @@ export function WeekendStats() {
 
       // Update stats based on location type:
       // - Real location: always update (even if 0, that's the actual count)
-      // - Default location with > 0: update immediately
+      // - Default location with > 0: update immediately (only if no real location stats yet)
       // - Default location with 0: don't update, wait for real location
       if (!isDefault) {
         // Real location resolved - always update (including 0, that's valid data)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[WeekendStats] Updating stats from real location - Active sales:', activeSales)
         }
+        hasRealLocationStatsRef.current = true // Mark that we have real location stats
         setStats({ activeSales })
         setLoading(false)
         setIsDefaultLocation(false)
         setError(false) // Clear error on successful fetch
-      } else if (activeSales > 0) {
-        // Default location has sales - show immediately
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
-        }
-        setStats({ activeSales })
-        setLoading(false)
-        setError(false) // Clear error on successful fetch
       } else {
-        // Default location returned 0 - wait for real location
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[WeekendStats] Default location returned 0, waiting for real location')
+        // Default location - only process if we don't already have real location stats
+        // This prevents race conditions where default location completes after real location
+        if (hasRealLocationStatsRef.current) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[WeekendStats] Ignoring default location result - already have real location stats')
+          }
+          return // Don't update anything if we already have real location stats
         }
-        setIsDefaultLocation(true)
-        // Keep loading true and don't update stats - show fallback
+        
+        if (activeSales > 0) {
+          // Default location has sales - show immediately
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
+          }
+          setStats({ activeSales })
+          setLoading(false)
+          setError(false) // Clear error on successful fetch
+        } else {
+          // Default location returned 0 - wait for real location
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[WeekendStats] Default location returned 0, waiting for real location')
+          }
+          setIsDefaultLocation(true)
+          // Keep loading true and don't update stats - show fallback
+          // The IP geolocation will either succeed (update stats) or fail (we'll show 0)
+        }
       }
     } catch (error) {
       console.error('[WeekendStats] Error fetching stats:', error)
       // On error, mark as error state - will show "---" instead of a number
-      // Only set error if we don't have any stats yet (don't overwrite valid data)
+      // Always clear loading state on error, but only set error if we don't have stats
+      setLoading(false)
       if (!stats) {
         setError(true)
-        setLoading(false)
       }
+      // If we have stats from a previous successful fetch, keep them
     }
   }, [stats])
 
@@ -142,12 +162,14 @@ export function WeekendStats() {
       return
     }
 
-    // 2) Start with a default US location to fetch stats immediately
-    // This ensures the count appears quickly while we resolve the actual location
+    // 2) Start both IP geolocation and default location in parallel
+    // Whichever completes first with data wins - this speeds up the display
     const defaultLocation: LocationState = { lat: 39.8283, lng: -98.5795 } // US center
+    
+    // Start default location fetch immediately (fast fallback)
     fetchStatsForLocation(defaultLocation, true)
-
-    // 3) Try IP-based geolocation in parallel (works with VPNs and doesn't require permission)
+    
+    // Start IP geolocation in parallel (preferred, but don't wait too long)
     const tryIPGeolocation = async () => {
       try {
         const ipRes = await fetch('/api/geolocation/ip')
@@ -165,7 +187,7 @@ export function WeekendStats() {
             }
             setLocation(loc)
             setIsDefaultLocation(false)
-            // Fetch with actual location (will update the count if different)
+            // Fetch with actual location (will update if different from default)
             fetchStatsForLocation(loc, false)
             return true
           }
@@ -176,23 +198,21 @@ export function WeekendStats() {
       return false
     }
     
-    // Try IP geolocation (respects VPN location)
-    tryIPGeolocation().then((ipSuccess) => {
-      if (ipSuccess) return
-      
-      // If IP geolocation failed, keep using default location
-      setLocation(defaultLocation)
-      console.log('[WeekendStats] Using default location after IP geolocation failed')
-    })
+    // Start IP geolocation (runs in parallel with default location fetch)
+    tryIPGeolocation()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   // Show fallback values while loading, on error, or if we only have a 0 from default location
   // IMPORTANT: never hardcode a non-zero count; fallback should be neutral when we don't have real data
+  // If we have stats from a real location (not default), always show them (even if 0)
+  // Only hide stats if they're from default location AND are 0 (waiting for real location)
   const displayStats = (stats && (!isDefaultLocation || stats.activeSales > 0)) 
     ? stats 
     : null
   
   // Determine what to display: number if we have valid stats, "---" if loading/error/no data
+  // Show "0" if we have valid stats with 0 sales (real location, not default)
   const displayCount = (loading || error || !displayStats || typeof displayStats.activeSales !== 'number')
     ? '---'
     : displayStats.activeSales

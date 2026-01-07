@@ -8,13 +8,12 @@ import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import MobileRecenterButton from '@/components/location/MobileRecenterButton'
-import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { isPointInsideBounds } from '@/lib/map/bounds'
 import { flipToUserAuthority } from '@/lib/map/authority'
-import { flipToUserAuthority } from '@/lib/map/authority'
+import { requestGeolocation, isGeolocationAvailable, type GeolocationError } from '@/lib/map/geolocation'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -437,39 +436,26 @@ export default function MobileSalesShell({
                 )}
               </button>
               
-              {/* "Use my location" button - Top Right (Mobile) */}
-              <div className="absolute top-4 right-4 pointer-events-auto">
-                <UseMyLocationButton
-                  onLocationFound={(lat, lng) => {
-                    // "Use my location" is explicit user intent - flip authority to user
-                    flipToUserAuthority()
-                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                      console.log('[USE_MY_LOCATION] Mobile: Centering map on:', { lat, lng })
-                    }
-                    
-                    // Calculate zoom and bounds (matches desktop logic)
-                    const DEFAULT_ZOOM = 12
-                    const latRange = 0.11 // ~10 miles at mid-latitudes
-                    const lngRange = latRange * Math.cos(lat * Math.PI / 180)
-                    
-                    onViewportChange({
-                      center: { lat, lng },
-                      zoom: DEFAULT_ZOOM,
-                      bounds: {
-                        west: lng - lngRange / 2,
-                        south: lat - latRange / 2,
-                        east: lng + lngRange / 2,
-                        north: lat + latRange / 2
-                      }
-                    })
-                  }}
-                  onError={(error) => {
-                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                      console.log('[USE_MY_LOCATION] Mobile error:', error)
-                    }
-                  }}
-                />
-              </div>
+              {/* "Use my location" button - Icon only, above mode toggle (Mobile) */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleUseMyLocation()
+                }}
+                disabled={isLocationLoading}
+                className="absolute bottom-32 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Use my location"
+                title="Center map on your current location"
+              >
+                {isLocationLoading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                )}
+              </button>
               
               {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
               <MobileRecenterButton

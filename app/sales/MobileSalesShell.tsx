@@ -8,10 +8,13 @@ import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import MobileRecenterButton from '@/components/location/MobileRecenterButton'
+import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { isPointInsideBounds } from '@/lib/map/bounds'
+import { flipToUserAuthority } from '@/lib/map/authority'
+import { flipToUserAuthority } from '@/lib/map/authority'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -433,6 +436,40 @@ export default function MobileSalesShell({
                   <span className="absolute top-1 right-1 w-2 h-2 bg-[#F4B63A] rounded-full"></span>
                 )}
               </button>
+              
+              {/* "Use my location" button - Top Right (Mobile) */}
+              <div className="absolute top-4 right-4 pointer-events-auto">
+                <UseMyLocationButton
+                  onLocationFound={(lat, lng) => {
+                    // "Use my location" is explicit user intent - flip authority to user
+                    flipToUserAuthority()
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[USE_MY_LOCATION] Mobile: Centering map on:', { lat, lng })
+                    }
+                    
+                    // Calculate zoom and bounds (matches desktop logic)
+                    const DEFAULT_ZOOM = 12
+                    const latRange = 0.11 // ~10 miles at mid-latitudes
+                    const lngRange = latRange * Math.cos(lat * Math.PI / 180)
+                    
+                    onViewportChange({
+                      center: { lat, lng },
+                      zoom: DEFAULT_ZOOM,
+                      bounds: {
+                        west: lng - lngRange / 2,
+                        south: lat - latRange / 2,
+                        east: lng + lngRange / 2,
+                        north: lat + latRange / 2
+                      }
+                    })
+                  }}
+                  onError={(error) => {
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[USE_MY_LOCATION] Mobile error:', error)
+                    }
+                  }}
+                />
+              </div>
               
               {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
               <MobileRecenterButton

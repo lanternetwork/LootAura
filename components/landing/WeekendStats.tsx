@@ -52,9 +52,14 @@ export function WeekendStats() {
       }
       const countRes = await fetch(countUrl)
       if (!countRes.ok) {
-        throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
+        const errorText = await countRes.text().catch(() => 'Unknown error')
+        throw new Error(`Failed to fetch weekend sales count: ${countRes.status} - ${errorText}`)
       }
       const countData = await countRes.json()
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[WeekendStats] API response:', countData)
+      }
       // Validate response format - handle both success and error response formats
       // API may return { ok: true, count: number } or { ok: false, error: string } or { count: number }
       let weekendCount: number | null = null
@@ -113,20 +118,23 @@ export function WeekendStats() {
         setError(false) // Clear error on successful fetch
       } else {
         // Default location returned 0 - wait for real location
+        // But don't keep loading indefinitely - if IP geolocation fails, we'll show 0
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[WeekendStats] Default location returned 0, waiting for real location')
         }
         setIsDefaultLocation(true)
         // Keep loading true and don't update stats - show fallback
+        // The IP geolocation will either succeed (update stats) or fail (we'll show 0)
       }
     } catch (error) {
       console.error('[WeekendStats] Error fetching stats:', error)
       // On error, mark as error state - will show "---" instead of a number
-      // Only set error if we don't have any stats yet (don't overwrite valid data)
+      // Always clear loading state on error, but only set error if we don't have stats
+      setLoading(false)
       if (!stats) {
         setError(true)
-        setLoading(false)
       }
+      // If we have stats from a previous successful fetch, keep them
     }
   }, [stats])
 
@@ -180,19 +188,34 @@ export function WeekendStats() {
     tryIPGeolocation().then((ipSuccess) => {
       if (ipSuccess) return
       
-      // If IP geolocation failed, keep using default location
+      // If IP geolocation failed, use default location
       setLocation(defaultLocation)
       console.log('[WeekendStats] Using default location after IP geolocation failed')
+      
+      // If we don't have stats yet (default location returned 0 and we're waiting),
+      // show 0 since we've exhausted all location options
+      setStats((prevStats) => {
+        if (!prevStats) {
+          return { activeSales: 0 }
+        }
+        return prevStats
+      })
+      setLoading(false)
+      setIsDefaultLocation(false) // No longer default - we've tried everything
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   // Show fallback values while loading, on error, or if we only have a 0 from default location
   // IMPORTANT: never hardcode a non-zero count; fallback should be neutral when we don't have real data
+  // If we have stats from a real location (not default), always show them (even if 0)
+  // Only hide stats if they're from default location AND are 0 (waiting for real location)
   const displayStats = (stats && (!isDefaultLocation || stats.activeSales > 0)) 
     ? stats 
     : null
   
   // Determine what to display: number if we have valid stats, "---" if loading/error/no data
+  // Show "0" if we have valid stats with 0 sales (real location, not default)
   const displayCount = (loading || error || !displayStats || typeof displayStats.activeSales !== 'number')
     ? '---'
     : displayStats.activeSales

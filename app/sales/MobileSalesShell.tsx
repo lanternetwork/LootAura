@@ -13,7 +13,7 @@ import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { isPointInsideBounds } from '@/lib/map/bounds'
 import { flipToUserAuthority } from '@/lib/map/authority'
-import { requestGeolocation, isGeolocationAvailable, type GeolocationError } from '@/lib/map/geolocation'
+import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -223,6 +223,55 @@ export default function MobileSalesShell({
   const handleToggleMode = useCallback(() => {
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
+
+  // Handle "Use my location" button (mobile, icon-only)
+  const [isLocationLoading, setIsLocationLoading] = useState(false)
+  const handleUseMyLocation = useCallback(async () => {
+    if (!isGeolocationAvailable()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: Geolocation not available')
+      }
+      return
+    }
+
+    setIsLocationLoading(true)
+
+    try {
+      const location = await requestGeolocation({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes
+      })
+
+      // "Use my location" is explicit user intent - flip authority to user
+      flipToUserAuthority()
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: Centering map on:', location)
+      }
+      
+      // Calculate zoom and bounds (matches desktop logic)
+      const DEFAULT_ZOOM = 12
+      const latRange = 0.11 // ~10 miles at mid-latitudes
+      const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
+      
+      onViewportChange({
+        center: { lat: location.lat, lng: location.lng },
+        zoom: DEFAULT_ZOOM,
+        bounds: {
+          west: location.lng - lngRange / 2,
+          south: location.lat - latRange / 2,
+          east: location.lng + lngRange / 2,
+          north: location.lat + latRange / 2
+        }
+      })
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile error:', error)
+      }
+    } finally {
+      setIsLocationLoading(false)
+    }
+  }, [onViewportChange])
 
   // Calculate visibility of recenter button - only show when user location is outside viewport
   const shouldShowRecenterButton = useMemo(() => {

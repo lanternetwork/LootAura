@@ -485,14 +485,14 @@ describe('Mobile map authority does not leak after user intent', () => {
     const authorityAfterNavigation = getMapAuthority()
     expect(authorityAfterNavigation).toBe('user')
 
-    // Phase 5: Persistence must not override
-    // Save persisted viewport (simulating previous session)
+    // Phase 5: Persistence should restore user's saved position when navigating
+    // Save persisted viewport (user's current position after moving map)
     saveViewportState(
       { lat: ipLocation.lat, lng: ipLocation.lng, zoom: 10 },
       { dateRange: 'any', categories: [], radius: 10 }
     )
 
-    // Resolve viewport with user authority
+    // Resolve viewport with user authority (simulating navigation back to /sales)
     const userAuthorityResult = resolveInitialViewport({
       urlLat: null,
       urlLng: null,
@@ -502,9 +502,11 @@ describe('Mobile map authority does not leak after user intent', () => {
       userInteracted: false // This doesn't matter when authority is user
     })
 
-    // Should return 'user' source, not 'persisted'
-    expect(userAuthorityResult.source).toBe('user')
-    expect(userAuthorityResult.center).toBeNull() // No auto-recenter
+    // Should restore persisted viewport (user's saved position) when navigating
+    // This allows map position to persist between pages
+    expect(userAuthorityResult.source).toBe('persisted')
+    expect(userAuthorityResult.center).toEqual({ lat: ipLocation.lat, lng: ipLocation.lng })
+    expect(userAuthorityResult.zoom).toBe(10)
 
     // Phase 6: Hard refresh resets authority
     // Clear sessionStorage (simulating hard refresh)

@@ -41,11 +41,11 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
   const coldStart = isColdStart()
   const isUser = isUserAuthority()
 
-  // If user authority, ignore all automatic sources
-  // Only explicit user actions (URL params from user navigation) are allowed
+  // If user authority, ignore all automatic sources (GPS, IP, cookies)
+  // But allow URL params and persisted viewport (user's own saved position)
   if (isUser) {
     // User authority: Only respect URL params if they exist (user-initiated navigation)
-    // Ignore persistence, cookies, IP, GPS
+    // Ignore GPS, IP, cookies (automatic sources)
     if (urlLat && urlLng) {
       const lat = parseFloat(urlLat)
       const lng = parseFloat(urlLng)
@@ -64,10 +64,33 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
       }
     }
 
-    // User authority but no URL params: return null to preserve current map state
+    // User authority but no URL params: check persisted viewport (user's own saved position)
+    // This allows restoring the map position when navigating between pages
+    const persisted = loadViewportState()
+    if (persisted?.viewport) {
+      const { viewport } = persisted
+      if (
+        !isNaN(viewport.lat) && !isNaN(viewport.lng) && !isNaN(viewport.zoom) &&
+        viewport.lat >= -90 && viewport.lat <= 90 &&
+        viewport.lng >= -180 && viewport.lng <= 180 &&
+        viewport.zoom >= 0 && viewport.zoom <= 22
+      ) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[VIEWPORT_RESOLVER] User authority: Using persisted viewport (user saved position):', viewport)
+        }
+        return {
+          viewport,
+          source: 'persisted',
+          center: { lat: viewport.lat, lng: viewport.lng },
+          zoom: viewport.zoom
+        }
+      }
+    }
+
+    // User authority but no URL params and no persisted viewport: return null to preserve current map state
     // The component should not recenter
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[VIEWPORT_RESOLVER] User authority: No URL params, preserving current state')
+      console.log('[VIEWPORT_RESOLVER] User authority: No URL params or persisted viewport, preserving current state')
     }
     return {
       viewport: null,

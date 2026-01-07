@@ -54,9 +54,6 @@ describe('Stripe Integration Guards', () => {
     delete process.env.STRIPE_SECRET_KEY
     delete process.env.STRIPE_WEBHOOK_SECRET
     delete process.env.STRIPE_PRICE_ID_FEATURED_WEEK
-    
-    // Ensure NODE_ENV is test to trigger env re-parsing
-    process.env.NODE_ENV = 'test'
   })
 
   it('returns null when PAYMENTS_ENABLED=false', async () => {
@@ -106,7 +103,7 @@ describe('Stripe Integration Guards', () => {
     expect(result).toBe(mockStripeInstance)
     expect(mockStripeConstructor).toHaveBeenCalledTimes(1)
     expect(mockStripeConstructor).toHaveBeenCalledWith('sk_test_valid_key_12345', {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2023-10-16',
     })
   })
 

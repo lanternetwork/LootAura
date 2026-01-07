@@ -78,26 +78,10 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
   }
 
   // System authority: Normal precedence rules apply
-  // On mobile cold start: GPS-first (ignore persistence/cookies/URL params)
+  // On mobile cold start: GPS-first (ignore persistence/cookies, but URL params are user-initiated so they win)
   // On desktop or non-cold-start: Normal precedence
 
-  // Mobile cold start: GPS-first (ignore everything else)
-  if (isMobile && coldStart) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[VIEWPORT_RESOLVER] Mobile cold start: GPS-first, ignoring persistence/cookies/URL params')
-    }
-    // Return geo signal to attempt GPS
-    // GPS will be attempted even if persisted viewport exists
-    return {
-      viewport: null,
-      source: 'geo',
-      center: null,
-      zoom: null
-    }
-  }
-
-  // Desktop or non-cold-start: Normal precedence
-  // 1) URL viewport params (if not mobile cold start)
+  // 1) URL viewport params - highest priority (even on mobile cold start, URL params are user-initiated navigation)
   if (urlLat && urlLng) {
     const lat = parseFloat(urlLat)
     const lng = parseFloat(urlLng)
@@ -116,7 +100,23 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
     }
   }
 
-  // 2) localStorage persisted viewport (only if not mobile cold start)
+  // 2) Mobile cold start: GPS-first (ignore persistence/cookies, but only if no user interaction)
+  // URL params already handled above, so we're past that point
+  if (isMobile && coldStart && !userInteracted) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[VIEWPORT_RESOLVER] Mobile cold start: GPS-first, ignoring persistence/cookies')
+    }
+    // Return geo signal to attempt GPS
+    // GPS will be attempted even if persisted viewport exists
+    return {
+      viewport: null,
+      source: 'geo',
+      center: null,
+      zoom: null
+    }
+  }
+
+  // 3) localStorage persisted viewport (only if not mobile cold start)
   const persisted = loadViewportState()
   if (persisted?.viewport) {
     const { viewport } = persisted
@@ -138,7 +138,7 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
     }
   }
 
-  // 3) Mobile-only device geolocation (non-cold-start, no user interaction)
+  // 4) Mobile-only device geolocation (non-cold-start, no user interaction, no persisted)
   // This is a signal that geolocation should be attempted, not the actual result
   if (isMobile && !userInteracted && !persisted) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -152,7 +152,7 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
     }
   }
 
-  // 4) IP-derived initialCenter fallback
+  // 5) IP-derived initialCenter fallback
   if (initialCenter?.lat && initialCenter?.lng) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[VIEWPORT_RESOLVER] Using IP-derived initialCenter:', initialCenter)
@@ -165,7 +165,7 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
     }
   }
 
-  // 5) Ultimate fallback (should rarely happen)
+  // 6) Ultimate fallback (should rarely happen)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[VIEWPORT_RESOLVER] Using neutral US center fallback')
   }

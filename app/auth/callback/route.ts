@@ -29,6 +29,15 @@ export async function GET(req: Request) {
   })
 
   const cookieStore = cookies()
+  
+  // Detect if request is over HTTPS (for Vercel preview deployments)
+  const protocol = url.protocol
+  const forwardedProto = req.headers.get('x-forwarded-proto')
+  const isHttps = protocol === 'https:' || 
+                 forwardedProto === 'https' ||
+                 url.href.startsWith('https://') ||
+                 process.env.NODE_ENV === 'production'
+  
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,7 +49,17 @@ export async function GET(req: Request) {
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set({ name, value, ...options })
+              // Ensure cookies have proper options for cross-domain and security
+              cookieStore.set({ 
+                name, 
+                value, 
+                ...options,
+                // Ensure these options are set for proper cookie handling
+                path: options?.path || '/',
+                sameSite: options?.sameSite || 'lax',
+                secure: options?.secure !== undefined ? options.secure : isHttps,
+                httpOnly: options?.httpOnly !== undefined ? options.httpOnly : true,
+              })
             })
           } catch (error) {
             console.log('[AUTH_CALLBACK] Cookie setting failed:', error)

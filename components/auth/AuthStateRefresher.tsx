@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, usePathname } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
@@ -12,30 +12,44 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
  */
 export function AuthStateRefresher() {
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    // Check if we just authenticated by checking for auth state change
+    const sb = createSupabaseBrowserClient()
+    
+    // Check if we just came from OAuth callback (no code param, but might have been redirected)
+    // Also check if we're on a page that might have just received auth cookies
     const checkAuthAndRefresh = async () => {
-      const sb = createSupabaseBrowserClient()
-      
-      // Check current auth state
-      const { data: { user } } = await sb.auth.getUser()
-      
-      // If we have a user, invalidate the auth query cache to force a refetch
-      // This ensures the UI updates immediately after OAuth redirect
-      if (user) {
-        queryClient.invalidateQueries({ queryKey: ['auth'] })
-        queryClient.invalidateQueries({ queryKey: ['profile'] })
+      try {
+        // Force a session refresh by calling getUser which reads from cookies
+        const { data: { user }, error } = await sb.auth.getUser()
+        
+        if (error) {
+          console.log('[AUTH_REFRESHER] Error getting user:', error.message)
+          return
+        }
+        
+        // If we have a user, invalidate the auth query cache to force a refetch
+        // This ensures the UI updates immediately after OAuth redirect
+        if (user) {
+          console.log('[AUTH_REFRESHER] User found, invalidating queries:', user.id)
+          queryClient.invalidateQueries({ queryKey: ['auth'] })
+          queryClient.invalidateQueries({ queryKey: ['profile'] })
+        } else {
+          console.log('[AUTH_REFRESHER] No user found')
+        }
+      } catch (error) {
+        console.error('[AUTH_REFRESHER] Error checking auth:', error)
       }
     }
 
-    // Run check on mount to refresh auth state after OAuth redirect
+    // Run check on mount and when pathname changes (e.g., after OAuth redirect)
     checkAuthAndRefresh()
 
     // Also listen for auth state changes from Supabase
-    const sb = createSupabaseBrowserClient()
-    const { data: { subscription } } = sb.auth.onAuthStateChange((event, _session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+      console.log('[AUTH_REFRESHER] Auth state changed:', event, session?.user?.id)
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         // Invalidate queries when auth state changes
         queryClient.invalidateQueries({ queryKey: ['auth'] })
@@ -46,7 +60,7 @@ export function AuthStateRefresher() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [searchParams, queryClient])
+  }, [searchParams, pathname, queryClient])
 
   // This component doesn't render anything
   return null

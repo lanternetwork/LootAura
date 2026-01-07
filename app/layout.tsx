@@ -1,6 +1,7 @@
 import "./globals.css"
 import { Metadata } from 'next'
 import Script from 'next/script'
+import { Suspense } from 'react'
 import { Providers } from './providers'
 import WebVitals from '@/components/WebVitals'
 import { ConditionalHeader } from '@/components/landing/ConditionalHeader'
@@ -17,6 +18,7 @@ import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
 import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
 import { ENV_PUBLIC } from '@/lib/env'
+import { AuthStateRefresher } from '@/components/auth/AuthStateRefresher'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -93,6 +95,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <Providers>
           <ErrorBoundary>
+            <Suspense fallback={null}>
+              <AuthStateRefresher />
+            </Suspense>
             <CsrfTokenInitializer />
             <ClarityClient />
             <ConditionalHeader />

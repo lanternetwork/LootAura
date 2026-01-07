@@ -551,8 +551,6 @@ export default function SalesClient({
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
-  
-  const isMobile = windowWidth < 768
 
   // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
   useEffect(() => {
@@ -781,13 +779,20 @@ export default function SalesClient({
     })
   }, [])
 
-  // Persist map view to sessionStorage whenever it changes (for browser back button)
+  // Persist map view to localStorage whenever it changes (for browser back button)
   // Don't update URL params here to avoid conflicts with URL param restoration
   useEffect(() => {
     if (mapView) {
-      persistMapView(mapView)
+      saveViewportState(
+        { lat: mapView.center.lat, lng: mapView.center.lng, zoom: mapView.zoom },
+        {
+          dateRange: filters.dateRange || 'any',
+          categories: filters.categories || [],
+          radius: filters.distance || 10
+        }
+      )
     }
-  }, [mapView])
+  }, [mapView, filters.dateRange, filters.categories, filters.distance])
 
   // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
   // Core buffer logic: only fetch when viewport exits buffered area

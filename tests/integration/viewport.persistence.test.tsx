@@ -66,9 +66,6 @@ beforeEach(() => {
       value: 1024 // Desktop by default
     })
   }
-  
-  // Clear all mocks AFTER setup to reset call history
-  vi.clearAllMocks()
 })
 
 afterEach(() => {

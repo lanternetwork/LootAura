@@ -20,10 +20,11 @@ export function WeekendStats() {
   const searchParams = useSearchParams()
   const [location, setLocation] = useState<LocationState | null>(null)
   const [stats, setStats] = useState<WeekendStatsData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Start with false to show optimistic state
   const [error, setError] = useState<boolean>(false)
   const [isDefaultLocation, setIsDefaultLocation] = useState(false)
   const hasRealLocationStatsRef = useRef(false) // Track if we've received stats from a real location
+  const ipGeolocationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Fetch stats with a given location
   const fetchStatsForLocation = useCallback(async (loc: LocationState, isDefault = false) => {
@@ -120,22 +121,19 @@ export function WeekendStats() {
           return // Don't update anything if we already have real location stats
         }
         
-        if (activeSales > 0) {
-          // Default location has sales - show immediately
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
-          }
-          setStats({ activeSales })
-          setLoading(false)
-          setError(false) // Clear error on successful fetch
-        } else {
-          // Default location returned 0 - wait for real location
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[WeekendStats] Default location returned 0, waiting for real location')
-          }
-          setIsDefaultLocation(true)
-          // Keep loading true and don't update stats - show fallback
-          // The IP geolocation will either succeed (update stats) or fail (we'll show 0)
+        // Default location - show result immediately (even if 0) for better UX
+        // This makes the UI feel faster - user sees a number right away
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
+        }
+        setStats({ activeSales })
+        setLoading(false) // Clear loading so we show the number immediately
+        setError(false)
+        
+        // If default location has 0 sales, we'll still wait for real location to update
+        // But at least user sees "0" instead of "---" which is less jarring
+        if (activeSales === 0) {
+          setIsDefaultLocation(true) // Mark as default so real location can override
         }
       }
     } catch (error) {
@@ -165,72 +163,116 @@ export function WeekendStats() {
     // 2) Start with a default US location to fetch stats immediately
     // This ensures the count appears quickly while we resolve the actual location
     const defaultLocation: LocationState = { lat: 39.8283, lng: -98.5795 } // US center
+    setLoading(true) // Show loading only while fetching
     fetchStatsForLocation(defaultLocation, true)
 
-    // 3) Try IP-based geolocation in parallel (works with VPNs and doesn't require permission)
+    // 3) Try IP-based geolocation in parallel with timeout (works with VPNs and doesn't require permission)
     const tryIPGeolocation = async () => {
       try {
-        const ipRes = await fetch('/api/geolocation/ip')
-        if (ipRes.ok) {
-          const ipData = await ipRes.json()
-          if (ipData.lat && ipData.lng) {
+        // Set timeout for IP geolocation - if it takes too long, use default location
+        const timeoutPromise = new Promise<null>((resolve) => {
+          ipGeolocationTimeoutRef.current = setTimeout(() => {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[WeekendStats] Using IP geolocation:', ipData)
+              console.log('[WeekendStats] IP geolocation timeout, using default location')
             }
-            const loc = { 
-              lat: ipData.lat, 
-              lng: ipData.lng, 
-              city: ipData.city,
-              state: ipData.state
+            resolve(null)
+          }, 1500) // 1.5 second timeout
+        })
+        
+        const ipPromise = fetch('/api/geolocation/ip').then(async (ipRes) => {
+          if (ipRes.ok) {
+            const ipData = await ipRes.json()
+            if (ipData.lat && ipData.lng) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[WeekendStats] Using IP geolocation:', ipData)
+              }
+              const loc = { 
+                lat: ipData.lat, 
+                lng: ipData.lng, 
+                city: ipData.city,
+                state: ipData.state
+              }
+              setLocation(loc)
+              setIsDefaultLocation(false)
+              // Fetch with actual location (will update the count if different)
+              fetchStatsForLocation(loc, false)
+              return true
             }
-            setLocation(loc)
-            setIsDefaultLocation(false)
-            // Fetch with actual location (will update the count if different)
-            fetchStatsForLocation(loc, false)
-            return true
           }
+          return false
+        }).catch((error) => {
+          console.warn('[WeekendStats] IP geolocation failed:', error)
+          return false
+        })
+        
+        // Race between timeout and IP geolocation
+        const result = await Promise.race([ipPromise, timeoutPromise])
+        
+        // Clear timeout if IP geolocation completed first
+        if (ipGeolocationTimeoutRef.current) {
+          clearTimeout(ipGeolocationTimeoutRef.current)
+          ipGeolocationTimeoutRef.current = null
         }
+        
+        if (result === true) {
+          return true // IP geolocation succeeded
+        }
+        
+        // Timeout or failure - use default location
+        setLocation(defaultLocation)
+        console.log('[WeekendStats] Using default location after IP geolocation timeout/failure')
+        
+        // If we don't have stats yet (default location returned 0 and we're waiting),
+        // show 0 since we've exhausted all location options
+        setStats((prevStats) => {
+          if (!prevStats) {
+            return { activeSales: 0 }
+          }
+          return prevStats
+        })
+        setLoading(false)
+        setIsDefaultLocation(false) // No longer default - we've tried everything
+        return false
       } catch (error) {
-        console.warn('[WeekendStats] IP geolocation failed:', error)
+        console.warn('[WeekendStats] IP geolocation error:', error)
+        return false
       }
-      return false
     }
     
     // Try IP geolocation (respects VPN location)
-    tryIPGeolocation().then((ipSuccess) => {
-      if (ipSuccess) return
-      
-      // If IP geolocation failed, use default location
-      setLocation(defaultLocation)
-      console.log('[WeekendStats] Using default location after IP geolocation failed')
-      
-      // If we don't have stats yet (default location returned 0 and we're waiting),
-      // show 0 since we've exhausted all location options
-      setStats((prevStats) => {
-        if (!prevStats) {
-          return { activeSales: 0 }
-        }
-        return prevStats
-      })
-      setLoading(false)
-      setIsDefaultLocation(false) // No longer default - we've tried everything
-    })
+    tryIPGeolocation()
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (ipGeolocationTimeoutRef.current) {
+        clearTimeout(ipGeolocationTimeoutRef.current)
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  // Show fallback values while loading, on error, or if we only have a 0 from default location
-  // IMPORTANT: never hardcode a non-zero count; fallback should be neutral when we don't have real data
-  // If we have stats from a real location (not default), always show them (even if 0)
-  // Only hide stats if they're from default location AND are 0 (waiting for real location)
-  const displayStats = (stats && (!isDefaultLocation || stats.activeSales > 0)) 
-    ? stats 
-    : null
+  // Show stats if available - prefer real location, but show default location if it has sales
+  // This makes the UI feel faster by showing data immediately
+  const displayStats = stats || null
   
-  // Determine what to display: number if we have valid stats, "---" if loading/error/no data
-  // Show "0" if we have valid stats with 0 sales (real location, not default)
-  const displayCount = (loading || error || !displayStats || typeof displayStats.activeSales !== 'number')
-    ? '---'
-    : displayStats.activeSales
+  // Determine what to display: number if we have valid stats, "0" optimistically while loading, "---" only on error
+  // Strategy: Show data immediately when available, show "0" optimistically while loading (less jarring than "---")
+  const displayCount = (() => {
+    if (error) {
+      return '---'
+    }
+    // If we have stats, show them (even if from default location - better UX than "---")
+    if (displayStats && typeof displayStats.activeSales === 'number') {
+      return displayStats.activeSales
+    }
+    // While loading, show "0" optimistically instead of "---" (less jarring)
+    // This will update to the real number when data arrives
+    if (loading) {
+      return 0
+    }
+    // No data and not loading - show "---" (shouldn't happen often)
+    return '---'
+  })()
   
   // Decode URL-encoded city name if present (safe decode)
   const cityName = (() => {

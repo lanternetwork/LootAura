@@ -43,20 +43,27 @@ beforeEach(() => {
   // Mock sessionStorage if not available (JSDOM doesn't provide it by default)
   // Also ensure it's properly defined for typeof checks
   if (typeof window !== 'undefined') {
+    const store: Record<string, string> = {}
     const sessionStorageMock = {
-      getItem: vi.fn((key: string) => {
-        return (sessionStorageMock as any)._store[key] || null
-      }),
-      setItem: vi.fn((key: string, value: string) => {
-        (sessionStorageMock as any)._store[key] = value
-      }),
-      removeItem: vi.fn((key: string) => {
-        delete (sessionStorageMock as any)._store[key]
-      }),
-      clear: vi.fn(() => {
-        (sessionStorageMock as any)._store = {}
-      }),
-      _store: {} as Record<string, string>
+      getItem: (key: string) => {
+        return store[key] || null
+      },
+      setItem: (key: string, value: string) => {
+        store[key] = value
+      },
+      removeItem: (key: string) => {
+        delete store[key]
+      },
+      clear: () => {
+        Object.keys(store).forEach(key => delete store[key])
+      },
+      get length() {
+        return Object.keys(store).length
+      },
+      key: (index: number) => {
+        const keys = Object.keys(store)
+        return keys[index] || null
+      }
     }
     Object.defineProperty(window, 'sessionStorage', {
       value: sessionStorageMock,

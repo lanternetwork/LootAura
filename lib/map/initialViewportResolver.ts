@@ -14,7 +14,7 @@
  */
 
 import { loadViewportState, type ViewportState } from './viewportPersistence'
-import { getMapAuthority, isColdStart, isUserAuthority } from './authority'
+import { isColdStart, isUserAuthority } from './authority'
 
 export interface InitialViewportResult {
   viewport: ViewportState | null
@@ -38,7 +38,6 @@ export interface ResolverOptions {
 export function resolveInitialViewport(options: ResolverOptions): InitialViewportResult {
   const { urlLat, urlLng, urlZoom, initialCenter, isMobile, userInteracted } = options
 
-  const authority = getMapAuthority()
   const coldStart = isColdStart()
   const isUser = isUserAuthority()
 

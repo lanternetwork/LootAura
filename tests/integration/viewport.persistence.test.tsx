@@ -40,6 +40,39 @@ beforeEach(() => {
     localStorage.clear()
   }
   
+  // Mock sessionStorage if not available (JSDOM doesn't provide it by default)
+  // Also ensure it's properly defined for typeof checks
+  if (typeof window !== 'undefined') {
+    const sessionStorageMock = {
+      getItem: vi.fn((key: string) => {
+        return (sessionStorageMock as any)._store[key] || null
+      }),
+      setItem: vi.fn((key: string, value: string) => {
+        (sessionStorageMock as any)._store[key] = value
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete (sessionStorageMock as any)._store[key]
+      }),
+      clear: vi.fn(() => {
+        (sessionStorageMock as any)._store = {}
+      }),
+      _store: {} as Record<string, string>
+    }
+    Object.defineProperty(window, 'sessionStorage', {
+      value: sessionStorageMock,
+      writable: true,
+      configurable: true
+    })
+    // Also define on global scope for typeof checks
+    if (typeof globalThis !== 'undefined') {
+      Object.defineProperty(globalThis, 'sessionStorage', {
+        value: sessionStorageMock,
+        writable: true,
+        configurable: true
+      })
+    }
+  }
+  
   // Clear sessionStorage (authority state)
   if (typeof sessionStorage !== 'undefined') {
     sessionStorage.clear()

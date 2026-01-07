@@ -53,9 +53,13 @@ beforeEach(() => {
     } catch {
       // Ignore if delete fails
     }
-    // Assign directly - this ensures 'geolocation' in navigator returns true
-    // and navigator.geolocation points to our mock
-    ;(navigator as any).geolocation = mockGeolocation
+    // Use Object.defineProperty with enumerable: true to ensure 'geolocation' in navigator returns true
+    Object.defineProperty(navigator, 'geolocation', {
+      value: mockGeolocation,
+      writable: true,
+      configurable: true,
+      enumerable: true
+    })
   }
   
   // Mock window.innerWidth for mobile detection

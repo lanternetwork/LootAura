@@ -492,7 +492,7 @@ export default function MobileSalesShell({
                   handleUseMyLocation()
                 }}
                 disabled={isLocationLoading}
-                className="absolute bottom-32 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="absolute bottom-36 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Use my location"
                 title="Center map on your current location"
               >

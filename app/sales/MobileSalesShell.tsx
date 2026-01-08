@@ -11,7 +11,6 @@ import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { isPointInsideBounds } from '@/lib/map/bounds'
-import { flipToUserAuthority } from '@/lib/map/authority'
 import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
 import { checkGeolocationPermission } from '@/lib/location/client'
 

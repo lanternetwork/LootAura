@@ -553,65 +553,6 @@ export default function SalesClient({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Unified function to recenter map to user's GPS location
-  // source: 'auto' = automatic GPS (subject to authority guard)
-  // source: 'user' = user-initiated GPS (always recenters, bypasses authority)
-  const recenterToUserLocation = useCallback((location: { lat: number; lng: number }, source: 'auto' | 'user') => {
-    // For automatic GPS, check authority guard
-    if (source === 'auto') {
-      // Only recenter if authority is still system (user hasn't taken control)
-      if (isUserAuthority() || userInteractedRef.current) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[GEO] Location found but authority is user or user has interacted, not recentering (auto)')
-        }
-        return false
-      }
-    }
-    // For user-initiated GPS, always recenter (no authority check)
-
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log(`[GEO] Recentering map to user location (source: ${source}):`, location)
-    }
-
-    const defaultDistance = 10
-    const calculatedZoom = distanceToZoom(defaultDistance)
-    const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
-    const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
-
-    const newBounds = {
-      west: location.lng - lngRange / 2,
-      south: location.lat - latRange / 2,
-      east: location.lng + lngRange / 2,
-      north: location.lat + latRange / 2
-    }
-
-    // Update map view state directly
-    setMapView({
-      center: { lat: location.lat, lng: location.lng },
-      bounds: newBounds,
-      zoom: calculatedZoom
-    })
-
-    // Trigger viewport change handler to update URL, fetch data, and persist
-    handleViewportChange({
-      center: { lat: location.lat, lng: location.lng },
-      zoom: calculatedZoom,
-      bounds: newBounds
-    })
-
-    // Persist the new viewport (map distance to radius for persistence schema)
-    saveViewportState(
-      { lat: location.lat, lng: location.lng, zoom: calculatedZoom },
-      {
-        dateRange: filters.dateRange || 'any',
-        categories: filters.categories || [],
-        radius: filters.distance || 10
-      }
-    )
-
-    return true
-  }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
-
   // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
   useEffect(() => {
     // Only attempt on mobile, if resolver indicated geolocation should be attempted
@@ -992,6 +933,66 @@ export default function SalesClient({
       initialLoadRef.current = false // Mark initial load as complete
     }, 200)
   }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance])
+
+  // Unified function to recenter map to user's GPS location
+  // source: 'auto' = automatic GPS (subject to authority guard)
+  // source: 'user' = user-initiated GPS (always recenters, bypasses authority)
+  // NOTE: Must be defined after handleViewportChange since it depends on it
+  const recenterToUserLocation = useCallback((location: { lat: number; lng: number }, source: 'auto' | 'user') => {
+    // For automatic GPS, check authority guard
+    if (source === 'auto') {
+      // Only recenter if authority is still system (user hasn't taken control)
+      if (isUserAuthority() || userInteractedRef.current) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[GEO] Location found but authority is user or user has interacted, not recentering (auto)')
+        }
+        return false
+      }
+    }
+    // For user-initiated GPS, always recenter (no authority check)
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[GEO] Recentering map to user location (source: ${source}):`, location)
+    }
+
+    const defaultDistance = 10
+    const calculatedZoom = distanceToZoom(defaultDistance)
+    const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
+    const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
+
+    const newBounds = {
+      west: location.lng - lngRange / 2,
+      south: location.lat - latRange / 2,
+      east: location.lng + lngRange / 2,
+      north: location.lat + latRange / 2
+    }
+
+    // Update map view state directly
+    setMapView({
+      center: { lat: location.lat, lng: location.lng },
+      bounds: newBounds,
+      zoom: calculatedZoom
+    })
+
+    // Trigger viewport change handler to update URL, fetch data, and persist
+    handleViewportChange({
+      center: { lat: location.lat, lng: location.lng },
+      zoom: calculatedZoom,
+      bounds: newBounds
+    })
+
+    // Persist the new viewport (map distance to radius for persistence schema)
+    saveViewportState(
+      { lat: location.lat, lng: location.lng, zoom: calculatedZoom },
+      {
+        dateRange: filters.dateRange || 'any',
+        categories: filters.categories || [],
+        radius: filters.distance || 10
+      }
+    )
+
+    return true
+  }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {

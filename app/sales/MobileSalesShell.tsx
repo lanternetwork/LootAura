@@ -252,7 +252,7 @@ export default function MobileSalesShell({
   // Handle "Use my location" button - handles both permission request and recentering
   const [isLocationLoading, setIsLocationLoading] = useState(false)
   const handleUseMyLocation = useCallback(async () => {
-    // Always attempt GPS first - permission prompt happens here
+    // Always attempt GPS to trigger permission prompt
     if (!isGeolocationAvailable()) {
       // If geolocation API not available, fall back to IP immediately
       try {
@@ -272,6 +272,53 @@ export default function MobileSalesShell({
     }
 
     setIsLocationLoading(true)
+
+    try {
+      // Attempt GPS - this triggers permission prompt
+      // Use shorter timeout for non-GPS devices (desktop browsers) to fallback faster
+      const timeout = canUsePreciseGeolocation ? 10000 : 5000
+      let location
+      try {
+        location = await requestGeolocation({
+          enableHighAccuracy: canUsePreciseGeolocation,
+          timeout,
+          maximumAge: 300000
+        })
+      } catch (gpsError) {
+        // If GPS fails, fall back to IP geolocation
+        const error = gpsError as { code?: number; message?: string }
+        if (error.code === 3 || error.code === 2) { // TIMEOUT or POSITION_UNAVAILABLE
+          try {
+            const ipRes = await fetch('/api/geolocation/ip')
+            if (ipRes.ok) {
+              const ipData = await ipRes.json()
+              if (ipData.lat && ipData.lng) {
+                const mapInstance = mapRef.current?.getMap?.()
+                onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+                flushSync(() => {
+                  setIsLocationLoading(false)
+                })
+                return
+              }
+            }
+          } catch {
+            // Ignore IP fallback errors
+          }
+        }
+        throw gpsError
+      }
+
+      // GPS succeeded
+      const mapInstance = mapRef.current?.getMap?.()
+      onUserLocationRequest(location, mapInstance, 'gps')
+    } catch (error) {
+      // Error handling - clear loading state
+    } finally {
+      flushSync(() => {
+        setIsLocationLoading(false)
+      })
+    }
+  }, [canUsePreciseGeolocation, onUserLocationRequest])
 
     try {
       // Try high accuracy first with shorter timeout

@@ -299,11 +299,32 @@ export default function MobileSalesShell({
     setIsLocationLoading(true)
 
     try {
-      const location = await requestGeolocation({
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000 // 5 minutes
-      })
+      // Try high accuracy first with shorter timeout
+      let location
+      try {
+        location = await requestGeolocation({
+          enableHighAccuracy: true,
+          timeout: 10000, // 10 seconds for high accuracy
+          maximumAge: 300000 // 5 minutes
+        })
+      } catch (highAccuracyError) {
+        // If high accuracy times out, fall back to low accuracy (faster, less precise)
+        const error = highAccuracyError as { code?: number; message?: string }
+        if (error.code === 3) { // TIMEOUT
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[USE_MY_LOCATION] Mobile: High accuracy timeout, trying low accuracy fallback')
+          }
+          // Fallback to low accuracy for faster response
+          location = await requestGeolocation({
+            enableHighAccuracy: false,
+            timeout: 5000, // 5 seconds for low accuracy
+            maximumAge: 300000 // 5 minutes - accept cached location
+          })
+        } else {
+          // Re-throw non-timeout errors (permission denied, etc.)
+          throw highAccuracyError
+        }
+      }
 
       // Store the actual GPS location for centering check
       setActualUserLocation({ lat: location.lat, lng: location.lng })

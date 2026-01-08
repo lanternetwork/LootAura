@@ -368,6 +368,39 @@ export default function MobileSalesShell({
       if (geoError.code === 1) {
         setHasLocationPermission(false)
       }
+      
+      // If GPS failed (timeout or other error), try IP geolocation as fallback
+      // This ensures the map still recenters even when GPS is unavailable
+      if (geoError.code === 3 || geoError.code === 2) { // TIMEOUT or POSITION_UNAVAILABLE
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[USE_MY_LOCATION] Mobile: GPS failed, trying IP geolocation fallback')
+        }
+        try {
+          const ipRes = await fetch('/api/geolocation/ip')
+          if (ipRes.ok) {
+            const ipData = await ipRes.json()
+            if (ipData.lat && ipData.lng) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[USE_MY_LOCATION] Mobile: Using IP geolocation fallback:', ipData)
+              }
+              // Get map instance for imperative recentering
+              const mapInstance = mapRef.current?.getMap?.()
+              // Use IP location to recenter
+              onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance)
+              // Clear loading state after successful IP fallback
+              flushSync(() => {
+                setIsLocationLoading(false)
+              })
+              return // Success with IP fallback - exit early (skip finally block)
+            }
+          }
+        } catch (ipError) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[USE_MY_LOCATION] Mobile: IP geolocation fallback also failed:', ipError)
+          }
+          // If IP geolocation also fails, finally block will clear loading state
+        }
+      }
     } finally {
       // Always clear loading state - ensure it happens even if there are errors
       // Use flushSync to force immediate synchronous state update

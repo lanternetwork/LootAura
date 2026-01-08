@@ -38,14 +38,36 @@ export default function UseMyLocationButton({
     setError(null)
 
     try {
-      const location = await requestGeolocation({
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000 // 5 minutes
-      })
+      // Desktop-friendly geolocation: use low accuracy for network-based positioning
+      // This works on machines without GPS hardware and is faster
+      let location
+      try {
+        location = await requestGeolocation({
+          enableHighAccuracy: false, // Desktop-friendly: network-based positioning
+          timeout: 15000, // 15 seconds - longer timeout for network-based location
+          maximumAge: 600000 // 10 minutes - accept cached location
+        })
+      } catch (highAccuracyError) {
+        // If low accuracy also fails, try with even more lenient settings
+        const error = highAccuracyError as { code?: number; message?: string }
+        if (error.code === 3) { // TIMEOUT
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[USE_MY_LOCATION] Desktop: First attempt timed out, retrying with cached location')
+          }
+          // Retry with very long maximumAge to use any cached location
+          location = await requestGeolocation({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 86400000 // 24 hours - accept any cached location
+          })
+        } else {
+          // Re-throw non-timeout errors (permission denied, etc.)
+          throw highAccuracyError
+        }
+      }
 
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Location found:', location)
+        console.log('[USE_MY_LOCATION] Desktop: Location found:', location)
       }
 
       onLocationFound(location.lat, location.lng)
@@ -54,7 +76,7 @@ export default function UseMyLocationButton({
       const geoError = err as GeolocationError
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Error:', geoError)
+        console.log('[USE_MY_LOCATION] Desktop: Error:', geoError)
       }
 
       onError?.(geoError)

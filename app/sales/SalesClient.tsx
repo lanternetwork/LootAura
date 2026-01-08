@@ -967,7 +967,7 @@ export default function SalesClient({
     // 7. Let the map's onMoveEnd handler naturally call handleViewportChange after animation
     // This ensures URL updates and data fetching happen after smooth animation completes
     // Do NOT call handleViewportChange here - it would update URL immediately and trigger resolver conflict
-  }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
+  }, [filters.dateRange, filters.categories, filters.distance, distanceToZoom, setMapView, setMapAuthority, saveViewportState])
 
   // Unified function to recenter map to user's GPS location
   // source: 'auto' = automatic GPS (subject to authority guard)

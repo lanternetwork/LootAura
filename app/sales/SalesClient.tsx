@@ -1849,7 +1849,7 @@ export default function SalesClient({
   }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, haversineMeters])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
-  // User-initiated GPS: MUST use imperative recenter to bypass all guards
+  // User-initiated: Recenter immediately with best available location, then fire GPS in background
   // This callback receives the map instance from MobileSalesShell
   const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }, mapInstance?: any, source: 'gps' | 'ip' = 'gps') => {
     try {
@@ -1857,31 +1857,47 @@ export default function SalesClient({
         console.log('[USE_MY_LOCATION] Mobile: User-initiated recenter to:', location, 'hasMap:', !!mapInstance, 'source:', source)
       }
 
-      // Store last known user location
-      setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
-      // Update permission state immediately (permission was granted if GPS succeeded)
-      if (source === 'gps') {
-        setHasLocationPermission(true)
-      } else {
-        // For IP fallback, check permission state
-        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
-      }
-
-      // If map instance provided, use imperative recenter
-      if (mapInstance) {
-        forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
-        // Ensure visibility recomputes after recenter (even if map was already centered)
-        // Force a mapView state update to trigger shouldShowLocationIcon recomputation
-        setMapView(prev => prev ? { ...prev } : null)
-      } else {
+      if (!mapInstance) {
         // Fallback: use reactive path (should not happen, but handle gracefully)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.warn('[USE_MY_LOCATION] Mobile: No map instance provided, using fallback')
         }
+        setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
+        if (source === 'gps') {
+          setHasLocationPermission(true)
+        } else {
+          checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+        }
         flipToUserAuthority()
         recenterToUserLocation(location, 'user')
-        // Ensure visibility recomputes
         setMapView(prev => prev ? { ...prev } : null)
+        return
+      }
+
+      if (source === 'ip') {
+        // IP location - recenter immediately
+        setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'ip', timestamp: Date.now() })
+        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+        forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
+        setMapView(prev => prev ? { ...prev } : null)
+      } else if (source === 'gps') {
+        // GPS result - check if it differs meaningfully from last known location
+        const previousLocation = lastUserLocation
+        setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
+        setHasLocationPermission(true)
+        
+        if (previousLocation) {
+          const distance = haversineMeters(previousLocation.lat, previousLocation.lng, location.lat, location.lng)
+          if (distance > 50) {
+            // GPS differs meaningfully, recenter again
+            forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
+            setMapView(prev => prev ? { ...prev } : null)
+          }
+        } else {
+          // No previous location, recenter with GPS
+          forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
+          setMapView(prev => prev ? { ...prev } : null)
+        }
       }
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1889,7 +1905,7 @@ export default function SalesClient({
       }
       throw error // Re-throw to be caught by mobile component
     }
-  }, [forceRecenterToLocation, recenterToUserLocation])
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, flipToUserAuthority, recenterToUserLocation, haversineMeters])
 
   return (
     <>

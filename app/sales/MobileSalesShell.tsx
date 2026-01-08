@@ -106,6 +106,8 @@ export default function MobileSalesShell({
   const isDraggingRef = useRef<boolean>(false)
   const [isDragging, setIsDragging] = useState(false) // State version for visibility calculation
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [showRecenterButton, setShowRecenterButton] = useState(false) // Debounced visibility
+  const recenterButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Sync mode to URL params
   useEffect(() => {
@@ -275,7 +277,7 @@ export default function MobileSalesShell({
   }, [onViewportChange])
 
   // Calculate visibility of recenter button - only show when user location is outside viewport
-  // Hide during map dragging to prevent flickering
+  // Hide during map dragging to prevent flickering, with debounce after dragging ends
   const shouldShowRecenterButton = useMemo(() => {
     if (!userLocation || !mapView?.bounds) return false
     if (isDragging) return false // Hide during active dragging
@@ -283,6 +285,34 @@ export default function MobileSalesShell({
     const point: [number, number] = [userLocation.lng, userLocation.lat]
     return !isPointInsideBounds(point, mapView.bounds)
   }, [userLocation, mapView?.bounds, isDragging])
+
+  // Debounce recenter button visibility to prevent flashing during map movement
+  useEffect(() => {
+    // Clear any existing timeout
+    if (recenterButtonTimeoutRef.current) {
+      clearTimeout(recenterButtonTimeoutRef.current)
+      recenterButtonTimeoutRef.current = null
+    }
+
+    if (isDragging) {
+      // Hide immediately when dragging starts
+      setShowRecenterButton(false)
+    } else if (shouldShowRecenterButton) {
+      // Delay showing the button after dragging ends to prevent flashing
+      recenterButtonTimeoutRef.current = setTimeout(() => {
+        setShowRecenterButton(true)
+      }, 300) // 300ms delay after dragging ends
+    } else {
+      // Hide immediately if conditions aren't met
+      setShowRecenterButton(false)
+    }
+
+    return () => {
+      if (recenterButtonTimeoutRef.current) {
+        clearTimeout(recenterButtonTimeoutRef.current)
+      }
+    }
+  }, [isDragging, shouldShowRecenterButton])
 
   // Handle re-center - animate map to user location using mapRef
   const handleRecenter = useCallback(() => {
@@ -513,7 +543,7 @@ export default function MobileSalesShell({
               
               {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
               <MobileRecenterButton
-                visible={shouldShowRecenterButton}
+                visible={showRecenterButton}
                 onClick={handleRecenter}
               />
               

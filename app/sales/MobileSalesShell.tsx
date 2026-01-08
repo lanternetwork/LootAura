@@ -106,15 +106,45 @@ export default function MobileSalesShell({
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [hasLocationPermission, setHasLocationPermission] = useState(false)
+  const [actualUserLocation, setActualUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   
-  // Check location permission on mount and when userLocation changes
+  // Check location permission on mount
   useEffect(() => {
     const checkPermission = async () => {
       const hasPermission = await checkGeolocationPermission()
       setHasLocationPermission(hasPermission)
     }
     checkPermission()
-  }, [userLocation])
+  }, [])
+  
+  // Listen for permission changes
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.permissions) return
+    
+    let permissionStatus: PermissionStatus | null = null
+    let updatePermission: (() => void) | null = null
+    
+    const setupPermissionListener = async () => {
+      try {
+        permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        updatePermission = () => {
+          setHasLocationPermission(permissionStatus?.state === 'granted')
+        }
+        updatePermission()
+        permissionStatus.addEventListener('change', updatePermission)
+      } catch (error) {
+        // Permission API not supported, fall back to checking on user action
+      }
+    }
+    
+    setupPermissionListener()
+    
+    return () => {
+      if (permissionStatus && updatePermission) {
+        permissionStatus.removeEventListener('change', updatePermission)
+      }
+    }
+  }, [])
 
   // Sync mode to URL params
   useEffect(() => {
@@ -234,12 +264,13 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
-  // Calculate if map is centered on user location
+  // Calculate if map is centered on user's actual GPS location
+  // Use actualUserLocation (from GPS) instead of userLocation prop (which is map center)
   const isMapCenteredOnUserLocation = useMemo(() => {
-    if (!userLocation || !mapView?.bounds) return false
-    const point: [number, number] = [userLocation.lng, userLocation.lat]
+    if (!actualUserLocation || !mapView?.bounds) return false
+    const point: [number, number] = [actualUserLocation.lng, actualUserLocation.lat]
     return isPointInsideBounds(point, mapView.bounds)
-  }, [userLocation, mapView?.bounds])
+  }, [actualUserLocation, mapView?.bounds])
 
   // Consolidated visibility logic for location icon button
   // Visible if: permission not granted OR (permission granted AND map not centered on user)
@@ -271,8 +302,12 @@ export default function MobileSalesShell({
         maximumAge: 300000 // 5 minutes
       })
 
+      // Store the actual GPS location for centering check
+      setActualUserLocation({ lat: location.lat, lng: location.lng })
+
       // Update permission state after successful location request
-      setHasLocationPermission(true)
+      const hasPermission = await checkGeolocationPermission()
+      setHasLocationPermission(hasPermission)
 
       // "Use my location" is explicit user intent - flip authority to user
       flipToUserAuthority()

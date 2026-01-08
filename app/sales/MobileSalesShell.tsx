@@ -320,9 +320,6 @@ export default function MobileSalesShell({
         }
       }
 
-      // Store the actual GPS location (for backwards compatibility)
-      setActualUserLocation({ lat: location.lat, lng: location.lng })
-
       // "Use my location" is explicit user intent - use imperative recenter
       // This bypasses authority guard and always recenters
       // Note: lastUserLocation and permission state are now managed in SalesClient

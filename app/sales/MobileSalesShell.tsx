@@ -503,7 +503,7 @@ export default function MobileSalesShell({
               </button>
               
               {/* Location icon button - Handles both permission request and recentering */}
-              {shouldShowLocationButton && (
+              {shouldShowLocationIcon && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation()

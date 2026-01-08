@@ -82,7 +82,8 @@
   "overrides": {
     "preact": "^10.28.2",
     "cookie": "^0.7.2",
-    "prismjs": "^1.29.0"
+    "prismjs": "^1.29.0",
+    "nodemailer": "^6.10.0"
   },
   "devDependencies": {
     "eslint-config-next": "^14.2.32",

@@ -383,6 +383,8 @@ export default function MobileSalesShell({
               if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                 console.log('[USE_MY_LOCATION] Mobile: Using IP geolocation fallback:', ipData)
               }
+              // Store the IP location for centering check (so button can hide when centered)
+              setActualUserLocation({ lat: ipData.lat, lng: ipData.lng })
               // Get map instance for imperative recentering
               const mapInstance = mapRef.current?.getMap?.()
               // Use IP location to recenter

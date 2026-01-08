@@ -30,6 +30,7 @@ interface SimpleMapProps {
     bounds: { west: number; south: number; east: number; north: number } 
   }) => void
   onDragStart?: () => void // Called when user starts dragging the map
+  onDragEnd?: () => void // Called when user finishes dragging the map
   onCenteringStart?: (locationId: string, lat: number, lng: number) => void
   onCenteringEnd?: () => void
   isTransitioning?: boolean
@@ -56,6 +57,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   onViewportChange,
   onViewportMove,
   onDragStart,
+  onDragEnd,
   onCenteringStart,
   onCenteringEnd,
   isTransitioning = false,
@@ -195,6 +197,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       // Small delay to ensure all drag-related state updates complete
       setTimeout(() => {
         isUserDraggingRef.current = false
+        onDragEnd?.()
       }, 100)
     }
     
@@ -205,7 +208,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       map.off('dragstart', handleDragStart)
       map.off('dragend', handleDragEnd)
     }
-  }, [onDragStart, loaded])
+  }, [onDragStart, onDragEnd, loaded])
 
   // Handle map move (continuous during drag) - update viewport for live rendering
   const handleMove = useCallback(() => {

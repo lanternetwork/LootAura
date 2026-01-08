@@ -390,9 +390,7 @@ export default function MobileSalesShell({
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => {
-    // Clear dragging flag on moveEnd
-    isDraggingRef.current = false
-    setIsDragging(false)
+    // Don't clear dragging flag here - it's cleared in onDragEnd
     // Don't close callout on moveEnd - let user drag map freely
     // Callout will close when user taps outside or explicitly dismisses
     onViewportChange(args)
@@ -485,6 +483,11 @@ export default function MobileSalesShell({
                 // Set dragging flag to prevent pinPosition updates during drag
                 isDraggingRef.current = true
                 setIsDragging(true)
+              }}
+              onDragEnd={() => {
+                // Clear dragging flag when drag actually ends
+                isDraggingRef.current = false
+                setIsDragging(false)
               }}
               onCenteringStart={onCenteringStart}
               onCenteringEnd={onCenteringEnd}

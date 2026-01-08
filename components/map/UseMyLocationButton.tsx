@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { requestGeolocation, isGeolocationAvailable, type GeolocationError } from '@/lib/map/geolocation'
 
 interface UseMyLocationButtonProps {
-  onLocationFound: (lat: number, lng: number) => void
+  onLocationFound: (lat: number, lng: number, source: 'gps' | 'ip') => void
   onError?: (error: GeolocationError) => void
   className?: string
   hasLocationPermission?: boolean
@@ -37,7 +37,7 @@ export default function UseMyLocationButton({
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
               console.log('[USE_MY_LOCATION] Desktop: Using IP geolocation fallback (GPS unavailable):', ipData)
             }
-            onLocationFound(ipData.lat, ipData.lng)
+            onLocationFound(ipData.lat, ipData.lng, 'ip')
             return
           }
         }
@@ -85,7 +85,7 @@ export default function UseMyLocationButton({
                 if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                   console.log('[USE_MY_LOCATION] Desktop: Using IP geolocation fallback:', ipData)
                 }
-                onLocationFound(ipData.lat, ipData.lng)
+                onLocationFound(ipData.lat, ipData.lng, 'ip')
                 setIsLoading(false)
                 return // Success with IP fallback - exit early
               }
@@ -131,7 +131,7 @@ export default function UseMyLocationButton({
         console.log('[USE_MY_LOCATION] Desktop: Location found:', location)
       }
 
-      onLocationFound(location.lat, location.lng)
+      onLocationFound(location.lat, location.lng, 'gps')
     } catch (err) {
       const geoError = err as GeolocationError
       

@@ -1793,14 +1793,13 @@ export default function SalesClient({
 
   // Handle "Use my location" button click (desktop)
   // User-initiated GPS: MUST use imperative recenter to bypass all guards
-  const handleUseMyLocation = useCallback((lat: number, lng: number) => {
+  const handleUseMyLocation = useCallback((lat: number, lng: number, source: 'gps' | 'ip') => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[USE_MY_LOCATION] Desktop: User-initiated recenter to:', { lat, lng })
+      console.log('[USE_MY_LOCATION] Desktop: User-initiated recenter to:', { lat, lng, source })
     }
 
     // Store last known user location (for visibility computation)
-    // Source is 'ip' because desktop typically uses IP geolocation fallback
-    setLastUserLocation({ lat, lng, source: 'ip', timestamp: Date.now() })
+    setLastUserLocation({ lat, lng, source, timestamp: Date.now() })
     // Update permission state (may have been granted during GPS attempt)
     checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
 
@@ -1815,7 +1814,11 @@ export default function SalesClient({
 
     // Use imperative recenter (bypasses all guards)
     forceRecenterToLocation(map, lat, lng, 'user')
-  }, [forceRecenterToLocation])
+    
+    // Ensure visibility recomputes after recenter (even if map was already centered)
+    // Force a mapView state update to trigger shouldShowLocationIcon recomputation
+    setMapView(prev => prev ? { ...prev } : null)
+  }, [forceRecenterToLocation, setLastUserLocation, setHasLocationPermission, setMapView])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
   // User-initiated GPS: MUST use imperative recenter to bypass all guards
@@ -1834,6 +1837,9 @@ export default function SalesClient({
       // If map instance provided, use imperative recenter
       if (mapInstance) {
         forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
+        // Ensure visibility recomputes after recenter (even if map was already centered)
+        // Force a mapView state update to trigger shouldShowLocationIcon recomputation
+        setMapView(prev => prev ? { ...prev } : null)
       } else {
         // Fallback: use reactive path (should not happen, but handle gracefully)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1841,6 +1847,8 @@ export default function SalesClient({
         }
         flipToUserAuthority()
         recenterToUserLocation(location, 'user')
+        // Ensure visibility recomputes
+        setMapView(prev => prev ? { ...prev } : null)
       }
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

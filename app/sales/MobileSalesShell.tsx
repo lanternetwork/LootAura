@@ -90,7 +90,7 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters,
   hybridResult,
-  userLocation
+  userLocation: _userLocation // Unused - we use actualUserLocation (GPS) instead of userLocation prop (map center)
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()

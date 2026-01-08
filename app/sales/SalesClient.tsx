@@ -56,6 +56,8 @@ export default function SalesClient({
   // Track user interaction to prevent surprise recentering
   const userInteractedRef = useRef(false)
   const geolocationAttemptedRef = useRef(false)
+  // Track when we're doing an imperative recenter to prevent reactive conflicts
+  const isImperativeRecenterRef = useRef(false)
   
   // Check for URL parameters
   const urlLat = searchParams.get('lat')
@@ -713,6 +715,10 @@ export default function SalesClient({
   // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
   // Core buffer logic: only fetch when viewport exits buffered area
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
+    // Skip URL update if we're in the middle of an imperative recenter
+    // This prevents the viewport resolver from triggering another easeTo conflict
+    const skipUrlUpdate = isImperativeRecenterRef.current
+    
     const viewportBounds: Bounds = {
       west: bounds.west,
       south: bounds.south,
@@ -813,12 +819,17 @@ export default function SalesClient({
     
     // Update URL params to keep them in sync (for browser back button)
     // Only update if this is a user-initiated change (not from URL param restoration)
-    const params = new URLSearchParams(searchParams?.toString() || '')
-    params.set('lat', center.lat.toFixed(6))
-    params.set('lng', center.lng.toFixed(6))
-    params.set('zoom', zoom.toFixed(2))
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
-    router.replace(newUrl, { scroll: false })
+    // Skip URL update during imperative recenter to prevent resolver conflicts
+    if (!skipUrlUpdate) {
+      const params = new URLSearchParams(searchParams?.toString() || '')
+      params.set('lat', center.lat.toFixed(6))
+      params.set('lng', center.lng.toFixed(6))
+      params.set('zoom', zoom.toFixed(2))
+      const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
+      router.replace(newUrl, { scroll: false })
+    } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FORCE_RECENTER] Skipping URL update during imperative recenter')
+    }
 
     // Buffer-based fetch logic: only fetch when viewport exits buffered area
     // Clear existing timer
@@ -923,24 +934,21 @@ export default function SalesClient({
       duration: 400
     })
 
-    // 2. Sync React state AFTER the move
+    // 2. Flip authority explicitly to 'user' (before state updates to prevent conflicts)
+    setMapAuthority('user')
+
+    // 3. Set flag to prevent reactive updates from conflicting during animation
+    isImperativeRecenterRef.current = true
+
+    // 4. Update state immediately so components have correct values during animation
+    // SimpleMap's guards (isUserDragging, isCenteringToPin) will prevent reactive easeTo conflicts
     setMapView({
       center: { lat, lng },
       bounds: newBounds,
       zoom: calculatedZoom
     })
 
-    // 3. Flip authority explicitly to 'user'
-    setMapAuthority('user')
-
-    // 4. Trigger viewport change handler to update URL, fetch data
-    handleViewportChange({
-      center: { lat, lng },
-      zoom: calculatedZoom,
-      bounds: newBounds
-    })
-
-    // 5. Persist viewport
+    // 5. Persist viewport state immediately (doesn't trigger re-renders or URL updates)
     saveViewportState(
       { lat, lng, zoom: calculatedZoom },
       {
@@ -949,6 +957,16 @@ export default function SalesClient({
         radius: filters.distance || 10
       }
     )
+
+    // 6. Clear flag after animation completes (slightly longer than duration to be safe)
+    // This allows normal reactive updates to resume
+    setTimeout(() => {
+      isImperativeRecenterRef.current = false
+    }, 500)
+
+    // 7. Let the map's onMoveEnd handler naturally call handleViewportChange after animation
+    // This ensures URL updates and data fetching happen after smooth animation completes
+    // Do NOT call handleViewportChange here - it would update URL immediately and trigger resolver conflict
   }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
 
   // Unified function to recenter map to user's GPS location

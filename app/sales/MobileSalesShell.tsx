@@ -377,6 +377,8 @@ export default function MobileSalesShell({
         setHasLocationPermission(false)
       }
     } finally {
+      // Always clear loading state
+      setIsLocationLoading(false)
       setIsLocationLoading(false)
     }
   }, [onUserLocationRequest])

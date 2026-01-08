@@ -315,12 +315,17 @@ export default function MobileSalesShell({
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[USE_MY_LOCATION] Mobile: High accuracy timeout, trying low accuracy fallback')
           }
-          // Fallback to low accuracy for faster response
-          location = await requestGeolocation({
-            enableHighAccuracy: false,
-            timeout: 5000, // 5 seconds for low accuracy
-            maximumAge: 300000 // 5 minutes - accept cached location
-          })
+          try {
+            // Fallback to low accuracy for faster response
+            location = await requestGeolocation({
+              enableHighAccuracy: false,
+              timeout: 5000, // 5 seconds for low accuracy
+              maximumAge: 300000 // 5 minutes - accept cached location
+            })
+          } catch (lowAccuracyError) {
+            // Low accuracy also failed - re-throw to be handled by outer catch
+            throw lowAccuracyError
+          }
         } else {
           // Re-throw non-timeout errors (permission denied, etc.)
           throw highAccuracyError
@@ -377,9 +382,11 @@ export default function MobileSalesShell({
         setHasLocationPermission(false)
       }
     } finally {
-      // Always clear loading state
-      setIsLocationLoading(false)
-      setIsLocationLoading(false)
+      // Always clear loading state - ensure it happens even if there are errors
+      // Use requestAnimationFrame to ensure it happens after React's state batching
+      requestAnimationFrame(() => {
+        setIsLocationLoading(false)
+      })
     }
   }, [onUserLocationRequest])
   

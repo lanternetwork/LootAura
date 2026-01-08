@@ -7,6 +7,7 @@ interface UseMyLocationButtonProps {
   onLocationFound: (lat: number, lng: number) => void
   onError?: (error: GeolocationError) => void
   className?: string
+  hasLocationPermission?: boolean
 }
 
 /**
@@ -18,7 +19,8 @@ interface UseMyLocationButtonProps {
 export default function UseMyLocationButton({
   onLocationFound,
   onError,
-  className = ''
+  className = '',
+  hasLocationPermission = false
 }: UseMyLocationButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -171,8 +173,8 @@ export default function UseMyLocationButton({
           text-sm font-medium text-gray-700
           transition-colors
         `}
-        aria-label="Use my location"
-        title="Center map on your current location"
+        aria-label={hasLocationPermission ? "Recenter map" : "Use my location"}
+        title={hasLocationPermission ? "Recenter map on your location" : "Center map on your current location"}
       >
         {isLoading ? (
           <>
@@ -201,7 +203,7 @@ export default function UseMyLocationButton({
                 d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            <span>Use my location</span>
+            <span>{hasLocationPermission ? "Recenter map" : "Use my location"}</span>
           </>
         )}
       </button>

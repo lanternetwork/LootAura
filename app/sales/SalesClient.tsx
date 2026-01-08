@@ -1937,6 +1937,7 @@ export default function SalesClient({
                         console.log('[USE_MY_LOCATION] Error:', error)
                       }
                     }}
+                    hasLocationPermission={hasLocationPermission}
                   />
                 </div>
               )}

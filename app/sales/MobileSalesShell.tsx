@@ -369,10 +369,10 @@ export default function MobileSalesShell({
       }
     } finally {
       // Always clear loading state - ensure it happens even if there are errors
-      // Use requestAnimationFrame to ensure it happens after React's state batching
-      requestAnimationFrame(() => {
-        setIsLocationLoading(false)
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: Clearing loading state in finally block')
+      }
+      setIsLocationLoading(false)
     }
   }, [onUserLocationRequest])
   

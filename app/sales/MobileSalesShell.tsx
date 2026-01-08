@@ -274,8 +274,8 @@ export default function MobileSalesShell({
     setIsLocationLoading(true)
 
     try {
-      // Attempt GPS - this triggers permission prompt
-      // Use shorter timeout for non-GPS devices (desktop browsers) to fallback faster
+      // ALWAYS attempt GPS - this triggers permission prompt
+      // Capability detection only affects timeout/accuracy, not whether we attempt GPS
       const timeout = canUsePreciseGeolocation ? 10000 : 5000
       let location
       try {
@@ -284,10 +284,34 @@ export default function MobileSalesShell({
           timeout,
           maximumAge: 300000
         })
-      } catch (gpsError) {
-        // If GPS fails, fall back to IP geolocation
-        const error = gpsError as { code?: number; message?: string }
-        if (error.code === 3 || error.code === 2) { // TIMEOUT or POSITION_UNAVAILABLE
+      } catch (highAccuracyError) {
+        // If high accuracy times out and device is GPS-capable, try low accuracy
+        const error = highAccuracyError as { code?: number; message?: string }
+        if (error.code === 3 && canUsePreciseGeolocation) { // TIMEOUT on GPS-capable device
+          try {
+            location = await requestGeolocation({
+              enableHighAccuracy: false,
+              timeout: 5000,
+              maximumAge: 300000
+            })
+          } catch {
+            // If low accuracy also fails, fall back to IP
+            const ipRes = await fetch('/api/geolocation/ip')
+            if (ipRes.ok) {
+              const ipData = await ipRes.json()
+              if (ipData.lat && ipData.lng) {
+                const mapInstance = mapRef.current?.getMap?.()
+                onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+                flushSync(() => {
+                  setIsLocationLoading(false)
+                })
+                return
+              }
+            }
+            throw highAccuracyError
+          }
+        } else if (error.code === 3 || error.code === 2) { // TIMEOUT or POSITION_UNAVAILABLE
+          // Fall back to IP geolocation
           try {
             const ipRes = await fetch('/api/geolocation/ip')
             if (ipRes.ok) {
@@ -304,8 +328,11 @@ export default function MobileSalesShell({
           } catch {
             // Ignore IP fallback errors
           }
+          throw highAccuracyError
+        } else {
+          // Re-throw other errors (permission denied, etc.)
+          throw highAccuracyError
         }
-        throw gpsError
       }
 
       // GPS succeeded

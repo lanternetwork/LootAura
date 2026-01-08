@@ -121,12 +121,12 @@ export default function MobileSalesShell({
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.permissions) return
     
-    let permissionStatus: PermissionStatus | null = null
+    let permissionStatus: { state: string; addEventListener: (type: string, listener: () => void) => void; removeEventListener: (type: string, listener: () => void) => void } | null = null
     let updatePermission: (() => void) | null = null
     
     const setupPermissionListener = async () => {
       try {
-        permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName }) as { state: string; addEventListener: (type: string, listener: () => void) => void; removeEventListener: (type: string, listener: () => void) => void }
         updatePermission = () => {
           setHasLocationPermission(permissionStatus?.state === 'granted')
         }

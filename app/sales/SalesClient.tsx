@@ -1928,16 +1928,18 @@ export default function SalesClient({
               onClick={handleDesktopMapClick}
             >
               {/* Desktop "Use my location" button */}
-              <div className="absolute top-4 right-4 z-10">
-                <UseMyLocationButton
-                  onLocationFound={handleUseMyLocation}
-                  onError={(error) => {
-                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                      console.log('[USE_MY_LOCATION] Error:', error)
-                    }
-                  }}
-                />
-              </div>
+              {shouldShowLocationIcon && (
+                <div className="absolute top-4 right-4 z-10">
+                  <UseMyLocationButton
+                    onLocationFound={handleUseMyLocation}
+                    onError={(error) => {
+                      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                        console.log('[USE_MY_LOCATION] Error:', error)
+                      }
+                    }}
+                  />
+                </div>
+              )}
               <div className="w-full h-full">
                 {mapView ? (
                   <SimpleMap

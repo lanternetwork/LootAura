@@ -83,7 +83,7 @@ export default function SalesClient({
   const isCenteredOnLocation = useCallback((
     mapCenter: { lat: number; lng: number },
     target: { lat: number; lng: number },
-    thresholdMeters = 100
+    thresholdMeters = 50
   ): boolean => {
     const distanceMeters = haversineMeters(mapCenter.lat, mapCenter.lng, target.lat, target.lng)
     return distanceMeters <= thresholdMeters
@@ -215,8 +215,8 @@ export default function SalesClient({
       return true
     }
     
-    // Check if map is centered on user location
-    const isCentered = isCenteredOnLocation(mapView.center, lastUserLocation, 100)
+    // Check if map is centered on user location (50m threshold to avoid flickering)
+    const isCentered = isCenteredOnLocation(mapView.center, lastUserLocation, 50)
     
     // Show icon if NOT centered, hide if centered
     return !isCentered
@@ -1138,19 +1138,22 @@ export default function SalesClient({
         checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
         
         // Check if map is already centered on this location before attempting recenter
-        const isAlreadyCentered = mapView?.center ? isCenteredOnLocation(mapView.center, location, 100) : false
+        const isAlreadyCentered = mapView?.center ? isCenteredOnLocation(mapView.center, location, 50) : false
         
         // Automatic GPS: Use reactive recenterToUserLocation with source: 'auto'
         // This applies authority guard - will NOT recenter if user has taken control
         // Do NOT use forceRecenterToLocation here - automatic GPS must respect guards
         const didRecenter = recenterToUserLocation(location, 'auto')
         
-        // If recenter was blocked by authority guard but map is already centered on this location,
-        // ensure visibility recomputes by updating mapView to trigger shouldShowLocationIcon recomputation
+        // Ensure visibility recomputes after auto-geolocation success, even if map doesn't move
         // This handles the case where auto-prompt grants permission and map is already at user location
         if (!didRecenter && isAlreadyCentered && mapView) {
           // Map is already centered, force a state update to trigger visibility recomputation
-          // This ensures shouldShowLocationIcon recomputes with the new lastUserLocation
+          // Use a timestamp-based update to ensure React sees it as a change
+          setMapView(prev => prev ? { ...prev, zoom: prev.zoom } : null)
+        } else if (didRecenter) {
+          // If we did recenter, mapView is already updated, but ensure visibility recomputes
+          // by triggering a small state update (React will dedupe if truly unchanged)
           setMapView(prev => prev ? { ...prev } : null)
         }
       })
@@ -1794,6 +1797,12 @@ export default function SalesClient({
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[USE_MY_LOCATION] Desktop: User-initiated recenter to:', { lat, lng })
     }
+
+    // Store last known user location (for visibility computation)
+    // Source is 'ip' because desktop typically uses IP geolocation fallback
+    setLastUserLocation({ lat, lng, source: 'ip', timestamp: Date.now() })
+    // Update permission state (may have been granted during GPS attempt)
+    checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
 
     // Get map instance from desktop ref
     const map = desktopMapRef.current?.getMap?.()

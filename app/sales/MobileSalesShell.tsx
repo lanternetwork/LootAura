@@ -252,39 +252,21 @@ export default function MobileSalesShell({
   // Handle "Use my location" button - handles both permission request and recentering
   const [isLocationLoading, setIsLocationLoading] = useState(false)
   const handleUseMyLocation = useCallback(async () => {
-    // If device cannot use precise geolocation (e.g., desktop browser), skip GPS attempt
-    // and immediately use IP geolocation fallback (no spinner, no timeout)
-    if (!canUsePreciseGeolocation) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile: Cannot use precise geolocation, using IP fallback immediately')
-      }
+    // Always attempt GPS first - permission prompt happens here
+    if (!isGeolocationAvailable()) {
+      // If geolocation API not available, fall back to IP immediately
       try {
         const ipRes = await fetch('/api/geolocation/ip')
         if (ipRes.ok) {
           const ipData = await ipRes.json()
           if (ipData.lat && ipData.lng) {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[USE_MY_LOCATION] Mobile: Using IP geolocation (non-GPS device):', ipData)
-            }
-            // Get map instance for imperative recentering
             const mapInstance = mapRef.current?.getMap?.()
-            // Use IP location to recenter (pass 'ip' as source)
             onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
-            return // Success - exit early (no spinner shown)
+            return
           }
         }
-      } catch (ipError) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.error('[USE_MY_LOCATION] Mobile: IP geolocation failed:', ipError)
-        }
-      }
-      return // If IP geolocation fails, do nothing (no spinner, no timeout)
-    }
-
-    // Device can use precise geolocation - attempt GPS with spinner
-    if (!isGeolocationAvailable()) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile: Geolocation not available')
+      } catch {
+        // Ignore IP fallback errors
       }
       return
     }

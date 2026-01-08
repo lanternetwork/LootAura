@@ -11,7 +11,6 @@ import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
-import { isPointInsideBounds } from '@/lib/map/bounds'
 import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
 
 const HEADER_HEIGHT = 64 // px
@@ -114,9 +113,20 @@ export default function MobileSalesShell({
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
   
-  // Note: Location permission and visibility are now managed in SalesClient
-  // We still need actualUserLocation for backwards compatibility, but visibility is controlled by shouldShowLocationIcon prop
-  const [actualUserLocation, setActualUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  // Capability detection: separate from layout breakpoint
+  // Desktop browsers resized to mobile width do not have GPS capability
+  const canUsePreciseGeolocation = useMemo(() => {
+    if (typeof navigator === 'undefined') return false
+    if (!('geolocation' in navigator)) return false
+    if (!window.isSecureContext) return false
+    
+    // Check if this is likely a desktop environment (no touch support)
+    const isLikelyDesktopEnvironment = 
+      !('ontouchstart' in window) && 
+      navigator.maxTouchPoints === 0
+    
+    return !isLikelyDesktopEnvironment
+  }, [])
 
   // Sync mode to URL params
   useEffect(() => {

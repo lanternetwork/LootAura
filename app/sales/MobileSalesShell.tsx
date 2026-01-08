@@ -318,13 +318,30 @@ export default function MobileSalesShell({
         console.log('[USE_MY_LOCATION] Mobile: Requesting recenter to:', location)
       }
       
-      onUserLocationRequest(location)
-    } catch (error) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile error:', error)
+      try {
+        onUserLocationRequest(location)
+      } catch (callbackError) {
+        // Handle errors from the callback
+        console.error('[USE_MY_LOCATION] Mobile: Error in onUserLocationRequest callback:', {
+          error: callbackError,
+          errorString: String(callbackError),
+          errorMessage: callbackError instanceof Error ? callbackError.message : 'Unknown error',
+          errorStack: callbackError instanceof Error ? callbackError.stack : undefined
+        })
+        throw callbackError // Re-throw to be caught by outer catch
       }
+    } catch (error) {
+      // Log detailed error information
+      const geoError = error as { code?: number; message?: string }
+      console.error('[USE_MY_LOCATION] Mobile error:', {
+        code: geoError.code,
+        message: geoError.message,
+        error: error,
+        errorString: String(error),
+        errorJSON: JSON.stringify(error, Object.getOwnPropertyNames(error))
+      })
+      
       // Update permission state on error (permission denied)
-      const geoError = error as { code?: number }
       if (geoError.code === 1) {
         setHasLocationPermission(false)
       }

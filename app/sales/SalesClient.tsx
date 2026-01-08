@@ -1635,9 +1635,22 @@ export default function SalesClient({
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
   const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }) => {
-    // User-initiated GPS: flip authority and recenter (bypasses authority guard)
-    flipToUserAuthority()
-    recenterToUserLocation(location, 'user')
+    try {
+      // User-initiated GPS: flip authority and recenter (bypasses authority guard)
+      flipToUserAuthority()
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: Calling recenterToUserLocation with:', location)
+      }
+      const result = recenterToUserLocation(location, 'user')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: recenterToUserLocation result:', result)
+      }
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[USE_MY_LOCATION] Mobile: Error in handleUserLocationRequest:', error)
+      }
+      throw error // Re-throw to be caught by mobile component
+    }
   }, [recenterToUserLocation])
 
   return (

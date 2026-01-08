@@ -1821,31 +1821,19 @@ export default function SalesClient({
       return
     }
 
-    if (source === 'ip') {
-      // IP location - recenter immediately
-      setLastUserLocation({ lat, lng, source: 'ip', timestamp: Date.now() })
-      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
-      forceRecenterToLocation(map, lat, lng, 'user')
-      setMapView(prev => prev ? { ...prev } : null)
-    } else if (source === 'gps') {
-      // GPS result - check if it differs meaningfully from last known location
-      const previousLocation = lastUserLocation
-      setLastUserLocation({ lat, lng, source: 'gps', timestamp: Date.now() })
+    // Store location and update permission state
+    setLastUserLocation({ lat, lng, source, timestamp: Date.now() })
+    if (source === 'gps') {
       setHasLocationPermission(true)
-      
-      if (previousLocation) {
-        const distance = haversineMeters(previousLocation.lat, previousLocation.lng, lat, lng)
-        if (distance > 50) {
-          // GPS differs meaningfully, recenter again
-          forceRecenterToLocation(map, lat, lng, 'user')
-          setMapView(prev => prev ? { ...prev } : null)
-        }
-      } else {
-        // No previous location, recenter with GPS
-        forceRecenterToLocation(map, lat, lng, 'user')
-        setMapView(prev => prev ? { ...prev } : null)
-      }
+    } else {
+      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
     }
+
+    // Recenter map
+    forceRecenterToLocation(map, lat, lng, 'user')
+    
+    // Force visibility recomputation even if map doesn't move
+    setMapView(prev => prev ? { ...prev } : null)
   }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, haversineMeters])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)

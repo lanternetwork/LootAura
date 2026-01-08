@@ -26,13 +26,50 @@ export default function UseMyLocationButton({
   const [error, setError] = useState<string | null>(null)
 
   const handleClick = useCallback(async () => {
-    // Immediately recenter with IP location (don't block on GPS)
+    let resolvedLocation: { lat: number; lng: number; source: 'gps' | 'ip' } | null = null
+
+    // If permission already granted, skip IP and go straight to GPS
+    if (hasLocationPermission) {
+      if (!isGeolocationAvailable()) {
+        return
+      }
+      setIsLoading(true)
+      setError(null)
+      requestGeolocation({
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 600000
+      }).then((location) => {
+        if (!resolvedLocation) {
+          resolvedLocation = { lat: location.lat, lng: location.lng, source: 'gps' }
+          onLocationFound(location.lat, location.lng, 'gps')
+        }
+        setIsLoading(false)
+      }).catch((err) => {
+        const geoError = err as GeolocationError
+        onError?.(geoError)
+        if (geoError.code === 1) {
+          setError('Location access denied')
+        } else if (geoError.code === 2) {
+          setError('Location unavailable')
+        } else if (geoError.code === 3) {
+          setError('Location request timed out')
+        } else {
+          setError('Failed to get location')
+        }
+        setTimeout(() => setError(null), 3000)
+        setIsLoading(false)
+      })
+      return
+    }
+
+    // Permission not granted - try IP first, then GPS
     try {
       const ipRes = await fetch('/api/geolocation/ip')
       if (ipRes.ok) {
         const ipData = await ipRes.json()
         if (ipData.lat && ipData.lng) {
-          // Recenter immediately with IP location
+          resolvedLocation = { lat: ipData.lat, lng: ipData.lng, source: 'ip' }
           onLocationFound(ipData.lat, ipData.lng, 'ip')
         }
       }
@@ -40,7 +77,7 @@ export default function UseMyLocationButton({
       // Ignore IP errors - continue to GPS attempt
     }
 
-    // Fire GPS in background (don't block recentering)
+    // Fire GPS in background only if permission not granted (to trigger prompt)
     if (!isGeolocationAvailable()) {
       return
     }
@@ -48,14 +85,15 @@ export default function UseMyLocationButton({
     setIsLoading(true)
     setError(null)
 
-    // Fire GPS request without blocking
     requestGeolocation({
       enableHighAccuracy: false,
       timeout: 10000,
       maximumAge: 600000
     }).then((location) => {
-      // GPS resolved - check if it differs meaningfully and recenter if needed
-      onLocationFound(location.lat, location.lng, 'gps')
+      // Only use GPS if IP didn't already resolve
+      if (!resolvedLocation) {
+        onLocationFound(location.lat, location.lng, 'gps')
+      }
       setIsLoading(false)
     }).catch((err) => {
       const geoError = err as GeolocationError
@@ -72,7 +110,7 @@ export default function UseMyLocationButton({
       setTimeout(() => setError(null), 3000)
       setIsLoading(false)
     })
-  }, [onLocationFound, onError])
+  }, [onLocationFound, onError, hasLocationPermission])
 
   return (
     <div className={`relative ${className}`}>

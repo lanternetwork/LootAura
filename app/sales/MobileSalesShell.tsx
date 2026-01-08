@@ -252,65 +252,116 @@ export default function MobileSalesShell({
   // Handle "Use my location" button - handles both permission request and recentering
   const [isLocationLoading, setIsLocationLoading] = useState(false)
   const handleUseMyLocation = useCallback(async () => {
-    // Immediately recenter with IP location (don't block on GPS)
     const mapInstance = mapRef.current?.getMap?.()
-    try {
-      const ipRes = await fetch('/api/geolocation/ip')
-      if (ipRes.ok) {
-        const ipData = await ipRes.json()
-        if (ipData.lat && ipData.lng) {
-          // Recenter immediately with IP location
-          onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
-        }
-      }
-    } catch {
-      // Ignore IP errors - continue to GPS attempt
-    }
+    let resolvedLocation: { lat: number; lng: number; source: 'gps' | 'ip' } | null = null
 
-    // Fire GPS in background (don't block recentering)
-    if (!isGeolocationAvailable()) {
-      return
-    }
+    // Check permission state - if granted, skip IP and go straight to GPS
+    // Note: We don't have direct access to hasLocationPermission here, so we'll check via GPS attempt
+    // If GPS succeeds immediately (cached), permission is granted
 
-    setIsLocationLoading(true)
-
-    // Fire GPS request without blocking
-    const timeout = canUsePreciseGeolocation ? 10000 : 5000
-    requestGeolocation({
-      enableHighAccuracy: canUsePreciseGeolocation,
-      timeout,
-      maximumAge: 300000
-    }).then((location) => {
-      // GPS resolved - handler will check if it differs meaningfully and recenter if needed
-      onUserLocationRequest(location, mapInstance, 'gps')
-      flushSync(() => {
-        setIsLocationLoading(false)
-      })
-    }).catch((error) => {
-      // GPS failed - try low accuracy if GPS-capable
-      const geoError = error as { code?: number; message?: string }
-      if (geoError.code === 3 && canUsePreciseGeolocation) {
-        // Timeout on GPS-capable device - try low accuracy
-        requestGeolocation({
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 300000
-        }).then((location) => {
-          onUserLocationRequest(location, mapInstance, 'gps')
-          flushSync(() => {
-            setIsLocationLoading(false)
-          })
-        }).catch(() => {
-          flushSync(() => {
-            setIsLocationLoading(false)
-          })
-        })
-      } else {
+    // Fire GPS first if available (will trigger prompt if needed)
+    if (isGeolocationAvailable()) {
+      setIsLocationLoading(true)
+      
+      const timeout = canUsePreciseGeolocation ? 10000 : 5000
+      requestGeolocation({
+        enableHighAccuracy: canUsePreciseGeolocation,
+        timeout,
+        maximumAge: 300000
+      }).then((location) => {
+        resolvedLocation = { lat: location.lat, lng: location.lng, source: 'gps' }
+        onUserLocationRequest(location, mapInstance, 'gps')
         flushSync(() => {
           setIsLocationLoading(false)
         })
+      }).catch((error) => {
+        const geoError = error as { code?: number; message?: string }
+        if (geoError.code === 3 && canUsePreciseGeolocation) {
+          // Timeout on GPS-capable device - try low accuracy
+          requestGeolocation({
+            enableHighAccuracy: false,
+            timeout: 5000,
+            maximumAge: 300000
+          }).then((location) => {
+            if (!resolvedLocation) {
+              resolvedLocation = { lat: location.lat, lng: location.lng, source: 'gps' }
+              onUserLocationRequest(location, mapInstance, 'gps')
+            }
+            flushSync(() => {
+              setIsLocationLoading(false)
+            })
+          }).catch(() => {
+            // GPS failed - try IP fallback
+            if (!resolvedLocation) {
+              fetch('/api/geolocation/ip').then(ipRes => {
+                if (ipRes.ok) {
+                  return ipRes.json()
+                }
+                return null
+              }).then(ipData => {
+                if (ipData?.lat && ipData?.lng && !resolvedLocation) {
+                  onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+                }
+                flushSync(() => {
+                  setIsLocationLoading(false)
+                })
+              }).catch(() => {
+                flushSync(() => {
+                  setIsLocationLoading(false)
+                })
+              })
+            } else {
+              flushSync(() => {
+                setIsLocationLoading(false)
+              })
+            }
+          })
+        } else if (geoError.code === 2 || geoError.code === 3) {
+          // POSITION_UNAVAILABLE or TIMEOUT - try IP fallback
+          if (!resolvedLocation) {
+            fetch('/api/geolocation/ip').then(ipRes => {
+              if (ipRes.ok) {
+                return ipRes.json()
+              }
+              return null
+            }).then(ipData => {
+              if (ipData?.lat && ipData?.lng && !resolvedLocation) {
+                onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+              }
+              flushSync(() => {
+                setIsLocationLoading(false)
+              })
+            }).catch(() => {
+              flushSync(() => {
+                setIsLocationLoading(false)
+              })
+            })
+          } else {
+            flushSync(() => {
+              setIsLocationLoading(false)
+            })
+          }
+        } else {
+          // Permission denied or other error
+          flushSync(() => {
+            setIsLocationLoading(false)
+          })
+        }
+      })
+    } else {
+      // GPS not available - use IP
+      try {
+        const ipRes = await fetch('/api/geolocation/ip')
+        if (ipRes.ok) {
+          const ipData = await ipRes.json()
+          if (ipData.lat && ipData.lng) {
+            onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+          }
+        }
+      } catch {
+        // Ignore IP errors
       }
-    })
+    }
   }, [canUsePreciseGeolocation, onUserLocationRequest])
   
   // Close callout when map is clicked or moved

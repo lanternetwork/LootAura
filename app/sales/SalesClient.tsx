@@ -30,6 +30,10 @@ import { saveViewportState } from '@/lib/map/viewportPersistence'
 import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable } from '@/lib/map/geolocation'
 import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
+import { haversineMeters } from '@/lib/geo/distance'
+import { checkGeolocationPermission } from '@/lib/location/client'
+import { haversineMeters } from '@/lib/geo/distance'
+import { checkGeolocationPermission } from '@/lib/location/client'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -58,6 +62,58 @@ export default function SalesClient({
   const geolocationAttemptedRef = useRef(false)
   // Track when we're doing an imperative recenter to prevent reactive conflicts
   const isImperativeRecenterRef = useRef(false)
+  
+  // Single source of truth for last known user location
+  const [lastUserLocation, setLastUserLocation] = useState<{ lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null>(null)
+  const [hasLocationPermission, setHasLocationPermission] = useState(false)
+  
+  // Check location permission on mount
+  useEffect(() => {
+    const checkPermission = async () => {
+      try {
+        const hasPermission = await checkGeolocationPermission()
+        setHasLocationPermission(hasPermission)
+      } catch (error) {
+        // If permission check fails, assume no permission
+        setHasLocationPermission(false)
+      }
+    }
+    checkPermission()
+  }, [])
+  
+  // Helper function to check if map is centered on a location
+  const isCenteredOnLocation = useCallback((
+    mapCenter: { lat: number; lng: number },
+    target: { lat: number; lng: number },
+    thresholdMeters = 100
+  ): boolean => {
+    const distanceMeters = haversineMeters(mapCenter.lat, mapCenter.lng, target.lat, target.lng)
+    return distanceMeters <= thresholdMeters
+  }, [])
+  
+  // Single source of truth for location icon visibility
+  const shouldShowLocationIcon = useMemo(() => {
+    // If permission not granted, show icon (to request permission)
+    if (!hasLocationPermission) {
+      return true
+    }
+    
+    // If no last known location, show icon (can't confirm centeredness)
+    if (!lastUserLocation) {
+      return true
+    }
+    
+    // If map center not available, show icon
+    if (!mapView?.center) {
+      return true
+    }
+    
+    // Check if map is centered on user location
+    const isCentered = isCenteredOnLocation(mapView.center, lastUserLocation, 100)
+    
+    // Show icon if NOT centered, hide if centered
+    return !isCentered
+  }, [hasLocationPermission, lastUserLocation, mapView?.center, isCenteredOnLocation])
   
   // Check for URL parameters
   const urlLat = searchParams.get('lat')
@@ -1077,6 +1133,10 @@ export default function SalesClient({
       maximumAge: 300000 // 5 minutes
     })
       .then((location) => {
+        // Store last known user location
+        setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
+        // Update permission state after successful location request
+        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
         // Automatic GPS: Use reactive recenterToUserLocation with source: 'auto'
         // This applies authority guard - will NOT recenter if user has taken control
         // Do NOT use forceRecenterToLocation here - automatic GPS must respect guards
@@ -1739,11 +1799,16 @@ export default function SalesClient({
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
   // User-initiated GPS: MUST use imperative recenter to bypass all guards
   // This callback receives the map instance from MobileSalesShell
-  const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }, mapInstance?: any) => {
+  const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }, mapInstance?: any, source: 'gps' | 'ip' = 'gps') => {
     try {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile: User-initiated recenter to:', location, 'hasMap:', !!mapInstance)
+        console.log('[USE_MY_LOCATION] Mobile: User-initiated recenter to:', location, 'hasMap:', !!mapInstance, 'source:', source)
       }
+
+      // Store last known user location
+      setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
+      // Update permission state after successful location request
+      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
 
       // If map instance provided, use imperative recenter
       if (mapInstance) {
@@ -1803,6 +1868,7 @@ export default function SalesClient({
           hybridResult={hybridResult}
           userLocation={effectiveCenter || null}
           onUserLocationRequest={handleUserLocationRequest}
+          shouldShowLocationIcon={shouldShowLocationIcon}
         />
       ) : (
         /* Desktop Layout - md and above */

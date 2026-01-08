@@ -13,7 +13,6 @@ import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { isPointInsideBounds } from '@/lib/map/bounds'
 import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
-import { checkGeolocationPermission } from '@/lib/location/client'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -60,7 +59,10 @@ interface MobileSalesShellProps {
   
   // Callback for user-initiated GPS (bypasses authority guard)
   // Receives location and optional map instance for imperative recentering
-  onUserLocationRequest: (location: { lat: number; lng: number }, mapInstance?: any) => void
+  onUserLocationRequest: (location: { lat: number; lng: number }, mapInstance?: any, source?: 'gps' | 'ip') => void
+  
+  // Visibility flag for location icon (computed in SalesClient)
+  shouldShowLocationIcon: boolean
 }
 
 /**
@@ -95,7 +97,8 @@ export default function MobileSalesShell({
   hasActiveFilters,
   hybridResult,
   userLocation: _userLocation, // Unused - we use actualUserLocation (GPS) instead of userLocation prop (map center)
-  onUserLocationRequest // Callback for user-initiated GPS (bypasses authority guard)
+  onUserLocationRequest, // Callback for user-initiated GPS (bypasses authority guard)
+  shouldShowLocationIcon // Visibility flag computed in SalesClient
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -110,46 +113,10 @@ export default function MobileSalesShell({
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
-  const [hasLocationPermission, setHasLocationPermission] = useState(false)
+  
+  // Note: Location permission and visibility are now managed in SalesClient
+  // We still need actualUserLocation for backwards compatibility, but visibility is controlled by shouldShowLocationIcon prop
   const [actualUserLocation, setActualUserLocation] = useState<{ lat: number; lng: number } | null>(null)
-  
-  // Check location permission on mount
-  useEffect(() => {
-    const checkPermission = async () => {
-      const hasPermission = await checkGeolocationPermission()
-      setHasLocationPermission(hasPermission)
-    }
-    checkPermission()
-  }, [])
-  
-  // Listen for permission changes
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.permissions) return
-    
-    let permissionStatus: { state: string; addEventListener: (type: string, listener: () => void) => void; removeEventListener: (type: string, listener: () => void) => void } | null = null
-    let updatePermission: (() => void) | null = null
-    
-    const setupPermissionListener = async () => {
-      try {
-        permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName }) as { state: string; addEventListener: (type: string, listener: () => void) => void; removeEventListener: (type: string, listener: () => void) => void }
-        updatePermission = () => {
-          setHasLocationPermission(permissionStatus?.state === 'granted')
-        }
-        updatePermission()
-        permissionStatus.addEventListener('change', updatePermission)
-      } catch (error) {
-        // Permission API not supported, fall back to checking on user action
-      }
-    }
-    
-    setupPermissionListener()
-    
-    return () => {
-      if (permissionStatus && updatePermission) {
-        permissionStatus.removeEventListener('change', updatePermission)
-      }
-    }
-  }, [])
 
   // Sync mode to URL params
   useEffect(() => {
@@ -269,24 +236,8 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
-  // Calculate if map is centered on user's actual GPS location
-  // Use actualUserLocation (from GPS) instead of userLocation prop (which is map center)
-  const isMapCenteredOnUserLocation = useMemo(() => {
-    if (!actualUserLocation || !mapView?.bounds) return false
-    const point: [number, number] = [actualUserLocation.lng, actualUserLocation.lat]
-    return isPointInsideBounds(point, mapView.bounds)
-  }, [actualUserLocation, mapView?.bounds])
-
-  // Consolidated visibility logic for location icon button
-  // Visible if: permission not granted OR (permission granted AND map not centered on user)
-  // Hidden if: permission granted AND map centered on user
-  const shouldShowLocationButton = useMemo(() => {
-    // If no permission, always show (to request permission)
-    if (!hasLocationPermission) return true
-    
-    // If permission granted, only show if map is not centered on user
-    return !isMapCenteredOnUserLocation
-  }, [hasLocationPermission, isMapCenteredOnUserLocation])
+  // Visibility is now controlled by shouldShowLocationIcon prop from SalesClient
+  // This ensures a single source of truth for visibility logic
 
   // Handle "Use my location" button - handles both permission request and recentering
   const [isLocationLoading, setIsLocationLoading] = useState(false)
@@ -329,15 +280,12 @@ export default function MobileSalesShell({
         }
       }
 
-      // Store the actual GPS location for centering check
+      // Store the actual GPS location (for backwards compatibility)
       setActualUserLocation({ lat: location.lat, lng: location.lng })
-
-      // Update permission state after successful location request
-      const hasPermission = await checkGeolocationPermission()
-      setHasLocationPermission(hasPermission)
 
       // "Use my location" is explicit user intent - use imperative recenter
       // This bypasses authority guard and always recenters
+      // Note: lastUserLocation and permission state are now managed in SalesClient
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[USE_MY_LOCATION] Mobile: Requesting imperative recenter to:', location)
       }
@@ -345,9 +293,9 @@ export default function MobileSalesShell({
       // Get map instance for imperative recentering
       const mapInstance = mapRef.current?.getMap?.()
       
-      // Pass map instance to callback for imperative recentering
+      // Pass map instance and source to callback for imperative recentering
       // If callback throws, it will be caught by outer catch block
-      onUserLocationRequest(location, mapInstance)
+      onUserLocationRequest(location, mapInstance, 'gps')
     } catch (error) {
       // Log detailed error information - log each property individually so they show in console
       const geoError = error as { code?: number; message?: string; name?: string }
@@ -364,10 +312,8 @@ export default function MobileSalesShell({
       }
       console.error('[USE_MY_LOCATION] Mobile error - full error object:', error)
       
-      // Update permission state on error (permission denied)
-      if (geoError.code === 1) {
-        setHasLocationPermission(false)
-      }
+      // Permission state is now managed in SalesClient
+      // No need to update it here
       
       // If GPS failed (timeout or other error), try IP geolocation as fallback
       // This ensures the map still recenters even when GPS is unavailable
@@ -383,12 +329,12 @@ export default function MobileSalesShell({
               if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                 console.log('[USE_MY_LOCATION] Mobile: Using IP geolocation fallback:', ipData)
               }
-              // Store the IP location for centering check (so button can hide when centered)
+              // Store the IP location (for backwards compatibility)
               setActualUserLocation({ lat: ipData.lat, lng: ipData.lng })
               // Get map instance for imperative recentering
               const mapInstance = mapRef.current?.getMap?.()
-              // Use IP location to recenter
-              onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance)
+              // Use IP location to recenter (pass 'ip' as source)
+              onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
               // Clear loading state after successful IP fallback
               flushSync(() => {
                 setIsLocationLoading(false)
@@ -565,8 +511,8 @@ export default function MobileSalesShell({
                   }}
                   disabled={isLocationLoading}
                   className="absolute bottom-36 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label={hasLocationPermission ? "Recenter map on your location" : "Request location permission"}
-                  title={hasLocationPermission ? "Recenter map on your location" : "Request location permission"}
+                  aria-label="Use my location"
+                  title="Use my location"
                 >
                   {isLocationLoading ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>

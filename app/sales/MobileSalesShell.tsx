@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import SimpleMap from '@/components/location/SimpleMap'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
@@ -369,10 +370,14 @@ export default function MobileSalesShell({
       }
     } finally {
       // Always clear loading state - ensure it happens even if there are errors
+      // Use flushSync to force immediate synchronous state update
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[USE_MY_LOCATION] Mobile: Clearing loading state in finally block')
       }
-      setIsLocationLoading(false)
+      // Force immediate synchronous update to ensure UI reflects the change
+      flushSync(() => {
+        setIsLocationLoading(false)
+      })
     }
   }, [onUserLocationRequest])
   

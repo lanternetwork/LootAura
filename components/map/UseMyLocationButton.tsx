@@ -111,7 +111,7 @@ export default function UseMyLocationButton({
                   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                     console.log('[USE_MY_LOCATION] Desktop: Using IP geolocation fallback:', ipData)
                   }
-                  onLocationFound(ipData.lat, ipData.lng)
+                  onLocationFound(ipData.lat, ipData.lng, 'ip')
                   setIsLoading(false)
                   return // Success with IP fallback - exit early
                 }

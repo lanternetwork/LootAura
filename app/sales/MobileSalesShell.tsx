@@ -7,13 +7,13 @@ import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
-import MobileRecenterButton from '@/components/location/MobileRecenterButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { isPointInsideBounds } from '@/lib/map/bounds'
 import { flipToUserAuthority } from '@/lib/map/authority'
 import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
+import { checkGeolocationPermission } from '@/lib/location/client'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -106,7 +106,17 @@ export default function MobileSalesShell({
   const isDraggingRef = useRef<boolean>(false)
   const [isDragging, setIsDragging] = useState(false) // State version for visibility calculation
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [hasLocationPermission, setHasLocationPermission] = useState(false)
   
+  // Check location permission on mount and when userLocation changes
+  useEffect(() => {
+    const checkPermission = async () => {
+      const hasPermission = await checkGeolocationPermission()
+      setHasLocationPermission(hasPermission)
+    }
+    checkPermission()
+  }, [userLocation])
+
   // Sync mode to URL params
   useEffect(() => {
     const currentView = searchParams?.get('view')
@@ -225,7 +235,25 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
-  // Handle "Use my location" button (mobile, icon-only)
+  // Calculate if map is centered on user location
+  const isMapCenteredOnUserLocation = useMemo(() => {
+    if (!userLocation || !mapView?.bounds) return false
+    const point: [number, number] = [userLocation.lng, userLocation.lat]
+    return isPointInsideBounds(point, mapView.bounds)
+  }, [userLocation, mapView?.bounds])
+
+  // Consolidated visibility logic for location icon button
+  // Visible if: permission not granted OR (permission granted AND map not centered on user)
+  // Hidden if: permission granted AND map centered on user
+  const shouldShowLocationButton = useMemo(() => {
+    // If no permission, always show (to request permission)
+    if (!hasLocationPermission) return true
+    
+    // If permission granted, only show if map is not centered on user
+    return !isMapCenteredOnUserLocation
+  }, [hasLocationPermission, isMapCenteredOnUserLocation])
+
+  // Handle "Use my location" button - handles both permission request and recentering
   const [isLocationLoading, setIsLocationLoading] = useState(false)
   const handleUseMyLocation = useCallback(async () => {
     if (!isGeolocationAvailable()) {
@@ -243,6 +271,9 @@ export default function MobileSalesShell({
         timeout: 10000,
         maximumAge: 300000 // 5 minutes
       })
+
+      // Update permission state after successful location request
+      setHasLocationPermission(true)
 
       // "Use my location" is explicit user intent - flip authority to user
       flipToUserAuthority()
@@ -269,84 +300,15 @@ export default function MobileSalesShell({
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[USE_MY_LOCATION] Mobile error:', error)
       }
+      // Update permission state on error (permission denied)
+      const geoError = error as { code?: number }
+      if (geoError.code === 1) {
+        setHasLocationPermission(false)
+      }
     } finally {
       setIsLocationLoading(false)
     }
   }, [onViewportChange])
-
-  // Calculate visibility of recenter button - only show when user location is outside viewport
-  // Hide during map dragging to prevent flickering
-  const shouldShowRecenterButton = useMemo(() => {
-    if (!userLocation || !mapView?.bounds) return false
-    if (isDragging) return false // Hide during active dragging
-    
-    const point: [number, number] = [userLocation.lng, userLocation.lat]
-    return !isPointInsideBounds(point, mapView.bounds)
-  }, [userLocation, mapView?.bounds, isDragging])
-
-  // Handle re-center - animate map to user location using mapRef
-  const handleRecenter = useCallback(() => {
-    if (!userLocation || !mapRef.current) return
-    
-    const map = mapRef.current.getMap?.()
-    if (!map) return
-
-    // Default zoom for 10-mile distance (matches distanceToZoom logic)
-    const DEFAULT_ZOOM = 12
-
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[MOBILE_RECENTER] Animating to user location:', userLocation, 'zoom:', DEFAULT_ZOOM)
-    }
-
-    // Calculate bounds for the new viewport (approximate for zoom 12)
-    const latRange = 0.11 // ~10 miles at mid-latitudes
-    const lngRange = latRange * Math.cos(userLocation.lat * Math.PI / 180)
-    const newBounds = {
-      west: userLocation.lng - lngRange / 2,
-      south: userLocation.lat - latRange / 2,
-      east: userLocation.lng + lngRange / 2,
-      north: userLocation.lat + latRange / 2
-    }
-
-    // Calculate distance to determine appropriate duration
-    const currentCenter = map.getCenter()
-    const currentLat = currentCenter.lat
-    const currentLng = currentCenter.lng
-    const distance = Math.sqrt(
-      Math.pow((userLocation.lat - currentLat) * 111, 2) + 
-      Math.pow((userLocation.lng - currentLng) * 111 * Math.cos(currentLat * Math.PI / 180), 2)
-    ) // Approximate distance in km
-    
-    // Use longer duration for longer distances (max 3 seconds for very long distances)
-    const duration = Math.min(3000, Math.max(1000, distance * 50))
-
-    // Listen for moveend event to know when flyTo animation completes
-    // Use once() to automatically remove listener after it fires
-    const handleMoveEnd = () => {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[MOBILE_RECENTER] Animation completed, updating viewport state')
-      }
-      
-      // Update viewport state after animation completes
-      // This ensures SimpleMap's easeTo doesn't interfere with the flyTo animation
-      onViewportChange({
-        center: userLocation,
-        zoom: DEFAULT_ZOOM,
-        bounds: newBounds
-      })
-    }
-
-    // Add listener before starting animation
-    map.once('moveend', handleMoveEnd)
-
-    // Animate to user location
-    map.flyTo({
-      center: [userLocation.lng, userLocation.lat],
-      zoom: DEFAULT_ZOOM,
-      duration: duration,
-      essential: true
-    })
-  }, [userLocation, onViewportChange])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {
@@ -490,32 +452,28 @@ export default function MobileSalesShell({
                 )}
               </button>
               
-              {/* "Use my location" button - Icon only, above mode toggle (Mobile) */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleUseMyLocation()
-                }}
-                disabled={isLocationLoading}
-                className="absolute bottom-36 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Use my location"
-                title="Center map on your current location"
-              >
-                {isLocationLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>
-                ) : (
-                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                )}
-              </button>
-              
-              {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
-              <MobileRecenterButton
-                visible={shouldShowRecenterButton}
-                onClick={handleRecenter}
-              />
+              {/* Location icon button - Handles both permission request and recentering */}
+              {shouldShowLocationButton && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleUseMyLocation()
+                  }}
+                  disabled={isLocationLoading}
+                  className="absolute bottom-36 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label={hasLocationPermission ? "Recenter map on your location" : "Request location permission"}
+                  title={hasLocationPermission ? "Recenter map on your location" : "Request location permission"}
+                >
+                  {isLocationLoading ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>
+                  ) : (
+                    <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </button>
+              )}
               
               {/* Mode Toggle FAB - Bottom Right */}
               <button

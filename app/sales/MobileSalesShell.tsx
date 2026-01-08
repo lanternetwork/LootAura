@@ -344,19 +344,9 @@ export default function MobileSalesShell({
       // Get map instance for imperative recentering
       const mapInstance = mapRef.current?.getMap?.()
       
-      try {
-        // Pass map instance to callback for imperative recentering
-        onUserLocationRequest(location, mapInstance)
-      } catch (callbackError) {
-        // Handle errors from the callback
-        console.error('[USE_MY_LOCATION] Mobile: Error in onUserLocationRequest callback:', {
-          error: callbackError,
-          errorString: String(callbackError),
-          errorMessage: callbackError instanceof Error ? callbackError.message : 'Unknown error',
-          errorStack: callbackError instanceof Error ? callbackError.stack : undefined
-        })
-        throw callbackError // Re-throw to be caught by outer catch
-      }
+      // Pass map instance to callback for imperative recentering
+      // If callback throws, it will be caught by outer catch block
+      onUserLocationRequest(location, mapInstance)
     } catch (error) {
       // Log detailed error information - log each property individually so they show in console
       const geoError = error as { code?: number; message?: string; name?: string }

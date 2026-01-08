@@ -65,7 +65,7 @@ export default function SalesClient({
   const [lastUserLocation, setLastUserLocation] = useState<{ lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null>(null)
   const [hasLocationPermission, setHasLocationPermission] = useState(false)
   
-  // Check location permission on mount
+  // Check location permission on mount and listen for changes
   useEffect(() => {
     const checkPermission = async () => {
       try {
@@ -77,6 +77,20 @@ export default function SalesClient({
       }
     }
     checkPermission()
+    
+    // Listen for permission changes
+    if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(permission => {
+        const updatePermission = () => {
+          setHasLocationPermission(permission.state === 'granted')
+        }
+        updatePermission()
+        permission.addEventListener('change', updatePermission)
+        return () => permission.removeEventListener('change', updatePermission)
+      }).catch(() => {
+        // Permission query not supported, rely on checkPermission only
+      })
+    }
   }, [])
   
   // Helper function to check if map is centered on a location
@@ -1800,8 +1814,13 @@ export default function SalesClient({
 
     // Store last known user location (for visibility computation)
     setLastUserLocation({ lat, lng, source, timestamp: Date.now() })
-    // Update permission state (may have been granted during GPS attempt)
-    checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+    // Update permission state immediately (permission was granted if GPS succeeded)
+    if (source === 'gps') {
+      setHasLocationPermission(true)
+    } else {
+      // For IP fallback, check permission state
+      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+    }
 
     // Get map instance from desktop ref
     const map = desktopMapRef.current?.getMap?.()
@@ -1831,8 +1850,13 @@ export default function SalesClient({
 
       // Store last known user location
       setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
-      // Update permission state after successful location request
-      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+      // Update permission state immediately (permission was granted if GPS succeeded)
+      if (source === 'gps') {
+        setHasLocationPermission(true)
+      } else {
+        // For IP fallback, check permission state
+        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+      }
 
       // If map instance provided, use imperative recenter
       if (mapInstance) {

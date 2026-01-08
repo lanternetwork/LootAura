@@ -60,6 +60,7 @@ export default function UseMyLocationButton({
     setError(null)
 
     try {
+      // Call geolocation immediately - permission prompt happens here
       // Desktop-friendly geolocation: use low accuracy for network-based positioning
       // This works on machines without GPS hardware and is faster
       let location

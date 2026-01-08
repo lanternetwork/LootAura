@@ -1148,8 +1148,8 @@ export default function SalesClient({
       .then((location) => {
         // Store last known user location (triggers visibility recomputation)
         setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
-        // Update permission state after successful location request
-        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+        // Update permission state immediately (GPS success means permission was granted)
+        setHasLocationPermission(true)
         
         // Check if map is already centered on this location before attempting recenter
         const isAlreadyCentered = mapView?.center ? isCenteredOnLocation(mapView.center, location, 50) : false

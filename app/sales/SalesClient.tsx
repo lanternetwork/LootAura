@@ -1862,31 +1862,19 @@ export default function SalesClient({
         return
       }
 
-      if (source === 'ip') {
-        // IP location - recenter immediately
-        setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'ip', timestamp: Date.now() })
-        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
-        forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
-        setMapView(prev => prev ? { ...prev } : null)
-      } else if (source === 'gps') {
-        // GPS result - check if it differs meaningfully from last known location
-        const previousLocation = lastUserLocation
-        setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
+      // Store location and update permission state
+      setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
+      if (source === 'gps') {
         setHasLocationPermission(true)
-        
-        if (previousLocation) {
-          const distance = haversineMeters(previousLocation.lat, previousLocation.lng, location.lat, location.lng)
-          if (distance > 50) {
-            // GPS differs meaningfully, recenter again
-            forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
-            setMapView(prev => prev ? { ...prev } : null)
-          }
-        } else {
-          // No previous location, recenter with GPS
-          forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
-          setMapView(prev => prev ? { ...prev } : null)
-        }
+      } else {
+        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
       }
+
+      // Recenter map
+      forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
+      
+      // Force visibility recomputation even if map doesn't move
+      setMapView(prev => prev ? { ...prev } : null)
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('[USE_MY_LOCATION] Mobile: Error in handleUserLocationRequest:', error)

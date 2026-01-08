@@ -1631,6 +1631,12 @@ export default function SalesClient({
     recenterToUserLocation({ lat, lng }, 'user')
   }, [recenterToUserLocation])
 
+  // Handle user-initiated GPS request from mobile (bypasses authority guard)
+  const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }) => {
+    // User-initiated GPS: flip authority and recenter (bypasses authority guard)
+    flipToUserAuthority()
+    recenterToUserLocation(location, 'user')
+  }, [recenterToUserLocation])
 
   return (
     <>
@@ -1670,11 +1676,7 @@ export default function SalesClient({
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
           hybridResult={hybridResult}
           userLocation={effectiveCenter || null}
-          onUserLocationRequest={(location) => {
-            // User-initiated GPS: flip authority and recenter (bypasses authority guard)
-            flipToUserAuthority()
-            recenterToUserLocation(location, 'user')
-          }}
+          onUserLocationRequest={handleUserLocationRequest}
         />
       ) : (
         /* Desktop Layout - md and above */

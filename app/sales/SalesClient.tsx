@@ -89,30 +89,6 @@ export default function SalesClient({
     return distanceMeters <= thresholdMeters
   }, [])
   
-  // Single source of truth for location icon visibility
-  const shouldShowLocationIcon = useMemo(() => {
-    // If permission not granted, show icon (to request permission)
-    if (!hasLocationPermission) {
-      return true
-    }
-    
-    // If no last known location, show icon (can't confirm centeredness)
-    if (!lastUserLocation) {
-      return true
-    }
-    
-    // If map center not available, show icon
-    if (!mapView?.center) {
-      return true
-    }
-    
-    // Check if map is centered on user location
-    const isCentered = isCenteredOnLocation(mapView.center, lastUserLocation, 100)
-    
-    // Show icon if NOT centered, hide if centered
-    return !isCentered
-  }, [hasLocationPermission, lastUserLocation, mapView?.center, isCenteredOnLocation])
-  
   // Check for URL parameters
   const urlLat = searchParams.get('lat')
   const urlLng = searchParams.get('lng')
@@ -220,6 +196,31 @@ export default function SalesClient({
       zoom: 10
     }
   })
+
+  // Single source of truth for location icon visibility
+  // Must be declared after mapView since it depends on it
+  const shouldShowLocationIcon = useMemo(() => {
+    // If permission not granted, show icon (to request permission)
+    if (!hasLocationPermission) {
+      return true
+    }
+    
+    // If no last known location, show icon (can't confirm centeredness)
+    if (!lastUserLocation) {
+      return true
+    }
+    
+    // If map center not available, show icon
+    if (!mapView?.center) {
+      return true
+    }
+    
+    // Check if map is centered on user location
+    const isCentered = isCenteredOnLocation(mapView.center, lastUserLocation, 100)
+    
+    // Show icon if NOT centered, hide if centered
+    return !isCentered
+  }, [hasLocationPermission, lastUserLocation, mapView?.center, isCenteredOnLocation])
 
   // Sales data state - map is source of truth
   // fetchedSales: All sales for the buffered area (larger than viewport)

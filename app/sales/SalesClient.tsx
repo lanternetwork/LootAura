@@ -1806,20 +1806,10 @@ export default function SalesClient({
   }, [handleViewportChange])
 
   // Handle "Use my location" button click (desktop)
-  // User-initiated GPS: MUST use imperative recenter to bypass all guards
+  // User-initiated: Recenter immediately with best available location, then fire GPS in background
   const handleUseMyLocation = useCallback((lat: number, lng: number, source: 'gps' | 'ip') => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[USE_MY_LOCATION] Desktop: User-initiated recenter to:', { lat, lng, source })
-    }
-
-    // Store last known user location (for visibility computation)
-    setLastUserLocation({ lat, lng, source, timestamp: Date.now() })
-    // Update permission state immediately (permission was granted if GPS succeeded)
-    if (source === 'gps') {
-      setHasLocationPermission(true)
-    } else {
-      // For IP fallback, check permission state
-      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
     }
 
     // Get map instance from desktop ref
@@ -1831,13 +1821,32 @@ export default function SalesClient({
       return
     }
 
-    // Use imperative recenter (bypasses all guards)
-    forceRecenterToLocation(map, lat, lng, 'user')
-    
-    // Ensure visibility recomputes after recenter (even if map was already centered)
-    // Force a mapView state update to trigger shouldShowLocationIcon recomputation
-    setMapView(prev => prev ? { ...prev } : null)
-  }, [forceRecenterToLocation, setLastUserLocation, setHasLocationPermission, setMapView])
+    if (source === 'ip') {
+      // IP location - recenter immediately
+      setLastUserLocation({ lat, lng, source: 'ip', timestamp: Date.now() })
+      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+      forceRecenterToLocation(map, lat, lng, 'user')
+      setMapView(prev => prev ? { ...prev } : null)
+    } else if (source === 'gps') {
+      // GPS result - check if it differs meaningfully from last known location
+      const previousLocation = lastUserLocation
+      setLastUserLocation({ lat, lng, source: 'gps', timestamp: Date.now() })
+      setHasLocationPermission(true)
+      
+      if (previousLocation) {
+        const distance = haversineMeters(previousLocation.lat, previousLocation.lng, lat, lng)
+        if (distance > 50) {
+          // GPS differs meaningfully, recenter again
+          forceRecenterToLocation(map, lat, lng, 'user')
+          setMapView(prev => prev ? { ...prev } : null)
+        }
+      } else {
+        // No previous location, recenter with GPS
+        forceRecenterToLocation(map, lat, lng, 'user')
+        setMapView(prev => prev ? { ...prev } : null)
+      }
+    }
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, haversineMeters])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
   // User-initiated GPS: MUST use imperative recenter to bypass all guards

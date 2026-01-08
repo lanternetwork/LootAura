@@ -252,99 +252,65 @@ export default function MobileSalesShell({
   // Handle "Use my location" button - handles both permission request and recentering
   const [isLocationLoading, setIsLocationLoading] = useState(false)
   const handleUseMyLocation = useCallback(async () => {
-    // Always attempt GPS to trigger permission prompt
-    if (!isGeolocationAvailable()) {
-      // If geolocation API not available, fall back to IP immediately
-      try {
-        const ipRes = await fetch('/api/geolocation/ip')
-        if (ipRes.ok) {
-          const ipData = await ipRes.json()
-          if (ipData.lat && ipData.lng) {
-            const mapInstance = mapRef.current?.getMap?.()
-            onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
-            return
-          }
+    // Immediately recenter with IP location (don't block on GPS)
+    const mapInstance = mapRef.current?.getMap?.()
+    try {
+      const ipRes = await fetch('/api/geolocation/ip')
+      if (ipRes.ok) {
+        const ipData = await ipRes.json()
+        if (ipData.lat && ipData.lng) {
+          // Recenter immediately with IP location
+          onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
         }
-      } catch {
-        // Ignore IP fallback errors
       }
+    } catch {
+      // Ignore IP errors - continue to GPS attempt
+    }
+
+    // Fire GPS in background (don't block recentering)
+    if (!isGeolocationAvailable()) {
       return
     }
 
     setIsLocationLoading(true)
 
-    try {
-      // ALWAYS attempt GPS - this triggers permission prompt
-      // Capability detection only affects timeout/accuracy, not whether we attempt GPS
-      const timeout = canUsePreciseGeolocation ? 10000 : 5000
-      let location
-      try {
-        location = await requestGeolocation({
-          enableHighAccuracy: canUsePreciseGeolocation,
-          timeout,
-          maximumAge: 300000
-        })
-      } catch (highAccuracyError) {
-        // If high accuracy times out and device is GPS-capable, try low accuracy
-        const error = highAccuracyError as { code?: number; message?: string }
-        if (error.code === 3 && canUsePreciseGeolocation) { // TIMEOUT on GPS-capable device
-          try {
-            location = await requestGeolocation({
-              enableHighAccuracy: false,
-              timeout: 5000,
-              maximumAge: 300000
-            })
-          } catch {
-            // If low accuracy also fails, fall back to IP
-            const ipRes = await fetch('/api/geolocation/ip')
-            if (ipRes.ok) {
-              const ipData = await ipRes.json()
-              if (ipData.lat && ipData.lng) {
-                const mapInstance = mapRef.current?.getMap?.()
-                onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
-                flushSync(() => {
-                  setIsLocationLoading(false)
-                })
-                return
-              }
-            }
-            throw highAccuracyError
-          }
-        } else if (error.code === 3 || error.code === 2) { // TIMEOUT or POSITION_UNAVAILABLE
-          // Fall back to IP geolocation
-          try {
-            const ipRes = await fetch('/api/geolocation/ip')
-            if (ipRes.ok) {
-              const ipData = await ipRes.json()
-              if (ipData.lat && ipData.lng) {
-                const mapInstance = mapRef.current?.getMap?.()
-                onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
-                flushSync(() => {
-                  setIsLocationLoading(false)
-                })
-                return
-              }
-            }
-          } catch {
-            // Ignore IP fallback errors
-          }
-          throw highAccuracyError
-        } else {
-          // Re-throw other errors (permission denied, etc.)
-          throw highAccuracyError
-        }
-      }
-
-      // GPS succeeded
-      const mapInstance = mapRef.current?.getMap?.()
+    // Fire GPS request without blocking
+    const timeout = canUsePreciseGeolocation ? 10000 : 5000
+    requestGeolocation({
+      enableHighAccuracy: canUsePreciseGeolocation,
+      timeout,
+      maximumAge: 300000
+    }).then((location) => {
+      // GPS resolved - handler will check if it differs meaningfully and recenter if needed
       onUserLocationRequest(location, mapInstance, 'gps')
-    } catch (error) {
-      // Error handling - clear loading state
-    } finally {
       flushSync(() => {
         setIsLocationLoading(false)
       })
-    }
+    }).catch((error) => {
+      // GPS failed - try low accuracy if GPS-capable
+      const geoError = error as { code?: number; message?: string }
+      if (geoError.code === 3 && canUsePreciseGeolocation) {
+        // Timeout on GPS-capable device - try low accuracy
+        requestGeolocation({
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 300000
+        }).then((location) => {
+          onUserLocationRequest(location, mapInstance, 'gps')
+          flushSync(() => {
+            setIsLocationLoading(false)
+          })
+        }).catch(() => {
+          flushSync(() => {
+            setIsLocationLoading(false)
+          })
+        })
+      } else {
+        flushSync(() => {
+          setIsLocationLoading(false)
+        })
+      }
+    })
   }, [canUsePreciseGeolocation, onUserLocationRequest])
   
   // Close callout when map is clicked or moved

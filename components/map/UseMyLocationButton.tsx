@@ -26,123 +26,40 @@ export default function UseMyLocationButton({
   const [error, setError] = useState<string | null>(null)
 
   const handleClick = useCallback(async () => {
-    // Don't show loading state if geolocation is not available - fallback immediately
+    // Immediately recenter with IP location (don't block on GPS)
+    try {
+      const ipRes = await fetch('/api/geolocation/ip')
+      if (ipRes.ok) {
+        const ipData = await ipRes.json()
+        if (ipData.lat && ipData.lng) {
+          // Recenter immediately with IP location
+          onLocationFound(ipData.lat, ipData.lng, 'ip')
+        }
+      }
+    } catch {
+      // Ignore IP errors - continue to GPS attempt
+    }
+
+    // Fire GPS in background (don't block recentering)
     if (!isGeolocationAvailable()) {
-      // Try IP geolocation fallback immediately (no loading state)
-      try {
-        const ipRes = await fetch('/api/geolocation/ip')
-        if (ipRes.ok) {
-          const ipData = await ipRes.json()
-          if (ipData.lat && ipData.lng) {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[USE_MY_LOCATION] Desktop: Using IP geolocation fallback (GPS unavailable):', ipData)
-            }
-            onLocationFound(ipData.lat, ipData.lng, 'ip')
-            return
-          }
-        }
-      } catch (ipError) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.error('[USE_MY_LOCATION] Desktop: IP geolocation fallback failed:', ipError)
-        }
-      }
-      
-      const err: GeolocationError = {
-        code: 0,
-        message: 'Geolocation is not available in this browser'
-      }
-      onError?.(err)
-      setError('Location services not available')
       return
     }
 
     setIsLoading(true)
     setError(null)
 
-    try {
-      // Call geolocation immediately - permission prompt happens here
-      // Desktop-friendly geolocation: use low accuracy for network-based positioning
-      // This works on machines without GPS hardware and is faster
-      let location
-      try {
-        location = await requestGeolocation({
-          enableHighAccuracy: false, // Desktop-friendly: network-based positioning
-          timeout: 10000, // 10 seconds - shorter timeout for faster fallback
-          maximumAge: 600000 // 10 minutes - accept cached location
-        })
-      } catch (highAccuracyError) {
-        // If low accuracy also fails, try with even more lenient settings
-        const error = highAccuracyError as { code?: number; message?: string }
-        if (error.code === 3) { // TIMEOUT
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[USE_MY_LOCATION] Desktop: GPS timed out, trying IP geolocation fallback')
-          }
-          // Fallback to IP geolocation on timeout
-          try {
-            const ipRes = await fetch('/api/geolocation/ip')
-            if (ipRes.ok) {
-              const ipData = await ipRes.json()
-              if (ipData.lat && ipData.lng) {
-                if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                  console.log('[USE_MY_LOCATION] Desktop: Using IP geolocation fallback:', ipData)
-                }
-                onLocationFound(ipData.lat, ipData.lng, 'ip')
-                setIsLoading(false)
-                return // Success with IP fallback - exit early
-              }
-            }
-          } catch (ipError) {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.error('[USE_MY_LOCATION] Desktop: IP geolocation fallback failed:', ipError)
-            }
-          }
-          // If IP fallback also fails, throw the original timeout error
-          throw highAccuracyError
-        } else {
-          // For non-timeout errors (permission denied, etc.), try IP fallback
-          if (error.code === 2) { // POSITION_UNAVAILABLE
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[USE_MY_LOCATION] Desktop: GPS unavailable, trying IP geolocation fallback')
-            }
-            try {
-              const ipRes = await fetch('/api/geolocation/ip')
-              if (ipRes.ok) {
-                const ipData = await ipRes.json()
-                if (ipData.lat && ipData.lng) {
-                  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                    console.log('[USE_MY_LOCATION] Desktop: Using IP geolocation fallback:', ipData)
-                  }
-                  onLocationFound(ipData.lat, ipData.lng, 'ip')
-                  setIsLoading(false)
-                  return // Success with IP fallback - exit early
-                }
-              }
-            } catch (ipError) {
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.error('[USE_MY_LOCATION] Desktop: IP geolocation fallback failed:', ipError)
-              }
-            }
-          }
-          // Re-throw non-timeout errors (permission denied, etc.)
-          throw highAccuracyError
-        }
-      }
-
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Desktop: Location found:', location)
-      }
-
+    // Fire GPS request without blocking
+    requestGeolocation({
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 600000
+    }).then((location) => {
+      // GPS resolved - check if it differs meaningfully and recenter if needed
       onLocationFound(location.lat, location.lng, 'gps')
-    } catch (err) {
+      setIsLoading(false)
+    }).catch((err) => {
       const geoError = err as GeolocationError
-      
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Desktop: Error:', geoError)
-      }
-
       onError?.(geoError)
-      
-      // Set user-friendly error message
       if (geoError.code === 1) {
         setError('Location access denied')
       } else if (geoError.code === 2) {
@@ -152,13 +69,9 @@ export default function UseMyLocationButton({
       } else {
         setError('Failed to get location')
       }
-      
-      // Clear error message after 3 seconds
       setTimeout(() => setError(null), 3000)
-    } finally {
-      // Always clear loading state, even if we used IP fallback
       setIsLoading(false)
-    }
+    })
   }, [onLocationFound, onError])
 
   return (

@@ -32,8 +32,6 @@ import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { haversineMeters } from '@/lib/geo/distance'
 import { checkGeolocationPermission } from '@/lib/location/client'
-import { haversineMeters } from '@/lib/geo/distance'
-import { checkGeolocationPermission } from '@/lib/location/client'
 
 // Simplified map-as-source types
 interface MapViewState {

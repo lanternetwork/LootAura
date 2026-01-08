@@ -331,19 +331,20 @@ export default function MobileSalesShell({
         throw callbackError // Re-throw to be caught by outer catch
       }
     } catch (error) {
-      // Log detailed error information - always log, not just in debug mode
+      // Log detailed error information - log each property individually so they show in console
       const geoError = error as { code?: number; message?: string; name?: string }
-      const errorDetails = {
-        code: geoError.code,
-        message: geoError.message,
-        name: geoError.name,
-        errorType: error?.constructor?.name,
-        errorKeys: error ? Object.keys(error) : [],
-        fullError: error
+      console.error('[USE_MY_LOCATION] Mobile error - code:', geoError.code)
+      console.error('[USE_MY_LOCATION] Mobile error - message:', geoError.message)
+      console.error('[USE_MY_LOCATION] Mobile error - name:', geoError.name)
+      console.error('[USE_MY_LOCATION] Mobile error - type:', error?.constructor?.name)
+      if (error && typeof error === 'object') {
+        console.error('[USE_MY_LOCATION] Mobile error - keys:', Object.keys(error))
+        // Try to get all enumerable properties
+        for (const key in error) {
+          console.error(`[USE_MY_LOCATION] Mobile error - ${key}:`, (error as any)[key])
+        }
       }
-      console.error('[USE_MY_LOCATION] Mobile error details:', errorDetails)
-      // Also log the raw error for inspection
-      console.error('[USE_MY_LOCATION] Mobile raw error:', error)
+      console.error('[USE_MY_LOCATION] Mobile error - full error object:', error)
       
       // Update permission state on error (permission denied)
       if (geoError.code === 1) {

@@ -1132,25 +1132,26 @@ export default function SalesClient({
       maximumAge: 300000 // 5 minutes
     })
       .then((location) => {
-        // Store last known user location
+        // Store last known user location (triggers visibility recomputation)
         setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
         // Update permission state after successful location request
         checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+        
+        // Check if map is already centered on this location before attempting recenter
+        const isAlreadyCentered = mapView?.center ? isCenteredOnLocation(mapView.center, location, 100) : false
+        
         // Automatic GPS: Use reactive recenterToUserLocation with source: 'auto'
         // This applies authority guard - will NOT recenter if user has taken control
         // Do NOT use forceRecenterToLocation here - automatic GPS must respect guards
         const didRecenter = recenterToUserLocation(location, 'auto')
         
         // If recenter was blocked by authority guard but map is already centered on this location,
-        // ensure visibility recomputes by explicitly checking and updating mapView if needed
-        if (!didRecenter && mapView?.center) {
-          const isAlreadyCentered = isCenteredOnLocation(mapView.center, location, 100)
-          if (isAlreadyCentered) {
-            // Map is already centered, but we need to ensure visibility recomputes
-            // Force a state update by setting mapView to the same value (React will dedupe if truly unchanged)
-            // This ensures shouldShowLocationIcon recomputes with the new lastUserLocation
-            setMapView(prev => prev ? { ...prev } : null)
-          }
+        // ensure visibility recomputes by updating mapView to trigger shouldShowLocationIcon recomputation
+        // This handles the case where auto-prompt grants permission and map is already at user location
+        if (!didRecenter && isAlreadyCentered && mapView) {
+          // Map is already centered, force a state update to trigger visibility recomputation
+          // This ensures shouldShowLocationIcon recomputes with the new lastUserLocation
+          setMapView(prev => prev ? { ...prev } : null)
         }
       })
       .catch((error) => {

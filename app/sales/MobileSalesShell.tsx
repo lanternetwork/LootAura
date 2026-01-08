@@ -315,17 +315,13 @@ export default function MobileSalesShell({
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[USE_MY_LOCATION] Mobile: High accuracy timeout, trying low accuracy fallback')
           }
-          try {
-            // Fallback to low accuracy for faster response
-            location = await requestGeolocation({
-              enableHighAccuracy: false,
-              timeout: 5000, // 5 seconds for low accuracy
-              maximumAge: 300000 // 5 minutes - accept cached location
-            })
-          } catch (lowAccuracyError) {
-            // Low accuracy also failed - re-throw to be handled by outer catch
-            throw lowAccuracyError
-          }
+          // Fallback to low accuracy for faster response
+          // If this also fails, let it propagate to outer catch
+          location = await requestGeolocation({
+            enableHighAccuracy: false,
+            timeout: 5000, // 5 seconds for low accuracy
+            maximumAge: 300000 // 5 minutes - accept cached location
+          })
         } else {
           // Re-throw non-timeout errors (permission denied, etc.)
           throw highAccuracyError

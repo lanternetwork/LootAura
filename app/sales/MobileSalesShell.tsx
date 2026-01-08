@@ -104,7 +104,6 @@ export default function MobileSalesShell({
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
-  const [isDragging, setIsDragging] = useState(false) // State version for visibility calculation
   const [mapLoaded, setMapLoaded] = useState(false)
   const [hasLocationPermission, setHasLocationPermission] = useState(false)
   
@@ -324,7 +323,6 @@ export default function MobileSalesShell({
   }) => {
     // Clear dragging flag on moveEnd
     isDraggingRef.current = false
-    setIsDragging(false)
     // Don't close callout on moveEnd - let user drag map freely
     // Callout will close when user taps outside or explicitly dismisses
     onViewportChange(args)
@@ -416,7 +414,6 @@ export default function MobileSalesShell({
               onDragStart={() => {
                 // Set dragging flag to prevent pinPosition updates during drag
                 isDraggingRef.current = true
-                setIsDragging(true)
               }}
               onCenteringStart={onCenteringStart}
               onCenteringEnd={onCenteringEnd}

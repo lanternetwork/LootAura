@@ -1629,14 +1629,14 @@ export default function SalesClient({
 
     // Use unified function with source: 'user' (bypasses authority guard)
     recenterToUserLocation({ lat, lng }, 'user')
-  }, [recenterToUserLocation])
+  }, [recenterToUserLocation, flipToUserAuthority])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
   const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }) => {
     // User-initiated GPS: flip authority and recenter (bypasses authority guard)
     flipToUserAuthority()
     recenterToUserLocation(location, 'user')
-  }, [recenterToUserLocation])
+  }, [recenterToUserLocation, flipToUserAuthority])
 
   return (
     <>

@@ -57,6 +57,9 @@ interface MobileSalesShellProps {
   
   // User location for recenter button visibility
   userLocation: { lat: number; lng: number } | null
+  
+  // Callback for user-initiated GPS (bypasses authority guard)
+  onUserLocationRequest: (location: { lat: number; lng: number }) => void
 }
 
 /**
@@ -90,7 +93,8 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters,
   hybridResult,
-  userLocation: _userLocation // Unused - we use actualUserLocation (GPS) instead of userLocation prop (map center)
+  userLocation: _userLocation, // Unused - we use actualUserLocation (GPS) instead of userLocation prop (map center)
+  onUserLocationRequest // Callback for user-initiated GPS (bypasses authority guard)
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -309,27 +313,13 @@ export default function MobileSalesShell({
       const hasPermission = await checkGeolocationPermission()
       setHasLocationPermission(hasPermission)
 
-      // "Use my location" is explicit user intent - flip authority to user
-      flipToUserAuthority()
+      // "Use my location" is explicit user intent - use unified function with source: 'user'
+      // This bypasses authority guard and always recenters
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile: Centering map on:', location)
+        console.log('[USE_MY_LOCATION] Mobile: Requesting recenter to:', location)
       }
       
-      // Calculate zoom and bounds (matches desktop logic)
-      const DEFAULT_ZOOM = 12
-      const latRange = 0.11 // ~10 miles at mid-latitudes
-      const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
-      
-      onViewportChange({
-        center: { lat: location.lat, lng: location.lng },
-        zoom: DEFAULT_ZOOM,
-        bounds: {
-          west: location.lng - lngRange / 2,
-          south: location.lat - latRange / 2,
-          east: location.lng + lngRange / 2,
-          north: location.lat + latRange / 2
-        }
-      })
+      onUserLocationRequest(location)
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[USE_MY_LOCATION] Mobile error:', error)
@@ -342,7 +332,7 @@ export default function MobileSalesShell({
     } finally {
       setIsLocationLoading(false)
     }
-  }, [onViewportChange])
+  }, [onUserLocationRequest])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {

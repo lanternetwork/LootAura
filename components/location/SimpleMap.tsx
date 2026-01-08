@@ -463,10 +463,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
   }, [fitBounds, fitBoundsOptions, loaded])
 
-  // Handle center/zoom changes
+  // Handle center/zoom changes (reactive updates from props)
   // Skip center/zoom updates when fitBounds is active to prevent zoom flash
   // Also skip when we're programmatically centering to a pin (to avoid conflicts)
   // Also skip when user is actively dragging/interacting with the map
+  // 
+  // NOTE: These guards only apply to reactive prop-based updates.
+  // Imperative map movements (map.easeTo/map.flyTo called directly) bypass this useEffect
+  // and are not affected by these guards. This allows user-initiated recentering to work
+  // even when guards would normally block reactive updates.
   useEffect(() => {
     if (!loaded || !mapRef.current || fitBounds) return
     

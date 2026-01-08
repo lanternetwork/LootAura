@@ -28,7 +28,7 @@ import {
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
 import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable } from '@/lib/map/geolocation'
-import { flipToUserAuthority, isUserAuthority } from '@/lib/map/authority'
+import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 
 // Simplified map-as-source types
@@ -882,6 +882,75 @@ export default function SalesClient({
     }, 200)
   }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance])
 
+  // Imperative function to force recenter map to a location
+  // This bypasses all guards (isUserDragging, fitBounds, authority checks) and directly moves the map
+  // Used ONLY for explicit user-initiated location requests
+  // NOTE: Must be defined after handleViewportChange since it depends on it
+  const forceRecenterToLocation = useCallback((
+    map: any, // Mapbox map instance from mapRef.current.getMap()
+    lat: number,
+    lng: number,
+    source: 'user'
+  ) => {
+    if (!map) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[FORCE_RECENTER] Map instance not available')
+      }
+      return
+    }
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[FORCE_RECENTER] Imperative recenter to:`, { lat, lng, source })
+    }
+
+    const defaultDistance = 10
+    const calculatedZoom = distanceToZoom(defaultDistance)
+    const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
+    const lngRange = latRange * Math.cos(lat * Math.PI / 180)
+
+    const newBounds = {
+      west: lng - lngRange / 2,
+      south: lat - latRange / 2,
+      east: lng + lngRange / 2,
+      north: lat + latRange / 2
+    }
+
+    // 1. Imperative move - MUST happen first, bypasses all guards
+    map.easeTo({
+      center: [lng, lat],
+      zoom: calculatedZoom,
+      essential: true, // Ensure the animation completes
+      duration: 400
+    })
+
+    // 2. Sync React state AFTER the move
+    setMapView({
+      center: { lat, lng },
+      bounds: newBounds,
+      zoom: calculatedZoom
+    })
+
+    // 3. Flip authority explicitly to 'user'
+    setMapAuthority('user')
+
+    // 4. Trigger viewport change handler to update URL, fetch data
+    handleViewportChange({
+      center: { lat, lng },
+      zoom: calculatedZoom,
+      bounds: newBounds
+    })
+
+    // 5. Persist viewport
+    saveViewportState(
+      { lat, lng, zoom: calculatedZoom },
+      {
+        dateRange: filters.dateRange || 'any',
+        categories: filters.categories || [],
+        radius: filters.distance || 10
+      }
+    )
+  }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
+
   // Unified function to recenter map to user's GPS location
   // source: 'auto' = automatic GPS (subject to authority guard)
   // source: 'user' = user-initiated GPS (always recenters, bypasses authority)
@@ -944,6 +1013,12 @@ export default function SalesClient({
 
   // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
   // NOTE: Must be defined after recenterToUserLocation since it depends on it
+  // 
+  // IMPORTANT: Automatic GPS vs User-Initiated GPS
+  // - Automatic GPS (this useEffect): Uses reactive recenterToUserLocation with source: 'auto'
+  //   Subject to authority guard - will NOT recenter if user has taken control
+  // - User-Initiated GPS (handleUseMyLocation/handleUserLocationRequest): Uses imperative forceRecenterToLocation
+  //   Bypasses ALL guards - always recenters regardless of authority state
   useEffect(() => {
     // Only attempt on mobile, if resolver indicated geolocation should be attempted
     if (!isMobile || resolvedViewport.source !== 'geo') {
@@ -984,7 +1059,9 @@ export default function SalesClient({
       maximumAge: 300000 // 5 minutes
     })
       .then((location) => {
-        // Use unified function with source: 'auto' (applies authority guard)
+        // Automatic GPS: Use reactive recenterToUserLocation with source: 'auto'
+        // This applies authority guard - will NOT recenter if user has taken control
+        // Do NOT use forceRecenterToLocation here - automatic GPS must respect guards
         recenterToUserLocation(location, 'auto')
       })
       .catch((error) => {
@@ -1622,28 +1699,44 @@ export default function SalesClient({
   }, [handleViewportChange])
 
   // Handle "Use my location" button click (desktop)
+  // User-initiated GPS: MUST use imperative recenter to bypass all guards
   const handleUseMyLocation = useCallback((lat: number, lng: number) => {
-    // "Use my location" is explicit user intent - flip authority to user
-    flipToUserAuthority()
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[USE_MY_LOCATION] Desktop: Centering map on:', { lat, lng })
+      console.log('[USE_MY_LOCATION] Desktop: User-initiated recenter to:', { lat, lng })
     }
 
-    // Use unified function with source: 'user' (bypasses authority guard)
-    recenterToUserLocation({ lat, lng }, 'user')
-  }, [recenterToUserLocation])
+    // Get map instance from desktop ref
+    const map = desktopMapRef.current?.getMap?.()
+    if (!map) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[USE_MY_LOCATION] Desktop: Map not ready')
+      }
+      return
+    }
+
+    // Use imperative recenter (bypasses all guards)
+    forceRecenterToLocation(map, lat, lng, 'user')
+  }, [forceRecenterToLocation])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
-  const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }) => {
+  // User-initiated GPS: MUST use imperative recenter to bypass all guards
+  // This callback receives the map instance from MobileSalesShell
+  const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }, mapInstance?: any) => {
     try {
-      // User-initiated GPS: flip authority and recenter (bypasses authority guard)
-      flipToUserAuthority()
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile: Calling recenterToUserLocation with:', location)
+        console.log('[USE_MY_LOCATION] Mobile: User-initiated recenter to:', location, 'hasMap:', !!mapInstance)
       }
-      const result = recenterToUserLocation(location, 'user')
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile: recenterToUserLocation result:', result)
+
+      // If map instance provided, use imperative recenter
+      if (mapInstance) {
+        forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
+      } else {
+        // Fallback: use reactive path (should not happen, but handle gracefully)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[USE_MY_LOCATION] Mobile: No map instance provided, using fallback')
+        }
+        flipToUserAuthority()
+        recenterToUserLocation(location, 'user')
       }
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1651,7 +1744,7 @@ export default function SalesClient({
       }
       throw error // Re-throw to be caught by mobile component
     }
-  }, [recenterToUserLocation])
+  }, [forceRecenterToLocation, recenterToUserLocation])
 
   return (
     <>

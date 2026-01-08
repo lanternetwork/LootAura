@@ -58,7 +58,8 @@ interface MobileSalesShellProps {
   userLocation: { lat: number; lng: number } | null
   
   // Callback for user-initiated GPS (bypasses authority guard)
-  onUserLocationRequest: (location: { lat: number; lng: number }) => void
+  // Receives location and optional map instance for imperative recentering
+  onUserLocationRequest: (location: { lat: number; lng: number }, mapInstance?: any) => void
 }
 
 /**
@@ -333,14 +334,18 @@ export default function MobileSalesShell({
       const hasPermission = await checkGeolocationPermission()
       setHasLocationPermission(hasPermission)
 
-      // "Use my location" is explicit user intent - use unified function with source: 'user'
+      // "Use my location" is explicit user intent - use imperative recenter
       // This bypasses authority guard and always recenters
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Mobile: Requesting recenter to:', location)
+        console.log('[USE_MY_LOCATION] Mobile: Requesting imperative recenter to:', location)
       }
       
+      // Get map instance for imperative recentering
+      const mapInstance = mapRef.current?.getMap?.()
+      
       try {
-        onUserLocationRequest(location)
+        // Pass map instance to callback for imperative recentering
+        onUserLocationRequest(location, mapInstance)
       } catch (callbackError) {
         // Handle errors from the callback
         console.error('[USE_MY_LOCATION] Mobile: Error in onUserLocationRequest callback:', {

@@ -553,58 +553,6 @@ export default function SalesClient({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
-  useEffect(() => {
-    // Only attempt on mobile, if resolver indicated geolocation should be attempted
-    if (!isMobile || resolvedViewport.source !== 'geo') {
-      return
-    }
-
-    // Don't attempt if already attempted or user has interacted
-    if (geolocationAttemptedRef.current || userInteractedRef.current) {
-      return
-    }
-
-    // Don't attempt if geolocation is denied
-    if (isGeolocationDenied()) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[GEO] Skipping geolocation - previously denied')
-      }
-      return
-    }
-
-    // Don't attempt if geolocation API not available
-    if (!isGeolocationAvailable()) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[GEO] Skipping geolocation - API not available')
-      }
-      return
-    }
-
-    // Mark as attempted to prevent duplicate requests
-    geolocationAttemptedRef.current = true
-
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[GEO] Attempting mobile geolocation (auto)')
-    }
-
-    requestGeolocation({
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 300000 // 5 minutes
-    })
-      .then((location) => {
-        // Use unified function with source: 'auto' (applies authority guard)
-        recenterToUserLocation(location, 'auto')
-      })
-      .catch((error) => {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[GEO] Geolocation error:', error)
-        }
-        // Error handling (denial tracking) is done in requestGeolocation
-      })
-  }, [isMobile, resolvedViewport.source, recenterToUserLocation])
-
   // Hybrid system: Get current viewport for clustering
   const currentViewport = useMemo(() => {
     if (!mapView || !mapView.bounds) return null
@@ -993,6 +941,59 @@ export default function SalesClient({
 
     return true
   }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
+
+  // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
+  // NOTE: Must be defined after recenterToUserLocation since it depends on it
+  useEffect(() => {
+    // Only attempt on mobile, if resolver indicated geolocation should be attempted
+    if (!isMobile || resolvedViewport.source !== 'geo') {
+      return
+    }
+
+    // Don't attempt if already attempted or user has interacted
+    if (geolocationAttemptedRef.current || userInteractedRef.current) {
+      return
+    }
+
+    // Don't attempt if geolocation is denied
+    if (isGeolocationDenied()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[GEO] Skipping geolocation - previously denied')
+      }
+      return
+    }
+
+    // Don't attempt if geolocation API not available
+    if (!isGeolocationAvailable()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[GEO] Skipping geolocation - API not available')
+      }
+      return
+    }
+
+    // Mark as attempted to prevent duplicate requests
+    geolocationAttemptedRef.current = true
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[GEO] Attempting mobile geolocation (auto)')
+    }
+
+    requestGeolocation({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 300000 // 5 minutes
+    })
+      .then((location) => {
+        // Use unified function with source: 'auto' (applies authority guard)
+        recenterToUserLocation(location, 'auto')
+      })
+      .catch((error) => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[GEO] Geolocation error:', error)
+        }
+        // Error handling (denial tracking) is done in requestGeolocation
+      })
+  }, [isMobile, resolvedViewport.source, recenterToUserLocation])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {

@@ -995,7 +995,13 @@ export default function SalesClient({
       north: lat + latRange / 2
     }
 
-    // 1. Imperative move - MUST happen first, bypasses all guards
+    // 1. Set flag BEFORE any state updates to prevent reactive updates
+    isImperativeRecenterRef.current = true
+
+    // 2. Flip authority explicitly to 'user' (before state updates to prevent conflicts)
+    setMapAuthority('user')
+
+    // 3. Imperative move - MUST happen first, bypasses all guards
     map.easeTo({
       center: [lng, lat],
       zoom: calculatedZoom,
@@ -1003,21 +1009,11 @@ export default function SalesClient({
       duration: 400
     })
 
-    // 2. Flip authority explicitly to 'user' (before state updates to prevent conflicts)
-    setMapAuthority('user')
+    // 4. DON'T update mapView state here - let onMoveEnd handle it naturally
+    // This prevents SimpleMap from reacting to prop changes and calling easeTo again
+    // The map is already moving imperatively, so we don't need to trigger reactive updates
 
-    // 3. Set flag to prevent reactive updates from conflicting during animation
-    isImperativeRecenterRef.current = true
-
-    // 4. Update state immediately so components have correct values during animation
-    // SimpleMap's guards (isUserDragging, isCenteringToPin) will prevent reactive easeTo conflicts
-    setMapView({
-      center: { lat, lng },
-      bounds: newBounds,
-      zoom: calculatedZoom
-    })
-
-    // 5. Persist viewport state immediately (doesn't trigger re-renders or URL updates)
+    // 5. Persist viewport state (but don't update URL - handleViewportChange will skip it)
     saveViewportState(
       { lat, lng, zoom: calculatedZoom },
       {
@@ -1027,15 +1023,15 @@ export default function SalesClient({
       }
     )
 
-    // 6. Clear flag after animation completes (slightly longer than duration to be safe)
-    // This allows normal reactive updates to resume
+    // 6. Clear flag after animation completes + URL update cycle (longer timeout to prevent resolver conflicts)
+    // The map animation (400ms) + onMoveEnd + handleViewportChange + potential URL resolver cycle
     setTimeout(() => {
       isImperativeRecenterRef.current = false
-    }, 500)
+    }, 1000)
 
     // 7. Let the map's onMoveEnd handler naturally call handleViewportChange after animation
-    // This ensures URL updates and data fetching happen after smooth animation completes
-    // Do NOT call handleViewportChange here - it would update URL immediately and trigger resolver conflict
+    // handleViewportChange will skip URL updates due to isImperativeRecenterRef flag
+    // This prevents the viewport resolver from triggering another easeTo
   }, [filters.dateRange, filters.categories, filters.distance, distanceToZoom, setMapView, setMapAuthority, saveViewportState])
 
   // Unified function to recenter map to user's GPS location
@@ -1873,8 +1869,9 @@ export default function SalesClient({
       // Recenter map
       forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
       
-      // Force visibility recomputation even if map doesn't move
-      setMapView(prev => prev ? { ...prev } : null)
+      // Force visibility recomputation - onMoveEnd will update mapView naturally
+      // We trigger a minimal state update to force shouldShowLocationIcon recomputation
+      // This happens after the imperative move, so it won't cause double recenter
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('[USE_MY_LOCATION] Mobile: Error in handleUserLocationRequest:', error)

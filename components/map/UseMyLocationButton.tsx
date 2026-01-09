@@ -28,13 +28,12 @@ export default function UseMyLocationButton({
   const handleClick = useCallback(async () => {
     let resolvedLocation: { lat: number; lng: number; source: 'gps' | 'ip' } | null = null
 
-    // If permission already granted, skip IP and go straight to GPS
+    // If permission already granted, skip IP and spinner, go straight to GPS
     if (hasLocationPermission) {
       if (!isGeolocationAvailable()) {
         return
       }
-      setIsLoading(true)
-      setError(null)
+      // No spinner - permission already granted, GPS should be fast
       requestGeolocation({
         enableHighAccuracy: false,
         timeout: 10000,
@@ -44,26 +43,14 @@ export default function UseMyLocationButton({
           resolvedLocation = { lat: location.lat, lng: location.lng, source: 'gps' }
           onLocationFound(location.lat, location.lng, 'gps')
         }
-        setIsLoading(false)
       }).catch((err) => {
         const geoError = err as GeolocationError
         onError?.(geoError)
-        if (geoError.code === 1) {
-          setError('Location access denied')
-        } else if (geoError.code === 2) {
-          setError('Location unavailable')
-        } else if (geoError.code === 3) {
-          setError('Location request timed out')
-        } else {
-          setError('Failed to get location')
-        }
-        setTimeout(() => setError(null), 3000)
-        setIsLoading(false)
       })
       return
     }
 
-    // Permission not granted - try IP first, then GPS
+    // Permission not granted - try IP first (no spinner), then GPS with spinner
     try {
       const ipRes = await fetch('/api/geolocation/ip')
       if (ipRes.ok) {
@@ -77,7 +64,7 @@ export default function UseMyLocationButton({
       // Ignore IP errors - continue to GPS attempt
     }
 
-    // Fire GPS in background only if permission not granted (to trigger prompt)
+    // Fire GPS in background to trigger permission prompt (show spinner)
     if (!isGeolocationAvailable()) {
       return
     }

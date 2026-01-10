@@ -20,7 +20,7 @@ async function callbackHandler(request: NextRequest) {
     // If no redirectTo in query, redirect to signin page which can check sessionStorage
     // This allows the client-side signin page to handle the redirect using sessionStorage
     if (!redirectTo) {
-      authDebug.logAuthFlow('oauth-callback', 'no-redirect-to', 'info', {
+      authDebug.logAuthFlow('oauth-callback', 'no-redirect-to', 'start', {
         message: 'No redirectTo in query, redirecting to signin to check sessionStorage'
       })
       return NextResponse.redirect(new URL('/auth/signin', url.origin))

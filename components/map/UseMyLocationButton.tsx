@@ -50,52 +50,95 @@ export default function UseMyLocationButton({
       return
     }
 
-    // Permission not granted - try IP first (no spinner), then GPS with spinner
-    try {
-      const ipRes = await fetch('/api/geolocation/ip')
-      if (ipRes.ok) {
-        const ipData = await ipRes.json()
-        if (ipData.lat && ipData.lng) {
-          resolvedLocation = { lat: ipData.lat, lng: ipData.lng, source: 'ip' }
-          onLocationFound(ipData.lat, ipData.lng, 'ip')
-        }
-      }
-    } catch {
-      // Ignore IP errors - continue to GPS attempt
-    }
-
-    // Fire GPS in background to trigger permission prompt (show spinner)
+    // Permission not granted - wait for permission prompt resolution before recentering
+    // Don't recenter with IP immediately - wait for user to respond to permission prompt
     if (!isGeolocationAvailable()) {
+      // GPS not available - fallback to IP
+      try {
+        const ipRes = await fetch('/api/geolocation/ip')
+        if (ipRes.ok) {
+          const ipData = await ipRes.json()
+          if (ipData.lat && ipData.lng) {
+            onLocationFound(ipData.lat, ipData.lng, 'ip')
+          }
+        }
+      } catch {
+        // Ignore IP errors
+      }
       return
     }
 
     setIsLoading(true)
     setError(null)
 
+    // Request GPS - this will show permission prompt
+    // Wait for user response before recentering
     requestGeolocation({
       enableHighAccuracy: false,
       timeout: 10000,
       maximumAge: 600000
     }).then((location) => {
-      // Only use GPS if IP didn't already resolve
-      if (!resolvedLocation) {
-        onLocationFound(location.lat, location.lng, 'gps')
-      }
+      // Permission granted - recenter with GPS location
+      onLocationFound(location.lat, location.lng, 'gps')
       setIsLoading(false)
     }).catch((err) => {
       const geoError = err as GeolocationError
       onError?.(geoError)
+      
+      // If permission denied or error, fallback to IP
       if (geoError.code === 1) {
         setError('Location access denied')
+        // Fallback to IP when permission denied
+        fetch('/api/geolocation/ip').then(ipRes => {
+          if (ipRes.ok) {
+            return ipRes.json()
+          }
+          return null
+        }).then(ipData => {
+          if (ipData?.lat && ipData?.lng) {
+            onLocationFound(ipData.lat, ipData.lng, 'ip')
+          }
+          setIsLoading(false)
+        }).catch(() => {
+          setIsLoading(false)
+        })
       } else if (geoError.code === 2) {
         setError('Location unavailable')
+        // Fallback to IP when unavailable
+        fetch('/api/geolocation/ip').then(ipRes => {
+          if (ipRes.ok) {
+            return ipRes.json()
+          }
+          return null
+        }).then(ipData => {
+          if (ipData?.lat && ipData?.lng) {
+            onLocationFound(ipData.lat, ipData.lng, 'ip')
+          }
+          setIsLoading(false)
+        }).catch(() => {
+          setIsLoading(false)
+        })
       } else if (geoError.code === 3) {
         setError('Location request timed out')
+        // Fallback to IP on timeout
+        fetch('/api/geolocation/ip').then(ipRes => {
+          if (ipRes.ok) {
+            return ipRes.json()
+          }
+          return null
+        }).then(ipData => {
+          if (ipData?.lat && ipData?.lng) {
+            onLocationFound(ipData.lat, ipData.lng, 'ip')
+          }
+          setIsLoading(false)
+        }).catch(() => {
+          setIsLoading(false)
+        })
       } else {
         setError('Failed to get location')
+        setIsLoading(false)
       }
       setTimeout(() => setError(null), 3000)
-      setIsLoading(false)
     })
   }, [onLocationFound, onError, hasLocationPermission])
 

@@ -1821,7 +1821,7 @@ export default function SalesClient({
     
     // Force visibility recomputation even if map doesn't move
     setMapView(prev => prev ? { ...prev } : null)
-  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, haversineMeters])
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
   // User-initiated: Recenter immediately with best available location, then fire GPS in background
@@ -1869,7 +1869,7 @@ export default function SalesClient({
       }
       throw error // Re-throw to be caught by mobile component
     }
-  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, flipToUserAuthority, recenterToUserLocation, haversineMeters])
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, flipToUserAuthority, recenterToUserLocation])
 
   return (
     <>

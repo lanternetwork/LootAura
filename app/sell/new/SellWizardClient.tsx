@@ -1667,6 +1667,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             minLength={2}
             pattern="[A-Za-z\s]+"
             title="City name (letters only)"
+            autoComplete="address-level2"
             aria-invalid={!!errors?.city}
             aria-describedby={errors?.city ? 'city-error' : undefined}
           />
@@ -1692,6 +1693,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             maxLength={2}
             pattern="[A-Z]{2}"
             title="Two-letter state code (e.g., KY, CA)"
+            autoComplete="address-level1"
             aria-invalid={!!errors?.state}
             aria-describedby={errors?.state ? 'state-error' : undefined}
           />
@@ -1717,6 +1719,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             }`}
             pattern="\d{5}"
             title="5-digit ZIP code"
+            autoComplete="postal-code"
             aria-invalid={!!errors?.zip_code}
             aria-describedby={errors?.zip_code ? 'zip_code-error' : undefined}
           />

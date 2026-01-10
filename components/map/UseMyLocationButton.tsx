@@ -4,9 +4,10 @@ import { useState, useCallback } from 'react'
 import { requestGeolocation, isGeolocationAvailable, type GeolocationError } from '@/lib/map/geolocation'
 
 interface UseMyLocationButtonProps {
-  onLocationFound: (lat: number, lng: number) => void
+  onLocationFound: (lat: number, lng: number, source: 'gps' | 'ip') => void
   onError?: (error: GeolocationError) => void
   className?: string
+  hasLocationPermission?: boolean
 }
 
 /**
@@ -18,48 +19,72 @@ interface UseMyLocationButtonProps {
 export default function UseMyLocationButton({
   onLocationFound,
   onError,
-  className = ''
+  className = '',
+  hasLocationPermission = false
 }: UseMyLocationButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleClick = useCallback(async () => {
-    if (!isGeolocationAvailable()) {
-      const err: GeolocationError = {
-        code: 0,
-        message: 'Geolocation is not available in this browser'
+    let resolvedLocation: { lat: number; lng: number; source: 'gps' | 'ip' } | null = null
+
+    // If permission already granted, skip IP and spinner, go straight to GPS
+    if (hasLocationPermission) {
+      if (!isGeolocationAvailable()) {
+        return
       }
-      onError?.(err)
-      setError('Location services not available')
+      // No spinner - permission already granted, GPS should be fast
+      requestGeolocation({
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 600000
+      }).then((location) => {
+        if (!resolvedLocation) {
+          resolvedLocation = { lat: location.lat, lng: location.lng, source: 'gps' }
+          onLocationFound(location.lat, location.lng, 'gps')
+        }
+      }).catch((err) => {
+        const geoError = err as GeolocationError
+        onError?.(geoError)
+      })
+      return
+    }
+
+    // Permission not granted - try IP first (no spinner), then GPS with spinner
+    try {
+      const ipRes = await fetch('/api/geolocation/ip')
+      if (ipRes.ok) {
+        const ipData = await ipRes.json()
+        if (ipData.lat && ipData.lng) {
+          resolvedLocation = { lat: ipData.lat, lng: ipData.lng, source: 'ip' }
+          onLocationFound(ipData.lat, ipData.lng, 'ip')
+        }
+      }
+    } catch {
+      // Ignore IP errors - continue to GPS attempt
+    }
+
+    // Fire GPS in background to trigger permission prompt (show spinner)
+    if (!isGeolocationAvailable()) {
       return
     }
 
     setIsLoading(true)
     setError(null)
 
-    try {
-      const location = await requestGeolocation({
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000 // 5 minutes
-      })
-
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Location found:', location)
+    requestGeolocation({
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 600000
+    }).then((location) => {
+      // Only use GPS if IP didn't already resolve
+      if (!resolvedLocation) {
+        onLocationFound(location.lat, location.lng, 'gps')
       }
-
-      onLocationFound(location.lat, location.lng)
       setIsLoading(false)
-    } catch (err) {
+    }).catch((err) => {
       const geoError = err as GeolocationError
-      
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[USE_MY_LOCATION] Error:', geoError)
-      }
-
       onError?.(geoError)
-      
-      // Set user-friendly error message
       if (geoError.code === 1) {
         setError('Location access denied')
       } else if (geoError.code === 2) {
@@ -69,13 +94,10 @@ export default function UseMyLocationButton({
       } else {
         setError('Failed to get location')
       }
-      
-      setIsLoading(false)
-      
-      // Clear error message after 3 seconds
       setTimeout(() => setError(null), 3000)
-    }
-  }, [onLocationFound, onError])
+      setIsLoading(false)
+    })
+  }, [onLocationFound, onError, hasLocationPermission])
 
   return (
     <div className={`relative ${className}`}>
@@ -90,8 +112,8 @@ export default function UseMyLocationButton({
           text-sm font-medium text-gray-700
           transition-colors
         `}
-        aria-label="Use my location"
-        title="Center map on your current location"
+        aria-label={hasLocationPermission ? "Recenter map" : "Use my location"}
+        title={hasLocationPermission ? "Recenter map on your location" : "Center map on your current location"}
       >
         {isLoading ? (
           <>
@@ -120,7 +142,7 @@ export default function UseMyLocationButton({
                 d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            <span>Use my location</span>
+            <span>{hasLocationPermission ? "Recenter map" : "Use my location"}</span>
           </>
         )}
       </button>

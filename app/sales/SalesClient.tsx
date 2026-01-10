@@ -28,8 +28,10 @@ import {
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
 import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable } from '@/lib/map/geolocation'
-import { flipToUserAuthority, isUserAuthority } from '@/lib/map/authority'
+import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
+import { haversineMeters } from '@/lib/geo/distance'
+import { checkGeolocationPermission } from '@/lib/location/client'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -56,6 +58,50 @@ export default function SalesClient({
   // Track user interaction to prevent surprise recentering
   const userInteractedRef = useRef(false)
   const geolocationAttemptedRef = useRef(false)
+  // Track when we're doing an imperative recenter to prevent reactive conflicts
+  const isImperativeRecenterRef = useRef(false)
+  
+  // Single source of truth for last known user location
+  const [lastUserLocation, setLastUserLocation] = useState<{ lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null>(null)
+  const [hasLocationPermission, setHasLocationPermission] = useState(false)
+  
+  // Check location permission on mount and listen for changes
+  useEffect(() => {
+    const checkPermission = async () => {
+      try {
+        const hasPermission = await checkGeolocationPermission()
+        setHasLocationPermission(hasPermission)
+      } catch (error) {
+        // If permission check fails, assume no permission
+        setHasLocationPermission(false)
+      }
+    }
+    checkPermission()
+    
+    // Listen for permission changes
+    if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(permission => {
+        const updatePermission = () => {
+          setHasLocationPermission(permission.state === 'granted')
+        }
+        updatePermission()
+        permission.addEventListener('change', updatePermission)
+        return () => permission.removeEventListener('change', updatePermission)
+      }).catch(() => {
+        // Permission query not supported, rely on checkPermission only
+      })
+    }
+  }, [])
+  
+  // Helper function to check if map is centered on a location
+  const isCenteredOnLocation = useCallback((
+    mapCenter: { lat: number; lng: number },
+    target: { lat: number; lng: number },
+    thresholdMeters = 50
+  ): boolean => {
+    const distanceMeters = haversineMeters(mapCenter.lat, mapCenter.lng, target.lat, target.lng)
+    return distanceMeters <= thresholdMeters
+  }, [])
   
   // Check for URL parameters
   const urlLat = searchParams.get('lat')
@@ -164,6 +210,31 @@ export default function SalesClient({
       zoom: 10
     }
   })
+
+  // Single source of truth for location icon visibility
+  // Must be declared after mapView since it depends on it
+  const shouldShowLocationIcon = useMemo(() => {
+    // If permission not granted, show icon (to request permission)
+    if (!hasLocationPermission) {
+      return true
+    }
+    
+    // If no last known location, show icon (can't confirm centeredness)
+    if (!lastUserLocation) {
+      return true
+    }
+    
+    // If map center not available, show icon
+    if (!mapView?.center) {
+      return true
+    }
+    
+    // Check if map is centered on user location (50m threshold to avoid flickering)
+    const isCentered = isCenteredOnLocation(mapView.center, lastUserLocation, 50)
+    
+    // Show icon if NOT centered, hide if centered
+    return !isCentered
+  }, [hasLocationPermission, lastUserLocation, mapView?.center, isCenteredOnLocation])
 
   // Sales data state - map is source of truth
   // fetchedSales: All sales for the buffered area (larger than viewport)
@@ -553,93 +624,6 @@ export default function SalesClient({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
-  useEffect(() => {
-    // Only attempt on mobile, if resolver indicated geolocation should be attempted
-    if (!isMobile || resolvedViewport.source !== 'geo') {
-      return
-    }
-
-    // Don't attempt if already attempted or user has interacted
-    if (geolocationAttemptedRef.current || userInteractedRef.current) {
-      return
-    }
-
-    // Don't attempt if geolocation is denied
-    if (isGeolocationDenied()) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[GEO] Skipping geolocation - previously denied')
-      }
-      return
-    }
-
-    // Don't attempt if geolocation API not available
-    if (!isGeolocationAvailable()) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[GEO] Skipping geolocation - API not available')
-      }
-      return
-    }
-
-    // Mark as attempted to prevent duplicate requests
-    geolocationAttemptedRef.current = true
-
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[GEO] Attempting mobile geolocation')
-    }
-
-    requestGeolocation({
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 300000 // 5 minutes
-    })
-      .then((location) => {
-        // Only recenter if authority is still system (user hasn't taken control)
-        // Check both userInteractedRef and authority to be safe
-        if (!isUserAuthority() && !userInteractedRef.current && mapView) {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[GEO] Location found, recentering map:', location)
-          }
-
-          const defaultDistance = 10
-          const calculatedZoom = distanceToZoom(defaultDistance)
-          const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
-          const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
-
-          setMapView({
-            center: { lat: location.lat, lng: location.lng },
-            bounds: {
-              west: location.lng - lngRange / 2,
-              south: location.lat - latRange / 2,
-              east: location.lng + lngRange / 2,
-              north: location.lat + latRange / 2
-            },
-            zoom: calculatedZoom
-          })
-
-          // Persist the new viewport (map distance to radius for persistence schema)
-          saveViewportState(
-            { lat: location.lat, lng: location.lng, zoom: calculatedZoom },
-            {
-              dateRange: filters.dateRange || 'any',
-              categories: filters.categories || [],
-              radius: filters.distance || 10
-            }
-          )
-        } else {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[GEO] Location found but authority is user or user has interacted, not recentering')
-          }
-        }
-      })
-      .catch((error) => {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[GEO] Geolocation error:', error)
-        }
-        // Error handling (denial tracking) is done in requestGeolocation
-      })
-  }, [isMobile, resolvedViewport.source, mapView, filters.dateRange, filters.categories, filters.distance])
-
   // Hybrid system: Get current viewport for clustering
   const currentViewport = useMemo(() => {
     if (!mapView || !mapView.bounds) return null
@@ -800,6 +784,10 @@ export default function SalesClient({
   // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
   // Core buffer logic: only fetch when viewport exits buffered area
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
+    // Skip URL update if we're in the middle of an imperative recenter
+    // This prevents the viewport resolver from triggering another easeTo conflict
+    const skipUrlUpdate = isImperativeRecenterRef.current
+    
     const viewportBounds: Bounds = {
       west: bounds.west,
       south: bounds.south,
@@ -900,12 +888,17 @@ export default function SalesClient({
     
     // Update URL params to keep them in sync (for browser back button)
     // Only update if this is a user-initiated change (not from URL param restoration)
-    const params = new URLSearchParams(searchParams?.toString() || '')
-    params.set('lat', center.lat.toFixed(6))
-    params.set('lng', center.lng.toFixed(6))
-    params.set('zoom', zoom.toFixed(2))
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
-    router.replace(newUrl, { scroll: false })
+    // Skip URL update during imperative recenter to prevent resolver conflicts
+    if (!skipUrlUpdate) {
+      const params = new URLSearchParams(searchParams?.toString() || '')
+      params.set('lat', center.lat.toFixed(6))
+      params.set('lng', center.lng.toFixed(6))
+      params.set('zoom', zoom.toFixed(2))
+      const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
+      router.replace(newUrl, { scroll: false })
+    } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FORCE_RECENTER] Skipping URL update during imperative recenter')
+    }
 
     // Buffer-based fetch logic: only fetch when viewport exits buffered area
     // Clear existing timer
@@ -968,6 +961,210 @@ export default function SalesClient({
       initialLoadRef.current = false // Mark initial load as complete
     }, 200)
   }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance])
+
+  // Imperative function to force recenter map to a location
+  // This bypasses all guards (isUserDragging, fitBounds, authority checks) and directly moves the map
+  // Used ONLY for explicit user-initiated location requests
+  // NOTE: Must be defined after handleViewportChange since it depends on it
+  const forceRecenterToLocation = useCallback((
+    map: any, // Mapbox map instance from mapRef.current.getMap()
+    lat: number,
+    lng: number,
+    source: 'user'
+  ) => {
+    if (!map) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[FORCE_RECENTER] Map instance not available')
+      }
+      return
+    }
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[FORCE_RECENTER] Imperative recenter to:`, { lat, lng, source })
+    }
+
+    const defaultDistance = 10
+    const calculatedZoom = distanceToZoom(defaultDistance)
+
+    // 1. Set flag BEFORE any state updates to prevent reactive updates
+    isImperativeRecenterRef.current = true
+
+    // 2. Flip authority explicitly to 'user' (before state updates to prevent conflicts)
+    setMapAuthority('user')
+
+    // 3. Imperative move - MUST happen first, bypasses all guards
+    map.easeTo({
+      center: [lng, lat],
+      zoom: calculatedZoom,
+      essential: true, // Ensure the animation completes
+      duration: 400
+    })
+
+    // 4. DON'T update mapView state here - let onMoveEnd handle it naturally
+    // This prevents SimpleMap from reacting to prop changes and calling easeTo again
+    // The map is already moving imperatively, so we don't need to trigger reactive updates
+
+    // 5. Persist viewport state (but don't update URL - handleViewportChange will skip it)
+    saveViewportState(
+      { lat, lng, zoom: calculatedZoom },
+      {
+        dateRange: filters.dateRange || 'any',
+        categories: filters.categories || [],
+        radius: filters.distance || 10
+      }
+    )
+
+    // 6. Clear flag after animation completes + URL update cycle (longer timeout to prevent resolver conflicts)
+    // The map animation (400ms) + onMoveEnd + handleViewportChange + potential URL resolver cycle
+    setTimeout(() => {
+      isImperativeRecenterRef.current = false
+    }, 1000)
+
+    // 7. Let the map's onMoveEnd handler naturally call handleViewportChange after animation
+    // handleViewportChange will skip URL updates due to isImperativeRecenterRef flag
+    // This prevents the viewport resolver from triggering another easeTo
+  }, [filters.dateRange, filters.categories, filters.distance, distanceToZoom, setMapView, setMapAuthority, saveViewportState])
+
+  // Unified function to recenter map to user's GPS location
+  // source: 'auto' = automatic GPS (subject to authority guard)
+  // source: 'user' = user-initiated GPS (always recenters, bypasses authority)
+  // NOTE: Must be defined after handleViewportChange since it depends on it
+  const recenterToUserLocation = useCallback((location: { lat: number; lng: number }, source: 'auto' | 'user') => {
+    // For automatic GPS, check authority guard
+    if (source === 'auto') {
+      // Only recenter if authority is still system (user hasn't taken control)
+      if (isUserAuthority() || userInteractedRef.current) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[GEO] Location found but authority is user or user has interacted, not recentering (auto)')
+        }
+        return false
+      }
+    }
+    // For user-initiated GPS, always recenter (no authority check)
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[GEO] Recentering map to user location (source: ${source}):`, location)
+    }
+
+    const defaultDistance = 10
+    const calculatedZoom = distanceToZoom(defaultDistance)
+    const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
+    const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
+
+    const newBounds = {
+      west: location.lng - lngRange / 2,
+      south: location.lat - latRange / 2,
+      east: location.lng + lngRange / 2,
+      north: location.lat + latRange / 2
+    }
+
+    // Update map view state directly
+    setMapView({
+      center: { lat: location.lat, lng: location.lng },
+      bounds: newBounds,
+      zoom: calculatedZoom
+    })
+
+    // Trigger viewport change handler to update URL, fetch data, and persist
+    handleViewportChange({
+      center: { lat: location.lat, lng: location.lng },
+      zoom: calculatedZoom,
+      bounds: newBounds
+    })
+
+    // Persist the new viewport (map distance to radius for persistence schema)
+    saveViewportState(
+      { lat: location.lat, lng: location.lng, zoom: calculatedZoom },
+      {
+        dateRange: filters.dateRange || 'any',
+        categories: filters.categories || [],
+        radius: filters.distance || 10
+      }
+    )
+
+    return true
+  }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
+
+  // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
+  // NOTE: Must be defined after recenterToUserLocation since it depends on it
+  // 
+  // IMPORTANT: Automatic GPS vs User-Initiated GPS
+  // - Automatic GPS (this useEffect): Uses reactive recenterToUserLocation with source: 'auto'
+  //   Subject to authority guard - will NOT recenter if user has taken control
+  // - User-Initiated GPS (handleUseMyLocation/handleUserLocationRequest): Uses imperative forceRecenterToLocation
+  //   Bypasses ALL guards - always recenters regardless of authority state
+  useEffect(() => {
+    // Only attempt on mobile, if resolver indicated geolocation should be attempted
+    if (!isMobile || resolvedViewport.source !== 'geo') {
+      return
+    }
+
+    // Don't attempt if already attempted or user has interacted
+    if (geolocationAttemptedRef.current || userInteractedRef.current) {
+      return
+    }
+
+    // Don't attempt if geolocation is denied
+    if (isGeolocationDenied()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[GEO] Skipping geolocation - previously denied')
+      }
+      return
+    }
+
+    // Don't attempt if geolocation API not available
+    if (!isGeolocationAvailable()) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[GEO] Skipping geolocation - API not available')
+      }
+      return
+    }
+
+    // Mark as attempted to prevent duplicate requests
+    geolocationAttemptedRef.current = true
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[GEO] Attempting mobile geolocation (auto)')
+    }
+
+    requestGeolocation({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 300000 // 5 minutes
+    })
+      .then((location) => {
+        // Store last known user location (triggers visibility recomputation)
+        setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
+        // Update permission state immediately (GPS success means permission was granted)
+        setHasLocationPermission(true)
+        
+        // Check if map is already centered on this location before attempting recenter
+        const isAlreadyCentered = mapView?.center ? isCenteredOnLocation(mapView.center, location, 50) : false
+        
+        // Automatic GPS: Use reactive recenterToUserLocation with source: 'auto'
+        // This applies authority guard - will NOT recenter if user has taken control
+        // Do NOT use forceRecenterToLocation here - automatic GPS must respect guards
+        const didRecenter = recenterToUserLocation(location, 'auto')
+        
+        // Ensure visibility recomputes after auto-geolocation success, even if map doesn't move
+        // This handles the case where auto-prompt grants permission and map is already at user location
+        if (!didRecenter && isAlreadyCentered && mapView) {
+          // Map is already centered, force a state update to trigger visibility recomputation
+          // Use a timestamp-based update to ensure React sees it as a change
+          setMapView(prev => prev ? { ...prev, zoom: prev.zoom } : null)
+        } else if (didRecenter) {
+          // If we did recenter, mapView is already updated, but ensure visibility recomputes
+          // by triggering a small state update (React will dedupe if truly unchanged)
+          setMapView(prev => prev ? { ...prev } : null)
+        }
+      })
+      .catch((error) => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[GEO] Geolocation error:', error)
+        }
+        // Error handling (denial tracking) is done in requestGeolocation
+      })
+  }, [isMobile, resolvedViewport.source, recenterToUserLocation])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
@@ -1596,40 +1793,83 @@ export default function SalesClient({
   }, [handleViewportChange])
 
   // Handle "Use my location" button click (desktop)
-  const handleUseMyLocation = useCallback((lat: number, lng: number) => {
-    // "Use my location" is explicit user intent - flip authority to user
-    flipToUserAuthority()
+  // User-initiated: Recenter immediately with best available location, then fire GPS in background
+  const handleUseMyLocation = useCallback((lat: number, lng: number, source: 'gps' | 'ip') => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[USE_MY_LOCATION] Centering map on:', { lat, lng })
+      console.log('[USE_MY_LOCATION] Desktop: User-initiated recenter to:', { lat, lng, source })
     }
 
-    const defaultDistance = 10
-    const calculatedZoom = distanceToZoom(defaultDistance)
-    const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
-    const lngRange = latRange * Math.cos(lat * Math.PI / 180)
+    // Get map instance from desktop ref
+    const map = desktopMapRef.current?.getMap?.()
+    if (!map) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[USE_MY_LOCATION] Desktop: Map not ready')
+      }
+      return
+    }
 
-    setMapView({
-      center: { lat, lng },
-      bounds: {
-        west: lng - lngRange / 2,
-        south: lat - latRange / 2,
-        east: lng + lngRange / 2,
-        north: lat + latRange / 2
-      },
-      zoom: calculatedZoom
-    })
+    // Store location and update permission state
+    setLastUserLocation({ lat, lng, source, timestamp: Date.now() })
+    if (source === 'gps') {
+      setHasLocationPermission(true)
+    } else {
+      checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+    }
 
-          // Persist the new viewport (map distance to radius for persistence schema)
-          saveViewportState(
-            { lat, lng, zoom: calculatedZoom },
-            {
-              dateRange: filters.dateRange || 'any',
-              categories: filters.categories || [],
-              radius: filters.distance || 10
-            }
-          )
-  }, [filters.dateRange, filters.categories, filters.distance])
+    // Recenter map
+    forceRecenterToLocation(map, lat, lng, 'user')
+    
+    // Force visibility recomputation even if map doesn't move
+    setMapView(prev => prev ? { ...prev } : null)
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView])
 
+  // Handle user-initiated GPS request from mobile (bypasses authority guard)
+  // User-initiated: Recenter immediately with best available location, then fire GPS in background
+  // This callback receives the map instance from MobileSalesShell
+  const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }, mapInstance?: any, source: 'gps' | 'ip' = 'gps') => {
+    try {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[USE_MY_LOCATION] Mobile: User-initiated recenter to:', location, 'hasMap:', !!mapInstance, 'source:', source)
+      }
+
+      if (!mapInstance) {
+        // Fallback: use reactive path (should not happen, but handle gracefully)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[USE_MY_LOCATION] Mobile: No map instance provided, using fallback')
+        }
+        setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
+        if (source === 'gps') {
+          setHasLocationPermission(true)
+        } else {
+          checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+        }
+        flipToUserAuthority()
+        recenterToUserLocation(location, 'user')
+        setMapView(prev => prev ? { ...prev } : null)
+        return
+      }
+
+      // Store location and update permission state
+      setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
+      if (source === 'gps') {
+        setHasLocationPermission(true)
+      } else {
+        checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
+      }
+
+      // Recenter map
+      forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
+      
+      // Force visibility recomputation - onMoveEnd will update mapView naturally
+      // We trigger a minimal state update to force shouldShowLocationIcon recomputation
+      // This happens after the imperative move, so it won't cause double recenter
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[USE_MY_LOCATION] Mobile: Error in handleUserLocationRequest:', error)
+      }
+      throw error // Re-throw to be caught by mobile component
+    }
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, flipToUserAuthority, recenterToUserLocation])
 
   return (
     <>
@@ -1669,6 +1909,8 @@ export default function SalesClient({
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
           hybridResult={hybridResult}
           userLocation={effectiveCenter || null}
+          onUserLocationRequest={handleUserLocationRequest}
+          shouldShowLocationIcon={shouldShowLocationIcon}
         />
       ) : (
         /* Desktop Layout - md and above */
@@ -1707,16 +1949,19 @@ export default function SalesClient({
               onClick={handleDesktopMapClick}
             >
               {/* Desktop "Use my location" button */}
-              <div className="absolute top-4 right-4 z-10">
-                <UseMyLocationButton
-                  onLocationFound={handleUseMyLocation}
-                  onError={(error) => {
-                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                      console.log('[USE_MY_LOCATION] Error:', error)
-                    }
-                  }}
-                />
-              </div>
+              {shouldShowLocationIcon && (
+                <div className="absolute top-4 right-4 z-10">
+                  <UseMyLocationButton
+                    onLocationFound={handleUseMyLocation}
+                    onError={(error) => {
+                      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                        console.log('[USE_MY_LOCATION] Error:', error)
+                      }
+                    }}
+                    hasLocationPermission={hasLocationPermission}
+                  />
+                </div>
+              )}
               <div className="w-full h-full">
                 {mapView ? (
                   <SimpleMap

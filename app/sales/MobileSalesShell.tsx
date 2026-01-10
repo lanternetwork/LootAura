@@ -255,27 +255,25 @@ export default function MobileSalesShell({
     const mapInstance = mapRef.current?.getMap?.()
     let resolvedLocation: { lat: number; lng: number; source: 'gps' | 'ip' } | null = null
 
-    // Try IP first (no spinner, immediate recenter)
-    try {
-      const ipRes = await fetch('/api/geolocation/ip')
-      if (ipRes.ok) {
-        const ipData = await ipRes.json()
-        if (ipData.lat && ipData.lng) {
-          resolvedLocation = { lat: ipData.lat, lng: ipData.lng, source: 'ip' }
-          onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
-        }
-      }
-    } catch {
-      // Ignore IP errors - continue to GPS attempt
-    }
-
-    // Fire GPS in background (will trigger permission prompt if needed)
+    // Fire GPS first to trigger permission prompt
+    // Don't recenter with IP immediately - wait for user to respond to permission prompt
     if (!isGeolocationAvailable()) {
+      // GPS not available - fallback to IP immediately
+      try {
+        const ipRes = await fetch('/api/geolocation/ip')
+        if (ipRes.ok) {
+          const ipData = await ipRes.json()
+          if (ipData.lat && ipData.lng) {
+            onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+          }
+        }
+      } catch {
+        // Ignore IP errors
+      }
       return
     }
 
-    // Only show spinner if permission not granted (awaiting prompt)
-    // If permission already granted, GPS should be fast (cached) - no spinner needed
+    // Show spinner while waiting for permission prompt resolution
     setIsLocationLoading(true)
 
     const timeout = canUsePreciseGeolocation ? 10000 : 5000
@@ -284,10 +282,9 @@ export default function MobileSalesShell({
       timeout,
       maximumAge: 300000
     }).then((location) => {
-      // Only use GPS if IP didn't already resolve
-      if (!resolvedLocation) {
-        onUserLocationRequest(location, mapInstance, 'gps')
-      }
+      // Permission granted - recenter with GPS location
+      resolvedLocation = { lat: location.lat, lng: location.lng, source: 'gps' }
+      onUserLocationRequest(location, mapInstance, 'gps')
       flushSync(() => {
         setIsLocationLoading(false)
       })
@@ -301,20 +298,63 @@ export default function MobileSalesShell({
           maximumAge: 300000
         }).then((location) => {
           if (!resolvedLocation) {
+            resolvedLocation = { lat: location.lat, lng: location.lng, source: 'gps' }
             onUserLocationRequest(location, mapInstance, 'gps')
           }
           flushSync(() => {
             setIsLocationLoading(false)
           })
         }).catch(() => {
+          // GPS failed - fallback to IP
+          if (!resolvedLocation) {
+            fetch('/api/geolocation/ip').then(ipRes => {
+              if (ipRes.ok) {
+                return ipRes.json()
+              }
+              return null
+            }).then(ipData => {
+              if (ipData?.lat && ipData?.lng && !resolvedLocation) {
+                onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+              }
+              flushSync(() => {
+                setIsLocationLoading(false)
+              })
+            }).catch(() => {
+              flushSync(() => {
+                setIsLocationLoading(false)
+              })
+            })
+          } else {
+            flushSync(() => {
+              setIsLocationLoading(false)
+            })
+          }
+        })
+      } else {
+        // Permission denied or other error - fallback to IP
+        if (!resolvedLocation) {
+          fetch('/api/geolocation/ip').then(ipRes => {
+            if (ipRes.ok) {
+              return ipRes.json()
+            }
+            return null
+          }).then(ipData => {
+            if (ipData?.lat && ipData?.lng && !resolvedLocation) {
+              onUserLocationRequest({ lat: ipData.lat, lng: ipData.lng }, mapInstance, 'ip')
+            }
+            flushSync(() => {
+              setIsLocationLoading(false)
+            })
+          }).catch(() => {
+            flushSync(() => {
+              setIsLocationLoading(false)
+            })
+          })
+        } else {
           flushSync(() => {
             setIsLocationLoading(false)
           })
-        })
-      } else {
-        flushSync(() => {
-          setIsLocationLoading(false)
-        })
+        }
       }
     })
   }, [canUsePreciseGeolocation, onUserLocationRequest])

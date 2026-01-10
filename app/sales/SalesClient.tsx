@@ -985,15 +985,6 @@ export default function SalesClient({
 
     const defaultDistance = 10
     const calculatedZoom = distanceToZoom(defaultDistance)
-    const latRange = calculatedZoom === 12 ? 0.11 : calculatedZoom === 10 ? 0.45 : calculatedZoom === 11 ? 0.22 : 1.0
-    const lngRange = latRange * Math.cos(lat * Math.PI / 180)
-
-    const newBounds = {
-      west: lng - lngRange / 2,
-      south: lat - latRange / 2,
-      east: lng + lngRange / 2,
-      north: lat + latRange / 2
-    }
 
     // 1. Set flag BEFORE any state updates to prevent reactive updates
     isImperativeRecenterRef.current = true

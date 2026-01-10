@@ -17,9 +17,13 @@ async function callbackHandler(request: NextRequest) {
     // The client-side signin page will handle sessionStorage fallback
     let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
     
-    // If no redirectTo in query, default to /sales
+    // If no redirectTo in query, redirect to signin page which can check sessionStorage
+    // This allows the client-side signin page to handle the redirect using sessionStorage
     if (!redirectTo) {
-      redirectTo = '/sales'
+      authDebug.logAuthFlow('oauth-callback', 'no-redirect-to', 'info', {
+        message: 'No redirectTo in query, redirecting to signin to check sessionStorage'
+      })
+      return NextResponse.redirect(new URL('/auth/signin', url.origin))
     }
     
     // Decode the redirectTo if it was encoded

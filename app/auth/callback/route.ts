@@ -9,9 +9,14 @@ export async function GET(req: Request) {
   // Check for redirectTo (preferred) or next (fallback)
   let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
   
-  // If no redirectTo in query, default to /sales
+  // If no redirectTo in query, redirect to signin page which can check sessionStorage
+  // This allows the client-side signin page to handle the redirect using sessionStorage
   if (!redirectTo) {
-    redirectTo = '/sales'
+    // Redirect to signin page - it will check sessionStorage for auth:postLoginRedirect
+    // and redirect appropriately after authentication is confirmed
+    const signinUrl = new URL('/auth/signin', url.origin)
+    console.log('[AUTH_CALLBACK] No redirectTo in query, redirecting to signin to check sessionStorage')
+    return NextResponse.redirect(signinUrl)
   }
   
   // Decode the redirectTo if it was encoded
@@ -130,9 +135,23 @@ export async function GET(req: Request) {
         finalRedirectTo = '/sales'
       }
       
+      // Ensure redirectTo is a valid path (starts with /)
+      if (!finalRedirectTo.startsWith('/')) {
+        console.warn('[AUTH_CALLBACK] Invalid redirectTo path, defaulting to /sales:', finalRedirectTo)
+        finalRedirectTo = '/sales'
+      }
+      
       // Build redirect URL and ensure it doesn't contain the code parameter
       // This prevents the client-side from trying to exchange the code again
-      const redirectUrl = new URL(finalRedirectTo, url.origin)
+      // Parse the redirectTo to handle query parameters correctly
+      const [path, queryString] = finalRedirectTo.split('?')
+      const redirectUrl = new URL(path, url.origin)
+      if (queryString) {
+        const params = new URLSearchParams(queryString)
+        params.forEach((value, key) => {
+          redirectUrl.searchParams.set(key, value)
+        })
+      }
       redirectUrl.searchParams.delete('code')
       redirectUrl.searchParams.delete('error')
       

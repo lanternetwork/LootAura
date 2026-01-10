@@ -22,9 +22,11 @@ export default function GoogleSignInButton() {
       const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
       
       // Build callback URL with redirectTo param
+      // Encode the redirectTo parameter to ensure it's preserved through the OAuth flow
       const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
       if (redirectParam) {
-        callbackUrl.searchParams.set('redirectTo', redirectParam)
+        // URL-encode the redirectTo parameter to ensure it's preserved through OAuth redirects
+        callbackUrl.searchParams.set('redirectTo', encodeURIComponent(redirectParam))
       }
       const redirectTo = callbackUrl.toString()
       

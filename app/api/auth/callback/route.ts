@@ -23,9 +23,17 @@ async function callbackHandler(request: NextRequest) {
       redirectTo = '/sales'
     }
     
-    // Decode the redirectTo if it was encoded
+    // Decode the redirectTo if it was encoded (handle double-encoding from OAuth flow)
+    // OAuth providers may encode query params, so we need to decode once or twice
     try {
-      redirectTo = decodeURIComponent(redirectTo)
+      // Try decoding once
+      const decodedOnce = decodeURIComponent(redirectTo)
+      // If it still looks encoded (contains %), try decoding again
+      if (decodedOnce.includes('%')) {
+        redirectTo = decodeURIComponent(decodedOnce)
+      } else {
+        redirectTo = decodedOnce
+      }
     } catch (e) {
       // If decoding fails, use as-is
     }

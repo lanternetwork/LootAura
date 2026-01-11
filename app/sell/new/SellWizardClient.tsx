@@ -2150,32 +2150,92 @@ function PromotionStep({
   return (
     <DiagnosticErrorBoundary componentName="PromotionStep-Content">
       <div className="space-y-6">
-        <h3 className="text-lg font-medium text-gray-900">Feature Your Sale</h3>
-        
-        <div className="space-y-3">
-          <div className="bg-white border border-purple-200 rounded-lg p-4">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        {/* Value Proposition */}
+        <div>
+          <h3 className="text-2xl font-semibold text-gray-900">Get More Buyers to Your Sale</h3>
+          <p className="text-base text-gray-600 mt-2">
+            Feature your sale to reach more people in your area and get early interest before your sale starts.
+          </p>
+        </div>
+
+        {/* Benefits Section */}
+        <div className="bg-white border border-purple-200 rounded-lg p-6">
+          <h4 className="font-medium text-[#3A2268] text-lg mb-4">What's included:</h4>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
               <div>
-                <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
-                <p className="text-sm text-[#3A2268] mt-1">
-                  Get more visibility by featuring your sale in weekly emails and discovery.
-                </p>
-                <p className="mt-1 text-xs text-[#3A2268]">
-                  You can also promote later from your dashboard.
+                <p className="font-medium text-gray-900">Featured placement</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Your sale appears prominently in search results and discovery feeds, making it easier for buyers to find you.
                 </p>
               </div>
-              <div className="flex items-center justify-start sm:justify-end">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!wantsPromotion}
-                    onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                    className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
-                    data-testid="promotion-step-feature-toggle"
-                  />
-                  <span className="text-sm text-[#3A2268]">Feature this sale</span>
-                </label>
+            </div>
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <div>
+                <p className="font-medium text-gray-900">Weekly email discovery</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Get included in our weekly email to local buyers, driving more traffic to your sale listing.
+                </p>
               </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <div>
+                <p className="font-medium text-gray-900">Increased early views</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Reach buyers before your sale starts, so they can plan ahead and arrive ready to shop.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing & Reassurance */}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="space-y-2">
+              <h4 className="font-medium text-purple-800">Promotion is optional</h4>
+              <p className="text-sm text-purple-700">
+                You can publish your sale for free. Promotion is a one-time charge that helps you reach more buyers.
+              </p>
+              <p className="text-sm text-purple-700">
+                No charge unless your sale is published. You can also add promotion later from your dashboard if you change your mind.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Section */}
+        <div className="bg-white border border-purple-200 rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex-1">
+              <h4 className="font-medium text-[#3A2268]">Feature this sale</h4>
+              <p className="text-sm text-[#3A2268] mt-1">
+                Check the box below to feature your sale and reach more buyers in your area.
+              </p>
+            </div>
+            <div className="flex items-center justify-start sm:justify-end">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!wantsPromotion}
+                  onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                  className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                  data-testid="promotion-step-feature-toggle"
+                />
+                <span className="text-sm text-[#3A2268] font-medium">Feature this sale</span>
+              </label>
             </div>
           </div>
         </div>

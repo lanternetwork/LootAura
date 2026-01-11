@@ -886,12 +886,6 @@ export default function SellWizardClient({
     }
   }
 
-  const handlePrevious = () => {
-    if (currentStep > STEPS.DETAILS) {
-      setCurrentStep(currentStep - 1)
-    }
-  }
-
   // Helper to build sale payload (for direct publish without draft)
   const buildSalePayload = useCallback(() => {
     // Ensure time_start is normalized

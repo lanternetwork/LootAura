@@ -18,35 +18,26 @@ export default function GoogleSignInButton() {
       )
       
       // Get redirect destination from query param or sessionStorage (for non-OAuth flows)
-      // For OAuth redirects, we encode this in the OAuth state parameter (not query params or sessionStorage)
-      // This ensures server-authoritative redirects that survive the OAuth flow
       const urlParams = new URLSearchParams(window.location.search)
       const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
       
-      // Build callback URL (no redirectTo query param needed - it's in state)
-      const callbackUrl = `${window.location.origin}/auth/callback`
-      
-      // Encode redirectTo in OAuth state parameter (JSON + base64)
-      // This ensures the redirect survives the OAuth flow and is server-authoritative
-      let oauthState: string | undefined
+      // Build callback URL with redirectTo as query parameter
+      // Supabase's redirectTo option preserves query parameters through the OAuth flow
+      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
       if (redirectParam) {
-        const statePayload = { redirectTo: redirectParam }
-        // Use btoa for browser-compatible base64 encoding
-        oauthState = btoa(JSON.stringify(statePayload))
-        console.log('[GOOGLE_AUTH] Encoding redirect in OAuth state:', { redirectParam, oauthState })
+        // URL-encode the redirectTo to preserve nested query params (e.g., /sell/new?resume=promotion)
+        callbackUrl.searchParams.set('redirectTo', redirectParam)
       }
       
-      console.log('[GOOGLE_AUTH] Starting OAuth with state-based redirect:', { redirectParam, callbackUrl })
+      console.log('[GOOGLE_AUTH] Starting OAuth with redirectTo:', { redirectParam, callbackUrl: callbackUrl.toString() })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: callbackUrl,
+          redirectTo: callbackUrl.toString(),
           queryParams: { 
             prompt: 'select_account' // Better UX - always show account selection
-          },
-          // Pass redirectTo in OAuth state parameter (returned in callback URL)
-          ...(oauthState && { state: oauthState })
+          }
         }
       })
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
@@ -18,6 +18,50 @@ import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalD
 import { saveDraftServer, getLatestDraftServer, getDraftByKeyServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
+
+// DIAGNOSTIC ERROR BOUNDARY - TEMPORARY FOR DEBUGGING
+// This component logs the full error and stack trace to help identify React errors #418/#422
+class DiagnosticErrorBoundary extends Component<
+  { children: ReactNode; componentName: string },
+  { hasError: boolean; error: Error | null; errorInfo: ErrorInfo | null }
+> {
+  constructor(props: { children: ReactNode; componentName: string }) {
+    super(props)
+    this.state = { hasError: false, error: null, errorInfo: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log the FULL unminified error with stack trace
+    console.error(`[DIAGNOSTIC_ERROR_BOUNDARY] ${this.props.componentName} threw an error:`, {
+      error,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      errorName: error.name,
+      componentStack: errorInfo.componentStack,
+      errorInfo: errorInfo,
+      timestamp: new Date().toISOString(),
+    })
+    
+    this.setState({ error, errorInfo })
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Minimal fallback - just render a placeholder so the app continues
+      return (
+        <div className="border-2 border-red-300 bg-red-50 p-2 text-xs text-red-700">
+          [DIAGNOSTIC] {this.props.componentName} error caught - check console for details
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 interface WizardStep {
   id: string
@@ -481,81 +525,90 @@ export default function SellWizardClient({
         }
       }
 
-      // Restore draft if found
-      if (draftToRestore) {
-        // hasResumedRef.current already set synchronously above to prevent concurrent runs
-        isRestoringDraftRef.current = true // Prevent autosave during restoration
-        
-        // Set draftKeyRef to the restored draft's key (critical: prevents creating new draft on autosave)
-        if (restoredDraftKey) {
-          draftKeyRef.current = restoredDraftKey
-          // Also update localStorage to persist the draft key
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('draft:key', restoredDraftKey)
+        // Restore draft if found
+        if (draftToRestore) {
+          // hasResumedRef.current already set synchronously above to prevent concurrent runs
+          isRestoringDraftRef.current = true // Prevent autosave during restoration
+          
+          // Set draftKeyRef to the restored draft's key (critical: prevents creating new draft on autosave)
+          if (restoredDraftKey) {
+            draftKeyRef.current = restoredDraftKey
+            // Also update localStorage to persist the draft key
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('draft:key', restoredDraftKey)
+            }
+          } else if (source === 'server' && typeof window !== 'undefined') {
+            // If we got a server draft but no explicit key, try to get it from localStorage
+            const storedKey = localStorage.getItem('draft:key')
+            if (storedKey) {
+              draftKeyRef.current = storedKey
+            }
           }
-        } else if (source === 'server' && typeof window !== 'undefined') {
-          // If we got a server draft but no explicit key, try to get it from localStorage
-          const storedKey = localStorage.getItem('draft:key')
-          if (storedKey) {
-            draftKeyRef.current = storedKey
-          }
-        }
-        
-        // Restore form data
-        if (draftToRestore.formData) {
-          const nextForm = { ...draftToRestore.formData }
-          if (nextForm.time_start) {
-            nextForm.time_start = normalizeTimeToNearest30(nextForm.time_start) || nextForm.time_start
-          }
-          setFormData(nextForm as Partial<SaleInput>)
-        }
+          
+          // ATOMIC RESUME STATE UPDATE: Apply all state changes in a single batch
+          // This prevents React errors #418/#422 by ensuring all updates happen in one render pass
+          // Critical state (formData, photos, items, wantsPromotion, currentStep) is applied synchronously
+          // Non-critical state (toast messages) is wrapped in startTransition
+          
+          // Prepare all state updates
+          const nextForm = draftToRestore.formData ? (() => {
+            const form = { ...draftToRestore.formData }
+            if (form.time_start) {
+              form.time_start = normalizeTimeToNearest30(form.time_start) || form.time_start
+            }
+            return form as Partial<SaleInput>
+          })() : undefined
 
-        // Restore photos
-        if (draftToRestore.photos) {
-          setPhotos(draftToRestore.photos)
-        }
+          const nextPhotos = draftToRestore.photos || undefined
 
-        // Restore items (ensure IDs)
-        if (draftToRestore.items) {
-          const loadedItems = draftToRestore.items.map(item => ({
+          const nextItems = draftToRestore.items ? draftToRestore.items.map(item => ({
             id: item.id || `item-${Date.now()}-${Math.random()}`,
             name: item.name,
             price: item.price,
             description: item.description,
             image_url: item.image_url,
             category: item.category,
-          }))
-          setItems(loadedItems)
-        }
+          })) : undefined
 
-        // Restore promotion intent (backward compatible: defaults to false if missing)
-        if (draftToRestore.wantsPromotion !== undefined) {
-          setWantsPromotion(draftToRestore.wantsPromotion)
-        }
+          const nextWantsPromotion = draftToRestore.wantsPromotion !== undefined ? draftToRestore.wantsPromotion : undefined
 
-        // Restore step: if resume=review, force Review step; otherwise use saved step
-        if (isReviewResume) {
-          setCurrentStep(STEPS.REVIEW)
-          setToastMessage('Draft restored. Ready to review your sale.')
-        } else if (draftToRestore.currentStep !== undefined) {
-          setCurrentStep(draftToRestore.currentStep)
-          setToastMessage(`Draft restored${source === 'server' ? ' from cloud' : ''}`)
-        }
+          const nextStep = isReviewResume 
+            ? STEPS.REVIEW 
+            : (draftToRestore.currentStep !== undefined ? draftToRestore.currentStep : undefined)
 
-        setShowToast(true)
+          const nextToastMessage = isReviewResume
+            ? 'Draft restored. Ready to review your sale.'
+            : (draftToRestore.currentStep !== undefined ? `Draft restored${source === 'server' ? ' from cloud' : ''}` : undefined)
 
-        // If user is authenticated and we restored local draft, save to server
-        if (user && source === 'local' && draftKeyRef.current) {
-          saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
-            // Silent fail - already saved locally
-          })
+          // Apply all critical state updates in a single synchronous batch
+          // React 18 will automatically batch these since they're in the same execution context
+          if (nextForm) setFormData(nextForm)
+          if (nextPhotos) setPhotos(nextPhotos)
+          if (nextItems) setItems(nextItems)
+          if (nextWantsPromotion !== undefined) setWantsPromotion(nextWantsPromotion)
+          if (nextStep !== undefined) setCurrentStep(nextStep)
+
+          // Apply non-critical toast updates in a transition to avoid blocking render
+          if (nextToastMessage) {
+            startTransition(() => {
+              setToastMessage(nextToastMessage)
+              setShowToast(true)
+            })
+          }
+
+          // If user is authenticated and we restored local draft, save to server
+          if (user && source === 'local' && draftKeyRef.current) {
+            saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
+              // Silent fail - already saved locally
+            })
+          }
+          
+          // Clear restoration flag after autosave debounce period (2s to be safe)
+          // This allows state to settle before autosave can trigger
+          setTimeout(() => {
+            isRestoringDraftRef.current = false
+          }, 2000)
         }
-        
-        // Clear restoration flag after autosave debounce period (2s to be safe)
-        // This allows state to settle before autosave can trigger
-        setTimeout(() => {
-          isRestoringDraftRef.current = false
-        }, 2000)
       } else if (isReviewResume) {
         // Draft not found but resume=review - still go to Review step
         setCurrentStep(STEPS.REVIEW)
@@ -1652,27 +1705,29 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Address *
         </label>
-        <AddressAutocomplete
-          value={formData.address || ''}
-          onChange={(address) => onChange('address', address)}
-          onPlaceSelected={(place) => {
-            // Update all fields atomically - batch updates to prevent multiple re-renders
-            // Use the full label for address field if available, otherwise use line1
-            const addressValue = place.address || ''
-            onChange('address', addressValue)
-            onChange('city', place.city || '')
-            onChange('state', place.state || '')
-            onChange('zip_code', place.zip || '')
-            onChange('lat', place.lat)
-            onChange('lng', place.lng)
-          }}
-          placeholder="Start typing your address..."
-          userLat={userLat}
-          userLng={userLng}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          required
-          error={errors?.address}
-        />
+        <DiagnosticErrorBoundary componentName="AddressAutocomplete">
+          <AddressAutocomplete
+            value={formData.address || ''}
+            onChange={(address) => onChange('address', address)}
+            onPlaceSelected={(place) => {
+              // Update all fields atomically - batch updates to prevent multiple re-renders
+              // Use the full label for address field if available, otherwise use line1
+              const addressValue = place.address || ''
+              onChange('address', addressValue)
+              onChange('city', place.city || '')
+              onChange('state', place.state || '')
+              onChange('zip_code', place.zip || '')
+              onChange('lat', place.lat)
+              onChange('lng', place.lng)
+            }}
+            placeholder="Start typing your address..."
+            userLat={userLat}
+            userLng={userLng}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            required
+            error={errors?.address}
+          />
+        </DiagnosticErrorBoundary>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2037,10 +2092,11 @@ function ReviewStep({
   }
 
   return (
-    <div className="space-y-6">
-      <h3 className="text-lg font-medium text-gray-900">Review Your Sale</h3>
-      
-      <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+    <DiagnosticErrorBoundary componentName="ReviewStep-Content">
+      <div className="space-y-6">
+        <h3 className="text-lg font-medium text-gray-900">Review Your Sale</h3>
+        
+        <div className="bg-gray-50 rounded-lg p-6 space-y-4">
         <div>
           <h4 className="font-medium text-gray-900">Sale Information</h4>
           <div className="mt-2 space-y-1 text-sm text-gray-600">
@@ -2135,31 +2191,33 @@ function ReviewStep({
           }
           return promotionsEnabled
         })() && (
-          <div className="bg-white border border-purple-200 rounded-lg p-4">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div>
-                <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
-                <p className="text-sm text-[#3A2268] mt-1">
-                  Get more visibility by featuring your sale in weekly emails and discovery.
-                </p>
-                <p className="mt-1 text-xs text-[#3A2268]">
-                  You can also promote later from your dashboard.
-                </p>
-              </div>
-              <div className="flex items-center justify-start sm:justify-end">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!wantsPromotion}
-                    onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                    className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
-                    data-testid="review-feature-toggle"
-                  />
-                  <span className="text-sm text-[#3A2268]">Feature this sale</span>
-                </label>
+          <DiagnosticErrorBoundary componentName="ReviewStep-PromotionSection">
+            <div className="bg-white border border-purple-200 rounded-lg p-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
+                  <p className="text-sm text-[#3A2268] mt-1">
+                    Get more visibility by featuring your sale in weekly emails and discovery.
+                  </p>
+                  <p className="mt-1 text-xs text-[#3A2268]">
+                    You can also promote later from your dashboard.
+                  </p>
+                </div>
+                <div className="flex items-center justify-start sm:justify-end">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!wantsPromotion}
+                      onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                      className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                      data-testid="review-feature-toggle"
+                    />
+                    <span className="text-sm text-[#3A2268]">Feature this sale</span>
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
+          </DiagnosticErrorBoundary>
         )}
       </div>
       
@@ -2197,7 +2255,8 @@ function ReviewStep({
           )}
         </button>
       </div>
-    </div>
+      </div>
+    </DiagnosticErrorBoundary>
   )
 }
 

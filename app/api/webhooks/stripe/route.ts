@@ -162,14 +162,14 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
           .maybeSingle()
         
         if (draftError || !draft) {
-          logger.error('Failed to read draft for sale creation after payment', {
+          const error = draftError ? new Error(draftError.message) : new Error('Draft not found')
+          logger.error('Failed to read draft for sale creation after payment', error, {
             component: 'webhooks/stripe',
             operation: 'checkout_completed',
             draft_key: draftKey,
             session_id: session.id,
-            error: draftError?.message,
           })
-          throw new Error(`Failed to read draft: ${draftError?.message || 'Draft not found'}`)
+          throw error
         }
         
         // Validate payload

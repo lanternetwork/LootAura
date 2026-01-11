@@ -62,8 +62,8 @@ export default function SellWizardClient({
   saleId: _saleId,
   userLat,
   userLng,
-  promotionsEnabled = false,
-  paymentsEnabled = false,
+  promotionsEnabled: promotionsEnabledProp,
+  paymentsEnabled: paymentsEnabledProp,
 }: {
   initialData?: Partial<SaleInput>
   isEdit?: boolean
@@ -73,6 +73,16 @@ export default function SellWizardClient({
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
 }) {
+  // Preserve server-provided prop value - only default if truly undefined (hydration safety)
+  // This ensures server-computed value is never overridden by client defaults
+  const promotionsEnabled = promotionsEnabledProp ?? false
+  const paymentsEnabled = paymentsEnabledProp ?? false
+
+  // Defensive assertion: log warning if prop is undefined (indicates prop passing issue)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' && promotionsEnabledProp === undefined) {
+    console.warn('[SELL_WIZARD] promotionsEnabled prop is undefined - server prop may not have been passed correctly')
+  }
+
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
@@ -1970,7 +1980,7 @@ function ReviewStep({
   onPublish,
   loading,
   submitError,
-  promotionsEnabled,
+  promotionsEnabled: promotionsEnabledProp,
   paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
@@ -1986,6 +1996,15 @@ function ReviewStep({
   wantsPromotion?: boolean
   onTogglePromotion?: (next: boolean) => void
 }) {
+  // Ensure promotionsEnabled is always a boolean (defensive check)
+  // This preserves the server-computed value and prevents undefined from hiding promotion section
+  const promotionsEnabled = promotionsEnabledProp ?? false
+
+  // Defensive assertion: log warning if prop is undefined (indicates prop passing issue)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' && promotionsEnabledProp === undefined) {
+    console.warn('[REVIEW_STEP] promotionsEnabled prop is undefined - may indicate prop passing issue')
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { 

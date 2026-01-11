@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = validationResult.data
-    const { formData, photos, items } = payload
+    const { formData, photos, items, wantsPromotion } = payload
 
     // Validate required fields
     if (!formData.title || !formData.city || !formData.state || !formData.date_start || !formData.time_start) {
@@ -118,6 +118,80 @@ export async function POST(request: NextRequest) {
     }
     const lat = formData.lat
     const lng = formData.lng
+
+    // GATE: If promotion is requested, require payment before sale creation
+    if (wantsPromotion === true) {
+      const { getStripeClient, isPaymentsEnabled, isPromotionsEnabled, getFeaturedWeekPriceId } = await import('@/lib/stripe/client')
+      
+      // Safety gates: Payments and promotions must be enabled
+      if (!isPaymentsEnabled()) {
+        return fail(403, 'PAYMENTS_DISABLED', 'Payments are currently disabled', {
+          message: 'Promoted listings are not available at this time. Please check back later.',
+        })
+      }
+      
+      if (!isPromotionsEnabled()) {
+        return fail(403, 'PROMOTIONS_DISABLED', 'Promotions are currently disabled', {
+          message: 'Promoted listings are not available at this time. Please check back later.',
+        })
+      }
+      
+      const stripe = getStripeClient()
+      if (!stripe) {
+        return fail(500, 'STRIPE_NOT_CONFIGURED', 'Stripe is not properly configured')
+      }
+      
+      const priceId = getFeaturedWeekPriceId()
+      if (!priceId) {
+        return fail(500, 'PRICE_ID_MISSING', 'Promotion price ID is not configured')
+      }
+      
+      // Get site URL for redirects
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+      
+      // Create Stripe Checkout Session with draft_key in metadata
+      // Sale will be created after payment succeeds via webhook
+      let checkoutSession
+      try {
+        checkoutSession = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price: priceId,
+              quantity: 1,
+            },
+          ],
+          success_url: `${siteUrl}/sales?promoted=success`,
+          cancel_url: `${siteUrl}/sell/new?resume=review&payment=canceled`,
+          metadata: {
+            draft_key: draftKey,
+            owner_profile_id: user.id,
+            tier: 'featured_week',
+            wants_promotion: 'true',
+          },
+          customer_email: user.email || undefined,
+        })
+      } catch (error) {
+        const { logger } = await import('@/lib/log')
+        logger.error('Failed to create Stripe checkout session for promotion', error instanceof Error ? error : new Error(String(error)), {
+          component: 'drafts/publish',
+          operation: 'create_checkout_session',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'STRIPE_ERROR', 'Failed to create checkout session')
+      }
+      
+      // Return checkout URL instead of creating sale
+      return ok({ 
+        data: { 
+          checkoutUrl: checkoutSession.url,
+          requiresPayment: true 
+        } 
+      })
+    }
 
     // Use a transaction-like approach: create sale, then items, then update draft
     // Note: Supabase doesn't support true transactions across multiple operations,

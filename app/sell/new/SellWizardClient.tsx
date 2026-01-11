@@ -1241,6 +1241,14 @@ export default function SellWizardClient({
           return
         }
 
+        // Check if payment is required (promotion enabled)
+        if (result.data?.requiresPayment && result.data?.checkoutUrl) {
+          // Redirect to Stripe Checkout
+          window.location.href = result.data.checkoutUrl
+          setLoading(false)
+          return
+        }
+
         const saleId = result.data?.saleId
         if (!saleId) {
           setSubmitError('Invalid response from server')

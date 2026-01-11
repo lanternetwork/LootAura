@@ -7,16 +7,14 @@ export async function GET(req: Request) {
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
   // Check for redirectTo (preferred) or next (fallback)
-  let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
+  // Store original value to check if it was missing (for sessionStorage fallback)
+  const originalRedirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
+  let redirectTo = originalRedirectTo
   
-  // If no redirectTo in query, redirect to signin page which can check sessionStorage
-  // This allows the client-side signin page to handle the redirect using sessionStorage
+  // If no redirectTo in query, default to /sales for backward compatibility
+  // The signin page will check sessionStorage when user is already authenticated
   if (!redirectTo) {
-    // Redirect to signin page - it will check sessionStorage for auth:postLoginRedirect
-    // and redirect appropriately after authentication is confirmed
-    const signinUrl = new URL('/auth/signin', url.origin)
-    console.log('[AUTH_CALLBACK] No redirectTo in query, redirecting to signin to check sessionStorage')
-    return NextResponse.redirect(signinUrl)
+    redirectTo = '/sales'
   }
   
   // Decode the redirectTo if it was encoded
@@ -128,8 +126,17 @@ export async function GET(req: Request) {
       }
       
       // Success: user session cookies are automatically set by auth-helpers
-      // Prevent redirect loops: never redirect to auth pages
+      // If redirectTo was missing from query (defaulted to /sales), redirect to signin page
+      // which can check sessionStorage for auth:postLoginRedirect
       let finalRedirectTo = redirectTo
+      if (!originalRedirectTo && finalRedirectTo === '/sales') {
+        // No redirectTo was provided - redirect to signin to check sessionStorage
+        console.log('[AUTH_CALLBACK] No redirectTo provided, redirecting to signin to check sessionStorage')
+        const signinUrl = new URL('/auth/signin', url.origin)
+        return NextResponse.redirect(signinUrl)
+      }
+      
+      // Prevent redirect loops: never redirect to auth pages
       if (finalRedirectTo.startsWith('/auth/') || finalRedirectTo.startsWith('/login') || finalRedirectTo.startsWith('/signin')) {
         console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
         finalRedirectTo = '/sales'

@@ -104,7 +104,7 @@ describe('OAuth Callback Route', () => {
         json: () => Promise.resolve({ created: true }),
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123')
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales')
       
       const response = await GET(request)
       
@@ -218,7 +218,7 @@ describe('OAuth Callback Route', () => {
         status: 500,
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123')
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales')
       
       const response = await GET(request)
       
@@ -248,7 +248,7 @@ describe('OAuth Callback Route', () => {
         json: () => Promise.resolve({ created: true }),
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123')
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales')
       
       await GET(request)
       
@@ -283,7 +283,7 @@ describe('OAuth Callback Route', () => {
         json: () => Promise.resolve({ created: true }),
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123', {
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales', {
         headers: {
           'Cookie': 'session=valid',
         },

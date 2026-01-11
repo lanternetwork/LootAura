@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition } from 'react'
+import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
@@ -74,31 +74,47 @@ const STEPS = {
   DETAILS: 0,
   PHOTOS: 1,
   ITEMS: 2,
-  REVIEW: 3
+  PROMOTION: 3,
+  REVIEW: 4
 } as const
 
-const WIZARD_STEPS: WizardStep[] = [
-  {
-    id: 'details',
-    title: 'Sale Details',
-    description: 'Basic information about your sale'
-  },
-  {
-    id: 'photos',
-    title: 'Photos',
-    description: 'Add photos to showcase your items'
-  },
-  {
-    id: 'items',
-    title: 'Items',
-    description: 'List the items you\'re selling'
-  },
-  {
+// WIZARD_STEPS is computed based on promotionsEnabled to conditionally include promotion step
+// This function returns the steps array with promotion included if enabled
+function getWizardSteps(promotionsEnabled: boolean): WizardStep[] {
+  const baseSteps: WizardStep[] = [
+    {
+      id: 'details',
+      title: 'Sale Details',
+      description: 'Basic information about your sale'
+    },
+    {
+      id: 'photos',
+      title: 'Photos',
+      description: 'Add photos to showcase your items'
+    },
+    {
+      id: 'items',
+      title: 'Items',
+      description: 'List the items you\'re selling'
+    }
+  ]
+
+  if (promotionsEnabled) {
+    baseSteps.push({
+      id: 'promotion',
+      title: 'Feature Your Sale',
+      description: 'Get more visibility with promotion'
+    })
+  }
+
+  baseSteps.push({
     id: 'review',
     title: 'Review',
     description: 'Review and publish your sale'
-  }
-]
+  })
+
+  return baseSteps
+}
 
 export default function SellWizardClient({
   initialData,
@@ -128,9 +144,32 @@ export default function SellWizardClient({
   }
 
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
+  
+  // Compute wizard steps based on promotionsEnabled (promotion step is conditional)
+  const WIZARD_STEPS = useMemo(() => getWizardSteps(promotionsEnabled), [promotionsEnabled])
+  
+  // Helper to map step constant to WIZARD_STEPS index
+  const getStepIndex = useCallback((stepConstant: number): number => {
+    if (stepConstant === STEPS.DETAILS) return 0
+    if (stepConstant === STEPS.PHOTOS) return 1
+    if (stepConstant === STEPS.ITEMS) return 2
+    if (stepConstant === STEPS.PROMOTION) {
+      // Promotion is at index 3 if enabled, otherwise doesn't exist
+      return promotionsEnabled ? 3 : -1
+    }
+    if (stepConstant === STEPS.REVIEW) {
+      // Review is at index 3 if promotions disabled, index 4 if enabled
+      return promotionsEnabled ? 4 : 3
+    }
+    return 0
+  }, [promotionsEnabled])
+  
+  // Extract resumeParam from searchParams outside useEffect to stabilize dependency array
+  const resumeParam = searchParams.get('resume')
   // Normalize tags to ensure it's always an array
   // Also normalize case to match checkbox format (capitalize first letter)
   // Memoize to prevent useEffect from running on every render
@@ -441,6 +480,7 @@ export default function SellWizardClient({
 
     const resumeDraft = async () => {
       const resume = resumeParam
+      const isPromotionResume = resume === 'promotion'
       const isReviewResume = resume === 'review'
       
       let draftToRestore: SaleDraftPayload | null = null
@@ -572,11 +612,16 @@ export default function SellWizardClient({
 
           const nextWantsPromotion = draftToRestore.wantsPromotion !== undefined ? draftToRestore.wantsPromotion : undefined
 
-          const nextStep = isReviewResume 
-            ? STEPS.REVIEW 
+          // Determine target step: resume param takes precedence, then draft's saved step
+          const nextStep = isPromotionResume
+            ? STEPS.PROMOTION
+            : isReviewResume
+            ? STEPS.REVIEW
             : (draftToRestore.currentStep !== undefined ? draftToRestore.currentStep : undefined)
 
-          const nextToastMessage = isReviewResume
+          const nextToastMessage = isPromotionResume
+            ? 'Draft restored. Ready to feature your sale.'
+            : isReviewResume
             ? 'Draft restored. Ready to review your sale.'
             : (draftToRestore.currentStep !== undefined ? `Draft restored${source === 'server' ? ' from cloud' : ''}` : undefined)
 
@@ -608,16 +653,20 @@ export default function SellWizardClient({
           setTimeout(() => {
             isRestoringDraftRef.current = false
           }, 2000)
+        } else if (isPromotionResume) {
+          // Draft not found but resume=promotion - still go to Promotion step
+          setCurrentStep(STEPS.PROMOTION)
+          setToastMessage('Draft not found; please feature your sale.')
+          setShowToast(true)
+        } else if (isReviewResume) {
+          // Draft not found but resume=review - still go to Review step
+          setCurrentStep(STEPS.REVIEW)
+          setToastMessage('Draft not found; please review details.')
+          setShowToast(true)
         }
-      } else if (isReviewResume) {
-        // Draft not found but resume=review - still go to Review step
-        setCurrentStep(STEPS.REVIEW)
-        setToastMessage('Draft not found; please review details.')
-        setShowToast(true)
-      }
 
       // Clear sessionStorage keys after resume
-      if (isReviewResume) {
+      if (isPromotionResume || isReviewResume) {
         sessionStorage.removeItem('auth:postLoginRedirect')
         sessionStorage.removeItem('draft:returnStep')
       }
@@ -721,6 +770,25 @@ export default function SellWizardClient({
     return nextErrors
   }
 
+  const handlePrevious = useCallback(() => {
+    // Skip promotion step if disabled when going back from review
+    let prevStep = currentStep - 1
+    
+    // If going back from REVIEW and promotions disabled, skip PROMOTION
+    if (currentStep === STEPS.REVIEW && prevStep === STEPS.PROMOTION && !promotionsEnabled) {
+      prevStep = STEPS.ITEMS
+    }
+    
+    // If going back from PROMOTION, go to ITEMS
+    if (currentStep === STEPS.PROMOTION) {
+      prevStep = STEPS.ITEMS
+    }
+    
+    if (prevStep >= STEPS.DETAILS) {
+      setCurrentStep(prevStep)
+    }
+  }, [currentStep, promotionsEnabled])
+
   const handleNext = async () => {
     // Guard against duplicate clicks
     if (isNavigatingRef.current) return
@@ -748,7 +816,7 @@ export default function SellWizardClient({
         // Continue anyway - don't block navigation
       }
 
-      // Auth gate: Items (2) → Review (3)
+      // Auth gate: Items (2) → Promotion (3) or Review (4)
       // Check auth state synchronously to ensure we have the latest value
       if (currentStep === STEPS.ITEMS) {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -757,15 +825,19 @@ export default function SellWizardClient({
         }
         
         if (!currentUser) {
+          // Determine resume target: promotion if enabled, otherwise review
+          const resumeTarget = promotionsEnabled ? 'promotion' : 'review'
+          const resumeUrl = `/sell/new?resume=${resumeTarget}`
+          
           // Set redirect keys
-          sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
-          sessionStorage.setItem('draft:returnStep', 'review')
+          sessionStorage.setItem('auth:postLoginRedirect', resumeUrl)
+          sessionStorage.setItem('draft:returnStep', resumeTarget)
           
           // Update user state
           setUser(null)
           
           // Redirect to login (encode redirectTo to preserve query params)
-          const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+          const redirectUrl = encodeURIComponent(resumeUrl)
           router.push(`/auth/signin?redirectTo=${redirectUrl}`)
           isNavigatingRef.current = false
           return // Don't advance step
@@ -789,9 +861,22 @@ export default function SellWizardClient({
         }
       }
 
-      // Normal navigation
-      if (currentStep < WIZARD_STEPS.length - 1) {
-        setCurrentStep(currentStep + 1)
+      // Normal navigation - skip promotion step if disabled
+      let nextStep = currentStep + 1
+      
+      // If moving from ITEMS to PROMOTION but promotions are disabled, skip to REVIEW
+      if (currentStep === STEPS.ITEMS && nextStep === STEPS.PROMOTION && !promotionsEnabled) {
+        nextStep = STEPS.REVIEW
+      }
+      
+      // If moving from PROMOTION, always go to REVIEW
+      if (currentStep === STEPS.PROMOTION) {
+        nextStep = STEPS.REVIEW
+      }
+      
+      // Only advance if there's a valid next step
+      if (nextStep <= STEPS.REVIEW) {
+        setCurrentStep(nextStep)
       }
     } finally {
       // Reset navigation guard after a short delay
@@ -1271,6 +1356,13 @@ export default function SellWizardClient({
     setItems(prev => prev.filter(it => it.id !== id))
   }, [])
 
+  // Guard: if on PROMOTION step but promotions disabled, redirect to REVIEW
+  useEffect(() => {
+    if (currentStep === STEPS.PROMOTION && !promotionsEnabled) {
+      setCurrentStep(STEPS.REVIEW)
+    }
+  }, [currentStep, promotionsEnabled])
+
   const renderStep = () => {
     switch (currentStep) {
       case STEPS.DETAILS:
@@ -1279,6 +1371,17 @@ export default function SellWizardClient({
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
+      case STEPS.PROMOTION:
+        if (!promotionsEnabled) {
+          // Should not happen due to useEffect guard, but defensive check
+          return null
+        }
+        return (
+          <PromotionStep
+            wantsPromotion={wantsPromotion}
+            onTogglePromotion={setWantsPromotion}
+          />
+        )
       case STEPS.REVIEW:
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[SELL_WIZARD] Rendering ReviewStep with promotionsEnabled:', promotionsEnabled)
@@ -1293,7 +1396,6 @@ export default function SellWizardClient({
             submitError={submitError}
             promotionsEnabled={promotionsEnabled}
             wantsPromotion={wantsPromotion}
-            onTogglePromotion={setWantsPromotion}
           />
         )
       default:
@@ -1371,31 +1473,36 @@ export default function SellWizardClient({
       <div className="mb-8">
         <div className="flex justify-center">
           <div className="flex space-x-4">
-            {WIZARD_STEPS.map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  index <= currentStep
-                    ? 'bg-[var(--accent-primary)] text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {index + 1}
+            {WIZARD_STEPS.map((step, index) => {
+              const currentStepIndex = getStepIndex(currentStep)
+              const isActive = index <= currentStepIndex
+              const isCompleted = index < currentStepIndex
+              return (
+                <div key={step.id} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    isActive
+                      ? 'bg-[var(--accent-primary)] text-white'
+                      : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  {index < WIZARD_STEPS.length - 1 && (
+                    <div className={`w-12 h-0.5 mx-2 ${
+                      isCompleted ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
+                    }`} />
+                  )}
                 </div>
-                {index < WIZARD_STEPS.length - 1 && (
-                  <div className={`w-12 h-0.5 mx-2 ${
-                    index < currentStep ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
         
         <div className="text-center mt-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            {WIZARD_STEPS[currentStep].title}
+            {WIZARD_STEPS[getStepIndex(currentStep)]?.title || 'Review'}
           </h2>
           <p className="text-gray-600">
-            {WIZARD_STEPS[currentStep].description}
+            {WIZARD_STEPS[getStepIndex(currentStep)]?.description || 'Review and publish your sale'}
           </p>
         </div>
       </div>
@@ -1420,7 +1527,7 @@ export default function SellWizardClient({
           Previous
         </button>
 
-        {currentStep < WIZARD_STEPS.length - 1 ? (
+        {currentStep < STEPS.REVIEW ? (
           <button
             onClick={handleNext}
             aria-label="Next step"
@@ -2041,6 +2148,61 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
+// Step Components
+function PromotionStep({
+  wantsPromotion,
+  onTogglePromotion,
+}: {
+  wantsPromotion?: boolean
+  onTogglePromotion?: (next: boolean) => void
+}) {
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-medium text-gray-900">Feature Your Sale</h3>
+      
+      <div className="bg-white border border-purple-200 rounded-lg p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex-1">
+            <h4 className="font-medium text-[#3A2268] text-lg mb-2">Get more visibility</h4>
+            <p className="text-sm text-[#3A2268] mb-2">
+              Feature your sale in weekly emails and discovery to reach more buyers in your area.
+            </p>
+            <p className="text-xs text-[#3A2268]">
+              You can also promote later from your dashboard.
+            </p>
+          </div>
+          <div className="flex items-center justify-start sm:justify-end">
+            <label className="inline-flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!wantsPromotion}
+                onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                className="w-5 h-5 rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                data-testid="promotion-step-feature-toggle"
+              />
+              <span className="text-base font-medium text-[#3A2268]">Feature this sale</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div className="flex">
+          <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <h4 className="font-medium text-purple-800">Ready to continue?</h4>
+            <p className="text-sm text-purple-700 mt-1">
+              Click "Next" to review your sale before publishing.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReviewStep({ 
   formData, 
   photos,
@@ -2051,7 +2213,6 @@ function ReviewStep({
   promotionsEnabled: promotionsEnabledProp,
   paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
-  onTogglePromotion,
 }: {
   formData: Partial<SaleInput>
   photos: string[]
@@ -2062,7 +2223,6 @@ function ReviewStep({
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
   wantsPromotion?: boolean
-  onTogglePromotion?: (next: boolean) => void
 }) {
   // Ensure promotionsEnabled is always a boolean (defensive check)
   // This preserves the server-computed value and prevents undefined from hiding promotion section
@@ -2185,39 +2345,21 @@ function ReviewStep({
           </div>
         </div>
 
-        {(() => {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[REVIEW_STEP] Promotion section render check:', { promotionsEnabled, shouldRender: !!promotionsEnabled })
-          }
-          return promotionsEnabled
-        })() && (
-          <DiagnosticErrorBoundary componentName="ReviewStep-PromotionSection">
-            <div className="bg-white border border-purple-200 rounded-lg p-4">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div>
-                  <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
-                  <p className="text-sm text-[#3A2268] mt-1">
-                    Get more visibility by featuring your sale in weekly emails and discovery.
-                  </p>
-                  <p className="mt-1 text-xs text-[#3A2268]">
-                    You can also promote later from your dashboard.
-                  </p>
-                </div>
-                <div className="flex items-center justify-start sm:justify-end">
-                  <label className="inline-flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!wantsPromotion}
-                      onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                      className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
-                      data-testid="review-feature-toggle"
-                    />
-                    <span className="text-sm text-[#3A2268]">Feature this sale</span>
-                  </label>
-                </div>
+        {/* Promotion summary (read-only) */}
+        {promotionsEnabled && wantsPromotion && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <div>
+                <h4 className="font-medium text-purple-800">Sale will be featured</h4>
+                <p className="text-sm text-purple-700 mt-0.5">
+                  Your sale will be featured in weekly emails and discovery.
+                </p>
               </div>
             </div>
-          </DiagnosticErrorBoundary>
+          </div>
         )}
       </div>
       

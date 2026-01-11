@@ -390,6 +390,10 @@ export default function SellWizardClient({
   useEffect(() => {
     if (initialData || hasResumedRef.current) return
 
+    // Set flag synchronously to prevent multiple concurrent runs (fixes React error #418/#422)
+    // This prevents the effect from running again if user state changes before async completes
+    hasResumedRef.current = true
+
     const resumeDraft = async () => {
       const resume = resumeParam
       const isReviewResume = resume === 'review'
@@ -477,7 +481,7 @@ export default function SellWizardClient({
 
       // Restore draft if found
       if (draftToRestore) {
-        hasResumedRef.current = true
+        // hasResumedRef.current already set synchronously above to prevent concurrent runs
         isRestoringDraftRef.current = true // Prevent autosave during restoration
         
         // Set draftKeyRef to the restored draft's key (critical: prevents creating new draft on autosave)

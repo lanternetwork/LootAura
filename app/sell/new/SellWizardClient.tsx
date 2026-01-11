@@ -468,6 +468,7 @@ export default function SellWizardClient({
                   category: item.category,
                 })),
                 currentStep: parsed.currentStep || 0,
+                wantsPromotion: parsed.wantsPromotion || false,
               }
               source = 'local'
               if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

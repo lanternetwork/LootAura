@@ -198,8 +198,9 @@ export default function SellWizardClient({
         category: item.category,
       })),
       currentStep,
+      wantsPromotion,
     }
-  }, [formData, photos, items, currentStep])
+  }, [formData, photos, items, currentStep, wantsPromotion])
 
   // Check authentication status
   useEffect(() => {
@@ -524,6 +525,11 @@ export default function SellWizardClient({
             category: item.category,
           }))
           setItems(loadedItems)
+        }
+
+        // Restore promotion intent (backward compatible: defaults to false if missing)
+        if (draftToRestore.wantsPromotion !== undefined) {
+          setWantsPromotion(draftToRestore.wantsPromotion)
         }
 
         // Restore step: if resume=review, force Review step; otherwise use saved step

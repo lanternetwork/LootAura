@@ -164,7 +164,7 @@ describe('Sell Wizard Promote CTA', () => {
     
     // Should go to Promotion step
     await waitFor(() => {
-      expect(screen.getByText('Promote Your Sale')).toBeInTheDocument()
+      expect(screen.getByText('Feature Your Sale')).toBeInTheDocument()
     })
 
     // Toggle should exist in the promotion step

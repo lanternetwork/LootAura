@@ -102,7 +102,7 @@ function getWizardSteps(promotionsEnabled: boolean): WizardStep[] {
   if (promotionsEnabled) {
     baseSteps.push({
       id: 'promotion',
-      title: 'Feature Your Sale',
+      title: 'Promote Your Sale',
       description: 'Get more visibility with promotion'
     })
   }
@@ -617,7 +617,7 @@ export default function SellWizardClient({
             : (draftToRestore.currentStep !== undefined ? draftToRestore.currentStep : undefined)
 
           const nextToastMessage = isPromotionResume
-            ? 'Draft restored. Ready to feature your sale.'
+            ? 'Draft restored. Ready to promote your sale.'
             : isReviewResume
             ? 'Draft restored. Ready to review your sale.'
             : (draftToRestore.currentStep !== undefined ? `Draft restored${source === 'server' ? ' from cloud' : ''}` : undefined)
@@ -653,7 +653,7 @@ export default function SellWizardClient({
         } else if (isPromotionResume) {
           // Draft not found but resume=promotion - still go to Promotion step
           setCurrentStep(STEPS.PROMOTION)
-          setToastMessage('Draft not found; please feature your sale.')
+          setToastMessage('Draft not found; please promote your sale.')
           setShowToast(true)
         } else if (isReviewResume) {
           // Draft not found but resume=review - still go to Review step
@@ -1387,6 +1387,7 @@ export default function SellWizardClient({
             submitError={submitError}
             promotionsEnabled={promotionsEnabled}
             wantsPromotion={wantsPromotion}
+            onNavigateToPromotion={() => setCurrentStep(STEPS.PROMOTION)}
           />
         )
       default:
@@ -2150,88 +2151,89 @@ function PromotionStep({
   return (
     <DiagnosticErrorBoundary componentName="PromotionStep-Content">
       <div className="space-y-6">
-        {/* Stronger Opening Frame */}
-        <div>
-          <h3 className="text-2xl font-semibold text-gray-900">Boost Your Sale's Visibility</h3>
-          <p className="text-base text-gray-600 mt-2">
-            Before you publish, decide: list your sale for free, or feature it to reach more buyers in your area and get early interest.
-          </p>
-        </div>
-
-        {/* Value Contrast: Free vs Featured */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Free Option */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <h4 className="font-medium text-gray-900">Free Listing</h4>
-            </div>
-            <p className="text-sm text-gray-600">
-              Your sale will be visible to buyers who search for it. Standard placement in results.
+        {/* Primary Panel */}
+        <div className={`bg-white border-2 rounded-lg p-6 shadow-sm transition-colors ${
+          wantsPromotion 
+            ? 'bg-purple-50 border-purple-500' 
+            : 'border-gray-300'
+        }`}>
+          {/* Decision Framing */}
+          <div className="mb-6">
+            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+              Promote Your Sale
+            </h3>
+            <p className="text-base text-gray-700">
+              Before you publish, promote your sale for a one-time <strong className="font-semibold text-[#3A2268]">$2.99</strong> to reach more buyers in your area.
             </p>
           </div>
 
-          {/* Featured Option */}
-          <div className={`bg-gradient-to-br from-purple-50 to-purple-100 border-2 ${wantsPromotion ? 'border-purple-500' : 'border-purple-300'} rounded-lg p-5`}>
-            <div className="flex items-center gap-2 mb-3">
-              <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-              </svg>
-              <h4 className="font-semibold text-[#3A2268]">Featured Sale</h4>
-            </div>
-            <ul className="space-y-2 text-sm text-[#3A2268]">
+          {/* Benefits List */}
+          <div className="mb-6">
+            <h4 className="font-medium text-gray-900 mb-3">What promotion includes:</h4>
+            <ul className="space-y-2 text-sm text-gray-700">
               <li className="flex items-start gap-2">
-                <svg className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>Prominent placement in search & discovery</span>
+                <span>Prominent placement in search results and discovery feeds</span>
               </li>
               <li className="flex items-start gap-2">
-                <svg className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>Included in weekly email to local buyers</span>
               </li>
               <li className="flex items-start gap-2">
-                <svg className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>Early visibility before your sale starts</span>
               </li>
             </ul>
           </div>
-        </div>
 
-        {/* Primary Action Section - Prominent */}
-        <div className={`bg-white border-2 ${wantsPromotion ? 'border-purple-500' : 'border-purple-200'} rounded-lg p-6 shadow-sm`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Toggle Control */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div className="flex-1">
-              <h4 className="text-lg font-semibold text-[#3A2268] mb-1">Feature this sale</h4>
-              <p className="text-sm text-gray-600">
-                Get maximum visibility and reach more buyers. You can change this later from your dashboard.
-              </p>
+              <label className="text-base font-medium text-gray-900">
+                Promote this sale
+                <span className="ml-2 text-[#3A2268] font-semibold">$2.99 one-time</span>
+              </label>
             </div>
-            <label className="inline-flex items-center gap-3 cursor-pointer group">
+            <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={!!wantsPromotion}
                 onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                className="w-5 h-5 rounded border-2 border-gray-300 text-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 transition-colors"
+                className="sr-only peer"
                 data-testid="promotion-step-feature-toggle"
               />
-              <span className="text-base font-semibold text-[#3A2268] group-hover:text-purple-700 transition-colors">
-                {wantsPromotion ? 'Featured' : 'Feature this sale'}
-              </span>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
             </label>
           </div>
+
+          {/* State Reinforcement - ON State */}
+          {wantsPromotion && (
+            <div className="mt-4 pt-4 border-t border-purple-200">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <div>
+                  <p className="font-semibold text-purple-800">Promotion enabled</p>
+                  <p className="text-sm text-purple-700 mt-1">
+                    You'll be charged <strong>$2.99</strong> only if the sale is published.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Reassurance - De-emphasized */}
+        {/* Secondary Reassurance */}
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
           <p className="text-xs text-gray-600">
-            <span className="font-medium">Optional:</span> Promotion is a one-time charge. No charge unless your sale is published. You can add or remove promotion anytime from your dashboard.
+            <span className="font-medium">Optional:</span> Promotion is <strong>$2.99 one-time</strong>. No charge unless your sale is published. You can add or remove promotion anytime from your dashboard.
           </p>
         </div>
       </div>
@@ -2249,6 +2251,7 @@ function ReviewStep({
   promotionsEnabled: promotionsEnabledProp,
   paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
+  onNavigateToPromotion,
 }: {
   formData: Partial<SaleInput>
   photos: string[]
@@ -2259,6 +2262,7 @@ function ReviewStep({
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
   wantsPromotion?: boolean
+  onNavigateToPromotion?: () => void
 }) {
   // Ensure promotionsEnabled is always a boolean (defensive check)
   // This preserves the server-computed value and prevents undefined from hiding promotion section
@@ -2381,20 +2385,55 @@ function ReviewStep({
           </div>
         </div>
 
-        {/* Promotion summary (read-only) */}
-        {promotionsEnabled && wantsPromotion && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <div>
-                <h4 className="font-medium text-purple-800">Sale will be featured</h4>
-                <p className="text-sm text-purple-700 mt-0.5">
-                  Your sale will be featured in weekly emails and discovery.
-                </p>
+        {/* Promotion Confirmation Section */}
+        {promotionsEnabled && (
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            {wantsPromotion ? (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-purple-800">Promotion enabled</h4>
+                    <p className="text-sm text-gray-700 mt-1">
+                      Your sale will be promoted in weekly emails and discovery.
+                    </p>
+                    <p className="text-sm font-medium text-gray-900 mt-2">
+                      Cost: <span className="text-[#3A2268]">$2.99</span> (one-time)
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      You'll only be charged if this sale is published.
+                    </p>
+                  </div>
+                </div>
+                {onNavigateToPromotion && (
+                  <button
+                    onClick={onNavigateToPromotion}
+                    className="text-sm text-purple-600 hover:text-purple-700 font-medium underline"
+                  >
+                    Change promotion
+                  </button>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <h4 className="font-medium text-gray-900">Promotion not enabled</h4>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Your sale will publish without promotion.
+                  </p>
+                </div>
+                {onNavigateToPromotion && (
+                  <button
+                    onClick={onNavigateToPromotion}
+                    className="text-sm text-purple-600 hover:text-purple-700 font-medium underline"
+                  >
+                    Promote my sale for $2.99
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -13,11 +13,9 @@ async function callbackHandler(request: NextRequest) {
     const code = url.searchParams.get('code')
     const error = url.searchParams.get('error')
     // Check for redirectTo (preferred) or next (fallback)
-    // Store original value to check if it was missing (for sessionStorage fallback)
     // Note: We can't access sessionStorage from server-side, so we rely on the query param
     // The client-side signin page will handle sessionStorage fallback
-    const originalRedirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
-    let redirectTo = originalRedirectTo
+    let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
     
     // If no redirectTo in query, default to /sales for backward compatibility
     // The signin page will check sessionStorage when user is already authenticated
@@ -95,16 +93,10 @@ async function callbackHandler(request: NextRequest) {
       }
 
       // Success: user session cookies are automatically set by auth-helpers
-      // If redirectTo was missing from query (defaulted to /sales), redirect to signin page
-      // which can check sessionStorage for auth:postLoginRedirect
-      let finalRedirectTo = redirectTo
-      if (!originalRedirectTo && finalRedirectTo === '/sales') {
-        // No redirectTo was provided - redirect to signin to check sessionStorage
-        authDebug.logAuthFlow('oauth-callback', 'no-redirect-to', 'start', {
-          message: 'No redirectTo provided, redirecting to signin to check sessionStorage'
-        })
-        return NextResponse.redirect(new URL('/auth/signin', url.origin))
-      }
+      // Prevent redirect loops: never redirect to auth pages
+      const finalRedirectTo = redirectTo.startsWith('/auth/') || redirectTo.startsWith('/login') || redirectTo.startsWith('/signin')
+        ? '/sales'
+        : redirectTo
       
       authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { redirectTo: finalRedirectTo })
       return NextResponse.redirect(new URL(finalRedirectTo, url.origin))

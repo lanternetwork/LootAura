@@ -7,9 +7,7 @@ export async function GET(req: Request) {
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
   // Check for redirectTo (preferred) or next (fallback)
-  // Store original value to check if it was missing (for sessionStorage fallback)
-  const originalRedirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
-  let redirectTo = originalRedirectTo
+  let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
   
   // If no redirectTo in query, default to /sales for backward compatibility
   // The signin page will check sessionStorage when user is already authenticated
@@ -126,17 +124,8 @@ export async function GET(req: Request) {
       }
       
       // Success: user session cookies are automatically set by auth-helpers
-      // If redirectTo was missing from query (defaulted to /sales), redirect to signin page
-      // which can check sessionStorage for auth:postLoginRedirect
-      let finalRedirectTo = redirectTo
-      if (!originalRedirectTo && finalRedirectTo === '/sales') {
-        // No redirectTo was provided - redirect to signin to check sessionStorage
-        console.log('[AUTH_CALLBACK] No redirectTo provided, redirecting to signin to check sessionStorage')
-        const signinUrl = new URL('/auth/signin', url.origin)
-        return NextResponse.redirect(signinUrl)
-      }
-      
       // Prevent redirect loops: never redirect to auth pages
+      let finalRedirectTo = redirectTo
       if (finalRedirectTo.startsWith('/auth/') || finalRedirectTo.startsWith('/login') || finalRedirectTo.startsWith('/signin')) {
         console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
         finalRedirectTo = '/sales'

@@ -149,6 +149,8 @@ export default function SellWizardClient({
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
   const searchParams = useSearchParams()
+  // Extract resume param value to avoid hook order violations (searchParams object changes on every render)
+  const resumeParam = searchParams.get('resume')
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -389,7 +391,7 @@ export default function SellWizardClient({
     if (initialData || hasResumedRef.current) return
 
     const resumeDraft = async () => {
-      const resume = searchParams.get('resume')
+      const resume = resumeParam
       const isReviewResume = resume === 'review'
       
       let draftToRestore: SaleDraftPayload | null = null
@@ -558,7 +560,7 @@ export default function SellWizardClient({
     }
 
     resumeDraft()
-  }, [initialData, user, normalizeTimeToNearest30, searchParams])
+  }, [initialData, user, normalizeTimeToNearest30, resumeParam])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

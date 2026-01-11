@@ -2148,49 +2148,39 @@ function PromotionStep({
   onTogglePromotion?: (next: boolean) => void
 }) {
   return (
-    <div className="space-y-6">
-      <h3 className="text-lg font-medium text-gray-900">Feature Your Sale</h3>
-      
-      <div className="bg-white border border-purple-200 rounded-lg p-6">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex-1">
-            <h4 className="font-medium text-[#3A2268] text-lg mb-2">Get more visibility</h4>
-            <p className="text-sm text-[#3A2268] mb-2">
-              Feature your sale in weekly emails and discovery to reach more buyers in your area.
-            </p>
-            <p className="text-xs text-[#3A2268]">
-              You can also promote later from your dashboard.
-            </p>
-          </div>
-          <div className="flex items-center justify-start sm:justify-end">
-            <label className="inline-flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!wantsPromotion}
-                onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
-                data-testid="promotion-step-feature-toggle"
-              />
-              <span className="text-base font-medium text-[#3A2268]">Feature this sale</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <div className="flex">
-          <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h4 className="font-medium text-purple-800">Ready to continue?</h4>
-            <p className="text-sm text-purple-700 mt-1">
-              Click "Next" to review your sale before publishing.
-            </p>
+    <DiagnosticErrorBoundary componentName="PromotionStep-Content">
+      <div className="space-y-6">
+        <h3 className="text-lg font-medium text-gray-900">Feature Your Sale</h3>
+        
+        <div className="space-y-3">
+          <div className="bg-white border border-purple-200 rounded-lg p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
+                <p className="text-sm text-[#3A2268] mt-1">
+                  Get more visibility by featuring your sale in weekly emails and discovery.
+                </p>
+                <p className="mt-1 text-xs text-[#3A2268]">
+                  You can also promote later from your dashboard.
+                </p>
+              </div>
+              <div className="flex items-center justify-start sm:justify-end">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!wantsPromotion}
+                    onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                    className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                    data-testid="promotion-step-feature-toggle"
+                  />
+                  <span className="text-sm text-[#3A2268]">Feature this sale</span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </DiagnosticErrorBoundary>
   )
 }
 

@@ -105,7 +105,7 @@ async function callbackHandler(request: NextRequest) {
         // Redirect to signin page - it will check sessionStorage and redirect appropriately
         // This is necessary because server-side routes can't access sessionStorage
         // User is now authenticated, so signin page's useEffect will handle the redirect
-        authDebug.logAuthFlow('oauth-callback', 'no-redirect-param', 'info', {
+        authDebug.logAuthFlow('oauth-callback', 'no-redirect-param', 'success', {
           message: 'No redirectTo in query params, redirecting to signin to check sessionStorage'
         })
         return NextResponse.redirect(new URL('/auth/signin', url.origin))

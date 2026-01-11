@@ -231,9 +231,6 @@ export default function SellWizardClient({
   const isRestoringDraftRef = useRef<boolean>(false) // Flag to prevent autosave during draft restoration
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
-  const searchParams = useSearchParams()
-  // Extract resume param value to avoid hook order violations (searchParams object changes on every render)
-  const resumeParam = searchParams.get('resume')
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined

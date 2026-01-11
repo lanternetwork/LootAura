@@ -132,7 +132,7 @@ describe('OAuth Callback Route', () => {
     expect(response.url).toContain('/favorites')
   })
 
-  it('should redirect to sale creation when state parameter contains redirectTo (OAuth flow)', async () => {
+  it('should redirect to sale creation when redirectTo is double-encoded (OAuth flow)', async () => {
     const { createServerClient } = await import('@supabase/ssr')
     const mockSupabase = {
       auth: {
@@ -156,9 +156,10 @@ describe('OAuth Callback Route', () => {
     }
     vi.mocked(createServerClient).mockReturnValue(mockSupabase as any)
 
-    // Simulate OAuth callback with state parameter (redirectTo preserved through OAuth)
-    const redirectDestination = encodeURIComponent('/sell/new?resume=review')
-    const request = new NextRequest(`https://example.com/auth/callback?code=abc123&state=${redirectDestination}`)
+    // Simulate OAuth callback with double-encoded redirectTo (preserved through OAuth)
+    // OAuth providers may encode query params, so redirectTo gets double-encoded
+    const redirectDestination = encodeURIComponent(encodeURIComponent('/sell/new?resume=review'))
+    const request = new NextRequest(`https://example.com/auth/callback?code=abc123&redirectTo=${redirectDestination}`)
     
     const response = await GET(request)
     

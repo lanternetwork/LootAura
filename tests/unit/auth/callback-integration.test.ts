@@ -135,7 +135,7 @@ describe('OAuth Callback Route', () => {
       expect(response.url).toContain('/favorites')
     })
 
-    it('should redirect to sale creation when state parameter contains redirectTo (Google OAuth flow)', async () => {
+    it('should redirect to sale creation when redirectTo is double-encoded (Google OAuth flow)', async () => {
       const mockSession = {
         user: { id: 'user123' },
         access_token: 'token123',
@@ -152,10 +152,11 @@ describe('OAuth Callback Route', () => {
         json: () => Promise.resolve({ created: true }),
       })
 
-      // Simulate Google OAuth callback with state parameter preserving redirectTo
-      // This tests the fix for sale creation flow where redirectTo is lost in nested query params
-      const redirectDestination = encodeURIComponent('/sell/new?resume=review')
-      const request = new NextRequest(`https://example.com/auth/callback?code=abc123&state=${redirectDestination}`)
+      // Simulate Google OAuth callback with double-encoded redirectTo
+      // This tests the fix for sale creation flow where nested query params are preserved
+      // OAuth providers may encode query params, so redirectTo gets double-encoded
+      const redirectDestination = encodeURIComponent(encodeURIComponent('/sell/new?resume=review'))
+      const request = new NextRequest(`https://example.com/auth/callback?code=abc123&redirectTo=${redirectDestination}`)
       
       const response = await GET(request)
       

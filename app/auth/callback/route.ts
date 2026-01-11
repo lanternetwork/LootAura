@@ -9,31 +9,25 @@ export async function GET(req: Request) {
   
   // Resolve redirect destination in priority order:
   // 1) Explicit redirectTo/next query param (if preserved through OAuth)
-  // 2) State parameter (preserved through OAuth flow, used when query params are lost)
-  // 3) Default fallback (/sales)
+  // 2) Default fallback (/sales)
   let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
-  
-  // If redirectTo not in query params, check state parameter (preserved through OAuth)
-  if (!redirectTo) {
-    const stateParam = url.searchParams.get('state')
-    if (stateParam) {
-      try {
-        redirectTo = decodeURIComponent(stateParam)
-      } catch (e) {
-        // If decoding fails, ignore state param
-        console.log('[AUTH_CALLBACK] Failed to decode state parameter:', e)
-      }
-    }
-  }
   
   // Default fallback if no redirect intent found
   if (!redirectTo) {
     redirectTo = '/sales'
   }
 
-  // Decode the redirectTo if it was encoded (handle double-encoding)
+  // Decode the redirectTo if it was encoded (handle double-encoding from OAuth flow)
+  // OAuth providers may encode query params, so we need to decode once or twice
   try {
-    redirectTo = decodeURIComponent(redirectTo)
+    // Try decoding once
+    const decodedOnce = decodeURIComponent(redirectTo)
+    // If it still looks encoded (contains %), try decoding again
+    if (decodedOnce.includes('%')) {
+      redirectTo = decodeURIComponent(decodedOnce)
+    } else {
+      redirectTo = decodedOnce
+    }
   } catch (e) {
     // If decoding fails, use as-is
   }

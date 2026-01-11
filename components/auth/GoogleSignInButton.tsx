@@ -21,24 +21,27 @@ export default function GoogleSignInButton() {
       const urlParams = new URLSearchParams(window.location.search)
       const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
       
-      // Build callback URL with redirectTo param
-      // Encode the redirectTo parameter to ensure it's preserved through the OAuth flow
-      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
-      if (redirectParam) {
-        // URL-encode the redirectTo parameter to ensure it's preserved through OAuth redirects
-        callbackUrl.searchParams.set('redirectTo', encodeURIComponent(redirectParam))
-      }
-      const redirectTo = callbackUrl.toString()
+      // Build callback URL - keep it simple, redirectTo will be passed via state
+      const callbackUrl = `${window.location.origin}/auth/callback`
       
-      console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo, { redirectParam })
+      // Prepare query params for OAuth
+      const queryParams: Record<string, string> = {
+        prompt: 'select_account' // Better UX - always show account selection
+      }
+      
+      // Pass redirect destination through state parameter to preserve it through OAuth flow
+      // State parameter is reliably preserved by OAuth providers and returned in callback
+      if (redirectParam) {
+        queryParams.state = encodeURIComponent(redirectParam)
+      }
+      
+      console.log('[GOOGLE_AUTH] Starting OAuth with redirect:', { redirectParam, callbackUrl })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
-          queryParams: { 
-            prompt: 'select_account' // Better UX - always show account selection
-          }
+          redirectTo: callbackUrl,
+          queryParams
         }
       })
 

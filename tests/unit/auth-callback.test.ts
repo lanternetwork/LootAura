@@ -131,4 +131,39 @@ describe('OAuth Callback Route', () => {
     
     expect(response.url).toContain('/favorites')
   })
+
+  it('should redirect to sale creation when state parameter contains redirectTo (OAuth flow)', async () => {
+    const { createServerClient } = await import('@supabase/ssr')
+    const mockSupabase = {
+      auth: {
+        exchangeCodeForSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: { id: 'user123' }
+            }
+          },
+          error: null
+        }),
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: { id: 'user123' }
+            }
+          },
+          error: null
+        })
+      }
+    }
+    vi.mocked(createServerClient).mockReturnValue(mockSupabase as any)
+
+    // Simulate OAuth callback with state parameter (redirectTo preserved through OAuth)
+    const redirectDestination = encodeURIComponent('/sell/new?resume=review')
+    const request = new NextRequest(`https://example.com/auth/callback?code=abc123&state=${redirectDestination}`)
+    
+    const response = await GET(request)
+    
+    // Should redirect to sale creation page with resume parameter
+    expect(response.url).toContain('/sell/new')
+    expect(response.url).toContain('resume=review')
+  })
 })

@@ -135,6 +135,35 @@ describe('OAuth Callback Route', () => {
       expect(response.url).toContain('/favorites')
     })
 
+    it('should redirect to sale creation when state parameter contains redirectTo (Google OAuth flow)', async () => {
+      const mockSession = {
+        user: { id: 'user123' },
+        access_token: 'token123',
+        refresh_token: 'refresh123',
+      }
+
+      mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+        data: { session: mockSession },
+        error: null
+      })
+
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ created: true }),
+      })
+
+      // Simulate Google OAuth callback with state parameter preserving redirectTo
+      // This tests the fix for sale creation flow where redirectTo is lost in nested query params
+      const redirectDestination = encodeURIComponent('/sell/new?resume=review')
+      const request = new NextRequest(`https://example.com/auth/callback?code=abc123&state=${redirectDestination}`)
+      
+      const response = await GET(request)
+      
+      // Should redirect to sale creation page with resume parameter
+      expect(response.url).toContain('/sell/new')
+      expect(response.url).toContain('resume=review')
+    })
+
     it('should attempt profile creation during successful auth', async () => {
       const mockSession = {
         user: { id: 'user123' },

@@ -6,39 +6,55 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
-  // Check for redirectTo (preferred) or next (fallback)
+  
+  // Resolve redirect destination in priority order:
+  // 1) Explicit redirectTo/next query param (if preserved through OAuth)
+  // 2) State parameter (preserved through OAuth flow, used when query params are lost)
+  // 3) Default fallback (/sales)
   let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
   
-  // If no redirectTo in query, default to /sales for backward compatibility
-  // The signin page will check sessionStorage when user is already authenticated
+  // If redirectTo not in query params, check state parameter (preserved through OAuth)
+  if (!redirectTo) {
+    const stateParam = url.searchParams.get('state')
+    if (stateParam) {
+      try {
+        redirectTo = decodeURIComponent(stateParam)
+      } catch (e) {
+        // If decoding fails, ignore state param
+        console.log('[AUTH_CALLBACK] Failed to decode state parameter:', e)
+      }
+    }
+  }
+  
+  // Default fallback if no redirect intent found
   if (!redirectTo) {
     redirectTo = '/sales'
   }
-  
-  // Decode the redirectTo if it was encoded
+
+  // Decode the redirectTo if it was encoded (handle double-encoding)
   try {
     redirectTo = decodeURIComponent(redirectTo)
   } catch (e) {
     // If decoding fails, use as-is
   }
 
-  console.log('[AUTH_CALLBACK] Processing OAuth callback:', { 
-    hasCode: !!code, 
-    hasError: !!error, 
+  console.log('[AUTH_CALLBACK] Processing OAuth callback:', {
+    hasCode: !!code,
+    hasError: !!error,
     redirectTo,
-    url: url.href 
+    url: url.href
   })
 
   const cookieStore = cookies()
-  
+
   // Detect if request is over HTTPS (for Vercel preview deployments)
   const protocol = url.protocol
   const forwardedProto = req.headers.get('x-forwarded-proto')
-  const isHttps = protocol === 'https:' || 
-                 forwardedProto === 'https' ||
-                 url.href.startsWith('https://') ||
-                 process.env.NODE_ENV === 'production'
-  
+  const isHttps = protocol === 'https:' ||
+    forwardedProto === 'https' ||
+    url.href.startsWith('https://') ||
+    process.env.NODE_ENV === 'production'
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -51,9 +67,9 @@ export async function GET(req: Request) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
               // Ensure cookies have proper options for cross-domain and security
-              cookieStore.set({ 
-                name, 
-                value, 
+              cookieStore.set({
+                name,
+                value,
                 ...options,
                 // Ensure these options are set for proper cookie handling
                 path: options?.path || '/',
@@ -91,7 +107,7 @@ export async function GET(req: Request) {
     // Exchange authorization code for session
     console.log('[AUTH_CALLBACK] Exchanging code for session...')
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-    
+
     if (exchangeError) {
       console.log('[AUTH_CALLBACK] Code exchange failed:', exchangeError.message)
       return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(exchangeError.message)}`, url.origin))
@@ -99,7 +115,7 @@ export async function GET(req: Request) {
 
     if (data.session) {
       console.log('[AUTH_CALLBACK] Code exchange successful, user authenticated:', data.session.user.id)
-      
+
       // Ensure profile exists for the user (idempotent)
       try {
         const profileResponse = await fetch(new URL('/api/profile', url.origin), {
@@ -108,12 +124,12 @@ export async function GET(req: Request) {
             'Cookie': req.headers.get('cookie') || '',
           },
         })
-        
+
         if (profileResponse.ok) {
           const profileData = await profileResponse.json()
-          console.log('[AUTH_CALLBACK] Profile ensured:', { 
+          console.log('[AUTH_CALLBACK] Profile ensured:', {
             created: profileData.created,
-            userId: data.session.user.id 
+            userId: data.session.user.id
           })
         } else {
           console.log('[AUTH_CALLBACK] Profile creation failed, but continuing:', profileResponse.status)
@@ -122,21 +138,34 @@ export async function GET(req: Request) {
         console.log('[AUTH_CALLBACK] Profile creation error, but continuing:', profileError)
         // Don't fail the auth flow if profile creation fails
       }
-      
+
       // Success: user session cookies are automatically set by auth-helpers
-      // Prevent redirect loops: never redirect to auth pages
+      // Validate and sanitize redirect destination for security
       let finalRedirectTo = redirectTo
+      
+      // Security: Ensure redirectTo is a relative path (starts with /) to prevent open redirects
+      if (!finalRedirectTo.startsWith('/')) {
+        console.warn('[AUTH_CALLBACK] Invalid redirectTo path (not relative), defaulting to /sales:', finalRedirectTo)
+        finalRedirectTo = '/sales'
+      }
+      
+      // Security: Prevent redirect loops - never redirect to auth pages
       if (finalRedirectTo.startsWith('/auth/') || finalRedirectTo.startsWith('/login') || finalRedirectTo.startsWith('/signin')) {
         console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
         finalRedirectTo = '/sales'
       }
       
-      // Ensure redirectTo is a valid path (starts with /)
-      if (!finalRedirectTo.startsWith('/')) {
-        console.warn('[AUTH_CALLBACK] Invalid redirectTo path, defaulting to /sales:', finalRedirectTo)
-        finalRedirectTo = '/sales'
+      // Security: Prevent redirects to external URLs (double-check)
+      try {
+        const testUrl = new URL(finalRedirectTo, 'http://localhost')
+        if (testUrl.origin !== 'http://localhost') {
+          console.warn('[AUTH_CALLBACK] External redirect detected, defaulting to /sales:', finalRedirectTo)
+          finalRedirectTo = '/sales'
+        }
+      } catch (e) {
+        // URL parsing failed, which is fine for relative paths
       }
-      
+
       // Build redirect URL and ensure it doesn't contain the code parameter
       // This prevents the client-side from trying to exchange the code again
       // Parse the redirectTo to handle query parameters correctly
@@ -150,7 +179,7 @@ export async function GET(req: Request) {
       }
       redirectUrl.searchParams.delete('code')
       redirectUrl.searchParams.delete('error')
-      
+
       console.log('[AUTH_CALLBACK] Redirecting to:', redirectUrl.toString())
       return NextResponse.redirect(redirectUrl)
     } else {

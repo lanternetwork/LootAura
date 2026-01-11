@@ -17,28 +17,36 @@ export default function GoogleSignInButton() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
       
-      // Preserve redirect query param or sessionStorage redirect
+      // Get redirect destination from query param or sessionStorage (for non-OAuth flows)
+      // For OAuth redirects, we encode this in the OAuth state parameter (not query params or sessionStorage)
+      // This ensures server-authoritative redirects that survive the OAuth flow
       const urlParams = new URLSearchParams(window.location.search)
       const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
       
-      // Build callback URL with redirectTo as a properly encoded query parameter
-      // URL-encode the entire redirectTo value to preserve nested query params through OAuth
-      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+      // Build callback URL (no redirectTo query param needed - it's in state)
+      const callbackUrl = `${window.location.origin}/auth/callback`
+      
+      // Encode redirectTo in OAuth state parameter (JSON + base64)
+      // This ensures the redirect survives the OAuth flow and is server-authoritative
+      let oauthState: string | undefined
       if (redirectParam) {
-        // Double-encode to ensure nested query params survive OAuth provider redirects
-        // First encode the redirect destination, then encode the entire query param value
-        callbackUrl.searchParams.set('redirectTo', encodeURIComponent(encodeURIComponent(redirectParam)))
+        const statePayload = { redirectTo: redirectParam }
+        // Use btoa for browser-compatible base64 encoding
+        oauthState = btoa(JSON.stringify(statePayload))
+        console.log('[GOOGLE_AUTH] Encoding redirect in OAuth state:', { redirectParam, oauthState })
       }
       
-      console.log('[GOOGLE_AUTH] Starting OAuth with redirect:', { redirectParam, callbackUrl: callbackUrl.toString() })
+      console.log('[GOOGLE_AUTH] Starting OAuth with state-based redirect:', { redirectParam, callbackUrl })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: callbackUrl.toString(),
+          redirectTo: callbackUrl,
           queryParams: { 
             prompt: 'select_account' // Better UX - always show account selection
-          }
+          },
+          // Pass redirectTo in OAuth state parameter (returned in callback URL)
+          ...(oauthState && { state: oauthState })
         }
       })
 

@@ -17,25 +17,28 @@ async function callbackHandler(request: NextRequest) {
     // The client-side signin page will handle sessionStorage fallback
     let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
     
+    // Decode the redirectTo if it was encoded (handle double-encoding from OAuth flow)
+    // OAuth providers may encode query params, so we need to decode once or twice
+    // searchParams.get() already decodes once, so we may need to decode again
+    if (redirectTo) {
+      try {
+        // Keep decoding until no more % signs remain (handles double/triple encoding)
+        let decoded = redirectTo
+        let previousDecoded = ''
+        while (decoded !== previousDecoded && decoded.includes('%')) {
+          previousDecoded = decoded
+          decoded = decodeURIComponent(decoded)
+        }
+        redirectTo = decoded
+      } catch (e) {
+        // If decoding fails, use as-is
+      }
+    }
+    
     // If no redirectTo in query, default to /sales for backward compatibility
     // The signin page will check sessionStorage when user is already authenticated
     if (!redirectTo) {
       redirectTo = '/sales'
-    }
-    
-    // Decode the redirectTo if it was encoded (handle double-encoding from OAuth flow)
-    // OAuth providers may encode query params, so we need to decode once or twice
-    try {
-      // Try decoding once
-      const decodedOnce = decodeURIComponent(redirectTo)
-      // If it still looks encoded (contains %), try decoding again
-      if (decodedOnce.includes('%')) {
-        redirectTo = decodeURIComponent(decodedOnce)
-      } else {
-        redirectTo = decodedOnce
-      }
-    } catch (e) {
-      // If decoding fails, use as-is
     }
 
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {

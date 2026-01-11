@@ -2,6 +2,9 @@ import { Suspense } from 'react'
 import { headers } from 'next/headers'
 import SellWizardClient from './SellWizardClient'
 
+// Force dynamic rendering to ensure promotionsEnabled is always re-evaluated after OAuth
+export const dynamic = 'force-dynamic'
+
 export default async function SellNewPage() {
   // Get user location server-side (same pattern as sales page)
   let userLat: number | undefined
@@ -36,6 +39,10 @@ export default async function SellNewPage() {
 
   const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'
   const paymentsEnabled = process.env.PAYMENTS_ENABLED === 'true'
+
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[SELL_NEW_PAGE] Rendering with flags:', { promotionsEnabled, paymentsEnabled })
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -290,6 +290,8 @@ const ALLOWED_PATTERNS = [
   // CSRF client logging (lib/api/csrfClient.ts)
   /^\[CSRF_CLIENT\]/, // CSRF client logging - tests/integration/sale.share-button.render.test.tsx, tests/integration/sale.details.*.test.tsx
   /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
+  /^\[SELL_WIZARD\] promotionsEnabled prop is undefined/, // Prop passing diagnostic warning - app/sell/new/SellWizardClient.tsx
+  /^\[REVIEW_STEP\] promotionsEnabled prop is undefined/, // Prop passing diagnostic warning - app/sell/new/SellWizardClient.tsx ReviewStep
 ]
 
 const isAllowedMessage = (message: string): boolean => {

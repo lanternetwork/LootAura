@@ -17,18 +17,24 @@ async function callbackHandler(request: NextRequest) {
     // The client-side signin page will handle sessionStorage fallback
     let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
     
-    // If no redirectTo in query, default to /sales
-    if (!redirectTo) {
-      redirectTo = '/sales'
+    // Decode the redirectTo if it was encoded (handle double-encoding from OAuth flow)
+    // OAuth providers may encode query params, so we need to decode once or twice
+    // searchParams.get() already decodes once, so we may need to decode again
+    if (redirectTo) {
+      try {
+        // Keep decoding until no more % signs remain (handles double/triple encoding)
+        let decoded = redirectTo
+        let previousDecoded = ''
+        while (decoded !== previousDecoded && decoded.includes('%')) {
+          previousDecoded = decoded
+          decoded = decodeURIComponent(decoded)
+        }
+        redirectTo = decoded
+      } catch (e) {
+        // If decoding fails, use as-is
+      }
     }
     
-    // Decode the redirectTo if it was encoded
-    try {
-      redirectTo = decodeURIComponent(redirectTo)
-    } catch (e) {
-      // If decoding fails, use as-is
-    }
-
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {
       hasCode: !!code,
       hasError: !!error,
@@ -92,8 +98,26 @@ async function callbackHandler(request: NextRequest) {
       }
 
       // Success: user session cookies are automatically set by auth-helpers
-      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { redirectTo })
-      return NextResponse.redirect(new URL(redirectTo, url.origin))
+      
+      // If no redirectTo in query, redirect to signin page so client-side code can check sessionStorage
+      // This ensures Google OAuth redirects work even if query param is lost during OAuth flow
+      if (!redirectTo) {
+        // Redirect to signin page - it will check sessionStorage and redirect appropriately
+        // This is necessary because server-side routes can't access sessionStorage
+        // User is now authenticated, so signin page's useEffect will handle the redirect
+        authDebug.logAuthFlow('oauth-callback', 'no-redirect-param', 'success', {
+          message: 'No redirectTo in query params, redirecting to signin to check sessionStorage'
+        })
+        return NextResponse.redirect(new URL('/auth/signin', url.origin))
+      }
+      
+      // Prevent redirect loops: never redirect to auth pages
+      const finalRedirectTo = redirectTo.startsWith('/auth/') || redirectTo.startsWith('/login') || redirectTo.startsWith('/signin')
+        ? '/sales'
+        : redirectTo
+      
+      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { redirectTo: finalRedirectTo })
+      return NextResponse.redirect(new URL(finalRedirectTo, url.origin))
     }
 
     authDebug.logAuthFlow('oauth-callback', 'no-session', 'error')

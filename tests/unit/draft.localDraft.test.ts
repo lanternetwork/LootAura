@@ -82,7 +82,8 @@ describe('localDraft utilities', () => {
             price: 10
           }
         ],
-        currentStep: 1
+        currentStep: 1,
+        wantsPromotion: false
       }
 
       saveLocalDraft(payload)
@@ -104,7 +105,8 @@ describe('localDraft utilities', () => {
         formData: {},
         photos: [],
         items: [],
-        currentStep: 0
+        currentStep: 0,
+        wantsPromotion: false
       }
 
       saveLocalDraft(payload)

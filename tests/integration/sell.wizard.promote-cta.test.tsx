@@ -95,9 +95,9 @@ describe('Sell Wizard Promote CTA', () => {
     time_start: '09:00',
   }
 
-  const goToReviewStep = async () => {
+  const goToItemsStep = async () => {
     const user = userEvent.setup()
-    // Move from Details → Photos → Items → Review
+    // Move from Details → Photos → Items
     // Wait for form to be ready (AddressAutocomplete mock sets lat/lng via useEffect)
     await waitFor(() => {
       expect(screen.getByDisplayValue('Test Sale')).toBeInTheDocument()
@@ -113,17 +113,6 @@ describe('Sell Wizard Promote CTA', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add item/i })).toBeInTheDocument()
     })
-    // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
-    await new Promise(resolve => setTimeout(resolve, 600))
-    await user.click(screen.getByRole('button', { name: /next/i }))
-    // Review - wait for the step to change by checking for Review step content
-    // The Review step renders "Review Your Sale" heading, which is more reliable than waiting for the button
-    await waitFor(() => {
-      expect(screen.getByText('Review Your Sale')).toBeInTheDocument()
-    })
-    // Now verify the Publish Sale button exists
-    const buttons = screen.queryAllByRole('button', { name: /publish sale/i })
-    expect(buttons.length).toBeGreaterThan(0)
   }
 
   it('hides Feature your sale toggle when promotions are disabled', async () => {
@@ -137,9 +126,21 @@ describe('Sell Wizard Promote CTA', () => {
       />
     )
 
-    await goToReviewStep()
+    const user = userEvent.setup()
+    await goToItemsStep()
+    
+    // When promotions are disabled, clicking Next from Items should skip to Review
+    // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
+    await new Promise(resolve => setTimeout(resolve, 600))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    
+    // Should go directly to Review (promotion step skipped)
+    await waitFor(() => {
+      expect(screen.getByText('Review Your Sale')).toBeInTheDocument()
+    })
 
-    expect(screen.queryByTestId('review-feature-toggle')).toBeNull()
+    // Toggle should not exist anywhere
+    expect(screen.queryByTestId('promotion-step-feature-toggle')).toBeNull()
   })
 
   it('shows Feature your sale toggle when promotions are enabled', async () => {
@@ -153,9 +154,18 @@ describe('Sell Wizard Promote CTA', () => {
       />
     )
 
-    await goToReviewStep()
-
-    expect(screen.getByTestId('review-feature-toggle')).toBeInTheDocument()
+    const user = userEvent.setup()
+    await goToItemsStep()
+    
+    // When promotions are enabled, clicking Next from Items should go to Promotion step
+    // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
+    await new Promise(resolve => setTimeout(resolve, 600))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    
+    // Should go to Promotion step - wait for the toggle to appear (more reliable than text)
+    await waitFor(() => {
+      expect(screen.getByTestId('promotion-step-feature-toggle')).toBeInTheDocument()
+    })
   })
 })
 

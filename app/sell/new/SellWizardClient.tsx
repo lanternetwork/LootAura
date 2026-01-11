@@ -1204,6 +1204,9 @@ export default function SellWizardClient({
       case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
       case STEPS.REVIEW:
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SELL_WIZARD] Rendering ReviewStep with promotionsEnabled:', promotionsEnabled)
+        }
         return (
           <ReviewStep
             formData={formData}
@@ -2094,7 +2097,12 @@ function ReviewStep({
           </div>
         </div>
 
-        {promotionsEnabled && (
+        {(() => {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[REVIEW_STEP] Promotion section render check:', { promotionsEnabled, shouldRender: !!promotionsEnabled })
+          }
+          return promotionsEnabled
+        })() && (
           <div className="bg-white border border-purple-200 rounded-lg p-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>

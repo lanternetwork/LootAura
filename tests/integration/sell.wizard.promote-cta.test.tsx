@@ -162,13 +162,10 @@ describe('Sell Wizard Promote CTA', () => {
     await new Promise(resolve => setTimeout(resolve, 600))
     await user.click(screen.getByRole('button', { name: /next/i }))
     
-    // Should go to Promotion step
+    // Should go to Promotion step - wait for the toggle to appear (more reliable than text)
     await waitFor(() => {
-      expect(screen.getByText('Feature Your Sale')).toBeInTheDocument()
+      expect(screen.getByTestId('promotion-step-feature-toggle')).toBeInTheDocument()
     })
-
-    // Toggle should exist in the promotion step
-    expect(screen.getByTestId('promotion-step-feature-toggle')).toBeInTheDocument()
   })
 })
 

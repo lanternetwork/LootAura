@@ -6,6 +6,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Sale, SaleItem } from '@/lib/types'
 import type { SaleWithOwnerInfo } from '@/lib/data/sales'
+import type { DraftRecord } from '@/lib/drafts/computePublishability'
 
 export interface SaleListing {
   id: string
@@ -354,7 +355,6 @@ export async function getUserDrafts(
     // Map to DraftListing format, extracting title from payload if not set
     // Compute publishability for each draft
     const { computePublishability } = await import('@/lib/drafts/computePublishability')
-    type DraftRecord = Parameters<typeof computePublishability>[0]
     const mappedDrafts: DraftListing[] = (drafts || []).map((draft: any) => {
       const publishability = computePublishability({
         id: draft.id,

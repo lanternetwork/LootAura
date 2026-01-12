@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition, useMemo, useReducer } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
@@ -116,6 +116,90 @@ function getWizardSteps(promotionsEnabled: boolean): WizardStep[] {
   return baseSteps
 }
 
+// Wizard state type
+type WizardState = {
+  currentStep: number
+  formData: Partial<SaleInput>
+  photos: string[]
+  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>
+  wantsPromotion: boolean
+  loading: boolean
+  errors: Record<string, string>
+  submitError: string | null
+}
+
+// Wizard actions
+type WizardAction =
+  | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
+  | { type: 'SET_STEP'; step: number }
+  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any }
+  | { type: 'SET_FORM_DATA'; formData: Partial<SaleInput> }
+  | { type: 'SET_PHOTOS'; photos: string[] }
+  | { type: 'SET_ITEMS'; items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }> }
+  | { type: 'ADD_ITEM'; item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue } }
+  | { type: 'UPDATE_ITEM'; item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue } }
+  | { type: 'REMOVE_ITEM'; id: string }
+  | { type: 'TOGGLE_PROMOTION'; value: boolean }
+  | { type: 'SET_LOADING'; loading: boolean }
+  | { type: 'SET_ERRORS'; errors: Record<string, string> }
+  | { type: 'SET_SUBMIT_ERROR'; error: string | null }
+
+// Initial wizard state
+const initialWizardState: WizardState = {
+  currentStep: 0,
+  formData: {},
+  photos: [],
+  items: [],
+  wantsPromotion: false,
+  loading: false,
+  errors: {},
+  submitError: null,
+}
+
+// Wizard reducer
+function wizardReducer(state: WizardState, action: WizardAction): WizardState {
+  switch (action.type) {
+    case 'RESUME_DRAFT':
+      return {
+        ...state,
+        ...(action.payload.formData !== undefined && { formData: action.payload.formData }),
+        ...(action.payload.photos !== undefined && { photos: action.payload.photos }),
+        ...(action.payload.items !== undefined && { items: action.payload.items }),
+        ...(action.payload.wantsPromotion !== undefined && { wantsPromotion: action.payload.wantsPromotion }),
+        ...(action.payload.currentStep !== undefined && { currentStep: action.payload.currentStep }),
+      }
+    case 'SET_STEP':
+      return { ...state, currentStep: action.step }
+    case 'UPDATE_FORM':
+      return { ...state, formData: { ...state.formData, [action.field]: action.value } }
+    case 'SET_FORM_DATA':
+      return { ...state, formData: action.formData }
+    case 'SET_PHOTOS':
+      return { ...state, photos: action.photos }
+    case 'SET_ITEMS':
+      return { ...state, items: action.items }
+    case 'ADD_ITEM':
+      return { ...state, items: [...state.items, action.item] }
+    case 'UPDATE_ITEM':
+      return {
+        ...state,
+        items: state.items.map(item => item.id === action.item.id ? action.item : item)
+      }
+    case 'REMOVE_ITEM':
+      return { ...state, items: state.items.filter(item => item.id !== action.id) }
+    case 'TOGGLE_PROMOTION':
+      return { ...state, wantsPromotion: action.value }
+    case 'SET_LOADING':
+      return { ...state, loading: action.loading }
+    case 'SET_ERRORS':
+      return { ...state, errors: action.errors }
+    case 'SET_SUBMIT_ERROR':
+      return { ...state, submitError: action.error }
+    default:
+      return state
+  }
+}
+
 export default function SellWizardClient({
   initialData,
   isEdit: _isEdit = false,
@@ -145,27 +229,7 @@ export default function SellWizardClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createSupabaseBrowserClient()
-  const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
-  
-  // Compute wizard steps based on promotionsEnabled (promotion step is conditional)
-  const WIZARD_STEPS = useMemo(() => getWizardSteps(promotionsEnabled), [promotionsEnabled])
-  
-  // Helper to map step constant to WIZARD_STEPS index
-  const getStepIndex = useCallback((stepConstant: number): number => {
-    if (stepConstant === STEPS.DETAILS) return 0
-    if (stepConstant === STEPS.PHOTOS) return 1
-    if (stepConstant === STEPS.ITEMS) return 2
-    if (stepConstant === STEPS.PROMOTION) {
-      // Promotion is at index 3 if enabled, otherwise doesn't exist
-      return promotionsEnabled ? 3 : -1
-    }
-    if (stepConstant === STEPS.REVIEW) {
-      // Review is at index 3 if promotions disabled, index 4 if enabled
-      return promotionsEnabled ? 4 : 3
-    }
-    return 0
-  }, [promotionsEnabled])
   
   // Extract resumeParam from searchParams outside useEffect to stabilize dependency array
   const resumeParam = searchParams.get('resume')
@@ -194,31 +258,53 @@ export default function SellWizardClient({
       return matched || trimmed // Use matched format, or keep original if no match
     }).filter(Boolean)
   }, [])
+  
+  // Initialize wizard state from initialData if provided
+  const [wizardState, dispatch] = useReducer(wizardReducer, initialWizardState, (initialState) => ({
+    ...initialState,
+    formData: {
+      title: initialData?.title || '',
+      description: initialData?.description || '',
+      address: initialData?.address || '',
+      city: initialData?.city || '',
+      state: initialData?.state || '',
+      zip_code: initialData?.zip_code || '',
+      date_start: initialData?.date_start || '',
+      time_start: initialData?.time_start || '09:00',
+      date_end: initialData?.date_end || '',
+      time_end: initialData?.time_end || '',
+      duration_hours: initialData?.duration_hours || 4,
+      tags: normalizeTags(initialData?.tags),
+      pricing_mode: initialData?.pricing_mode || 'negotiable',
+      status: initialData?.status || 'draft'
+    }
+  }))
+  
+  // Extract wizard state for easier access
+  const { currentStep, formData, photos, items, wantsPromotion, loading, errors, submitError } = wizardState
+  
+  // Compute wizard steps based on promotionsEnabled (promotion step is conditional)
+  const WIZARD_STEPS = useMemo(() => getWizardSteps(promotionsEnabled), [promotionsEnabled])
+  
+  // Helper to map step constant to WIZARD_STEPS index
+  const getStepIndex = useCallback((stepConstant: number): number => {
+    if (stepConstant === STEPS.DETAILS) return 0
+    if (stepConstant === STEPS.PHOTOS) return 1
+    if (stepConstant === STEPS.ITEMS) return 2
+    if (stepConstant === STEPS.PROMOTION) {
+      // Promotion is at index 3 if enabled, otherwise doesn't exist
+      return promotionsEnabled ? 3 : -1
+    }
+    if (stepConstant === STEPS.REVIEW) {
+      // Review is at index 3 if promotions disabled, index 4 if enabled
+      return promotionsEnabled ? 4 : 3
+    }
+    return 0
+  }, [promotionsEnabled])
 
-  const [formData, setFormData] = useState<Partial<SaleInput>>({
-    title: initialData?.title || '',
-    description: initialData?.description || '',
-    address: initialData?.address || '',
-    city: initialData?.city || '',
-    state: initialData?.state || '',
-    zip_code: initialData?.zip_code || '',
-    date_start: initialData?.date_start || '',
-    time_start: initialData?.time_start || '09:00', // Default to 9:00 AM
-    date_end: initialData?.date_end || '',
-    time_end: initialData?.time_end || '',
-    duration_hours: initialData?.duration_hours || 4, // Default 4 hours
-    tags: normalizeTags(initialData?.tags),
-    pricing_mode: initialData?.pricing_mode || 'negotiable',
-    status: initialData?.status || 'draft'
-  })
-  const [photos, setPhotos] = useState<string[]>([])
-  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>>([])
-  const [loading, setLoading] = useState(false)
-  const [_errors, setErrors] = useState<Record<string, string>>({})
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  // Non-wizard state (UI state, auth state, etc.)
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
-  const [wantsPromotion, setWantsPromotion] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -620,13 +706,18 @@ export default function SellWizardClient({
             ? 'Draft restored. Ready to review your sale.'
             : (draftToRestore.currentStep !== undefined ? `Draft restored${source === 'server' ? ' from cloud' : ''}` : undefined)
 
-          // Apply all critical state updates in a single synchronous batch
-          // React 18 will automatically batch these since they're in the same execution context
-          if (nextForm) setFormData(nextForm)
-          if (nextPhotos) setPhotos(nextPhotos)
-          if (nextItems) setItems(nextItems)
-          if (nextWantsPromotion !== undefined) setWantsPromotion(nextWantsPromotion)
-          if (nextStep !== undefined) setCurrentStep(nextStep)
+          // ATOMIC RESUME: Dispatch single RESUME_DRAFT action to set all wizard state atomically
+          // This prevents React errors #418/#422 by ensuring all updates happen in one reducer call
+          dispatch({
+            type: 'RESUME_DRAFT',
+            payload: {
+              ...(nextForm && { formData: nextForm }),
+              ...(nextPhotos !== undefined && { photos: nextPhotos }),
+              ...(nextItems !== undefined && { items: nextItems }),
+              ...(nextWantsPromotion !== undefined && { wantsPromotion: nextWantsPromotion }),
+              ...(nextStep !== undefined && { currentStep: nextStep }),
+            }
+          })
 
           // Apply non-critical toast updates in a transition to avoid blocking render
           if (nextToastMessage) {
@@ -650,12 +741,12 @@ export default function SellWizardClient({
           }, 2000)
         } else if (isPromotionResume) {
           // Draft not found but resume=promotion - still go to Promotion step
-          setCurrentStep(STEPS.PROMOTION)
+          dispatch({ type: 'SET_STEP', step: STEPS.PROMOTION })
           setToastMessage('Draft not found; please promote your sale.')
           setShowToast(true)
         } else if (isReviewResume) {
           // Draft not found but resume=review - still go to Review step
-          setCurrentStep(STEPS.REVIEW)
+          dispatch({ type: 'SET_STEP', step: STEPS.REVIEW })
           setToastMessage('Draft not found; please review details.')
           setShowToast(true)
         }
@@ -674,44 +765,46 @@ export default function SellWizardClient({
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
-      }
+    
+    // Calculate updated formData
+    const updated = { ...formData, [field]: value }
 
-      // Snap start time to 30-minute increments (nearest 00/30 with carry)
-      if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
-        updated.time_start = normalizeTimeToNearest30(value)
-      }
+    // Snap start time to 30-minute increments (nearest 00/30 with carry)
+    if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
+      updated.time_start = normalizeTimeToNearest30(value)
+    }
+    
+    // Calculate end date/time when duration, start date, or start time changes
+    if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
+      const dateStart = updated.date_start || formData.date_start
+      const timeStart = updated.time_start || formData.time_start
+      const durationHours = updated.duration_hours || formData.duration_hours || 4
       
-      // Calculate end date/time when duration, start date, or start time changes
-      if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
-        const dateStart = updated.date_start || prev.date_start
-        const timeStart = updated.time_start || prev.time_start
-        const durationHours = updated.duration_hours || prev.duration_hours || 4
+      if (dateStart && timeStart && durationHours) {
+        // Validate duration doesn't exceed 8 hours
+        const maxDuration = 8
+        const actualDuration = Math.min(durationHours, maxDuration)
         
-        if (dateStart && timeStart && durationHours) {
-          // Validate duration doesn't exceed 8 hours
-          const maxDuration = 8
-          const actualDuration = Math.min(durationHours, maxDuration)
-          
-          // Calculate end time
-          const startDateTime = new Date(`${dateStart}T${timeStart}`)
-          const endDateTime = new Date(startDateTime.getTime() + actualDuration * 60 * 60 * 1000)
-          
-          // Format end date (YYYY-MM-DD)
-          const endDate = endDateTime.toISOString().split('T')[0]
-          // Format end time (HH:MM)
-          const endTime = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
-          
-          updated.date_end = endDate
-          updated.time_end = endTime
-        }
+        // Calculate end time
+        const startDateTime = new Date(`${dateStart}T${timeStart}`)
+        const endDateTime = new Date(startDateTime.getTime() + actualDuration * 60 * 60 * 1000)
+        
+        // Format end date (YYYY-MM-DD)
+        const endDate = endDateTime.toISOString().split('T')[0]
+        // Format end time (HH:MM)
+        const endTime = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
+        
+        updated.date_end = endDate
+        updated.time_end = endTime
       }
-      
-      return updated
-    })
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
+    }
+    
+    // Dispatch single update with all calculated fields
+    dispatch({ type: 'SET_FORM_DATA', formData: updated })
   }
 
   const validateDetails = (): Record<string, string> => {
@@ -739,7 +832,7 @@ export default function SellWizardClient({
     if (!timeStart || !timeStart.includes(':')) {
       timeStart = '09:00'
       // Update formData with default time if it's missing
-      setFormData(prev => ({ ...prev, time_start: timeStart }))
+      dispatch({ type: 'UPDATE_FORM', field: 'time_start', value: timeStart })
     }
     
     if (!timeStart) nextErrors.time_start = 'Start time is required'
@@ -780,7 +873,7 @@ export default function SellWizardClient({
     }
     
     if (prevStep >= STEPS.DETAILS) {
-      setCurrentStep(prevStep)
+      dispatch({ type: 'SET_STEP', step: prevStep })
     }
   }, [currentStep, promotionsEnabled])
 
@@ -793,7 +886,7 @@ export default function SellWizardClient({
       // Require core fields on the Details step before advancing
       if (currentStep === STEPS.DETAILS) {
         const nextErrors = validateDetails()
-        setErrors(nextErrors)
+        dispatch({ type: 'SET_ERRORS', errors: nextErrors })
         if (Object.keys(nextErrors).length > 0) {
           isNavigatingRef.current = false
           return
@@ -871,7 +964,7 @@ export default function SellWizardClient({
       
       // Only advance if there's a valid next step
       if (nextStep <= STEPS.REVIEW) {
-        setCurrentStep(nextStep)
+        dispatch({ type: 'SET_STEP', step: nextStep })
       }
     } finally {
       // Reset navigation guard after a short delay
@@ -982,8 +1075,8 @@ export default function SellWizardClient({
 
   // Helper to submit sale payload (used by both handleSubmit and auto-resume)
   const submitSalePayload = useCallback(async (payload: { saleData: any; items: any[] }) => {
-    setLoading(true)
-    setSubmitError(null)
+    dispatch({ type: 'SET_LOADING', loading: true })
+    dispatch({ type: 'SET_SUBMIT_ERROR', error: null })
 
     try {
       const response = await fetch('/api/sales', {
@@ -1007,7 +1100,7 @@ export default function SellWizardClient({
         // Redirect to login (encode redirectTo to preserve query params)
         const redirectUrl = encodeURIComponent('/sell/new?resume=review')
         router.push(`/auth/signin?redirectTo=${redirectUrl}`)
-        setLoading(false)
+        dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
 
@@ -1022,8 +1115,8 @@ export default function SellWizardClient({
           fullResponse: errorData
         })
         const errorMessage = errorData.error || errorData.details || `Failed to create sale (${response.status})`
-        setSubmitError(errorMessage)
-        setLoading(false)
+        dispatch({ type: 'SET_SUBMIT_ERROR', error: errorMessage })
+        dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
 
@@ -1031,8 +1124,8 @@ export default function SellWizardClient({
       const sale = result.sale || result
       if (!sale || !sale.id) {
         console.error('Invalid sale response:', result)
-        setSubmitError('Invalid response from server')
-        setLoading(false)
+        dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Invalid response from server' })
+        dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
       const saleId = sale.id
@@ -1050,7 +1143,7 @@ export default function SellWizardClient({
           // The sale was created successfully, so we don't want to fail the entire operation
           const errorMessage = error instanceof Error ? error.message : 'Failed to create some items'
           console.error('[SELL_WIZARD] Item creation error (sale was created):', errorMessage)
-          setSubmitError(`Sale created successfully, but some items failed to save: ${errorMessage}. You can add items later from the sale detail page.`)
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: `Sale created successfully, but some items failed to save: ${errorMessage}. You can add items later from the sale detail page.` })
           // Still show the confirmation modal so user can view the sale
         }
       }
@@ -1092,9 +1185,9 @@ export default function SellWizardClient({
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('Error creating sale:', error)
       }
-      setSubmitError('Something went wrong while creating your sale. Please try again.')
+      dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Something went wrong while creating your sale. Please try again.' })
     } finally {
-      setLoading(false)
+      dispatch({ type: 'SET_LOADING', loading: false })
     }
   }, [router, createItemsForSale])
 
@@ -1116,12 +1209,12 @@ export default function SellWizardClient({
       }
 
       // Auto-publish the draft
-      setLoading(true)
+      dispatch({ type: 'SET_LOADING', loading: true })
       
       // Store draft key in local variable (TypeScript type narrowing)
       const draftKeyToPublish = draftKeyRef.current
       if (!draftKeyToPublish) {
-        setLoading(false)
+        dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
       
@@ -1157,7 +1250,7 @@ export default function SellWizardClient({
           hasResumedRef.current = false // Allow retry
         })
         .finally(() => {
-          setLoading(false)
+          dispatch({ type: 'SET_LOADING', loading: false })
         })
     }
   }, [searchParams, user, validateDetails])
@@ -1182,7 +1275,7 @@ export default function SellWizardClient({
     // Client-side required validation
     const nextErrors = validateDetails()
     console.log('[SELL_WIZARD] Validation errors:', nextErrors)
-    setErrors(nextErrors)
+    dispatch({ type: 'SET_ERRORS', errors: nextErrors })
     if (Object.keys(nextErrors).length > 0) {
       console.log('[SELL_WIZARD] Validation failed, preventing submit')
       return
@@ -1216,8 +1309,8 @@ export default function SellWizardClient({
       }
 
       // Publish draft (transactional)
-      setLoading(true)
-      setSubmitError(null)
+      dispatch({ type: 'SET_LOADING', loading: true })
+      dispatch({ type: 'SET_SUBMIT_ERROR', error: null })
       
       // Store draft key before clearing it (we need it for the publish call)
       const draftKeyToPublish = draftKeyRef.current
@@ -1240,7 +1333,7 @@ export default function SellWizardClient({
             // Should not happen since we checked user, but handle gracefully
             const redirectUrl = encodeURIComponent('/sell/new?resume=review')
             router.push(`/auth/signin?redirectTo=${redirectUrl}`)
-            setLoading(false)
+            dispatch({ type: 'SET_LOADING', loading: false })
             return
           }
           
@@ -1251,28 +1344,29 @@ export default function SellWizardClient({
             }
             const payload = buildSalePayload()
             await submitSalePayload(payload)
-            setLoading(false)
+            dispatch({ type: 'SET_LOADING', loading: false })
             return
           }
           
-          setSubmitError(result.error || 'Failed to publish sale')
-          setLoading(false)
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: result.error || 'Failed to publish sale' })
+          dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
 
         // Check if payment is required (promotion enabled)
+        // STRIPE REDIRECT: Single place for Stripe checkout redirect
         if (result.data && 'requiresPayment' in result.data && result.data.requiresPayment && 'checkoutUrl' in result.data) {
           // Redirect to Stripe Checkout
           window.location.href = result.data.checkoutUrl
-          setLoading(false)
+          dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
 
         // Normal publish flow - sale was created
         // Type guard: check if result.data has saleId property
         if (!result.data || !('saleId' in result.data)) {
-          setSubmitError('Invalid response from server')
-          setLoading(false)
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Invalid response from server' })
+          dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
 
@@ -1314,13 +1408,13 @@ export default function SellWizardClient({
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.error('[SELL_WIZARD] Error publishing draft:', error)
         }
-        setSubmitError('Something went wrong while publishing your sale. Please try again.')
+        dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Something went wrong while publishing your sale. Please try again.' })
         // Reset publishing flag on error so autosave can work again
         // Don't restore draftKeyRef - the draft should remain cleared even on error
         // User can start fresh if they need to
         isPublishingRef.current = false
       } finally {
-        setLoading(false)
+        dispatch({ type: 'SET_LOADING', loading: false })
       }
     } else {
       // No draft exists, create sale directly (existing flow)
@@ -1331,58 +1425,45 @@ export default function SellWizardClient({
 
   const handlePhotoUpload = useCallback((urls: string[]) => {
     // Replace photos array with new URLs (ImageUploadCard emits all done URLs)
-    setPhotos(urls)
+    dispatch({ type: 'SET_PHOTOS', photos: urls })
   }, [])
 
   const handleReorderPhotos = (fromIndex: number, toIndex: number) => {
-    setPhotos(prev => {
-      const next = [...prev]
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, moved)
-      return next
-    })
+    const next = [...photos]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    dispatch({ type: 'SET_PHOTOS', photos: next })
   }
 
   const handleSetCover = (index: number) => {
-    setPhotos(prev => {
-      if (index <= 0 || index >= prev.length) return prev
-      const next = [...prev]
-      const [moved] = next.splice(index, 1)
-      next.unshift(moved)
-      return next
-    })
+    if (index <= 0 || index >= photos.length) return
+    const next = [...photos]
+    const [moved] = next.splice(index, 1)
+    next.unshift(moved)
+    dispatch({ type: 'SET_PHOTOS', photos: next })
   }
 
   const handleRemovePhoto = (index: number) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index))
+    dispatch({ type: 'SET_PHOTOS', photos: photos.filter((_, i) => i !== index) })
   }
 
   const handleAddItem = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => {
-    setItems(prev => {
-      if (prev.length >= 50) return prev
-      return [...prev, item]
-    })
-  }, [])
+    if (items.length >= 50) return
+    dispatch({ type: 'ADD_ITEM', item })
+  }, [items.length])
 
   const handleUpdateItem = useCallback((updated: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }) => {
-    setItems(prev => {
-      const next = prev.slice()
-      const i = next.findIndex(it => it.id === updated.id)
-      if (i !== -1) {
-        next[i] = { ...next[i], ...updated }
-      }
-      return next
-    })
+    dispatch({ type: 'UPDATE_ITEM', item: updated })
   }, [])
 
   const handleRemoveItem = useCallback((id: string) => {
-    setItems(prev => prev.filter(it => it.id !== id))
+    dispatch({ type: 'REMOVE_ITEM', id })
   }, [])
 
   // Guard: if on PROMOTION step but promotions disabled, redirect to REVIEW
   useEffect(() => {
     if (currentStep === STEPS.PROMOTION && !promotionsEnabled) {
-      setCurrentStep(STEPS.REVIEW)
+      dispatch({ type: 'SET_STEP', step: STEPS.REVIEW })
     }
   }, [currentStep, promotionsEnabled])
 
@@ -1402,7 +1483,7 @@ export default function SellWizardClient({
         return (
           <PromotionStep
             wantsPromotion={wantsPromotion}
-            onTogglePromotion={setWantsPromotion}
+            onTogglePromotion={(value) => dispatch({ type: 'TOGGLE_PROMOTION', value })}
           />
         )
       case STEPS.REVIEW:
@@ -1419,7 +1500,7 @@ export default function SellWizardClient({
             submitError={submitError}
             promotionsEnabled={promotionsEnabled}
             wantsPromotion={wantsPromotion}
-            onNavigateToPromotion={() => setCurrentStep(STEPS.PROMOTION)}
+            onNavigateToPromotion={() => dispatch({ type: 'SET_STEP', step: STEPS.PROMOTION })}
           />
         )
       default:
@@ -1462,25 +1543,30 @@ export default function SellWizardClient({
                       deleteDraftServer(draftKeyRef.current).catch(() => {})
                     }
                     // Reset form
-                    setFormData({
-                      title: '',
-                      description: '',
-                      address: '',
-                      city: '',
-                      state: '',
-                      zip_code: '',
-                      date_start: '',
-                      time_start: '09:00',
-                      date_end: '',
-                      time_end: '',
-                      duration_hours: 4,
-                      tags: [],
-                      pricing_mode: 'negotiable',
-                      status: 'draft'
+                    dispatch({
+                      type: 'RESUME_DRAFT',
+                      payload: {
+                        formData: {
+                          title: '',
+                          description: '',
+                          address: '',
+                          city: '',
+                          state: '',
+                          zip_code: '',
+                          date_start: '',
+                          time_start: '09:00',
+                          date_end: '',
+                          time_end: '',
+                          duration_hours: 4,
+                          tags: [],
+                          pricing_mode: 'negotiable',
+                          status: 'draft'
+                        },
+                        photos: [],
+                        items: [],
+                        currentStep: 0
+                      }
                     })
-                    setPhotos([])
-                    setItems([])
-                    setCurrentStep(0)
                     setToastMessage('Draft discarded')
                     setShowToast(true)
                   }

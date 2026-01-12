@@ -1120,18 +1120,25 @@ export default function SellWizardClient({
       // Auto-publish the draft
       setLoading(true)
       
+      // Store draft key in local variable (TypeScript type narrowing)
+      const draftKeyToPublish = draftKeyRef.current
+      if (!draftKeyToPublish) {
+        setLoading(false)
+        return
+      }
+      
       // CRITICAL: Save current draft payload (including wantsPromotion) before publishing
       const currentPayload = buildDraftPayload()
-      saveDraftServer(currentPayload, draftKeyRef.current)
+      saveDraftServer(currentPayload, draftKeyToPublish)
         .then(() => {
           // After save completes, publish the draft
-          return publishDraftServer(draftKeyRef.current)
+          return publishDraftServer(draftKeyToPublish)
         })
         .catch((error) => {
           // If save fails, log warning but continue with publish anyway
           console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
           // Continue with publish - might already exist on server
-          return publishDraftServer(draftKeyRef.current)
+          return publishDraftServer(draftKeyToPublish)
         })
         .then((result) => {
           if (result.ok && result.data && 'saleId' in result.data) {

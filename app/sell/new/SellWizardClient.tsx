@@ -126,14 +126,16 @@ type WizardState = {
   loading: boolean
   errors: Record<string, string>
   submitError: string | null
+  lastAutocompleteTimestamp: number
 }
 
 // Wizard actions
 type WizardAction =
   | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
   | { type: 'SET_STEP'; step: number }
-  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any }
+  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any; source?: 'manual' | 'autocomplete'; timestamp?: number }
   | { type: 'SET_FORM_DATA'; formData: Partial<SaleInput> }
+  | { type: 'UPDATE_ADDRESS_FIELDS'; fields: { address?: string; city?: string; state?: string; zip_code?: string; lat?: number; lng?: number }; source: 'autocomplete' }
   | { type: 'SET_PHOTOS'; photos: string[] }
   | { type: 'SET_ITEMS'; items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }> }
   | { type: 'ADD_ITEM'; item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue } }
@@ -154,6 +156,7 @@ const initialWizardState: WizardState = {
   loading: false,
   errors: {},
   submitError: null,
+  lastAutocompleteTimestamp: 0,
 }
 
 // Wizard reducer
@@ -171,7 +174,32 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     case 'SET_STEP':
       return { ...state, currentStep: action.step }
     case 'UPDATE_FORM':
+      // If manually updating address field and there's a recent autocomplete, ignore the update
+      if (action.field === 'address' && action.source === 'manual' && action.timestamp) {
+        const timeSinceAutocomplete = action.timestamp - state.lastAutocompleteTimestamp
+        // Ignore manual address updates within 1 second of autocomplete selection
+        if (timeSinceAutocomplete < 1000 && state.lastAutocompleteTimestamp > 0) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Ignoring manual address update due to recent autocomplete selection', {
+              timeSinceAutocomplete,
+              lastAutocompleteTimestamp: state.lastAutocompleteTimestamp,
+              updateTimestamp: action.timestamp
+            })
+          }
+          return state
+        }
+      }
       return { ...state, formData: { ...state.formData, [action.field]: action.value } }
+    case 'UPDATE_ADDRESS_FIELDS':
+      // Update all address fields atomically from autocomplete selection
+      return {
+        ...state,
+        formData: {
+          ...state.formData,
+          ...action.fields
+        },
+        lastAutocompleteTimestamp: Date.now()
+      }
     case 'SET_FORM_DATA':
       return { ...state, formData: action.formData }
     case 'SET_PHOTOS':
@@ -768,7 +796,20 @@ export default function SellWizardClient({
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
     
-    // Calculate updated formData
+    // For address field, use UPDATE_FORM with manual source and timestamp
+    // This ensures we only update the address field, not city/state/zip/lat/lng
+    if (field === 'address') {
+      dispatch({ 
+        type: 'UPDATE_FORM', 
+        field, 
+        value, 
+        source: 'manual',
+        timestamp: Date.now()
+      })
+      return
+    }
+    
+    // Calculate updated formData for other fields
     const updated = { ...formData, [field]: value }
 
     // Snap start time to 30-minute increments (nearest 00/30 with carry)
@@ -807,6 +848,26 @@ export default function SellWizardClient({
     
     // Dispatch single update with all calculated fields
     dispatch({ type: 'SET_FORM_DATA', formData: updated })
+  }
+
+  // Handler for autocomplete place selection - updates all address fields atomically
+  const handlePlaceSelected = (place: { address?: string; city?: string; state?: string; zip?: string; lat?: number; lng?: number }) => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] handlePlaceSelected called:', { place })
+    }
+    
+    dispatch({
+      type: 'UPDATE_ADDRESS_FIELDS',
+      fields: {
+        address: place.address || '',
+        city: place.city || '',
+        state: place.state || '',
+        zip_code: place.zip || '',
+        lat: place.lat,
+        lng: place.lng,
+      },
+      source: 'autocomplete'
+    })
   }
 
   const validateDetails = (): Record<string, string> => {
@@ -1472,7 +1533,7 @@ export default function SellWizardClient({
   const renderStep = () => {
     switch (currentStep) {
       case STEPS.DETAILS:
-        return <DetailsStep formData={formData} onChange={handleInputChange} errors={errors} userLat={userLat} userLng={userLng} />
+        return <DetailsStep formData={formData} onChange={handleInputChange} onPlaceSelected={handlePlaceSelected} errors={errors} userLat={userLat} userLng={userLng} />
       case STEPS.PHOTOS:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case STEPS.ITEMS:
@@ -1712,7 +1773,7 @@ export default function SellWizardClient({
 }
 
 // Step Components
-function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string>, userLat?: number, userLng?: number }) {
+function DetailsStep({ formData, onChange, onPlaceSelected, errors, userLat, userLng }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, onPlaceSelected: (place: { address?: string; city?: string; state?: string; zip?: string; lat?: number; lng?: number }) => void, errors?: Record<string, string>, userLat?: number, userLng?: number }) {
   return (
     <div className="space-y-6">
       <div>
@@ -1827,17 +1888,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
           <AddressAutocomplete
             value={formData.address || ''}
             onChange={(address) => onChange('address', address)}
-            onPlaceSelected={(place) => {
-              // Update all fields atomically - batch updates to prevent multiple re-renders
-              // Use the full label for address field if available, otherwise use line1
-              const addressValue = place.address || ''
-              onChange('address', addressValue)
-              onChange('city', place.city || '')
-              onChange('state', place.state || '')
-              onChange('zip_code', place.zip || '')
-              onChange('lat', place.lat)
-              onChange('lng', place.lng)
-            }}
+            onPlaceSelected={onPlaceSelected}
             placeholder="Start typing your address..."
             userLat={userLat}
             userLng={userLng}

@@ -1121,9 +1121,10 @@ export default function SellWizardClient({
       setLoading(true)
       publishDraftServer(draftKeyRef.current)
         .then((result) => {
-          if (result.ok && result.data?.saleId) {
+          if (result.ok && result.data && 'saleId' in result.data) {
             clearLocalDraft()
-            setCreatedSaleId(result.data.saleId)
+            const saleData = result.data as { saleId: string }
+            setCreatedSaleId(saleData.saleId)
             setConfirmationModalOpen(true)
           } else {
             setToastMessage(result.error || 'Failed to publish sale. Please try again.')

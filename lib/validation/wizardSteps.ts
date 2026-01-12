@@ -6,7 +6,6 @@
  */
 
 import { containsUnsavory } from '@/lib/filters/profanity'
-import type { SaleInput } from '@/lib/data'
 
 /**
  * Validation result type

@@ -269,6 +269,8 @@ export default function SellWizardClient({
       city: initialData?.city || '',
       state: initialData?.state || '',
       zip_code: initialData?.zip_code || '',
+      lat: initialData?.lat,
+      lng: initialData?.lng,
       date_start: initialData?.date_start || '',
       time_start: initialData?.time_start || '09:00',
       date_end: initialData?.date_end || '',

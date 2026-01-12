@@ -409,12 +409,12 @@ export default function SellWizardClient({
   // Drafts are only created once this returns true
   const hasMinimumViableData = useCallback((): boolean => {
     // Category required: at least one tag
-    const hasCategory = formData.tags && Array.isArray(formData.tags) && formData.tags.length > 0
+    const hasCategory = !!(formData.tags && Array.isArray(formData.tags) && formData.tags.length > 0)
     
     // Location required: address, city, state, lat, lng all present and valid
-    const hasAddress = formData.address && typeof formData.address === 'string' && formData.address.trim().length >= 5
-    const hasCity = formData.city && typeof formData.city === 'string' && formData.city.trim().length >= 2
-    const hasState = formData.state && typeof formData.state === 'string' && formData.state.trim().length >= 2
+    const hasAddress = !!(formData.address && typeof formData.address === 'string' && formData.address.trim().length >= 5)
+    const hasCity = !!(formData.city && typeof formData.city === 'string' && formData.city.trim().length >= 2)
+    const hasState = !!(formData.state && typeof formData.state === 'string' && formData.state.trim().length >= 2)
     const hasLat = typeof formData.lat === 'number' && !isNaN(formData.lat) && formData.lat >= -90 && formData.lat <= 90
     const hasLng = typeof formData.lng === 'number' && !isNaN(formData.lng) && formData.lng >= -180 && formData.lng <= 180
     
@@ -1523,7 +1523,24 @@ export default function SellWizardClient({
       hasResumedRef.current = true
       
       // Validate before auto-publishing
-      const nextErrors = validateDetails()
+      const locationValidation = validateLocationStep({
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+        lat: formData.lat,
+        lng: formData.lng,
+      })
+      const detailsValidation = validateDetailsStep({
+        title: formData.title,
+        description: formData.description,
+        date_start: formData.date_start,
+        time_start: formData.time_start,
+        duration_hours: formData.duration_hours,
+        pricing_mode: formData.pricing_mode,
+        tags: formData.tags,
+      })
+      const nextErrors = { ...locationValidation.errors, ...detailsValidation.errors }
       if (Object.keys(nextErrors).length > 0) {
         // Don't auto-publish if validation fails - let user fix it
         setToastMessage('Please complete all required fields before publishing')
@@ -1577,7 +1594,7 @@ export default function SellWizardClient({
           dispatch({ type: 'SET_LOADING', loading: false })
         })
     }
-  }, [searchParams, user, validateDetails])
+  }, [searchParams, user, formData])
 
   const handleSubmit = async () => {
     console.log('[SELL_WIZARD] handleSubmit called', { 
@@ -1597,7 +1614,24 @@ export default function SellWizardClient({
     })
     
     // Client-side required validation
-    const nextErrors = validateDetails()
+    const locationValidation = validateLocationStep({
+      address: formData.address,
+      city: formData.city,
+      state: formData.state,
+      zip_code: formData.zip_code,
+      lat: formData.lat,
+      lng: formData.lng,
+    })
+    const detailsValidation = validateDetailsStep({
+      title: formData.title,
+      description: formData.description,
+      date_start: formData.date_start,
+      time_start: formData.time_start,
+      duration_hours: formData.duration_hours,
+      pricing_mode: formData.pricing_mode,
+      tags: formData.tags,
+    })
+    const nextErrors = { ...locationValidation.errors, ...detailsValidation.errors }
     console.log('[SELL_WIZARD] Validation errors:', nextErrors)
     dispatch({ type: 'SET_ERRORS', errors: nextErrors })
     if (Object.keys(nextErrors).length > 0) {

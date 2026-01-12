@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
-import { FaEdit, FaTrash, FaPaperPlane, FaCalendar } from 'react-icons/fa'
+import { FaEdit, FaTrash, FaPaperPlane, FaCalendar, FaExclamationTriangle } from 'react-icons/fa'
 import { publishDraftServer, deleteDraftServer } from '@/lib/draft/draftClient'
 import { getCategoryLabel } from '@/lib/data/categories'
 import type { DraftListing } from '@/lib/data/salesAccess'
@@ -115,6 +115,16 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
   }
 
   const updatedAt = draft.updated_at ? formatRelativeTime(new Date(draft.updated_at)) : 'Recently'
+  
+  // Check publishability from server
+  const isPublishable = draft.publishability?.isPublishable ?? true // Default to true for backward compatibility
+  const blockingErrors = draft.publishability?.blockingErrors ?? {}
+  const hasBlockingErrors = Object.keys(blockingErrors).length > 0
+  
+  // Build tooltip text from blocking errors
+  const tooltipText = hasBlockingErrors
+    ? `Cannot publish: ${Object.values(blockingErrors).join(', ')}`
+    : undefined
 
   return (
     <div className="card card-hover group relative">
@@ -193,6 +203,26 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
           )}
         </div>
 
+        {/* Blocking errors warning */}
+        {!isPublishable && hasBlockingErrors && (
+          <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            <div className="flex items-start gap-1">
+              <FaExclamationTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="font-medium mb-1">Not ready to publish</div>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {Object.entries(blockingErrors).slice(0, 3).map(([field, error]) => (
+                    <li key={field}>{error}</li>
+                  ))}
+                  {Object.keys(blockingErrors).length > 3 && (
+                    <li className="text-yellow-700">+{Object.keys(blockingErrors).length - 3} more issue{Object.keys(blockingErrors).length - 3 === 1 ? '' : 's'}</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-2 mt-auto pt-2 border-t">
           <button
@@ -203,15 +233,24 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
             <FaEdit className="w-3 h-3" />
             Continue
           </button>
-          <button
-            onClick={handlePublish}
-            disabled={isPublishing}
-            className="px-3 py-1.5 border border-green-600 text-green-600 rounded text-sm hover:bg-green-50 disabled:opacity-50 flex items-center gap-1"
-            aria-label={`Publish ${title}`}
-          >
-            <FaPaperPlane className="w-3 h-3" />
-            {isPublishing ? '...' : 'Publish'}
-          </button>
+          <div className="relative group">
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing || !isPublishable}
+              className="px-3 py-1.5 border border-green-600 text-green-600 rounded text-sm hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              aria-label={isPublishable ? `Publish ${title}` : tooltipText || `Cannot publish ${title}`}
+              title={tooltipText}
+            >
+              <FaPaperPlane className="w-3 h-3" />
+              {isPublishing ? '...' : 'Publish'}
+            </button>
+            {!isPublishable && tooltipText && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                {tooltipText}
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting}

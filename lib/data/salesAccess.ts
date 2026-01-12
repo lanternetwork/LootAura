@@ -354,8 +354,15 @@ export async function getUserDrafts(
     // Map to DraftListing format, extracting title from payload if not set
     // Compute publishability for each draft
     const { computePublishability } = await import('@/lib/drafts/computePublishability')
+    type DraftRecord = Parameters<typeof computePublishability>[0]
     const mappedDrafts: DraftListing[] = (drafts || []).map((draft: any) => {
-      const publishability = computePublishability(draft)
+      const publishability = computePublishability({
+        id: draft.id,
+        draft_key: draft.draft_key,
+        title: draft.title,
+        payload: draft.payload || { formData: {}, photos: [], items: [] },
+        updated_at: draft.updated_at
+      } as DraftRecord)
       return {
         id: draft.id,
         draft_key: draft.draft_key,

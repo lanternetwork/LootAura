@@ -42,7 +42,13 @@ export async function GET(_request: NextRequest) {
 
     // Add publishability to each draft
     const draftsWithPublishability = (drafts || []).map((draft: any) => {
-      const publishability = computePublishability(draft as DraftRecord)
+      const publishability = computePublishability({
+        id: draft.id,
+        draft_key: draft.draft_key,
+        title: draft.title,
+        payload: draft.payload || { formData: {}, photos: [], items: [] },
+        updated_at: draft.updated_at
+      } as DraftRecord)
       return {
         ...draft,
         publishability
@@ -81,7 +87,12 @@ export async function GET(_request: NextRequest) {
       }
 
       // Compute publishability
-      const publishability = computePublishability(draft as DraftRecord)
+      const publishability = computePublishability({
+        id: draft.id,
+        draft_key: draft.draft_key,
+        payload: validationResult.data,
+        updated_at: draft.updated_at
+      } as DraftRecord)
 
       return ok({ 
         data: { 
@@ -122,7 +133,11 @@ export async function GET(_request: NextRequest) {
     }
 
     // Compute publishability
-    const publishability = computePublishability(draft as DraftRecord)
+    const publishability = computePublishability({
+      id: draft.id,
+      payload: validationResult.data,
+      updated_at: draft.updated_at
+    } as DraftRecord)
 
     return ok({ 
       data: { 

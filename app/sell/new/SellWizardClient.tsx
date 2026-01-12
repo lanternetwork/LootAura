@@ -1242,19 +1242,21 @@ export default function SellWizardClient({
         }
 
         // Check if payment is required (promotion enabled)
-        if (result.data?.requiresPayment && result.data?.checkoutUrl) {
+        if (result.data && 'requiresPayment' in result.data && result.data.requiresPayment && 'checkoutUrl' in result.data) {
           // Redirect to Stripe Checkout
           window.location.href = result.data.checkoutUrl
           setLoading(false)
           return
         }
 
-        const saleId = result.data?.saleId
-        if (!saleId) {
+        // Normal publish flow - sale was created
+        if (!result.data || !('saleId' in result.data)) {
           setSubmitError('Invalid response from server')
           setLoading(false)
           return
         }
+
+        const saleId = result.data.saleId
 
         // Clear drafts and sessionStorage keys
         clearLocalDraft()

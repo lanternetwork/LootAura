@@ -6,6 +6,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Sale, SaleItem } from '@/lib/types'
 import type { SaleWithOwnerInfo } from '@/lib/data/sales'
+import type { DraftRecord } from '@/lib/drafts/computePublishability'
 
 export interface SaleListing {
   id: string
@@ -32,6 +33,10 @@ export interface DraftListing {
       name?: string
       category?: string
     }>
+  }
+  publishability?: {
+    isPublishable: boolean
+    blockingErrors: Record<string, string>
   }
 }
 
@@ -348,13 +353,25 @@ export async function getUserDrafts(
     }
 
     // Map to DraftListing format, extracting title from payload if not set
-    const mappedDrafts: DraftListing[] = (drafts || []).map((draft: any) => ({
-      id: draft.id,
-      draft_key: draft.draft_key,
-      title: draft.title || draft.payload?.formData?.title || null,
-      updated_at: draft.updated_at,
-      payload: draft.payload || {},
-    }))
+    // Compute publishability for each draft
+    const { computePublishability } = await import('@/lib/drafts/computePublishability')
+    const mappedDrafts: DraftListing[] = (drafts || []).map((draft: any) => {
+      const publishability = computePublishability({
+        id: draft.id,
+        draft_key: draft.draft_key,
+        title: draft.title,
+        payload: draft.payload || { formData: {}, photos: [], items: [] },
+        updated_at: draft.updated_at
+      } as DraftRecord)
+      return {
+        id: draft.id,
+        draft_key: draft.draft_key,
+        title: draft.title || draft.payload?.formData?.title || null,
+        updated_at: draft.updated_at,
+        payload: draft.payload || {},
+        publishability,
+      }
+    })
 
     return {
       data: mappedDrafts,

@@ -6,7 +6,8 @@ import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { containsUnsavory } from '@/lib/filters/profanity'
+import { validateLocationStep, validateDetailsStep, validateItemsStep } from '@/lib/validation/wizardSteps'
+import { computePublishability, type DraftRecord } from '@/lib/drafts/computePublishability'
 import AddressAutocomplete from '@/components/location/AddressAutocomplete'
 import TimePicker30 from '@/components/TimePicker30'
 import ItemFormModal from '@/components/sales/ItemFormModal'
@@ -216,6 +217,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     case 'REMOVE_ITEM':
       return { ...state, items: state.items.filter(item => item.id !== action.id) }
     case 'TOGGLE_PROMOTION':
+      // Promotion toggle only updates state - does not trigger validation or saves
+      // Validation is handled by publishability check before toggle is enabled
       return { ...state, wantsPromotion: action.value }
     case 'SET_LOADING':
       return { ...state, loading: action.loading }
@@ -312,6 +315,44 @@ export default function SellWizardClient({
   
   // Extract wizard state for easier access
   const { currentStep, formData, photos, items, wantsPromotion, loading, errors, submitError } = wizardState
+
+  // Compute publishability for current draft state
+  // This determines if promotion can be enabled
+  const publishability = useMemo(() => {
+    const draftRecord: DraftRecord = {
+      payload: {
+        formData: {
+          title: formData.title,
+          description: formData.description,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code,
+          lat: formData.lat,
+          lng: formData.lng,
+          date_start: formData.date_start,
+          time_start: formData.time_start,
+          date_end: formData.date_end,
+          time_end: formData.time_end,
+          duration_hours: formData.duration_hours,
+          tags: formData.tags,
+          pricing_mode: formData.pricing_mode,
+        },
+        photos: photos || [],
+        items: (items || []).map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          description: item.description,
+          image_url: item.image_url,
+          category: item.category,
+        })),
+        currentStep,
+        wantsPromotion,
+      }
+    }
+    return computePublishability(draftRecord)
+  }, [formData, photos, items, currentStep, wantsPromotion])
   
   // Compute wizard steps based on promotionsEnabled (promotion step is conditional)
   const WIZARD_STEPS = useMemo(() => getWizardSteps(promotionsEnabled), [promotionsEnabled])
@@ -345,6 +386,7 @@ export default function SellWizardClient({
   const isRestoringDraftRef = useRef<boolean>(false) // Flag to prevent autosave during draft restoration
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
+  const lastSavedPayloadRef = useRef<string | null>(null) // Track last saved normalized payload (JSON string)
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -361,6 +403,24 @@ export default function SellWizardClient({
     }
     return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`
   }, [])
+
+  // Check if minimum viable data exists (category + location valid)
+  // Drafts are only created once this returns true
+  const hasMinimumViableData = useCallback((): boolean => {
+    // Category required: at least one tag
+    const hasCategory = !!(formData.tags && Array.isArray(formData.tags) && formData.tags.length > 0)
+    
+    // Location required: address, city, state, lat, lng all present and valid
+    const hasAddress = !!(formData.address && typeof formData.address === 'string' && formData.address.trim().length >= 5)
+    const hasCity = !!(formData.city && typeof formData.city === 'string' && formData.city.trim().length >= 2)
+    const hasState = !!(formData.state && typeof formData.state === 'string' && formData.state.trim().length >= 2)
+    const hasLat = typeof formData.lat === 'number' && !isNaN(formData.lat) && formData.lat >= -90 && formData.lat <= 90
+    const hasLng = typeof formData.lng === 'number' && !isNaN(formData.lng) && formData.lng >= -180 && formData.lng <= 180
+    
+    const hasLocation = hasAddress && hasCity && hasState && hasLat && hasLng
+    
+    return hasCategory && hasLocation
+  }, [formData.tags, formData.address, formData.city, formData.state, formData.lat, formData.lng])
 
   // Helper to build draft payload (defined early so it can be used in useEffects)
   const buildDraftPayload = useCallback((): SaleDraftPayload => {
@@ -396,6 +456,114 @@ export default function SellWizardClient({
     }
   }, [formData, photos, items, currentStep, wantsPromotion])
 
+  // Normalize draft payload for comparison (trim strings, stable array ordering, canonical values)
+  const normalizeDraftPayload = useCallback((payload: SaleDraftPayload): SaleDraftPayload => {
+    // Normalize formData strings (trim whitespace)
+    const normalizedFormData = {
+      ...payload.formData,
+      title: payload.formData.title?.trim() || '',
+      description: payload.formData.description?.trim() || '',
+      address: payload.formData.address?.trim() || '',
+      city: payload.formData.city?.trim() || '',
+      state: payload.formData.state?.trim() || '',
+      zip_code: payload.formData.zip_code?.trim() || '',
+      date_start: payload.formData.date_start?.trim() || '',
+      time_start: payload.formData.time_start?.trim() || '',
+      date_end: payload.formData.date_end?.trim() || '',
+      time_end: payload.formData.time_end?.trim() || '',
+      // Tags: sort for stable ordering, trim each tag
+      tags: (payload.formData.tags || [])
+        .map(tag => tag?.trim())
+        .filter(Boolean)
+        .sort(), // Stable ordering
+      pricing_mode: payload.formData.pricing_mode || 'negotiable',
+    }
+
+    // Photos: stable ordering (sort by URL)
+    const normalizedPhotos = [...(payload.photos || [])]
+      .filter(Boolean)
+      .sort() // Stable ordering
+
+    // Items: stable ordering (sort by id), normalize item fields
+    const normalizedItems = [...(payload.items || [])]
+      .map(item => ({
+        id: item.id || '',
+        name: (item.name || '').trim(),
+        price: item.price,
+        description: (item.description || '').trim(),
+        image_url: (item.image_url || '').trim(),
+        category: item.category,
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)) // Stable ordering by id
+
+    return {
+      formData: normalizedFormData,
+      photos: normalizedPhotos,
+      items: normalizedItems,
+      currentStep: payload.currentStep,
+      wantsPromotion: payload.wantsPromotion || false,
+    }
+  }, [])
+
+  // Check if current step is valid (no validation errors)
+  const isCurrentStepValid = useCallback((): boolean => {
+    // If there are any errors, step is invalid
+    if (errors && Object.keys(errors).length > 0) {
+      return false
+    }
+
+    // Validate based on current step
+    if (currentStep === STEPS.DETAILS) {
+      // Details step: validate location and details
+      const locationResult = validateLocationStep({
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+        lat: formData.lat,
+        lng: formData.lng,
+      })
+      const detailsResult = validateDetailsStep({
+        title: formData.title,
+        description: formData.description,
+        date_start: formData.date_start,
+        time_start: formData.time_start || '09:00',
+        duration_hours: formData.duration_hours,
+        pricing_mode: formData.pricing_mode,
+        tags: formData.tags,
+      })
+      return locationResult.isValid && detailsResult.isValid
+    } else if (currentStep === STEPS.ITEMS) {
+      // Items step: validate items
+      const itemsResult = validateItemsStep({ items })
+      return itemsResult.isValid
+    }
+
+    // Other steps (PHOTOS, PROMOTION, REVIEW) are always valid (no validation required)
+    return true
+  }, [currentStep, formData, items, errors])
+
+  // Check if payload has meaningfully changed (normalized comparison)
+  // Promotion toggle does not trigger saves - only changes to form data, photos, or items do
+  const hasMeaningfulChange = useCallback((payload: SaleDraftPayload): boolean => {
+    // If no last saved payload, this is a meaningful change
+    if (!lastSavedPayloadRef.current) {
+      return true
+    }
+
+    // Normalize both payloads
+    const normalizedCurrent = normalizeDraftPayload(payload)
+    const normalizedLast = JSON.parse(lastSavedPayloadRef.current)
+
+    // Compare normalized payloads, but exclude wantsPromotion from comparison
+    // This ensures promotion toggle does not trigger saves
+    const currentWithoutPromotion = { ...normalizedCurrent, wantsPromotion: undefined }
+    const lastWithoutPromotion = { ...normalizedLast, wantsPromotion: undefined }
+
+    // Only return true if there's a change other than wantsPromotion
+    return JSON.stringify(currentWithoutPromotion) !== JSON.stringify(lastWithoutPromotion)
+  }, [normalizeDraftPayload])
+
   // Check authentication status
   useEffect(() => {
     const checkUser = async () => {
@@ -425,14 +593,15 @@ export default function SellWizardClient({
   }, [supabase.auth])
 
   // Save local draft to server when user signs in mid-wizard
+  // Only if minimum viable data exists
   useEffect(() => {
-    if (user && draftKeyRef.current && hasLocalDraft()) {
+    if (user && draftKeyRef.current && hasLocalDraft() && hasMinimumViableData()) {
       const payload = buildDraftPayload()
       saveDraftServer(payload, draftKeyRef.current).catch(() => {
         // Silent fail - already saved locally
       })
     }
-  }, [user, buildDraftPayload])
+  }, [user, buildDraftPayload, hasMinimumViableData])
 
   // Save draft to localStorage whenever form data changes
   useEffect(() => {
@@ -447,14 +616,33 @@ export default function SellWizardClient({
     }
   }, [])
 
-  // Initialize draft key on mount
+  // Initialize draft key only when minimum viable data exists
+  // This prevents creating empty drafts
   useEffect(() => {
+    // Don't create draft key if minimum viable data doesn't exist
+    if (!hasMinimumViableData()) {
+      // Clear any existing draft key if data becomes invalid
+      if (draftKeyRef.current) {
+        draftKeyRef.current = null
+        // Also clear from localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('draft:sale:key')
+        }
+      }
+      return
+    }
+    
+    // Only create draft key when minimum viable data exists
     if (!draftKeyRef.current) {
       draftKeyRef.current = getDraftKey()
     }
-  }, [])
+  }, [hasMinimumViableData])
 
   // Debounced autosave (local + server)
+  // Only saves when:
+  // 1. Minimum viable data exists (category + location valid)
+  // 2. Current step is valid (no validation errors)
+  // 3. Normalized payload differs from last saved payload (meaningful change)
   useEffect(() => {
     // Don't autosave if we're publishing or have already published
     if (isPublishingRef.current) {
@@ -466,25 +654,65 @@ export default function SellWizardClient({
       return
     }
     
+    // CRITICAL: Only autosave when minimum viable data exists
+    // This prevents creating empty drafts
+    if (!hasMinimumViableData()) {
+      // Clear save status if data becomes invalid
+      if (saveStatus !== 'idle') {
+        setSaveStatus('idle')
+      }
+      return
+    }
+
+    // CRITICAL: Only autosave when current step is valid
+    // This prevents saving invalid states
+    if (!isCurrentStepValid()) {
+      // Don't save invalid states
+      return
+    }
+    
     // Clear existing timeout
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
     }
 
     // Set new timeout for debounced save (1.5s)
+    // This prevents saving during typing
     autosaveTimeoutRef.current = setTimeout(() => {
       // Double-check we're not publishing before saving
       if (isPublishingRef.current) {
         return
       }
       
+      // Double-check minimum viable data still exists
+      if (!hasMinimumViableData()) {
+        return
+      }
+
+      // Double-check current step is still valid
+      if (!isCurrentStepValid()) {
+        return
+      }
+      
       const payload = buildDraftPayload()
       
-      // Always save locally
-      saveLocalDraft(payload)
-      setSaveStatus('saved')
+      // CRITICAL: Only save if payload has meaningfully changed (normalized comparison)
+      // This prevents unnecessary saves when values haven't actually changed
+      if (!hasMeaningfulChange(payload)) {
+        // No meaningful change, skip save
+        return
+      }
+      
+      // Only save locally if draft key exists (created when minimum viable data exists)
+      if (draftKeyRef.current) {
+        saveLocalDraft(payload)
+        // Update last saved payload reference (store normalized version)
+        const normalized = normalizeDraftPayload(payload)
+        lastSavedPayloadRef.current = JSON.stringify(normalized)
+        setSaveStatus('saved')
+      }
 
-      // Save to server if authenticated (throttle to max 1x per 10s)
+      // Save to server if authenticated and draft key exists (throttle to max 1x per 10s)
       if (user && draftKeyRef.current && !isPublishingRef.current) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
@@ -522,12 +750,23 @@ export default function SellWizardClient({
         clearTimeout(autosaveTimeoutRef.current)
       }
     }
-  }, [formData, photos, items, currentStep, user, buildDraftPayload])
+  }, [formData, photos, items, currentStep, user, buildDraftPayload, hasMinimumViableData, isCurrentStepValid, hasMeaningfulChange, normalizeDraftPayload, saveStatus])
 
-  // Save on beforeunload
+  // Save on beforeunload (only if minimum viable data exists and meaningful change)
   useEffect(() => {
     const handleBeforeUnload = () => {
+      // Only save if minimum viable data exists and draft key exists
+      if (!hasMinimumViableData() || !draftKeyRef.current) {
+        return
+      }
+      
       const payload = buildDraftPayload()
+      
+      // Only save if payload has meaningfully changed
+      if (!hasMeaningfulChange(payload)) {
+        return
+      }
+      
       saveLocalDraft(payload)
       if (user && draftKeyRef.current) {
         // Fire and forget - don't wait for response
@@ -539,7 +778,7 @@ export default function SellWizardClient({
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [buildDraftPayload, user])
+  }, [buildDraftPayload, user, hasMinimumViableData, hasMeaningfulChange])
 
 
   // Ensure tags are properly set when initialData is provided (edit mode)
@@ -749,6 +988,18 @@ export default function SellWizardClient({
             }
           })
 
+          // Update last saved payload reference to prevent immediate autosave after resume
+          // This ensures we don't save the same draft immediately after restoring it
+          const restoredPayload: SaleDraftPayload = {
+            formData: nextForm || {},
+            photos: nextPhotos || [],
+            items: nextItems || [],
+            currentStep: nextStep !== undefined ? nextStep : 0,
+            wantsPromotion: nextWantsPromotion || false,
+          }
+          const normalizedRestored = normalizeDraftPayload(restoredPayload)
+          lastSavedPayloadRef.current = JSON.stringify(normalizedRestored)
+
           // Apply non-critical toast updates in a transition to avoid blocking render
           if (nextToastMessage) {
             startTransition(() => {
@@ -870,57 +1121,6 @@ export default function SellWizardClient({
     })
   }
 
-  const validateDetails = (): Record<string, string> => {
-    const nextErrors: Record<string, string> = {}
-    if (!formData.title) nextErrors.title = 'Title is required'
-    if (!formData.address || formData.address.trim().length < 5) {
-      nextErrors.address = 'Address is required (minimum 5 characters)'
-    }
-    if (!formData.city || formData.city.trim().length < 2) {
-      nextErrors.city = 'City is required'
-    }
-    if (!formData.state || formData.state.trim().length < 2) {
-      nextErrors.state = 'State is required'
-    }
-    if (formData.zip_code && !/^\d{5}(-\d{4})?$/.test(formData.zip_code)) {
-      nextErrors.zip_code = 'ZIP code must be 5 digits or 5+4 format'
-    }
-    if (!formData.lat || !formData.lng) {
-      nextErrors.address = 'Please enter a complete address (street, city, state)'
-    }
-    if (!formData.date_start) nextErrors.date_start = 'Start date is required'
-    
-    // Ensure time_start has a value (default to 09:00 if empty)
-    let timeStart = formData.time_start
-    if (!timeStart || !timeStart.includes(':')) {
-      timeStart = '09:00'
-      // Update formData with default time if it's missing
-      dispatch({ type: 'UPDATE_FORM', field: 'time_start', value: timeStart })
-    }
-    
-    if (!timeStart) nextErrors.time_start = 'Start time is required'
-    
-    // Validate duration (1-8 hours)
-    const durationHours = formData.duration_hours || 4
-    if (durationHours < 1 || durationHours > 8) {
-      nextErrors.duration_hours = 'Duration must be between 1 and 8 hours'
-    }
-    
-    // Unsavory language checks (client-side guard; server also validates)
-    const unsavoryFields: Array<[keyof SaleInput, string | undefined]> = [
-      ['title', formData.title],
-      ['description', formData.description],
-      ['address', formData.address],
-      ['city', formData.city],
-      ['state', formData.state],
-    ]
-    for (const [key, value] of unsavoryFields) {
-      const res = containsUnsavory(value || '')
-      if (!res.ok) nextErrors[key as string] = 'Please remove inappropriate language'
-    }
-    return nextErrors
-  }
-
   const handlePrevious = useCallback(() => {
     // Skip promotion step if disabled when going back from review
     let prevStep = currentStep - 1
@@ -946,25 +1146,81 @@ export default function SellWizardClient({
     isNavigatingRef.current = true
 
     try {
-      // Require core fields on the Details step before advancing
+      // Validate current step before advancing
+      let stepErrors: Record<string, string> = {}
+
       if (currentStep === STEPS.DETAILS) {
-        const nextErrors = validateDetails()
-        dispatch({ type: 'SET_ERRORS', errors: nextErrors })
-        if (Object.keys(nextErrors).length > 0) {
+        // Ensure time_start has default value before validation
+        // If missing, set default and use it for validation
+        let timeStartForValidation = formData.time_start
+        if (!timeStartForValidation || !timeStartForValidation.includes(':')) {
+          timeStartForValidation = '09:00'
+          // Update formData with default time (side effect, but needed for consistency)
+          dispatch({ type: 'UPDATE_FORM', field: 'time_start', value: timeStartForValidation })
+        }
+        
+        // Details step contains both location and details fields
+        // Validate both before allowing advance
+        const locationResult = validateLocationStep({
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code,
+          lat: formData.lat,
+          lng: formData.lng,
+        })
+        
+        const detailsResult = validateDetailsStep({
+          title: formData.title,
+          description: formData.description,
+          date_start: formData.date_start,
+          time_start: timeStartForValidation,
+          duration_hours: formData.duration_hours,
+          pricing_mode: formData.pricing_mode,
+          tags: formData.tags,
+        })
+        
+        // Merge errors from both validators
+        stepErrors = { ...locationResult.errors, ...detailsResult.errors }
+        
+        // If validation fails, set errors and prevent advance
+        if (!locationResult.isValid || !detailsResult.isValid) {
+          dispatch({ type: 'SET_ERRORS', errors: stepErrors })
+          isNavigatingRef.current = false
+          return
+        }
+      } else if (currentStep === STEPS.ITEMS) {
+        // Validate items step before advancing
+        const itemsResult = validateItemsStep({ items })
+        
+        if (!itemsResult.isValid) {
+          stepErrors = itemsResult.errors
+          dispatch({ type: 'SET_ERRORS', errors: stepErrors })
           isNavigatingRef.current = false
           return
         }
       }
-
-      // Build and save draft before advancing
-      const payload = buildDraftPayload()
       
-      // Save to localStorage first (await to ensure it's written)
-      try {
-        saveLocalDraft(payload)
-      } catch (error) {
-        console.error('[SELL_WIZARD] Error saving local draft:', error)
-        // Continue anyway - don't block navigation
+      // Clear errors if validation passed
+      if (Object.keys(stepErrors).length === 0) {
+        dispatch({ type: 'SET_ERRORS', errors: {} })
+      }
+
+      // Build and save draft before advancing (only if minimum viable data exists)
+      // This ensures drafts are only created when category + location are valid
+      if (hasMinimumViableData()) {
+        const payload = buildDraftPayload()
+        
+        // Save to localStorage first (await to ensure it's written)
+        // Only save if draft key exists (created when minimum viable data exists)
+        if (draftKeyRef.current) {
+          try {
+            saveLocalDraft(payload)
+          } catch (error) {
+            console.error('[SELL_WIZARD] Error saving local draft:', error)
+            // Continue anyway - don't block navigation
+          }
+        }
       }
 
       // Auth gate: Items (2) → Promotion (3) or Review (4)
@@ -1001,14 +1257,18 @@ export default function SellWizardClient({
       }
 
       // Fire-and-forget server save (throttled, non-blocking)
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      if (currentUser && draftKeyRef.current) {
-        const now = Date.now()
-        if (now - lastServerSaveRef.current > 10000) {
-          lastServerSaveRef.current = now
-          saveDraftServer(payload, draftKeyRef.current).catch(() => {
-            // Silent fail - already saved locally
-          })
+      // Only save if minimum viable data exists
+      if (hasMinimumViableData()) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (currentUser && draftKeyRef.current) {
+          const payload = buildDraftPayload()
+          const now = Date.now()
+          if (now - lastServerSaveRef.current > 10000) {
+            lastServerSaveRef.current = now
+            saveDraftServer(payload, draftKeyRef.current).catch(() => {
+              // Silent fail - already saved locally
+            })
+          }
         }
       }
 
@@ -1262,8 +1522,24 @@ export default function SellWizardClient({
       hasResumedRef.current = true
       
       // Validate before auto-publishing
-      const nextErrors = validateDetails()
-      if (Object.keys(nextErrors).length > 0) {
+      const locationValidation = validateLocationStep({
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+        lat: formData.lat,
+        lng: formData.lng,
+      })
+      const detailsValidation = validateDetailsStep({
+        title: formData.title,
+        description: formData.description,
+        date_start: formData.date_start,
+        time_start: formData.time_start,
+        duration_hours: formData.duration_hours,
+        pricing_mode: formData.pricing_mode,
+        tags: formData.tags,
+      })
+      if (!locationValidation.isValid || !detailsValidation.isValid) {
         // Don't auto-publish if validation fails - let user fix it
         setToastMessage('Please complete all required fields before publishing')
         setShowToast(true)
@@ -1316,7 +1592,7 @@ export default function SellWizardClient({
           dispatch({ type: 'SET_LOADING', loading: false })
         })
     }
-  }, [searchParams, user, validateDetails])
+  }, [searchParams, user, formData, buildDraftPayload, dispatch, setToastMessage, setShowToast, setCreatedSaleId, setConfirmationModalOpen])
 
   const handleSubmit = async () => {
     console.log('[SELL_WIZARD] handleSubmit called', { 
@@ -1336,10 +1612,27 @@ export default function SellWizardClient({
     })
     
     // Client-side required validation
-    const nextErrors = validateDetails()
+    const locationValidation = validateLocationStep({
+      address: formData.address,
+      city: formData.city,
+      state: formData.state,
+      zip_code: formData.zip_code,
+      lat: formData.lat,
+      lng: formData.lng,
+    })
+    const detailsValidation = validateDetailsStep({
+      title: formData.title,
+      description: formData.description,
+      date_start: formData.date_start,
+      time_start: formData.time_start,
+      duration_hours: formData.duration_hours,
+      pricing_mode: formData.pricing_mode,
+      tags: formData.tags,
+    })
+    const nextErrors = { ...locationValidation.errors, ...detailsValidation.errors }
     console.log('[SELL_WIZARD] Validation errors:', nextErrors)
     dispatch({ type: 'SET_ERRORS', errors: nextErrors })
-    if (Object.keys(nextErrors).length > 0) {
+    if (!locationValidation.isValid || !detailsValidation.isValid) {
       console.log('[SELL_WIZARD] Validation failed, preventing submit')
       return
     }
@@ -1622,7 +1915,16 @@ export default function SellWizardClient({
         return (
           <PromotionStep
             wantsPromotion={wantsPromotion}
-            onTogglePromotion={(value) => dispatch({ type: 'TOGGLE_PROMOTION', value })}
+            onTogglePromotion={(value) => {
+              // Only allow toggling if draft is publishable
+              // This prevents enabling promotion on invalid drafts
+              if (value && !publishability.isPublishable) {
+                return // Disable toggle - draft is not publishable
+              }
+              dispatch({ type: 'TOGGLE_PROMOTION', value })
+            }}
+            isPublishable={publishability.isPublishable}
+            blockingErrors={publishability.blockingErrors}
           />
         )
       case STEPS.REVIEW:
@@ -2291,9 +2593,13 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
 function PromotionStep({
   wantsPromotion,
   onTogglePromotion,
+  isPublishable,
+  blockingErrors,
 }: {
   wantsPromotion?: boolean
   onTogglePromotion?: (next: boolean) => void
+  isPublishable?: boolean
+  blockingErrors?: Record<string, string>
 }) {
   return (
     <DiagnosticErrorBoundary componentName="PromotionStep-Content">
@@ -2346,16 +2652,33 @@ function PromotionStep({
                 Promote this sale
                 <span className="ml-2 text-[#3A2268] font-semibold">$2.99 one-time</span>
               </label>
+              {!isPublishable && blockingErrors && Object.keys(blockingErrors).length > 0 && (
+                <p className="text-sm text-red-600 mt-1">
+                  Complete required fields before enabling promotion
+                </p>
+              )}
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
+            <label className={`relative inline-flex items-center ${isPublishable ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
               <input
                 type="checkbox"
                 checked={!!wantsPromotion}
-                onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                onChange={(e) => {
+                  // Only allow toggling if draft is publishable
+                  if (isPublishable) {
+                    onTogglePromotion?.(e.target.checked)
+                  }
+                }}
+                disabled={!isPublishable}
                 className="sr-only peer"
                 data-testid="promotion-step-feature-toggle"
+                aria-disabled={!isPublishable}
+                aria-label={isPublishable ? "Enable promotion" : "Promotion unavailable - complete required fields"}
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              <div className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                isPublishable
+                  ? 'bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 peer-checked:bg-purple-600'
+                  : 'bg-gray-300 peer-checked:bg-gray-400'
+              }`}></div>
             </label>
           </div>
 

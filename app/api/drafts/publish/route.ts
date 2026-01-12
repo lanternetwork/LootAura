@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
-import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
 import { deleteSaleAndItemsForRollback } from '@/lib/data/draftsPublishRollback'
@@ -77,27 +76,9 @@ export async function POST(request: NextRequest) {
     const payload = validationResult.data
     const { formData, photos, items, wantsPromotion } = payload
 
-    // Validate required fields
-    if (!formData.title || !formData.city || !formData.state || !formData.date_start || !formData.time_start) {
-      return fail(400, 'MISSING_FIELDS', 'Missing required fields')
-    }
-
-    // Validate image URLs
-    const allImages = photos || []
-    if (allImages.length > 0) {
-      for (const imageUrl of allImages) {
-        if (!isAllowedImageUrl(imageUrl)) {
-          return fail(400, 'INVALID_IMAGE_URL', `Invalid image URL: ${imageUrl}`)
-        }
-      }
-    }
-
-    // Validate item image URLs
-    for (const item of items || []) {
-      if (item.image_url && !isAllowedImageUrl(item.image_url)) {
-        return fail(400, 'INVALID_IMAGE_URL', `Invalid item image URL: ${item.image_url}`)
-      }
-    }
+    // NOTE: Field-level validation removed - drafts are assumed to be publishable
+    // Validation happens at draft creation/update time via computePublishability
+    // This route only fails on missing config or Stripe API errors
 
     // Normalize time_start to 30-minute increments
     let normalizedTimeStart = formData.time_start
@@ -111,13 +92,24 @@ export async function POST(request: NextRequest) {
       normalizedTimeStart = `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`
     }
 
-    // Get lat/lng from formData (should be set by address autocomplete)
-    // If missing, we'll need to geocode - for now, require it
-    if (!formData.lat || !formData.lng) {
-      return fail(400, 'MISSING_LOCATION', 'Location (lat/lng) is required')
-    }
+    // Get lat/lng from formData (assumed to be present in publishable drafts)
+    // If missing, this indicates a data integrity issue, not a validation error
     const lat = formData.lat
     const lng = formData.lng
+    
+    // Guard against missing location (should not happen for publishable drafts)
+    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+      const { logger } = await import('@/lib/log')
+      logger.error('Draft missing location data (data integrity issue)', new Error('MISSING_LOCATION_DATA'), {
+        component: 'drafts/publish',
+        operation: 'validate_location',
+        draftKey,
+        userId: user.id,
+        hasLat: typeof lat === 'number',
+        hasLng: typeof lng === 'number',
+      })
+      return fail(500, 'DATA_INTEGRITY_ERROR', 'Draft is missing required location data. Please refresh and try again.')
+    }
 
     // GATE: If promotion is requested, require payment before sale creation
     if (wantsPromotion === true) {

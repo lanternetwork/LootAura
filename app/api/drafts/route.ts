@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
+import { computePublishability, type DraftRecord } from '@/lib/drafts/computePublishability'
 import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
@@ -39,7 +40,22 @@ export async function GET(_request: NextRequest) {
       return fail(500, 'FETCH_ERROR', 'Failed to fetch drafts', error)
     }
 
-    return ok({ data: drafts || [] })
+    // Add publishability to each draft
+    const draftsWithPublishability = (drafts || []).map((draft: any) => {
+      const publishability = computePublishability({
+        id: draft.id,
+        draft_key: draft.draft_key,
+        title: draft.title,
+        payload: draft.payload || { formData: {}, photos: [], items: [] },
+        updated_at: draft.updated_at
+      } as DraftRecord)
+      return {
+        ...draft,
+        publishability
+      }
+    })
+
+    return ok({ data: draftsWithPublishability })
     }
 
     // If draftKey is provided, fetch that specific draft
@@ -70,7 +86,22 @@ export async function GET(_request: NextRequest) {
         return ok({ data: null })
       }
 
-      return ok({ data: { id: draft.id, draft_key: draft.draft_key, payload: validationResult.data } })
+      // Compute publishability
+      const publishability = computePublishability({
+        id: draft.id,
+        draft_key: draft.draft_key,
+        payload: validationResult.data,
+        updated_at: draft.updated_at
+      } as DraftRecord)
+
+      return ok({ 
+        data: { 
+          id: draft.id, 
+          draft_key: draft.draft_key, 
+          payload: validationResult.data,
+          publishability
+        } 
+      })
     }
 
     // Fetch latest active draft for user (read from base table via schema-scoped client)
@@ -101,7 +132,20 @@ export async function GET(_request: NextRequest) {
       return ok({ data: null })
     }
 
-    return ok({ data: { id: draft.id, payload: validationResult.data } })
+    // Compute publishability
+    const publishability = computePublishability({
+      id: draft.id,
+      payload: validationResult.data,
+      updated_at: draft.updated_at
+    } as DraftRecord)
+
+    return ok({ 
+      data: { 
+        id: draft.id, 
+        payload: validationResult.data,
+        publishability
+      } 
+    })
   } catch (e: any) {
     if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] thrown:', e)
     Sentry.captureException(e, { tags: { operation: 'getLatestDraft' } })

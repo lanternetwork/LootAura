@@ -1592,7 +1592,7 @@ export default function SellWizardClient({
           dispatch({ type: 'SET_LOADING', loading: false })
         })
     }
-  }, [searchParams, user, formData])
+  }, [searchParams, user, formData, buildDraftPayload, dispatch, setToastMessage, setShowToast, setCreatedSaleId, setConfirmationModalOpen])
 
   const handleSubmit = async () => {
     console.log('[SELL_WIZARD] handleSubmit called', { 

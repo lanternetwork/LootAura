@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition, useMemo, useReducer } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
@@ -19,6 +19,50 @@ import { saveDraftServer, getLatestDraftServer, getDraftByKeyServer, deleteDraft
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
+// DIAGNOSTIC ERROR BOUNDARY - TEMPORARY FOR DEBUGGING
+// This component logs the full error and stack trace to help identify React errors #418/#422
+class DiagnosticErrorBoundary extends Component<
+  { children: ReactNode; componentName: string },
+  { hasError: boolean; error: Error | null; errorInfo: ErrorInfo | null }
+> {
+  constructor(props: { children: ReactNode; componentName: string }) {
+    super(props)
+    this.state = { hasError: false, error: null, errorInfo: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log the FULL unminified error with stack trace
+    console.error(`[DIAGNOSTIC_ERROR_BOUNDARY] ${this.props.componentName} threw an error:`, {
+      error,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      errorName: error.name,
+      componentStack: errorInfo.componentStack,
+      errorInfo: errorInfo,
+      timestamp: new Date().toISOString(),
+    })
+    
+    this.setState({ error, errorInfo })
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Minimal fallback - just render a placeholder so the app continues
+      return (
+        <div className="border-2 border-red-300 bg-red-50 p-2 text-xs text-red-700">
+          [DIAGNOSTIC] {this.props.componentName} error caught - check console for details
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
 interface WizardStep {
   id: string
   title: string
@@ -30,31 +74,159 @@ const STEPS = {
   DETAILS: 0,
   PHOTOS: 1,
   ITEMS: 2,
-  REVIEW: 3
+  PROMOTION: 3,
+  REVIEW: 4
 } as const
 
-const WIZARD_STEPS: WizardStep[] = [
-  {
-    id: 'details',
-    title: 'Sale Details',
-    description: 'Basic information about your sale'
-  },
-  {
-    id: 'photos',
-    title: 'Photos',
-    description: 'Add photos to showcase your items'
-  },
-  {
-    id: 'items',
-    title: 'Items',
-    description: 'List the items you\'re selling'
-  },
-  {
+// WIZARD_STEPS is computed based on promotionsEnabled to conditionally include promotion step
+// This function returns the steps array with promotion included if enabled
+function getWizardSteps(promotionsEnabled: boolean): WizardStep[] {
+  const baseSteps: WizardStep[] = [
+    {
+      id: 'details',
+      title: 'Sale Details',
+      description: 'Basic information about your sale'
+    },
+    {
+      id: 'photos',
+      title: 'Photos',
+      description: 'Add photos to showcase your items'
+    },
+    {
+      id: 'items',
+      title: 'Items',
+      description: 'List the items you\'re selling'
+    }
+  ]
+
+  if (promotionsEnabled) {
+    baseSteps.push({
+      id: 'promotion',
+      title: 'Promote Your Sale',
+      description: 'Get more visibility with promotion'
+    })
+  }
+
+  baseSteps.push({
     id: 'review',
     title: 'Review',
     description: 'Review and publish your sale'
+  })
+
+  return baseSteps
+}
+
+// Wizard state type
+type WizardState = {
+  currentStep: number
+  formData: Partial<SaleInput>
+  photos: string[]
+  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>
+  wantsPromotion: boolean
+  loading: boolean
+  errors: Record<string, string>
+  submitError: string | null
+  lastAutocompleteTimestamp: number
+}
+
+// Wizard actions
+type WizardAction =
+  | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
+  | { type: 'SET_STEP'; step: number }
+  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any; source?: 'manual' | 'autocomplete'; timestamp?: number }
+  | { type: 'SET_FORM_DATA'; formData: Partial<SaleInput> }
+  | { type: 'UPDATE_ADDRESS_FIELDS'; fields: { address?: string; city?: string; state?: string; zip_code?: string; lat?: number; lng?: number }; source: 'autocomplete' }
+  | { type: 'SET_PHOTOS'; photos: string[] }
+  | { type: 'SET_ITEMS'; items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }> }
+  | { type: 'ADD_ITEM'; item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue } }
+  | { type: 'UPDATE_ITEM'; item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue } }
+  | { type: 'REMOVE_ITEM'; id: string }
+  | { type: 'TOGGLE_PROMOTION'; value: boolean }
+  | { type: 'SET_LOADING'; loading: boolean }
+  | { type: 'SET_ERRORS'; errors: Record<string, string> }
+  | { type: 'SET_SUBMIT_ERROR'; error: string | null }
+
+// Initial wizard state
+const initialWizardState: WizardState = {
+  currentStep: 0,
+  formData: {},
+  photos: [],
+  items: [],
+  wantsPromotion: false,
+  loading: false,
+  errors: {},
+  submitError: null,
+  lastAutocompleteTimestamp: 0,
+}
+
+// Wizard reducer
+function wizardReducer(state: WizardState, action: WizardAction): WizardState {
+  switch (action.type) {
+    case 'RESUME_DRAFT':
+      return {
+        ...state,
+        ...(action.payload.formData !== undefined && { formData: action.payload.formData }),
+        ...(action.payload.photos !== undefined && { photos: action.payload.photos }),
+        ...(action.payload.items !== undefined && { items: action.payload.items }),
+        ...(action.payload.wantsPromotion !== undefined && { wantsPromotion: action.payload.wantsPromotion }),
+        ...(action.payload.currentStep !== undefined && { currentStep: action.payload.currentStep }),
+      }
+    case 'SET_STEP':
+      return { ...state, currentStep: action.step }
+    case 'UPDATE_FORM':
+      // If manually updating address field and there's a recent autocomplete, ignore the update
+      if (action.field === 'address' && action.source === 'manual' && action.timestamp) {
+        const timeSinceAutocomplete = action.timestamp - state.lastAutocompleteTimestamp
+        // Ignore manual address updates within 1 second of autocomplete selection
+        if (timeSinceAutocomplete < 1000 && state.lastAutocompleteTimestamp > 0) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Ignoring manual address update due to recent autocomplete selection', {
+              timeSinceAutocomplete,
+              lastAutocompleteTimestamp: state.lastAutocompleteTimestamp,
+              updateTimestamp: action.timestamp
+            })
+          }
+          return state
+        }
+      }
+      return { ...state, formData: { ...state.formData, [action.field]: action.value } }
+    case 'UPDATE_ADDRESS_FIELDS':
+      // Update all address fields atomically from autocomplete selection
+      return {
+        ...state,
+        formData: {
+          ...state.formData,
+          ...action.fields
+        },
+        lastAutocompleteTimestamp: Date.now()
+      }
+    case 'SET_FORM_DATA':
+      return { ...state, formData: action.formData }
+    case 'SET_PHOTOS':
+      return { ...state, photos: action.photos }
+    case 'SET_ITEMS':
+      return { ...state, items: action.items }
+    case 'ADD_ITEM':
+      return { ...state, items: [...state.items, action.item] }
+    case 'UPDATE_ITEM':
+      return {
+        ...state,
+        items: state.items.map(item => item.id === action.item.id ? action.item : item)
+      }
+    case 'REMOVE_ITEM':
+      return { ...state, items: state.items.filter(item => item.id !== action.id) }
+    case 'TOGGLE_PROMOTION':
+      return { ...state, wantsPromotion: action.value }
+    case 'SET_LOADING':
+      return { ...state, loading: action.loading }
+    case 'SET_ERRORS':
+      return { ...state, errors: action.errors }
+    case 'SET_SUBMIT_ERROR':
+      return { ...state, submitError: action.error }
+    default:
+      return state
   }
-]
+}
 
 export default function SellWizardClient({
   initialData,
@@ -62,8 +234,8 @@ export default function SellWizardClient({
   saleId: _saleId,
   userLat,
   userLng,
-  promotionsEnabled = false,
-  paymentsEnabled = false,
+  promotionsEnabled: promotionsEnabledProp,
+  paymentsEnabled: _paymentsEnabledProp,
 }: {
   initialData?: Partial<SaleInput>
   isEdit?: boolean
@@ -73,10 +245,22 @@ export default function SellWizardClient({
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
 }) {
+  // Preserve server-provided prop value - only default if truly undefined (hydration safety)
+  // This ensures server-computed value is never overridden by client defaults
+  const promotionsEnabled = promotionsEnabledProp ?? false
+
+  // Defensive assertion: log warning if prop is undefined (indicates prop passing issue)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' && promotionsEnabledProp === undefined) {
+    console.warn('[SELL_WIZARD] promotionsEnabled prop is undefined - server prop may not have been passed correctly')
+  }
+
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createSupabaseBrowserClient()
-  const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
+  
+  // Extract resumeParam from searchParams outside useEffect to stabilize dependency array
+  const resumeParam = searchParams.get('resume')
   // Normalize tags to ensure it's always an array
   // Also normalize case to match checkbox format (capitalize first letter)
   // Memoize to prevent useEffect from running on every render
@@ -102,32 +286,55 @@ export default function SellWizardClient({
       return matched || trimmed // Use matched format, or keep original if no match
     }).filter(Boolean)
   }, [])
+  
+  // Initialize wizard state from initialData if provided
+  const [wizardState, dispatch] = useReducer(wizardReducer, initialWizardState, (initialState) => ({
+    ...initialState,
+    formData: {
+      title: initialData?.title || '',
+      description: initialData?.description || '',
+      address: initialData?.address || '',
+      city: initialData?.city || '',
+      state: initialData?.state || '',
+      zip_code: initialData?.zip_code || '',
+      lat: initialData?.lat,
+      lng: initialData?.lng,
+      date_start: initialData?.date_start || '',
+      time_start: initialData?.time_start || '09:00',
+      date_end: initialData?.date_end || '',
+      time_end: initialData?.time_end || '',
+      duration_hours: initialData?.duration_hours || 4,
+      tags: normalizeTags(initialData?.tags),
+      pricing_mode: initialData?.pricing_mode || 'negotiable',
+      status: initialData?.status || 'draft'
+    }
+  }))
+  
+  // Extract wizard state for easier access
+  const { currentStep, formData, photos, items, wantsPromotion, loading, errors, submitError } = wizardState
+  
+  // Compute wizard steps based on promotionsEnabled (promotion step is conditional)
+  const WIZARD_STEPS = useMemo(() => getWizardSteps(promotionsEnabled), [promotionsEnabled])
+  
+  // Helper to map step constant to WIZARD_STEPS index
+  const getStepIndex = useCallback((stepConstant: number): number => {
+    if (stepConstant === STEPS.DETAILS) return 0
+    if (stepConstant === STEPS.PHOTOS) return 1
+    if (stepConstant === STEPS.ITEMS) return 2
+    if (stepConstant === STEPS.PROMOTION) {
+      // Promotion is at index 3 if enabled, otherwise doesn't exist
+      return promotionsEnabled ? 3 : -1
+    }
+    if (stepConstant === STEPS.REVIEW) {
+      // Review is at index 3 if promotions disabled, index 4 if enabled
+      return promotionsEnabled ? 4 : 3
+    }
+    return 0
+  }, [promotionsEnabled])
 
-  const [formData, setFormData] = useState<Partial<SaleInput>>({
-    title: initialData?.title || '',
-    description: initialData?.description || '',
-    address: initialData?.address || '',
-    city: initialData?.city || '',
-    state: initialData?.state || '',
-    zip_code: initialData?.zip_code || '',
-    date_start: initialData?.date_start || '',
-    time_start: initialData?.time_start || '09:00', // Default to 9:00 AM
-    date_end: initialData?.date_end || '',
-    time_end: initialData?.time_end || '',
-    duration_hours: initialData?.duration_hours || 4, // Default 4 hours
-    tags: normalizeTags(initialData?.tags),
-    pricing_mode: initialData?.pricing_mode || 'negotiable',
-    status: initialData?.status || 'draft'
-  })
-  const [photos, setPhotos] = useState<string[]>([])
-  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>>([])
-  const [loading, setLoading] = useState(false)
-  const [_errors, setErrors] = useState<Record<string, string>>({})
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  // Non-wizard state (UI state, auth state, etc.)
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
-  const [wantsPromotion, setWantsPromotion] = useState(false)
-  const [isPromoting, setIsPromoting] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -138,7 +345,6 @@ export default function SellWizardClient({
   const isRestoringDraftRef = useRef<boolean>(false) // Flag to prevent autosave during draft restoration
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
-  const searchParams = useSearchParams()
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -186,8 +392,9 @@ export default function SellWizardClient({
         category: item.category,
       })),
       currentStep,
+      wantsPromotion,
     }
-  }, [formData, photos, items, currentStep])
+  }, [formData, photos, items, currentStep, wantsPromotion])
 
   // Check authentication status
   useEffect(() => {
@@ -370,7 +577,7 @@ export default function SellWizardClient({
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[SELL_WIZARD] Updating formData.tags:', normalized)
       }
-      setFormData(prev => ({ ...prev, tags: normalized }))
+      dispatch({ type: 'SET_FORM_DATA', formData: { ...formData, tags: normalized } })
     }
   }, [initialData?.tags, _isEdit, normalizeTags]) // normalizeTags is now memoized, so it's stable
 
@@ -378,8 +585,13 @@ export default function SellWizardClient({
   useEffect(() => {
     if (initialData || hasResumedRef.current) return
 
+    // Set flag synchronously to prevent multiple concurrent runs (fixes React error #418/#422)
+    // This prevents the effect from running again if user state changes before async completes
+    hasResumedRef.current = true
+
     const resumeDraft = async () => {
-      const resume = searchParams.get('resume')
+      const resume = resumeParam
+      const isPromotionResume = resume === 'promotion'
       const isReviewResume = resume === 'review'
       
       let draftToRestore: SaleDraftPayload | null = null
@@ -451,6 +663,7 @@ export default function SellWizardClient({
                   category: item.category,
                 })),
                 currentStep: parsed.currentStep || 0,
+                wantsPromotion: parsed.wantsPromotion || false,
               }
               source = 'local'
               if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -463,134 +676,197 @@ export default function SellWizardClient({
         }
       }
 
-      // Restore draft if found
-      if (draftToRestore) {
-        hasResumedRef.current = true
-        isRestoringDraftRef.current = true // Prevent autosave during restoration
-        
-        // Set draftKeyRef to the restored draft's key (critical: prevents creating new draft on autosave)
-        if (restoredDraftKey) {
-          draftKeyRef.current = restoredDraftKey
-          // Also update localStorage to persist the draft key
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('draft:key', restoredDraftKey)
+        // Restore draft if found
+        if (draftToRestore) {
+          // hasResumedRef.current already set synchronously above to prevent concurrent runs
+          isRestoringDraftRef.current = true // Prevent autosave during restoration
+          
+          // Set draftKeyRef to the restored draft's key (critical: prevents creating new draft on autosave)
+          if (restoredDraftKey) {
+            draftKeyRef.current = restoredDraftKey
+            // Also update localStorage to persist the draft key
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('draft:key', restoredDraftKey)
+            }
+          } else if (source === 'server' && typeof window !== 'undefined') {
+            // If we got a server draft but no explicit key, try to get it from localStorage
+            const storedKey = localStorage.getItem('draft:key')
+            if (storedKey) {
+              draftKeyRef.current = storedKey
+            }
           }
-        } else if (source === 'server' && typeof window !== 'undefined') {
-          // If we got a server draft but no explicit key, try to get it from localStorage
-          const storedKey = localStorage.getItem('draft:key')
-          if (storedKey) {
-            draftKeyRef.current = storedKey
-          }
-        }
-        
-        // Restore form data
-        if (draftToRestore.formData) {
-          const nextForm = { ...draftToRestore.formData }
-          if (nextForm.time_start) {
-            nextForm.time_start = normalizeTimeToNearest30(nextForm.time_start) || nextForm.time_start
-          }
-          setFormData(nextForm as Partial<SaleInput>)
-        }
+          
+          // ATOMIC RESUME STATE UPDATE: Apply all state changes in a single batch
+          // This prevents React errors #418/#422 by ensuring all updates happen in one render pass
+          // Critical state (formData, photos, items, wantsPromotion, currentStep) is applied synchronously
+          // Non-critical state (toast messages) is wrapped in startTransition
+          
+          // Prepare all state updates
+          const nextForm = draftToRestore.formData ? (() => {
+            const form = { ...draftToRestore.formData }
+            if (form.time_start) {
+              form.time_start = normalizeTimeToNearest30(form.time_start) || form.time_start
+            }
+            return form as Partial<SaleInput>
+          })() : undefined
 
-        // Restore photos
-        if (draftToRestore.photos) {
-          setPhotos(draftToRestore.photos)
-        }
+          const nextPhotos = draftToRestore.photos || undefined
 
-        // Restore items (ensure IDs)
-        if (draftToRestore.items) {
-          const loadedItems = draftToRestore.items.map(item => ({
+          const nextItems = draftToRestore.items ? draftToRestore.items.map(item => ({
             id: item.id || `item-${Date.now()}-${Math.random()}`,
             name: item.name,
             price: item.price,
             description: item.description,
             image_url: item.image_url,
             category: item.category,
-          }))
-          setItems(loadedItems)
-        }
+          })) : undefined
 
-        // Restore step: if resume=review, force Review step; otherwise use saved step
-        if (isReviewResume) {
-          setCurrentStep(STEPS.REVIEW)
-          setToastMessage('Draft restored. Ready to review your sale.')
-        } else if (draftToRestore.currentStep !== undefined) {
-          setCurrentStep(draftToRestore.currentStep)
-          setToastMessage(`Draft restored${source === 'server' ? ' from cloud' : ''}`)
-        }
+          const nextWantsPromotion = draftToRestore.wantsPromotion !== undefined ? draftToRestore.wantsPromotion : undefined
 
-        setShowToast(true)
+          // Determine target step: resume param takes precedence, then draft's saved step
+          const nextStep = isPromotionResume
+            ? STEPS.PROMOTION
+            : isReviewResume
+            ? STEPS.REVIEW
+            : (draftToRestore.currentStep !== undefined ? draftToRestore.currentStep : undefined)
 
-        // If user is authenticated and we restored local draft, save to server
-        if (user && source === 'local' && draftKeyRef.current) {
-          saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
-            // Silent fail - already saved locally
+          const nextToastMessage = isPromotionResume
+            ? 'Draft restored. Ready to promote your sale.'
+            : isReviewResume
+            ? 'Draft restored. Ready to review your sale.'
+            : (draftToRestore.currentStep !== undefined ? `Draft restored${source === 'server' ? ' from cloud' : ''}` : undefined)
+
+          // ATOMIC RESUME: Dispatch single RESUME_DRAFT action to set all wizard state atomically
+          // This prevents React errors #418/#422 by ensuring all updates happen in one reducer call
+          dispatch({
+            type: 'RESUME_DRAFT',
+            payload: {
+              ...(nextForm && { formData: nextForm }),
+              ...(nextPhotos !== undefined && { photos: nextPhotos }),
+              ...(nextItems !== undefined && { items: nextItems }),
+              ...(nextWantsPromotion !== undefined && { wantsPromotion: nextWantsPromotion }),
+              ...(nextStep !== undefined && { currentStep: nextStep }),
+            }
           })
+
+          // Apply non-critical toast updates in a transition to avoid blocking render
+          if (nextToastMessage) {
+            startTransition(() => {
+              setToastMessage(nextToastMessage)
+              setShowToast(true)
+            })
+          }
+
+          // If user is authenticated and we restored local draft, save to server
+          if (user && source === 'local' && draftKeyRef.current) {
+            saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
+              // Silent fail - already saved locally
+            })
+          }
+          
+          // Clear restoration flag after autosave debounce period (2s to be safe)
+          // This allows state to settle before autosave can trigger
+          setTimeout(() => {
+            isRestoringDraftRef.current = false
+          }, 2000)
+        } else if (isPromotionResume) {
+          // Draft not found but resume=promotion - still go to Promotion step
+          dispatch({ type: 'SET_STEP', step: STEPS.PROMOTION })
+          setToastMessage('Draft not found; please promote your sale.')
+          setShowToast(true)
+        } else if (isReviewResume) {
+          // Draft not found but resume=review - still go to Review step
+          dispatch({ type: 'SET_STEP', step: STEPS.REVIEW })
+          setToastMessage('Draft not found; please review details.')
+          setShowToast(true)
         }
-        
-        // Clear restoration flag after autosave debounce period (2s to be safe)
-        // This allows state to settle before autosave can trigger
-        setTimeout(() => {
-          isRestoringDraftRef.current = false
-        }, 2000)
-      } else if (isReviewResume) {
-        // Draft not found but resume=review - still go to Review step
-        setCurrentStep(STEPS.REVIEW)
-        setToastMessage('Draft not found; please review details.')
-        setShowToast(true)
-      }
 
       // Clear sessionStorage keys after resume
-      if (isReviewResume) {
+      if (isPromotionResume || isReviewResume) {
         sessionStorage.removeItem('auth:postLoginRedirect')
         sessionStorage.removeItem('draft:returnStep')
       }
     }
 
     resumeDraft()
-  }, [initialData, user, normalizeTimeToNearest30, searchParams])
+  }, [initialData, user, normalizeTimeToNearest30, resumeParam])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
-      }
+    
+    // For address field, use UPDATE_FORM with manual source and timestamp
+    // This ensures we only update the address field, not city/state/zip/lat/lng
+    if (field === 'address') {
+      dispatch({ 
+        type: 'UPDATE_FORM', 
+        field, 
+        value, 
+        source: 'manual',
+        timestamp: Date.now()
+      })
+      return
+    }
+    
+    // Calculate updated formData for other fields
+    const updated = { ...formData, [field]: value }
 
-      // Snap start time to 30-minute increments (nearest 00/30 with carry)
-      if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
-        updated.time_start = normalizeTimeToNearest30(value)
-      }
+    // Snap start time to 30-minute increments (nearest 00/30 with carry)
+    if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
+      updated.time_start = normalizeTimeToNearest30(value)
+    }
+    
+    // Calculate end date/time when duration, start date, or start time changes
+    if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
+      const dateStart = updated.date_start || formData.date_start
+      const timeStart = updated.time_start || formData.time_start
+      const durationHours = updated.duration_hours || formData.duration_hours || 4
       
-      // Calculate end date/time when duration, start date, or start time changes
-      if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
-        const dateStart = updated.date_start || prev.date_start
-        const timeStart = updated.time_start || prev.time_start
-        const durationHours = updated.duration_hours || prev.duration_hours || 4
+      if (dateStart && timeStart && durationHours) {
+        // Validate duration doesn't exceed 8 hours
+        const maxDuration = 8
+        const actualDuration = Math.min(durationHours, maxDuration)
         
-        if (dateStart && timeStart && durationHours) {
-          // Validate duration doesn't exceed 8 hours
-          const maxDuration = 8
-          const actualDuration = Math.min(durationHours, maxDuration)
-          
-          // Calculate end time
-          const startDateTime = new Date(`${dateStart}T${timeStart}`)
-          const endDateTime = new Date(startDateTime.getTime() + actualDuration * 60 * 60 * 1000)
-          
-          // Format end date (YYYY-MM-DD)
-          const endDate = endDateTime.toISOString().split('T')[0]
-          // Format end time (HH:MM)
-          const endTime = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
-          
-          updated.date_end = endDate
-          updated.time_end = endTime
-        }
+        // Calculate end time
+        const startDateTime = new Date(`${dateStart}T${timeStart}`)
+        const endDateTime = new Date(startDateTime.getTime() + actualDuration * 60 * 60 * 1000)
+        
+        // Format end date (YYYY-MM-DD)
+        const endDate = endDateTime.toISOString().split('T')[0]
+        // Format end time (HH:MM)
+        const endTime = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
+        
+        updated.date_end = endDate
+        updated.time_end = endTime
       }
-      
-      return updated
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
+    }
+    
+    // Dispatch single update with all calculated fields
+    dispatch({ type: 'SET_FORM_DATA', formData: updated })
+  }
+
+  // Handler for autocomplete place selection - updates all address fields atomically
+  const handlePlaceSelected = (place: { address?: string; city?: string; state?: string; zip?: string; lat?: number; lng?: number }) => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] handlePlaceSelected called:', { place })
+    }
+    
+    dispatch({
+      type: 'UPDATE_ADDRESS_FIELDS',
+      fields: {
+        address: place.address || '',
+        city: place.city || '',
+        state: place.state || '',
+        zip_code: place.zip || '',
+        lat: place.lat,
+        lng: place.lng,
+      },
+      source: 'autocomplete'
     })
   }
 
@@ -619,7 +895,7 @@ export default function SellWizardClient({
     if (!timeStart || !timeStart.includes(':')) {
       timeStart = '09:00'
       // Update formData with default time if it's missing
-      setFormData(prev => ({ ...prev, time_start: timeStart }))
+      dispatch({ type: 'UPDATE_FORM', field: 'time_start', value: timeStart })
     }
     
     if (!timeStart) nextErrors.time_start = 'Start time is required'
@@ -645,6 +921,25 @@ export default function SellWizardClient({
     return nextErrors
   }
 
+  const handlePrevious = useCallback(() => {
+    // Skip promotion step if disabled when going back from review
+    let prevStep = currentStep - 1
+    
+    // If going back from REVIEW and promotions disabled, skip PROMOTION
+    if (currentStep === STEPS.REVIEW && prevStep === STEPS.PROMOTION && !promotionsEnabled) {
+      prevStep = STEPS.ITEMS
+    }
+    
+    // If going back from PROMOTION, go to ITEMS
+    if (currentStep === STEPS.PROMOTION) {
+      prevStep = STEPS.ITEMS
+    }
+    
+    if (prevStep >= STEPS.DETAILS) {
+      dispatch({ type: 'SET_STEP', step: prevStep })
+    }
+  }, [currentStep, promotionsEnabled])
+
   const handleNext = async () => {
     // Guard against duplicate clicks
     if (isNavigatingRef.current) return
@@ -654,7 +949,7 @@ export default function SellWizardClient({
       // Require core fields on the Details step before advancing
       if (currentStep === STEPS.DETAILS) {
         const nextErrors = validateDetails()
-        setErrors(nextErrors)
+        dispatch({ type: 'SET_ERRORS', errors: nextErrors })
         if (Object.keys(nextErrors).length > 0) {
           isNavigatingRef.current = false
           return
@@ -672,7 +967,7 @@ export default function SellWizardClient({
         // Continue anyway - don't block navigation
       }
 
-      // Auth gate: Items (2) → Review (3)
+      // Auth gate: Items (2) → Promotion (3) or Review (4)
       // Check auth state synchronously to ensure we have the latest value
       if (currentStep === STEPS.ITEMS) {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -681,15 +976,19 @@ export default function SellWizardClient({
         }
         
         if (!currentUser) {
+          // Determine resume target: promotion if enabled, otherwise review
+          const resumeTarget = promotionsEnabled ? 'promotion' : 'review'
+          const resumeUrl = `/sell/new?resume=${resumeTarget}`
+          
           // Set redirect keys
-          sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
-          sessionStorage.setItem('draft:returnStep', 'review')
+          sessionStorage.setItem('auth:postLoginRedirect', resumeUrl)
+          sessionStorage.setItem('draft:returnStep', resumeTarget)
           
           // Update user state
           setUser(null)
           
           // Redirect to login (encode redirectTo to preserve query params)
-          const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+          const redirectUrl = encodeURIComponent(resumeUrl)
           router.push(`/auth/signin?redirectTo=${redirectUrl}`)
           isNavigatingRef.current = false
           return // Don't advance step
@@ -713,21 +1012,28 @@ export default function SellWizardClient({
         }
       }
 
-      // Normal navigation
-      if (currentStep < WIZARD_STEPS.length - 1) {
-        setCurrentStep(currentStep + 1)
+      // Normal navigation - skip promotion step if disabled
+      let nextStep = currentStep + 1
+      
+      // If moving from ITEMS to PROMOTION but promotions are disabled, skip to REVIEW
+      if (currentStep === STEPS.ITEMS && nextStep === STEPS.PROMOTION && !promotionsEnabled) {
+        nextStep = STEPS.REVIEW
+      }
+      
+      // If moving from PROMOTION, always go to REVIEW
+      if (currentStep === STEPS.PROMOTION) {
+        nextStep = STEPS.REVIEW
+      }
+      
+      // Only advance if there's a valid next step
+      if (nextStep <= STEPS.REVIEW) {
+        dispatch({ type: 'SET_STEP', step: nextStep })
       }
     } finally {
       // Reset navigation guard after a short delay
       setTimeout(() => {
         isNavigatingRef.current = false
       }, 500)
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentStep > STEPS.DETAILS) {
-      setCurrentStep(currentStep - 1)
     }
   }
 
@@ -832,8 +1138,8 @@ export default function SellWizardClient({
 
   // Helper to submit sale payload (used by both handleSubmit and auto-resume)
   const submitSalePayload = useCallback(async (payload: { saleData: any; items: any[] }) => {
-    setLoading(true)
-    setSubmitError(null)
+    dispatch({ type: 'SET_LOADING', loading: true })
+    dispatch({ type: 'SET_SUBMIT_ERROR', error: null })
 
     try {
       const response = await fetch('/api/sales', {
@@ -857,7 +1163,7 @@ export default function SellWizardClient({
         // Redirect to login (encode redirectTo to preserve query params)
         const redirectUrl = encodeURIComponent('/sell/new?resume=review')
         router.push(`/auth/signin?redirectTo=${redirectUrl}`)
-        setLoading(false)
+        dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
 
@@ -872,8 +1178,8 @@ export default function SellWizardClient({
           fullResponse: errorData
         })
         const errorMessage = errorData.error || errorData.details || `Failed to create sale (${response.status})`
-        setSubmitError(errorMessage)
-        setLoading(false)
+        dispatch({ type: 'SET_SUBMIT_ERROR', error: errorMessage })
+        dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
 
@@ -881,8 +1187,8 @@ export default function SellWizardClient({
       const sale = result.sale || result
       if (!sale || !sale.id) {
         console.error('Invalid sale response:', result)
-        setSubmitError('Invalid response from server')
-        setLoading(false)
+        dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Invalid response from server' })
+        dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
       const saleId = sale.id
@@ -900,7 +1206,7 @@ export default function SellWizardClient({
           // The sale was created successfully, so we don't want to fail the entire operation
           const errorMessage = error instanceof Error ? error.message : 'Failed to create some items'
           console.error('[SELL_WIZARD] Item creation error (sale was created):', errorMessage)
-          setSubmitError(`Sale created successfully, but some items failed to save: ${errorMessage}. You can add items later from the sale detail page.`)
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: `Sale created successfully, but some items failed to save: ${errorMessage}. You can add items later from the sale detail page.` })
           // Still show the confirmation modal so user can view the sale
         }
       }
@@ -942,9 +1248,9 @@ export default function SellWizardClient({
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('Error creating sale:', error)
       }
-      setSubmitError('Something went wrong while creating your sale. Please try again.')
+      dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Something went wrong while creating your sale. Please try again.' })
     } finally {
-      setLoading(false)
+      dispatch({ type: 'SET_LOADING', loading: false })
     }
   }, [router, createItemsForSale])
 
@@ -966,12 +1272,33 @@ export default function SellWizardClient({
       }
 
       // Auto-publish the draft
-      setLoading(true)
-      publishDraftServer(draftKeyRef.current)
+      dispatch({ type: 'SET_LOADING', loading: true })
+      
+      // Store draft key in local variable (TypeScript type narrowing)
+      const draftKeyToPublish = draftKeyRef.current
+      if (!draftKeyToPublish) {
+        dispatch({ type: 'SET_LOADING', loading: false })
+        return
+      }
+      
+      // CRITICAL: Save current draft payload (including wantsPromotion) before publishing
+      const currentPayload = buildDraftPayload()
+      saveDraftServer(currentPayload, draftKeyToPublish)
+        .then(() => {
+          // After save completes, publish the draft
+          return publishDraftServer(draftKeyToPublish)
+        })
+        .catch((error) => {
+          // If save fails, log warning but continue with publish anyway
+          console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
+          // Continue with publish - might already exist on server
+          return publishDraftServer(draftKeyToPublish)
+        })
         .then((result) => {
-          if (result.ok && result.data?.saleId) {
+          if (result.ok && result.data && 'saleId' in result.data) {
             clearLocalDraft()
-            setCreatedSaleId(result.data.saleId)
+            const saleData = result.data as { saleId: string }
+            setCreatedSaleId(saleData.saleId)
             setConfirmationModalOpen(true)
           } else {
             setToastMessage(result.error || 'Failed to publish sale. Please try again.')
@@ -986,7 +1313,7 @@ export default function SellWizardClient({
           hasResumedRef.current = false // Allow retry
         })
         .finally(() => {
-          setLoading(false)
+          dispatch({ type: 'SET_LOADING', loading: false })
         })
     }
   }, [searchParams, user, validateDetails])
@@ -1011,7 +1338,7 @@ export default function SellWizardClient({
     // Client-side required validation
     const nextErrors = validateDetails()
     console.log('[SELL_WIZARD] Validation errors:', nextErrors)
-    setErrors(nextErrors)
+    dispatch({ type: 'SET_ERRORS', errors: nextErrors })
     if (Object.keys(nextErrors).length > 0) {
       console.log('[SELL_WIZARD] Validation failed, preventing submit')
       return
@@ -1035,6 +1362,19 @@ export default function SellWizardClient({
 
     // User is authenticated - try to publish draft if exists, else create directly
     if (draftKeyRef.current && hasLocalDraft()) {
+      // CRITICAL: If promotion is enabled, validate user profile is ready before publish
+      if (wantsPromotion === true) {
+        if (!user || !user.id) {
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Your account is not ready. Please refresh the page and try again.' })
+          return
+        }
+        
+        if (!draftKeyRef.current) {
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Draft is missing. Please refresh the page and try again.' })
+          return
+        }
+      }
+      
       // First, ensure draft is saved to server (in case it's only local)
       const localPayload = buildDraftPayload()
       try {
@@ -1045,8 +1385,8 @@ export default function SellWizardClient({
       }
 
       // Publish draft (transactional)
-      setLoading(true)
-      setSubmitError(null)
+      dispatch({ type: 'SET_LOADING', loading: true })
+      dispatch({ type: 'SET_SUBMIT_ERROR', error: null })
       
       // Store draft key before clearing it (we need it for the publish call)
       const draftKeyToPublish = draftKeyRef.current
@@ -1064,37 +1404,104 @@ export default function SellWizardClient({
       try {
         const result = await publishDraftServer(draftKeyToPublish)
         
+        // VERIFICATION LOG: Log publish response payload
+        console.log('[VERIFY_PROMOTION] Publish response received:', {
+          ok: result.ok,
+          code: result.code,
+          hasData: !!result.data,
+          dataKeys: result.data ? Object.keys(result.data) : [],
+          requiresPayment: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
+          hasCheckoutUrl: result.data && 'checkoutUrl' in result.data ? !!result.data.checkoutUrl : undefined,
+          hasSaleId: result.data && 'saleId' in result.data ? !!result.data.saleId : undefined,
+          wantsPromotion,
+          timestamp: new Date().toISOString()
+        })
+        
         if (!result.ok) {
           if (result.code === 'AUTH_REQUIRED') {
             // Should not happen since we checked user, but handle gracefully
             const redirectUrl = encodeURIComponent('/sell/new?resume=review')
             router.push(`/auth/signin?redirectTo=${redirectUrl}`)
-            setLoading(false)
+            dispatch({ type: 'SET_LOADING', loading: false })
             return
           }
           
-          // If draft not found, fall back to direct creation
+          // CRITICAL: If promotion is enabled, never fall back to direct creation
+          // This would bypass payment and create a promoted sale without payment
+          if (wantsPromotion === true) {
+            const errorMessage = result.error || 'Failed to start checkout. Please try again.'
+            dispatch({ type: 'SET_SUBMIT_ERROR', error: errorMessage })
+            dispatch({ type: 'SET_LOADING', loading: false })
+            return
+          }
+          
+          // If draft not found and promotion is NOT enabled, fall back to direct creation
           if (result.code === 'DRAFT_NOT_FOUND') {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
               console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
             }
             const payload = buildSalePayload()
             await submitSalePayload(payload)
-            setLoading(false)
+            dispatch({ type: 'SET_LOADING', loading: false })
             return
           }
           
-          setSubmitError(result.error || 'Failed to publish sale')
-          setLoading(false)
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: result.error || 'Failed to publish sale' })
+          dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
 
-        const saleId = result.data?.saleId
-        if (!saleId) {
-          setSubmitError('Invalid response from server')
-          setLoading(false)
+        // CRITICAL: If promotion is enabled, we MUST get a checkout URL
+        // Never fall through to normal publish flow when wantsPromotion is true
+        if (wantsPromotion === true) {
+          if (!result.data || !('requiresPayment' in result.data) || !result.data.requiresPayment || !('checkoutUrl' in result.data) || !result.data.checkoutUrl) {
+            console.error('[VERIFY_PROMOTION] ERROR: wantsPromotion === true but checkout URL missing:', {
+              hasData: !!result.data,
+              hasRequiresPayment: result.data && 'requiresPayment' in result.data,
+              requiresPaymentValue: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
+              hasCheckoutUrl: result.data && 'checkoutUrl' in result.data,
+              checkoutUrlValue: result.data && 'checkoutUrl' in result.data ? result.data.checkoutUrl : undefined
+            })
+            dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Checkout is not available. Please refresh the page and try again.' })
+            dispatch({ type: 'SET_LOADING', loading: false })
+            return
+          }
+          
+          // VERIFICATION LOG: Confirm Stripe redirect is happening
+          console.log('[VERIFY_PROMOTION] Redirecting to Stripe Checkout - this is the ONLY valid path for promoted sales:', {
+            checkoutUrl: result.data.checkoutUrl,
+            wantsPromotion: true,
+            timestamp: new Date().toISOString()
+          })
+          console.log('[VERIFY_PROMOTION] Execution will return here - normal publish-success path will NOT be reached')
+          
+          // Redirect to Stripe Checkout - this is the ONLY valid path for promoted sales
+          window.location.href = result.data.checkoutUrl
+          dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
+
+        // VERIFICATION LOG: This code path should NEVER be reached when wantsPromotion === true
+        // If this log appears when wantsPromotion === true, the invariant is broken
+        console.log('[VERIFY_PROMOTION] Normal publish-success path reached:', {
+          wantsPromotion,
+          hasData: !!result.data,
+          hasSaleId: result.data && 'saleId' in result.data,
+          timestamp: new Date().toISOString(),
+          note: 'If wantsPromotion === true above, this is a BUG - normal publish path should not happen'
+        })
+        
+        // Normal publish flow - sale was created (only for non-promoted sales)
+        // Type guard: check if result.data has saleId property
+        if (!result.data || !('saleId' in result.data)) {
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Invalid response from server' })
+          dispatch({ type: 'SET_LOADING', loading: false })
+          return
+        }
+
+        // After type guard, TypeScript knows result.data has saleId
+        const saleData = result.data as { saleId: string }
+        const saleId = saleData.saleId
 
         // Clear drafts and sessionStorage keys
         clearLocalDraft()
@@ -1130,13 +1537,13 @@ export default function SellWizardClient({
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.error('[SELL_WIZARD] Error publishing draft:', error)
         }
-        setSubmitError('Something went wrong while publishing your sale. Please try again.')
+        dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Something went wrong while publishing your sale. Please try again.' })
         // Reset publishing flag on error so autosave can work again
         // Don't restore draftKeyRef - the draft should remain cleared even on error
         // User can start fresh if they need to
         isPublishingRef.current = false
       } finally {
-        setLoading(false)
+        dispatch({ type: 'SET_LOADING', loading: false })
       }
     } else {
       // No draft exists, create sale directly (existing flow)
@@ -1147,63 +1554,71 @@ export default function SellWizardClient({
 
   const handlePhotoUpload = useCallback((urls: string[]) => {
     // Replace photos array with new URLs (ImageUploadCard emits all done URLs)
-    setPhotos(urls)
+    dispatch({ type: 'SET_PHOTOS', photos: urls })
   }, [])
 
   const handleReorderPhotos = (fromIndex: number, toIndex: number) => {
-    setPhotos(prev => {
-      const next = [...prev]
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, moved)
-      return next
-    })
+    const next = [...photos]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    dispatch({ type: 'SET_PHOTOS', photos: next })
   }
 
   const handleSetCover = (index: number) => {
-    setPhotos(prev => {
-      if (index <= 0 || index >= prev.length) return prev
-      const next = [...prev]
-      const [moved] = next.splice(index, 1)
-      next.unshift(moved)
-      return next
-    })
+    if (index <= 0 || index >= photos.length) return
+    const next = [...photos]
+    const [moved] = next.splice(index, 1)
+    next.unshift(moved)
+    dispatch({ type: 'SET_PHOTOS', photos: next })
   }
 
   const handleRemovePhoto = (index: number) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index))
+    dispatch({ type: 'SET_PHOTOS', photos: photos.filter((_, i) => i !== index) })
   }
 
   const handleAddItem = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => {
-    setItems(prev => {
-      if (prev.length >= 50) return prev
-      return [...prev, item]
-    })
-  }, [])
+    if (items.length >= 50) return
+    dispatch({ type: 'ADD_ITEM', item })
+  }, [items.length])
 
   const handleUpdateItem = useCallback((updated: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }) => {
-    setItems(prev => {
-      const next = prev.slice()
-      const i = next.findIndex(it => it.id === updated.id)
-      if (i !== -1) {
-        next[i] = { ...next[i], ...updated }
-      }
-      return next
-    })
+    dispatch({ type: 'UPDATE_ITEM', item: updated })
   }, [])
 
   const handleRemoveItem = useCallback((id: string) => {
-    setItems(prev => prev.filter(it => it.id !== id))
+    dispatch({ type: 'REMOVE_ITEM', id })
   }, [])
+
+  // Guard: if on PROMOTION step but promotions disabled, redirect to REVIEW
+  useEffect(() => {
+    if (currentStep === STEPS.PROMOTION && !promotionsEnabled) {
+      dispatch({ type: 'SET_STEP', step: STEPS.REVIEW })
+    }
+  }, [currentStep, promotionsEnabled])
 
   const renderStep = () => {
     switch (currentStep) {
       case STEPS.DETAILS:
-        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} userLat={userLat} userLng={userLng} />
+        return <DetailsStep formData={formData} onChange={handleInputChange} onPlaceSelected={handlePlaceSelected} errors={errors} userLat={userLat} userLng={userLng} />
       case STEPS.PHOTOS:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
+      case STEPS.PROMOTION:
+        if (!promotionsEnabled) {
+          // Should not happen due to useEffect guard, but defensive check
+          return null
+        }
+        return (
+          <PromotionStep
+            wantsPromotion={wantsPromotion}
+            onTogglePromotion={(value) => dispatch({ type: 'TOGGLE_PROMOTION', value })}
+          />
+        )
       case STEPS.REVIEW:
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SELL_WIZARD] Rendering ReviewStep with promotionsEnabled:', promotionsEnabled)
+        }
         return (
           <ReviewStep
             formData={formData}
@@ -1214,7 +1629,8 @@ export default function SellWizardClient({
             submitError={submitError}
             promotionsEnabled={promotionsEnabled}
             wantsPromotion={wantsPromotion}
-            onTogglePromotion={setWantsPromotion}
+            onNavigateToPromotion={() => dispatch({ type: 'SET_STEP', step: STEPS.PROMOTION })}
+            canStartCheckout={!!(user && user.id && draftKeyRef.current)}
           />
         )
       default:
@@ -1257,25 +1673,30 @@ export default function SellWizardClient({
                       deleteDraftServer(draftKeyRef.current).catch(() => {})
                     }
                     // Reset form
-                    setFormData({
-                      title: '',
-                      description: '',
-                      address: '',
-                      city: '',
-                      state: '',
-                      zip_code: '',
-                      date_start: '',
-                      time_start: '09:00',
-                      date_end: '',
-                      time_end: '',
-                      duration_hours: 4,
-                      tags: [],
-                      pricing_mode: 'negotiable',
-                      status: 'draft'
+                    dispatch({
+                      type: 'RESUME_DRAFT',
+                      payload: {
+                        formData: {
+                          title: '',
+                          description: '',
+                          address: '',
+                          city: '',
+                          state: '',
+                          zip_code: '',
+                          date_start: '',
+                          time_start: '09:00',
+                          date_end: '',
+                          time_end: '',
+                          duration_hours: 4,
+                          tags: [],
+                          pricing_mode: 'negotiable',
+                          status: 'draft'
+                        },
+                        photos: [],
+                        items: [],
+                        currentStep: 0
+                      }
                     })
-                    setPhotos([])
-                    setItems([])
-                    setCurrentStep(0)
                     setToastMessage('Draft discarded')
                     setShowToast(true)
                   }
@@ -1292,31 +1713,36 @@ export default function SellWizardClient({
       <div className="mb-8">
         <div className="flex justify-center">
           <div className="flex space-x-4">
-            {WIZARD_STEPS.map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  index <= currentStep
-                    ? 'bg-[var(--accent-primary)] text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {index + 1}
+            {WIZARD_STEPS.map((step, index) => {
+              const currentStepIndex = getStepIndex(currentStep)
+              const isActive = index <= currentStepIndex
+              const isCompleted = index < currentStepIndex
+              return (
+                <div key={step.id} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    isActive
+                      ? 'bg-[var(--accent-primary)] text-white'
+                      : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  {index < WIZARD_STEPS.length - 1 && (
+                    <div className={`w-12 h-0.5 mx-2 ${
+                      isCompleted ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
+                    }`} />
+                  )}
                 </div>
-                {index < WIZARD_STEPS.length - 1 && (
-                  <div className={`w-12 h-0.5 mx-2 ${
-                    index < currentStep ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
         
         <div className="text-center mt-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            {WIZARD_STEPS[currentStep].title}
+            {WIZARD_STEPS[getStepIndex(currentStep)]?.title || 'Review'}
           </h2>
           <p className="text-gray-600">
-            {WIZARD_STEPS[currentStep].description}
+            {WIZARD_STEPS[getStepIndex(currentStep)]?.description || 'Review and publish your sale'}
           </p>
         </div>
       </div>
@@ -1341,7 +1767,7 @@ export default function SellWizardClient({
           Previous
         </button>
 
-        {currentStep < WIZARD_STEPS.length - 1 ? (
+        {currentStep < STEPS.REVIEW ? (
           <button
             onClick={handleNext}
             aria-label="Next step"
@@ -1399,108 +1825,7 @@ export default function SellWizardClient({
             setConfirmationModalOpen(false)
           }}
           saleId={createdSaleId}
-          showPromoteCta={promotionsEnabled && wantsPromotion}
-          isPromoting={isPromoting}
-          promoteDisabledReason={
-            promotionsEnabled && wantsPromotion && !paymentsEnabled
-              ? 'Promotions are not available right now. You can try again later from your dashboard.'
-              : null
-          }
-          onPromoteNow={async () => {
-            if (!createdSaleId || !promotionsEnabled) {
-              return
-            }
-
-            if (!paymentsEnabled) {
-              setToastMessage('Promotions are not available right now. Please check back later.')
-              setShowToast(true)
-              return
-            }
-
-            if (isPromoting) {
-              return
-            }
-
-            setIsPromoting(true)
-            try {
-              const response = await fetch('/api/promotions/checkout', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...getCsrfHeaders(),
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                  sale_id: createdSaleId,
-                  tier: 'featured_week',
-                }),
-              })
-
-              const data = await response.json().catch(() => ({}))
-
-              if (!response.ok) {
-                const code = data?.code
-
-                if (code === 'PAYMENTS_DISABLED') {
-                  setToastMessage(
-                    data?.details?.message ||
-                      'Promotions are not available right now. Please check back later.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                if (code === 'PROMOTIONS_DISABLED') {
-                  setToastMessage(
-                    data?.details?.message ||
-                      'Promotions are currently disabled. Please check back later.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                if (code === 'ACCOUNT_LOCKED') {
-                  setToastMessage(
-                    data?.details?.message ||
-                      'Your account is locked. Please contact support if you believe this is an error.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                if (code === 'SALE_NOT_ELIGIBLE') {
-                  setToastMessage(
-                    data?.message || 'This sale is not eligible for promotion at this time.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                setToastMessage(
-                  data?.message || 'Failed to start promotion checkout. Please try again.'
-                )
-                setShowToast(true)
-                return
-              }
-
-              if (data?.checkoutUrl) {
-                window.location.href = data.checkoutUrl
-              } else {
-                setToastMessage(
-                  'Unexpected response from promotion checkout. Please try again.'
-                )
-                setShowToast(true)
-              }
-            } catch (error: any) {
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.error('[SELL_WIZARD] Error starting promotion checkout:', error)
-              }
-              setToastMessage('Failed to start promotion checkout. Please try again.')
-              setShowToast(true)
-            } finally {
-              setIsPromoting(false)
-            }
-          }}
+          showPromoteCta={false}
         />
       )}
 
@@ -1515,7 +1840,7 @@ export default function SellWizardClient({
 }
 
 // Step Components
-function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string>, userLat?: number, userLng?: number }) {
+function DetailsStep({ formData, onChange, onPlaceSelected, errors, userLat, userLng }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, onPlaceSelected: (place: { address?: string; city?: string; state?: string; zip?: string; lat?: number; lng?: number }) => void, errors?: Record<string, string>, userLat?: number, userLng?: number }) {
   return (
     <div className="space-y-6">
       <div>
@@ -1626,27 +1951,19 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Address *
         </label>
-        <AddressAutocomplete
-          value={formData.address || ''}
-          onChange={(address) => onChange('address', address)}
-          onPlaceSelected={(place) => {
-            // Update all fields atomically - batch updates to prevent multiple re-renders
-            // Use the full label for address field if available, otherwise use line1
-            const addressValue = place.address || ''
-            onChange('address', addressValue)
-            onChange('city', place.city || '')
-            onChange('state', place.state || '')
-            onChange('zip_code', place.zip || '')
-            onChange('lat', place.lat)
-            onChange('lng', place.lng)
-          }}
-          placeholder="Start typing your address..."
-          userLat={userLat}
-          userLng={userLng}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          required
-          error={errors?.address}
-        />
+        <DiagnosticErrorBoundary componentName="AddressAutocomplete">
+          <AddressAutocomplete
+            value={formData.address || ''}
+            onChange={(address) => onChange('address', address)}
+            onPlaceSelected={onPlaceSelected}
+            placeholder="Start typing your address..."
+            userLat={userLat}
+            userLng={userLng}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            required
+            error={errors?.address}
+          />
+        </DiagnosticErrorBoundary>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1667,6 +1984,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             minLength={2}
             pattern="[A-Za-z\s]+"
             title="City name (letters only)"
+            autoComplete="address-level2"
             aria-invalid={!!errors?.city}
             aria-describedby={errors?.city ? 'city-error' : undefined}
           />
@@ -1692,6 +2010,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             maxLength={2}
             pattern="[A-Z]{2}"
             title="Two-letter state code (e.g., KY, CA)"
+            autoComplete="address-level1"
             aria-invalid={!!errors?.state}
             aria-describedby={errors?.state ? 'state-error' : undefined}
           />
@@ -1717,6 +2036,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             }`}
             pattern="\d{5}"
             title="5-digit ZIP code"
+            autoComplete="postal-code"
             aria-invalid={!!errors?.zip_code}
             aria-describedby={errors?.zip_code ? 'zip_code-error' : undefined}
           />
@@ -1957,6 +2277,107 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
+// Step Components
+function PromotionStep({
+  wantsPromotion,
+  onTogglePromotion,
+}: {
+  wantsPromotion?: boolean
+  onTogglePromotion?: (next: boolean) => void
+}) {
+  return (
+    <DiagnosticErrorBoundary componentName="PromotionStep-Content">
+      <div className="space-y-6">
+        {/* Primary Panel */}
+        <div className={`bg-white border-2 rounded-lg p-6 shadow-sm transition-colors ${
+          wantsPromotion 
+            ? 'bg-purple-50 border-purple-500' 
+            : 'border-gray-300'
+        }`}>
+          {/* Decision Framing */}
+          <div className="mb-6">
+            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+              Promote Your Sale
+            </h3>
+            <p className="text-base text-gray-700">
+              Before you publish, promote your sale for a one-time <strong className="font-semibold text-[#3A2268]">$2.99</strong> to reach more buyers in your area.
+            </p>
+          </div>
+
+          {/* Benefits List */}
+          <div className="mb-6">
+            <h4 className="font-medium text-gray-900 mb-3">What promotion includes:</h4>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Prominent placement in search results and discovery feeds</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Included in weekly email to local buyers</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Early visibility before your sale starts</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Toggle Control */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <div className="flex-1">
+              <label className="text-base font-medium text-gray-900">
+                Promote this sale
+                <span className="ml-2 text-[#3A2268] font-semibold">$2.99 one-time</span>
+              </label>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!wantsPromotion}
+                onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                className="sr-only peer"
+                data-testid="promotion-step-feature-toggle"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+
+          {/* State Reinforcement - ON State */}
+          {wantsPromotion && (
+            <div className="mt-4 pt-4 border-t border-purple-200">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <div>
+                  <p className="font-semibold text-purple-800">Promotion enabled</p>
+                  <p className="text-sm text-purple-700 mt-1">
+                    You'll be charged <strong>$2.99</strong> only if the sale is published.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Secondary Reassurance */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <p className="text-xs text-gray-600">
+            <span className="font-medium">Optional:</span> Promotion is <strong>$2.99 one-time</strong>. No charge unless your sale is published. You can add or remove promotion anytime from your dashboard.
+          </p>
+        </div>
+      </div>
+    </DiagnosticErrorBoundary>
+  )
+}
+
 function ReviewStep({ 
   formData, 
   photos,
@@ -1964,10 +2385,11 @@ function ReviewStep({
   onPublish,
   loading,
   submitError,
-  promotionsEnabled,
+  promotionsEnabled: promotionsEnabledProp,
   paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
-  onTogglePromotion,
+  onNavigateToPromotion,
+  canStartCheckout,
 }: {
   formData: Partial<SaleInput>
   photos: string[]
@@ -1978,9 +2400,20 @@ function ReviewStep({
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
   wantsPromotion?: boolean
-  onTogglePromotion?: (next: boolean) => void
+  onNavigateToPromotion?: () => void
+  canStartCheckout?: boolean
 }) {
+  // Ensure promotionsEnabled is always a boolean (defensive check)
+  // This preserves the server-computed value and prevents undefined from hiding promotion section
+  const promotionsEnabled = promotionsEnabledProp ?? false
+
+  // Defensive assertion: log warning if prop is undefined (indicates prop passing issue)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' && promotionsEnabledProp === undefined) {
+    console.warn('[REVIEW_STEP] promotionsEnabled prop is undefined - may indicate prop passing issue')
+  }
+
   const formatDate = (dateString: string) => {
+    if (!dateString) return ''
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -1991,6 +2424,7 @@ function ReviewStep({
   }
 
   const formatTime = (timeString: string) => {
+    if (!timeString) return ''
     const [hours, minutes] = timeString.split(':')
     const hour = parseInt(hours)
     const ampm = hour >= 12 ? 'PM' : 'AM'
@@ -1999,17 +2433,18 @@ function ReviewStep({
   }
 
   return (
-    <div className="space-y-6">
-      <h3 className="text-lg font-medium text-gray-900">Review Your Sale</h3>
-      
-      <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+    <DiagnosticErrorBoundary componentName="ReviewStep-Content">
+      <div className="space-y-6">
+        <h3 className="text-lg font-medium text-gray-900">Review Your Sale</h3>
+        
+        <div className="bg-gray-50 rounded-lg p-6 space-y-4">
         <div>
           <h4 className="font-medium text-gray-900">Sale Information</h4>
           <div className="mt-2 space-y-1 text-sm text-gray-600">
             <p><strong>Title:</strong> {formData.title}</p>
             {formData.description && <p><strong>Description:</strong> {formData.description}</p>}
-            <p><strong>Date:</strong> {formData.date_start && formatDate(formData.date_start)} at {formData.time_start && formatTime(formData.time_start)}</p>
-            {formData.date_end && <p><strong>Ends:</strong> {formatDate(formData.date_end)} at {formData.time_end && formatTime(formData.time_end)}</p>}
+            <p><strong>Date:</strong> {formData.date_start ? formatDate(formData.date_start) : 'Not set'} {formData.time_start ? `at ${formatTime(formData.time_start)}` : ''}</p>
+            {formData.date_end && <p><strong>Ends:</strong> {formatDate(formData.date_end)} {formData.time_end ? `at ${formatTime(formData.time_end)}` : ''}</p>}
             <p><strong>Location:</strong> {formData.address}, {formData.city}, {formData.state}</p>
             {formData.price && <p><strong>Starting Price:</strong> ${formData.price}</p>}
             {formData.tags && formData.tags.length > 0 && (
@@ -2091,31 +2526,55 @@ function ReviewStep({
           </div>
         </div>
 
+        {/* Promotion Confirmation Section */}
         {promotionsEnabled && (
-          <div className="bg-white border border-purple-200 rounded-lg p-4">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div>
-                <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
-                <p className="text-sm text-[#3A2268] mt-1">
-                  Get more visibility by featuring your sale in weekly emails and discovery.
-                </p>
-                <p className="mt-1 text-xs text-[#3A2268]">
-                  You can also promote later from your dashboard.
-                </p>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            {wantsPromotion ? (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-purple-800">Promotion enabled</h4>
+                    <p className="text-sm text-gray-700 mt-1">
+                      Your sale will be promoted in weekly emails and discovery.
+                    </p>
+                    <p className="text-sm font-medium text-gray-900 mt-2">
+                      Cost: <span className="text-[#3A2268]">$2.99</span> (one-time)
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      You'll only be charged if this sale is published.
+                    </p>
+                  </div>
+                </div>
+                {onNavigateToPromotion && (
+                  <button
+                    onClick={onNavigateToPromotion}
+                    className="text-sm text-purple-600 hover:text-purple-700 font-medium underline"
+                  >
+                    Change promotion
+                  </button>
+                )}
               </div>
-              <div className="flex items-center justify-start sm:justify-end">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!wantsPromotion}
-                    onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                    className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
-                    data-testid="review-feature-toggle"
-                  />
-                  <span className="text-sm text-[#3A2268]">Feature this sale</span>
-                </label>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <h4 className="font-medium text-gray-900">Promotion not enabled</h4>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Your sale will publish without promotion.
+                  </p>
+                </div>
+                {onNavigateToPromotion && (
+                  <button
+                    onClick={onNavigateToPromotion}
+                    className="text-sm text-purple-600 hover:text-purple-700 font-medium underline"
+                  >
+                    Promote my sale for $2.99
+                  </button>
+                )}
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -2126,27 +2585,42 @@ function ReviewStep({
             {submitError}
           </div>
         )}
+        {wantsPromotion && !canStartCheckout && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+            Your account is not ready for checkout. Please refresh the page and try again.
+          </div>
+        )}
         <button
           onClick={(e) => {
+            // VERIFICATION LOG: Log button state and behavior
+            console.log('[VERIFY_PROMOTION] ReviewStep button clicked:', {
+              wantsPromotion,
+              canStartCheckout,
+              buttonDisabled: loading || (wantsPromotion && !canStartCheckout),
+              buttonText: wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale',
+              loading,
+              timestamp: new Date().toISOString()
+            })
+            
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion, canStartCheckout })
             }
             e.preventDefault()
             e.stopPropagation()
             onPublish()
           }}
-          disabled={loading}
-          aria-label="Publish sale"
+          disabled={loading || (wantsPromotion && !canStartCheckout)}
+          aria-label={wantsPromotion ? "Checkout for promotion" : "Publish sale"}
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >
           {loading ? (
             <>
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Publishing...
+              {wantsPromotion ? 'Processing...' : 'Publishing...'}
             </>
           ) : (
             <>
-              Publish Sale
+              {wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale'}
               <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
@@ -2154,7 +2628,8 @@ function ReviewStep({
           )}
         </button>
       </div>
-    </div>
+      </div>
+    </DiagnosticErrorBoundary>
   )
 }
 

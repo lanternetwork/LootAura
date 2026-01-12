@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = validationResult.data
-    const { formData, photos, items } = payload
+    const { formData, photos, items, wantsPromotion } = payload
 
     // Validate required fields
     if (!formData.title || !formData.city || !formData.state || !formData.date_start || !formData.time_start) {
@@ -118,6 +118,135 @@ export async function POST(request: NextRequest) {
     }
     const lat = formData.lat
     const lng = formData.lng
+
+    // GATE: If promotion is requested, require payment before sale creation
+    if (wantsPromotion === true) {
+      const { getStripeClient, isPaymentsEnabled, isPromotionsEnabled, getFeaturedWeekPriceId } = await import('@/lib/stripe/client')
+      const { logger } = await import('@/lib/log')
+      
+      // Validate all required inputs before attempting Stripe checkout
+      if (!user || !user.id) {
+        logger.error('Promotion requested but user profile not ready', new Error('PROFILE_NOT_READY'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          hasUser: !!user,
+          userId: user?.id,
+        })
+        return fail(400, 'PROFILE_NOT_READY', 'User profile is not ready. Please refresh and try again.')
+      }
+      
+      if (!draftKey || typeof draftKey !== 'string') {
+        logger.error('Promotion requested but draftKey is invalid', new Error('INVALID_DRAFT_KEY'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          draftKeyType: typeof draftKey,
+        })
+        return fail(400, 'INVALID_PROMOTION_STATE', 'Draft key is missing or invalid. Please refresh and try again.')
+      }
+      
+      // Safety gates: Payments and promotions must be enabled
+      if (!isPaymentsEnabled()) {
+        return fail(403, 'PAYMENTS_DISABLED', 'Payments are currently disabled', {
+          message: 'Promoted listings are not available at this time. Please check back later.',
+        })
+      }
+      
+      if (!isPromotionsEnabled()) {
+        return fail(403, 'PROMOTIONS_DISABLED', 'Promotions are currently disabled', {
+          message: 'Promoted listings are not available at this time. Please check back later.',
+        })
+      }
+      
+      const stripe = getStripeClient()
+      if (!stripe) {
+        logger.error('Promotion requested but Stripe client not configured', new Error('STRIPE_NOT_CONFIGURED'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'STRIPE_NOT_CONFIGURED', 'Stripe is not properly configured')
+      }
+      
+      const priceId = getFeaturedWeekPriceId()
+      if (!priceId) {
+        logger.error('Promotion requested but price ID not configured', new Error('PRICE_ID_MISSING'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'PRICE_ID_MISSING', 'Promotion price ID is not configured')
+      }
+      
+      // Get site URL for redirects
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+      
+      if (!siteUrl) {
+        logger.error('Promotion requested but site URL not configured', new Error('SITE_URL_MISSING'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'SITE_URL_MISSING', 'Site URL is not configured')
+      }
+      
+      // All validations passed - create Stripe Checkout Session with draft_key in metadata
+      // Sale will be created after payment succeeds via webhook
+      let checkoutSession
+      try {
+        checkoutSession = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price: priceId,
+              quantity: 1,
+            },
+          ],
+          success_url: `${siteUrl}/sales?promoted=success`,
+          cancel_url: `${siteUrl}/sell/new?resume=review&payment=canceled`,
+          metadata: {
+            draft_key: draftKey,
+            owner_profile_id: user.id,
+            tier: 'featured_week',
+            wants_promotion: 'true',
+          },
+          customer_email: user.email || undefined,
+        })
+      } catch (error) {
+        logger.error('Failed to create Stripe checkout session for promotion', error instanceof Error ? error : new Error(String(error)), {
+          component: 'drafts/publish',
+          operation: 'create_checkout_session',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'STRIPE_ERROR', 'Failed to create checkout session')
+      }
+      
+      if (!checkoutSession || !checkoutSession.url) {
+        logger.error('Stripe checkout session created but URL is missing', new Error('CHECKOUT_URL_MISSING'), {
+          component: 'drafts/publish',
+          operation: 'create_checkout_session',
+          draftKey,
+          userId: user.id,
+          hasSession: !!checkoutSession,
+        })
+        return fail(500, 'CHECKOUT_URL_MISSING', 'Checkout session was created but URL is missing')
+      }
+      
+      // Return checkout URL instead of creating sale
+      return ok({ 
+        data: { 
+          checkoutUrl: checkoutSession.url,
+          requiresPayment: true 
+        } 
+      })
+    }
 
     // Use a transaction-like approach: create sale, then items, then update draft
     // Note: Supabase doesn't support true transactions across multiple operations,

@@ -17,23 +17,24 @@ export default function GoogleSignInButton() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
       
-      // Preserve redirect query param or sessionStorage redirect
+      // Get redirect destination from query param or sessionStorage (for non-OAuth flows)
       const urlParams = new URLSearchParams(window.location.search)
       const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
       
-      // Build callback URL with redirectTo param
+      // Build callback URL with redirectTo as query parameter
+      // Supabase's redirectTo option preserves query parameters through the OAuth flow
       const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
       if (redirectParam) {
+        // URL-encode the redirectTo to preserve nested query params (e.g., /sell/new?resume=promotion)
         callbackUrl.searchParams.set('redirectTo', redirectParam)
       }
-      const redirectTo = callbackUrl.toString()
       
-      console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo, { redirectParam })
+      console.log('[GOOGLE_AUTH] Starting OAuth with redirectTo:', { redirectParam, callbackUrl: callbackUrl.toString() })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
+          redirectTo: callbackUrl.toString(),
           queryParams: { 
             prompt: 'select_account' // Better UX - always show account selection
           }

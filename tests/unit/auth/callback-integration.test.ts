@@ -104,7 +104,7 @@ describe('OAuth Callback Route', () => {
         json: () => Promise.resolve({ created: true }),
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123')
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales')
       
       const response = await GET(request)
       
@@ -133,6 +133,36 @@ describe('OAuth Callback Route', () => {
       const response = await GET(request)
       
       expect(response.url).toContain('/favorites')
+    })
+
+    it('should redirect to sale creation when redirectTo is double-encoded (Google OAuth flow)', async () => {
+      const mockSession = {
+        user: { id: 'user123' },
+        access_token: 'token123',
+        refresh_token: 'refresh123',
+      }
+
+      mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+        data: { session: mockSession },
+        error: null
+      })
+
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ created: true }),
+      })
+
+      // Simulate Google OAuth callback with double-encoded redirectTo
+      // This tests the fix for sale creation flow where nested query params are preserved
+      // OAuth providers may encode query params, so redirectTo gets double-encoded
+      const redirectDestination = encodeURIComponent(encodeURIComponent('/sell/new?resume=review'))
+      const request = new NextRequest(`https://example.com/auth/callback?code=abc123&redirectTo=${redirectDestination}`)
+      
+      const response = await GET(request)
+      
+      // Should redirect to sale creation page with resume parameter
+      expect(response.url).toContain('/sell/new')
+      expect(response.url).toContain('resume=review')
     })
 
     it('should attempt profile creation during successful auth', async () => {
@@ -188,7 +218,7 @@ describe('OAuth Callback Route', () => {
         status: 500,
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123')
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales')
       
       const response = await GET(request)
       
@@ -218,7 +248,7 @@ describe('OAuth Callback Route', () => {
         json: () => Promise.resolve({ created: true }),
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123')
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales')
       
       await GET(request)
       
@@ -253,7 +283,7 @@ describe('OAuth Callback Route', () => {
         json: () => Promise.resolve({ created: true }),
       })
 
-      const request = new NextRequest('https://example.com/auth/callback?code=abc123', {
+      const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales', {
         headers: {
           'Cookie': 'session=valid',
         },

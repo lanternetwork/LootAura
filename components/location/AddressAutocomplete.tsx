@@ -1339,7 +1339,7 @@ export default function AddressAutocomplete({
           required={required}
           minLength={5}
           disabled={isGeocoding}
-          autoComplete="section-sell address-line1"
+          autoComplete="new-password"
           name="sale_address_line1"
           aria-autocomplete="list"
           aria-expanded={isOpen}

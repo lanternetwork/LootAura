@@ -145,8 +145,9 @@ export async function deleteDraftServer(draftKey: string): Promise<ApiResponse<{
 
 /**
  * Publish draft (transactional: create sale + items, mark draft as published)
+ * Returns either saleId (normal publish) or checkoutUrl (promotion requires payment)
  */
-export async function publishDraftServer(draftKey: string): Promise<ApiResponse<{ saleId: string }>> {
+export async function publishDraftServer(draftKey: string): Promise<ApiResponse<{ saleId: string } | { checkoutUrl: string; requiresPayment: true }>> {
   try {
     const response = await fetch('/api/drafts/publish', {
       method: 'POST',

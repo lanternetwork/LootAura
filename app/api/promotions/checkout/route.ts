@@ -140,11 +140,24 @@ async function checkoutHandler(request: NextRequest) {
     const price = await stripe.prices.retrieve(priceId)
     amountCents = price.unit_amount || 0
   } catch (error) {
-    logger.error('Failed to retrieve Stripe price', error instanceof Error ? error : new Error(String(error)), {
+    const stripeError = error instanceof Error ? error : new Error(String(error))
+    logger.error('Failed to retrieve Stripe price', stripeError, {
       component: 'promotions/checkout',
       operation: 'retrieve_price',
       price_id: priceId,
     })
+    
+    // Debug-only: Expose underlying Stripe error for troubleshooting
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROMOTIONS_CHECKOUT] Stripe price retrieval failed:', {
+        error: stripeError.message,
+        errorStack: stripeError.stack,
+        priceId,
+        saleId: sale_id,
+        userId: user.id.substring(0, 8) + '...',
+      })
+    }
+    
     return fail(500, 'STRIPE_ERROR', 'Failed to retrieve promotion pricing')
   }
 
@@ -173,15 +186,19 @@ async function checkoutHandler(request: NextRequest) {
     return fail(500, 'DATABASE_ERROR', 'Failed to create promotion record')
   }
 
-  // Validate site URL is configured (required for checkout redirects)
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-  if (!siteUrl || !siteUrl.startsWith('http')) {
-    logger.error('NEXT_PUBLIC_SITE_URL not configured or invalid', new Error('NEXT_PUBLIC_SITE_URL missing'), {
+  // Get site URL for redirects (aligned with /api/drafts/publish validation)
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+  
+  if (!siteUrl) {
+    logger.error('Site URL not configured', new Error('SITE_URL_MISSING'), {
       component: 'promotions/checkout',
       operation: 'create_checkout',
       sale_id,
+      hasNextPublicSiteUrl: !!process.env.NEXT_PUBLIC_SITE_URL,
+      hasVercelUrl: !!process.env.VERCEL_URL,
     })
-    return fail(500, 'CONFIG_ERROR', 'Site URL is not configured. Please contact support.')
+    return fail(500, 'SITE_URL_MISSING', 'Site URL is not configured')
   }
 
   // Create Stripe Checkout Session
@@ -207,12 +224,29 @@ async function checkoutHandler(request: NextRequest) {
       customer_email: user.email || undefined,
     })
   } catch (error) {
-    logger.error('Failed to create Stripe checkout session', error instanceof Error ? error : new Error(String(error)), {
+    const stripeError = error instanceof Error ? error : new Error(String(error))
+    logger.error('Failed to create Stripe checkout session', stripeError, {
       component: 'promotions/checkout',
       operation: 'create_checkout_session',
       promotion_id: promotion.id,
       sale_id,
+      price_id: priceId,
+      site_url: siteUrl,
     })
+    
+    // Debug-only: Expose underlying Stripe error for troubleshooting
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROMOTIONS_CHECKOUT] Stripe checkout session creation failed:', {
+        error: stripeError.message,
+        errorStack: stripeError.stack,
+        priceId,
+        siteUrl,
+        promotionId: promotion.id,
+        saleId: sale_id,
+        userId: user.id.substring(0, 8) + '...',
+      })
+    }
+    
     // Clean up promotion record
     await fromBase(admin, 'promotions')
       .update({ status: 'canceled', canceled_at: new Date().toISOString() })

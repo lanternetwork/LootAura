@@ -1,3 +1,6 @@
-{}
+{
+  // ESLint temporarily disabled during refactor; rules enforced via CI
+  // See package.json "lint" script for CI enforcement
+}
 
 

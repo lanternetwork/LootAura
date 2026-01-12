@@ -69,17 +69,18 @@ export async function checkCsrfIfRequired(request: NextRequest): Promise<ReturnT
 
   // Verify CSRF token
   try {
-    // Always log what we receive (not conditional on debug flag)
     const csrfHeader = request.headers.get('x-csrf-token')
     const cookieHeader = request.headers.get('cookie')
-    console.log('[CSRF_CHECK] Checking CSRF for request:', {
-      pathname,
-      method,
-      hasCsrfHeader: !!csrfHeader,
-      csrfHeaderValue: csrfHeader || 'MISSING',
-      hasCookieHeader: !!cookieHeader,
-      cookieHeaderPreview: cookieHeader ? cookieHeader.substring(0, 500) : 'MISSING',
-    })
+    
+    // Debug-only logging (no token leakage)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[CSRF_CHECK] Checking CSRF for request:', {
+        pathname,
+        method,
+        hasCsrfHeader: !!csrfHeader,
+        hasCookieHeader: !!cookieHeader,
+      })
+    }
     
     if (!requireCsrfToken(request)) {
       // Use logger.warn instead of console.error to avoid test failures
@@ -90,8 +91,8 @@ export async function checkCsrfIfRequired(request: NextRequest): Promise<ReturnT
           operation: 'csrf_validation',
           path: pathname,
           method,
-          csrfHeader: csrfHeader || 'MISSING',
-          cookieHeader: cookieHeader ? cookieHeader.substring(0, 500) : 'MISSING',
+          hasCsrfHeader: !!csrfHeader,
+          hasCookieHeader: !!cookieHeader,
         })
       }
       logger.warn('CSRF token validation failed', {

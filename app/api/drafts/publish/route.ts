@@ -124,6 +124,16 @@ export async function POST(request: NextRequest) {
       const { getStripeClient, isPaymentsEnabled, isPromotionsEnabled, getFeaturedWeekPriceId } = await import('@/lib/stripe/client')
       const { logger } = await import('@/lib/log')
       
+      // Debug-only verification logs for promotion/checkout invariants
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[VERIFY_PROMOTION] Promotion requested:', {
+          wantsPromotion: true,
+          owner_profile_id: user?.id,
+          draftKey,
+          timestamp: new Date().toISOString()
+        })
+      }
+      
       // Validate all required inputs before attempting Stripe checkout
       if (!user || !user.id) {
         logger.error('Promotion requested but user profile not ready', new Error('PROFILE_NOT_READY'), {
@@ -171,6 +181,15 @@ export async function POST(request: NextRequest) {
       }
       
       const priceId = getFeaturedWeekPriceId()
+      
+      // Debug-only verification logs for promotion/checkout invariants
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[VERIFY_PROMOTION] Price ID retrieved:', {
+          priceId: priceId || 'MISSING',
+          hasPriceId: !!priceId
+        })
+      }
+      
       if (!priceId) {
         logger.error('Promotion requested but price ID not configured', new Error('PRICE_ID_MISSING'), {
           component: 'drafts/publish',
@@ -239,12 +258,37 @@ export async function POST(request: NextRequest) {
         return fail(500, 'CHECKOUT_URL_MISSING', 'Checkout session was created but URL is missing')
       }
       
+      // Debug-only verification logs for promotion/checkout invariants
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[VERIFY_PROMOTION] Checkout session created successfully:', {
+          checkoutUrl: checkoutSession.url,
+          requiresPayment: true,
+          owner_profile_id: user.id,
+          priceId,
+          draftKey,
+          timestamp: new Date().toISOString()
+        })
+        console.log('[VERIFY_PROMOTION] Returning requiresPayment: true - sale creation code path will NOT be reached')
+      }
+      
       // Return checkout URL instead of creating sale
+      // VERIFICATION: This return ensures sale creation code path (lines 196+) is NEVER reached when wantsPromotion === true
       return ok({ 
         data: { 
           checkoutUrl: checkoutSession.url,
           requiresPayment: true 
         } 
+      })
+    }
+
+    // Debug-only verification logs for promotion/checkout invariants
+    // This code path should NEVER be reached when wantsPromotion === true
+    // If this log appears when wantsPromotion === true, the invariant is broken
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[VERIFY_PROMOTION] Sale creation code path reached:', {
+        wantsPromotion: payload.wantsPromotion,
+        timestamp: new Date().toISOString(),
+        note: 'If wantsPromotion === true above, this is a BUG - sale creation should not happen'
       })
     }
 

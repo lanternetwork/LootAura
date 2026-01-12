@@ -382,8 +382,8 @@ export default function SellWizardClient({
         tags: formData.tags,
         pricing_mode: formData.pricing_mode,
       },
-      photos,
-      items: items.map(item => ({
+      photos: photos || [],
+      items: (items || []).map(item => ({
         id: item.id,
         name: item.name,
         price: item.price,
@@ -1404,18 +1404,20 @@ export default function SellWizardClient({
       try {
         const result = await publishDraftServer(draftKeyToPublish)
         
-        // VERIFICATION LOG: Log publish response payload
-        console.log('[VERIFY_PROMOTION] Publish response received:', {
-          ok: result.ok,
-          code: result.code,
-          hasData: !!result.data,
-          dataKeys: result.data ? Object.keys(result.data) : [],
-          requiresPayment: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
-          hasCheckoutUrl: result.data && 'checkoutUrl' in result.data ? !!result.data.checkoutUrl : undefined,
-          hasSaleId: result.data && 'saleId' in result.data ? !!result.data.saleId : undefined,
-          wantsPromotion,
-          timestamp: new Date().toISOString()
-        })
+        // Debug-only verification logs for promotion/checkout invariants
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[VERIFY_PROMOTION] Publish response received:', {
+            ok: result.ok,
+            code: result.code,
+            hasData: !!result.data,
+            dataKeys: result.data ? Object.keys(result.data) : [],
+            requiresPayment: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
+            hasCheckoutUrl: result.data && 'checkoutUrl' in result.data ? !!result.data.checkoutUrl : undefined,
+            hasSaleId: result.data && 'saleId' in result.data ? !!result.data.saleId : undefined,
+            wantsPromotion,
+            timestamp: new Date().toISOString()
+          })
+        }
         
         if (!result.ok) {
           if (result.code === 'AUTH_REQUIRED') {
@@ -1455,25 +1457,30 @@ export default function SellWizardClient({
         // Never fall through to normal publish flow when wantsPromotion is true
         if (wantsPromotion === true) {
           if (!result.data || !('requiresPayment' in result.data) || !result.data.requiresPayment || !('checkoutUrl' in result.data) || !result.data.checkoutUrl) {
-            console.error('[VERIFY_PROMOTION] ERROR: wantsPromotion === true but checkout URL missing:', {
-              hasData: !!result.data,
-              hasRequiresPayment: result.data && 'requiresPayment' in result.data,
-              requiresPaymentValue: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
-              hasCheckoutUrl: result.data && 'checkoutUrl' in result.data,
-              checkoutUrlValue: result.data && 'checkoutUrl' in result.data ? result.data.checkoutUrl : undefined
-            })
+            // Debug-only verification logs for promotion/checkout invariants
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.error('[VERIFY_PROMOTION] ERROR: wantsPromotion === true but checkout URL missing:', {
+                hasData: !!result.data,
+                hasRequiresPayment: result.data && 'requiresPayment' in result.data,
+                requiresPaymentValue: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
+                hasCheckoutUrl: result.data && 'checkoutUrl' in result.data,
+                checkoutUrlValue: result.data && 'checkoutUrl' in result.data ? result.data.checkoutUrl : undefined
+              })
+            }
             dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Checkout is not available. Please refresh the page and try again.' })
             dispatch({ type: 'SET_LOADING', loading: false })
             return
           }
           
-          // VERIFICATION LOG: Confirm Stripe redirect is happening
-          console.log('[VERIFY_PROMOTION] Redirecting to Stripe Checkout - this is the ONLY valid path for promoted sales:', {
-            checkoutUrl: result.data.checkoutUrl,
-            wantsPromotion: true,
-            timestamp: new Date().toISOString()
-          })
-          console.log('[VERIFY_PROMOTION] Execution will return here - normal publish-success path will NOT be reached')
+          // Debug-only verification logs for promotion/checkout invariants
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[VERIFY_PROMOTION] Redirecting to Stripe Checkout - this is the ONLY valid path for promoted sales:', {
+              checkoutUrl: result.data.checkoutUrl,
+              wantsPromotion: true,
+              timestamp: new Date().toISOString()
+            })
+            console.log('[VERIFY_PROMOTION] Execution will return here - normal publish-success path will NOT be reached')
+          }
           
           // Redirect to Stripe Checkout - this is the ONLY valid path for promoted sales
           window.location.href = result.data.checkoutUrl
@@ -1481,15 +1488,18 @@ export default function SellWizardClient({
           return
         }
 
-        // VERIFICATION LOG: This code path should NEVER be reached when wantsPromotion === true
+        // Debug-only verification logs for promotion/checkout invariants
+        // This code path should NEVER be reached when wantsPromotion === true
         // If this log appears when wantsPromotion === true, the invariant is broken
-        console.log('[VERIFY_PROMOTION] Normal publish-success path reached:', {
-          wantsPromotion,
-          hasData: !!result.data,
-          hasSaleId: result.data && 'saleId' in result.data,
-          timestamp: new Date().toISOString(),
-          note: 'If wantsPromotion === true above, this is a BUG - normal publish path should not happen'
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[VERIFY_PROMOTION] Normal publish-success path reached:', {
+            wantsPromotion,
+            hasData: !!result.data,
+            hasSaleId: result.data && 'saleId' in result.data,
+            timestamp: new Date().toISOString(),
+            note: 'If wantsPromotion === true above, this is a BUG - normal publish path should not happen'
+          })
+        }
         
         // Normal publish flow - sale was created (only for non-promoted sales)
         // Type guard: check if result.data has saleId property
@@ -2592,17 +2602,16 @@ function ReviewStep({
         )}
         <button
           onClick={(e) => {
-            // VERIFICATION LOG: Log button state and behavior
-            console.log('[VERIFY_PROMOTION] ReviewStep button clicked:', {
-              wantsPromotion,
-              canStartCheckout,
-              buttonDisabled: loading || (wantsPromotion && !canStartCheckout),
-              buttonText: wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale',
-              loading,
-              timestamp: new Date().toISOString()
-            })
-            
+            // Debug-only verification logs for promotion/checkout invariants
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[VERIFY_PROMOTION] ReviewStep button clicked:', {
+                wantsPromotion,
+                canStartCheckout,
+                buttonDisabled: loading || (wantsPromotion && !canStartCheckout),
+                buttonText: wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale',
+                loading,
+                timestamp: new Date().toISOString()
+              })
               console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion, canStartCheckout })
             }
             e.preventDefault()

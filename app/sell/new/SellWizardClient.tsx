@@ -1122,14 +1122,17 @@ export default function SellWizardClient({
       
       // CRITICAL: Save current draft payload (including wantsPromotion) before publishing
       const currentPayload = buildDraftPayload()
-      try {
-        await saveDraftServer(currentPayload, draftKeyRef.current)
-      } catch (error) {
-        console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
-        // Continue anyway - might already exist on server
-      }
-      
-      publishDraftServer(draftKeyRef.current)
+      saveDraftServer(currentPayload, draftKeyRef.current)
+        .then(() => {
+          // After save completes, publish the draft
+          return publishDraftServer(draftKeyRef.current)
+        })
+        .catch((error) => {
+          // If save fails, log warning but continue with publish anyway
+          console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
+          // Continue with publish - might already exist on server
+          return publishDraftServer(draftKeyRef.current)
+        })
         .then((result) => {
           if (result.ok && result.data && 'saleId' in result.data) {
             clearLocalDraft()

@@ -1119,6 +1119,16 @@ export default function SellWizardClient({
 
       // Auto-publish the draft
       setLoading(true)
+      
+      // CRITICAL: Save current draft payload (including wantsPromotion) before publishing
+      const currentPayload = buildDraftPayload()
+      try {
+        await saveDraftServer(currentPayload, draftKeyRef.current)
+      } catch (error) {
+        console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
+        // Continue anyway - might already exist on server
+      }
+      
       publishDraftServer(draftKeyRef.current)
         .then((result) => {
           if (result.ok && result.data && 'saleId' in result.data) {
@@ -1591,108 +1601,7 @@ export default function SellWizardClient({
             setConfirmationModalOpen(false)
           }}
           saleId={createdSaleId}
-          showPromoteCta={promotionsEnabled && wantsPromotion}
-          isPromoting={isPromoting}
-          promoteDisabledReason={
-            promotionsEnabled && wantsPromotion && !paymentsEnabled
-              ? 'Promotions are not available right now. You can try again later from your dashboard.'
-              : null
-          }
-          onPromoteNow={async () => {
-            if (!createdSaleId || !promotionsEnabled) {
-              return
-            }
-
-            if (!paymentsEnabled) {
-              setToastMessage('Promotions are not available right now. Please check back later.')
-              setShowToast(true)
-              return
-            }
-
-            if (isPromoting) {
-              return
-            }
-
-            setIsPromoting(true)
-            try {
-              const response = await fetch('/api/promotions/checkout', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...getCsrfHeaders(),
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                  sale_id: createdSaleId,
-                  tier: 'featured_week',
-                }),
-              })
-
-              const data = await response.json().catch(() => ({}))
-
-              if (!response.ok) {
-                const code = data?.code
-
-                if (code === 'PAYMENTS_DISABLED') {
-                  setToastMessage(
-                    data?.details?.message ||
-                      'Promotions are not available right now. Please check back later.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                if (code === 'PROMOTIONS_DISABLED') {
-                  setToastMessage(
-                    data?.details?.message ||
-                      'Promotions are currently disabled. Please check back later.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                if (code === 'ACCOUNT_LOCKED') {
-                  setToastMessage(
-                    data?.details?.message ||
-                      'Your account is locked. Please contact support if you believe this is an error.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                if (code === 'SALE_NOT_ELIGIBLE') {
-                  setToastMessage(
-                    data?.message || 'This sale is not eligible for promotion at this time.'
-                  )
-                  setShowToast(true)
-                  return
-                }
-
-                setToastMessage(
-                  data?.message || 'Failed to start promotion checkout. Please try again.'
-                )
-                setShowToast(true)
-                return
-              }
-
-              if (data?.checkoutUrl) {
-                window.location.href = data.checkoutUrl
-              } else {
-                setToastMessage(
-                  'Unexpected response from promotion checkout. Please try again.'
-                )
-                setShowToast(true)
-              }
-            } catch (error: any) {
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.error('[SELL_WIZARD] Error starting promotion checkout:', error)
-              }
-              setToastMessage('Failed to start promotion checkout. Please try again.')
-              setShowToast(true)
-            } finally {
-              setIsPromoting(false)
-            }
-          }}
+          showPromoteCta={false}
         />
       )}
 
@@ -2288,6 +2197,7 @@ function ReviewStep({
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return ''
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -2298,6 +2208,7 @@ function ReviewStep({
   }
 
   const formatTime = (timeString: string) => {
+    if (!timeString) return ''
     const [hours, minutes] = timeString.split(':')
     const hour = parseInt(hours)
     const ampm = hour >= 12 ? 'PM' : 'AM'
@@ -2316,8 +2227,8 @@ function ReviewStep({
           <div className="mt-2 space-y-1 text-sm text-gray-600">
             <p><strong>Title:</strong> {formData.title}</p>
             {formData.description && <p><strong>Description:</strong> {formData.description}</p>}
-            <p><strong>Date:</strong> {formData.date_start && formatDate(formData.date_start)} at {formData.time_start && formatTime(formData.time_start)}</p>
-            {formData.date_end && <p><strong>Ends:</strong> {formatDate(formData.date_end)} at {formData.time_end && formatTime(formData.time_end)}</p>}
+            <p><strong>Date:</strong> {formData.date_start ? formatDate(formData.date_start) : 'Not set'} {formData.time_start ? `at ${formatTime(formData.time_start)}` : ''}</p>
+            {formData.date_end && <p><strong>Ends:</strong> {formatDate(formData.date_end)} {formData.time_end ? `at ${formatTime(formData.time_end)}` : ''}</p>}
             <p><strong>Location:</strong> {formData.address}, {formData.city}, {formData.state}</p>
             {formData.price && <p><strong>Starting Price:</strong> ${formData.price}</p>}
             {formData.tags && formData.tags.length > 0 && (
@@ -2461,24 +2372,24 @@ function ReviewStep({
         <button
           onClick={(e) => {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion })
             }
             e.preventDefault()
             e.stopPropagation()
             onPublish()
           }}
           disabled={loading}
-          aria-label="Publish sale"
+          aria-label={wantsPromotion ? "Checkout for promotion" : "Publish sale"}
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >
           {loading ? (
             <>
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Publishing...
+              {wantsPromotion ? 'Processing...' : 'Publishing...'}
             </>
           ) : (
             <>
-              Publish Sale
+              {wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale'}
               <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>

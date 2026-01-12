@@ -207,7 +207,7 @@ export default function SellWizardClient({
   userLat,
   userLng,
   promotionsEnabled: promotionsEnabledProp,
-  paymentsEnabled: paymentsEnabledProp,
+  paymentsEnabled: _paymentsEnabledProp,
 }: {
   initialData?: Partial<SaleInput>
   isEdit?: boolean

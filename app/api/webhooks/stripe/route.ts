@@ -282,11 +282,10 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
           .single()
         
         if (promotionError) {
-          logger.error('Failed to create promotion record', {
+          logger.error('Failed to create promotion record', new Error(promotionError.message), {
             component: 'webhooks/stripe',
             operation: 'checkout_completed',
             sale_id: createdSaleId,
-            error: promotionError.message,
           })
           // Don't fail - sale is created, promotion can be fixed manually
         }

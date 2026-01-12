@@ -122,6 +122,29 @@ export async function POST(request: NextRequest) {
     // GATE: If promotion is requested, require payment before sale creation
     if (wantsPromotion === true) {
       const { getStripeClient, isPaymentsEnabled, isPromotionsEnabled, getFeaturedWeekPriceId } = await import('@/lib/stripe/client')
+      const { logger } = await import('@/lib/log')
+      
+      // Validate all required inputs before attempting Stripe checkout
+      if (!user || !user.id) {
+        logger.error('Promotion requested but user profile not ready', new Error('PROFILE_NOT_READY'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          hasUser: !!user,
+          userId: user?.id,
+        })
+        return fail(400, 'PROFILE_NOT_READY', 'User profile is not ready. Please refresh and try again.')
+      }
+      
+      if (!draftKey || typeof draftKey !== 'string') {
+        logger.error('Promotion requested but draftKey is invalid', new Error('INVALID_DRAFT_KEY'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          draftKeyType: typeof draftKey,
+        })
+        return fail(400, 'INVALID_PROMOTION_STATE', 'Draft key is missing or invalid. Please refresh and try again.')
+      }
       
       // Safety gates: Payments and promotions must be enabled
       if (!isPaymentsEnabled()) {
@@ -138,11 +161,23 @@ export async function POST(request: NextRequest) {
       
       const stripe = getStripeClient()
       if (!stripe) {
+        logger.error('Promotion requested but Stripe client not configured', new Error('STRIPE_NOT_CONFIGURED'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          userId: user.id,
+        })
         return fail(500, 'STRIPE_NOT_CONFIGURED', 'Stripe is not properly configured')
       }
       
       const priceId = getFeaturedWeekPriceId()
       if (!priceId) {
+        logger.error('Promotion requested but price ID not configured', new Error('PRICE_ID_MISSING'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          userId: user.id,
+        })
         return fail(500, 'PRICE_ID_MISSING', 'Promotion price ID is not configured')
       }
       
@@ -150,7 +185,17 @@ export async function POST(request: NextRequest) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
       
-      // Create Stripe Checkout Session with draft_key in metadata
+      if (!siteUrl) {
+        logger.error('Promotion requested but site URL not configured', new Error('SITE_URL_MISSING'), {
+          component: 'drafts/publish',
+          operation: 'validate_promotion',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'SITE_URL_MISSING', 'Site URL is not configured')
+      }
+      
+      // All validations passed - create Stripe Checkout Session with draft_key in metadata
       // Sale will be created after payment succeeds via webhook
       let checkoutSession
       try {
@@ -174,7 +219,6 @@ export async function POST(request: NextRequest) {
           customer_email: user.email || undefined,
         })
       } catch (error) {
-        const { logger } = await import('@/lib/log')
         logger.error('Failed to create Stripe checkout session for promotion', error instanceof Error ? error : new Error(String(error)), {
           component: 'drafts/publish',
           operation: 'create_checkout_session',
@@ -182,6 +226,17 @@ export async function POST(request: NextRequest) {
           userId: user.id,
         })
         return fail(500, 'STRIPE_ERROR', 'Failed to create checkout session')
+      }
+      
+      if (!checkoutSession || !checkoutSession.url) {
+        logger.error('Stripe checkout session created but URL is missing', new Error('CHECKOUT_URL_MISSING'), {
+          component: 'drafts/publish',
+          operation: 'create_checkout_session',
+          draftKey,
+          userId: user.id,
+          hasSession: !!checkoutSession,
+        })
+        return fail(500, 'CHECKOUT_URL_MISSING', 'Checkout session was created but URL is missing')
       }
       
       // Return checkout URL instead of creating sale

@@ -1362,6 +1362,19 @@ export default function SellWizardClient({
 
     // User is authenticated - try to publish draft if exists, else create directly
     if (draftKeyRef.current && hasLocalDraft()) {
+      // CRITICAL: If promotion is enabled, validate user profile is ready before publish
+      if (wantsPromotion === true) {
+        if (!user || !user.id) {
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Your account is not ready. Please refresh the page and try again.' })
+          return
+        }
+        
+        if (!draftKeyRef.current) {
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Draft is missing. Please refresh the page and try again.' })
+          return
+        }
+      }
+      
       // First, ensure draft is saved to server (in case it's only local)
       const localPayload = buildDraftPayload()
       try {
@@ -1400,7 +1413,16 @@ export default function SellWizardClient({
             return
           }
           
-          // If draft not found, fall back to direct creation
+          // CRITICAL: If promotion is enabled, never fall back to direct creation
+          // This would bypass payment and create a promoted sale without payment
+          if (wantsPromotion === true) {
+            const errorMessage = result.error || result.message || 'Failed to start checkout. Please try again.'
+            dispatch({ type: 'SET_SUBMIT_ERROR', error: errorMessage })
+            dispatch({ type: 'SET_LOADING', loading: false })
+            return
+          }
+          
+          // If draft not found and promotion is NOT enabled, fall back to direct creation
           if (result.code === 'DRAFT_NOT_FOUND') {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
               console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
@@ -1416,16 +1438,22 @@ export default function SellWizardClient({
           return
         }
 
-        // Check if payment is required (promotion enabled)
-        // STRIPE REDIRECT: Single place for Stripe checkout redirect
-        if (result.data && 'requiresPayment' in result.data && result.data.requiresPayment && 'checkoutUrl' in result.data) {
-          // Redirect to Stripe Checkout
+        // CRITICAL: If promotion is enabled, we MUST get a checkout URL
+        // Never fall through to normal publish flow when wantsPromotion is true
+        if (wantsPromotion === true) {
+          if (!result.data || !('requiresPayment' in result.data) || !result.data.requiresPayment || !('checkoutUrl' in result.data) || !result.data.checkoutUrl) {
+            dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Checkout is not available. Please refresh the page and try again.' })
+            dispatch({ type: 'SET_LOADING', loading: false })
+            return
+          }
+          
+          // Redirect to Stripe Checkout - this is the ONLY valid path for promoted sales
           window.location.href = result.data.checkoutUrl
           dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
 
-        // Normal publish flow - sale was created
+        // Normal publish flow - sale was created (only for non-promoted sales)
         // Type guard: check if result.data has saleId property
         if (!result.data || !('saleId' in result.data)) {
           dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Invalid response from server' })
@@ -1564,6 +1592,7 @@ export default function SellWizardClient({
             promotionsEnabled={promotionsEnabled}
             wantsPromotion={wantsPromotion}
             onNavigateToPromotion={() => dispatch({ type: 'SET_STEP', step: STEPS.PROMOTION })}
+            canStartCheckout={!!(user && user.id && draftKeyRef.current)}
           />
         )
       default:
@@ -2322,6 +2351,7 @@ function ReviewStep({
   paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
   onNavigateToPromotion,
+  canStartCheckout,
 }: {
   formData: Partial<SaleInput>
   photos: string[]
@@ -2333,6 +2363,7 @@ function ReviewStep({
   paymentsEnabled?: boolean
   wantsPromotion?: boolean
   onNavigateToPromotion?: () => void
+  canStartCheckout?: boolean
 }) {
   // Ensure promotionsEnabled is always a boolean (defensive check)
   // This preserves the server-computed value and prevents undefined from hiding promotion section
@@ -2516,16 +2547,21 @@ function ReviewStep({
             {submitError}
           </div>
         )}
+        {wantsPromotion && !canStartCheckout && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+            Your account is not ready for checkout. Please refresh the page and try again.
+          </div>
+        )}
         <button
           onClick={(e) => {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion })
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion, canStartCheckout })
             }
             e.preventDefault()
             e.stopPropagation()
             onPublish()
           }}
-          disabled={loading}
+          disabled={loading || (wantsPromotion && !canStartCheckout)}
           aria-label={wantsPromotion ? "Checkout for promotion" : "Publish sale"}
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >

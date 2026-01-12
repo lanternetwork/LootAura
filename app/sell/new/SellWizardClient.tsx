@@ -1541,7 +1541,7 @@ export default function SellWizardClient({
         tags: formData.tags,
       })
       const nextErrors = { ...locationValidation.errors, ...detailsValidation.errors }
-      if (Object.keys(nextErrors).length > 0) {
+      if (!locationValidation.isValid || !detailsValidation.isValid || Object.keys(nextErrors).length > 0) {
         // Don't auto-publish if validation fails - let user fix it
         setToastMessage('Please complete all required fields before publishing')
         setShowToast(true)
@@ -1634,7 +1634,7 @@ export default function SellWizardClient({
     const nextErrors = { ...locationValidation.errors, ...detailsValidation.errors }
     console.log('[SELL_WIZARD] Validation errors:', nextErrors)
     dispatch({ type: 'SET_ERRORS', errors: nextErrors })
-    if (Object.keys(nextErrors).length > 0) {
+    if (!locationValidation.isValid || !detailsValidation.isValid || Object.keys(nextErrors).length > 0) {
       console.log('[SELL_WIZARD] Validation failed, preventing submit')
       return
     }

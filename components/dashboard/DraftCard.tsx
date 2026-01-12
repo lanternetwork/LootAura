@@ -71,14 +71,15 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
     setIsPublishing(true)
     try {
       const result = await publishDraftServer(draft.draft_key)
-      if (result.ok && result.data?.saleId) {
-        onPublish(draft.draft_key, result.data.saleId)
+      if (result.ok && result.data && 'saleId' in result.data) {
+        const saleData = result.data as { saleId: string }
+        onPublish(draft.draft_key, saleData.saleId)
         // Emit revalidation event
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'create', id: result.data.saleId } }))
+          window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'create', id: saleData.saleId } }))
         }
         toast.success('Draft published successfully!')
-        router.push(`/sales/${result.data.saleId}`)
+        router.push(`/sales/${saleData.saleId}`)
       } else {
         toast.error(result.error || 'Failed to publish draft')
       }

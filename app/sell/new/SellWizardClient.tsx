@@ -1250,13 +1250,16 @@ export default function SellWizardClient({
         }
 
         // Normal publish flow - sale was created
+        // Type guard: check if result.data has saleId property
         if (!result.data || !('saleId' in result.data)) {
           setSubmitError('Invalid response from server')
           setLoading(false)
           return
         }
 
-        const saleId = result.data.saleId
+        // After type guard, TypeScript knows result.data has saleId
+        const saleData = result.data as { saleId: string }
+        const saleId = saleData.saleId
 
         // Clear drafts and sessionStorage keys
         clearLocalDraft()

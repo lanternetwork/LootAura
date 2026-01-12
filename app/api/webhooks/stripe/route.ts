@@ -150,8 +150,6 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
       if (draftKey && wantsPromotion) {
         const { getRlsDb } = await import('@/lib/supabase/clients')
         const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
-        const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-        const { createSupabaseServerClient } = await import('@/lib/supabase/server')
         
         // Read draft
         const rls = getRlsDb()

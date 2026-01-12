@@ -547,7 +547,7 @@ export default function SellWizardClient({
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[SELL_WIZARD] Updating formData.tags:', normalized)
       }
-      setFormData(prev => ({ ...prev, tags: normalized }))
+      dispatch({ type: 'SET_FORM_DATA', formData: { ...formData, tags: normalized } })
     }
   }, [initialData?.tags, _isEdit, normalizeTags]) // normalizeTags is now memoized, so it's stable
 
@@ -1470,7 +1470,7 @@ export default function SellWizardClient({
   const renderStep = () => {
     switch (currentStep) {
       case STEPS.DETAILS:
-        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} userLat={userLat} userLng={userLng} />
+        return <DetailsStep formData={formData} onChange={handleInputChange} errors={errors} userLat={userLat} userLng={userLng} />
       case STEPS.PHOTOS:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case STEPS.ITEMS:

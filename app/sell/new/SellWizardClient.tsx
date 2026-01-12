@@ -136,7 +136,6 @@ export default function SellWizardClient({
   // Preserve server-provided prop value - only default if truly undefined (hydration safety)
   // This ensures server-computed value is never overridden by client defaults
   const promotionsEnabled = promotionsEnabledProp ?? false
-  const paymentsEnabled = paymentsEnabledProp ?? false
 
   // Defensive assertion: log warning if prop is undefined (indicates prop passing issue)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true' && promotionsEnabledProp === undefined) {
@@ -220,7 +219,6 @@ export default function SellWizardClient({
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
   const [wantsPromotion, setWantsPromotion] = useState(false)
-  const [isPromoting, setIsPromoting] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')

@@ -949,7 +949,7 @@ export default function SaleDetailClient({
                       // Navigate directly to internal checkout page
                       // /api/promotions/intent will handle validation and create promotion record if needed
                       const checkoutUrl = `/promotions/checkout?mode=sale&sale_id=${encodeURIComponent(sale.id)}&tier=featured_week`
-                      router.push(checkoutUrl)
+                      window.location.href = checkoutUrl
                     }}
                     className="mt-1 inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-[#3A2268] text-white hover:bg-[#4b2a80] disabled:opacity-60 disabled:cursor-not-allowed"
                     data-testid="sale-detail-promote-button"

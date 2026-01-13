@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import { Sale } from '@/lib/types'
@@ -33,9 +34,9 @@ export default function DashboardSaleCard({
   promotionStatus,
   isPromotionLoading = false,
 }: DashboardSaleCardProps) {
+  const router = useRouter()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isPromoting, setIsPromoting] = useState(false)
   const cover = getSaleCoverUrl(sale)
 
   const isPromotionActive = promotionStatus?.is_active && !!promotionStatus.ends_at
@@ -50,7 +51,7 @@ export default function DashboardSaleCard({
     })
   }
 
-  const handlePromote = async () => {
+  const handlePromote = () => {
     if (!promotionsEnabled) {
       return
     }
@@ -60,81 +61,14 @@ export default function DashboardSaleCard({
       return
     }
 
-    if (isPromoting || isPromotionLoading) {
+    if (isPromotionLoading) {
       return
     }
 
-    setIsPromoting(true)
-
-    try {
-      const response = await fetch('/api/promotions/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getCsrfHeaders(),
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          sale_id: sale.id,
-          tier: 'featured_week',
-        }),
-      })
-
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        const code = data?.code
-
-        if (code === 'PAYMENTS_DISABLED') {
-          toast.info(
-            data?.details?.message ||
-              'Promotions are not available right now. Please check back later.'
-          )
-          return
-        }
-
-        if (code === 'PROMOTIONS_DISABLED') {
-          toast.info(
-            data?.details?.message ||
-              'Promotions are currently disabled. Please check back later.'
-          )
-          return
-        }
-
-        if (code === 'ACCOUNT_LOCKED') {
-          toast.error(
-            data?.details?.message ||
-              'Your account is locked. Please contact support if you believe this is an error.'
-          )
-          return
-        }
-
-        if (code === 'SALE_NOT_ELIGIBLE') {
-          toast.error(
-            data?.message || 'This sale is not eligible for promotion at this time.'
-          )
-          return
-        }
-
-        toast.error(
-          data?.message || 'Failed to start promotion checkout. Please try again.'
-        )
-        return
-      }
-
-      if (data?.checkoutUrl) {
-        window.location.href = data.checkoutUrl
-      } else {
-        toast.error('Unexpected response from promotion checkout. Please try again.')
-      }
-    } catch (error: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DASHBOARD_SALE_CARD] Error starting promotion checkout:', error)
-      }
-      toast.error('Failed to start promotion checkout. Please try again.')
-    } finally {
-      setIsPromoting(false)
-    }
+    // Navigate directly to internal checkout page
+    // /api/promotions/intent will handle validation and create promotion record if needed
+    const checkoutUrl = `/promotions/checkout?mode=sale&sale_id=${encodeURIComponent(sale.id)}&tier=featured_week`
+    router.push(checkoutUrl)
   }
 
   const handleDelete = async () => {
@@ -283,7 +217,7 @@ export default function DashboardSaleCard({
                 type="button"
                 onClick={isPromotionActive ? undefined : handlePromote}
                 disabled={
-                  isPromoting || isPromotionLoading || isPromotionActive || !paymentsEnabled
+                  isPromotionLoading || isPromotionActive || !paymentsEnabled
                 }
                 className={`flex items-center justify-center gap-1 px-3 py-1.5 text-sm rounded transition-colors ${
                   isPromotionActive
@@ -297,7 +231,7 @@ export default function DashboardSaleCard({
               >
                 {isPromotionActive
                   ? `Promoted${promotionStatus?.ends_at ? ` • Ends ${formatPromotionEndDate(promotionStatus.ends_at)}` : ''}`
-                  : isPromoting || isPromotionLoading
+                  : isPromotionLoading
                     ? 'Promoting...'
                     : paymentsEnabled
                       ? 'Promote'

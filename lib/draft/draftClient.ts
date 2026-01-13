@@ -41,13 +41,15 @@ export async function saveDraftServer(
         errorData = { error: response.statusText || 'Failed to save draft' }
       }
       
-      console.error('[DRAFT_CLIENT] Save failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData.error,
-        code: errorData.code,
-        details: errorData.details
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFT_CLIENT] Save failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData.error,
+          code: errorData.code,
+          details: errorData.details
+        })
+      }
       
       return {
         ok: false,
@@ -60,7 +62,9 @@ export async function saveDraftServer(
     const result = await response.json()
     return result
   } catch (error) {
-    console.error('[DRAFT_CLIENT] Error saving draft:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[DRAFT_CLIENT] Error saving draft:', error)
+    }
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Failed to save draft',
@@ -84,7 +88,9 @@ export async function getLatestDraftServer(): Promise<ApiResponse<{ id: string; 
     const result = await response.json()
     return result
   } catch (error) {
-    console.error('[DRAFT_CLIENT] Error fetching draft:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[DRAFT_CLIENT] Error fetching draft:', error)
+    }
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Failed to fetch draft',
@@ -108,7 +114,9 @@ export async function getDraftByKeyServer(draftKey: string): Promise<ApiResponse
     const result = await response.json()
     return result
   } catch (error) {
-    console.error('[DRAFT_CLIENT] Error fetching draft by key:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[DRAFT_CLIENT] Error fetching draft by key:', error)
+    }
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Failed to fetch draft',
@@ -134,7 +142,9 @@ export async function deleteDraftServer(draftKey: string): Promise<ApiResponse<{
     const result = await response.json()
     return result
   } catch (error) {
-    console.error('[DRAFT_CLIENT] Error deleting draft:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[DRAFT_CLIENT] Error deleting draft:', error)
+    }
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Failed to delete draft',
@@ -145,9 +155,10 @@ export async function deleteDraftServer(draftKey: string): Promise<ApiResponse<{
 
 /**
  * Publish draft (transactional: create sale + items, mark draft as published)
- * Returns either saleId (normal publish) or checkoutUrl (promotion requires payment)
+ * Returns either saleId (normal publish) or requiresPayment flag (promotion requires payment)
+ * Note: Promotion flow now uses internal Elements checkout page, not Stripe hosted checkout
  */
-export async function publishDraftServer(draftKey: string): Promise<ApiResponse<{ saleId: string } | { checkoutUrl: string; requiresPayment: true }>> {
+export async function publishDraftServer(draftKey: string): Promise<ApiResponse<{ saleId: string } | { requiresPayment: true; draftKey: string }>> {
   try {
     const response = await fetch('/api/drafts/publish', {
       method: 'POST',
@@ -168,14 +179,16 @@ export async function publishDraftServer(draftKey: string): Promise<ApiResponse<
         errorData = { error: response.statusText || 'Failed to publish draft' }
       }
       
-      console.error('[DRAFT_CLIENT] Publish failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData.error,
-        code: errorData.code,
-        details: errorData.details,
-        hint: errorData.hint
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFT_CLIENT] Publish failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData.error,
+          code: errorData.code,
+          details: errorData.details,
+          hint: errorData.hint
+        })
+      }
       
       return {
         ok: false,
@@ -187,7 +200,9 @@ export async function publishDraftServer(draftKey: string): Promise<ApiResponse<
     const result = await response.json()
     return result
   } catch (error) {
-    console.error('[DRAFT_CLIENT] Error publishing draft:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[DRAFT_CLIENT] Error publishing draft:', error)
+    }
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Failed to publish draft',

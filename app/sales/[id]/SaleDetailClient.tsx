@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
@@ -939,7 +939,7 @@ export default function SaleDetailClient({
                   <button
                     type="button"
                     disabled={isPromotionLoading || !paymentsEnabled}
-                    onClick={async () => {
+                    onClick={() => {
                       if (!paymentsEnabled) {
                         toast.info('Promotions are not available right now. Please check back later.')
                         return
@@ -947,85 +947,10 @@ export default function SaleDetailClient({
                       if (isPromotionLoading) {
                         return
                       }
-                      try {
-                        setIsPromotionLoading(true)
-                        const response = await fetch('/api/promotions/checkout', {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            ...getCsrfHeaders(),
-                          },
-                          credentials: 'include',
-                          body: JSON.stringify({
-                            sale_id: sale.id,
-                            tier: 'featured_week',
-                          }),
-                        })
-
-                        const data = await response.json().catch(() => ({}))
-
-                        if (!response.ok) {
-                          const code = data?.code
-
-                          if (code === 'PAYMENTS_DISABLED') {
-                            toast.info(
-                              data?.details?.message ||
-                                'Promotions are not available right now. Please check back later.'
-                            )
-                            return
-                          }
-
-                          if (code === 'PROMOTIONS_DISABLED') {
-                            toast.info(
-                              data?.details?.message ||
-                                'Promotions are currently disabled. Please check back later.'
-                            )
-                            return
-                          }
-
-                          if (code === 'ACCOUNT_LOCKED') {
-                            toast.error(
-                              data?.details?.message ||
-                                'Your account is locked. Please contact support if you believe this is an error.'
-                            )
-                            return
-                          }
-
-                          if (code === 'SALE_NOT_ELIGIBLE') {
-                            toast.error(
-                              data?.message ||
-                                'This sale is not eligible for promotion at this time.'
-                            )
-                            return
-                          }
-
-                          toast.error(
-                            data?.message ||
-                              'Failed to start promotion checkout. Please try again.'
-                          )
-                          return
-                        }
-
-                        if (data?.checkoutUrl) {
-                          window.location.href = data.checkoutUrl
-                        } else {
-                          toast.error(
-                            'Unexpected response from promotion checkout. Please try again.'
-                          )
-                        }
-                      } catch (error: any) {
-                        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                          console.error(
-                            '[SALE_DETAIL] Error starting promotion checkout:',
-                            error
-                          )
-                        }
-                        toast.error(
-                          'Failed to start promotion checkout. Please try again.'
-                        )
-                      } finally {
-                        setIsPromotionLoading(false)
-                      }
+                      // Navigate directly to internal checkout page
+                      // /api/promotions/intent will handle validation and create promotion record if needed
+                      const checkoutUrl = `/promotions/checkout?mode=sale&sale_id=${encodeURIComponent(sale.id)}&tier=featured_week`
+                      router.push(checkoutUrl)
                     }}
                     className="mt-1 inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-[#3A2268] text-white hover:bg-[#4b2a80] disabled:opacity-60 disabled:cursor-not-allowed"
                     data-testid="sale-detail-promote-button"

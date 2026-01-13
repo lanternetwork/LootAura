@@ -161,6 +161,8 @@ export async function POST(request: NextRequest) {
         })
       }
       
+      // Validate Stripe is configured (but don't create Checkout Session here)
+      // PaymentIntent will be created by /api/promotions/intent when user reaches checkout page
       const stripe = getStripeClient()
       if (!stripe) {
         logger.error('Promotion requested but Stripe client not configured', new Error('STRIPE_NOT_CONFIGURED'), {
@@ -172,103 +174,26 @@ export async function POST(request: NextRequest) {
         return fail(500, 'STRIPE_NOT_CONFIGURED', 'Stripe is not properly configured')
       }
       
-      const priceId = getFeaturedWeekPriceId()
+      // All validations passed - return requiresPayment flag to redirect to internal checkout page
+      // PaymentIntent will be created by /api/promotions/intent, sale will be created after payment succeeds via webhook
       
       // Debug-only verification logs for promotion/checkout invariants
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[VERIFY_PROMOTION] Price ID retrieved:', {
-          priceId: priceId || 'MISSING',
-          hasPriceId: !!priceId
-        })
-      }
-      
-      if (!priceId) {
-        logger.error('Promotion requested but price ID not configured', new Error('PRICE_ID_MISSING'), {
-          component: 'drafts/publish',
-          operation: 'validate_promotion',
-          draftKey,
-          userId: user.id,
-        })
-        return fail(500, 'PRICE_ID_MISSING', 'Promotion price ID is not configured')
-      }
-      
-      // Get site URL for redirects
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
-      
-      if (!siteUrl) {
-        logger.error('Promotion requested but site URL not configured', new Error('SITE_URL_MISSING'), {
-          component: 'drafts/publish',
-          operation: 'validate_promotion',
-          draftKey,
-          userId: user.id,
-        })
-        return fail(500, 'SITE_URL_MISSING', 'Site URL is not configured')
-      }
-      
-      // All validations passed - create Stripe Checkout Session with draft_key in metadata
-      // Sale will be created after payment succeeds via webhook
-      let checkoutSession
-      try {
-        checkoutSession = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          payment_method_types: ['card'],
-          line_items: [
-            {
-              price: priceId,
-              quantity: 1,
-            },
-          ],
-          success_url: `${siteUrl}/sales?promoted=success`,
-          cancel_url: `${siteUrl}/sell/new?resume=review&payment=canceled`,
-          metadata: {
-            draft_key: draftKey,
-            owner_profile_id: user.id,
-            tier: 'featured_week',
-            wants_promotion: 'true',
-          },
-          customer_email: user.email || undefined,
-        })
-      } catch (error) {
-        logger.error('Failed to create Stripe checkout session for promotion', error instanceof Error ? error : new Error(String(error)), {
-          component: 'drafts/publish',
-          operation: 'create_checkout_session',
-          draftKey,
-          userId: user.id,
-        })
-        return fail(500, 'STRIPE_ERROR', 'Failed to create checkout session')
-      }
-      
-      if (!checkoutSession || !checkoutSession.url) {
-        logger.error('Stripe checkout session created but URL is missing', new Error('CHECKOUT_URL_MISSING'), {
-          component: 'drafts/publish',
-          operation: 'create_checkout_session',
-          draftKey,
-          userId: user.id,
-          hasSession: !!checkoutSession,
-        })
-        return fail(500, 'CHECKOUT_URL_MISSING', 'Checkout session was created but URL is missing')
-      }
-      
-      // Debug-only verification logs for promotion/checkout invariants
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[VERIFY_PROMOTION] Checkout session created successfully:', {
-          checkoutUrl: checkoutSession.url,
+        console.log('[VERIFY_PROMOTION] Promotion requested, returning requiresPayment: true:', {
           requiresPayment: true,
           owner_profile_id: user.id,
-          priceId,
           draftKey,
           timestamp: new Date().toISOString()
         })
         console.log('[VERIFY_PROMOTION] Returning requiresPayment: true - sale creation code path will NOT be reached')
       }
       
-      // Return checkout URL instead of creating sale
+      // Return requiresPayment flag - client will redirect to internal checkout page
       // VERIFICATION: This return ensures sale creation code path (lines 196+) is NEVER reached when wantsPromotion === true
       return ok({ 
         data: { 
-          checkoutUrl: checkoutSession.url,
-          requiresPayment: true 
+          requiresPayment: true,
+          draftKey,
         } 
       })
     }

@@ -167,6 +167,7 @@ export default function SaleDetailClient({
     }
   }
   const searchParams = useSearchParams()
+  const router = useRouter()
   const isArchived = sale.status === 'archived'
   
   // Get viewport params from URL to preserve on back navigation

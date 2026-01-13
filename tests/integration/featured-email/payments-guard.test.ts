@@ -107,8 +107,8 @@ describe('Payments Disabled Safety Guard (real /api/promotions/checkout)', () =>
     const response = await handler(makeRequest())
     const data = await response.json()
 
-    expect(response.status).toBe(403)
-    expect(data.code).toBe('PAYMENTS_DISABLED')
+    expect(response.status).toBe(410)
+    expect(data.code).toBe('DEPRECATED')
     expect(mockGetStripeClient).not.toHaveBeenCalled()
   })
 
@@ -118,8 +118,8 @@ describe('Payments Disabled Safety Guard (real /api/promotions/checkout)', () =>
     const response = await handler(makeRequest())
     const data = await response.json()
 
-    expect(response.status).toBe(403)
-    expect(data.code).toBe('PAYMENTS_DISABLED')
+    expect(response.status).toBe(410)
+    expect(data.code).toBe('DEPRECATED')
     expect(mockGetStripeClient).not.toHaveBeenCalled()
   })
 
@@ -129,8 +129,8 @@ describe('Payments Disabled Safety Guard (real /api/promotions/checkout)', () =>
     const response = await handler(makeRequest())
     const data = await response.json()
 
-    expect(response.status).toBe(403)
-    expect(data.code).toBe('PAYMENTS_DISABLED')
+    expect(response.status).toBe(410)
+    expect(data.code).toBe('DEPRECATED')
     expect(mockGetStripeClient).not.toHaveBeenCalled()
   })
 
@@ -139,7 +139,7 @@ describe('Payments Disabled Safety Guard (real /api/promotions/checkout)', () =>
 
     const response = await handler(makeRequest())
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(410)
     expect(mockGetStripeClient).not.toHaveBeenCalled()
   })
 })

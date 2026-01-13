@@ -17,6 +17,5 @@ declare module 'stripe' {
     [key: string]: any
   }
   
-  export = Stripe
   export default Stripe
 }

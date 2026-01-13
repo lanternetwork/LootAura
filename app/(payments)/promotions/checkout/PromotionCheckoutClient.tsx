@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 // Initialize Stripe (only once)
 let stripePromise: Promise<any> | null = null

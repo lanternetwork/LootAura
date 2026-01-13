@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     // GATE: If promotion is requested, require payment before sale creation
     if (wantsPromotion === true) {
-      const { getStripeClient, isPaymentsEnabled, isPromotionsEnabled, getFeaturedWeekPriceId } = await import('@/lib/stripe/client')
+      const { getStripeClient, isPaymentsEnabled, isPromotionsEnabled } = await import('@/lib/stripe/client')
       const { logger } = await import('@/lib/log')
       
       // Debug-only verification logs for promotion/checkout invariants

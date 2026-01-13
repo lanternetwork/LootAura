@@ -139,7 +139,7 @@ async function intentHandler(request: NextRequest) {
     }
 
     const admin = getAdminDb()
-    let metadata: Record<string, string> = {
+    const metadata: Record<string, string> = {
       owner_profile_id: user.id,
       tier,
       mode,

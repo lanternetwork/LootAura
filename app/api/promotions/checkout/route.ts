@@ -22,7 +22,7 @@ import { fail } from '@/lib/http/json'
 
 export const dynamic = 'force-dynamic'
 
-async function checkoutHandler(request: NextRequest) {
+async function checkoutHandler(_request: NextRequest) {
   // Return 410 Gone for deprecated endpoint
   // Webhook handler still processes checkout.session.completed for existing sessions
   return fail(410, 'DEPRECATED', 'This endpoint is deprecated. Please use /promotions/checkout page with Stripe Elements instead.', {

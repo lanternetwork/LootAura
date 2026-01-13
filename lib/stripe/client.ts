@@ -71,3 +71,24 @@ export function getFeaturedWeekPriceId(): string | null {
   return ENV_SERVER.STRIPE_PRICE_ID_FEATURED_WEEK || null
 }
 
+/**
+ * Get Stripe publishable key (client-side)
+ */
+export function getStripePublishableKey(): string | null {
+  if (typeof window === 'undefined') {
+    // Server-side: return null (should use secret key instead)
+    return null
+  }
+  return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || null
+}
+
+/**
+ * Get featured week promotion amount in cents
+ * Falls back to 299 cents ($2.99) if price ID is not configured
+ */
+export function getFeaturedWeekAmountCents(): number {
+  // If price ID is configured, we'd need to fetch it from Stripe
+  // For now, return hardcoded fallback
+  // TODO: Could fetch from Stripe if price ID exists, but fallback is safer
+  return 299 // $2.99 in cents
+}

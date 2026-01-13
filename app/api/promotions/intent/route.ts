@@ -277,6 +277,11 @@ async function intentHandler(request: NextRequest) {
         }
       }
 
+      // TypeScript guard: finalPromotionId must be defined at this point
+      if (!finalPromotionId) {
+        return fail(500, 'INTERNAL_ERROR', 'Promotion ID is missing')
+      }
+
       // Add sale metadata
       metadata.promotion_id = finalPromotionId
       metadata.sale_id = sale_id

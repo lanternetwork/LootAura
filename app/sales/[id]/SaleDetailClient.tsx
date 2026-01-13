@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
@@ -166,7 +166,6 @@ export default function SaleDetailClient({
     }
   }
   const searchParams = useSearchParams()
-  const router = useRouter()
   const isArchived = sale.status === 'archived'
   
   // Get viewport params from URL to preserve on back navigation

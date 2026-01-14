@@ -59,6 +59,14 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
             <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.69]" />
           </div>
         )}
+        {/* Featured badge overlay */}
+        {((sale as any).isFeatured === true || sale.is_featured === true) && (
+          <div className="absolute top-2 left-2 z-10">
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-green-600 text-white shadow-lg backdrop-blur-sm">
+              Featured
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="p-3 md:p-4 flex flex-col gap-1">

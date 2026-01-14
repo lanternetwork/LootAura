@@ -135,11 +135,260 @@ async function webhookHandler(request: NextRequest) {
   return ok({ processed: true })
 }
 
+/**
+ * Finalize draft-based sale creation with promotion
+ * Reusable function for both checkout.session.completed and payment_intent.succeeded
+ */
+async function finalizeDraftPromotion(
+  draftKey: string,
+  paymentIntentId: string | null,
+  admin: ReturnType<typeof getAdminDb>
+): Promise<{ saleId: string; promotionId: string | null }> {
+  const { fromBase } = await import('@/lib/supabase/clients')
+  const { getRlsDb } = await import('@/lib/supabase/clients')
+  const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
+  
+  // Check idempotency: has this draft already been finalized?
+  const rls = getRlsDb()
+  const { data: draft, error: draftError } = await fromBase(rls, 'sale_drafts')
+    .select('*')
+    .eq('draft_key', draftKey)
+    .eq('status', 'active')
+    .maybeSingle()
+  
+  if (draftError || !draft) {
+    // Draft not found - check if this was already processed (idempotency)
+    // Look for promotion with matching payment_intent_id
+    if (paymentIntentId) {
+      const { data: existingPromotion } = await fromBase(admin, 'promotions')
+        .select('id, sale_id')
+        .eq('stripe_payment_intent_id', paymentIntentId)
+        .maybeSingle()
+      
+      if (existingPromotion) {
+        // Already processed - idempotent
+        logger.info('Draft promotion already finalized (idempotent)', {
+          component: 'webhooks/stripe',
+          operation: 'finalize_draft_promotion',
+          draft_key: draftKey,
+          sale_id: existingPromotion.sale_id,
+          promotion_id: existingPromotion.id,
+          payment_intent_id: paymentIntentId,
+        })
+        return { saleId: existingPromotion.sale_id, promotionId: existingPromotion.id }
+      }
+    }
+    
+    // Draft not found and no existing promotion - this is an error
+    const error = draftError ? new Error(draftError.message) : new Error('Draft not found')
+    logger.error('Failed to read draft for sale creation after payment', error, {
+      component: 'webhooks/stripe',
+      operation: 'finalize_draft_promotion',
+      draft_key: draftKey,
+      payment_intent_id: paymentIntentId,
+    })
+    throw error
+  }
+  
+  // Validate payload
+  const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
+  if (!validationResult.success) {
+    throw new Error('Invalid draft payload')
+  }
+  
+  const payload = validationResult.data
+  const { formData, photos, items } = payload
+  
+  // Get user ID from draft (already validated during draft creation)
+  const userId = draft.user_id
+  
+  // Normalize time_start
+  let normalizedTimeStart = formData.time_start
+  if (normalizedTimeStart && normalizedTimeStart.includes(':')) {
+    const parts = normalizedTimeStart.split(':')
+    const h = parseInt(parts[0] || '0', 10)
+    const m = parseInt(parts[1] || '0', 10)
+    const snapped = Math.round(m / 30) * 30
+    const finalM = snapped === 60 ? 0 : snapped
+    const finalH = snapped === 60 ? (h + 1) % 24 : h
+    normalizedTimeStart = `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`
+  }
+  
+  // Normalize tags
+  const rawTags = (formData as any)?.tags
+  const normalizedTags: string[] = Array.isArray(rawTags)
+    ? rawTags.filter((t: any): t is string => typeof t === 'string').map((t: string) => t.trim()).filter(Boolean)
+    : typeof rawTags === 'string'
+      ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
+      : []
+  
+  // Create sale with promotion
+  const salePayload = {
+    owner_id: userId,
+    title: formData.title,
+    description: formData.description || null,
+    address: formData.address || null,
+    city: formData.city,
+    state: formData.state,
+    zip_code: formData.zip_code || null,
+    lat: parseFloat(String(formData.lat)),
+    lng: parseFloat(String(formData.lng)),
+    date_start: formData.date_start,
+    time_start: normalizedTimeStart,
+    date_end: formData.date_end || null,
+    time_end: formData.time_end || null,
+    cover_image_url: photos && photos.length > 0 ? photos[0] : null,
+    images: photos && photos.length > 1 ? photos.slice(1) : null,
+    pricing_mode: formData.pricing_mode || 'negotiable',
+    status: 'published',
+    privacy_mode: 'exact',
+    is_featured: true, // Promotion enabled
+    tags: normalizedTags,
+  }
+  
+  const { data: saleRow, error: saleError } = await fromBase(admin, 'sales')
+    .insert(salePayload)
+    .select('id')
+    .single()
+  
+  if (saleError) {
+    throw new Error(`Failed to create sale: ${saleError.message}`)
+  }
+  
+  const createdSaleId = saleRow.id
+  
+  // Create items if any
+  if (items && items.length > 0) {
+    const { normalizeItemImages } = await import('@/lib/data/itemImageNormalization')
+    const itemsPayload = items.map((item: any) => {
+      const normalizedImages = normalizeItemImages({
+        image_url: item.image_url,
+        images: item.images,
+      })
+      return {
+        sale_id: createdSaleId,
+        name: item.name,
+        description: item.description || null,
+        price: item.price || null,
+        category: item.category || null,
+        images: normalizedImages.images,
+        image_url: normalizedImages.image_url,
+      }
+    })
+    
+    const { error: itemsError } = await fromBase(admin, 'items').insert(itemsPayload)
+    if (itemsError) {
+      // Rollback sale
+      await fromBase(admin, 'sales').delete().eq('id', createdSaleId)
+      throw new Error(`Failed to create items: ${itemsError.message}`)
+    }
+  }
+  
+  // Create promotion record
+  const { data: promotion, error: promotionError } = await fromBase(admin, 'promotions')
+    .insert({
+      sale_id: createdSaleId,
+      owner_profile_id: userId,
+      tier: 'featured_week',
+      status: 'active',
+      stripe_payment_intent_id: paymentIntentId,
+      start_date: new Date().toISOString(),
+    })
+    .select('id')
+    .single()
+  
+  if (promotionError) {
+    logger.error('Failed to create promotion record', new Error(promotionError.message), {
+      component: 'webhooks/stripe',
+      operation: 'finalize_draft_promotion',
+      sale_id: createdSaleId,
+    })
+    // Don't fail - sale is created, promotion can be fixed manually
+  }
+  
+  // Delete draft
+  await fromBase(admin, 'sale_drafts')
+    .delete()
+    .eq('id', draft.id)
+    .eq('draft_key', draftKey)
+  
+  logger.info('Sale created with promotion after payment', {
+    component: 'webhooks/stripe',
+    operation: 'finalize_draft_promotion',
+    sale_id: createdSaleId,
+    promotion_id: promotion?.id,
+    draft_key: draftKey,
+    payment_intent_id: paymentIntentId,
+  })
+  
+  return { saleId: createdSaleId, promotionId: promotion?.id || null }
+}
+
+/**
+ * Finalize existing sale promotion
+ * Reusable function for both checkout.session.completed and payment_intent.succeeded
+ */
+async function finalizeExistingSalePromotion(
+  promotionId: string,
+  saleId: string,
+  paymentIntentId: string | null,
+  admin: ReturnType<typeof getAdminDb>
+): Promise<void> {
+  const { fromBase } = await import('@/lib/supabase/clients')
+  
+  // Check idempotency: is promotion already active?
+  const { data: existingPromotion } = await fromBase(admin, 'promotions')
+    .select('id, status')
+    .eq('id', promotionId)
+    .maybeSingle()
+  
+  if (!existingPromotion) {
+    throw new Error(`Promotion not found: ${promotionId}`)
+  }
+  
+  if (existingPromotion.status === 'active') {
+    // Already finalized - idempotent
+    logger.info('Promotion already active (idempotent)', {
+      component: 'webhooks/stripe',
+      operation: 'finalize_existing_sale_promotion',
+      promotion_id: promotionId,
+      sale_id: saleId,
+      payment_intent_id: paymentIntentId,
+    })
+    return
+  }
+  
+  // Update promotion to active
+  const { error: updateError } = await fromBase(admin, 'promotions')
+    .update({
+      status: 'active',
+      stripe_payment_intent_id: paymentIntentId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', promotionId)
+    .eq('status', 'pending') // Only update if still pending (idempotency)
+
+  if (updateError) {
+    throw new Error(`Failed to activate promotion: ${updateError.message}`)
+  }
+
+  logger.info('Promotion activated via payment', {
+    component: 'webhooks/stripe',
+    operation: 'finalize_existing_sale_promotion',
+    promotion_id: promotionId,
+    sale_id: saleId,
+    payment_intent_id: paymentIntentId,
+  })
+}
+
 async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminDb>) {
   const { fromBase } = await import('@/lib/supabase/clients')
 
   switch (event.type) {
     case 'checkout.session.completed': {
+      // LEGACY: Keep this handler for existing Checkout Sessions created before migration
+      // New promotion flows use payment_intent.succeeded instead
+      // This handler will be removed after all legacy sessions expire
       const session = event.data.object
       const promotionId = session.metadata?.promotion_id
       const saleId = session.metadata?.sale_id
@@ -148,186 +397,22 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
 
       // Handle draft-based sale creation (new publish flow with promotion)
       if (draftKey && wantsPromotion) {
-        const { getRlsDb } = await import('@/lib/supabase/clients')
-        const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
-        
-        // Read draft
-        const rls = getRlsDb()
-        const { data: draft, error: draftError } = await fromBase(rls, 'sale_drafts')
-          .select('*')
-          .eq('draft_key', draftKey)
-          .eq('status', 'active')
-          .maybeSingle()
-        
-        if (draftError || !draft) {
-          const error = draftError ? new Error(draftError.message) : new Error('Draft not found')
-          logger.error('Failed to read draft for sale creation after payment', error, {
-            component: 'webhooks/stripe',
-            operation: 'checkout_completed',
-            draft_key: draftKey,
-            session_id: session.id,
-          })
-          throw error
-        }
-        
-        // Validate payload
-        const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
-        if (!validationResult.success) {
-          throw new Error('Invalid draft payload')
-        }
-        
-        const payload = validationResult.data
-        const { formData, photos, items } = payload
-        
-        // Get user ID from draft (already validated during draft creation)
-        const userId = draft.user_id
-        
-        // Normalize time_start
-        let normalizedTimeStart = formData.time_start
-        if (normalizedTimeStart && normalizedTimeStart.includes(':')) {
-          const parts = normalizedTimeStart.split(':')
-          const h = parseInt(parts[0] || '0', 10)
-          const m = parseInt(parts[1] || '0', 10)
-          const snapped = Math.round(m / 30) * 30
-          const finalM = snapped === 60 ? 0 : snapped
-          const finalH = snapped === 60 ? (h + 1) % 24 : h
-          normalizedTimeStart = `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`
-        }
-        
-        // Normalize tags
-        const rawTags = (formData as any)?.tags
-        const normalizedTags: string[] = Array.isArray(rawTags)
-          ? rawTags.filter((t: any): t is string => typeof t === 'string').map((t: string) => t.trim()).filter(Boolean)
-          : typeof rawTags === 'string'
-            ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
-            : []
-        
-        // Create sale with promotion
-        const salePayload = {
-          owner_id: userId,
-          title: formData.title,
-          description: formData.description || null,
-          address: formData.address || null,
-          city: formData.city,
-          state: formData.state,
-          zip_code: formData.zip_code || null,
-          lat: parseFloat(String(formData.lat)),
-          lng: parseFloat(String(formData.lng)),
-          date_start: formData.date_start,
-          time_start: normalizedTimeStart,
-          date_end: formData.date_end || null,
-          time_end: formData.time_end || null,
-          cover_image_url: photos && photos.length > 0 ? photos[0] : null,
-          images: photos && photos.length > 1 ? photos.slice(1) : null,
-          pricing_mode: formData.pricing_mode || 'negotiable',
-          status: 'published',
-          privacy_mode: 'exact',
-          is_featured: true, // Promotion enabled
-          tags: normalizedTags,
-        }
-        
-        const { data: saleRow, error: saleError } = await fromBase(admin, 'sales')
-          .insert(salePayload)
-          .select('id')
-          .single()
-        
-        if (saleError) {
-          throw new Error(`Failed to create sale: ${saleError.message}`)
-        }
-        
-        const createdSaleId = saleRow.id
-        
-        // Create items if any
-        if (items && items.length > 0) {
-          const { normalizeItemImages } = await import('@/lib/data/itemImageNormalization')
-          const itemsPayload = items.map((item: any) => {
-            const normalizedImages = normalizeItemImages({
-              image_url: item.image_url,
-              images: item.images,
-            })
-            return {
-              sale_id: createdSaleId,
-              name: item.name,
-              description: item.description || null,
-              price: item.price || null,
-              category: item.category || null,
-              images: normalizedImages.images,
-              image_url: normalizedImages.image_url,
-            }
-          })
-          
-          const { error: itemsError } = await fromBase(admin, 'items').insert(itemsPayload)
-          if (itemsError) {
-            // Rollback sale
-            await fromBase(admin, 'sales').delete().eq('id', createdSaleId)
-            throw new Error(`Failed to create items: ${itemsError.message}`)
-          }
-        }
-        
-        // Create promotion record
-        const { data: promotion, error: promotionError } = await fromBase(admin, 'promotions')
-          .insert({
-            sale_id: createdSaleId,
-            owner_profile_id: userId,
-            tier: 'featured_week',
-            status: 'active',
-            stripe_checkout_session_id: session.id,
-            stripe_payment_intent_id: session.payment_intent as string | null,
-            stripe_customer_id: session.customer as string | null,
-            start_date: new Date().toISOString(),
-          })
-          .select('id')
-          .single()
-        
-        if (promotionError) {
-          logger.error('Failed to create promotion record', new Error(promotionError.message), {
-            component: 'webhooks/stripe',
-            operation: 'checkout_completed',
-            sale_id: createdSaleId,
-          })
-          // Don't fail - sale is created, promotion can be fixed manually
-        }
-        
-        // Delete draft
-        await fromBase(admin, 'sale_drafts')
-          .delete()
-          .eq('id', draft.id)
-          .eq('draft_key', draftKey)
-        
-        logger.info('Sale created with promotion after payment', {
-          component: 'webhooks/stripe',
-          operation: 'checkout_completed',
-          sale_id: createdSaleId,
-          promotion_id: promotion?.id,
-          draft_key: draftKey,
-          session_id: session.id,
-        })
+        await finalizeDraftPromotion(
+          draftKey,
+          session.payment_intent as string | null,
+          admin
+        )
         break
       }
       
       // Handle existing sale promotion (legacy flow)
       if (promotionId && saleId) {
-        // Update promotion to active
-        const { error: updateError } = await fromBase(admin, 'promotions')
-          .update({
-            status: 'active',
-            stripe_payment_intent_id: session.payment_intent as string | null,
-            stripe_customer_id: session.customer as string | null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', promotionId)
-
-        if (updateError) {
-          throw new Error(`Failed to activate promotion: ${updateError.message}`)
-        }
-
-        logger.info('Promotion activated via checkout session', {
-          component: 'webhooks/stripe',
-          operation: 'checkout_completed',
-          promotion_id: promotionId,
-          sale_id: saleId,
-          session_id: session.id,
-        })
+        await finalizeExistingSalePromotion(
+          promotionId,
+          saleId,
+          session.payment_intent as string | null,
+          admin
+        )
         break
       }
       
@@ -341,7 +426,74 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
       break
     }
 
-    case 'payment_intent.payment_failed':
+    case 'payment_intent.succeeded': {
+      const paymentIntent = event.data.object
+      const metadata = paymentIntent.metadata || {}
+      const promotionId = metadata.promotion_id
+      const saleId = metadata.sale_id
+      const draftKey = metadata.draft_key
+      const wantsPromotion = metadata.wants_promotion === 'true'
+      const paymentIntentId = paymentIntent.id
+
+      // Handle draft-based sale creation (new publish flow with promotion)
+      if (draftKey && wantsPromotion) {
+        await finalizeDraftPromotion(draftKey, paymentIntentId, admin)
+        break
+      }
+
+      // Handle existing sale promotion
+      if (promotionId && saleId) {
+        await finalizeExistingSalePromotion(promotionId, saleId, paymentIntentId, admin)
+        break
+      }
+
+      // No valid metadata
+      logger.warn('PaymentIntent succeeded without valid metadata', {
+        component: 'webhooks/stripe',
+        operation: 'payment_intent_succeeded',
+        payment_intent_id: paymentIntentId,
+        metadata,
+      })
+      break
+    }
+
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object
+      const metadata = paymentIntent.metadata || {}
+      const promotionId = metadata.promotion_id
+
+      if (!promotionId) {
+        logger.warn('Payment failed without promotion_id', {
+          component: 'webhooks/stripe',
+          operation: 'payment_intent_payment_failed',
+          payment_intent_id: paymentIntent.id,
+        })
+        break
+      }
+
+      // Cancel promotion
+      const { error: updateError } = await fromBase(admin, 'promotions')
+        .update({
+          status: 'canceled',
+          canceled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', promotionId)
+        .eq('status', 'pending') // Only cancel if still pending
+
+      if (updateError) {
+        throw new Error(`Failed to cancel promotion: ${updateError.message}`)
+      }
+
+      logger.info('Promotion canceled due to payment failure', {
+        component: 'webhooks/stripe',
+        operation: 'payment_intent_payment_failed',
+        promotion_id: promotionId,
+        payment_intent_id: paymentIntent.id,
+      })
+      break
+    }
+
     case 'checkout.session.expired': {
       const sessionOrIntent = event.data.object
       const promotionId = sessionOrIntent.metadata?.promotion_id || 

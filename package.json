@@ -77,7 +77,9 @@
     "recharts": "^2.12.7",
     "resend": "^4.0.0",
     "@react-email/components": "^0.0.20",
-    "stripe": "^14.21.0"
+    "stripe": "^14.21.0",
+    "@stripe/stripe-js": "^2.4.0",
+    "@stripe/react-stripe-js": "^2.4.0"
   },
   "overrides": {
     "preact": "^10.28.2",

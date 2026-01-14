@@ -36,16 +36,18 @@ class DiagnosticErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the FULL unminified error with stack trace
-    console.error(`[DIAGNOSTIC_ERROR_BOUNDARY] ${this.props.componentName} threw an error:`, {
-      error,
-      errorMessage: error.message,
-      errorStack: error.stack,
-      errorName: error.name,
-      componentStack: errorInfo.componentStack,
-      errorInfo: errorInfo,
-      timestamp: new Date().toISOString(),
-    })
+    // Log the FULL unminified error with stack trace (gated for production)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error(`[DIAGNOSTIC_ERROR_BOUNDARY] ${this.props.componentName} threw an error:`, {
+        error,
+        errorMessage: error.message,
+        errorStack: error.stack,
+        errorName: error.name,
+        componentStack: errorInfo.componentStack,
+        errorInfo: errorInfo,
+        timestamp: new Date().toISOString(),
+      })
+    }
     
     this.setState({ error, errorInfo })
   }
@@ -1217,7 +1219,9 @@ export default function SellWizardClient({
           try {
             saveLocalDraft(payload)
           } catch (error) {
-            console.error('[SELL_WIZARD] Error saving local draft:', error)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.error('[SELL_WIZARD] Error saving local draft:', error)
+            }
             // Continue anyway - don't block navigation
           }
         }
@@ -1595,21 +1599,24 @@ export default function SellWizardClient({
   }, [searchParams, user, formData, buildDraftPayload, dispatch, setToastMessage, setShowToast, setCreatedSaleId, setConfirmationModalOpen])
 
   const handleSubmit = async () => {
-    console.log('[SELL_WIZARD] handleSubmit called', { 
-      currentStep, 
-      hasDraftKey: !!draftKeyRef.current,
-      hasLocalDraft: hasLocalDraft(),
-      formData: {
-        title: formData.title,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        lat: formData.lat,
-        lng: formData.lng,
-        date_start: formData.date_start,
-        time_start: formData.time_start,
-      }
-    })
+    const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true'
+    if (DEBUG) {
+      console.log('[SELL_WIZARD] handleSubmit called', { 
+        currentStep, 
+        hasDraftKey: !!draftKeyRef.current,
+        hasLocalDraft: hasLocalDraft(),
+        formData: {
+          title: formData.title,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          lat: formData.lat,
+          lng: formData.lng,
+          date_start: formData.date_start,
+          time_start: formData.time_start,
+        }
+      })
+    }
     
     // Client-side required validation
     const locationValidation = validateLocationStep({
@@ -1630,14 +1637,20 @@ export default function SellWizardClient({
       tags: formData.tags,
     })
     const nextErrors = { ...locationValidation.errors, ...detailsValidation.errors }
-    console.log('[SELL_WIZARD] Validation errors:', nextErrors)
+    if (DEBUG) {
+      console.log('[SELL_WIZARD] Validation errors:', nextErrors)
+    }
     dispatch({ type: 'SET_ERRORS', errors: nextErrors })
     if (!locationValidation.isValid || !detailsValidation.isValid) {
-      console.log('[SELL_WIZARD] Validation failed, preventing submit')
+      if (DEBUG) {
+        console.log('[SELL_WIZARD] Validation failed, preventing submit')
+      }
       return
     }
     
-    console.log('[SELL_WIZARD] Validation passed, proceeding with submit')
+    if (DEBUG) {
+      console.log('[SELL_WIZARD] Validation passed, proceeding with submit')
+    }
 
     // Check if user is authenticated
     if (!user) {
@@ -1673,7 +1686,9 @@ export default function SellWizardClient({
       try {
         await saveDraftServer(localPayload, draftKeyRef.current)
       } catch (error) {
-        console.warn('[SELL_WIZARD] Failed to save draft to server before publish:', error)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[SELL_WIZARD] Failed to save draft to server before publish:', error)
+        }
         // Continue anyway - might already exist on server
       }
 
@@ -1705,7 +1720,7 @@ export default function SellWizardClient({
             hasData: !!result.data,
             dataKeys: result.data ? Object.keys(result.data) : [],
             requiresPayment: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
-            hasCheckoutUrl: result.data && 'checkoutUrl' in result.data ? !!result.data.checkoutUrl : undefined,
+            hasDraftKey: result.data && 'draftKey' in result.data ? !!result.data.draftKey : undefined,
             hasSaleId: result.data && 'saleId' in result.data ? !!result.data.saleId : undefined,
             wantsPromotion,
             timestamp: new Date().toISOString()
@@ -1746,18 +1761,17 @@ export default function SellWizardClient({
           return
         }
 
-        // CRITICAL: If promotion is enabled, we MUST get a checkout URL
+        // CRITICAL: If promotion is enabled, we MUST get requiresPayment flag
         // Never fall through to normal publish flow when wantsPromotion is true
         if (wantsPromotion === true) {
-          if (!result.data || !('requiresPayment' in result.data) || !result.data.requiresPayment || !('checkoutUrl' in result.data) || !result.data.checkoutUrl) {
+          if (!result.data || !('requiresPayment' in result.data) || !result.data.requiresPayment) {
             // Debug-only verification logs for promotion/checkout invariants
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.error('[VERIFY_PROMOTION] ERROR: wantsPromotion === true but checkout URL missing:', {
+              console.error('[VERIFY_PROMOTION] ERROR: wantsPromotion === true but requiresPayment missing:', {
                 hasData: !!result.data,
                 hasRequiresPayment: result.data && 'requiresPayment' in result.data,
                 requiresPaymentValue: result.data && 'requiresPayment' in result.data ? result.data.requiresPayment : undefined,
-                hasCheckoutUrl: result.data && 'checkoutUrl' in result.data,
-                checkoutUrlValue: result.data && 'checkoutUrl' in result.data ? result.data.checkoutUrl : undefined
+                hasDraftKey: result.data && 'draftKey' in result.data,
               })
             }
             dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Checkout is not available. Please refresh the page and try again.' })
@@ -1765,18 +1779,27 @@ export default function SellWizardClient({
             return
           }
           
+          // Get draft_key from response or use the one we stored
+          const draftKeyForCheckout = result.data.draftKey || draftKeyToPublish
+          if (!draftKeyForCheckout) {
+            dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Draft key is missing. Please refresh the page and try again.' })
+            dispatch({ type: 'SET_LOADING', loading: false })
+            return
+          }
+          
           // Debug-only verification logs for promotion/checkout invariants
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[VERIFY_PROMOTION] Redirecting to Stripe Checkout - this is the ONLY valid path for promoted sales:', {
-              checkoutUrl: result.data.checkoutUrl,
+            console.log('[VERIFY_PROMOTION] Redirecting to internal checkout page - this is the ONLY valid path for promoted sales:', {
+              draftKey: draftKeyForCheckout,
               wantsPromotion: true,
               timestamp: new Date().toISOString()
             })
             console.log('[VERIFY_PROMOTION] Execution will return here - normal publish-success path will NOT be reached')
           }
           
-          // Redirect to Stripe Checkout - this is the ONLY valid path for promoted sales
-          window.location.href = result.data.checkoutUrl
+          // Redirect to internal checkout page - this is the ONLY valid path for promoted sales
+          const checkoutUrl = `/promotions/checkout?mode=draft&draft_key=${encodeURIComponent(draftKeyForCheckout)}&tier=featured_week`
+          router.push(checkoutUrl)
           dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
@@ -1943,6 +1966,8 @@ export default function SellWizardClient({
             wantsPromotion={wantsPromotion}
             onNavigateToPromotion={() => dispatch({ type: 'SET_STEP', step: STEPS.PROMOTION })}
             canStartCheckout={!!(user && user.id && draftKeyRef.current)}
+            isPublishable={publishability.isPublishable}
+            blockingErrors={publishability.blockingErrors}
           />
         )
       default:
@@ -2100,8 +2125,11 @@ export default function SellWizardClient({
                     e.stopPropagation()
                     handleSubmit()
                   }}
-                  disabled={loading}
-                  aria-label="Publish sale"
+                  disabled={loading || !publishability.isPublishable}
+                  aria-label={publishability.isPublishable ? "Publish sale" : "Complete required fields to publish"}
+                  title={!publishability.isPublishable && Object.keys(publishability.blockingErrors).length > 0 
+                    ? Object.values(publishability.blockingErrors).join(', ')
+                    : undefined}
                   className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 >
             {loading ? (
@@ -2723,6 +2751,8 @@ function ReviewStep({
   wantsPromotion,
   onNavigateToPromotion,
   canStartCheckout,
+  isPublishable,
+  blockingErrors,
 }: {
   formData: Partial<SaleInput>
   photos: string[]
@@ -2735,6 +2765,8 @@ function ReviewStep({
   wantsPromotion?: boolean
   onNavigateToPromotion?: () => void
   canStartCheckout?: boolean
+  isPublishable?: boolean
+  blockingErrors?: Record<string, string>
 }) {
   // Ensure promotionsEnabled is always a boolean (defensive check)
   // This preserves the server-computed value and prevents undefined from hiding promotion section
@@ -2923,6 +2955,19 @@ function ReviewStep({
             Your account is not ready for checkout. Please refresh the page and try again.
           </div>
         )}
+        {!isPublishable && blockingErrors && Object.keys(blockingErrors).length > 0 && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+            <div className="font-medium mb-1">Complete required fields to publish:</div>
+            <ul className="list-disc list-inside space-y-0.5">
+              {Object.entries(blockingErrors).slice(0, 3).map(([field, error]) => (
+                <li key={field}>{error}</li>
+              ))}
+              {Object.keys(blockingErrors).length > 3 && (
+                <li className="text-yellow-700">+{Object.keys(blockingErrors).length - 3} more issue{Object.keys(blockingErrors).length - 3 === 1 ? '' : 's'}</li>
+              )}
+            </ul>
+          </div>
+        )}
         <button
           onClick={(e) => {
             // Debug-only verification logs for promotion/checkout invariants
@@ -2930,19 +2975,23 @@ function ReviewStep({
               console.log('[VERIFY_PROMOTION] ReviewStep button clicked:', {
                 wantsPromotion,
                 canStartCheckout,
-                buttonDisabled: loading || (wantsPromotion && !canStartCheckout),
+                isPublishable,
+                buttonDisabled: loading || (wantsPromotion && !canStartCheckout) || !isPublishable,
                 buttonText: wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale',
                 loading,
                 timestamp: new Date().toISOString()
               })
-              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion, canStartCheckout })
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion, canStartCheckout, isPublishable })
             }
             e.preventDefault()
             e.stopPropagation()
             onPublish()
           }}
-          disabled={loading || (wantsPromotion && !canStartCheckout)}
-          aria-label={wantsPromotion ? "Checkout for promotion" : "Publish sale"}
+          disabled={loading || (wantsPromotion && !canStartCheckout) || !isPublishable}
+          aria-label={isPublishable ? (wantsPromotion ? "Checkout for promotion" : "Publish sale") : "Complete required fields to publish"}
+          title={!isPublishable && blockingErrors && Object.keys(blockingErrors).length > 0 
+            ? Object.values(blockingErrors).join(', ')
+            : undefined}
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >
           {loading ? (

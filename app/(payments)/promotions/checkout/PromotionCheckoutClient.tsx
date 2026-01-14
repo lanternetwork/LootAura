@@ -14,14 +14,14 @@ import { getCsrfHeaders } from '@/lib/csrf-client'
 // Initialize Stripe (only once)
 let stripePromise: Promise<any> | null = null
 
-function getStripePromise() {
+function getStripePromise(): Promise<any> | null {
   if (stripePromise) {
     return stripePromise
   }
   
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   if (!publishableKey) {
-    throw new Error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not configured')
+    return null
   }
   
   stripePromise = loadStripe(publishableKey)
@@ -154,8 +154,13 @@ export default function PromotionCheckoutClient() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [amountCents, setAmountCents] = useState<number | null>(null)
   const [mode, setMode] = useState<'draft' | 'sale'>('draft')
+  
+  // Check for Stripe publishable key on mount
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    !publishableKey ? 'Payment processing is not configured. Please contact support.' : null
+  )
   const [success, setSuccess] = useState(false)
 
   // Get parameters from URL
@@ -165,6 +170,12 @@ export default function PromotionCheckoutClient() {
   const urlMode = searchParams.get('mode') as 'draft' | 'sale' | null
 
   useEffect(() => {
+    // Check for Stripe publishable key first
+    if (!publishableKey) {
+      setLoading(false)
+      return
+    }
+
     // Determine mode from URL params
     const detectedMode = urlMode || (draftKey ? 'draft' : saleId ? 'sale' : null)
     
@@ -356,6 +367,28 @@ export default function PromotionCheckoutClient() {
 
   // Initialize Stripe Elements
   const stripePromise = getStripePromise()
+  if (!stripePromise) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full mx-auto px-4">
+          <div className="bg-white rounded-lg shadow-sm p-8">
+            <div className="text-center">
+              <div className="text-red-600 text-4xl mb-4">✕</div>
+              <h1 className="text-xl font-semibold text-gray-900 mb-2">Payment Setup Failed</h1>
+              <p className="text-gray-600 mb-6">Payment processing is not configured. Please contact support.</p>
+              <button
+                onClick={() => router.back()}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const amount = amountCents || 299
   const elementsOptions: StripeElementsOptions = {
     clientSecret,

@@ -8,8 +8,10 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js'
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { getCsrfHeaders } from '@/lib/csrf-client'
+import { getDraftByKeyServer } from '@/lib/draft/draftClient'
+import Image from 'next/image'
 
 // Initialize Stripe (only once)
 let stripePromise: Promise<any> | null = null
@@ -36,7 +38,7 @@ interface PaymentFormProps {
   onError: (error: string) => void
 }
 
-function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onError: _onError }: PaymentFormProps) {
+function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onError }: PaymentFormProps) {
   const stripe = useStripe()
   const elements = useElements()
   const [isProcessing, setIsProcessing] = useState(false)
@@ -55,13 +57,6 @@ function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onErro
     setIsProcessing(true)
     setError(null)
 
-    const cardElement = elements.getElement(CardElement)
-    if (!cardElement) {
-      setError('Card element not found. Please refresh the page.')
-      setIsProcessing(false)
-      return
-    }
-
     try {
       const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
@@ -72,6 +67,7 @@ function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onErro
       if (confirmError) {
         setError(confirmError.message || 'Payment failed. Please try again.')
         setIsProcessing(false)
+        onError(confirmError.message || 'Payment failed')
         return
       }
 
@@ -81,40 +77,45 @@ function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onErro
       } else {
         setError('Payment status is unexpected. Please contact support.')
         setIsProcessing(false)
+        onError('Payment status is unexpected')
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
       setError(errorMessage)
       setIsProcessing(false)
+      onError(errorMessage)
     }
-  }
-
-  const cardElementOptions = {
-    style: {
-      base: {
-        fontSize: '16px',
-        color: '#424770',
-        '::placeholder': {
-          color: '#aab7c4',
-        },
-      },
-      invalid: {
-        color: '#9e2146',
-      },
-    },
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Price Display */}
-      <div className="text-center">
-        <div className="text-3xl font-bold text-gray-900">${amountDollars}</div>
-        <div className="text-sm text-gray-600 mt-1">Featured Week Promotion</div>
+      {/* Total Display */}
+      <div className="flex items-baseline justify-between pb-4 border-b border-gray-200">
+        <span className="text-sm font-medium text-gray-700">Total</span>
+        <span className="text-2xl font-bold text-gray-900">${amountDollars}</span>
       </div>
 
-      {/* Card Element */}
-      <div className="border border-gray-300 rounded-lg p-4 bg-white">
-        <CardElement options={cardElementOptions} />
+      {/* Payment Element */}
+      <div className="py-2">
+        <PaymentElement
+          options={{
+            layout: 'tabs',
+            fields: {
+              billingDetails: {
+                email: 'never',
+                phone: 'never',
+                address: {
+                  country: 'never',
+                  line1: 'never',
+                  line2: 'never',
+                  city: 'never',
+                  state: 'never',
+                  postalCode: 'never',
+                },
+              },
+            },
+          }}
+        />
       </div>
 
       {/* Error Display */}
@@ -128,7 +129,7 @@ function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onErro
       <button
         type="submit"
         disabled={!stripe || isProcessing}
-        className="w-full px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
+        className="w-full px-6 py-3.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] text-base shadow-sm"
       >
         {isProcessing ? (
           <span className="flex items-center justify-center">
@@ -142,10 +143,19 @@ function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onErro
 
       {/* Info Text */}
       <p className="text-xs text-gray-500 text-center">
-        Your payment is secure and will be processed by Stripe. Your listing will be activated shortly after payment confirmation.
+        Your payment is secure and will be processed by Stripe.
       </p>
     </form>
   )
+}
+
+interface CheckoutSummary {
+  title: string
+  city: string
+  state: string
+  photoUrl: string | null
+  dateStart?: string
+  timeStart?: string
 }
 
 export default function PromotionCheckoutClient() {
@@ -154,6 +164,7 @@ export default function PromotionCheckoutClient() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [amountCents, setAmountCents] = useState<number | null>(null)
   const [mode, setMode] = useState<'draft' | 'sale'>('draft')
+  const [summary, setSummary] = useState<CheckoutSummary | null>(null)
   
   // Check for Stripe publishable key on mount
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -187,85 +198,150 @@ export default function PromotionCheckoutClient() {
 
     setMode(detectedMode)
 
-    // Fetch client secret from API
-    const fetchClientSecret = async () => {
+    // Fetch summary first, then client secret
+    const fetchSummaryAndClientSecret = async () => {
       try {
-        const requestBody: any = {
-          mode: detectedMode,
-          tier: 'featured_week',
-        }
+        // Step 1: Fetch checkout summary
+        let fetchedSummary: CheckoutSummary | null = null
 
-        if (detectedMode === 'draft') {
-          if (!draftKey) {
-            setError('draft_key is required for draft mode')
-            setLoading(false)
-            return
-          }
-          requestBody.draft_key = draftKey
-        } else {
+        if (detectedMode === 'sale') {
           if (!saleId) {
             setError('sale_id is required for sale mode')
             setLoading(false)
             return
           }
-          requestBody.sale_id = saleId
-          if (promotionId) {
-            requestBody.promotion_id = promotionId
+
+          const summaryResponse = await fetch(`/api/sales/${saleId}/summary`)
+          if (!summaryResponse.ok) {
+            const errorData = await summaryResponse.json().catch(() => ({}))
+            setError(errorData.error || 'Failed to load sale information')
+            setLoading(false)
+            return
+          }
+
+          const summaryData = await summaryResponse.json()
+          fetchedSummary = {
+            title: summaryData.title || 'Untitled Sale',
+            city: summaryData.city || '',
+            state: summaryData.state || '',
+            photoUrl: summaryData.photoUrl || null,
+          }
+        } else {
+          // Draft mode
+          if (!draftKey) {
+            setError('draft_key is required for draft mode')
+            setLoading(false)
+            return
+          }
+
+          const draftResult = await getDraftByKeyServer(draftKey)
+          if (!draftResult.ok || !draftResult.data?.payload) {
+            setError(draftResult.error || 'Failed to load draft information')
+            setLoading(false)
+            return
+          }
+
+          const payload = draftResult.data.payload
+          fetchedSummary = {
+            title: payload.formData?.title || 'Untitled Sale',
+            city: payload.formData?.city || '',
+            state: payload.formData?.state || '',
+            photoUrl: payload.photos && payload.photos.length > 0 ? payload.photos[0] : null,
+            dateStart: payload.formData?.date_start,
+            timeStart: payload.formData?.time_start,
           }
         }
 
-        const response = await fetch('/api/promotions/intent', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...getCsrfHeaders(),
-          },
-          credentials: 'include',
-          body: JSON.stringify(requestBody),
-        })
-
-        const data = await response.json().catch(() => ({}))
-
-        if (!response.ok) {
-          const errorMessage = data.error || data.message || 'Failed to initialize payment'
-          setError(errorMessage)
-          setLoading(false)
-          return
+        // Use placeholder if no photo
+        if (!fetchedSummary.photoUrl) {
+          fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
         }
 
-        if (!data.clientSecret) {
-          setError('Invalid response from server')
-          setLoading(false)
-          return
-        }
+        setSummary(fetchedSummary)
 
-        setClientSecret(data.clientSecret)
-
-        // Fetch amount for display
+        // Step 2: Fetch client secret from API
         try {
-          const amountResponse = await fetch('/api/promotions/amount?tier=featured_week')
-          const amountData = await amountResponse.json()
-          if (amountData.amountCents) {
-            setAmountCents(amountData.amountCents)
+          const requestBody: any = {
+            mode: detectedMode,
+            tier: 'featured_week',
+          }
+
+          if (detectedMode === 'draft') {
+            if (!draftKey) {
+              setError('draft_key is required for draft mode')
+              setLoading(false)
+              return
+            }
+            requestBody.draft_key = draftKey
           } else {
+            if (!saleId) {
+              setError('sale_id is required for sale mode')
+              setLoading(false)
+              return
+            }
+            requestBody.sale_id = saleId
+            if (promotionId) {
+              requestBody.promotion_id = promotionId
+            }
+          }
+
+          const response = await fetch('/api/promotions/intent', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getCsrfHeaders(),
+            },
+            credentials: 'include',
+            body: JSON.stringify(requestBody),
+          })
+
+          const data = await response.json().catch(() => ({}))
+
+          if (!response.ok) {
+            const errorMessage = data.error || data.message || 'Failed to initialize payment'
+            setError(errorMessage)
+            setLoading(false)
+            return
+          }
+
+          if (!data.clientSecret) {
+            setError('Invalid response from server')
+            setLoading(false)
+            return
+          }
+
+          setClientSecret(data.clientSecret)
+
+          // Fetch amount for display
+          try {
+            const amountResponse = await fetch('/api/promotions/amount?tier=featured_week')
+            const amountData = await amountResponse.json()
+            if (amountData.amountCents) {
+              setAmountCents(amountData.amountCents)
+            } else {
+              // Fallback to default
+              setAmountCents(299)
+            }
+          } catch {
             // Fallback to default
             setAmountCents(299)
           }
-        } catch {
-          // Fallback to default
-          setAmountCents(299)
-        }
 
-        setLoading(false)
+          setLoading(false)
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment'
+          setError(errorMessage)
+          setLoading(false)
+        }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment'
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load checkout information'
         setError(errorMessage)
         setLoading(false)
       }
     }
 
-    fetchClientSecret()
-  }, [draftKey, saleId, promotionId, urlMode])
+    fetchSummaryAndClientSecret()
+  }, [draftKey, saleId, promotionId, urlMode, publishableKey])
 
   const handleSuccess = () => {
     setSuccess(true)
@@ -286,33 +362,47 @@ export default function PromotionCheckoutClient() {
     setError(errorMessage)
   }
 
+  // Skeleton loading component
+  const SkeletonLoader = () => (
+    <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+        <div className="lg:grid lg:grid-cols-2">
+          {/* Left column skeleton */}
+          <div className="aspect-[16/9] lg:aspect-auto lg:h-full bg-gray-200 animate-pulse"></div>
+          {/* Right column skeleton */}
+          <div className="p-6 lg:p-8 space-y-6">
+            <div className="h-6 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+            <div className="h-32 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-12 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading payment form...</p>
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12">
+        <SkeletonLoader />
       </div>
     )
   }
 
-  // Error state
+  // Error state (inside card)
   if (error && !clientSecret) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm p-8">
-            <div className="text-center">
-              <div className="text-red-600 text-4xl mb-4">✕</div>
-              <h1 className="text-xl font-semibold text-gray-900 mb-2">Payment Setup Failed</h1>
-              <p className="text-gray-600 mb-6">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+        <div className="max-w-4xl w-full">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 lg:p-12">
+            <div className="text-center max-w-md mx-auto">
+              <div className="text-red-600 text-5xl mb-6">✕</div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-3">Payment Setup Failed</h1>
+              <p className="text-gray-600 mb-8">{error}</p>
               <button
                 onClick={() => router.back()}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
                 Go Back
               </button>
@@ -326,12 +416,12 @@ export default function PromotionCheckoutClient() {
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm p-8">
-            <div className="text-center">
-              <div className="text-green-600 text-4xl mb-4">✓</div>
-              <h1 className="text-xl font-semibold text-gray-900 mb-2">Payment Successful</h1>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+        <div className="max-w-4xl w-full">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 lg:p-12">
+            <div className="text-center max-w-md mx-auto">
+              <div className="text-green-600 text-5xl mb-6">✓</div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-3">Payment Successful</h1>
               <p className="text-gray-600">
                 {mode === 'draft' 
                   ? 'Your listing is being processed and will appear shortly.'
@@ -347,14 +437,14 @@ export default function PromotionCheckoutClient() {
   // Payment form
   if (!clientSecret) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm p-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+        <div className="max-w-4xl w-full">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 lg:p-12">
             <div className="text-center">
-              <p className="text-gray-600">Unable to initialize payment. Please try again.</p>
+              <p className="text-gray-600 mb-6">Unable to initialize payment. Please try again.</p>
               <button
                 onClick={() => router.back()}
-                className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
                 Go Back
               </button>
@@ -369,16 +459,16 @@ export default function PromotionCheckoutClient() {
   const stripePromise = getStripePromise()
   if (!stripePromise) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm p-8">
-            <div className="text-center">
-              <div className="text-red-600 text-4xl mb-4">✕</div>
-              <h1 className="text-xl font-semibold text-gray-900 mb-2">Payment Setup Failed</h1>
-              <p className="text-gray-600 mb-6">Payment processing is not configured. Please contact support.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+        <div className="max-w-4xl w-full">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 lg:p-12">
+            <div className="text-center max-w-md mx-auto">
+              <div className="text-red-600 text-5xl mb-6">✕</div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-3">Payment Setup Failed</h1>
+              <p className="text-gray-600 mb-8">Payment processing is not configured. Please contact support.</p>
               <button
                 onClick={() => router.back()}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
                 Go Back
               </button>
@@ -397,23 +487,97 @@ export default function PromotionCheckoutClient() {
     },
   }
 
+  // Format date/time for display
+  const formatDateTime = (dateStart?: string, timeStart?: string) => {
+    if (!dateStart) return null
+    try {
+      const date = new Date(dateStart)
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      if (timeStart) {
+        // Format time (assuming HH:MM format)
+        const [hours, minutes] = timeStart.split(':')
+        const hour = parseInt(hours, 10)
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const displayHour = hour % 12 || 12
+        return `${dateStr} at ${displayHour}:${minutes} ${ampm}`
+      }
+      return dateStr
+    } catch {
+      return dateStart
+    }
+  }
+
+  const displayDateTime = summary ? formatDateTime(summary.dateStart, summary.timeStart) : null
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-            Complete Your Payment
-          </h1>
-          
-          <Elements stripe={stripePromise} options={elementsOptions}>
-            <PaymentForm
-              clientSecret={clientSecret}
-              amountCents={amount}
-              mode={mode}
-              onSuccess={handleSuccess}
-              onError={handleError}
-            />
-          </Elements>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl w-full">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="lg:grid lg:grid-cols-2">
+            {/* Left Column: Sale Image & Summary */}
+            <div className="relative aspect-[16/9] lg:aspect-auto bg-gray-100">
+              {summary && summary.photoUrl ? (
+                <>
+                  <Image
+                    src={summary.photoUrl}
+                    alt={summary.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    unoptimized={summary.photoUrl.startsWith('/placeholders/')}
+                    priority
+                  />
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                  {/* Featured Week Badge */}
+                  <div className="absolute top-4 left-4">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-green-600 text-white shadow-lg">
+                      Featured Week
+                    </span>
+                  </div>
+                  {/* Summary Info Overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-8 text-white">
+                    <h2 className="text-xl lg:text-2xl font-bold mb-2 line-clamp-2">
+                      {summary.title}
+                    </h2>
+                    <div className="space-y-1 text-sm lg:text-base">
+                      <p className="opacity-90">
+                        {summary.city && summary.state
+                          ? `${summary.city}, ${summary.state}`
+                          : summary.city || summary.state || 'Location not specified'}
+                      </p>
+                      {displayDateTime && (
+                        <p className="opacity-75 text-xs lg:text-sm">{displayDateTime}</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+                  <div className="text-gray-400 text-sm">Loading image...</div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Payment Form */}
+            <div className="p-6 lg:p-8 flex flex-col">
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-gray-900 mb-6">
+                  Complete Your Payment
+                </h1>
+                
+                <Elements stripe={stripePromise} options={elementsOptions}>
+                  <PaymentForm
+                    clientSecret={clientSecret}
+                    amountCents={amount}
+                    mode={mode}
+                    onSuccess={handleSuccess}
+                    onError={handleError}
+                  />
+                </Elements>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

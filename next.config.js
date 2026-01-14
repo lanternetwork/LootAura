@@ -91,8 +91,8 @@ const nextConfig = {
                    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google https://js.stripe.com; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
-                   // Some browsers use script-src-elem separately; allow Stripe Elements
-                   "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com; " +
+                   // Some browsers use script-src-elem separately; must include all script-src domains plus Stripe
+                   "script-src-elem 'self' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google https://js.stripe.com; " +
                    // Some browsers use style-src-elem separately
                    "style-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Permit WebWorkers (Mapbox GL uses blob workers)

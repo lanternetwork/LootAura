@@ -222,20 +222,20 @@ export default function PromotionCheckoutClient() {
           return
         }
 
-        if (!data.data?.clientSecret) {
+        if (!data.clientSecret) {
           setError('Invalid response from server')
           setLoading(false)
           return
         }
 
-        setClientSecret(data.data.clientSecret)
+        setClientSecret(data.clientSecret)
 
         // Fetch amount for display
         try {
           const amountResponse = await fetch('/api/promotions/amount?tier=featured_week')
           const amountData = await amountResponse.json()
-          if (amountData.data?.amountCents) {
-            setAmountCents(amountData.data.amountCents)
+          if (amountData.amountCents) {
+            setAmountCents(amountData.amountCents)
           } else {
             // Fallback to default
             setAmountCents(299)

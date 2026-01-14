@@ -87,20 +87,22 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
         value: "default-src 'self'; " +
-                   // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews; allow Microsoft Clarity; allow Google AdSense
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google; " +
+                   // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews; allow Microsoft Clarity; allow Google AdSense; allow Stripe Elements
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google https://js.stripe.com; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
+                   // Some browsers use script-src-elem separately; allow Stripe Elements
+                   "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com; " +
                    // Some browsers use style-src-elem separately
                    "style-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Permit WebWorkers (Mapbox GL uses blob workers)
                    "worker-src 'self' blob:; child-src blob:; " +
                    // Images and fonts (allow blob: for temporary image previews before upload)
                    "img-src 'self' data: blob: https: https://res.cloudinary.com; font-src 'self' data:; " +
-                   // Network connections - allow Clarity API calls and AdSense
-                   "connect-src 'self' https: https://api.cloudinary.com https://vercel.live https://www.clarity.ms https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://tpc.googlesyndication.com; " +
-                   // Misc - allow AdSense frames (including safeframes, quality monitoring, and Google domains), and Vercel Live
-                   "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://ep2.adtrafficquality.google https://www.google.com https://vercel.live; object-src 'none'; base-uri 'self'; form-action 'self';",
+                   // Network connections - allow Clarity API calls, AdSense, and Stripe API
+                   "connect-src 'self' https: https://api.cloudinary.com https://vercel.live https://www.clarity.ms https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://api.stripe.com https://m.stripe.network https://q.stripe.com; " +
+                   // Misc - allow AdSense frames (including safeframes, quality monitoring, and Google domains), Vercel Live, and Stripe Elements
+                   "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://ep2.adtrafficquality.google https://www.google.com https://vercel.live https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

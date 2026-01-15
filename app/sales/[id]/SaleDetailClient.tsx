@@ -264,7 +264,7 @@ export default function SaleDetailClient({
             credentials: 'include',
           }
         )
-        if (!res.ok) {
+        if (!res || !res.ok) {
           if (!cancelled) {
             setPromotionStatus({ isActive: false, endsAt: null })
           }
@@ -957,7 +957,7 @@ export default function SaleDetailClient({
                 </>
               ) : promotionStatus.isActive ? (
                 // Promoted Status Card
-                <div className="space-y-2">
+                <div className="space-y-2" data-testid="sale-detail-promote-active">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
                       <BadgeCheck className="w-4 h-4 text-white" />

@@ -258,7 +258,25 @@ describe('Sale Details Items Display', () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
     const originalFetch = global.fetch
-    const mockFetch = vi.fn()
+    const mockFetch = vi.fn((url: string) => {
+      // Mock promotion status endpoint
+      if (typeof url === 'string' && url.includes('/api/promotions/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            statuses: [{
+              sale_id: mockSale.id,
+              is_active: false,
+              ends_at: null,
+              tier: null,
+            }],
+          }),
+        })
+      }
+      // For other endpoints, return undefined to prevent calls
+      return Promise.resolve(undefined)
+    })
     ;(global as any).fetch = mockFetch
 
     try {
@@ -271,6 +289,12 @@ describe('Sale Details Items Display', () => {
           paymentsEnabled={false}
         />
       )
+
+      // Wait for promotion status to load
+      await waitFor(() => {
+        const button = screen.getByTestId('sale-detail-promote-button')
+        expect(button).toBeDisabled()
+      })
 
       const button = screen.getByTestId('sale-detail-promote-button')
       expect(button).toBeDisabled()

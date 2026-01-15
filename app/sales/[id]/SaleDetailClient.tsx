@@ -22,6 +22,7 @@ import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import ReportSaleModal from '@/components/moderation/ReportSaleModal'
+import { Sparkles } from 'lucide-react'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -914,24 +915,40 @@ export default function SaleDetailClient({
           {/* Seller-only Promote panel (desktop/sidebar) */}
           {promotionsEnabled && isOwner && (
             <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
-              <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
               {promotionStatus?.isActive ? (
-                <p className="text-sm text-[#3A2268]" data-testid="sale-detail-promote-active">
-                  Promoted
+                // Featured Status Card
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold text-[#3A2268]">Featured</h4>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          Active
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-[#3A2268]">
+                    This sale is currently featured to more buyers.
+                  </p>
                   {promotionStatus.endsAt && (
-                    <>
-                      {' '}
-                      • Ends{' '}
+                    <p className="text-xs text-[#3A2268]/70">
+                      Featured until{' '}
                       {new Date(promotionStatus.endsAt).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
                       })}
-                    </>
+                    </p>
                   )}
-                </p>
+                </div>
               ) : (
+                // Promote CTA (unchanged)
                 <>
+                  <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
                   <p className="text-sm text-[#3A2268] mb-2">
                     Feature your sale to get extra visibility in weekly emails and discovery.
                   </p>

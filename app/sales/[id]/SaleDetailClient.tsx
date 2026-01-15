@@ -916,27 +916,22 @@ export default function SaleDetailClient({
           {promotionsEnabled && isOwner && (
             <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
               {promotionStatus?.isActive ? (
-                // Featured Status Card
+                // Promoted Status Card
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
                       <BadgeCheck className="w-4 h-4 text-white" />
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-[#3A2268]">Featured</h4>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                          Active
-                        </span>
-                      </div>
+                      <h4 className="font-semibold text-[#3A2268]">Promoted</h4>
                     </div>
                   </div>
                   <p className="text-sm text-[#3A2268]">
-                    This sale is currently featured to more buyers.
+                    Your sale is being featured to more buyers.
                   </p>
                   {promotionStatus.endsAt && (
                     <p className="text-xs text-[#3A2268]/70">
-                      Featured until{' '}
+                      Ends{' '}
                       {new Date(promotionStatus.endsAt).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',

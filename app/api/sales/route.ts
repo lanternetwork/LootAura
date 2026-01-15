@@ -950,7 +950,7 @@ async function salesHandler(request: NextRequest) {
           }))
         } catch (promoError) {
           // Log error but don't fail - isFeatured will be undefined (fallback to is_featured)
-          logger.warn('Failed to query promotions for isFeatured', promoError instanceof Error ? promoError : new Error(String(promoError)), {
+          logger.error('Failed to query promotions for isFeatured', promoError instanceof Error ? promoError : new Error(String(promoError)), {
             component: 'sales',
             operation: 'compute_isFeatured',
           })

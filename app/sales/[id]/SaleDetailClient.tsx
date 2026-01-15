@@ -264,22 +264,37 @@ export default function SaleDetailClient({
           }
         )
         if (!res.ok) {
+          if (!cancelled) {
+            setPromotionStatus({ isActive: false, endsAt: null })
+          }
           return
         }
         const json = await res.json().catch(() => null)
         if (!json || !Array.isArray(json.statuses)) {
+          if (!cancelled) {
+            setPromotionStatus({ isActive: false, endsAt: null })
+          }
           return
         }
         const status = json.statuses.find((s: any) => s.sale_id === sale.id)
-        if (!cancelled && status) {
-          const isActive = !!status.is_active && !!status.ends_at
-          setPromotionStatus({
-            isActive,
-            endsAt: status.ends_at ?? null,
-          })
+        if (!cancelled) {
+          if (status) {
+            // API already computes is_active based on status='active' AND ends_at > now
+            const isActive = !!status.is_active
+            setPromotionStatus({
+              isActive,
+              endsAt: status.ends_at ?? null,
+            })
+          } else {
+            // No promotion found for this sale
+            setPromotionStatus({ isActive: false, endsAt: null })
+          }
         }
       } catch {
         // Silent failure - promotion status is non-critical
+        if (!cancelled) {
+          setPromotionStatus({ isActive: false, endsAt: null })
+        }
       } finally {
         if (!cancelled) {
           setIsPromotionLoading(false)

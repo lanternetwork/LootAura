@@ -22,7 +22,7 @@ import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import ReportSaleModal from '@/components/moderation/ReportSaleModal'
-import { Sparkles } from 'lucide-react'
+import { BadgeCheck } from 'lucide-react'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -920,7 +920,7 @@ export default function SaleDetailClient({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-white" />
+                      <BadgeCheck className="w-4 h-4 text-white" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">

@@ -61,48 +61,56 @@ function aggregatePromotionStatuses(
     promotionsBySaleId.get(promo.sale_id)!.push(promo)
   }
 
-  // Compute one status per sale_id
-  return saleIds.map((saleId) => {
-    const salePromotions = promotionsBySaleId.get(saleId) || []
-    
-    // Find all active promotions for this sale
-    const activePromotions = salePromotions.filter((p) => {
-      return (
-        p.status === 'active' &&
-        typeof p.starts_at === 'string' &&
-        typeof p.ends_at === 'string' &&
-        p.starts_at <= now &&
-        p.ends_at >= now
-      )
-    })
+  // Compute one status per sale_id that has promotions
+  // Only return statuses for sale_ids that have at least one promotion (ownership is enforced by the query)
+  return saleIds
+    .map((saleId) => {
+      const salePromotions = promotionsBySaleId.get(saleId) || []
+      
+      // If no promotions found for this sale_id, skip it (user doesn't own it or it has no promotions)
+      if (salePromotions.length === 0) {
+        return null
+      }
+      
+      // Find all active promotions for this sale
+      const activePromotions = salePromotions.filter((p) => {
+        return (
+          p.status === 'active' &&
+          typeof p.starts_at === 'string' &&
+          typeof p.ends_at === 'string' &&
+          p.starts_at <= now &&
+          p.ends_at >= now
+        )
+      })
 
-    if (activePromotions.length === 0) {
-      // No active promotion
+      if (activePromotions.length === 0) {
+        // No active promotion, but has promotions (inactive/expired)
+        return {
+          sale_id: saleId,
+          is_active: false,
+          ends_at: null,
+          tier: null,
+        }
+      }
+
+      // Find the active promotion with the latest ends_at
+      // All activePromotions have ends_at (filtered above), so we can safely compare
+      // Since we know activePromotions.length > 0, we can use the first as initial value
+      const latestActive = activePromotions.reduce((latest, current) => {
+        // Both should have ends_at at this point (filtered above), but be defensive
+        if (!current.ends_at) return latest
+        if (!latest.ends_at) return current
+        return current.ends_at > latest.ends_at ? current : latest
+      }, activePromotions[0])
+
       return {
         sale_id: saleId,
-        is_active: false,
-        ends_at: null,
-        tier: null,
+        is_active: true,
+        ends_at: latestActive.ends_at ?? null,
+        tier: latestActive.tier ?? null,
       }
-    }
-
-    // Find the active promotion with the latest ends_at
-    // All activePromotions have ends_at (filtered above), so we can safely compare
-    // Since we know activePromotions.length > 0, we can use the first as initial value
-    const latestActive = activePromotions.reduce((latest, current) => {
-      // Both should have ends_at at this point (filtered above), but be defensive
-      if (!current.ends_at) return latest
-      if (!latest.ends_at) return current
-      return current.ends_at > latest.ends_at ? current : latest
-    }, activePromotions[0])
-
-    return {
-      sale_id: saleId,
-      is_active: true,
-      ends_at: latestActive.ends_at ?? null,
-      tier: latestActive.tier ?? null,
-    }
-  })
+    })
+    .filter((status): status is NonNullable<typeof status> => status !== null)
 }
 
 export async function GET(request: NextRequest) {

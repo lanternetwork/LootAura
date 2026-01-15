@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface PromotionResult {
@@ -10,6 +10,14 @@ interface PromotionResult {
   starts_at: string
   ends_at: string
   tier: string
+}
+
+interface SaleOption {
+  id: string
+  title: string
+  city?: string
+  state?: string
+  date_start?: string
 }
 
 export default function TestPromotionTool() {
@@ -22,6 +30,50 @@ export default function TestPromotionTool() {
   const [result, setResult] = useState<PromotionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [deactivateResult, setDeactivateResult] = useState<{ count: number } | null>(null)
+  const [sales, setSales] = useState<SaleOption[]>([])
+  const [loadingSales, setLoadingSales] = useState(true)
+
+  // Fetch published sales on mount
+  useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const response = await fetch('/api/admin/sales/list', {
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch sales')
+        }
+
+        const data = await response.json()
+        if (data.ok && Array.isArray(data.sales)) {
+          setSales(data.sales)
+        }
+      } catch (err) {
+        console.error('Error fetching sales:', err)
+        setError('Failed to load sales list')
+      } finally {
+        setLoadingSales(false)
+      }
+    }
+
+    fetchSales()
+  }, [])
+
+  const formatSaleOption = (sale: SaleOption): string => {
+    const parts: string[] = []
+    if (sale.title) parts.push(sale.title)
+    if (sale.city && sale.state) parts.push(`${sale.city}, ${sale.state}`)
+    if (sale.date_start) {
+      try {
+        const date = new Date(sale.date_start)
+        parts.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+      } catch {
+        // Ignore date formatting errors
+      }
+    }
+    return parts.length > 0 ? parts.join(' • ') : sale.id.substring(0, 8) + '...'
+  }
 
   const activatePromotion = async () => {
     if (!saleId.trim()) {
@@ -152,18 +204,32 @@ export default function TestPromotionTool() {
       </div>
 
       <div className="space-y-4">
-        {/* Sale ID Input */}
+        {/* Sale Selection Dropdown */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Sale ID
+            Sale
           </label>
-          <input
-            type="text"
-            value={saleId}
-            onChange={(e) => setSaleId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter sale UUID"
-          />
+          {loadingSales ? (
+            <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 text-sm">
+              Loading sales...
+            </div>
+          ) : (
+            <select
+              value={saleId}
+              onChange={(e) => setSaleId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select a sale...</option>
+              {sales.map((sale) => (
+                <option key={sale.id} value={sale.id}>
+                  {formatSaleOption(sale)}
+                </option>
+              ))}
+            </select>
+          )}
+          {!loadingSales && sales.length === 0 && (
+            <p className="mt-1 text-sm text-gray-500">No published sales found</p>
+          )}
         </div>
 
         {/* Schedule Mode Dropdown */}

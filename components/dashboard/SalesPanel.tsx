@@ -82,12 +82,41 @@ export default function SalesPanel({
         if (!json || !Array.isArray(json.statuses)) {
           return
         }
+        // Defensive: aggregate multiple entries for same sale_id (shouldn't happen after API fix, but be resilient)
         const map: Record<string, PromotionStatus> = {}
+        const statusesBySaleId = new Map<string, PromotionStatus[]>()
+        
+        // Group statuses by sale_id
         for (const status of json.statuses as PromotionStatus[]) {
           if (status?.sale_id) {
-            map[status.sale_id] = status
+            if (!statusesBySaleId.has(status.sale_id)) {
+              statusesBySaleId.set(status.sale_id, [])
+            }
+            statusesBySaleId.get(status.sale_id)!.push(status)
           }
         }
+        
+        // Aggregate: for each sale_id, use any active entry, max ends_at among active entries
+        for (const [saleId, statuses] of statusesBySaleId.entries()) {
+          const hasActive = statuses.some((s) => s.is_active === true)
+          const activeStatuses = statuses.filter((s) => s.is_active === true)
+          const maxEndsAt = activeStatuses.reduce((max: string | null, s) => {
+            if (!s.ends_at) return max
+            if (!max) return s.ends_at
+            return s.ends_at > max ? s.ends_at : max
+          }, null as string | null)
+          
+          // Use the first status as base, but override with aggregated values
+          const baseStatus = statuses[0]
+          const tierWithMaxEndsAt = activeStatuses.find((s) => s.ends_at === maxEndsAt)?.tier
+          map[saleId] = {
+            sale_id: saleId,
+            is_active: hasActive,
+            ends_at: hasActive ? (maxEndsAt ?? null) : null,
+            tier: hasActive ? (tierWithMaxEndsAt ?? baseStatus.tier) : null,
+          }
+        }
+        
         setPromotionStatuses(map)
       })
       .catch(() => {

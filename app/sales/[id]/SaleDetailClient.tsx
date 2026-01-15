@@ -277,14 +277,23 @@ export default function SaleDetailClient({
           }
           return
         }
-        const status = json.statuses.find((s: any) => s.sale_id === sale.id)
+        // Defensive: handle multiple entries for same sale_id (shouldn't happen after API fix, but be resilient)
+        const matchingStatuses = json.statuses.filter((s: any) => s.sale_id === sale.id)
         if (!cancelled) {
-          if (status) {
-            // API already computes is_active based on status='active' AND ends_at > now
-            const isActive = status.is_active === true
+          if (matchingStatuses.length > 0) {
+            // If any entry has is_active === true, treat as promoted
+            const hasActive = matchingStatuses.some((s: any) => s.is_active === true)
+            // Find max ends_at among active entries
+            const activeStatuses = matchingStatuses.filter((s: any) => s.is_active === true)
+            const maxEndsAt = activeStatuses.reduce((max: string | null, s: any) => {
+              if (!s.ends_at) return max
+              if (!max) return s.ends_at
+              return s.ends_at > max ? s.ends_at : max
+            }, null as string | null)
+            
             setPromotionStatus({
-              isActive,
-              endsAt: status.ends_at ?? null,
+              isActive: hasActive,
+              endsAt: hasActive ? (maxEndsAt ?? null) : null,
             })
           } else {
             // No promotion found for this sale

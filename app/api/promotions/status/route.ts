@@ -94,13 +94,13 @@ function aggregatePromotionStatuses(
       if (!current.ends_at) return latest
       if (!latest.ends_at) return current
       return current.ends_at > latest.ends_at ? current : latest
-    })
+    }, activePromotions[0])
 
     return {
       sale_id: saleId,
       is_active: true,
-      ends_at: latestActive?.ends_at ?? null,
-      tier: latestActive?.tier ?? null,
+      ends_at: latestActive.ends_at ?? null,
+      tier: latestActive.tier ?? null,
     }
   })
 }

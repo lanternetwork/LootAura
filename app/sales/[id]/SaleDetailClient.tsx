@@ -191,8 +191,8 @@ export default function SaleDetailClient({
   const [promotionStatus, setPromotionStatus] = useState<{
     isActive: boolean
     endsAt: string | null
-  } | null>(null)
-  const [isPromotionLoading, setIsPromotionLoading] = useState(false)
+  }>({ isActive: false, endsAt: null })
+  const [isPromotionLoading, setIsPromotionLoading] = useState(true)
 
   // Track click event for navigation/directions
   const handleNavigationClick = () => {
@@ -249,7 +249,8 @@ export default function SaleDetailClient({
   // Fetch minimal promotion status for this sale (owner-only, when promotions are enabled)
   useEffect(() => {
     if (!promotionsEnabled || !isOwner) {
-      setPromotionStatus(null)
+      setPromotionStatus({ isActive: false, endsAt: null })
+      setIsPromotionLoading(false)
       return
     }
 
@@ -280,14 +281,29 @@ export default function SaleDetailClient({
         if (!cancelled) {
           if (status) {
             // API already computes is_active based on status='active' AND ends_at > now
-            const isActive = !!status.is_active
+            const isActive = status.is_active === true
             setPromotionStatus({
               isActive,
               endsAt: status.ends_at ?? null,
             })
+            // Debug logging in development
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SALE_DETAIL] Promotion status fetched', {
+                sale_id: sale.id,
+                status,
+                isActive,
+                ends_at: status.ends_at,
+              })
+            }
           } else {
             // No promotion found for this sale
             setPromotionStatus({ isActive: false, endsAt: null })
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SALE_DETAIL] No promotion found', {
+                sale_id: sale.id,
+                statuses: json.statuses,
+              })
+            }
           }
         }
       } catch {
@@ -930,7 +946,22 @@ export default function SaleDetailClient({
           {/* Seller-only Promote panel (desktop/sidebar) */}
           {promotionsEnabled && isOwner && (
             <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
-              {promotionStatus?.isActive ? (
+              {isPromotionLoading ? (
+                // Loading state - show disabled CTA to prevent layout shift
+                <>
+                  <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
+                  <p className="text-sm text-[#3A2268] mb-2">
+                    Feature your sale to get extra visibility in weekly emails and discovery.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="mt-1 inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-[#3A2268] text-white opacity-60 cursor-not-allowed"
+                  >
+                    Loading...
+                  </button>
+                </>
+              ) : promotionStatus.isActive ? (
                 // Promoted Status Card
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 mb-2">

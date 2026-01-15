@@ -36,10 +36,10 @@ async function deactivateTestPromotionHandler(request: NextRequest) {
     )
   }
 
-  // Require ADMIN_TOOLS_ENABLED flag
-  if (process.env.ADMIN_TOOLS_ENABLED !== 'true') {
+  // Require ENABLE_ADMIN_TOOLS flag
+  if (process.env.ENABLE_ADMIN_TOOLS !== 'true') {
     return NextResponse.json(
-      { error: 'Admin tools are not enabled. Set ADMIN_TOOLS_ENABLED=true to use this endpoint.' },
+      { error: 'Admin tools are not enabled. Set ENABLE_ADMIN_TOOLS=true to use this endpoint.' },
       { status: 403 }
     )
   }

@@ -139,13 +139,12 @@ async function activateTestPromotionHandler(request: NextRequest) {
       finalEndsAt = promotionEnd.toISOString()
     } else {
       // mode === 'now_plus_7' (default)
+      // Start immediately (now) and end 7 days from now
       const now = new Date()
-      const startDate = new Date(now)
-      startDate.setUTCHours(0, 0, 0, 0)
-      const endDate = new Date(startDate)
+      const endDate = new Date(now)
       endDate.setUTCDate(endDate.getUTCDate() + 7)
       
-      finalStartsAt = startDate.toISOString()
+      finalStartsAt = now.toISOString()
       finalEndsAt = endDate.toISOString()
     }
 

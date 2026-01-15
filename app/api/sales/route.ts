@@ -926,12 +926,20 @@ async function salesHandler(request: NextRequest) {
           const saleIds = results.map((s) => s.id)
           
           // Batch query active promotions for all sales
-          const { data: activePromotions } = await fromBase(admin, 'promotions')
-            .select('sale_id')
+          const { data: activePromotions, error: promoQueryError } = await fromBase(admin, 'promotions')
+            .select('sale_id, starts_at, ends_at, status')
             .eq('status', 'active')
             .lte('starts_at', nowStr)
             .gte('ends_at', nowStr)
             .in('sale_id', saleIds)
+          
+          if (promoQueryError) {
+            logger.error('Promotion query error', promoQueryError instanceof Error ? promoQueryError : new Error(String(promoQueryError)), {
+              component: 'sales',
+              operation: 'compute_isFeatured',
+              error: promoQueryError,
+            })
+          }
           
           // Create Set of featured sale IDs for O(1) lookup
           const featuredSaleIds = new Set<string>()
@@ -941,6 +949,22 @@ async function salesHandler(request: NextRequest) {
                 featuredSaleIds.add(p.sale_id)
               }
             })
+            
+            // Debug logging in development
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true' && activePromotions.length > 0) {
+              logger.debug('Active promotions found', {
+                component: 'sales',
+                operation: 'compute_isFeatured',
+                count: activePromotions.length,
+                now: nowStr,
+                promotions: activePromotions.map(p => ({
+                  sale_id: p.sale_id,
+                  starts_at: p.starts_at,
+                  ends_at: p.ends_at,
+                  status: p.status,
+                })),
+              })
+            }
           }
           
           // Attach isFeatured to each sale

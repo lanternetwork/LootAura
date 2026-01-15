@@ -41,8 +41,14 @@ async function activateTestPromotionHandler(request: NextRequest) {
   }
 
   // Require ENABLE_ADMIN_TOOLS flag (allow in debug mode for development/preview)
+  // Since assertAdminOrThrow already passed, this is just a safety flag
   const isDebugMode = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
-  if (process.env.ENABLE_ADMIN_TOOLS !== 'true' && !isDebugMode) {
+  const adminToolsValue = process.env.ENABLE_ADMIN_TOOLS?.trim().toLowerCase()
+  // Only block if explicitly disabled in production (or if not set in production)
+  // In non-production, allow unless explicitly set to 'false'
+  const isExplicitlyDisabled = adminToolsValue === 'false' || adminToolsValue === '0' || adminToolsValue === 'no'
+  const isExplicitlyEnabled = adminToolsValue === 'true' || adminToolsValue === '1' || adminToolsValue === 'yes'
+  if (!isDebugMode && (isExplicitlyDisabled || (process.env.NODE_ENV === 'production' && !isExplicitlyEnabled))) {
     return NextResponse.json(
       { error: 'Admin tools are not enabled. Set ENABLE_ADMIN_TOOLS=true to use this endpoint.' },
       { status: 403 }

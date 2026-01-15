@@ -279,31 +279,38 @@ export default function SaleDetailClient({
         }
         const status = json.statuses.find((s: any) => s.sale_id === sale.id)
         if (!cancelled) {
+          // Always log for debugging (remove in production if needed)
+          console.log('[SALE_DETAIL] Promotion status API response', {
+            sale_id: sale.id,
+            response_ok: res.ok,
+            statuses_count: json.statuses?.length || 0,
+            statuses: json.statuses,
+            found_status: status,
+            status_is_active: status?.is_active,
+            status_ends_at: status?.ends_at,
+          })
+          
           if (status) {
             // API already computes is_active based on status='active' AND ends_at > now
-            const isActive = status.is_active === true
+            // Be more lenient with the check - handle boolean true, string "true", or truthy value
+            const isActive = status.is_active === true || status.is_active === 'true' || !!status.is_active
+            console.log('[SALE_DETAIL] Setting promotion status', {
+              sale_id: sale.id,
+              raw_is_active: status.is_active,
+              typeof_is_active: typeof status.is_active,
+              isActive,
+              endsAt: status.ends_at,
+            })
             setPromotionStatus({
               isActive,
               endsAt: status.ends_at ?? null,
             })
-            // Debug logging in development
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALE_DETAIL] Promotion status fetched', {
-                sale_id: sale.id,
-                status,
-                isActive,
-                ends_at: status.ends_at,
-              })
-            }
           } else {
             // No promotion found for this sale
+            console.log('[SALE_DETAIL] No promotion found, setting isActive=false', {
+              sale_id: sale.id,
+            })
             setPromotionStatus({ isActive: false, endsAt: null })
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALE_DETAIL] No promotion found', {
-                sale_id: sale.id,
-                statuses: json.statuses,
-              })
-            }
           }
         }
       } catch {
@@ -946,6 +953,16 @@ export default function SaleDetailClient({
           {/* Seller-only Promote panel (desktop/sidebar) */}
           {promotionsEnabled && isOwner && (
             <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
+              {(() => {
+                // Debug: log current state on every render
+                console.log('[SALE_DETAIL] Rendering promotion panel', {
+                  isPromotionLoading,
+                  promotionStatus,
+                  isActive: promotionStatus?.isActive,
+                  willShowPromoted: !isPromotionLoading && promotionStatus?.isActive,
+                })
+                return null
+              })()}
               {isPromotionLoading ? (
                 // Loading state - show disabled CTA to prevent layout shift
                 <>

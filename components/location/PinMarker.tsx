@@ -8,6 +8,7 @@ interface PinMarkerProps {
   lat: number
   lng: number
   isSelected?: boolean
+  isFeatured?: boolean
   onClick?: (saleId: string) => void
 }
 
@@ -16,6 +17,7 @@ export default function PinMarker({
   lat, 
   lng, 
   isSelected = false,
+  isFeatured = false,
   onClick 
 }: PinMarkerProps) {
   const handleClick = useCallback((event: React.MouseEvent) => {
@@ -56,24 +58,52 @@ export default function PinMarker({
             pointerEvents: 'none' // Prevent double-click events
           }}
         >
-          <circle
-            cx="8"
-            cy="8"
-            r="6"
-            fill={isSelected ? '#dc2626' : '#ef4444'}
-            className={isSelected ? 'drop-shadow-lg' : ''}
-          />
-          {/* Subtle ring on hover (desktop only) */}
-          <circle
-            cx="8"
-            cy="8"
-            r="7"
-            fill="none"
-            stroke={isSelected ? '#dc2626' : '#ef4444'}
-            strokeWidth="1"
-            opacity="0"
-            className="md:hover:opacity-30 transition-opacity"
-          />
+          {/* Featured pins: amber/gold with subtle stroke; Regular pins: red */}
+          {isFeatured ? (
+            <>
+              <circle
+                cx="8"
+                cy="8"
+                r="6"
+                fill={isSelected ? '#d97706' : '#f59e0b'}
+                stroke={isSelected ? '#b45309' : '#d97706'}
+                strokeWidth="1.5"
+                className={isSelected ? 'drop-shadow-lg' : ''}
+              />
+              {/* Subtle ring on hover (desktop only) */}
+              <circle
+                cx="8"
+                cy="8"
+                r="7"
+                fill="none"
+                stroke={isSelected ? '#d97706' : '#f59e0b'}
+                strokeWidth="1"
+                opacity="0"
+                className="md:hover:opacity-30 transition-opacity"
+              />
+            </>
+          ) : (
+            <>
+              <circle
+                cx="8"
+                cy="8"
+                r="6"
+                fill={isSelected ? '#dc2626' : '#ef4444'}
+                className={isSelected ? 'drop-shadow-lg' : ''}
+              />
+              {/* Subtle ring on hover (desktop only) */}
+              <circle
+                cx="8"
+                cy="8"
+                r="7"
+                fill="none"
+                stroke={isSelected ? '#dc2626' : '#ef4444'}
+                strokeWidth="1"
+                opacity="0"
+                className="md:hover:opacity-30 transition-opacity"
+              />
+            </>
+          )}
         </svg>
       </div>
     </Marker>

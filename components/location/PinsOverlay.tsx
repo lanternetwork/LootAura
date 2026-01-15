@@ -144,6 +144,7 @@ export default function PinsOverlay({
             lat={sale.lat}
             lng={sale.lng}
             isSelected={selectedId === sale.id}
+            isFeatured={(sale as any).isFeatured === true || (sale as any).is_featured === true}
             onClick={onPinClick}
           />
         ))}
@@ -162,6 +163,7 @@ export default function PinsOverlay({
             lat={sale.lat}
             lng={sale.lng}
             isSelected={selectedId === sale.id}
+            isFeatured={(sale as any).isFeatured === true || (sale as any).is_featured === true}
             onClick={onPinClick}
           />
         ))}

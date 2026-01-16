@@ -13,7 +13,7 @@ import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
 import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
 
-const HEADER_HEIGHT = 64 // px
+const HEADER_HEIGHT = 56 // px - mobile header height (h-14 = 56px)
 
 type MobileMode = 'map' | 'list'
 

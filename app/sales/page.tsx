@@ -253,7 +253,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const initialSales: any[] = []
 
   return (
-    <div className="bg-gray-50 overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="bg-gray-50 overflow-hidden" style={{ height: '100vh', marginTop: '-56px', paddingTop: '56px' }}>
       <SalesClient 
         initialSales={initialSales}
         initialCenter={initialCenter}

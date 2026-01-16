@@ -130,7 +130,7 @@ export function Header() {
                     className="h-7 w-auto"
                   />
                 </span>
-                <span className="hidden md:inline">Loot Aura</span>
+                <span>Loot Aura</span>
               </Link>
             </>
           ) : (

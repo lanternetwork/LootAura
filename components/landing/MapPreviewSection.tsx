@@ -203,19 +203,21 @@ export function MapPreviewSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           {/* Left column - text */}
-          <div className="space-y-4">
+          <div className="space-y-4 text-center lg:text-left">
             <h2 className="text-2xl md:text-3xl font-semibold text-[#3A2268]">
               Browse on the live map
             </h2>
             <p className="text-base text-[#3A2268]/70">
               Pan, zoom, and filter by category to see what&apos;s happening in your neighborhood.
             </p>
-            <Link
-              href="/sales"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium rounded-lg transition-colors"
-            >
-              Open the map →
-            </Link>
+            <div className="flex justify-center lg:justify-start">
+              <Link
+                href="/sales"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium rounded-lg transition-colors"
+              >
+                Open the map →
+              </Link>
+            </div>
           </div>
 
           {/* Right column - map preview (non-interactive, clickable) */}

@@ -208,6 +208,8 @@ export default function PromotionCheckoutClient() {
   const [imageState, setImageState] = useState<'loading' | 'loaded' | 'error' | 'no-image'>('loading')
   const [debugTimings, setDebugTimings] = useState<Record<string, number | string | boolean>>({})
   const imageLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const successNavTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
   
   // Check for Stripe publishable key on mount
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -235,6 +237,9 @@ export default function PromotionCheckoutClient() {
   const urlMode = searchParams.get('mode') as 'draft' | 'sale' | null
 
   useEffect(() => {
+    // Mark component as mounted
+    isMountedRef.current = true
+    
     // Check for Stripe publishable key first
     if (!publishableKey) {
       setLoading(false)
@@ -252,6 +257,9 @@ export default function PromotionCheckoutClient() {
 
     setMode(detectedMode)
 
+    // Create abort controller for async operations
+    const abortController = new AbortController()
+
     // Fetch summary first, then client secret
     const fetchSummaryAndClientSecret = async () => {
       try {
@@ -260,20 +268,35 @@ export default function PromotionCheckoutClient() {
 
         if (detectedMode === 'sale') {
           if (!saleId) {
-            setError('sale_id is required for sale mode')
-            setLoading(false)
+            if (isMountedRef.current) {
+              setError('sale_id is required for sale mode')
+              setLoading(false)
+            }
             return
           }
 
           // Use no-store to prevent stale data after draft edits
-          const summaryResponse = await fetch(`/api/sales/${saleId}/summary`, {
-            cache: 'no-store',
-            credentials: 'include',
-          })
+          let summaryResponse: Response
+          try {
+            summaryResponse = await fetch(`/api/sales/${saleId}/summary`, {
+              cache: 'no-store',
+              credentials: 'include',
+              signal: abortController.signal,
+            })
+          } catch (err) {
+            // Ignore abort errors
+            if (err instanceof Error && (err.name === 'AbortError' || err.name === 'DOMException')) {
+              return
+            }
+            throw err
+          }
+          
           if (!summaryResponse.ok) {
-            const errorData = await summaryResponse.json().catch(() => ({}))
-            setError(errorData.error || 'Failed to load sale information')
-            setLoading(false)
+            if (isMountedRef.current) {
+              const errorData = await summaryResponse.json().catch(() => ({}))
+              setError(errorData.error || 'Failed to load sale information')
+              setLoading(false)
+            }
             return
           }
 
@@ -286,6 +309,8 @@ export default function PromotionCheckoutClient() {
           }
           
           // Set image state based on whether photoUrl exists
+          if (!isMountedRef.current) return
+          
           if (!fetchedSummary.photoUrl) {
             setImageState('no-image')
             fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
@@ -333,17 +358,39 @@ export default function PromotionCheckoutClient() {
         } else {
           // Draft mode
           if (!draftKey) {
-            setError('draft_key is required for draft mode')
-            setLoading(false)
+            if (isMountedRef.current) {
+              setError('draft_key is required for draft mode')
+              setLoading(false)
+            }
             return
           }
 
-          const draftResult = await getDraftByKeyServer(draftKey)
-          if (!draftResult.ok || !draftResult.data?.payload) {
-            setError(draftResult.error || 'Failed to load draft information')
-            setLoading(false)
+          let draftResult
+          try {
+            draftResult = await getDraftByKeyServer(draftKey)
+          } catch (err) {
+            // Ignore abort errors (though getDraftByKeyServer doesn't use abort signal)
+            // This is defensive in case it's updated in the future
+            if (err instanceof Error && (err.name === 'AbortError' || err.name === 'DOMException')) {
+              return
+            }
+            if (isMountedRef.current) {
+              setError('Failed to load draft information')
+              setLoading(false)
+            }
             return
           }
+          
+          if (!draftResult.ok || !draftResult.data?.payload) {
+            if (isMountedRef.current) {
+              setError(draftResult.error || 'Failed to load draft information')
+              setLoading(false)
+            }
+            return
+          }
+          
+          // Check if still mounted after async operation
+          if (!isMountedRef.current) return
 
           const payload = draftResult.data.payload
           fetchedSummary = {
@@ -356,6 +403,8 @@ export default function PromotionCheckoutClient() {
           }
           
           // Set image state based on whether photoUrl exists
+          if (!isMountedRef.current) return
+          
           if (!fetchedSummary.photoUrl) {
             setImageState('no-image')
             fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
@@ -388,11 +437,15 @@ export default function PromotionCheckoutClient() {
         }
 
         if (!fetchedSummary) {
-          setError('Failed to load checkout information')
-          setLoading(false)
+          if (isMountedRef.current) {
+            setError('Failed to load checkout information')
+            setLoading(false)
+          }
           return
         }
 
+        if (!isMountedRef.current) return
+        
         setSummary(fetchedSummary)
 
         // Step 2: Fetch client secret from API
@@ -404,15 +457,19 @@ export default function PromotionCheckoutClient() {
 
           if (detectedMode === 'draft') {
             if (!draftKey) {
-              setError('draft_key is required for draft mode')
-              setLoading(false)
+              if (isMountedRef.current) {
+                setError('draft_key is required for draft mode')
+                setLoading(false)
+              }
               return
             }
             requestBody.draft_key = draftKey
           } else {
             if (!saleId) {
-              setError('sale_id is required for sale mode')
-              setLoading(false)
+              if (isMountedRef.current) {
+                setError('sale_id is required for sale mode')
+                setLoading(false)
+              }
               return
             }
             requestBody.sale_id = saleId
@@ -421,17 +478,29 @@ export default function PromotionCheckoutClient() {
             }
           }
 
-          const response = await fetch('/api/promotions/intent', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...getCsrfHeaders(),
-            },
-            credentials: 'include',
-            body: JSON.stringify(requestBody),
-          })
+          let response: Response
+          try {
+            response = await fetch('/api/promotions/intent', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders(),
+              },
+              credentials: 'include',
+              body: JSON.stringify(requestBody),
+              signal: abortController.signal,
+            })
+          } catch (err) {
+            // Ignore abort errors
+            if (err instanceof Error && (err.name === 'AbortError' || err.name === 'DOMException')) {
+              return
+            }
+            throw err
+          }
 
           const data = await response.json().catch(() => ({}))
+
+          if (!isMountedRef.current) return
 
           if (!response.ok) {
             const errorMessage = data.error || data.message || 'Failed to initialize payment'
@@ -463,7 +532,10 @@ export default function PromotionCheckoutClient() {
           try {
             const amountResponse = await fetch('/api/promotions/amount?tier=featured_week', {
               cache: 'no-store',
+              signal: abortController.signal,
             })
+            if (!isMountedRef.current) return
+            
             const amountData = await amountResponse.json()
             if (amountData.amountCents) {
               setAmountCents(amountData.amountCents)
@@ -471,11 +543,18 @@ export default function PromotionCheckoutClient() {
               // Fallback to default
               setAmountCents(299)
             }
-          } catch {
-            // Fallback to default
-            setAmountCents(299)
+          } catch (err) {
+            // Ignore abort errors
+            if (err instanceof Error && (err.name === 'AbortError' || err.name === 'DOMException')) {
+              return
+            }
+            // Fallback to default only if still mounted
+            if (isMountedRef.current) {
+              setAmountCents(299)
+            }
           }
 
+          if (!isMountedRef.current) return
           setLoading(false)
           
           // Log timings in debug mode
@@ -492,23 +571,42 @@ export default function PromotionCheckoutClient() {
             }
           }
         } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment'
+          // Ignore abort errors
+          if (err instanceof Error && (err.name === 'AbortError' || err.name === 'DOMException')) {
+            return
+          }
+          if (isMountedRef.current) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment'
+            setError(errorMessage)
+            setLoading(false)
+          }
+        }
+      } catch (err) {
+        // Ignore abort errors
+        if (err instanceof Error && (err.name === 'AbortError' || err.name === 'DOMException')) {
+          return
+        }
+        if (isMountedRef.current) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to load checkout information'
           setError(errorMessage)
           setLoading(false)
         }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load checkout information'
-        setError(errorMessage)
-        setLoading(false)
       }
     }
 
     fetchSummaryAndClientSecret()
     
-    // Cleanup timeout on unmount
+    // Cleanup on unmount
     return () => {
+      isMountedRef.current = false
+      abortController.abort()
       if (imageLoadTimeoutRef.current) {
         clearTimeout(imageLoadTimeoutRef.current)
+        imageLoadTimeoutRef.current = null
+      }
+      if (successNavTimeoutRef.current) {
+        clearTimeout(successNavTimeoutRef.current)
+        successNavTimeoutRef.current = null
       }
     }
   }, [draftKey, saleId, promotionId, urlMode, publishableKey])
@@ -516,8 +614,14 @@ export default function PromotionCheckoutClient() {
   const handleSuccess = () => {
     setSuccess(true)
     
+    // Clear any existing navigation timeout
+    if (successNavTimeoutRef.current) {
+      clearTimeout(successNavTimeoutRef.current)
+    }
+    
     // Navigate after a short delay
-    setTimeout(() => {
+    successNavTimeoutRef.current = setTimeout(() => {
+      successNavTimeoutRef.current = null
       if (mode === 'draft') {
         // Navigate to processing page
         router.push('/promotions/processing?mode=draft')

@@ -383,6 +383,12 @@ export default function PromotionCheckoutClient() {
           }
         }
 
+        if (!fetchedSummary) {
+          setError('Failed to load checkout information')
+          setLoading(false)
+          return
+        }
+
         setSummary(fetchedSummary)
 
         // Step 2: Fetch client secret from API

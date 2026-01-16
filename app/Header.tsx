@@ -147,11 +147,42 @@ export function Header() {
           )}
           
           <div className="flex gap-2 sm:gap-6 items-center shrink-0">
-            {/* Main links cluster */}
-            <div ref={mainRef} className={`${isCollapsed ? 'hidden' : 'hidden sm:flex'} items-center gap-3 sm:gap-6`} aria-label="Main navigation">
+            {/* Main links cluster - Text links for large screens */}
+            <div ref={mainRef} className={`${isCollapsed ? 'hidden' : 'hidden lg:flex'} items-center gap-3 sm:gap-6`} aria-label="Main navigation">
               <Link href="/sales" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Browse Sales</Link>
-              <Link href="/favorites" className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
+              <Link href="/favorites" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
               <Link href="/sell/new" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
+            </div>
+            {/* Main links cluster - Icon buttons for medium screens (when text would be too tight) */}
+            <div className={`${isCollapsed ? 'hidden' : 'hidden sm:flex lg:hidden'} items-center gap-1 shrink-0`} aria-label="Main navigation">
+              <Link
+                href="/sales"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Browse Sales"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </Link>
+              <Link
+                href="/favorites"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Favorites"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </Link>
+              <Link
+                href="/sell/new"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Post Your Sale"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </Link>
             </div>
             {/* Visual divider between clusters (desktop only) */}
             <div className={`${isCollapsed ? 'hidden' : 'hidden md:block'} h-6 w-px bg-slate-200`} aria-hidden="true"></div>

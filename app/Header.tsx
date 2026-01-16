@@ -11,7 +11,6 @@ export function Header() {
   const router = useRouter()
   const [hasUser, setHasUser] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const logoRef = useRef<HTMLAnchorElement | null>(null)
   const mainRef = useRef<HTMLDivElement | null>(null)
@@ -79,7 +78,6 @@ export function Header() {
       if (collapsed !== last) {
         last = collapsed
         setIsCollapsed(collapsed)
-        if (!collapsed) setMenuOpen(false)
       }
     }
     const ro = new ResizeObserver(() => {
@@ -203,35 +201,12 @@ export function Header() {
                 </Link>
               )}
             </div>
-            {/* Hamburger trigger (shows when collapsed on desktop) */}
-            <button
-              aria-label="Open navigation menu"
-              aria-controls="site-menu"
-              aria-expanded={menuOpen}
-              className={`${isCollapsed ? '' : 'hidden'} hidden sm:flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors`}
-              onClick={() => setMenuOpen(v => !v)}
-            >
-              <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
             <div ref={userRef} className="flex items-center">
               <UserProfile />
             </div>
           </div>
         </div>
       </div>
-      {menuOpen && isCollapsed && (
-        <div role="dialog" aria-modal="true" id="site-menu" className="hidden sm:block border-t bg-white shadow-md">
-          <div className="px-4 py-3 flex flex-col gap-2">
-            <Link href="/sales" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Browse Sales</Link>
-            <Link href="/favorites" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Favorites</Link>
-            <Link href="/sell/new" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Post Your Sale</Link>
-            {hasUser && <hr className="my-2" />}
-            {hasUser && <Link href="/dashboard" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Dashboard</Link>}
-          </div>
-        </div>
-      )}
     </nav>
   )
 }

@@ -9,10 +9,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # Allow repository dispatch events
+  contents: read
   security-events: write
   actions: read
-  # Fixed permissions for notify-completion job
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -507,6 +506,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [env-presence, lint, typecheck, test-unit, test-integration, test-e2e-smoke, build, css-scan, migration-verify]
     if: always()
+    permissions:
+      contents: write  # Required for github.rest.repos.createDispatchEvent()
+      security-events: write
+      actions: read
     steps:
       - name: Emit ci_completed event
         uses: actions/github-script@v7

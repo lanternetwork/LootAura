@@ -307,7 +307,7 @@ export default function PromotionCheckoutClient() {
             }, 10000)
           }
           
-          if (isDebug) {
+          if (isDebug && fetchedSummary) {
             // Extract hostname only (no full URL) for safe logging
             let imageHostname: string | null = null
             if (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg') {
@@ -325,7 +325,7 @@ export default function PromotionCheckoutClient() {
               summaryFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
               hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
               imageHostname: imageHostname,
-              imageState: fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg' ? 'loading' : 'no-image',
+              imageState: (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg' ? 'loading' : 'no-image') as string,
             }))
           }
         } else {
@@ -361,7 +361,7 @@ export default function PromotionCheckoutClient() {
             setImageState('loading')
           }
           
-          if (isDebug) {
+          if (isDebug && fetchedSummary) {
             // Extract hostname only (no full URL) for safe logging
             let imageHostname: string | null = null
             if (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg') {
@@ -522,6 +522,19 @@ export default function PromotionCheckoutClient() {
     setError(errorMessage)
   }
 
+  // Memoize Elements options to prevent recreation on every render
+  // Must be called before any early returns (React hooks rules)
+  const amount = amountCents || 299
+  const elementsOptions: StripeElementsOptions | null = useMemo(() => {
+    if (!clientSecret) return null
+    return {
+      clientSecret,
+      appearance: {
+        theme: 'stripe' as const,
+      },
+    }
+  }, [clientSecret])
+
   // Skeleton loading component
   const SkeletonLoader = () => (
     <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8">
@@ -638,16 +651,6 @@ export default function PromotionCheckoutClient() {
       </div>
     )
   }
-
-  const amount = amountCents || 299
-  
-  // Memoize Elements options to prevent recreation on every render
-  const elementsOptions: StripeElementsOptions = useMemo(() => ({
-    clientSecret,
-    appearance: {
-      theme: 'stripe' as const,
-    },
-  }), [clientSecret])
 
   // Format date/time for display
   const formatDateTime = (dateStart?: string, timeStart?: string) => {
@@ -786,15 +789,17 @@ export default function PromotionCheckoutClient() {
                   Complete Your Payment
                 </h1>
                 
-                <Elements stripe={stripePromise} options={elementsOptions} key={clientSecret}>
-                  <PaymentForm
-                    clientSecret={clientSecret}
-                    amountCents={amount}
-                    mode={mode}
-                    onSuccess={handleSuccess}
-                    onError={handleError}
-                  />
-                </Elements>
+                {elementsOptions && (
+                  <Elements stripe={stripePromise} options={elementsOptions} key={clientSecret}>
+                    <PaymentForm
+                      clientSecret={clientSecret}
+                      amountCents={amount}
+                      mode={mode}
+                      onSuccess={handleSuccess}
+                      onError={handleError}
+                    />
+                  </Elements>
+                )}
               </div>
             </div>
             

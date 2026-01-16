@@ -851,15 +851,33 @@ export default function SellWizardClient({
         if (specificDraftKey) {
           // Load the specific draft by key
           const serverResult = await getDraftByKeyServer(specificDraftKey)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Draft fetch result:', {
+              ok: serverResult.ok,
+              hasData: !!serverResult.data,
+              hasPayload: !!serverResult.data?.payload,
+              error: serverResult.error,
+              code: serverResult.code
+            })
+          }
           if (serverResult.ok && serverResult.data?.payload) {
             draftToRestore = serverResult.data.payload
-            restoredDraftKey = serverResult.data.draft_key
+            restoredDraftKey = serverResult.data.draft_key || specificDraftKey
             source = 'server'
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SELL_WIZARD] Found specific server draft by key:', specificDraftKey)
+              console.log('[SELL_WIZARD] Found specific server draft by key:', specificDraftKey, {
+                hasFormData: !!draftToRestore.formData,
+                formDataKeys: draftToRestore.formData ? Object.keys(draftToRestore.formData) : []
+              })
             }
             // Clear the sessionStorage key after using it
             sessionStorage.removeItem('draft:key')
+          } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[SELL_WIZARD] Failed to load draft by key:', {
+              draftKey: specificDraftKey,
+              error: serverResult.error,
+              code: serverResult.code
+            })
           }
         }
         
@@ -936,10 +954,17 @@ export default function SellWizardClient({
               localStorage.setItem('draft:key', restoredDraftKey)
             }
           } else if (source === 'server' && typeof window !== 'undefined') {
-            // If we got a server draft but no explicit key, try to get it from localStorage
-            const storedKey = localStorage.getItem('draft:key')
-            if (storedKey) {
-              draftKeyRef.current = storedKey
+            // If we got a server draft but no explicit key, try to get it from sessionStorage first (from dashboard Continue button)
+            const sessionKey = sessionStorage.getItem('draft:key')
+            if (sessionKey) {
+              draftKeyRef.current = sessionKey
+              localStorage.setItem('draft:key', sessionKey)
+            } else {
+              // Fallback to localStorage
+              const storedKey = localStorage.getItem('draft:key')
+              if (storedKey) {
+                draftKeyRef.current = storedKey
+              }
             }
           }
           
@@ -949,7 +974,8 @@ export default function SellWizardClient({
           // Non-critical state (toast messages) is wrapped in startTransition
           
           // Prepare all state updates
-          const nextForm = draftToRestore.formData ? (() => {
+          // Always restore formData if it exists in the draft (even if empty object)
+          const nextForm = draftToRestore.formData !== undefined ? (() => {
             const form = { ...draftToRestore.formData }
             if (form.time_start) {
               form.time_start = normalizeTimeToNearest30(form.time_start) || form.time_start
@@ -985,10 +1011,24 @@ export default function SellWizardClient({
 
           // ATOMIC RESUME: Dispatch single RESUME_DRAFT action to set all wizard state atomically
           // This prevents React errors #418/#422 by ensuring all updates happen in one reducer call
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Restoring draft:', {
+              hasFormData: !!nextForm,
+              formDataKeys: nextForm ? Object.keys(nextForm) : [],
+              hasPhotos: nextPhotos !== undefined,
+              photosCount: nextPhotos?.length || 0,
+              hasItems: nextItems !== undefined,
+              itemsCount: nextItems?.length || 0,
+              wantsPromotion: nextWantsPromotion,
+              nextStep,
+              source,
+              restoredDraftKey
+            })
+          }
           dispatch({
             type: 'RESUME_DRAFT',
             payload: {
-              ...(nextForm && { formData: nextForm }),
+              ...(nextForm !== undefined && { formData: nextForm }),
               ...(nextPhotos !== undefined && { photos: nextPhotos }),
               ...(nextItems !== undefined && { items: nextItems }),
               ...(nextWantsPromotion !== undefined && { wantsPromotion: nextWantsPromotion }),

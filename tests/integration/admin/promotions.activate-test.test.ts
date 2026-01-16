@@ -58,11 +58,9 @@ describe('POST /api/admin/promotions/activate-test', () => {
 
     // Mock ENABLE_ADMIN_TOOLS check (allow in test)
     // Set env vars to allow admin tools in test environment
+    // NODE_ENV is already 'test' in vitest, so we don't need to set it
     if (typeof process.env.ENABLE_ADMIN_TOOLS === 'undefined') {
       process.env.ENABLE_ADMIN_TOOLS = 'true'
-    }
-    if (typeof process.env.NODE_ENV === 'undefined') {
-      process.env.NODE_ENV = 'test'
     }
 
     const module = await import('@/app/api/admin/promotions/activate-test/route')
@@ -70,11 +68,11 @@ describe('POST /api/admin/promotions/activate-test', () => {
   })
 
   it('expires all existing live promotions before creating new one (multi-promotion case)', async () => {
-    const saleId = 'sale-123'
-    const existingPromo1 = { id: 'promo-1', status: 'active' }
-    const existingPromo2 = { id: 'promo-2', status: 'pending' }
+    const saleId = '123e4567-e89b-12d3-a456-426614174000'
+    const existingPromo1 = { id: '111e4567-e89b-12d3-a456-426614174010', status: 'active' }
+    const existingPromo2 = { id: '222e4567-e89b-12d3-a456-426614174011', status: 'pending' }
     const newPromo = {
-      id: 'promo-3',
+      id: '333e4567-e89b-12d3-a456-426614174012',
       sale_id: saleId,
       status: 'active',
       starts_at: '2025-01-15T12:00:00.000Z',
@@ -190,7 +188,7 @@ describe('POST /api/admin/promotions/activate-test', () => {
     expect(res.status).toBe(200)
     expect(json.ok).toBe(true)
     expect(json.promotion).toBeDefined()
-    expect(json.promotion.id).toBe('promo-3')
+    expect(json.promotion.id).toBe('333e4567-e89b-12d3-a456-426614174012')
     expect(json.promotion.sale_id).toBe(saleId)
 
     // Verify bulk expire update was called
@@ -201,9 +199,9 @@ describe('POST /api/admin/promotions/activate-test', () => {
   })
 
   it('handles case with no existing promotions (idempotent)', async () => {
-    const saleId = 'sale-456'
+    const saleId = '456e7890-e89b-12d3-a456-426614174001'
     const newPromo = {
-      id: 'promo-new',
+      id: '444e4567-e89b-12d3-a456-426614174020',
       sale_id: saleId,
       status: 'active',
       starts_at: '2025-01-15T12:00:00.000Z',

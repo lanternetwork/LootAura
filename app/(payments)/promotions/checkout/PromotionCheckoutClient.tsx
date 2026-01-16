@@ -324,7 +324,7 @@ export default function PromotionCheckoutClient() {
               ...prev,
               summaryFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
               hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
-              imageHostname: imageHostname,
+              imageHostname: imageHostname || '',
               imageState: (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg' ? 'loading' : 'no-image') as string,
             }))
           }
@@ -378,7 +378,7 @@ export default function PromotionCheckoutClient() {
               ...prev,
               draftFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
               hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
-              imageHostname: imageHostname,
+              imageHostname: imageHostname || '',
             }))
           }
         }

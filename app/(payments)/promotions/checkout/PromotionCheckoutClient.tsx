@@ -308,24 +308,26 @@ export default function PromotionCheckoutClient() {
           }
           
           if (isDebug && fetchedSummary) {
+            // Capture in local const for type narrowing in closure
+            const summary = fetchedSummary
             // Extract hostname only (no full URL) for safe logging
             let imageHostname: string | null = null
-            if (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg') {
+            if (summary.photoUrl && summary.photoUrl !== '/placeholders/sale-placeholder.svg') {
               try {
-                const url = new URL(fetchedSummary.photoUrl)
+                const url = new URL(summary.photoUrl)
                 imageHostname = url.hostname
               } catch {
                 // Relative URL or placeholder
-                imageHostname = fetchedSummary.photoUrl.startsWith('/') ? 'relative' : 'unknown'
+                imageHostname = summary.photoUrl.startsWith('/') ? 'relative' : 'unknown'
               }
             }
             
             setDebugTimings(prev => ({
               ...prev,
               summaryFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
-              hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
+              hasImageUrl: !!summary.photoUrl && summary.photoUrl !== '/placeholders/sale-placeholder.svg',
               imageHostname: imageHostname || '',
-              imageState: (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg' ? 'loading' : 'no-image') as string,
+              imageState: (summary.photoUrl && summary.photoUrl !== '/placeholders/sale-placeholder.svg' ? 'loading' : 'no-image') as string,
             }))
           }
         } else {
@@ -362,11 +364,13 @@ export default function PromotionCheckoutClient() {
           }
           
           if (isDebug && fetchedSummary) {
+            // Capture in local const for type narrowing in closure
+            const summary = fetchedSummary
             // Extract hostname only (no full URL) for safe logging
             let imageHostname: string | null = null
-            if (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg') {
+            if (summary.photoUrl && summary.photoUrl !== '/placeholders/sale-placeholder.svg') {
               try {
-                const url = new URL(fetchedSummary.photoUrl)
+                const url = new URL(summary.photoUrl)
                 imageHostname = url.hostname
               } catch {
                 // Relative URL
@@ -377,7 +381,7 @@ export default function PromotionCheckoutClient() {
             setDebugTimings(prev => ({
               ...prev,
               draftFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
-              hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
+              hasImageUrl: !!summary.photoUrl && summary.photoUrl !== '/placeholders/sale-placeholder.svg',
               imageHostname: imageHostname || '',
             }))
           }

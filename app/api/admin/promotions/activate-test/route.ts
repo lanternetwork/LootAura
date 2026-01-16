@@ -156,87 +156,90 @@ async function activateTestPromotionHandler(request: NextRequest) {
       )
     }
 
-    // Check if promotion already exists for this sale
-    const { data: existingPromotion, error: existingError } = await fromBase(adminDb, 'promotions')
+    // Find all live promotions for this sale (active or pending)
+    // We'll expire them all before creating/updating the test promotion
+    const { data: existingPromotions, error: existingError } = await fromBase(adminDb, 'promotions')
       .select('id, status')
       .eq('sale_id', sale_id)
-      .maybeSingle()
+      .in('status', ['active', 'pending'])
 
-    if (existingError && existingError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
-      logger.error('Error checking existing promotion', existingError instanceof Error ? existingError : new Error(String(existingError)), {
+    if (existingError) {
+      logger.error('Error checking existing promotions', existingError instanceof Error ? existingError : new Error(String(existingError)), {
         component: 'admin/promotions',
         operation: 'activate_test',
         sale_id,
       })
       return NextResponse.json(
-        { error: 'Failed to check existing promotion' },
+        { error: 'Failed to check existing promotions' },
         { status: 500 }
       )
     }
 
-    let promotionId: string
-    let promotion: any
+    // Expire all existing live promotions (idempotent: if none exist, this is a no-op)
+    if (existingPromotions && existingPromotions.length > 0) {
+      const now = new Date().toISOString()
+      const promotionIds = existingPromotions.map((p) => p.id)
 
-    if (existingPromotion) {
-      // Update existing promotion
-      const { data: updatedPromotion, error: updateError } = await fromBase(adminDb, 'promotions')
+      const { error: expireError } = await fromBase(adminDb, 'promotions')
         .update({
-          status: 'active',
-          starts_at: finalStartsAt,
-          ends_at: finalEndsAt,
-          tier,
-          updated_at: new Date().toISOString(),
+          status: 'expired',
+          ends_at: now,
+          updated_at: now,
         })
-        .eq('id', existingPromotion.id)
-        .select('id, sale_id, status, starts_at, ends_at, tier')
-        .single()
+        .in('id', promotionIds)
+        .in('status', ['active', 'pending']) // Only expire if still active/pending (idempotent)
 
-      if (updateError || !updatedPromotion) {
-        logger.error('Failed to update promotion', updateError instanceof Error ? updateError : new Error(String(updateError)), {
+      if (expireError) {
+        logger.error('Failed to expire existing promotions', expireError instanceof Error ? expireError : new Error(String(expireError)), {
           component: 'admin/promotions',
           operation: 'activate_test',
           sale_id,
-          promotion_id: existingPromotion.id,
+          promotion_ids: promotionIds,
         })
         return NextResponse.json(
-          { error: 'Failed to update promotion' },
+          { error: 'Failed to expire existing promotions' },
           { status: 500 }
         )
       }
 
-      promotion = updatedPromotion
-      promotionId = updatedPromotion.id
-    } else {
-      // Create new promotion
-      const { data: newPromotion, error: createError } = await fromBase(adminDb, 'promotions')
-        .insert({
-          sale_id,
-          owner_profile_id: sale.owner_id,
-          status: 'active',
-          tier,
-          starts_at: finalStartsAt,
-          ends_at: finalEndsAt,
-          amount_cents: 0, // Test promotion - no payment
-          currency: 'usd',
-        })
-        .select('id, sale_id, status, starts_at, ends_at, tier')
-        .single()
-
-      if (createError || !newPromotion) {
-        logger.error('Failed to create promotion', createError instanceof Error ? createError : new Error(String(createError)), {
-          component: 'admin/promotions',
-          operation: 'activate_test',
-          sale_id,
-        })
-        return NextResponse.json(
-          { error: 'Failed to create promotion' },
-          { status: 500 }
-        )
-      }
-
-      promotion = newPromotion
-      promotionId = newPromotion.id
+      logger.info('Expired existing promotions before activating test promotion', {
+        component: 'admin/promotions',
+        operation: 'activate_test',
+        sale_id,
+        expired_count: promotionIds.length,
+        promotion_ids: promotionIds,
+      })
     }
+
+    // Create new test promotion (always create, never update, since we expired all existing ones)
+    const { data: newPromotion, error: createError } = await fromBase(adminDb, 'promotions')
+      .insert({
+        sale_id,
+        owner_profile_id: sale.owner_id,
+        status: 'active',
+        tier,
+        starts_at: finalStartsAt,
+        ends_at: finalEndsAt,
+        amount_cents: 0, // Test promotion - no payment
+        currency: 'usd',
+      })
+      .select('id, sale_id, status, starts_at, ends_at, tier')
+      .single()
+
+    if (createError || !newPromotion) {
+      logger.error('Failed to create promotion', createError instanceof Error ? createError : new Error(String(createError)), {
+        component: 'admin/promotions',
+        operation: 'activate_test',
+        sale_id,
+      })
+      return NextResponse.json(
+        { error: 'Failed to create promotion' },
+        { status: 500 }
+      )
+    }
+
+    const promotion = newPromotion
+    const promotionId = newPromotion.id
 
     logger.info('Test promotion activated', {
       component: 'admin/promotions',
@@ -247,6 +250,7 @@ async function activateTestPromotionHandler(request: NextRequest) {
       mode,
       starts_at: finalStartsAt,
       ends_at: finalEndsAt,
+      expired_existing_count: existingPromotions?.length || 0,
     })
 
     return NextResponse.json({

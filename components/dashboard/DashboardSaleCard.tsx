@@ -68,6 +68,10 @@ export default function DashboardSaleCard({
     // Navigate directly to internal checkout page
     // /api/promotions/intent will handle validation and create promotion record if needed
     const checkoutUrl = `/promotions/checkout?mode=sale&sale_id=${encodeURIComponent(sale.id)}&tier=featured_week`
+    
+    // Prefetch checkout route to warm code chunks
+    router.prefetch(checkoutUrl)
+    
     router.push(checkoutUrl)
   }
 

@@ -3,9 +3,9 @@ import Link from 'next/link'
 
 export function TopNav() {
   return (
-    <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
-        <div className="flex items-center justify-between h-full">
+    <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-full">
+        <div className="flex items-center justify-between h-full gap-2">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 text-xl font-bold text-[#3A2268]">
             <span className="inline-flex items-center justify-center">
@@ -15,7 +15,7 @@ export function TopNav() {
                 className="h-7 w-auto"
               />
             </span>
-            <span>Loot Aura</span>
+            <span className="hidden md:inline">Loot Aura</span>
           </Link>
 
           {/* Right side - links and sign in button */}
@@ -39,10 +39,10 @@ export function TopNav() {
           {/* Sign in button */}
           <Link
             href="/auth/signin"
-            className="btn-accent-secondary"
+            className="btn-accent-secondary whitespace-nowrap"
           >
-              Sign in
-            </Link>
+            Sign in
+          </Link>
           </div>
         </div>
       </div>

@@ -1805,6 +1805,8 @@ export default function SellWizardClient({
           
           // Redirect to internal checkout page - this is the ONLY valid path for promoted sales
           const checkoutUrl = `/promotions/checkout?mode=draft&draft_key=${encodeURIComponent(draftKeyForCheckout)}&tier=featured_week`
+          // Prefetch checkout route to warm code chunks
+          router.prefetch(checkoutUrl)
           router.push(checkoutUrl)
           dispatch({ type: 'SET_LOADING', loading: false })
           return

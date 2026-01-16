@@ -96,9 +96,9 @@ export function Header() {
   }, [])
   
   return (
-    <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-16">
-      <div ref={containerRef} className="w-full px-4 sm:px-6 lg:px-8 h-full">
-        <div className="flex justify-between items-center h-full">
+    <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">
+      <div ref={containerRef} className="w-full px-3 sm:px-6 lg:px-8 h-full">
+        <div className="flex justify-between items-center h-full gap-2">
           {/* Mobile: Show back button on sale detail pages or when list is open, otherwise show logo */}
           {(isSaleDetailPage || isSalesPageWithList) ? (
             <>
@@ -132,7 +132,7 @@ export function Header() {
                     className="h-7 w-auto"
                   />
                 </span>
-                <span>Loot Aura</span>
+                <span className="hidden md:inline">Loot Aura</span>
               </Link>
             </>
           ) : (
@@ -144,7 +144,7 @@ export function Header() {
                   className="h-7 w-auto"
                 />
               </span>
-              <span>Loot Aura</span>
+              <span className="hidden md:inline">Loot Aura</span>
             </Link>
           )}
           
@@ -161,54 +161,24 @@ export function Header() {
             <div ref={adminRef} className={`${isCollapsed ? 'hidden' : 'hidden md:flex'} items-center gap-3`} aria-label="Account">
               {hasUser && <Link href="/dashboard" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Dashboard</Link>}
             </div>
-            {/* Mobile-only navigation icons (replaces hamburger menu) */}
-            <div className="sm:hidden flex items-center gap-2">
-              <Link
-                href="/sales"
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                aria-label="Browse Sales"
-              >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </Link>
-              <Link
-                href="/favorites"
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                aria-label="Favorites"
-              >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </Link>
-              <Link
-                href="/sell/new"
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                aria-label="Post Your Sale"
-              >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </Link>
-              {hasUser && (
-                <Link
-                  href="/dashboard"
-                  className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                  aria-label="Dashboard"
-                >
-                  <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                </Link>
-              )}
-            </div>
+            {/* Mobile hamburger menu (replaces individual icon buttons on small screens) */}
+            <button
+              aria-label="Open navigation menu"
+              aria-controls="site-menu"
+              aria-expanded={menuOpen}
+              className="sm:hidden flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+              onClick={() => setMenuOpen(v => !v)}
+            >
+              <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             {/* Hamburger trigger (shows when collapsed on desktop) */}
             <button
               aria-label="Open navigation menu"
               aria-controls="site-menu"
               aria-expanded={menuOpen}
-              className={`${isCollapsed ? '' : 'hidden'} flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors`}
+              className={`${isCollapsed ? '' : 'hidden'} hidden sm:flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors`}
               onClick={() => setMenuOpen(v => !v)}
             >
               <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,8 +191,8 @@ export function Header() {
           </div>
         </div>
       </div>
-      {menuOpen && isCollapsed && (
-        <div role="dialog" aria-modal="true" id="site-menu" className="hidden sm:block border-t bg-white shadow-md">
+      {menuOpen && (
+        <div role="dialog" aria-modal="true" id="site-menu" className="border-t bg-white shadow-md">
           <div className="px-4 py-3 flex flex-col gap-2">
             <Link href="/sales" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Browse Sales</Link>
             <Link href="/favorites" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Favorites</Link>

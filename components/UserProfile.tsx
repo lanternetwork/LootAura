@@ -54,7 +54,7 @@ export default function UserProfile() {
     return (
       <a 
         href="/auth/signin" 
-        className="btn-accent-secondary text-sm"
+        className="btn-accent-secondary text-sm whitespace-nowrap"
       >
         Sign In
       </a>

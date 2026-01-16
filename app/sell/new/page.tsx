@@ -34,7 +34,9 @@ export default async function SellNewPage() {
     }
   } catch (e) {
     // Location fetch failed - continue without it
-    console.warn('[SellNewPage] Failed to get location:', e)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('[SellNewPage] Failed to get location:', e)
+    }
   }
 
   const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'

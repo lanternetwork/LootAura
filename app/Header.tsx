@@ -11,7 +11,6 @@ export function Header() {
   const router = useRouter()
   const [hasUser, setHasUser] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const logoRef = useRef<HTMLAnchorElement | null>(null)
   const mainRef = useRef<HTMLDivElement | null>(null)
@@ -79,7 +78,6 @@ export function Header() {
       if (collapsed !== last) {
         last = collapsed
         setIsCollapsed(collapsed)
-        if (!collapsed) setMenuOpen(false)
       }
     }
     const ro = new ResizeObserver(() => {
@@ -132,7 +130,7 @@ export function Header() {
                     className="h-7 w-auto"
                   />
                 </span>
-                <span className="hidden md:inline">Loot Aura</span>
+                <span>Loot Aura</span>
               </Link>
             </>
           ) : (
@@ -144,16 +142,47 @@ export function Header() {
                   className="h-7 w-auto"
                 />
               </span>
-              <span className="hidden md:inline">Loot Aura</span>
+              <span>Loot Aura</span>
             </Link>
           )}
           
-          <div className="flex gap-3 sm:gap-6 items-center">
-            {/* Main links cluster */}
-            <div ref={mainRef} className={`${isCollapsed ? 'hidden' : 'hidden sm:flex'} items-center gap-3 sm:gap-6`} aria-label="Main navigation">
+          <div className="flex gap-2 sm:gap-6 items-center shrink-0">
+            {/* Main links cluster - Text links for large screens */}
+            <div ref={mainRef} className={`${isCollapsed ? 'hidden' : 'hidden lg:flex'} items-center gap-3 sm:gap-6`} aria-label="Main navigation">
               <Link href="/sales" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Browse Sales</Link>
-              <Link href="/favorites" className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
-              <Link href="/sell/new" className="text-xs sm:text-sm md:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
+              <Link href="/favorites" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
+              <Link href="/sell/new" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
+            </div>
+            {/* Main links cluster - Icon buttons for medium screens (when text would be too tight) */}
+            <div className={`${isCollapsed ? 'hidden' : 'hidden sm:flex lg:hidden'} items-center gap-1 shrink-0`} aria-label="Main navigation">
+              <Link
+                href="/sales"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Browse Sales"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </Link>
+              <Link
+                href="/favorites"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Favorites"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </Link>
+              <Link
+                href="/sell/new"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Post Your Sale"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </Link>
             </div>
             {/* Visual divider between clusters (desktop only) */}
             <div className={`${isCollapsed ? 'hidden' : 'hidden md:block'} h-6 w-px bg-slate-200`} aria-hidden="true"></div>
@@ -161,47 +190,54 @@ export function Header() {
             <div ref={adminRef} className={`${isCollapsed ? 'hidden' : 'hidden md:flex'} items-center gap-3`} aria-label="Account">
               {hasUser && <Link href="/dashboard" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Dashboard</Link>}
             </div>
-            {/* Mobile hamburger menu (replaces individual icon buttons on small screens) */}
-            <button
-              aria-label="Open navigation menu"
-              aria-controls="site-menu"
-              aria-expanded={menuOpen}
-              className="sm:hidden flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-              onClick={() => setMenuOpen(v => !v)}
-            >
-              <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            {/* Hamburger trigger (shows when collapsed on desktop) */}
-            <button
-              aria-label="Open navigation menu"
-              aria-controls="site-menu"
-              aria-expanded={menuOpen}
-              className={`${isCollapsed ? '' : 'hidden'} hidden sm:flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors`}
-              onClick={() => setMenuOpen(v => !v)}
-            >
-              <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+            {/* Mobile-only navigation icons */}
+            <div className="sm:hidden flex items-center gap-1 shrink-0">
+              <Link
+                href="/sales"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Browse Sales"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </Link>
+              <Link
+                href="/favorites"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Favorites"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </Link>
+              <Link
+                href="/sell/new"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                aria-label="Post Your Sale"
+              >
+                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </Link>
+              {hasUser && (
+                <Link
+                  href="/dashboard"
+                  className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                  aria-label="Dashboard"
+                >
+                  <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </Link>
+              )}
+            </div>
             <div ref={userRef} className="flex items-center">
               <UserProfile />
             </div>
           </div>
         </div>
       </div>
-      {menuOpen && (
-        <div role="dialog" aria-modal="true" id="site-menu" className="border-t bg-white shadow-md">
-          <div className="px-4 py-3 flex flex-col gap-2">
-            <Link href="/sales" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Browse Sales</Link>
-            <Link href="/favorites" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Favorites</Link>
-            <Link href="/sell/new" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Post Your Sale</Link>
-            {hasUser && <hr className="my-2" />}
-            {hasUser && <Link href="/dashboard" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Dashboard</Link>}
-          </div>
-        </div>
-      )}
     </nav>
   )
 }

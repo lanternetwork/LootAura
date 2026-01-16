@@ -80,9 +80,10 @@ describe('POST /api/admin/promotions/activate-test', () => {
       tier: 'featured_week',
     }
 
-    // Track calls to verify bulk expire happened
+    // Track calls to verify bulk expire happened and capture update payload
     const updateSpy = vi.fn()
     const insertSpy = vi.fn()
+    let updatePayload: any = null
 
     let queryCallCount = 0
 
@@ -127,8 +128,9 @@ describe('POST /api/admin/promotions/activate-test', () => {
         // Second call: update (expire) existing promotions
         if (queryCallCount === 2) {
           const updateChain: any = {
-            update: vi.fn(() => {
+            update: vi.fn((payload: any) => {
               updateSpy()
+              updatePayload = payload // Capture the update payload
               return {
                 in: vi.fn(() => ({
                   in: vi.fn(() =>
@@ -190,12 +192,41 @@ describe('POST /api/admin/promotions/activate-test', () => {
     expect(json.promotion).toBeDefined()
     expect(json.promotion.id).toBe('333e4567-e89b-12d3-a456-426614174012')
     expect(json.promotion.sale_id).toBe(saleId)
+    expect(json.promotion.status).toBe('active')
+    expect(json.promotion.tier).toBe('featured_week')
 
-    // Verify bulk expire update was called
+    // Harden timestamp assertions: presence, validity, and ordering
+    expect(json.promotion.starts_at).toBeDefined()
+    expect(json.promotion.starts_at).toBeTypeOf('string')
+    const startsAtDate = new Date(json.promotion.starts_at)
+    expect(isNaN(startsAtDate.getTime())).toBe(false) // Valid date
+
+    expect(json.promotion.ends_at).toBeDefined()
+    expect(json.promotion.ends_at).toBeTypeOf('string')
+    const endsAtDate = new Date(json.promotion.ends_at)
+    expect(isNaN(endsAtDate.getTime())).toBe(false) // Valid date
+
+    // Assert ordering: ends_at > starts_at
+    expect(endsAtDate.getTime()).toBeGreaterThan(startsAtDate.getTime())
+
+    // Assert bulk-expire update includes terminal fields
     expect(updateSpy).toHaveBeenCalledTimes(1)
+    expect(updatePayload).toBeDefined()
+    expect(updatePayload.status).toBe('expired')
+    expect(updatePayload.ends_at).toBeDefined()
+    expect(updatePayload.ends_at).toBeTypeOf('string')
+    expect(updatePayload.updated_at).toBeDefined()
+    expect(updatePayload.updated_at).toBeTypeOf('string')
+    // Verify ends_at and updated_at are valid dates
+    expect(isNaN(new Date(updatePayload.ends_at).getTime())).toBe(false)
+    expect(isNaN(new Date(updatePayload.updated_at).getTime())).toBe(false)
 
-    // Verify new promotion insert was called
+    // Regression guard: verify only one live promo remains
+    // - Two existing promos were expired (update called once with both IDs)
+    // - One new promo was created (insert called once)
+    // - Response shows one active promotion
     expect(insertSpy).toHaveBeenCalledTimes(1)
+    expect(json.promotion.status).toBe('active') // Only one active promo in response
   })
 
   it('handles case with no existing promotions (idempotent)', async () => {
@@ -293,6 +324,22 @@ describe('POST /api/admin/promotions/activate-test', () => {
     expect(res.status).toBe(200)
     expect(json.ok).toBe(true)
     expect(json.promotion).toBeDefined()
+    expect(json.promotion.status).toBe('active')
+    expect(json.promotion.tier).toBe('featured_week')
+
+    // Harden timestamp assertions: presence, validity, and ordering
+    expect(json.promotion.starts_at).toBeDefined()
+    expect(json.promotion.starts_at).toBeTypeOf('string')
+    const startsAtDate = new Date(json.promotion.starts_at)
+    expect(isNaN(startsAtDate.getTime())).toBe(false) // Valid date
+
+    expect(json.promotion.ends_at).toBeDefined()
+    expect(json.promotion.ends_at).toBeTypeOf('string')
+    const endsAtDate = new Date(json.promotion.ends_at)
+    expect(isNaN(endsAtDate.getTime())).toBe(false) // Valid date
+
+    // Assert ordering: ends_at > starts_at
+    expect(endsAtDate.getTime()).toBeGreaterThan(startsAtDate.getTime())
 
     // Verify new promotion was created
     expect(insertSpy).toHaveBeenCalledTimes(1)

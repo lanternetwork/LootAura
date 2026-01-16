@@ -57,8 +57,13 @@ describe('POST /api/admin/promotions/activate-test', () => {
     mockAssertAdminOrThrow.mockResolvedValue({ user: currentUser })
 
     // Mock ENABLE_ADMIN_TOOLS check (allow in test)
-    process.env.ENABLE_ADMIN_TOOLS = 'true'
-    process.env.NODE_ENV = 'test'
+    // Set env vars to allow admin tools in test environment
+    if (typeof process.env.ENABLE_ADMIN_TOOLS === 'undefined') {
+      process.env.ENABLE_ADMIN_TOOLS = 'true'
+    }
+    if (typeof process.env.NODE_ENV === 'undefined') {
+      process.env.NODE_ENV = 'test'
+    }
 
     const module = await import('@/app/api/admin/promotions/activate-test/route')
     handler = module.POST

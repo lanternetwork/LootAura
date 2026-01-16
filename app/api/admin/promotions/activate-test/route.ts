@@ -250,7 +250,7 @@ async function activateTestPromotionHandler(request: NextRequest) {
       mode,
       starts_at: finalStartsAt,
       ends_at: finalEndsAt,
-      expired_existing_count: existingPromotions?.length || 0,
+      expired_existing_count: (existingPromotions || []).length,
     })
 
     return NextResponse.json({

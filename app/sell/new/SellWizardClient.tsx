@@ -825,6 +825,10 @@ export default function SellWizardClient({
   // Resume draft on mount (priority: server > local)
   useEffect(() => {
     if (initialData || hasResumedRef.current) return
+    
+    // Don't run if user is not yet loaded (wait for auth to complete)
+    // This ensures we can fetch server drafts when user becomes available
+    if (user === undefined) return
 
     // Set flag synchronously to prevent multiple concurrent runs (fixes React error #418/#422)
     // This prevents the effect from running again if user state changes before async completes
@@ -912,7 +916,9 @@ export default function SellWizardClient({
               }
             }
           } catch (error) {
-            console.error('[SELL_WIZARD] Error parsing old draft:', error)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.error('[SELL_WIZARD] Error parsing old draft:', error)
+            }
           }
         }
       }

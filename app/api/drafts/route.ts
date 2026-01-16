@@ -35,7 +35,9 @@ export async function GET(_request: NextRequest) {
         .limit(50)
 
     if (error) {
-      console.error('[DRAFTS/GET] supabase error:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS/GET] supabase error:', error)
+      }
       Sentry.captureException(error, { tags: { operation: 'getAllDrafts' } })
       return fail(500, 'FETCH_ERROR', 'Failed to fetch drafts', error)
     }
@@ -69,7 +71,9 @@ export async function GET(_request: NextRequest) {
         .maybeSingle()
 
       if (error) {
-        console.error('[DRAFTS/GET] supabase error:', error)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[DRAFTS/GET] supabase error:', error)
+        }
         Sentry.captureException(error, { tags: { operation: 'getDraftByKey' } })
         return fail(500, 'FETCH_ERROR', 'Failed to fetch draft', error)
       }
@@ -81,7 +85,9 @@ export async function GET(_request: NextRequest) {
       // Validate payload
       const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
       if (!validationResult.success) {
-        console.error('[DRAFTS] Invalid draft payload:', validationResult.error)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[DRAFTS] Invalid draft payload:', validationResult.error)
+        }
         // Return null rather than error - draft may be corrupted but don't break the flow
         return ok({ data: null })
       }
@@ -115,7 +121,9 @@ export async function GET(_request: NextRequest) {
       .maybeSingle()
 
     if (error) {
-      console.error('[DRAFTS/GET] supabase error:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS/GET] supabase error:', error)
+      }
       Sentry.captureException(error, { tags: { operation: 'getLatestDraft' } })
       return fail(500, 'FETCH_ERROR', 'Failed to fetch draft', error)
     }
@@ -127,7 +135,9 @@ export async function GET(_request: NextRequest) {
     // Validate payload
     const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
     if (!validationResult.success) {
-      console.error('[DRAFTS] Invalid draft payload:', validationResult.error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS] Invalid draft payload:', validationResult.error)
+      }
       // Return null rather than error - draft may be corrupted but don't break the flow
       return ok({ data: null })
     }
@@ -182,9 +192,11 @@ async function postDraftHandler(request: NextRequest) {
     try {
       body = await request.json()
     } catch (error) {
-      console.error('[DRAFTS] JSON parse error:', {
-        error: error instanceof Error ? error.message : String(error)
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS] JSON parse error:', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
       return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
     
@@ -197,13 +209,15 @@ async function postDraftHandler(request: NextRequest) {
     // Validate payload
     const validationResult = SaleDraftPayloadSchema.safeParse(payload)
     if (!validationResult.success) {
-      console.error('[DRAFTS] Validation failed:', {
-        errors: validationResult.error.issues,
-        payloadKeys: payload ? Object.keys(payload) : [],
-        payloadType: typeof payload,
-        hasFormData: !!(payload as any)?.formData,
-        formDataKeys: (payload as any)?.formData ? Object.keys((payload as any).formData) : []
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS] Validation failed:', {
+          errors: validationResult.error.issues,
+          payloadKeys: payload ? Object.keys(payload) : [],
+          payloadType: typeof payload,
+          hasFormData: !!(payload as any)?.formData,
+          formDataKeys: (payload as any)?.formData ? Object.keys((payload as any).formData) : []
+        })
+      }
       return fail(400, 'VALIDATION_ERROR', 'Invalid draft payload', validationResult.error)
     }
 
@@ -268,17 +282,21 @@ async function postDraftHandler(request: NextRequest) {
     }
 
     if (error) {
-      console.error('[DRAFTS/POST] supabase error:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS/POST] supabase error:', error)
+      }
       Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
       return fail(500, 'SAVE_ERROR', 'Failed to save draft', error)
     }
 
     if (!draft) {
-      console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
-        draftKey,
-        userId: user.id,
-        operation: existingDraft ? 'update' : 'insert',
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
+          draftKey,
+          userId: user.id,
+          operation: existingDraft ? 'update' : 'insert',
+        })
+      }
       return fail(500, 'NO_DATA_ERROR', 'Draft save succeeded but no data returned')
     }
 
@@ -347,7 +365,9 @@ async function deleteDraftHandler(request: NextRequest) {
       .eq('status', 'active')
 
     if (error) {
-      console.error('[DRAFTS/DELETE] supabase error:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS/DELETE] supabase error:', error)
+      }
       Sentry.captureException(error, { tags: { operation: 'deleteDraft' } })
       return fail(500, 'DELETE_ERROR', 'Failed to delete draft', error)
     }

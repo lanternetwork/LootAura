@@ -50,7 +50,9 @@ export default function TestPromotionTool() {
           setSales(data.sales)
         }
       } catch (err) {
-        console.error('Error fetching sales:', err)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('Error fetching sales:', err)
+        }
         setError('Failed to load sales list')
       } finally {
         setLoadingSales(false)

@@ -288,6 +288,7 @@ export default function PromotionCheckoutClient() {
           // Set image state based on whether photoUrl exists
           if (!fetchedSummary.photoUrl) {
             setImageState('no-image')
+            fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
           } else {
             setImageState('loading')
             // Set timeout to detect slow-loading images (10 seconds)
@@ -309,7 +310,7 @@ export default function PromotionCheckoutClient() {
           if (isDebug) {
             // Extract hostname only (no full URL) for safe logging
             let imageHostname: string | null = null
-            if (fetchedSummary.photoUrl) {
+            if (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg') {
               try {
                 const url = new URL(fetchedSummary.photoUrl)
                 imageHostname = url.hostname
@@ -322,9 +323,9 @@ export default function PromotionCheckoutClient() {
             setDebugTimings(prev => ({
               ...prev,
               summaryFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
-              hasImageUrl: !!fetchedSummary.photoUrl,
+              hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
               imageHostname: imageHostname,
-              imageState: fetchedSummary.photoUrl ? 'loading' : 'no-image',
+              imageState: fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg' ? 'loading' : 'no-image',
             }))
           }
         } else {
@@ -379,12 +380,6 @@ export default function PromotionCheckoutClient() {
               hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
               imageHostname: imageHostname,
             }))
-          }
-        } else {
-          // Sale mode: if no photo, set no-image state
-          if (!fetchedSummary.photoUrl) {
-            setImageState('no-image')
-            fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
           }
         }
 

@@ -43,8 +43,9 @@ describe('Header Full-Width Styling', () => {
     const nav = container.querySelector('nav')
     const innerContainer = nav?.querySelector('div')
     
-    // Should have responsive horizontal padding
-    expect(innerContainer?.className).toContain('px-4')
+    // Should have responsive horizontal padding (mobile-first: px-3, then sm:px-6, lg:px-8)
+    expect(innerContainer?.className).toContain('px-3')
+    expect(innerContainer?.className).toContain('sm:px-6')
     expect(innerContainer?.className).toContain('h-full')
   })
 
@@ -56,13 +57,13 @@ describe('Header Full-Width Styling', () => {
     
     // Full-width layout should use:
     // - w-full (full width)
-    // - px-4 sm:px-6 lg:px-8 (responsive horizontal padding)
+    // - px-3 sm:px-6 lg:px-8 (responsive horizontal padding, mobile-first)
     // - h-full (fills parent height)
     // - NOT max-w-* (max width constraints)
     // - NOT mx-auto (centering)
     
     const hasFullWidth = innerContainer?.className.includes('w-full')
-    const hasPadding = innerContainer?.className.includes('px-4')
+    const hasPadding = innerContainer?.className.includes('px-3') && innerContainer?.className.includes('sm:px-6')
     const hasHeight = innerContainer?.className.includes('h-full')
     const hasNoMaxWidth = !innerContainer?.className.includes('max-w-')
     const hasNoCentering = !innerContainer?.className.includes('mx-auto')

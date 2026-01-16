@@ -5,7 +5,7 @@
  * Handles Stripe Elements integration and payment confirmation
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -13,10 +13,15 @@ import { getCsrfHeaders } from '@/lib/csrf-client'
 import { getDraftByKeyServer } from '@/lib/draft/draftClient'
 import Image from 'next/image'
 
-// Initialize Stripe (only once)
+// Initialize Stripe (only once) - singleton pattern
 let stripePromise: Promise<any> | null = null
+let stripeInstance: any = null
 
 function getStripePromise(): Promise<any> | null {
+  if (stripeInstance) {
+    return Promise.resolve(stripeInstance)
+  }
+  
   if (stripePromise) {
     return stripePromise
   }
@@ -26,7 +31,20 @@ function getStripePromise(): Promise<any> | null {
     return null
   }
   
-  stripePromise = loadStripe(publishableKey)
+  // Mark Stripe initialization start
+  if (typeof performance !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    performance.mark('stripe-init-start')
+  }
+  
+  stripePromise = loadStripe(publishableKey).then((stripe) => {
+    stripeInstance = stripe
+    if (typeof performance !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      performance.mark('stripe-init-end')
+      performance.measure('stripe-init', 'stripe-init-start', 'stripe-init-end')
+    }
+    return stripe
+  })
+  
   return stripePromise
 }
 
@@ -43,8 +61,40 @@ function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onErro
   const elements = useElements()
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isPaymentElementReady, setIsPaymentElementReady] = useState(false)
+  const hasLoggedReadyRef = useRef(false)
 
   const amountDollars = (amountCents / 100).toFixed(2)
+  
+  // Memoize PaymentElement options to prevent recreation on every render
+  const paymentElementOptions = useMemo(() => ({
+    layout: 'tabs' as const,
+    fields: {
+      billingDetails: {
+        email: 'never' as const,
+        phone: 'never' as const,
+        address: {
+          country: 'never' as const,
+          line1: 'never' as const,
+          line2: 'never' as const,
+          city: 'never' as const,
+          state: 'never' as const,
+          postalCode: 'never' as const,
+        },
+      },
+    },
+    onReady: () => {
+      setIsPaymentElementReady(true)
+      if (typeof performance !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === 'true' && !hasLoggedReadyRef.current) {
+        performance.mark('payment-element-ready')
+        hasLoggedReadyRef.current = true
+        // Measure from component mount to ready
+        if (typeof window !== 'undefined' && (window as any).__checkoutMountTime) {
+          performance.measure('payment-element-load', '__checkout-mount', 'payment-element-ready')
+        }
+      }
+    },
+  }), [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -97,25 +147,15 @@ function PaymentForm({ clientSecret, amountCents, mode: _mode, onSuccess, onErro
 
       {/* Payment Element */}
       <div className="py-2">
-        <PaymentElement
-          options={{
-            layout: 'tabs',
-            fields: {
-              billingDetails: {
-                email: 'never',
-                phone: 'never',
-                address: {
-                  country: 'never',
-                  line1: 'never',
-                  line2: 'never',
-                  city: 'never',
-                  state: 'never',
-                  postalCode: 'never',
-                },
-              },
-            },
-          }}
-        />
+        {!isPaymentElementReady ? (
+          <div className="space-y-3 animate-pulse">
+            <div className="h-12 bg-gray-200 rounded-lg"></div>
+            <div className="h-12 bg-gray-200 rounded-lg"></div>
+            <div className="h-8 bg-gray-100 rounded"></div>
+          </div>
+        ) : (
+          <PaymentElement options={paymentElementOptions} />
+        )}
       </div>
 
       {/* Error Display */}
@@ -165,6 +205,9 @@ export default function PromotionCheckoutClient() {
   const [amountCents, setAmountCents] = useState<number | null>(null)
   const [mode, setMode] = useState<'draft' | 'sale'>('draft')
   const [summary, setSummary] = useState<CheckoutSummary | null>(null)
+  const [imageState, setImageState] = useState<'loading' | 'loaded' | 'error' | 'no-image'>('loading')
+  const [debugTimings, setDebugTimings] = useState<Record<string, number | string | boolean>>({})
+  const imageLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Check for Stripe publishable key on mount
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -173,6 +216,17 @@ export default function PromotionCheckoutClient() {
     !publishableKey ? 'Payment processing is not configured. Please contact support.' : null
   )
   const [success, setSuccess] = useState(false)
+  const isDebug = process.env.NEXT_PUBLIC_DEBUG === 'true'
+  
+  // Mark component mount time for timing instrumentation
+  useEffect(() => {
+    if (typeof performance !== 'undefined' && isDebug) {
+      performance.mark('__checkout-mount')
+      if (typeof window !== 'undefined') {
+        (window as any).__checkoutMountTime = performance.now()
+      }
+    }
+  }, [isDebug])
 
   // Get parameters from URL
   const draftKey = searchParams.get('draft_key')
@@ -211,7 +265,11 @@ export default function PromotionCheckoutClient() {
             return
           }
 
-          const summaryResponse = await fetch(`/api/sales/${saleId}/summary`)
+          // Use no-store to prevent stale data after draft edits
+          const summaryResponse = await fetch(`/api/sales/${saleId}/summary`, {
+            cache: 'no-store',
+            credentials: 'include',
+          })
           if (!summaryResponse.ok) {
             const errorData = await summaryResponse.json().catch(() => ({}))
             setError(errorData.error || 'Failed to load sale information')
@@ -225,6 +283,49 @@ export default function PromotionCheckoutClient() {
             city: summaryData.city || '',
             state: summaryData.state || '',
             photoUrl: summaryData.photoUrl || null,
+          }
+          
+          // Set image state based on whether photoUrl exists
+          if (!fetchedSummary.photoUrl) {
+            setImageState('no-image')
+          } else {
+            setImageState('loading')
+            // Set timeout to detect slow-loading images (10 seconds)
+            if (imageLoadTimeoutRef.current) {
+              clearTimeout(imageLoadTimeoutRef.current)
+            }
+            imageLoadTimeoutRef.current = setTimeout(() => {
+              if (imageState === 'loading') {
+                if (isDebug) {
+                  setDebugTimings(prev => ({
+                    ...prev,
+                    imageStillLoadingAfter: 10000,
+                  }))
+                }
+              }
+            }, 10000)
+          }
+          
+          if (isDebug) {
+            // Extract hostname only (no full URL) for safe logging
+            let imageHostname: string | null = null
+            if (fetchedSummary.photoUrl) {
+              try {
+                const url = new URL(fetchedSummary.photoUrl)
+                imageHostname = url.hostname
+              } catch {
+                // Relative URL or placeholder
+                imageHostname = fetchedSummary.photoUrl.startsWith('/') ? 'relative' : 'unknown'
+              }
+            }
+            
+            setDebugTimings(prev => ({
+              ...prev,
+              summaryFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
+              hasImageUrl: !!fetchedSummary.photoUrl,
+              imageHostname: imageHostname,
+              imageState: fetchedSummary.photoUrl ? 'loading' : 'no-image',
+            }))
           }
         } else {
           // Draft mode
@@ -250,11 +351,41 @@ export default function PromotionCheckoutClient() {
             dateStart: payload.formData?.date_start,
             timeStart: payload.formData?.time_start,
           }
-        }
-
-        // Use placeholder if no photo
-        if (!fetchedSummary.photoUrl) {
-          fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
+          
+          // Set image state based on whether photoUrl exists
+          if (!fetchedSummary.photoUrl) {
+            setImageState('no-image')
+            fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
+          } else {
+            setImageState('loading')
+          }
+          
+          if (isDebug) {
+            // Extract hostname only (no full URL) for safe logging
+            let imageHostname: string | null = null
+            if (fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg') {
+              try {
+                const url = new URL(fetchedSummary.photoUrl)
+                imageHostname = url.hostname
+              } catch {
+                // Relative URL
+                imageHostname = 'relative'
+              }
+            }
+            
+            setDebugTimings(prev => ({
+              ...prev,
+              draftFetchTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
+              hasImageUrl: !!fetchedSummary.photoUrl && fetchedSummary.photoUrl !== '/placeholders/sale-placeholder.svg',
+              imageHostname: imageHostname,
+            }))
+          }
+        } else {
+          // Sale mode: if no photo, set no-image state
+          if (!fetchedSummary.photoUrl) {
+            setImageState('no-image')
+            fetchedSummary.photoUrl = '/placeholders/sale-placeholder.svg'
+          }
         }
 
         setSummary(fetchedSummary)
@@ -311,10 +442,23 @@ export default function PromotionCheckoutClient() {
           }
 
           setClientSecret(data.clientSecret)
+          
+          if (isDebug && typeof performance !== 'undefined') {
+            performance.mark('client-secret-received')
+            if (typeof window !== 'undefined' && (window as any).__checkoutMountTime) {
+              performance.measure('client-secret-fetch', '__checkout-mount', 'client-secret-received')
+              setDebugTimings(prev => ({
+                ...prev,
+                clientSecretTime: performance.now() - (window as any).__checkoutMountTime,
+              }))
+            }
+          }
 
           // Fetch amount for display
           try {
-            const amountResponse = await fetch('/api/promotions/amount?tier=featured_week')
+            const amountResponse = await fetch('/api/promotions/amount?tier=featured_week', {
+              cache: 'no-store',
+            })
             const amountData = await amountResponse.json()
             if (amountData.amountCents) {
               setAmountCents(amountData.amountCents)
@@ -328,6 +472,20 @@ export default function PromotionCheckoutClient() {
           }
 
           setLoading(false)
+          
+          // Log timings in debug mode
+          if (isDebug && typeof performance !== 'undefined') {
+            const measures = performance.getEntriesByType('measure')
+            const timingData: Record<string, number> = {}
+            measures.forEach((measure) => {
+              if (measure.name.startsWith('stripe-') || measure.name.startsWith('payment-') || measure.name.startsWith('client-secret-')) {
+                timingData[measure.name] = Math.round(measure.duration)
+              }
+            })
+            if (Object.keys(timingData).length > 0) {
+              setDebugTimings(prev => ({ ...prev, ...timingData }))
+            }
+          }
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment'
           setError(errorMessage)
@@ -341,6 +499,13 @@ export default function PromotionCheckoutClient() {
     }
 
     fetchSummaryAndClientSecret()
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (imageLoadTimeoutRef.current) {
+        clearTimeout(imageLoadTimeoutRef.current)
+      }
+    }
   }, [draftKey, saleId, promotionId, urlMode, publishableKey])
 
   const handleSuccess = () => {
@@ -480,12 +645,14 @@ export default function PromotionCheckoutClient() {
   }
 
   const amount = amountCents || 299
-  const elementsOptions: StripeElementsOptions = {
+  
+  // Memoize Elements options to prevent recreation on every render
+  const elementsOptions: StripeElementsOptions = useMemo(() => ({
     clientSecret,
     appearance: {
-      theme: 'stripe',
+      theme: 'stripe' as const,
     },
-  }
+  }), [clientSecret])
 
   // Format date/time for display
   const formatDateTime = (dateStart?: string, timeStart?: string) => {
@@ -510,22 +677,58 @@ export default function PromotionCheckoutClient() {
   const displayDateTime = summary ? formatDateTime(summary.dateStart, summary.timeStart) : null
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
       <div className="max-w-4xl w-full">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden relative">
           <div className="lg:grid lg:grid-cols-2">
             {/* Left Column: Sale Image & Summary */}
             <div className="relative aspect-[16/9] lg:aspect-auto bg-gray-100">
-              {summary && summary.photoUrl ? (
+              {summary && summary.photoUrl && imageState !== 'no-image' ? (
                 <>
+                  {imageState === 'loading' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200 z-10">
+                      <div className="text-gray-400 text-sm">Loading image...</div>
+                    </div>
+                  )}
                   <Image
                     src={summary.photoUrl}
                     alt={summary.title}
                     fill
-                    className="object-cover"
+                    className={`object-cover ${imageState === 'loading' ? 'opacity-0' : 'opacity-100'} transition-opacity`}
                     sizes="(max-width: 1024px) 100vw, 50vw"
                     unoptimized={summary.photoUrl.startsWith('/placeholders/')}
                     priority
+                    onLoad={() => {
+                      // Clear timeout if image loads successfully
+                      if (imageLoadTimeoutRef.current) {
+                        clearTimeout(imageLoadTimeoutRef.current)
+                        imageLoadTimeoutRef.current = null
+                      }
+                      setImageState('loaded')
+                      if (isDebug) {
+                        setDebugTimings(prev => ({
+                          ...prev,
+                          imageLoadSuccess: true,
+                          imageLoadTime: Math.round(performance.now() - (typeof window !== 'undefined' && (window as any).__checkoutMountTime ? (window as any).__checkoutMountTime : 0)),
+                          imageState: 'loaded',
+                        }))
+                      }
+                    }}
+                    onError={() => {
+                      // Clear timeout on error
+                      if (imageLoadTimeoutRef.current) {
+                        clearTimeout(imageLoadTimeoutRef.current)
+                        imageLoadTimeoutRef.current = null
+                      }
+                      setImageState('error')
+                      if (isDebug) {
+                        setDebugTimings(prev => ({
+                          ...prev,
+                          imageLoadError: true,
+                          imageState: 'error',
+                        }))
+                      }
+                    }}
                   />
                   {/* Gradient Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
@@ -551,10 +754,32 @@ export default function PromotionCheckoutClient() {
                       )}
                     </div>
                   </div>
+                  {imageState === 'error' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200 z-20">
+                      <div className="text-center p-4">
+                        <p className="text-gray-600 text-sm mb-2">Image unavailable</p>
+                        <button
+                          onClick={() => {
+                            setImageState('loading')
+                            // Force image reload by updating src
+                            const img = document.querySelector('img[alt="' + summary.title + '"]') as HTMLImageElement
+                            if (img) {
+                              img.src = summary.photoUrl + '?retry=' + Date.now()
+                            }
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-700 underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                  <div className="text-gray-400 text-sm">Loading image...</div>
+                  <div className="text-center p-4">
+                    <p className="text-gray-500 text-sm">No photo yet</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -566,7 +791,7 @@ export default function PromotionCheckoutClient() {
                   Complete Your Payment
                 </h1>
                 
-                <Elements stripe={stripePromise} options={elementsOptions}>
+                <Elements stripe={stripePromise} options={elementsOptions} key={clientSecret}>
                   <PaymentForm
                     clientSecret={clientSecret}
                     amountCents={amount}
@@ -577,6 +802,21 @@ export default function PromotionCheckoutClient() {
                 </Elements>
               </div>
             </div>
+            
+            {/* Debug panel (only in debug mode) */}
+            {isDebug && Object.keys(debugTimings).length > 0 && (
+              <div className="absolute bottom-4 right-4 bg-black/80 text-white text-xs p-3 rounded-lg font-mono max-w-xs z-50 shadow-lg">
+                <div className="font-bold mb-2 text-yellow-300">Checkout Debug</div>
+                <div className="space-y-1">
+                  {Object.entries(debugTimings).map(([key, value]) => (
+                    <div key={key} className="flex justify-between gap-4">
+                      <span className="text-gray-300">{key}:</span>
+                      <span className="text-white">{typeof value === 'number' ? `${value}ms` : String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

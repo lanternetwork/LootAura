@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0 // Never cache - ensure fresh data after draft edits
 
 /**
  * GET /api/sales/[id]/summary
  * Returns lightweight summary for checkout display: { title, city, state, photoUrl }
+ * 
+ * IMPORTANT: This endpoint must not be cached to ensure fresh data after draft edits.
+ * Uses revalidate: 0 and cache: 'no-store' to prevent stale data.
  */
 export async function GET(
   _request: NextRequest,

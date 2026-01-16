@@ -1,0 +1,42 @@
+## Summary
+
+This PR adds a new admin tool for testing promotions without Stripe charges, improves promotion status aggregation, and fixes several bugs.
+
+## Features
+
+### Admin Test Promotion Tool
+- New admin-only tool at `/admin/tools` for activating/deactivating test promotions
+- Supports multiple schedule modes: 7 days before sale start, now + 7 days, custom dates
+- Sale selection via dropdown (published, non-archived sales)
+- Displays active promotion window and quick links
+- Prominent warning: "Admin test tool. No Stripe charge."
+
+### Promotion Status Improvements
+- Fixed `/api/promotions/status` to deduplicate and aggregate multiple promotions per sale
+- Returns single status per `sale_id` with "any active" logic
+- Client-side defensive handling for unexpected duplicate entries
+- Dashboard and sale detail pages show promoted status correctly
+
+### UI Improvements
+- Sale detail page: Replaces "Promote this sale" CTA with "Promoted" status card when active
+- Dashboard: Compact promotion badge (small pill + subtle end date)
+- Fixed React hydration errors and loading state flicker
+
+### Bug Fixes
+- Fixed draft continuation from dashboard (wait for user auth before resuming)
+- Gated all console.log/warn/error statements behind `NEXT_PUBLIC_DEBUG` flag
+- Fixed `activate-test` endpoint to handle multiple existing promotions (bulk expire before creating new)
+- Added comprehensive integration tests for multi-promotion handling
+
+## Technical Details
+
+- Admin endpoints require `ENABLE_ADMIN_TOOLS=true` (or debug mode)
+- Test promotions use `amount_cents: 0` and `status: 'active'`
+- Promotion status aggregation: `is_active = any active`, `ends_at = max(active.ends_at)`, `tier = latest active.tier`
+- All timestamp assertions in tests are deterministic (presence + validity + ordering, not exact values)
+
+## Testing
+
+- Integration tests for `activate-test` endpoint (multi-promotion case + idempotent case)
+- Hardened test assertions with timestamp validation
+- Regression guard: verifies only one live promo remains after operation

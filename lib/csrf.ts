@@ -56,37 +56,41 @@ export function validateCsrfToken(request: Request): boolean {
     }
   }
 
-  // Always log validation details (skip in test environment)
+  // Only log validation details in debug mode (skip in test environment)
   const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined
-  if (!isTestEnv) {
+  const isDebug = process.env.NEXT_PUBLIC_DEBUG === 'true'
+  
+  if (!isTestEnv && isDebug) {
+    // Log only safe metadata, never full tokens or cookie strings
+    const cookieNames = cookieHeader ? cookieHeader.split(';').map(c => {
+      const [name] = c.trim().split('=')
+      return name
+    }) : []
+    
     console.log('[CSRF] Validation check:', {
       hasHeader: !!tokenFromHeader,
       hasCookie: !!tokenFromCookie,
-      headerTokenPrefix: tokenFromHeader ? tokenFromHeader.substring(0, 8) + '...' : null,
-      cookieTokenPrefix: tokenFromCookie ? tokenFromCookie.substring(0, 8) + '...' : null,
+      headerTokenPrefix: tokenFromHeader ? tokenFromHeader.substring(0, 6) + '...' : null,
+      cookieTokenPrefix: tokenFromCookie ? tokenFromCookie.substring(0, 6) + '...' : null,
       headerTokenLength: tokenFromHeader?.length,
       cookieTokenLength: tokenFromCookie?.length,
-      headerTokenFull: tokenFromHeader || 'MISSING',
-      cookieTokenFull: tokenFromCookie || 'MISSING',
-      cookieHeader: cookieHeader ? cookieHeader.substring(0, 500) : null,
-      cookieNames: cookieHeader ? cookieHeader.split(';').map(c => c.trim().split('=')[0]) : []
+      cookieNames: cookieNames,
+      // Never log full tokens, cookie values, or cookie header string
     })
     
     if (!tokenFromHeader || !tokenFromCookie) {
       console.error('[CSRF] ✗ Validation failed - missing token:', {
         hasHeader: !!tokenFromHeader,
         hasCookie: !!tokenFromCookie,
-        headerValue: tokenFromHeader || 'MISSING',
-        cookieValue: tokenFromCookie || 'MISSING',
+        // Never log token values
       })
     } else if (tokenFromHeader !== tokenFromCookie) {
       console.error('[CSRF] ✗ Validation failed - tokens do not match:', {
-        headerTokenFull: tokenFromHeader,
-        cookieTokenFull: tokenFromCookie,
-        headerTokenPrefix: tokenFromHeader.substring(0, 16),
-        cookieTokenPrefix: tokenFromCookie.substring(0, 16),
+        headerTokenPrefix: tokenFromHeader.substring(0, 6) + '...',
+        cookieTokenPrefix: tokenFromCookie.substring(0, 6) + '...',
         tokensMatch: tokenFromHeader === tokenFromCookie,
         tokenLengthsMatch: tokenFromHeader.length === tokenFromCookie.length,
+        // Never log full tokens
       })
     } else {
       console.log('[CSRF] ✓ Validation passed - tokens match')

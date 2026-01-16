@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef, useMemo } from 'react'
 import { Marker, Popup } from 'react-map-gl'
 import { LocationGroup } from '@/lib/pins/types'
 
@@ -90,6 +90,11 @@ export default function LocationPin({
     }, 100)
   }, [])
 
+  // Check if any sale in this location is featured
+  const isFeatured = useMemo(() => {
+    return location.sales?.some((s: any) => s.isFeatured === true || s.is_featured === true) || false
+  }, [location.sales])
+
   // Get tooltip content - show first sale title or count
   const tooltipContent = location.totalSales === 1 && location.sales?.[0]
     ? location.sales[0].title || 'Yard sale'
@@ -130,25 +135,55 @@ export default function LocationPin({
               pointerEvents: 'none' // Prevent double-click events
             }}
           >
-            <circle
-              cx="8"
-              cy="8"
-              r="6"
-              fill={isSelected ? '#dc2626' : '#ef4444'}
-              className={isSelected ? 'drop-shadow-lg' : ''}
-            />
-            {/* Subtle ring on hover (desktop only) */}
-            {!isMobile && (
-              <circle
-                cx="8"
-                cy="8"
-                r="7"
-                fill="none"
-                stroke={isSelected ? '#dc2626' : '#ef4444'}
-                strokeWidth="1"
-                opacity="0.3"
-                className="hover:opacity-50 transition-opacity"
-              />
+            {/* Featured pins: amber/gold with subtle stroke; Regular pins: red */}
+            {isFeatured ? (
+              <>
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  fill={isSelected ? '#d97706' : '#f59e0b'}
+                  stroke={isSelected ? '#b45309' : '#d97706'}
+                  strokeWidth="1.5"
+                  className={isSelected ? 'drop-shadow-lg' : ''}
+                />
+                {/* Subtle ring on hover (desktop only) */}
+                {!isMobile && (
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="7"
+                    fill="none"
+                    stroke={isSelected ? '#d97706' : '#f59e0b'}
+                    strokeWidth="1"
+                    opacity="0.3"
+                    className="hover:opacity-50 transition-opacity"
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  fill={isSelected ? '#dc2626' : '#ef4444'}
+                  className={isSelected ? 'drop-shadow-lg' : ''}
+                />
+                {/* Subtle ring on hover (desktop only) */}
+                {!isMobile && (
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="7"
+                    fill="none"
+                    stroke={isSelected ? '#dc2626' : '#ef4444'}
+                    strokeWidth="1"
+                    opacity="0.3"
+                    className="hover:opacity-50 transition-opacity"
+                  />
+                )}
+              </>
             )}
           </svg>
         </div>

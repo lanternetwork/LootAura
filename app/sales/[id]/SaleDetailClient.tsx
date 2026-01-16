@@ -22,6 +22,7 @@ import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import ReportSaleModal from '@/components/moderation/ReportSaleModal'
+import { BadgeCheck } from 'lucide-react'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -190,8 +191,8 @@ export default function SaleDetailClient({
   const [promotionStatus, setPromotionStatus] = useState<{
     isActive: boolean
     endsAt: string | null
-  } | null>(null)
-  const [isPromotionLoading, setIsPromotionLoading] = useState(false)
+  }>({ isActive: false, endsAt: null })
+  const [isPromotionLoading, setIsPromotionLoading] = useState(true)
 
   // Track click event for navigation/directions
   const handleNavigationClick = () => {
@@ -248,7 +249,8 @@ export default function SaleDetailClient({
   // Fetch minimal promotion status for this sale (owner-only, when promotions are enabled)
   useEffect(() => {
     if (!promotionsEnabled || !isOwner) {
-      setPromotionStatus(null)
+      setPromotionStatus({ isActive: false, endsAt: null })
+      setIsPromotionLoading(false)
       return
     }
 
@@ -262,23 +264,47 @@ export default function SaleDetailClient({
             credentials: 'include',
           }
         )
-        if (!res.ok) {
+        if (!res || !res.ok) {
+          if (!cancelled) {
+            setPromotionStatus({ isActive: false, endsAt: null })
+          }
           return
         }
         const json = await res.json().catch(() => null)
         if (!json || !Array.isArray(json.statuses)) {
+          if (!cancelled) {
+            setPromotionStatus({ isActive: false, endsAt: null })
+          }
           return
         }
-        const status = json.statuses.find((s: any) => s.sale_id === sale.id)
-        if (!cancelled && status) {
-          const isActive = !!status.is_active && !!status.ends_at
-          setPromotionStatus({
-            isActive,
-            endsAt: status.ends_at ?? null,
-          })
+        // Defensive: handle multiple entries for same sale_id (shouldn't happen after API fix, but be resilient)
+        const matchingStatuses = json.statuses.filter((s: any) => s.sale_id === sale.id)
+        if (!cancelled) {
+          if (matchingStatuses.length > 0) {
+            // If any entry has is_active === true, treat as promoted
+            const hasActive = matchingStatuses.some((s: any) => s.is_active === true)
+            // Find max ends_at among active entries
+            const activeStatuses = matchingStatuses.filter((s: any) => s.is_active === true)
+            const maxEndsAt = activeStatuses.reduce((max: string | null, s: any) => {
+              if (!s.ends_at) return max
+              if (!max) return s.ends_at
+              return s.ends_at > max ? s.ends_at : max
+            }, null as string | null)
+            
+            setPromotionStatus({
+              isActive: hasActive,
+              endsAt: hasActive ? (maxEndsAt ?? null) : null,
+            })
+          } else {
+            // No promotion found for this sale
+            setPromotionStatus({ isActive: false, endsAt: null })
+          }
         }
       } catch {
         // Silent failure - promotion status is non-critical
+        if (!cancelled) {
+          setPromotionStatus({ isActive: false, endsAt: null })
+        }
       } finally {
         if (!cancelled) {
           setIsPromotionLoading(false)
@@ -914,24 +940,50 @@ export default function SaleDetailClient({
           {/* Seller-only Promote panel (desktop/sidebar) */}
           {promotionsEnabled && isOwner && (
             <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
-              <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
-              {promotionStatus?.isActive ? (
-                <p className="text-sm text-[#3A2268]" data-testid="sale-detail-promote-active">
-                  Promoted
+              {isPromotionLoading ? (
+                // Loading state - show disabled CTA to prevent layout shift
+                <>
+                  <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
+                  <p className="text-sm text-[#3A2268] mb-2">
+                    Feature your sale to get extra visibility in weekly emails and discovery.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="mt-1 inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-[#3A2268] text-white opacity-60 cursor-not-allowed"
+                  >
+                    Loading...
+                  </button>
+                </>
+              ) : promotionStatus.isActive ? (
+                // Promoted Status Card
+                <div className="space-y-2" data-testid="sale-detail-promote-active">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                      <BadgeCheck className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-[#3A2268]">Promoted</h4>
+                    </div>
+                  </div>
+                  <p className="text-sm text-[#3A2268]">
+                    Your sale is being featured to more buyers.
+                  </p>
                   {promotionStatus.endsAt && (
-                    <>
-                      {' '}
-                      • Ends{' '}
+                    <p className="text-xs text-[#3A2268]/70">
+                      Ends{' '}
                       {new Date(promotionStatus.endsAt).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
                       })}
-                    </>
+                    </p>
                   )}
-                </p>
+                </div>
               ) : (
+                // Promote CTA (unchanged)
                 <>
+                  <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
                   <p className="text-sm text-[#3A2268] mb-2">
                     Feature your sale to get extra visibility in weekly emails and discovery.
                   </p>

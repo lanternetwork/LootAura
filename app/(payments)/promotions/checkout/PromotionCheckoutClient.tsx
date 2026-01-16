@@ -529,10 +529,10 @@ export default function PromotionCheckoutClient() {
                   />
                   {/* Gradient Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-                  {/* Featured Week Badge */}
+                  {/* Promoted Badge */}
                   <div className="absolute top-4 left-4">
                     <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-green-600 text-white shadow-lg">
-                      Featured Week
+                      Promoted
                     </span>
                   </div>
                   {/* Summary Info Overlay */}

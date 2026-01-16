@@ -23,6 +23,96 @@ const MAX_SALE_IDS = 100
 // Defensive cap to avoid abuse with extremely long querystrings
 const MAX_SALE_IDS_PARAM_LENGTH = 4000
 
+/**
+ * Aggregates promotions by sale_id, returning one status per sale_id.
+ * 
+ * "Active" means: status === 'active' AND starts_at <= now AND ends_at >= now
+ * 
+ * For each sale_id:
+ * - is_active: true if ANY active promotion exists, else false
+ * - ends_at: if active, the maximum ends_at among active promotions, else null
+ * - tier: tier of the active promotion with the latest ends_at (or null if none active)
+ */
+function aggregatePromotionStatuses(
+  saleIds: string[],
+  promotions: Array<{
+    sale_id: string
+    status: string
+    tier: string | null
+    starts_at: string | null
+    ends_at: string | null
+  }>,
+  now: string
+): Array<{
+  sale_id: string
+  is_active: boolean
+  ends_at: string | null
+  tier: string | null
+}> {
+  // Group promotions by sale_id
+  const promotionsBySaleId = new Map<string, typeof promotions>()
+  
+  for (const promo of promotions) {
+    if (!promo.sale_id) continue
+    
+    if (!promotionsBySaleId.has(promo.sale_id)) {
+      promotionsBySaleId.set(promo.sale_id, [])
+    }
+    promotionsBySaleId.get(promo.sale_id)!.push(promo)
+  }
+
+  // Compute one status per sale_id that has promotions
+  // Only return statuses for sale_ids that have at least one promotion (ownership is enforced by the query)
+  return saleIds
+    .map((saleId) => {
+      const salePromotions = promotionsBySaleId.get(saleId) || []
+      
+      // If no promotions found for this sale_id, skip it (user doesn't own it or it has no promotions)
+      if (salePromotions.length === 0) {
+        return null
+      }
+      
+      // Find all active promotions for this sale
+      const activePromotions = salePromotions.filter((p) => {
+        return (
+          p.status === 'active' &&
+          typeof p.starts_at === 'string' &&
+          typeof p.ends_at === 'string' &&
+          p.starts_at <= now &&
+          p.ends_at >= now
+        )
+      })
+
+      if (activePromotions.length === 0) {
+        // No active promotion, but has promotions (inactive/expired)
+        return {
+          sale_id: saleId,
+          is_active: false,
+          ends_at: null,
+          tier: null,
+        }
+      }
+
+      // Find the active promotion with the latest ends_at
+      // All activePromotions have ends_at (filtered above), so we can safely compare
+      // Since we know activePromotions.length > 0, we can use the first as initial value
+      const latestActive = activePromotions.reduce((latest, current) => {
+        // Both should have ends_at at this point (filtered above), but be defensive
+        if (!current.ends_at) return latest
+        if (!latest.ends_at) return current
+        return current.ends_at > latest.ends_at ? current : latest
+      }, activePromotions[0])
+
+      return {
+        sale_id: saleId,
+        is_active: true,
+        ends_at: latestActive.ends_at ?? null,
+        tier: latestActive.tier ?? null,
+      }
+    })
+    .filter((status): status is NonNullable<typeof status> => status !== null)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
@@ -72,9 +162,9 @@ export async function GET(request: NextRequest) {
 
     const now = new Date().toISOString()
 
-    // Query promotions for these sale IDs
+    // Query promotions for these sale IDs (include starts_at for active check)
     let query = fromBase(adminDb, 'promotions')
-      .select('sale_id, status, tier, ends_at, owner_profile_id')
+      .select('sale_id, status, tier, starts_at, ends_at, owner_profile_id')
       .in('sale_id', saleIds)
 
     if (!isAdmin) {
@@ -96,19 +186,8 @@ export async function GET(request: NextRequest) {
       return fail(500, 'DATABASE_ERROR', 'Failed to fetch promotion status')
     }
 
-    const statuses = (promotions || []).map((p) => {
-      const isActive =
-        p.status === 'active' &&
-        typeof p.ends_at === 'string' &&
-        p.ends_at > now
-
-      return {
-        sale_id: p.sale_id,
-        is_active: isActive,
-        ends_at: p.ends_at,
-        tier: p.tier,
-      }
-    })
+    // Aggregate promotions by sale_id
+    const statuses = aggregatePromotionStatuses(saleIds, promotions || [], now)
 
     return ok({ statuses })
   } catch (error) {

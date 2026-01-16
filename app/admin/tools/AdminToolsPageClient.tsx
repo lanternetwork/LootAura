@@ -27,6 +27,7 @@ import EmailDiagnostics from '@/components/admin/EmailDiagnostics'
 import AdminUsersPanel from '@/components/admin/tools/AdminUsersPanel'
 import AdminReportsPanel from '@/components/admin/tools/AdminReportsPanel'
 import ArchiveControlPanel from '@/components/admin/tools/ArchiveControlPanel'
+import TestPromotionTool from '@/components/admin/TestPromotionTool'
 import { useState, useRef } from 'react'
 
 export default function AdminToolsPageClient() {
@@ -46,6 +47,9 @@ export default function AdminToolsPageClient() {
         <div className="space-y-8">
           {/* Archive System Control */}
           <ArchiveControlPanel />
+
+          {/* Test Promotion Tool */}
+          <TestPromotionTool />
 
           {/* Moderation Tools */}
           <div className="space-y-6">

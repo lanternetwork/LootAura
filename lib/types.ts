@@ -30,7 +30,10 @@ export type Sale = {
 }
 
 // Public sale type for API responses (without owner_id for security)
-export type PublicSale = Omit<Sale, 'owner_id'>
+export type PublicSale = Omit<Sale, 'owner_id'> & {
+  // Computed from promotions table: true if sale has active promotion
+  isFeatured?: boolean
+}
 
 export type SaleItem = {
   id: string

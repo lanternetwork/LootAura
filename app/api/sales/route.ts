@@ -918,6 +918,69 @@ async function salesHandler(request: NextRequest) {
         
       logger.debug('Direct query success', { component: 'sales', resultCount: results.length })
       
+      // 5. Compute isFeatured from active promotions (batch query)
+      if (results.length > 0) {
+        try {
+          const admin = getAdminDb()
+          const nowStr = new Date().toISOString()
+          const saleIds = results.map((s) => s.id)
+          
+          // Batch query active promotions for all sales
+          const { data: activePromotions, error: promoQueryError } = await fromBase(admin, 'promotions')
+            .select('sale_id, starts_at, ends_at, status')
+            .eq('status', 'active')
+            .lte('starts_at', nowStr)
+            .gte('ends_at', nowStr)
+            .in('sale_id', saleIds)
+          
+          if (promoQueryError) {
+            logger.error('Promotion query error', promoQueryError instanceof Error ? promoQueryError : new Error(String(promoQueryError)), {
+              component: 'sales',
+              operation: 'compute_isFeatured',
+              error: promoQueryError,
+            })
+          }
+          
+          // Create Set of featured sale IDs for O(1) lookup
+          const featuredSaleIds = new Set<string>()
+          if (activePromotions) {
+            activePromotions.forEach((p) => {
+              if (p.sale_id) {
+                featuredSaleIds.add(p.sale_id)
+              }
+            })
+            
+            // Debug logging in development
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true' && activePromotions.length > 0) {
+              logger.debug('Active promotions found', {
+                component: 'sales',
+                operation: 'compute_isFeatured',
+                count: activePromotions.length,
+                now: nowStr,
+                promotions: activePromotions.map(p => ({
+                  sale_id: p.sale_id,
+                  starts_at: p.starts_at,
+                  ends_at: p.ends_at,
+                  status: p.status,
+                })),
+              })
+            }
+          }
+          
+          // Attach isFeatured to each sale
+          results = results.map((sale) => ({
+            ...sale,
+            isFeatured: featuredSaleIds.has(sale.id),
+          }))
+        } catch (promoError) {
+          // Log error but don't fail - isFeatured will be undefined (fallback to is_featured)
+          logger.error('Failed to query promotions for isFeatured', promoError instanceof Error ? promoError : new Error(String(promoError)), {
+            component: 'sales',
+            operation: 'compute_isFeatured',
+          })
+        }
+      }
+      
     } catch (queryError: any) {
       logger.error('Direct query failed', queryError instanceof Error ? queryError : new Error(String(queryError)), {
         component: 'sales',

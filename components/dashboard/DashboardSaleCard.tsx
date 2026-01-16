@@ -196,6 +196,20 @@ export default function DashboardSaleCard({
             </div>
           )}
           
+          {/* Promotion Status Badge (compact) */}
+          {promotionsEnabled && isPromotionActive && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                Promoted
+              </span>
+              {promotionStatus?.ends_at && (
+                <span className="text-xs text-neutral-500">
+                  Ends {formatPromotionEndDate(promotionStatus.ends_at)}
+                </span>
+              )}
+            </div>
+          )}
+          
           {/* Actions */}
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
             <Link 
@@ -230,7 +244,7 @@ export default function DashboardSaleCard({
                 data-testid="dashboard-promote-button"
               >
                 {isPromotionActive
-                  ? `Promoted${promotionStatus?.ends_at ? ` • Ends ${formatPromotionEndDate(promotionStatus.ends_at)}` : ''}`
+                  ? 'Promoted'
                   : isPromotionLoading
                     ? 'Promoting...'
                     : paymentsEnabled

@@ -444,7 +444,7 @@ export default function SellWizardClient({
         tags: formData.tags,
         pricing_mode: formData.pricing_mode,
       },
-      photos: photos || [],
+      photos: (photos || []).filter((url): url is string => typeof url === 'string' && url.trim().length > 0), // Filter out empty/invalid URLs
       items: (items || []).map(item => ({
         id: item.id,
         name: item.name,
@@ -454,7 +454,7 @@ export default function SellWizardClient({
         category: item.category,
       })),
       currentStep,
-      wantsPromotion,
+      wantsPromotion: wantsPromotion ?? false, // Ensure always boolean, never undefined
     }
   }, [formData, photos, items, currentStep, wantsPromotion])
 

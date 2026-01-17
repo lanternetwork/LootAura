@@ -1984,7 +1984,7 @@ export default function SellWizardClient({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-2">
@@ -2055,9 +2055,9 @@ export default function SellWizardClient({
           </div>
 
       {/* Progress Steps */}
-      <div className="mb-8">
+      <div className="mb-8 overflow-x-hidden">
         <div className="flex justify-center">
-          <div className="flex space-x-4">
+          <div className="flex space-x-2 sm:space-x-4">
             {WIZARD_STEPS.map((step, index) => {
               const currentStepIndex = getStepIndex(currentStep)
               const isActive = index <= currentStepIndex
@@ -2072,7 +2072,7 @@ export default function SellWizardClient({
                     {index + 1}
                   </div>
                   {index < WIZARD_STEPS.length - 1 && (
-                    <div className={`w-12 h-0.5 mx-2 ${
+                    <div className={`w-8 sm:w-12 h-0.5 mx-1 sm:mx-2 ${
                       isCompleted ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
                     }`} />
                   )}
@@ -2093,18 +2093,18 @@ export default function SellWizardClient({
       </div>
 
       {/* Step Content */}
-      <div className="bg-white rounded-lg shadow-sm p-8 mb-24">
+      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 mb-24 overflow-x-hidden">
         {renderStep()}
       </div>
 
       {/* Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 overflow-x-hidden">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center gap-2">
         <button
           onClick={handlePrevious}
           disabled={currentStep === STEPS.DETAILS}
           aria-label="Previous step"
-          className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+          className="inline-flex items-center px-4 sm:px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-shrink-0"
         >
           <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -2116,7 +2116,7 @@ export default function SellWizardClient({
           <button
             onClick={handleNext}
             aria-label="Next step"
-            className="inline-flex items-center px-6 py-3 btn-accent min-h-[44px]"
+            className="inline-flex items-center px-4 sm:px-6 py-3 btn-accent min-h-[44px] flex-shrink-0"
           >
             Next
             <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -2138,7 +2138,7 @@ export default function SellWizardClient({
                   title={!publishability.isPublishable && Object.keys(publishability.blockingErrors).length > 0 
                     ? Object.values(publishability.blockingErrors).join(', ')
                     : undefined}
-                  className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                  className="inline-flex items-center px-4 sm:px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-shrink-0"
                 >
             {loading ? (
               <>

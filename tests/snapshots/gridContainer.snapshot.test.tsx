@@ -54,6 +54,7 @@ describe.skip('Grid Container Snapshot', () => {
     const { container } = render(
       <SalesClient
         initialSales={mockSales}
+        initialBufferedBounds={null}
         initialCenter={{ lat: 38.1405, lng: -85.6936 }}
         user={null}
       />
@@ -68,6 +69,7 @@ describe.skip('Grid Container Snapshot', () => {
     const { container } = render(
       <SalesClient
         initialSales={mockSales}
+        initialBufferedBounds={null}
         initialCenter={{ lat: 38.1405, lng: -85.6936 }}
         user={null}
       />
@@ -94,6 +96,7 @@ describe.skip('Grid Container Snapshot', () => {
       const { container } = render(
         <SalesClient
           initialSales={sales}
+          initialBufferedBounds={null}
           initialCenter={{ lat: 38.1405, lng: -85.6936 }}
           user={null}
         />

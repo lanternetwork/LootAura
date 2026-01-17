@@ -56,7 +56,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
   const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
   // Use fallback if host is empty (matching pattern from app/sell/new/page.tsx)
-  const baseUrl = host ? `${protocol}${host}` : 
+  const baseUrl: string = host ? `${protocol}${host}` : 
     (process.env.NEXT_PUBLIC_SITE_URL || 
      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'))
   

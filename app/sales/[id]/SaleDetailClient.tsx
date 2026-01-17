@@ -706,6 +706,7 @@ export default function SaleDetailClient({
                     lng={sale.lng ?? undefined}
                     address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
                     onClick={handleNavigationClick}
+                    className="underline hover:no-underline"
                   >
                     {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
                   </AddressLink>

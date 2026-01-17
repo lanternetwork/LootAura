@@ -11,6 +11,7 @@ interface SalesPageProps {
   searchParams: {
     lat?: string
     lng?: string
+    zoom?: string
     zip?: string
     distanceKm?: string
     city?: string

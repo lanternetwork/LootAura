@@ -11,7 +11,7 @@
 
 import { expandBounds, type Bounds, MAP_BUFFER_FACTOR } from '@/lib/map/bounds'
 import { Sale } from '@/lib/types'
-import { headers } from 'next/headers'
+import { headers } from 'next/headers' // eslint-disable-line @typescript-eslint/no-unused-vars
 
 /**
  * Distance to zoom level mapping (miles to zoom level)
@@ -105,7 +105,7 @@ async function fetchSalesForBbox(
     return []
   }
   
-  const data = await response.json()
+  const data = await response.json() as { ok?: boolean; data?: unknown }
   
   if (!data || !data.ok || !Array.isArray(data.data)) {
     return []
@@ -113,7 +113,7 @@ async function fetchSalesForBbox(
   
   // Deduplicate sales by ID (matching client's deduplicateSales logic)
   const seen = new Set<string>()
-  const unique = data.data.filter((sale: Sale) => {
+  const unique = (data.data as Sale[]).filter((sale: Sale) => {
     const canonicalId = sale.id
     if (seen.has(canonicalId)) {
       return false
@@ -122,7 +122,7 @@ async function fetchSalesForBbox(
     return true
   })
   
-  return unique as Sale[]
+  return unique
 }
 
 export interface SSRInitialSalesResult {

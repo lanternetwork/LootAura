@@ -43,7 +43,7 @@ interface MapViewState {
 
 interface SalesClientProps {
   initialSales: Sale[]
-  initialBufferedBounds: { west: number; south: number; east: number; north: number } | null
+  initialBufferedBounds: Bounds | null
   initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   user: User | null
 }

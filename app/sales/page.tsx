@@ -4,6 +4,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies, headers } from 'next/headers'
 import { createPageMetadata } from '@/lib/metadata'
 import { computeSSRInitialSales } from '@/lib/map/ssrInitialSales'
+import { type Bounds } from '@/lib/map/bounds'
+import { type Sale } from '@/lib/types'
 
 interface SalesPageProps {
   searchParams: {
@@ -257,8 +259,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const zipNeedsResolution = urlZip && !_lat && !_lng && 
     (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
   
-  let initialSales: any[] = []
-  let initialBufferedBounds: { west: number; south: number; east: number; north: number } | null = null
+  let initialSales: Sale[] = []
+  let initialBufferedBounds: Bounds | null = null
   
   // Only compute SSR data if we have a valid center and ZIP doesn't need resolution
   if (initialCenter && !zipNeedsResolution) {

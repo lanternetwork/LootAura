@@ -43,12 +43,14 @@ interface MapViewState {
 
 interface SalesClientProps {
   initialSales: Sale[]
+  initialBufferedBounds: { west: number; south: number; east: number; north: number } | null
   initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   user: User | null
 }
 
 export default function SalesClient({ 
   initialSales, 
+  initialBufferedBounds,
   initialCenter, 
   user: _user 
 }: SalesClientProps) {
@@ -240,7 +242,7 @@ export default function SalesClient({
   // fetchedSales: All sales for the buffered area (larger than viewport)
   // visibleSales: Subset of fetchedSales that intersect current viewport (computed via useMemo)
   const [fetchedSales, setFetchedSales] = useState<Sale[]>(initialSales)
-  const [bufferedBounds, setBufferedBounds] = useState<Bounds | null>(null)
+  const [bufferedBounds, setBufferedBounds] = useState<Bounds | null>(initialBufferedBounds)
   const [loading, setLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(false) // Track if a fetch is in progress
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(initialSales.length > 0) // Track if initial load is complete

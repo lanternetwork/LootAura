@@ -3,6 +3,7 @@ import SalesClient from './SalesClient'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies, headers } from 'next/headers'
 import { createPageMetadata } from '@/lib/metadata'
+import { computeSSRInitialSales } from '@/lib/map/ssrInitialSales'
 
 interface SalesPageProps {
   searchParams: {
@@ -249,13 +250,58 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     } catch {}
   }
 
-  // Start with empty sales; client fetches immediately using initialCenter
-  const initialSales: any[] = []
+  // Compute initial sales and buffered bounds server-side (matching client's first fetch)
+  // Only seed if we have a valid center (skip if ZIP needs client-side resolution)
+  const urlZoom = searchParams.zoom
+  const urlZip = searchParams.zip
+  const zipNeedsResolution = urlZip && !_lat && !_lng && 
+    (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
+  
+  let initialSales: any[] = []
+  let initialBufferedBounds: { west: number; south: number; east: number; north: number } | null = null
+  
+  // Only compute SSR data if we have a valid center and ZIP doesn't need resolution
+  if (initialCenter && !zipNeedsResolution) {
+    try {
+      // Parse filters from URL (matching client's useFilters initialization)
+      const dateRange = searchParams.dateFrom || searchParams.dateTo ? 'range' : 'any'
+      const categories = _categories || []
+      const distance = _distanceKm ? _distanceKm / 1.60934 : 10 // Convert km to miles, default 10
+      
+      const result = await computeSSRInitialSales(
+        { lat: initialCenter.lat, lng: initialCenter.lng },
+        urlZoom,
+        {
+          dateRange,
+          categories,
+          distance
+        }
+      )
+      
+      initialSales = result.initialSales
+      initialBufferedBounds = result.initialBufferedBounds
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES_PAGE] SSR initial data:`, {
+          salesCount: initialSales.length,
+          bufferedBounds: initialBufferedBounds
+        })
+      }
+    } catch (error) {
+      // On error, fall back to empty (client will fetch)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error(`[SALES_PAGE] SSR initial sales error:`, error)
+      }
+      initialSales = []
+      initialBufferedBounds = null
+    }
+  }
 
   return (
     <div className="bg-gray-50 overflow-hidden" style={{ height: '100vh', marginTop: '-56px', paddingTop: '56px' }}>
       <SalesClient 
         initialSales={initialSales}
+        initialBufferedBounds={initialBufferedBounds}
         initialCenter={initialCenter}
         user={user}
       />

@@ -91,6 +91,12 @@ async function fetchSalesForBbox(
   params.set('limit', '200')
   
   // Call API route internally
+  // baseUrl should always be provided, but handle empty string gracefully
+  if (!baseUrl) {
+    // Return empty if no baseUrl (should not happen in production)
+    return []
+  }
+  
   const response = await fetch(`${baseUrl}/api/sales?${params.toString()}`, {
     cache: 'no-store' // Ensure fresh data
   })

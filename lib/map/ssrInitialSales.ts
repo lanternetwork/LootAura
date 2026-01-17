@@ -11,7 +11,6 @@
 
 import { expandBounds, type Bounds, MAP_BUFFER_FACTOR } from '@/lib/map/bounds'
 import { Sale } from '@/lib/types'
-import { headers } from 'next/headers' // eslint-disable-line @typescript-eslint/no-unused-vars
 
 /**
  * Distance to zoom level mapping (miles to zoom level)
@@ -63,17 +62,13 @@ function computeInitialViewportBounds(
  */
 async function fetchSalesForBbox(
   bufferedBbox: Bounds,
+  baseUrl: string,
   options: {
     dateRange?: string
     categories?: string[]
     distanceKm?: number
   } = {}
 ): Promise<Sale[]> {
-  // Get base URL for internal API call
-  const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'localhost:3000'
-  const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
-  const baseUrl = `${protocol}${host}`
   
   // Build API URL with same params as client fetchMapSales (line 338-359)
   const params = new URLSearchParams()
@@ -144,6 +139,7 @@ export interface SSRInitialSalesResult {
  */
 export async function computeSSRInitialSales(
   center: { lat: number; lng: number },
+  baseUrl: string,
   urlZoom?: string | null,
   filters: {
     dateRange?: string
@@ -161,7 +157,7 @@ export async function computeSSRInitialSales(
   const distanceKm = filters.distance ? filters.distance * 1.60934 : undefined
   
   // Fetch sales with same logic as client
-  const sales = await fetchSalesForBbox(bufferedBounds, {
+  const sales = await fetchSalesForBbox(bufferedBounds, baseUrl, {
     dateRange: filters.dateRange || 'any',
     categories: filters.categories || [],
     distanceKm

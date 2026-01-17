@@ -272,6 +272,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       
       const result = await computeSSRInitialSales(
         { lat: initialCenter.lat, lng: initialCenter.lng },
+        baseUrl,
         urlZoom,
         {
           dateRange,

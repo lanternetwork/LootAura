@@ -2055,16 +2055,16 @@ export default function SellWizardClient({
           </div>
 
       {/* Progress Steps */}
-      <div className="mb-8 overflow-x-hidden">
+      <div className="mb-8 overflow-x-hidden px-2">
         <div className="flex justify-center">
-          <div className="flex space-x-2 sm:space-x-4">
+          <div className="flex space-x-1 sm:space-x-2 md:space-x-4">
             {WIZARD_STEPS.map((step, index) => {
               const currentStepIndex = getStepIndex(currentStep)
               const isActive = index <= currentStepIndex
               const isCompleted = index < currentStepIndex
               return (
-                <div key={step.id} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                <div key={step.id} className="flex items-center flex-shrink-0">
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
                     isActive
                       ? 'bg-[var(--accent-primary)] text-white'
                       : 'bg-gray-200 text-gray-500'
@@ -2072,7 +2072,7 @@ export default function SellWizardClient({
                     {index + 1}
                   </div>
                   {index < WIZARD_STEPS.length - 1 && (
-                    <div className={`w-8 sm:w-12 h-0.5 mx-1 sm:mx-2 ${
+                    <div className={`w-6 sm:w-8 md:w-12 h-0.5 mx-0.5 sm:mx-1 md:mx-2 ${
                       isCompleted ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
                     }`} />
                   )}

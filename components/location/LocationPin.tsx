@@ -10,11 +10,23 @@ interface LocationPinProps {
   onClick?: (locationId: string) => void
 }
 
+/**
+ * Detect if device has touch capability (not device type)
+ * Uses pointer capability detection, not user agent
+ */
+function hasTouchCapability(): boolean {
+  if (typeof window === 'undefined') return false
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0
+}
+
 export default function LocationPin({ 
   location, 
   isSelected = false,
   onClick 
 }: LocationPinProps) {
+  // Detect touch capability for hitbox sizing
+  const isTouchDevice = useMemo(() => hasTouchCapability(), [])
+
   const handleClick = useCallback((event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -34,11 +46,21 @@ export default function LocationPin({
         anchor="center"
         data-testid="location-marker"
       >
-        {/* Wrapper with larger hit area on mobile */}
+        {/* Platform-specific hitbox: tight on desktop, forgiving on touch */}
         <div
-          className={`relative flex items-center justify-center w-11 h-11 md:w-8 md:h-8 min-w-[44px] min-h-[44px] md:min-w-[32px] md:min-h-[32px] transition-transform duration-150 ease-out ${
+          className={`relative flex items-center justify-center transition-transform duration-150 ease-out ${
             isSelected ? 'scale-125' : 'hover:scale-110'
           }`}
+          style={{
+            // Desktop (mouse): tight hitbox matching SVG size (12px on desktop)
+            // Mobile (touch): larger hitbox (44px) for easier tapping
+            width: isTouchDevice ? '44px' : '12px',
+            height: isTouchDevice ? '44px' : '12px',
+            minWidth: isTouchDevice ? '44px' : '12px',
+            minHeight: isTouchDevice ? '44px' : '12px',
+            // Ensure extra hit area on touch devices is transparent
+            backgroundColor: isTouchDevice ? 'transparent' : undefined
+          }}
           onClick={handleClick}
           role="button"
           tabIndex={0}

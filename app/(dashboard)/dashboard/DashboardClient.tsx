@@ -113,7 +113,7 @@ export default function DashboardClient({
   const { data: profile } = useProfile()
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 overflow-x-hidden">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Seller Dashboard</h1>
       </div>

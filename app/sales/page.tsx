@@ -3,11 +3,15 @@ import SalesClient from './SalesClient'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies, headers } from 'next/headers'
 import { createPageMetadata } from '@/lib/metadata'
+import { computeSSRInitialSales } from '@/lib/map/ssrInitialSales'
+import { type Bounds } from '@/lib/map/bounds'
+import { type Sale } from '@/lib/types'
 
 interface SalesPageProps {
   searchParams: {
     lat?: string
     lng?: string
+    zoom?: string
     zip?: string
     distanceKm?: string
     city?: string
@@ -51,7 +55,10 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const headersList = await headers()
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
   const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
-  const baseUrl = host ? `${protocol}${host}` : ''
+  // Use fallback if host is empty (matching pattern from app/sell/new/page.tsx)
+  const baseUrl: string = host ? `${protocol}${host}` : 
+    (process.env.NEXT_PUBLIC_SITE_URL || 
+     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'))
   
   // Check if this is a mobile request (best-effort detection via user agent)
   // Note: Client-side will have accurate viewport width, but server-side we can only guess
@@ -249,13 +256,59 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     } catch {}
   }
 
-  // Start with empty sales; client fetches immediately using initialCenter
-  const initialSales: any[] = []
+  // Compute initial sales and buffered bounds server-side (matching client's first fetch)
+  // Only seed if we have a valid center (skip if ZIP needs client-side resolution)
+  const urlZoom = searchParams.zoom
+  const urlZip = searchParams.zip
+  const zipNeedsResolution = urlZip && !_lat && !_lng && 
+    (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
+  
+  let initialSales: Sale[] = []
+  let initialBufferedBounds: Bounds | null = null
+  
+  // Only compute SSR data if we have a valid center and ZIP doesn't need resolution
+  if (initialCenter && !zipNeedsResolution) {
+    try {
+      // Parse filters from URL (matching client's useFilters initialization)
+      const dateRange = searchParams.dateFrom || searchParams.dateTo ? 'range' : 'any'
+      const categories = _categories || []
+      const distance = _distanceKm ? _distanceKm / 1.60934 : 10 // Convert km to miles, default 10
+      
+      const result = await computeSSRInitialSales(
+        { lat: initialCenter.lat, lng: initialCenter.lng },
+        baseUrl,
+        urlZoom,
+        {
+          dateRange,
+          categories,
+          distance
+        }
+      )
+      
+      initialSales = result.initialSales
+      initialBufferedBounds = result.initialBufferedBounds
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES_PAGE] SSR initial data:`, {
+          salesCount: initialSales.length,
+          bufferedBounds: initialBufferedBounds
+        })
+      }
+    } catch (error) {
+      // On error, fall back to empty (client will fetch)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error(`[SALES_PAGE] SSR initial sales error:`, error)
+      }
+      initialSales = []
+      initialBufferedBounds = null
+    }
+  }
 
   return (
     <div className="bg-gray-50 overflow-hidden" style={{ height: '100vh', marginTop: '-56px', paddingTop: '56px' }}>
       <SalesClient 
         initialSales={initialSales}
+        initialBufferedBounds={initialBufferedBounds}
         initialCenter={initialCenter}
         user={user}
       />

@@ -47,7 +47,7 @@ export default async function SellNewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <Suspense fallback={<SellWizardSkeleton />}>
         <SellWizardClient
           userLat={userLat}

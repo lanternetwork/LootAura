@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
     const validatedBody = validationResult.data
     
     // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
-    const itemTitle = validatedBody.title || validatedBody.name || ''
+    // The refine ensures at least one exists, so this will never be empty
+    const itemTitle = (validatedBody.title ?? validatedBody.name) as string
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -297,7 +298,7 @@ export async function PUT(request: NextRequest) {
     const updatePayload: any = {}
     // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
     if (validatedBody.title !== undefined || validatedBody.name !== undefined) {
-      updatePayload.name = validatedBody.title || validatedBody.name
+      updatePayload.name = (validatedBody.title ?? validatedBody.name) as string
     }
     if (validatedBody.description !== undefined) {
       updatePayload.description = validatedBody.description

@@ -6,15 +6,20 @@ import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 import { z } from 'zod'
 
 // Validation schema for item creation/update
+// Accepts both 'name' and 'title' for backward compatibility (normalized to 'title' internally)
 const ItemV2InputSchema = z.object({
   sale_id: z.string().min(1, 'Sale ID is required'),
-  title: z.string().min(1, 'Item title is required'),
+  title: z.string().min(1, 'Item title is required').optional(),
+  name: z.string().min(1, 'Item name is required').optional(),
   description: z.string().optional(),
   price: z.number().min(0, 'Price must be a non-negative number').optional(),
   category: z.string().optional(),
   condition: z.string().optional(),
   image_url: z.string().url().optional(),
   images: z.array(z.string()).optional(),
+}).refine((data) => data.title || data.name, {
+  message: 'Either title or name is required',
+  path: ['title'],
 })
 
 export async function GET(request: NextRequest) {
@@ -101,6 +106,9 @@ export async function POST(request: NextRequest) {
     
     const validatedBody = validationResult.data
     
+    // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
+    const itemTitle = validatedBody.title || validatedBody.name || ''
+    
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
@@ -141,7 +149,7 @@ export async function POST(request: NextRequest) {
     // Build insert payload with normalized image fields
     const insertPayload: any = {
       sale_id: validatedBody.sale_id,
-      name: validatedBody.title,
+      name: itemTitle,
       description: validatedBody.description,
       price: validatedBody.price,
       category: validatedBody.category,
@@ -287,8 +295,9 @@ export async function PUT(request: NextRequest) {
     
     // Normalize image fields if present in update body
     const updatePayload: any = {}
-    if (validatedBody.title !== undefined) {
-      updatePayload.name = validatedBody.title
+    // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
+    if (validatedBody.title !== undefined || validatedBody.name !== undefined) {
+      updatePayload.name = validatedBody.title || validatedBody.name
     }
     if (validatedBody.description !== undefined) {
       updatePayload.description = validatedBody.description

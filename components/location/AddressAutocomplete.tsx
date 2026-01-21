@@ -1418,61 +1418,49 @@ export default function AddressAutocomplete({
           onChange={(e) => {
             const newValue = e.target.value
             const timeSinceSelection = Date.now() - lastSelectionTimestampRef.current
-            const recentlySelected = lastSelectionTimestampRef.current > 0 && timeSinceSelection < 1000
+            const recentlySelected = lastSelectionTimestampRef.current > 0 && timeSinceSelection < 500 // Reduced to 500ms for more permissive editing
             const valueTrimmed = value?.trim() || ''
             const newValueTrimmed = newValue.trim()
             
-            // CRITICAL: If current value prop matches selected address, NEVER allow onChange with different value
-            // This prevents the value from reverting when user clicks back into field
-            // The value prop is the source of truth - if it matches selected address, don't allow changes
-            if (lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current && newValueTrimmed !== valueTrimmed) {
-              // Value prop matches selected address, but onChange is trying to change it
-              // This is a revert attempt - prevent it
+            // SIMPLIFIED LOGIC: Allow all manual edits unless it's a very recent programmatic revert
+            // If user is typing something different from current value, always allow it (they're editing)
+            if (newValueTrimmed !== valueTrimmed) {
+              // User is typing something different - this is a manual edit
+              // Clear selection tracking to allow normal behavior
+              if (lastSelectedAddressRef.current && newValueTrimmed !== lastSelectedAddressRef.current) {
+                // User is editing away from selected address - clear tracking
+                lastSelectedAddressRef.current = null
+                lastSelectionTimestampRef.current = 0
+              }
+              // Mark that user has interacted
+              hasUserInteractedRef.current = true
+              // Reset selection flags
+              justSelectedRef.current = false
+              setHasJustSelected(false)
+              suppressNextFetchRef.current = false
+              setIsSuppressing(false)
+              // Always allow the edit
+              onChange(newValue)
+              return
+            }
+            
+            // If new value matches current value prop, it might be a programmatic update
+            // Only block if we very recently selected (within 500ms) and value matches selected address
+            if (recentlySelected && lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current && newValueTrimmed === valueTrimmed) {
+              // Very recent selection and value hasn't changed - likely programmatic update, prevent it
               if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[AddressAutocomplete] Preventing onChange - value revert detected', {
+                console.log('[AddressAutocomplete] Preventing onChange - very recent programmatic update', {
                   newValue: newValueTrimmed,
                   currentValue: valueTrimmed,
                   lastSelectedAddress: lastSelectedAddressRef.current,
-                  recentlySelected
+                  timeSinceSelection
                 })
-              }
-              // Force input to show correct value (the selected address)
-              if (inputRef.current && inputRef.current.value !== valueTrimmed) {
-                inputRef.current.value = valueTrimmed
               }
               return
             }
             
-            // If we recently selected and user is typing something new, allow it (clear selection tracking)
-            if (recentlySelected && newValueTrimmed !== valueTrimmed && newValueTrimmed !== lastSelectedAddressRef.current) {
-              // User is explicitly typing something different - allow it
-              lastSelectedAddressRef.current = null
-              lastSelectionTimestampRef.current = 0
-            } else if (lastSelectedAddressRef.current && newValueTrimmed === lastSelectedAddressRef.current && (suppressNextFetchRef.current || recentlySelected)) {
-              // This is likely a programmatic update or stale value, don't call onChange
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[AddressAutocomplete] Preventing onChange - programmatic update detected', {
-                  newValue: newValueTrimmed,
-                  lastSelectedAddress: lastSelectedAddressRef.current,
-                  currentValue: valueTrimmed,
-                  suppressNextFetch: suppressNextFetchRef.current,
-                  recentlySelected
-                })
-              }
-              return
-            }
-            // Mark that user has interacted with the field
+            // Default: allow the change (fallback for edge cases)
             hasUserInteractedRef.current = true
-            // User is manually typing - clear last selected address and timestamp so searches work normally
-            if (newValue !== lastSelectedAddressRef.current) {
-              lastSelectedAddressRef.current = null
-              lastSelectionTimestampRef.current = 0
-            }
-            // Only reset selection flags if user is manually typing (not programmatic update)
-            if (!suppressNextFetchRef.current && !recentlySelected) {
-              justSelectedRef.current = false
-              setHasJustSelected(false)
-            }
             onChange(newValue)
           }}
           onKeyDown={handleKeyDown}

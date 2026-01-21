@@ -129,16 +129,15 @@ type WizardState = {
   loading: boolean
   errors: Record<string, string>
   submitError: string | null
-  lastAutocompleteTimestamp: number
 }
 
 // Wizard actions
 type WizardAction =
   | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
   | { type: 'SET_STEP'; step: number }
-  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any; source?: 'manual' | 'autocomplete'; timestamp?: number }
+  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any }
   | { type: 'SET_FORM_DATA'; formData: Partial<SaleInput> }
-  | { type: 'UPDATE_ADDRESS_FIELDS'; fields: { address?: string; city?: string; state?: string; zip_code?: string; lat?: number; lng?: number }; source: 'autocomplete' }
+  | { type: 'ADDRESS_SELECTED'; fields: { address?: string; city?: string; state?: string; zip_code?: string; lat?: number; lng?: number } }
   | { type: 'SET_PHOTOS'; photos: string[] }
   | { type: 'SET_ITEMS'; items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }> }
   | { type: 'ADD_ITEM'; item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue } }
@@ -159,7 +158,6 @@ const initialWizardState: WizardState = {
   loading: false,
   errors: {},
   submitError: null,
-  lastAutocompleteTimestamp: 0,
 }
 
 // Wizard reducer
@@ -177,72 +175,28 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     case 'SET_STEP':
       return { ...state, currentStep: action.step }
     case 'UPDATE_FORM':
-      // If manually updating address field and there's a recent autocomplete, ignore the update
-      if (action.field === 'address' && action.source === 'manual' && action.timestamp) {
-        const timeSinceAutocomplete = action.timestamp - state.lastAutocompleteTimestamp
-        // Ignore manual address updates within 1 second of autocomplete selection
-        if (timeSinceAutocomplete < 1000 && state.lastAutocompleteTimestamp > 0) {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SELL_WIZARD] Ignoring manual address update due to recent autocomplete selection', {
-              timeSinceAutocomplete,
-              lastAutocompleteTimestamp: state.lastAutocompleteTimestamp,
-              updateTimestamp: action.timestamp
-            })
-          }
-          return state
-        }
-      }
+      // Update a single form field (for manual typing)
       return { ...state, formData: { ...state.formData, [action.field]: action.value } }
-    case 'UPDATE_ADDRESS_FIELDS':
-      // Update all address fields atomically from autocomplete selection
-      // This is the authoritative source for address fields - no other action should overwrite them
+    case 'ADDRESS_SELECTED':
+      // Atomic update of all address fields from autocomplete selection
+      // This is the authoritative source for address fields
       return {
         ...state,
         formData: {
           ...state.formData,
           ...action.fields
-        },
-        lastAutocompleteTimestamp: Date.now()
+        }
       }
     case 'SET_FORM_DATA':
-      // Preserve address fields if they were recently set by autocomplete (within 2 seconds)
-      // This prevents derived field calculations or other updates from overwriting autocomplete data
-      // Only preserve fields that are NOT being explicitly updated in action.formData
-      const timeSinceAutocomplete = Date.now() - state.lastAutocompleteTimestamp
-      const shouldPreserveAddressFields = timeSinceAutocomplete < 2000 && state.lastAutocompleteTimestamp > 0
-      
-      if (shouldPreserveAddressFields) {
-        // Only preserve address fields that are NOT being updated in action.formData
-        // This allows manual typing in city/state/zip to work correctly
-        const addressFieldsToPreserve: Partial<SaleInput> = {}
-        if (action.formData.address === undefined && state.formData.address !== undefined) {
-          addressFieldsToPreserve.address = state.formData.address
-        }
-        if (action.formData.city === undefined && state.formData.city !== undefined) {
-          addressFieldsToPreserve.city = state.formData.city
-        }
-        if (action.formData.state === undefined && state.formData.state !== undefined) {
-          addressFieldsToPreserve.state = state.formData.state
-        }
-        if (action.formData.zip_code === undefined && state.formData.zip_code !== undefined) {
-          addressFieldsToPreserve.zip_code = state.formData.zip_code
-        }
-        if (action.formData.lat === undefined && state.formData.lat !== undefined) {
-          addressFieldsToPreserve.lat = state.formData.lat
-        }
-        if (action.formData.lng === undefined && state.formData.lng !== undefined) {
-          addressFieldsToPreserve.lng = state.formData.lng
-        }
-        
-        return {
-          ...state,
-          formData: {
-            ...action.formData,
-            ...addressFieldsToPreserve // Only preserve fields that aren't being updated
-          }
+      // Merge new formData into existing formData instead of replacing it
+      // This prevents derived field calculations from overwriting address fields
+      return {
+        ...state,
+        formData: {
+          ...state.formData,
+          ...action.formData
         }
       }
-      return { ...state, formData: action.formData }
     case 'SET_PHOTOS':
       return { ...state, photos: action.photos }
     case 'SET_ITEMS':
@@ -1093,15 +1047,13 @@ export default function SellWizardClient({
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
     
-    // For address field, use UPDATE_FORM with manual source and timestamp
-    // This ensures we only update the address field, not city/state/zip/lat/lng
+    // For address field, use UPDATE_FORM to update only the address field
+    // This is for manual typing - autocomplete uses ADDRESS_SELECTED instead
     if (field === 'address') {
       dispatch({ 
         type: 'UPDATE_FORM', 
         field, 
-        value, 
-        source: 'manual',
-        timestamp: Date.now()
+        value
       })
       return
     }
@@ -1148,13 +1100,14 @@ export default function SellWizardClient({
   }
 
   // Handler for autocomplete place selection - updates all address fields atomically
+  // This is the authoritative source for address fields - no onChange is called after this
   const handlePlaceSelected = (place: { address?: string; city?: string; state?: string; zip?: string; lat?: number; lng?: number }) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] handlePlaceSelected called:', { place })
     }
     
     dispatch({
-      type: 'UPDATE_ADDRESS_FIELDS',
+      type: 'ADDRESS_SELECTED',
       fields: {
         address: place.address || '',
         city: place.city || '',
@@ -1162,8 +1115,7 @@ export default function SellWizardClient({
         zip_code: place.zip || '',
         lat: place.lat,
         lng: place.lng,
-      },
-      source: 'autocomplete'
+      }
     })
   }
 

@@ -1327,12 +1327,19 @@ export default function AddressAutocomplete({
     }
     // Delay to allow click on suggestion to register
     setTimeout(async () => {
+      const timeSinceSelection = Date.now() - lastSelectionTimestampRef.current
+      const recentlySelected = lastSelectionTimestampRef.current > 0 && timeSinceSelection < 2000
+      const valueTrimmed = value?.trim() || ''
+      const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
+      
       // Only geocode if:
       // 1. Dropdown is closed
-      // 2. We didn't just select (check both ref and state)
+      // 2. We didn't just select (check both ref and state AND timestamp)
       // 3. Not already geocoding
       // 4. Value is long enough
       // 5. Suppress flag is not active (additional safety check)
+      // 6. Value doesn't match selected address (prevent geocoding selected address)
+      // 7. Not recently selected (within 2 seconds)
       if (
         value && 
         value.length >= 5 && 
@@ -1341,7 +1348,9 @@ export default function AddressAutocomplete({
         !isOpen && 
         !justSelectedRef.current && 
         !hasJustSelected &&
-        !suppressNextFetchRef.current
+        !suppressNextFetchRef.current &&
+        !recentlySelected &&
+        !isSelectedAddress
       ) {
         setIsGeocoding(true)
         try {

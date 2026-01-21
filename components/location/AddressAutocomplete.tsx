@@ -1410,24 +1410,42 @@ export default function AddressAutocomplete({
             const newValue = e.target.value
             const timeSinceSelection = Date.now() - lastSelectionTimestampRef.current
             const recentlySelected = lastSelectionTimestampRef.current > 0 && timeSinceSelection < 1000
+            const valueTrimmed = value?.trim() || ''
+            const newValueTrimmed = newValue.trim()
             
-            // Prevent onChange if this is a programmatic update or if we recently selected
+            // CRITICAL: If current value prop matches selected address, NEVER allow onChange with different value
             // This prevents the value from reverting when user clicks back into field
-            // Check multiple conditions to catch all cases:
-            // 1. Value matches selected address AND suppress flag is active
-            // 2. We recently selected (within 1 second) AND new value doesn't match current value prop
-            // 3. New value matches a previous typed value that was replaced by selection
-            if (recentlySelected && newValue !== value && newValue !== lastSelectedAddressRef.current) {
-              // User is trying to type, but we recently selected - allow it (clear selection tracking)
+            // The value prop is the source of truth - if it matches selected address, don't allow changes
+            if (lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current && newValueTrimmed !== valueTrimmed) {
+              // Value prop matches selected address, but onChange is trying to change it
+              // This is a revert attempt - prevent it
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[AddressAutocomplete] Preventing onChange - value revert detected', {
+                  newValue: newValueTrimmed,
+                  currentValue: valueTrimmed,
+                  lastSelectedAddress: lastSelectedAddressRef.current,
+                  recentlySelected
+                })
+              }
+              // Force input to show correct value (the selected address)
+              if (inputRef.current && inputRef.current.value !== valueTrimmed) {
+                inputRef.current.value = valueTrimmed
+              }
+              return
+            }
+            
+            // If we recently selected and user is typing something new, allow it (clear selection tracking)
+            if (recentlySelected && newValueTrimmed !== valueTrimmed && newValueTrimmed !== lastSelectedAddressRef.current) {
+              // User is explicitly typing something different - allow it
               lastSelectedAddressRef.current = null
               lastSelectionTimestampRef.current = 0
-            } else if (lastSelectedAddressRef.current && newValue === lastSelectedAddressRef.current && (suppressNextFetchRef.current || recentlySelected)) {
+            } else if (lastSelectedAddressRef.current && newValueTrimmed === lastSelectedAddressRef.current && (suppressNextFetchRef.current || recentlySelected)) {
               // This is likely a programmatic update or stale value, don't call onChange
               if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                 console.log('[AddressAutocomplete] Preventing onChange - programmatic update detected', {
-                  newValue,
+                  newValue: newValueTrimmed,
                   lastSelectedAddress: lastSelectedAddressRef.current,
-                  currentValue: value,
+                  currentValue: valueTrimmed,
                   suppressNextFetch: suppressNextFetchRef.current,
                   recentlySelected
                 })

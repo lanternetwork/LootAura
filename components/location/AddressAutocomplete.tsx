@@ -1332,6 +1332,13 @@ export default function AddressAutocomplete({
       const valueTrimmed = value?.trim() || ''
       const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
       
+      // CRITICAL: If user has manually edited the field after selection, don't geocode
+      // This prevents overwriting user edits with geocoded results
+      // If lastSelectedAddressRef exists and current value differs from it, user has edited it
+      const userHasEditedAfterSelection = lastSelectedAddressRef.current && 
+                                          valueTrimmed !== lastSelectedAddressRef.current &&
+                                          valueTrimmed.length > 0
+      
       // Only geocode if:
       // 1. Dropdown is closed
       // 2. We didn't just select (check both ref and state AND timestamp)
@@ -1340,6 +1347,7 @@ export default function AddressAutocomplete({
       // 5. Suppress flag is not active (additional safety check)
       // 6. Value doesn't match selected address (prevent geocoding selected address)
       // 7. Not recently selected (within 2 seconds)
+      // 8. User hasn't manually edited the field after selection (NEW)
       if (
         value && 
         value.length >= 5 && 
@@ -1350,7 +1358,8 @@ export default function AddressAutocomplete({
         !hasJustSelected &&
         !suppressNextFetchRef.current &&
         !recentlySelected &&
-        !isSelectedAddress
+        !isSelectedAddress &&
+        !userHasEditedAfterSelection // NEW: Don't geocode if user has edited after selection
       ) {
         setIsGeocoding(true)
         try {
@@ -1374,6 +1383,12 @@ export default function AddressAutocomplete({
         } finally {
           setIsGeocoding(false)
         }
+      } else if (process.env.NEXT_PUBLIC_DEBUG === 'true' && userHasEditedAfterSelection) {
+        console.log('[AddressAutocomplete] Skipping blur geocode - user has edited field after selection', {
+          value: valueTrimmed,
+          lastSelectedAddress: lastSelectedAddressRef.current,
+          userHasEditedAfterSelection
+        })
       }
     }, 200)
   }

@@ -215,16 +215,16 @@ export default function DashboardSaleCard({
           )}
           
           {/* Actions */}
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mt-2 pt-2 border-t border-gray-200">
             <Link 
               href={`/sales/${sale.id}`}
-              className="flex-1 text-center px-3 py-1.5 text-sm text-[#3A2268] hover:bg-gray-50 rounded transition-colors"
+              className="flex-1 text-center px-2 sm:px-3 py-1.5 text-sm text-[#3A2268] hover:bg-gray-50 rounded transition-colors min-w-0 flex-shrink-0"
             >
               View
             </Link>
             <Link 
               href={`/sell/${sale.id}/edit`}
-              className="flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-[#3A2268] hover:bg-gray-50 rounded transition-colors"
+              className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 text-sm text-[#3A2268] hover:bg-gray-50 rounded transition-colors flex-shrink-0"
               aria-label="Edit sale"
             >
               <FaEdit className="w-3 h-3" />
@@ -237,7 +237,7 @@ export default function DashboardSaleCard({
                 disabled={
                   isPromotionLoading || isPromotionActive || !paymentsEnabled
                 }
-                className={`flex items-center justify-center gap-1 px-3 py-1.5 text-sm rounded transition-colors ${
+                className={`flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 text-sm rounded transition-colors flex-shrink-0 ${
                   isPromotionActive
                     ? 'text-green-700 bg-green-50 cursor-default'
                     : paymentsEnabled
@@ -259,7 +259,7 @@ export default function DashboardSaleCard({
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
-              className="flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
               aria-label="Delete sale"
             >
               <FaTrash className="w-3 h-3" />

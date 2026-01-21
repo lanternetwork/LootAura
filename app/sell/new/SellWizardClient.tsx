@@ -129,16 +129,15 @@ type WizardState = {
   loading: boolean
   errors: Record<string, string>
   submitError: string | null
-  lastAutocompleteTimestamp: number
 }
 
 // Wizard actions
 type WizardAction =
   | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
   | { type: 'SET_STEP'; step: number }
-  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any; source?: 'manual' | 'autocomplete'; timestamp?: number }
+  | { type: 'UPDATE_FORM'; field: keyof SaleInput; value: any }
   | { type: 'SET_FORM_DATA'; formData: Partial<SaleInput> }
-  | { type: 'UPDATE_ADDRESS_FIELDS'; fields: { address?: string; city?: string; state?: string; zip_code?: string; lat?: number; lng?: number }; source: 'autocomplete' }
+  | { type: 'ADDRESS_SELECTED'; fields: { address?: string; city?: string; state?: string; zip_code?: string; lat?: number; lng?: number } }
   | { type: 'SET_PHOTOS'; photos: string[] }
   | { type: 'SET_ITEMS'; items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }> }
   | { type: 'ADD_ITEM'; item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue } }
@@ -159,7 +158,6 @@ const initialWizardState: WizardState = {
   loading: false,
   errors: {},
   submitError: null,
-  lastAutocompleteTimestamp: 0,
 }
 
 // Wizard reducer
@@ -177,34 +175,28 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     case 'SET_STEP':
       return { ...state, currentStep: action.step }
     case 'UPDATE_FORM':
-      // If manually updating address field and there's a recent autocomplete, ignore the update
-      if (action.field === 'address' && action.source === 'manual' && action.timestamp) {
-        const timeSinceAutocomplete = action.timestamp - state.lastAutocompleteTimestamp
-        // Ignore manual address updates within 1 second of autocomplete selection
-        if (timeSinceAutocomplete < 1000 && state.lastAutocompleteTimestamp > 0) {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SELL_WIZARD] Ignoring manual address update due to recent autocomplete selection', {
-              timeSinceAutocomplete,
-              lastAutocompleteTimestamp: state.lastAutocompleteTimestamp,
-              updateTimestamp: action.timestamp
-            })
-          }
-          return state
-        }
-      }
+      // Update a single form field (for manual typing)
       return { ...state, formData: { ...state.formData, [action.field]: action.value } }
-    case 'UPDATE_ADDRESS_FIELDS':
-      // Update all address fields atomically from autocomplete selection
+    case 'ADDRESS_SELECTED':
+      // Atomic update of all address fields from autocomplete selection
+      // This is the authoritative source for address fields
       return {
         ...state,
         formData: {
           ...state.formData,
           ...action.fields
-        },
-        lastAutocompleteTimestamp: Date.now()
+        }
       }
     case 'SET_FORM_DATA':
-      return { ...state, formData: action.formData }
+      // Merge new formData into existing formData instead of replacing it
+      // This prevents derived field calculations from overwriting address fields
+      return {
+        ...state,
+        formData: {
+          ...state.formData,
+          ...action.formData
+        }
+      }
     case 'SET_PHOTOS':
       return { ...state, photos: action.photos }
     case 'SET_ITEMS':
@@ -1055,15 +1047,13 @@ export default function SellWizardClient({
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
     
-    // For address field, use UPDATE_FORM with manual source and timestamp
-    // This ensures we only update the address field, not city/state/zip/lat/lng
+    // For address field, use UPDATE_FORM to update only the address field
+    // This is for manual typing - autocomplete uses ADDRESS_SELECTED instead
     if (field === 'address') {
       dispatch({ 
         type: 'UPDATE_FORM', 
         field, 
-        value, 
-        source: 'manual',
-        timestamp: Date.now()
+        value
       })
       return
     }
@@ -1110,13 +1100,14 @@ export default function SellWizardClient({
   }
 
   // Handler for autocomplete place selection - updates all address fields atomically
+  // This is the authoritative source for address fields - no onChange is called after this
   const handlePlaceSelected = (place: { address?: string; city?: string; state?: string; zip?: string; lat?: number; lng?: number }) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] handlePlaceSelected called:', { place })
     }
     
     dispatch({
-      type: 'UPDATE_ADDRESS_FIELDS',
+      type: 'ADDRESS_SELECTED',
       fields: {
         address: place.address || '',
         city: place.city || '',
@@ -1124,8 +1115,7 @@ export default function SellWizardClient({
         zip_code: place.zip || '',
         lat: place.lat,
         lng: place.lng,
-      },
-      source: 'autocomplete'
+      }
     })
   }
 
@@ -1984,7 +1974,7 @@ export default function SellWizardClient({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-2">
@@ -2055,16 +2045,16 @@ export default function SellWizardClient({
           </div>
 
       {/* Progress Steps */}
-      <div className="mb-8">
+      <div className="mb-8 overflow-x-hidden px-2">
         <div className="flex justify-center">
-          <div className="flex space-x-4">
+          <div className="flex space-x-1 sm:space-x-2 md:space-x-4">
             {WIZARD_STEPS.map((step, index) => {
               const currentStepIndex = getStepIndex(currentStep)
               const isActive = index <= currentStepIndex
               const isCompleted = index < currentStepIndex
               return (
-                <div key={step.id} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                <div key={step.id} className="flex items-center flex-shrink-0">
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
                     isActive
                       ? 'bg-[var(--accent-primary)] text-white'
                       : 'bg-gray-200 text-gray-500'
@@ -2072,7 +2062,7 @@ export default function SellWizardClient({
                     {index + 1}
                   </div>
                   {index < WIZARD_STEPS.length - 1 && (
-                    <div className={`w-12 h-0.5 mx-2 ${
+                    <div className={`w-6 sm:w-8 md:w-12 h-0.5 mx-0.5 sm:mx-1 md:mx-2 ${
                       isCompleted ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
                     }`} />
                   )}
@@ -2093,18 +2083,18 @@ export default function SellWizardClient({
       </div>
 
       {/* Step Content */}
-      <div className="bg-white rounded-lg shadow-sm p-8 mb-24">
+      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 mb-24 overflow-x-hidden">
         {renderStep()}
       </div>
 
       {/* Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 overflow-x-hidden">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center gap-2">
         <button
           onClick={handlePrevious}
           disabled={currentStep === STEPS.DETAILS}
           aria-label="Previous step"
-          className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+          className="inline-flex items-center px-4 sm:px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-shrink-0"
         >
           <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -2116,7 +2106,7 @@ export default function SellWizardClient({
           <button
             onClick={handleNext}
             aria-label="Next step"
-            className="inline-flex items-center px-6 py-3 btn-accent min-h-[44px]"
+            className="inline-flex items-center px-4 sm:px-6 py-3 btn-accent min-h-[44px] flex-shrink-0"
           >
             Next
             <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -2138,7 +2128,7 @@ export default function SellWizardClient({
                   title={!publishability.isPublishable && Object.keys(publishability.blockingErrors).length > 0 
                     ? Object.values(publishability.blockingErrors).join(', ')
                     : undefined}
-                  className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                  className="inline-flex items-center px-4 sm:px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-shrink-0"
                 >
             {loading ? (
               <>

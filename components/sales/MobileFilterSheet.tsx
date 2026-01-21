@@ -50,6 +50,12 @@ export default function MobileFilterSheet({
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeDeltaY, setSwipeDeltaY] = useState(0)
   const sheetRef = useRef<HTMLDivElement>(null)
+  // Track last synced props to detect external changes
+  const lastSyncedPropsRef = useRef<{
+    dateRange: typeof dateRange
+    categories: string[]
+    distance: number
+  } | null>(null)
 
   // Swipe-to-dismiss gesture handling (only on drag handle area)
   const handleDragHandleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -88,12 +94,27 @@ export default function MobileFilterSheet({
     )
   }, [])
 
-  // Sync temp state when sheet opens or props change
+  // Sync temp state from props only when:
+  // 1. Sheet opens for the first time, OR
+  // 2. Props have changed externally (e.g., after Apply or external filter update)
+  // This preserves user's uncommitted selections when closing/reopening without applying
   useEffect(() => {
     if (isOpen) {
-      setTempDateRange(dateRange)
-      setTempCategories(categories)
-      setTempDistance(distance)
+      const lastSynced = lastSyncedPropsRef.current
+      const propsChanged = !lastSynced ||
+        lastSynced.dateRange !== dateRange ||
+        lastSynced.categories.length !== categories.length ||
+        !lastSynced.categories.every((cat, i) => cat === categories[i]) ||
+        lastSynced.distance !== distance
+      
+      if (propsChanged) {
+        // Props changed externally (e.g., after Apply) or first open: sync from props
+        setTempDateRange(dateRange)
+        setTempCategories(categories)
+        setTempDistance(distance)
+        lastSyncedPropsRef.current = { dateRange, categories: [...categories], distance }
+      }
+      // If props haven't changed, preserve temp state (user's uncommitted selections)
     }
   }, [isOpen, dateRange, categories, distance])
 

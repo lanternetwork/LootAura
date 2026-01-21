@@ -451,6 +451,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const boundsKey = `${fitBounds.west}|${fitBounds.south}|${fitBounds.east}|${fitBounds.north}`
     
     if (boundsKey !== lastBoundsKey.current) {
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: FIT_BOUNDS] Trigger: fitBounds prop changed', {
+          trigger: 'fitBounds prop change',
+          context: { fitBounds, fitBoundsOptions, boundsKey },
+          stack: new Error().stack
+        })
+      }
+      
       console.log('[MAP] fitBounds:', fitBounds, 'options:', fitBoundsOptions)
       const map = mapRef.current.getMap()
       if (map) {
@@ -492,6 +501,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const zoomDiff = Math.abs(currentZoom - zoom)
     
     if (latDiff > 1e-5 || lngDiff > 1e-5 || zoomDiff > 0.01) {
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: EASE_TO] Trigger: Center/zoom props changed (reactive)', {
+          trigger: 'Center/zoom props changed',
+          context: { center, zoom, currentCenter, currentZoom, latDiff, lngDiff, zoomDiff },
+          stack: new Error().stack
+        })
+      }
+      
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[MAP] easeTo:', { center, zoom })
       }

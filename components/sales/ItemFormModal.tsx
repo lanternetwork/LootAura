@@ -241,21 +241,43 @@ export default function ItemFormModal({
               </label>
               <input
                 id="item-price"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={price}
                 onChange={(e) => {
-                  setPrice(e.target.value)
-                  if (errors.price) {
-                    setErrors(prev => {
-                      const next = { ...prev }
-                      delete next.price
-                      return next
-                    })
+                  const value = e.target.value
+                  // Allow empty string, digits, and a single decimal point
+                  // Prevent non-numeric characters from being entered
+                  if (value === '') {
+                    setPrice('')
+                    if (errors.price) {
+                      setErrors(prev => {
+                        const next = { ...prev }
+                        delete next.price
+                        return next
+                      })
+                    }
+                    return
+                  }
+                  // Only allow digits and a single decimal point
+                  // Regex: digits (optional), decimal point (optional, max 1), digits after decimal (optional)
+                  const numericPattern = /^\d*\.?\d*$/
+                  if (numericPattern.test(value)) {
+                    // Ensure only one decimal point
+                    const decimalCount = (value.match(/\./g) || []).length
+                    if (decimalCount <= 1) {
+                      setPrice(value)
+                      if (errors.price) {
+                        setErrors(prev => {
+                          const next = { ...prev }
+                          delete next.price
+                          return next
+                        })
+                      }
+                    }
                   }
                 }}
                 placeholder="0.00"
-                min="0"
-                step="0.01"
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] ${
                   errors.price ? 'border-red-300' : 'border-gray-300'
                 }`}

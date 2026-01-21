@@ -3,6 +3,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
+import { z } from 'zod'
+
+// Base validation schema for item creation/update
+// Accepts both 'name' and 'title' for backward compatibility (normalized to 'title' internally)
+const ItemV2InputBaseSchema = z.object({
+  sale_id: z.string().min(1, 'Sale ID is required'),
+  title: z.string().min(1, 'Item title is required').optional(),
+  name: z.string().min(1, 'Item name is required').optional(),
+  description: z.string().optional(),
+  price: z.number().min(0, 'Price must be a non-negative number').optional(),
+  category: z.string().optional(),
+  condition: z.string().optional(),
+  image_url: z.string().url().optional(),
+  images: z.array(z.string()).optional(),
+})
+
+// Schema for POST (creation) - requires title or name
+const ItemV2InputSchema = ItemV2InputBaseSchema.refine((data) => data.title || data.name, {
+  message: 'Either title or name is required',
+  path: ['title'],
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,7 +87,32 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createSupabaseServerClient()
-    const body = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
+    }
+    
+    // Validate request body
+    const validationResult = ItemV2InputSchema.safeParse(body)
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message
+      }))
+      return NextResponse.json({ 
+        error: 'Validation failed',
+        details: errors
+      }, { status: 400 })
+    }
+    
+    const validatedBody = validationResult.data
+    
+    // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
+    // The refine ensures at least one exists, so this will never be undefined
+    // TypeScript doesn't understand Zod refine narrowing, so we use explicit type assertion
+    const itemTitle: string = (validatedBody.title ?? validatedBody.name ?? '') as string
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -85,36 +131,34 @@ export async function POST(request: NextRequest) {
     const db = getRlsDb()
     
     // Validate that the sale belongs to the authenticated user
-    if (body.sale_id) {
-      // Read from base table to check ownership (sales_v2 view doesn't include owner_id for security)
-      const { data: sale, error: saleError } = await fromBase(db, 'sales')
-        .select('id, owner_id')
-        .eq('id', body.sale_id)
-        .single()
-      
-      if (saleError || !sale) {
-        return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
-      }
-      
-      if (sale.owner_id !== user.id) {
-        return NextResponse.json({ error: 'You can only create items for your own sales' }, { status: 400 })
-      }
+    // Read from base table to check ownership (sales_v2 view doesn't include owner_id for security)
+    const { data: sale, error: saleError } = await fromBase(db, 'sales')
+      .select('id, owner_id')
+      .eq('id', validatedBody.sale_id)
+      .single()
+    
+    if (saleError || !sale) {
+      return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
+    }
+    
+    if (sale.owner_id !== user.id) {
+      return NextResponse.json({ error: 'You can only create items for your own sales' }, { status: 400 })
     }
     
     // Normalize image fields to canonical format (images array + image_url for compatibility)
     const normalizedImages = normalizeItemImages({
-      image_url: body.image_url,
-      images: body.images,
+      image_url: validatedBody.image_url,
+      images: validatedBody.images,
     })
     
     // Build insert payload with normalized image fields
     const insertPayload: any = {
-      sale_id: body.sale_id,
-      name: body.title,
-      description: body.description,
-      price: body.price,
-      category: body.category,
-      condition: body.condition,
+      sale_id: validatedBody.sale_id,
+      name: itemTitle,
+      description: validatedBody.description,
+      price: validatedBody.price,
+      category: validatedBody.category,
+      condition: validatedBody.condition,
       // Always set both fields for consistency (base table is authoritative)
       images: normalizedImages.images,
       image_url: normalizedImages.image_url,
@@ -126,9 +170,9 @@ export async function POST(request: NextRequest) {
       logger.debug('[ITEMS_V2] Creating item with image data', {
         component: 'items_v2',
         operation: 'POST',
-        hasImageUrl: !!body.image_url,
-        hasImages: Array.isArray(body.images) && body.images.length > 0,
-        imagesCount: Array.isArray(body.images) ? body.images.length : 0,
+        hasImageUrl: !!validatedBody.image_url,
+        hasImages: Array.isArray(validatedBody.images) && validatedBody.images.length > 0,
+        imagesCount: Array.isArray(validatedBody.images) ? validatedBody.images.length : 0,
         normalizedImages: normalizedImages.images?.length || 0,
         normalizedImageUrl: normalizedImages.image_url ? `${normalizedImages.image_url.substring(0, 50)}...` : null,
       })
@@ -162,7 +206,7 @@ export async function POST(request: NextRequest) {
         const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
         enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
           imageUrl: normalizedImages.image_url!,
-          saleId: body.sale_id,
+          saleId: validatedBody.sale_id,
           ownerId: user.id,
         }).catch((err) => {
           // Log but don't fail - job enqueueing is non-critical (debug only)
@@ -211,11 +255,36 @@ export async function PUT(request: NextRequest) {
     const supabase = createSupabaseServerClient()
     const { pathname } = new URL(request.url)
     const itemId = pathname.split('/').pop()
-    const body = await request.json()
     
     if (!itemId) {
       return NextResponse.json({ error: 'Item ID is required' }, { status: 400 })
     }
+    
+    let body: any
+    try {
+      body = await request.json()
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
+    }
+    
+    // Validate request body (all fields optional for updates)
+    // Use base schema without refine, then make all fields optional
+    const UpdateItemV2InputSchema = ItemV2InputBaseSchema.partial().extend({
+      sale_id: z.string().optional(), // sale_id should not be updated
+    })
+    const validationResult = UpdateItemV2InputSchema.safeParse(body)
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message
+      }))
+      return NextResponse.json({ 
+        error: 'Validation failed',
+        details: errors
+      }, { status: 400 })
+    }
+    
+    const validatedBody = validationResult.data
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -231,11 +300,27 @@ export async function PUT(request: NextRequest) {
     }
     
     // Normalize image fields if present in update body
-    const updatePayload: any = { ...body }
-    if ('image_url' in body || 'images' in body) {
+    const updatePayload: any = {}
+    // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
+    if (validatedBody.title !== undefined || validatedBody.name !== undefined) {
+      updatePayload.name = (validatedBody.title ?? validatedBody.name) as string
+    }
+    if (validatedBody.description !== undefined) {
+      updatePayload.description = validatedBody.description
+    }
+    if (validatedBody.price !== undefined) {
+      updatePayload.price = validatedBody.price
+    }
+    if (validatedBody.category !== undefined) {
+      updatePayload.category = validatedBody.category
+    }
+    if (validatedBody.condition !== undefined) {
+      updatePayload.condition = validatedBody.condition
+    }
+    if (validatedBody.image_url !== undefined || validatedBody.images !== undefined) {
       const normalizedImages = normalizeItemImages({
-        image_url: body.image_url,
-        images: body.images,
+        image_url: validatedBody.image_url,
+        images: validatedBody.images,
       })
       // Always set both fields for consistency (base table is authoritative)
       updatePayload.images = normalizedImages.images

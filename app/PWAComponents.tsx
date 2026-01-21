@@ -1,5 +1,6 @@
 'use client'
 import { useEffect } from 'react'
+import MobilePWASuppressor from '@/components/MobilePWASuppressor'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 import OfflineIndicator from '@/components/OfflineIndicator'
 
@@ -19,6 +20,8 @@ export function PWAComponents() {
 
   return (
     <>
+      {/* Suppress PWA install prompt on mobile only - must run before PWAInstallPrompt */}
+      <MobilePWASuppressor />
       <PWAInstallPrompt />
       <OfflineIndicator />
     </>

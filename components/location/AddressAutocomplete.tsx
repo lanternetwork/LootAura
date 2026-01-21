@@ -448,6 +448,9 @@ export default function AddressAutocomplete({
   const justSelectedRef = useRef<boolean>(false)
   const [hasJustSelected, setHasJustSelected] = useState(false)
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
+  const lastSelectedAddressRef = useRef<string | null>(null) // Track last selected address to prevent re-searching
+  const lastSelectionTimestampRef = useRef<number>(0) // Track when place was selected to prevent stale searches
+  const suggestionsWereShownRef = useRef<boolean>(false) // Track if suggestions were ever shown during this typing session
   const isInitialMountRef = useRef<boolean>(true)
   // Capture initial value synchronously on first render (before debounce triggers)
   const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value.trim() : undefined)
@@ -478,6 +481,13 @@ export default function AddressAutocomplete({
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
+  
+  // Track when suggestions are shown (to prevent blur geocoding if user didn't select)
+  useEffect(() => {
+    if (suggestions.length > 0 && isOpen) {
+      suggestionsWereShownRef.current = true
+    }
+  }, [suggestions, isOpen])
 
   // Use location from props if provided, otherwise try browser geolocation first (high accuracy), then IP geolocation
   useEffect(() => {
@@ -579,12 +589,84 @@ export default function AddressAutocomplete({
     // Also check if the query looks like a complete formatted address (has multiple commas) - this indicates a selection was made
     // This prevents searching when the value is accidentally set to the full formatted address
     const looksLikeFormattedAddress = trimmedQuery.includes(',') && trimmedQuery.split(',').length >= 3
-    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || looksLikeFormattedAddress) {
-      // Don't reset flags here - they're managed in handleSelect
+    
+    // Check if value prop was updated programmatically (from place selection) and doesn't match debouncedQuery
+    // This prevents searching with stale debouncedQuery after place selection
+    const valueTrimmed = value?.trim() || ''
+    
+    // If we just selected a place, always suppress searches until debouncedQuery catches up
+    // This is the most reliable check - if selection flags are active, don't search
+    // Also check timestamp - if selection happened recently (within 1 second), suppress
+    const timeSinceSelection = Date.now() - lastSelectionTimestampRef.current
+    const recentlySelected = lastSelectionTimestampRef.current > 0 && timeSinceSelection < 1000
+    
+    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || recentlySelected) {
+      // Abort any pending searches
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
       setIsLoading(false)
       setIsOpen(false)
       setShowGoogleAttribution(false)
       setShowFallbackMessage(false)
+      setSuggestions([])
+      return
+    }
+    
+    // If value matches last selected address, it's a programmatic update - don't search
+    // This prevents searches when user clicks back into field after selection
+    const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
+    
+    // CRITICAL: If current value prop doesn't match debouncedQuery, and we have a selected address,
+    // this means debouncedQuery is stale (hasn't caught up with value prop update from selection)
+    // In this case, NEVER search - wait for debouncedQuery to catch up
+    // This is the key fix: if value prop was updated by selection but debouncedQuery is still old, don't search
+    const debouncedQueryIsStale = valueTrimmed && 
+      valueTrimmed !== trimmedQuery && 
+      lastSelectedAddressRef.current &&
+      valueTrimmed === lastSelectedAddressRef.current
+    
+    // If value changed but doesn't match debouncedQuery, it's likely a programmatic update
+    // This happens when: value was set by place selection but debouncedQuery still has old typed value
+    const valueChangedProgrammatically = debouncedQueryIsStale || (valueTrimmed && 
+      valueTrimmed !== trimmedQuery && 
+      isSelectedAddress)
+    
+    // ALWAYS suppress if debouncedQuery is stale (value prop updated but debouncedQuery hasn't caught up)
+    // This is the most critical check - prevents searches with stale debouncedQuery after selection
+    if (debouncedQueryIsStale) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[AddressAutocomplete] Suppressing search - debouncedQuery is stale after selection', {
+          value: valueTrimmed,
+          debouncedQuery: trimmedQuery,
+          lastSelectedAddress: lastSelectedAddressRef.current
+        })
+      }
+      // Abort any pending searches
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
+      setSuggestions([])
+      return
+    }
+    
+    if (looksLikeFormattedAddress || valueChangedProgrammatically) {
+      // Abort any pending searches if value was updated programmatically
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
+      setSuggestions([]) // Clear suggestions when value changed programmatically
       return
     }
     
@@ -1157,11 +1239,21 @@ export default function AddressAutocomplete({
       setHasJustSelected(true)
       setIsSuppressing(true) // Update state for JSX render
       
-      // Close dropdown first
+      // Abort any pending searches immediately
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
+      
+      // Close dropdown and clear suggestions
       setIsOpen(false)
       setSuggestions([])
       setShowFallbackMessage(false)
       setShowGoogleAttribution(false)
+      setIsLoading(false)
+      
+      // Clear suggestions tracking since user selected from them
+      suggestionsWereShownRef.current = false
 
       // Call onPlaceSelected to update all form fields atomically
       // Use street address (line1) for address field, not full formatted label
@@ -1175,25 +1267,29 @@ export default function AddressAutocomplete({
           lng: final.lng
         }
         try {
+          // Track the selected address to prevent re-searching when user clicks back into field
+          lastSelectedAddressRef.current = streetAddress
+          lastSelectionTimestampRef.current = Date.now() // Track when selection happened
           onPlaceSelected(placeData)
         } catch (error) {
           console.error('[AddressAutocomplete] Error calling onPlaceSelected:', error)
         }
       }
       
-      // Update the input value to match (use street address for display)
-      // Use setTimeout to ensure parent's onChange completes first and prevent re-query
+      // Don't call onChange after place selection - onPlaceSelected already updates all fields
+      // The input value will update automatically via the value prop from the parent
+      // Use setTimeout to keep focus and manage suppress flags
       setTimeout(() => {
-        onChange(streetAddress)
         // Keep focus on input after selection
         inputRef.current?.focus()
         // Keep suppress flag active for longer to prevent debounced query and blur geocoding
+        // Also keep it active long enough for debouncedQuery to catch up with the new value
         setTimeout(() => {
           suppressNextFetchRef.current = false
           justSelectedRef.current = false
           setHasJustSelected(false)
           setIsSuppressing(false) // Update state for JSX render
-        }, 2000) // Increased to 2 seconds to prevent blur handler from geocoding
+        }, 1000) // 1000ms = 250ms debounce + 750ms buffer to ensure debouncedQuery has fully updated and stabilized
       }, 0)
     }
     run()
@@ -1242,12 +1338,33 @@ export default function AddressAutocomplete({
     }
     // Delay to allow click on suggestion to register
     setTimeout(async () => {
+      const timeSinceSelection = Date.now() - lastSelectionTimestampRef.current
+      const recentlySelected = lastSelectionTimestampRef.current > 0 && timeSinceSelection < 2000
+      const valueTrimmed = value?.trim() || ''
+      const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
+      
+      // CRITICAL: If user has manually edited the field after selection, don't geocode
+      // This prevents overwriting user edits with geocoded results
+      // If lastSelectedAddressRef exists and current value differs from it, user has edited it
+      const userHasEditedAfterSelection = lastSelectedAddressRef.current && 
+                                          valueTrimmed !== lastSelectedAddressRef.current &&
+                                          valueTrimmed.length > 0
+      
+      // CRITICAL: If suggestions were shown but user didn't select any, don't geocode on blur
+      // This prevents unwanted geocoding when user was looking at suggestions but decided not to select
+      const suggestionsShownButNotSelected = suggestionsWereShownRef.current && 
+                                             !lastSelectedAddressRef.current
+      
       // Only geocode if:
       // 1. Dropdown is closed
-      // 2. We didn't just select (check both ref and state)
+      // 2. We didn't just select (check both ref and state AND timestamp)
       // 3. Not already geocoding
       // 4. Value is long enough
       // 5. Suppress flag is not active (additional safety check)
+      // 6. Value doesn't match selected address (prevent geocoding selected address)
+      // 7. Not recently selected (within 2 seconds)
+      // 8. User hasn't manually edited the field after selection
+      // 9. Suggestions weren't shown (or if shown, user selected one)
       if (
         value && 
         value.length >= 5 && 
@@ -1256,7 +1373,11 @@ export default function AddressAutocomplete({
         !isOpen && 
         !justSelectedRef.current && 
         !hasJustSelected &&
-        !suppressNextFetchRef.current
+        !suppressNextFetchRef.current &&
+        !recentlySelected &&
+        !isSelectedAddress &&
+        !userHasEditedAfterSelection &&
+        !suggestionsShownButNotSelected // NEW: Don't geocode if suggestions were shown but not selected
       ) {
         setIsGeocoding(true)
         try {
@@ -1279,6 +1400,21 @@ export default function AddressAutocomplete({
           console.error('Geocoding error:', err)
         } finally {
           setIsGeocoding(false)
+        }
+      } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (userHasEditedAfterSelection) {
+          console.log('[AddressAutocomplete] Skipping blur geocode - user has edited field after selection', {
+            value: valueTrimmed,
+            lastSelectedAddress: lastSelectedAddressRef.current,
+            userHasEditedAfterSelection
+          })
+        }
+        if (suggestionsShownButNotSelected) {
+          console.log('[AddressAutocomplete] Skipping blur geocode - suggestions were shown but not selected', {
+            value: valueTrimmed,
+            suggestionsWereShown: suggestionsWereShownRef.current,
+            lastSelectedAddress: lastSelectedAddressRef.current
+          })
         }
       }
     }, 200)
@@ -1322,14 +1458,55 @@ export default function AddressAutocomplete({
           type="text"
           value={value}
           onChange={(e) => {
-            // Mark that user has interacted with the field
-            hasUserInteractedRef.current = true
-            // Only reset selection flags if user is manually typing (not programmatic update)
-            if (!suppressNextFetchRef.current) {
+            const newValue = e.target.value
+            const timeSinceSelection = Date.now() - lastSelectionTimestampRef.current
+            const recentlySelected = lastSelectionTimestampRef.current > 0 && timeSinceSelection < 500 // Reduced to 500ms for more permissive editing
+            const valueTrimmed = value?.trim() || ''
+            const newValueTrimmed = newValue.trim()
+            
+            // SIMPLIFIED LOGIC: Allow all manual edits unless it's a very recent programmatic revert
+            // If user is typing something different from current value, always allow it (they're editing)
+            if (newValueTrimmed !== valueTrimmed) {
+              // User is typing something different - this is a manual edit
+              // Clear selection tracking to allow normal behavior
+              if (lastSelectedAddressRef.current && newValueTrimmed !== lastSelectedAddressRef.current) {
+                // User is editing away from selected address - clear tracking
+                lastSelectedAddressRef.current = null
+                lastSelectionTimestampRef.current = 0
+              }
+              // Clear suggestions tracking when user starts typing a new query
+              // This allows blur geocoding for the new query if no suggestions appear
+              suggestionsWereShownRef.current = false
+              // Mark that user has interacted
+              hasUserInteractedRef.current = true
+              // Reset selection flags
               justSelectedRef.current = false
               setHasJustSelected(false)
+              suppressNextFetchRef.current = false
+              setIsSuppressing(false)
+              // Always allow the edit
+              onChange(newValue)
+              return
             }
-            onChange(e.target.value)
+            
+            // If new value matches current value prop, it might be a programmatic update
+            // Only block if we very recently selected (within 500ms) and value matches selected address
+            if (recentlySelected && lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current && newValueTrimmed === valueTrimmed) {
+              // Very recent selection and value hasn't changed - likely programmatic update, prevent it
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[AddressAutocomplete] Preventing onChange - very recent programmatic update', {
+                  newValue: newValueTrimmed,
+                  currentValue: valueTrimmed,
+                  lastSelectedAddress: lastSelectedAddressRef.current,
+                  timeSinceSelection
+                })
+              }
+              return
+            }
+            
+            // Default: allow the change (fallback for edge cases)
+            hasUserInteractedRef.current = true
+            onChange(newValue)
           }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}

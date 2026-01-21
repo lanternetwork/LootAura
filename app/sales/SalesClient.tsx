@@ -43,12 +43,14 @@ interface MapViewState {
 
 interface SalesClientProps {
   initialSales: Sale[]
+  initialBufferedBounds: Bounds | null
   initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   user: User | null
 }
 
 export default function SalesClient({ 
   initialSales, 
+  initialBufferedBounds,
   initialCenter, 
   user: _user 
 }: SalesClientProps) {
@@ -60,6 +62,8 @@ export default function SalesClient({
   const geolocationAttemptedRef = useRef(false)
   // Track when we're doing an imperative recenter to prevent reactive conflicts
   const isImperativeRecenterRef = useRef(false)
+  // Track previous URL location params to prevent unnecessary viewport updates on filter changes
+  const prevUrlLocationRef = useRef<{ lat: string | null; lng: string | null; zoom: string | null } | null>(null)
   
   // Single source of truth for last known user location
   const [lastUserLocation, setLastUserLocation] = useState<{ lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null>(null)
@@ -240,7 +244,7 @@ export default function SalesClient({
   // fetchedSales: All sales for the buffered area (larger than viewport)
   // visibleSales: Subset of fetchedSales that intersect current viewport (computed via useMemo)
   const [fetchedSales, setFetchedSales] = useState<Sale[]>(initialSales)
-  const [bufferedBounds, setBufferedBounds] = useState<Bounds | null>(null)
+  const [bufferedBounds, setBufferedBounds] = useState<Bounds | null>(initialBufferedBounds)
   const [loading, setLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(false) // Track if a fetch is in progress
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(initialSales.length > 0) // Track if initial load is complete
@@ -526,12 +530,56 @@ export default function SalesClient({
   
   // Update mapView when URL params change (e.g., when navigating back from sale detail)
   // This ensures map position persists across navigation
+  // Only updates when location params actually change, not on filter-only URL updates
   useEffect(() => {
+    // Authority-based check: Skip viewport sync if this is a filter-only update
+    // Check history.state for filterUpdate flag (set by useFilters.updateFilters)
+    const historyState = typeof window !== 'undefined' ? window.history.state : null
+    if (historyState && typeof historyState === 'object' && 'filterUpdate' in historyState && historyState.filterUpdate === true) {
+      // This is a filter-only update - skip viewport sync
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[VIEWPORT_SYNC] Skipping viewport sync - filter-only update detected in history.state')
+      }
+      // Clear the flag after checking (one-time use)
+      if (typeof window !== 'undefined') {
+        try {
+          window.history.replaceState(null, '', window.location.href)
+        } catch {
+          // Ignore errors
+        }
+      }
+      return
+    }
+    
+    // Check if location params actually changed (not just filter params)
+    const currentLocation = { lat: urlLat, lng: urlLng, zoom: urlZoom }
+    const prevLocation = prevUrlLocationRef.current
+    
+    // If location params haven't changed, skip update (filter-only change)
+    if (prevLocation && 
+        prevLocation.lat === currentLocation.lat && 
+        prevLocation.lng === currentLocation.lng && 
+        prevLocation.zoom === currentLocation.zoom) {
+      return
+    }
+    
+    // Update ref for next comparison
+    prevUrlLocationRef.current = currentLocation
+    
     // Only update if we have valid URL params and they differ from current mapView
     if (urlLat && urlLng) {
       const newLat = parseFloat(urlLat)
       const newLng = parseFloat(urlLng)
       const newZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(10)
+      
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: URL_PARAMS] Trigger: URL location params changed', {
+          trigger: 'URL params change',
+          context: { urlLat, urlLng, urlZoom, newLat, newLng, newZoom },
+          stack: new Error().stack
+        })
+      }
       
       // Use functional update to compare with current state
       setMapView(prev => {
@@ -742,6 +790,15 @@ export default function SalesClient({
     // This triggers viewportBounds and visibleSales recomputation via useMemo
     // Do NOT clear selection here - it causes blocking during drag
     setMapView(prev => {
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: VIEWPORT_MOVE] Trigger: Map drag/move (live update)', {
+          trigger: 'Map drag/move',
+          context: { center, zoom, bounds },
+          stack: new Error().stack
+        })
+      }
+      
       if (!prev) {
         const radiusKm = 16.09 // 10 miles
         const latRange = radiusKm / 111.0
@@ -815,6 +872,15 @@ export default function SalesClient({
     // This prevents the zoom-out flash that happens when pendingBounds clears
     if (pendingBounds) {
       setMapView(prev => {
+        // DIAGNOSTIC LOG - Desktop only
+        if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+          console.log('[VIEWPORT_CHANGE: PENDING_BOUNDS] Trigger: fitBounds active (pendingBounds)', {
+            trigger: 'fitBounds active',
+            context: { center, zoom, bounds, pendingBounds },
+            stack: new Error().stack
+          })
+        }
+        
         if (!prev) {
           return {
             center,
@@ -884,6 +950,15 @@ export default function SalesClient({
       }
     })()
     
+    // DIAGNOSTIC LOG - Desktop only (before setMapView call)
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      console.log('[VIEWPORT_CHANGE: VIEWPORT_CHANGE] Trigger: Map viewport change (onMoveEnd)', {
+        trigger: 'Map viewport change (onMoveEnd)',
+        context: { center, zoom, bounds, bufferedBounds, skipUrlUpdate },
+        stack: new Error().stack
+      })
+    }
+    
     setMapView(newMapView)
     
     // Update URL params to keep them in sync (for browser back button)
@@ -895,7 +970,14 @@ export default function SalesClient({
       params.set('lng', center.lng.toFixed(6))
       params.set('zoom', zoom.toFixed(2))
       const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
-      router.replace(newUrl, { scroll: false })
+      // Clear filterUpdate flag when location changes (authority-based)
+      // Use history.replaceState to clear the flag
+      try {
+        window.history.replaceState(null, '', newUrl)
+      } catch {
+        // Fallback to router.replace
+        router.replace(newUrl, { scroll: false })
+      }
     } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[FORCE_RECENTER] Skipping URL update during imperative recenter')
     }
@@ -993,6 +1075,15 @@ export default function SalesClient({
     setMapAuthority('user')
 
     // 3. Imperative move - MUST happen first, bypasses all guards
+    // DIAGNOSTIC LOG - Desktop only
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      console.log('[VIEWPORT_CHANGE: FORCE_RECENTER] Trigger: Force recenter to location (imperative)', {
+        trigger: 'Force recenter (imperative)',
+        context: { lat, lng, source, calculatedZoom },
+        stack: new Error().stack
+      })
+    }
+    
     map.easeTo({
       center: [lng, lat],
       zoom: calculatedZoom,
@@ -1056,6 +1147,15 @@ export default function SalesClient({
       south: location.lat - latRange / 2,
       east: location.lng + lngRange / 2,
       north: location.lat + latRange / 2
+    }
+
+    // DIAGNOSTIC LOG - Desktop only (before setMapView call)
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      console.log('[VIEWPORT_CHANGE: USER_LOCATION] Trigger: Recenter to user location', {
+        trigger: 'Recenter to user location',
+        context: { location, source, newBounds, calculatedZoom },
+        stack: new Error().stack
+      })
     }
 
     // Update map view state directly
@@ -1205,6 +1305,15 @@ export default function SalesClient({
     
     // Initialize or update map center - handle null prev state
     setMapView(prev => {
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: ZIP_LOCATION] Trigger: ZIP location found/resolved', {
+          trigger: 'ZIP location resolution',
+          context: { lat, lng, zip, city, state },
+          stack: new Error().stack
+        })
+      }
+      
       // Calculate appropriate zoom from distance (10 miles = zoom 11 per distanceToZoom)
       // But let fitBounds determine the exact zoom to show the 10-mile radius bounds
       const estimatedZoom = distanceToZoom(10) // This returns 12, but fitBounds will adjust
@@ -1346,6 +1455,21 @@ export default function SalesClient({
         
         // Update map view with new bounds and zoom
         setMapView(prev => {
+          // DIAGNOSTIC LOG - Desktop only
+          if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            console.log('[VIEWPORT_CHANGE: FILTER_DISTANCE] Trigger: Distance filter changed', {
+              trigger: 'Distance filter change',
+              context: { 
+                oldDistance: filters.distance, 
+                newDistance: newFilters.distance,
+                currentCenter: mapView?.center,
+                newBounds,
+                newZoom
+              },
+              stack: new Error().stack
+            })
+          }
+          
           if (!prev) {
             return {
               center: { lat: 39.8283, lng: -98.5795 },
@@ -1377,6 +1501,19 @@ export default function SalesClient({
         // No center yet, just update zoom
         const newZoom = distanceToZoom(newFilters.distance)
         setMapView(prev => {
+          // DIAGNOSTIC LOG - Desktop only
+          if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            console.log('[VIEWPORT_CHANGE: FILTER_DISTANCE_NO_CENTER] Trigger: Distance filter changed (no center)', {
+              trigger: 'Distance filter change (no center)',
+              context: { 
+                oldDistance: filters.distance, 
+                newDistance: newFilters.distance,
+                newZoom
+              },
+              stack: new Error().stack
+            })
+          }
+          
           if (!prev) {
             return {
               center: { lat: 39.8283, lng: -98.5795 },

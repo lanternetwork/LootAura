@@ -107,8 +107,12 @@ export async function POST(request: NextRequest) {
     const validatedBody = validationResult.data
     
     // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
-    // The refine ensures at least one exists, so this will never be empty
-    const itemTitle = (validatedBody.title ?? validatedBody.name) as string
+    // The refine ensures at least one exists, so this will never be undefined
+    const itemTitle = validatedBody.title || validatedBody.name
+    if (!itemTitle) {
+      // This should never happen due to refine validation, but TypeScript needs this check
+      return NextResponse.json({ error: 'Either title or name is required' }, { status: 400 })
+    }
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

@@ -448,6 +448,7 @@ export default function AddressAutocomplete({
   const justSelectedRef = useRef<boolean>(false)
   const [hasJustSelected, setHasJustSelected] = useState(false)
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
+  const lastSelectedAddressRef = useRef<string | null>(null) // Track last selected address to prevent re-searching
   const isInitialMountRef = useRef<boolean>(true)
   // Capture initial value synchronously on first render (before debounce triggers)
   const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value.trim() : undefined)
@@ -579,12 +580,27 @@ export default function AddressAutocomplete({
     // Also check if the query looks like a complete formatted address (has multiple commas) - this indicates a selection was made
     // This prevents searching when the value is accidentally set to the full formatted address
     const looksLikeFormattedAddress = trimmedQuery.includes(',') && trimmedQuery.split(',').length >= 3
-    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || looksLikeFormattedAddress) {
+    
+    // Check if value prop was updated programmatically (from place selection) and doesn't match debouncedQuery
+    // This prevents searching with stale debouncedQuery after place selection
+    const valueTrimmed = value?.trim() || ''
+    // If value matches last selected address, it's a programmatic update - don't search
+    const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
+    // If value changed but doesn't match debouncedQuery and user hasn't typed since selection, it's programmatic
+    const valueChangedProgrammatically = valueTrimmed && valueTrimmed !== trimmedQuery && (isSelectedAddress || (!hasUserInteractedRef.current && justSelectedRef.current))
+    
+    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || looksLikeFormattedAddress || valueChangedProgrammatically) {
       // Don't reset flags here - they're managed in handleSelect
+      // Abort any pending searches if value was updated programmatically
+      if (valueChangedProgrammatically && abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
       setIsLoading(false)
       setIsOpen(false)
       setShowGoogleAttribution(false)
       setShowFallbackMessage(false)
+      setSuggestions([]) // Clear suggestions when value changed programmatically
       return
     }
     
@@ -1157,11 +1173,18 @@ export default function AddressAutocomplete({
       setHasJustSelected(true)
       setIsSuppressing(true) // Update state for JSX render
       
-      // Close dropdown first
+      // Abort any pending searches immediately
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
+      
+      // Close dropdown and clear suggestions
       setIsOpen(false)
       setSuggestions([])
       setShowFallbackMessage(false)
       setShowGoogleAttribution(false)
+      setIsLoading(false)
 
       // Call onPlaceSelected to update all form fields atomically
       // Use street address (line1) for address field, not full formatted label
@@ -1175,6 +1198,8 @@ export default function AddressAutocomplete({
           lng: final.lng
         }
         try {
+          // Track the selected address to prevent re-searching when user clicks back into field
+          lastSelectedAddressRef.current = streetAddress
           onPlaceSelected(placeData)
         } catch (error) {
           console.error('[AddressAutocomplete] Error calling onPlaceSelected:', error)
@@ -1324,6 +1349,10 @@ export default function AddressAutocomplete({
           onChange={(e) => {
             // Mark that user has interacted with the field
             hasUserInteractedRef.current = true
+            // User is manually typing - clear last selected address so searches work normally
+            if (e.target.value !== lastSelectedAddressRef.current) {
+              lastSelectedAddressRef.current = null
+            }
             // Only reset selection flags if user is manually typing (not programmatic update)
             if (!suppressNextFetchRef.current) {
               justSelectedRef.current = false

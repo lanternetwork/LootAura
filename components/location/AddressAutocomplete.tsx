@@ -1353,10 +1353,17 @@ export default function AddressAutocomplete({
           type="text"
           value={value}
           onChange={(e) => {
+            const newValue = e.target.value
+            // Prevent onChange if this is a programmatic update (value matches selected address)
+            // This prevents the value from reverting when user clicks back into field
+            if (lastSelectedAddressRef.current && newValue === lastSelectedAddressRef.current && suppressNextFetchRef.current) {
+              // This is likely a programmatic update, don't call onChange
+              return
+            }
             // Mark that user has interacted with the field
             hasUserInteractedRef.current = true
             // User is manually typing - clear last selected address so searches work normally
-            if (e.target.value !== lastSelectedAddressRef.current) {
+            if (newValue !== lastSelectedAddressRef.current) {
               lastSelectedAddressRef.current = null
             }
             // Only reset selection flags if user is manually typing (not programmatic update)
@@ -1364,7 +1371,7 @@ export default function AddressAutocomplete({
               justSelectedRef.current = false
               setHasJustSelected(false)
             }
-            onChange(e.target.value)
+            onChange(newValue)
           }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}

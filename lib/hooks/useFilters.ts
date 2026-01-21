@@ -97,21 +97,78 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     // Update URL with new filters
     const params = new URLSearchParams(searchParams.toString())
     
-    // Check if location params are being changed (authority check)
-    const currentLat = searchParams.get('lat')
-    const currentLng = searchParams.get('lng')
-    const newLat = updatedFilters.lat?.toString()
-    const newLng = updatedFilters.lng?.toString()
-    const locationChanged = (newLat && newLat !== currentLat) || (newLng && newLng !== currentLng) ||
-                            (updatedFilters.lat === undefined && currentLat) || (updatedFilters.lng === undefined && currentLng)
+    // Authority check: Only update location params if they actually changed
+    // For filter-only updates (categories, dateRange, distance), preserve location params verbatim
+    // This prevents precision/rounding issues from triggering false location changes
+    const currentLatStr = searchParams.get('lat')
+    const currentLngStr = searchParams.get('lng')
     
-    // Update location
-    if (updatedFilters.lat && updatedFilters.lng) {
-      params.set('lat', updatedFilters.lat.toString())
-      params.set('lng', updatedFilters.lng.toString())
+    // Normalize location strings to fixed precision (6 decimal places, standard for lat/lng)
+    // This ensures consistent comparison regardless of how the value was originally formatted
+    const normalizeLocationStr = (str: string | null): string | null => {
+      if (!str) return null
+      const num = parseFloat(str)
+      if (isNaN(num)) return str // Invalid number, return as-is
+      return num.toFixed(6) // Standard precision for lat/lng in URLs
+    }
+    
+    const normalizedCurrentLat = normalizeLocationStr(currentLatStr)
+    const normalizedCurrentLng = normalizeLocationStr(currentLngStr)
+    
+    // Check if location is being explicitly changed
+    // Convert newFilters values to normalized strings for comparison
+    const newLatStr = newFilters.lat !== undefined ? newFilters.lat.toFixed(6) : null
+    const newLngStr = newFilters.lng !== undefined ? newFilters.lng.toFixed(6) : null
+    
+    // Location changed if:
+    // 1. New lat/lng provided and differs from current URL param (normalized comparison)
+    // 2. Both lat/lng explicitly set to undefined and URL has location (removal)
+    const latChanged = newLatStr !== null && newLatStr !== normalizedCurrentLat
+    const lngChanged = newLngStr !== null && newLngStr !== normalizedCurrentLng
+    const locationExplicitlyRemoved = newFilters.lat === undefined && newFilters.lng === undefined &&
+                                      (normalizedCurrentLat !== null || normalizedCurrentLng !== null)
+    const locationActuallyChanged = latChanged || lngChanged || locationExplicitlyRemoved
+    
+    if (locationActuallyChanged) {
+      // Location is actually being changed - update URL params
+      if (newFilters.lat !== undefined && newFilters.lng !== undefined) {
+        params.set('lat', newFilters.lat.toString())
+        params.set('lng', newFilters.lng.toString())
+      } else if (locationExplicitlyRemoved) {
+        // Explicitly removing location
+        params.delete('lat')
+        params.delete('lng')
+      } else {
+        // Partial location update - update changed coordinate, preserve other verbatim
+        if (latChanged && newLatStr !== null) {
+          params.set('lat', newLatStr)
+        } else if (currentLatStr) {
+          params.set('lat', currentLatStr) // Preserve verbatim
+        } else {
+          params.delete('lat')
+        }
+        if (lngChanged && newLngStr !== null) {
+          params.set('lng', newLngStr)
+        } else if (currentLngStr) {
+          params.set('lng', currentLngStr) // Preserve verbatim
+        } else {
+          params.delete('lng')
+        }
+      }
     } else {
-      params.delete('lat')
-      params.delete('lng')
+      // Location NOT actually changed - preserve existing URL params verbatim
+      // This ensures filter-only updates never modify location params
+      // Even if newFilters includes lat/lng from spread, if normalized values match, preserve verbatim
+      if (currentLatStr) {
+        params.set('lat', currentLatStr) // Preserve verbatim from URL, don't reconstruct from number
+      } else {
+        params.delete('lat')
+      }
+      if (currentLngStr) {
+        params.set('lng', currentLngStr) // Preserve verbatim from URL, don't reconstruct from number
+      } else {
+        params.delete('lng')
+      }
     }
     
     // Update distance
@@ -155,11 +212,12 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     // Set history.state flag to indicate filter-only update (no location change)
     const newUrl = `${window.location.pathname}?${params.toString()}`
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[FILTERS] history.replaceState (no scroll):', newUrl, 'locationChanged:', locationChanged)
+      console.log('[FILTERS] history.replaceState (no scroll):', newUrl, 'locationActuallyChanged:', locationActuallyChanged)
     }
     try {
       // Use history.state to mark filter-only updates (authority-based, not heuristic)
-      const historyState = locationChanged ? null : { filterUpdate: true, timestamp: Date.now() }
+      // Only set filterUpdate flag if location was NOT actually changed
+      const historyState = locationActuallyChanged ? null : { filterUpdate: true, timestamp: Date.now() }
       window.history.replaceState(historyState, '', newUrl)
     } catch {
       // Fallback to router.replace as a safety net

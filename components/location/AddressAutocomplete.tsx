@@ -1181,10 +1181,10 @@ export default function AddressAutocomplete({
         }
       }
       
-      // Update the input value to match (use street address for display)
-      // Use setTimeout to ensure parent's onChange completes first and prevent re-query
+      // Don't call onChange after place selection - onPlaceSelected already updates all fields
+      // The input value will update automatically via the value prop from the parent
+      // Use setTimeout to keep focus and manage suppress flags
       setTimeout(() => {
-        onChange(streetAddress)
         // Keep focus on input after selection
         inputRef.current?.focus()
         // Keep suppress flag active for longer to prevent debounced query and blur geocoding

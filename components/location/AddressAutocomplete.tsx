@@ -450,6 +450,7 @@ export default function AddressAutocomplete({
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
   const lastSelectedAddressRef = useRef<string | null>(null) // Track last selected address to prevent re-searching
   const lastSelectionTimestampRef = useRef<number>(0) // Track when place was selected to prevent stale searches
+  const suggestionsWereShownRef = useRef<boolean>(false) // Track if suggestions were ever shown during this typing session
   const isInitialMountRef = useRef<boolean>(true)
   // Capture initial value synchronously on first render (before debounce triggers)
   const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value.trim() : undefined)
@@ -480,6 +481,13 @@ export default function AddressAutocomplete({
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
+  
+  // Track when suggestions are shown (to prevent blur geocoding if user didn't select)
+  useEffect(() => {
+    if (suggestions.length > 0 && isOpen) {
+      suggestionsWereShownRef.current = true
+    }
+  }, [suggestions, isOpen])
 
   // Use location from props if provided, otherwise try browser geolocation first (high accuracy), then IP geolocation
   useEffect(() => {
@@ -1243,6 +1251,9 @@ export default function AddressAutocomplete({
       setShowFallbackMessage(false)
       setShowGoogleAttribution(false)
       setIsLoading(false)
+      
+      // Clear suggestions tracking since user selected from them
+      suggestionsWereShownRef.current = false
 
       // Call onPlaceSelected to update all form fields atomically
       // Use street address (line1) for address field, not full formatted label
@@ -1339,6 +1350,11 @@ export default function AddressAutocomplete({
                                           valueTrimmed !== lastSelectedAddressRef.current &&
                                           valueTrimmed.length > 0
       
+      // CRITICAL: If suggestions were shown but user didn't select any, don't geocode on blur
+      // This prevents unwanted geocoding when user was looking at suggestions but decided not to select
+      const suggestionsShownButNotSelected = suggestionsWereShownRef.current && 
+                                             !lastSelectedAddressRef.current
+      
       // Only geocode if:
       // 1. Dropdown is closed
       // 2. We didn't just select (check both ref and state AND timestamp)
@@ -1347,7 +1363,8 @@ export default function AddressAutocomplete({
       // 5. Suppress flag is not active (additional safety check)
       // 6. Value doesn't match selected address (prevent geocoding selected address)
       // 7. Not recently selected (within 2 seconds)
-      // 8. User hasn't manually edited the field after selection (NEW)
+      // 8. User hasn't manually edited the field after selection
+      // 9. Suggestions weren't shown (or if shown, user selected one)
       if (
         value && 
         value.length >= 5 && 
@@ -1359,7 +1376,8 @@ export default function AddressAutocomplete({
         !suppressNextFetchRef.current &&
         !recentlySelected &&
         !isSelectedAddress &&
-        !userHasEditedAfterSelection // NEW: Don't geocode if user has edited after selection
+        !userHasEditedAfterSelection &&
+        !suggestionsShownButNotSelected // NEW: Don't geocode if suggestions were shown but not selected
       ) {
         setIsGeocoding(true)
         try {
@@ -1383,12 +1401,21 @@ export default function AddressAutocomplete({
         } finally {
           setIsGeocoding(false)
         }
-      } else if (process.env.NEXT_PUBLIC_DEBUG === 'true' && userHasEditedAfterSelection) {
-        console.log('[AddressAutocomplete] Skipping blur geocode - user has edited field after selection', {
-          value: valueTrimmed,
-          lastSelectedAddress: lastSelectedAddressRef.current,
-          userHasEditedAfterSelection
-        })
+      } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (userHasEditedAfterSelection) {
+          console.log('[AddressAutocomplete] Skipping blur geocode - user has edited field after selection', {
+            value: valueTrimmed,
+            lastSelectedAddress: lastSelectedAddressRef.current,
+            userHasEditedAfterSelection
+          })
+        }
+        if (suggestionsShownButNotSelected) {
+          console.log('[AddressAutocomplete] Skipping blur geocode - suggestions were shown but not selected', {
+            value: valueTrimmed,
+            suggestionsWereShown: suggestionsWereShownRef.current,
+            lastSelectedAddress: lastSelectedAddressRef.current
+          })
+        }
       }
     }, 200)
   }
@@ -1447,6 +1474,9 @@ export default function AddressAutocomplete({
                 lastSelectedAddressRef.current = null
                 lastSelectionTimestampRef.current = 0
               }
+              // Clear suggestions tracking when user starts typing a new query
+              // This allows blur geocoding for the new query if no suggestions appear
+              suggestionsWereShownRef.current = false
               // Mark that user has interacted
               hasUserInteractedRef.current = true
               // Reset selection flags

@@ -605,11 +605,43 @@ export default function AddressAutocomplete({
     // This prevents searches when user clicks back into field after selection
     const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
     
+    // CRITICAL: If current value prop doesn't match debouncedQuery, and we have a selected address,
+    // this means debouncedQuery is stale (hasn't caught up with value prop update from selection)
+    // In this case, NEVER search - wait for debouncedQuery to catch up
+    // This is the key fix: if value prop was updated by selection but debouncedQuery is still old, don't search
+    const debouncedQueryIsStale = valueTrimmed && 
+      valueTrimmed !== trimmedQuery && 
+      lastSelectedAddressRef.current &&
+      valueTrimmed === lastSelectedAddressRef.current
+    
     // If value changed but doesn't match debouncedQuery, it's likely a programmatic update
     // This happens when: value was set by place selection but debouncedQuery still has old typed value
-    const valueChangedProgrammatically = valueTrimmed && 
+    const valueChangedProgrammatically = debouncedQueryIsStale || (valueTrimmed && 
       valueTrimmed !== trimmedQuery && 
-      isSelectedAddress
+      isSelectedAddress)
+    
+    // ALWAYS suppress if debouncedQuery is stale (value prop updated but debouncedQuery hasn't caught up)
+    // This is the most critical check - prevents searches with stale debouncedQuery after selection
+    if (debouncedQueryIsStale) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[AddressAutocomplete] Suppressing search - debouncedQuery is stale after selection', {
+          value: valueTrimmed,
+          debouncedQuery: trimmedQuery,
+          lastSelectedAddress: lastSelectedAddressRef.current
+        })
+      }
+      // Abort any pending searches
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
+      setSuggestions([])
+      return
+    }
     
     if (looksLikeFormattedAddress || valueChangedProgrammatically) {
       // Abort any pending searches if value was updated programmatically

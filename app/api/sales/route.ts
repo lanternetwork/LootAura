@@ -472,7 +472,7 @@ async function salesHandler(request: NextRequest) {
       // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       
       // Add category filters by joining with items table
-      if (categories.length > 0) {
+      if (dbCategories.length > 0) {
         logger.debug('Applying category filter', { component: 'sales', categories, dbCategories })
         
         // Debug: Check if items_v2 table has category column
@@ -570,7 +570,7 @@ async function salesHandler(request: NextRequest) {
           query = query.in('id', favoriteSaleIds)
         }
         
-        if (categories.length > 0) {
+        if (dbCategories.length > 0) {
           const { data: salesWithCategories } = await supabase
             .from('items_v2')
             .select('sale_id')

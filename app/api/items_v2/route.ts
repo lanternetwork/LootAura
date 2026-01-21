@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
     // The refine ensures at least one exists, so this will never be undefined
     // TypeScript doesn't understand Zod refine narrowing, so we use explicit type assertion
-    const itemTitle = (validatedBody.title ?? validatedBody.name)!
+    const itemTitle: string = (validatedBody.title ?? validatedBody.name ?? '') as string
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

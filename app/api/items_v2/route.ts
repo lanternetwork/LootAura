@@ -108,11 +108,8 @@ export async function POST(request: NextRequest) {
     
     // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
     // The refine ensures at least one exists, so this will never be undefined
-    const itemTitle = validatedBody.title || validatedBody.name
-    if (!itemTitle) {
-      // This should never happen due to refine validation, but TypeScript needs this check
-      return NextResponse.json({ error: 'Either title or name is required' }, { status: 400 })
-    }
+    // TypeScript doesn't understand Zod refine narrowing, so we use explicit type assertion
+    const itemTitle = (validatedBody.title ?? validatedBody.name)!
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

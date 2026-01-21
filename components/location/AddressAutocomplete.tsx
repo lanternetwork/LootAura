@@ -585,9 +585,14 @@ export default function AddressAutocomplete({
     // This prevents searching with stale debouncedQuery after place selection
     const valueTrimmed = value?.trim() || ''
     // If value matches last selected address, it's a programmatic update - don't search
+    // This is the most reliable check: if the current value matches what we selected, don't search
     const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
-    // If value changed but doesn't match debouncedQuery and user hasn't typed since selection, it's programmatic
-    const valueChangedProgrammatically = valueTrimmed && valueTrimmed !== trimmedQuery && (isSelectedAddress || (!hasUserInteractedRef.current && justSelectedRef.current))
+    // If value changed but doesn't match debouncedQuery, it might be a programmatic update
+    // This happens when: value was set by place selection but debouncedQuery still has old typed value
+    // Also check if we just selected (flags are still active)
+    const valueChangedProgrammatically = valueTrimmed && 
+      valueTrimmed !== trimmedQuery && 
+      (isSelectedAddress || justSelectedRef.current || hasJustSelected)
     
     if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || looksLikeFormattedAddress || valueChangedProgrammatically) {
       // Don't reset flags here - they're managed in handleSelect
@@ -1213,12 +1218,13 @@ export default function AddressAutocomplete({
         // Keep focus on input after selection
         inputRef.current?.focus()
         // Keep suppress flag active for longer to prevent debounced query and blur geocoding
+        // Also keep it active long enough for debouncedQuery to catch up with the new value
         setTimeout(() => {
           suppressNextFetchRef.current = false
           justSelectedRef.current = false
           setHasJustSelected(false)
           setIsSuppressing(false) // Update state for JSX render
-        }, 2000) // Increased to 2 seconds to prevent blur handler from geocoding
+        }, 500) // 500ms = 250ms debounce + 250ms buffer to ensure debouncedQuery has updated
       }, 0)
     }
     run()

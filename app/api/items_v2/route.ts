@@ -5,9 +5,9 @@ import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 import { z } from 'zod'
 
-// Validation schema for item creation/update
+// Base validation schema for item creation/update
 // Accepts both 'name' and 'title' for backward compatibility (normalized to 'title' internally)
-const ItemV2InputSchema = z.object({
+const ItemV2InputBaseSchema = z.object({
   sale_id: z.string().min(1, 'Sale ID is required'),
   title: z.string().min(1, 'Item title is required').optional(),
   name: z.string().min(1, 'Item name is required').optional(),
@@ -17,7 +17,10 @@ const ItemV2InputSchema = z.object({
   condition: z.string().optional(),
   image_url: z.string().url().optional(),
   images: z.array(z.string()).optional(),
-}).refine((data) => data.title || data.name, {
+})
+
+// Schema for POST (creation) - requires title or name
+const ItemV2InputSchema = ItemV2InputBaseSchema.refine((data) => data.title || data.name, {
   message: 'Either title or name is required',
   path: ['title'],
 })
@@ -265,7 +268,8 @@ export async function PUT(request: NextRequest) {
     }
     
     // Validate request body (all fields optional for updates)
-    const UpdateItemV2InputSchema = ItemV2InputSchema.partial().extend({
+    // Use base schema without refine, then make all fields optional
+    const UpdateItemV2InputSchema = ItemV2InputBaseSchema.partial().extend({
       sale_id: z.string().optional(), // sale_id should not be updated
     })
     const validationResult = UpdateItemV2InputSchema.safeParse(body)

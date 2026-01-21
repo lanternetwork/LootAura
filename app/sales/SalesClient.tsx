@@ -553,6 +553,15 @@ export default function SalesClient({
       const newLng = parseFloat(urlLng)
       const newZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(10)
       
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: URL_PARAMS] Trigger: URL location params changed', {
+          trigger: 'URL params change',
+          context: { urlLat, urlLng, urlZoom, newLat, newLng, newZoom },
+          stack: new Error().stack
+        })
+      }
+      
       // Use functional update to compare with current state
       setMapView(prev => {
         // Check if URL params differ from current mapView
@@ -762,6 +771,15 @@ export default function SalesClient({
     // This triggers viewportBounds and visibleSales recomputation via useMemo
     // Do NOT clear selection here - it causes blocking during drag
     setMapView(prev => {
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: VIEWPORT_MOVE] Trigger: Map drag/move (live update)', {
+          trigger: 'Map drag/move',
+          context: { center, zoom, bounds },
+          stack: new Error().stack
+        })
+      }
+      
       if (!prev) {
         const radiusKm = 16.09 // 10 miles
         const latRange = radiusKm / 111.0
@@ -835,6 +853,15 @@ export default function SalesClient({
     // This prevents the zoom-out flash that happens when pendingBounds clears
     if (pendingBounds) {
       setMapView(prev => {
+        // DIAGNOSTIC LOG - Desktop only
+        if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+          console.log('[VIEWPORT_CHANGE: PENDING_BOUNDS] Trigger: fitBounds active (pendingBounds)', {
+            trigger: 'fitBounds active',
+            context: { center, zoom, bounds, pendingBounds },
+            stack: new Error().stack
+          })
+        }
+        
         if (!prev) {
           return {
             center,
@@ -903,6 +930,15 @@ export default function SalesClient({
         bounds
       }
     })()
+    
+    // DIAGNOSTIC LOG - Desktop only (before setMapView call)
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      console.log('[VIEWPORT_CHANGE: VIEWPORT_CHANGE] Trigger: Map viewport change (onMoveEnd)', {
+        trigger: 'Map viewport change (onMoveEnd)',
+        context: { center, zoom, bounds, bufferedBounds, skipUrlUpdate },
+        stack: new Error().stack
+      })
+    }
     
     setMapView(newMapView)
     
@@ -1013,6 +1049,15 @@ export default function SalesClient({
     setMapAuthority('user')
 
     // 3. Imperative move - MUST happen first, bypasses all guards
+    // DIAGNOSTIC LOG - Desktop only
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      console.log('[VIEWPORT_CHANGE: FORCE_RECENTER] Trigger: Force recenter to location (imperative)', {
+        trigger: 'Force recenter (imperative)',
+        context: { lat, lng, source, calculatedZoom },
+        stack: new Error().stack
+      })
+    }
+    
     map.easeTo({
       center: [lng, lat],
       zoom: calculatedZoom,
@@ -1076,6 +1121,15 @@ export default function SalesClient({
       south: location.lat - latRange / 2,
       east: location.lng + lngRange / 2,
       north: location.lat + latRange / 2
+    }
+
+    // DIAGNOSTIC LOG - Desktop only (before setMapView call)
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      console.log('[VIEWPORT_CHANGE: USER_LOCATION] Trigger: Recenter to user location', {
+        trigger: 'Recenter to user location',
+        context: { location, source, newBounds, calculatedZoom },
+        stack: new Error().stack
+      })
     }
 
     // Update map view state directly
@@ -1225,6 +1279,15 @@ export default function SalesClient({
     
     // Initialize or update map center - handle null prev state
     setMapView(prev => {
+      // DIAGNOSTIC LOG - Desktop only
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        console.log('[VIEWPORT_CHANGE: ZIP_LOCATION] Trigger: ZIP location found/resolved', {
+          trigger: 'ZIP location resolution',
+          context: { lat, lng, zip, city, state },
+          stack: new Error().stack
+        })
+      }
+      
       // Calculate appropriate zoom from distance (10 miles = zoom 11 per distanceToZoom)
       // But let fitBounds determine the exact zoom to show the 10-mile radius bounds
       const estimatedZoom = distanceToZoom(10) // This returns 12, but fitBounds will adjust
@@ -1366,6 +1429,21 @@ export default function SalesClient({
         
         // Update map view with new bounds and zoom
         setMapView(prev => {
+          // DIAGNOSTIC LOG - Desktop only
+          if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            console.log('[VIEWPORT_CHANGE: FILTER_DISTANCE] Trigger: Distance filter changed', {
+              trigger: 'Distance filter change',
+              context: { 
+                oldDistance: filters.distance, 
+                newDistance: newFilters.distance,
+                currentCenter: mapView?.center,
+                newBounds,
+                newZoom
+              },
+              stack: new Error().stack
+            })
+          }
+          
           if (!prev) {
             return {
               center: { lat: 39.8283, lng: -98.5795 },
@@ -1397,6 +1475,19 @@ export default function SalesClient({
         // No center yet, just update zoom
         const newZoom = distanceToZoom(newFilters.distance)
         setMapView(prev => {
+          // DIAGNOSTIC LOG - Desktop only
+          if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            console.log('[VIEWPORT_CHANGE: FILTER_DISTANCE_NO_CENTER] Trigger: Distance filter changed (no center)', {
+              trigger: 'Distance filter change (no center)',
+              context: { 
+                oldDistance: filters.distance, 
+                newDistance: newFilters.distance,
+                newZoom
+              },
+              stack: new Error().stack
+            })
+          }
+          
           if (!prev) {
             return {
               center: { lat: 39.8283, lng: -98.5795 },

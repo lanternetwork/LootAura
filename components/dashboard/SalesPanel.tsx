@@ -195,7 +195,7 @@ export default function SalesPanel({
   // Calculate counts for each tab
   const liveCount = useMemo(() => localSales.filter((s) => s.status === 'published').length, [localSales])
   // Use state for archived count (initialized from props, updated when data loads)
-  const draftsCount = drafts.length
+  const draftsCount = useMemo(() => drafts.length, [drafts])
 
   const handleSaleDelete = (saleId: string) => {
     setLocalSales((prev) => prev.filter((s) => s.id !== saleId))

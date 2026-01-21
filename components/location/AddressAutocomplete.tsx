@@ -584,20 +584,36 @@ export default function AddressAutocomplete({
     // Check if value prop was updated programmatically (from place selection) and doesn't match debouncedQuery
     // This prevents searching with stale debouncedQuery after place selection
     const valueTrimmed = value?.trim() || ''
+    
+    // If we just selected a place, always suppress searches until debouncedQuery catches up
+    // This is the most reliable check - if selection flags are active, don't search
+    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing) {
+      // Abort any pending searches
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
+      setSuggestions([])
+      return
+    }
+    
     // If value matches last selected address, it's a programmatic update - don't search
-    // This is the most reliable check: if the current value matches what we selected, don't search
+    // This prevents searches when user clicks back into field after selection
     const isSelectedAddress = lastSelectedAddressRef.current && valueTrimmed === lastSelectedAddressRef.current
-    // If value changed but doesn't match debouncedQuery, it might be a programmatic update
+    
+    // If value changed but doesn't match debouncedQuery, it's likely a programmatic update
     // This happens when: value was set by place selection but debouncedQuery still has old typed value
-    // Also check if we just selected (flags are still active)
     const valueChangedProgrammatically = valueTrimmed && 
       valueTrimmed !== trimmedQuery && 
-      (isSelectedAddress || justSelectedRef.current || hasJustSelected)
+      isSelectedAddress
     
-    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || looksLikeFormattedAddress || valueChangedProgrammatically) {
-      // Don't reset flags here - they're managed in handleSelect
+    if (looksLikeFormattedAddress || valueChangedProgrammatically) {
       // Abort any pending searches if value was updated programmatically
-      if (valueChangedProgrammatically && abortRef.current) {
+      if (abortRef.current) {
         abortRef.current.abort()
         abortRef.current = null
       }
@@ -1224,7 +1240,7 @@ export default function AddressAutocomplete({
           justSelectedRef.current = false
           setHasJustSelected(false)
           setIsSuppressing(false) // Update state for JSX render
-        }, 500) // 500ms = 250ms debounce + 250ms buffer to ensure debouncedQuery has updated
+        }, 1000) // 1000ms = 250ms debounce + 750ms buffer to ensure debouncedQuery has fully updated and stabilized
       }, 0)
     }
     run()

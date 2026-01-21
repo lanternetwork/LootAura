@@ -62,6 +62,8 @@ export default function SalesClient({
   const geolocationAttemptedRef = useRef(false)
   // Track when we're doing an imperative recenter to prevent reactive conflicts
   const isImperativeRecenterRef = useRef(false)
+  // Track previous URL location params to prevent unnecessary viewport updates on filter changes
+  const prevUrlLocationRef = useRef<{ lat: string | null; lng: string | null; zoom: string | null } | null>(null)
   
   // Single source of truth for last known user location
   const [lastUserLocation, setLastUserLocation] = useState<{ lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null>(null)
@@ -528,7 +530,23 @@ export default function SalesClient({
   
   // Update mapView when URL params change (e.g., when navigating back from sale detail)
   // This ensures map position persists across navigation
+  // Only updates when location params actually change, not on filter-only URL updates
   useEffect(() => {
+    // Check if location params actually changed (not just filter params)
+    const currentLocation = { lat: urlLat, lng: urlLng, zoom: urlZoom }
+    const prevLocation = prevUrlLocationRef.current
+    
+    // If location params haven't changed, skip update (filter-only change)
+    if (prevLocation && 
+        prevLocation.lat === currentLocation.lat && 
+        prevLocation.lng === currentLocation.lng && 
+        prevLocation.zoom === currentLocation.zoom) {
+      return
+    }
+    
+    // Update ref for next comparison
+    prevUrlLocationRef.current = currentLocation
+    
     // Only update if we have valid URL params and they differ from current mapView
     if (urlLat && urlLng) {
       const newLat = parseFloat(urlLat)

@@ -112,22 +112,31 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       return num.toFixed(6) // Standard precision for lat/lng in URLs
     }
     
+    const normalizeLocationNum = (num: number | undefined): string | null => {
+      if (num === undefined) return null
+      return num.toFixed(6)
+    }
+    
     const normalizedCurrentLat = normalizeLocationStr(currentLatStr)
     const normalizedCurrentLng = normalizeLocationStr(currentLngStr)
     
     // Check if location is being explicitly changed
-    // Convert newFilters values to normalized strings for comparison
+    // If newFilters.lat/lng match current filter state, they're just being spread (not explicitly changed)
+    // Only treat as changed if they differ from current filter state OR are explicitly undefined (removal)
+    const currentFilterLatStr = normalizeLocationNum(filters.lat)
+    const currentFilterLngStr = normalizeLocationNum(filters.lng)
     const newLatStr = newFilters.lat !== undefined ? newFilters.lat.toFixed(6) : null
     const newLngStr = newFilters.lng !== undefined ? newFilters.lng.toFixed(6) : null
     
     // Location changed if:
-    // 1. New lat/lng provided and differs from current URL param (normalized comparison)
-    // 2. Both lat/lng explicitly set to undefined and URL has location (removal)
-    const latChanged = newLatStr !== null && newLatStr !== normalizedCurrentLat
-    const lngChanged = newLngStr !== null && newLngStr !== normalizedCurrentLng
+    // 1. newFilters.lat/lng are provided AND differ from current filter state (explicit change, not spread)
+    // 2. OR both lat/lng explicitly set to undefined and URL has location (removal)
+    // If newFilters.lat/lng match current filter state, they're just being spread - ignore them
+    const latDiffersFromState = newLatStr !== null && newLatStr !== currentFilterLatStr
+    const lngDiffersFromState = newLngStr !== null && newLngStr !== currentFilterLngStr
     const locationExplicitlyRemoved = newFilters.lat === undefined && newFilters.lng === undefined &&
                                       (normalizedCurrentLat !== null || normalizedCurrentLng !== null)
-    const locationActuallyChanged = latChanged || lngChanged || locationExplicitlyRemoved
+    const locationActuallyChanged = latDiffersFromState || lngDiffersFromState || locationExplicitlyRemoved
     
     if (locationActuallyChanged) {
       // Location is actually being changed - update URL params
@@ -140,14 +149,14 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
         params.delete('lng')
       } else {
         // Partial location update - update changed coordinate, preserve other verbatim
-        if (latChanged && newLatStr !== null) {
+        if (latDiffersFromState && newLatStr !== null) {
           params.set('lat', newLatStr)
         } else if (currentLatStr) {
           params.set('lat', currentLatStr) // Preserve verbatim
         } else {
           params.delete('lat')
         }
-        if (lngChanged && newLngStr !== null) {
+        if (lngDiffersFromState && newLngStr !== null) {
           params.set('lng', newLngStr)
         } else if (currentLngStr) {
           params.set('lng', currentLngStr) // Preserve verbatim

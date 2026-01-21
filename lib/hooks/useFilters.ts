@@ -97,6 +97,14 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     // Update URL with new filters
     const params = new URLSearchParams(searchParams.toString())
     
+    // Check if location params are being changed (authority check)
+    const currentLat = searchParams.get('lat')
+    const currentLng = searchParams.get('lng')
+    const newLat = updatedFilters.lat?.toString()
+    const newLng = updatedFilters.lng?.toString()
+    const locationChanged = (newLat && newLat !== currentLat) || (newLng && newLng !== currentLng) ||
+                            (updatedFilters.lat === undefined && currentLat) || (updatedFilters.lng === undefined && currentLng)
+    
     // Update location
     if (updatedFilters.lat && updatedFilters.lng) {
       params.set('lat', updatedFilters.lat.toString())
@@ -144,12 +152,15 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     }
     
     // Update URL without navigation or scroll using History API
+    // Set history.state flag to indicate filter-only update (no location change)
     const newUrl = `${window.location.pathname}?${params.toString()}`
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[FILTERS] history.replaceState (no scroll):', newUrl)
+      console.log('[FILTERS] history.replaceState (no scroll):', newUrl, 'locationChanged:', locationChanged)
     }
     try {
-      window.history.replaceState(null, '', newUrl)
+      // Use history.state to mark filter-only updates (authority-based, not heuristic)
+      const historyState = locationChanged ? null : { filterUpdate: true, timestamp: Date.now() }
+      window.history.replaceState(historyState, '', newUrl)
     } catch {
       // Fallback to router.replace as a safety net
       router.replace(newUrl, { scroll: false })

@@ -532,6 +532,25 @@ export default function SalesClient({
   // This ensures map position persists across navigation
   // Only updates when location params actually change, not on filter-only URL updates
   useEffect(() => {
+    // Authority-based check: Skip viewport sync if this is a filter-only update
+    // Check history.state for filterUpdate flag (set by useFilters.updateFilters)
+    const historyState = typeof window !== 'undefined' ? window.history.state : null
+    if (historyState && typeof historyState === 'object' && 'filterUpdate' in historyState && historyState.filterUpdate === true) {
+      // This is a filter-only update - skip viewport sync
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[VIEWPORT_SYNC] Skipping viewport sync - filter-only update detected in history.state')
+      }
+      // Clear the flag after checking (one-time use)
+      if (typeof window !== 'undefined') {
+        try {
+          window.history.replaceState(null, '', window.location.href)
+        } catch {
+          // Ignore errors
+        }
+      }
+      return
+    }
+    
     // Check if location params actually changed (not just filter params)
     const currentLocation = { lat: urlLat, lng: urlLng, zoom: urlZoom }
     const prevLocation = prevUrlLocationRef.current
@@ -951,7 +970,14 @@ export default function SalesClient({
       params.set('lng', center.lng.toFixed(6))
       params.set('zoom', zoom.toFixed(2))
       const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
-      router.replace(newUrl, { scroll: false })
+      // Clear filterUpdate flag when location changes (authority-based)
+      // Use history.replaceState to clear the flag
+      try {
+        window.history.replaceState(null, '', newUrl)
+      } catch {
+        // Fallback to router.replace
+        router.replace(newUrl, { scroll: false })
+      }
     } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[FORCE_RECENTER] Skipping URL update during imperative recenter')
     }

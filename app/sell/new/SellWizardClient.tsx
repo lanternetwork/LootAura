@@ -195,6 +195,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, formData: { ...state.formData, [action.field]: action.value } }
     case 'UPDATE_ADDRESS_FIELDS':
       // Update all address fields atomically from autocomplete selection
+      // This is the authoritative source for address fields - no other action should overwrite them
       return {
         ...state,
         formData: {
@@ -204,6 +205,43 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         lastAutocompleteTimestamp: Date.now()
       }
     case 'SET_FORM_DATA':
+      // Preserve address fields if they were recently set by autocomplete (within 2 seconds)
+      // This prevents derived field calculations or other updates from overwriting autocomplete data
+      // Only preserve fields that are NOT being explicitly updated in action.formData
+      const timeSinceAutocomplete = Date.now() - state.lastAutocompleteTimestamp
+      const shouldPreserveAddressFields = timeSinceAutocomplete < 2000 && state.lastAutocompleteTimestamp > 0
+      
+      if (shouldPreserveAddressFields) {
+        // Only preserve address fields that are NOT being updated in action.formData
+        // This allows manual typing in city/state/zip to work correctly
+        const addressFieldsToPreserve: Partial<SaleInput> = {}
+        if (action.formData.address === undefined && state.formData.address !== undefined) {
+          addressFieldsToPreserve.address = state.formData.address
+        }
+        if (action.formData.city === undefined && state.formData.city !== undefined) {
+          addressFieldsToPreserve.city = state.formData.city
+        }
+        if (action.formData.state === undefined && state.formData.state !== undefined) {
+          addressFieldsToPreserve.state = state.formData.state
+        }
+        if (action.formData.zip_code === undefined && state.formData.zip_code !== undefined) {
+          addressFieldsToPreserve.zip_code = state.formData.zip_code
+        }
+        if (action.formData.lat === undefined && state.formData.lat !== undefined) {
+          addressFieldsToPreserve.lat = state.formData.lat
+        }
+        if (action.formData.lng === undefined && state.formData.lng !== undefined) {
+          addressFieldsToPreserve.lng = state.formData.lng
+        }
+        
+        return {
+          ...state,
+          formData: {
+            ...action.formData,
+            ...addressFieldsToPreserve // Only preserve fields that aren't being updated
+          }
+        }
+      }
       return { ...state, formData: action.formData }
     case 'SET_PHOTOS':
       return { ...state, photos: action.photos }

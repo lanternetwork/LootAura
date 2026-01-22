@@ -88,7 +88,9 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
         {nearbySales.map((nearbySale) => {
           const cover = getSaleCoverUrl(nearbySale)
           const distanceText = formatDistance(nearbySale.distance_m, 'miles')
-          const dateText = formatDate(nearbySale.date_start, nearbySale.time_start, nearbySale.date_end)
+          const dateText = nearbySale.date_start 
+            ? formatDate(nearbySale.date_start, nearbySale.time_start, nearbySale.date_end) || 'Date TBD'
+            : 'Date TBD'
           const locationText = nearbySale.city && nearbySale.state 
             ? `${nearbySale.city}, ${nearbySale.state}`
             : nearbySale.city || nearbySale.state || ''

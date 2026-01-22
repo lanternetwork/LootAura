@@ -541,7 +541,7 @@ export default function SaleDetailClient({
                   </svg>
                   <div>
                     <div className="font-medium text-gray-900 text-sm">Ends: {formatDate(sale.date_end)}</div>
-                    {sale.time_end && (
+                    {sale.time_end && sale.time_end !== sale.time_start && (
                       <div className="text-xs text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
                     )}
                   </div>
@@ -778,7 +778,7 @@ export default function SaleDetailClient({
                       </svg>
                       <div>
                         <div className="font-medium text-gray-900">Ends: {formatDate(sale.date_end)}</div>
-                        {sale.time_end && (
+                        {sale.time_end && sale.time_end !== sale.time_start && (
                           <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
                         )}
                       </div>

@@ -1279,12 +1279,14 @@ export default function SalesClient({
       console.log('[ZIP] Received coordinates:', { lat, lng })
     }
     
-    // Calculate bounds for ZIP location (10 mile radius)
-    const radiusKm = 16.09 // 10 miles in kilometers
+    // Use current distance filter as single source of truth
+    // filters.distance is always defined (defaults to 10 in useFilters), but use nullish coalescing for safety
+    const distanceMiles = filters.distance ?? 10
+    const radiusKm = distanceMiles * 1.60934 // Convert miles to kilometers
     const latRange = radiusKm / 111.0
     const lngRange = radiusKm / (111.0 * Math.cos(lat * Math.PI / 180))
     
-    // Calculate exact 10-mile radius bounds
+    // Calculate bounds based on selected distance
     const calculatedBounds = {
       west: lng - lngRange,
       south: lat - latRange,
@@ -1297,7 +1299,7 @@ export default function SalesClient({
     // Use expanded bounds for buffer, and pass current filters to ensure distance filter is applied
     const bufferedBounds = expandBounds(calculatedBounds, MAP_BUFFER_FACTOR)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds, bufferedBounds })
+      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, distanceMiles, bounds: calculatedBounds, bufferedBounds })
     }
     fetchMapSales(bufferedBounds, filters).catch(err => {
       console.error('[ZIP] Failed to prefetch sales:', err)
@@ -1309,18 +1311,18 @@ export default function SalesClient({
       if (typeof window !== 'undefined' && window.innerWidth >= 768) {
         console.log('[VIEWPORT_CHANGE: ZIP_LOCATION] Trigger: ZIP location found/resolved', {
           trigger: 'ZIP location resolution',
-          context: { lat, lng, zip, city, state },
+          context: { lat, lng, zip, city, state, distanceMiles },
           stack: new Error().stack
         })
       }
       
-      // Calculate appropriate zoom from distance (10 miles = zoom 11 per distanceToZoom)
-      // But let fitBounds determine the exact zoom to show the 10-mile radius bounds
-      const estimatedZoom = distanceToZoom(10) // This returns 12, but fitBounds will adjust
+      // Calculate appropriate zoom from selected distance
+      // But let fitBounds determine the exact zoom to show the distance radius bounds
+      const estimatedZoom = distanceToZoom(distanceMiles) // Use selected distance
       
       if (!prev) {
         // Create new map view with ZIP location
-        // Let fitBounds calculate the exact zoom to show the 10-mile radius
+        // Let fitBounds calculate the exact zoom to show the selected distance radius
         const newView: MapViewState = {
           center: { lat, lng },
           bounds: calculatedBounds,
@@ -1330,7 +1332,7 @@ export default function SalesClient({
           console.log('[ZIP] New map view:', newView, 'calculatedBounds:', calculatedBounds)
         }
         
-        // Use fitBounds to ensure exactly 10-mile radius is visible
+        // Use fitBounds to ensure exactly the selected distance radius is visible
         // Set bounds immediately - map will apply when loaded
         setPendingBounds(calculatedBounds)
         // Clear after fitBounds animation completes (300ms duration + buffer)
@@ -1356,7 +1358,7 @@ export default function SalesClient({
         console.log('[ZIP] Updated map view:', newView, 'calculatedBounds:', calculatedBounds)
       }
       
-      // Use fitBounds to ensure exactly 10-mile radius is visible
+      // Use fitBounds to ensure exactly the selected distance radius is visible
       // Set bounds - map will apply when ready
       setPendingBounds(calculatedBounds)
       // Clear after fitBounds animation completes (300ms duration + buffer)
@@ -1380,7 +1382,7 @@ export default function SalesClient({
     }
     router.replace(`/sales?${currentParams.toString()}`, { scroll: false })
 
-    // Don't clear bounds immediately - let them persist to maintain the exact 10-mile radius
+    // Don't clear bounds immediately - let them persist to maintain the exact distance radius
     // Only clear if user manually pans/zooms (handled by handleViewportChange)
     
     // Map will update directly without transition overlay
@@ -1391,7 +1393,7 @@ export default function SalesClient({
     setTimeout(() => {
       setIsZipSearching(false)
     }, 1000)
-  }, [searchParams, router, fetchMapSales])
+  }, [searchParams, router, fetchMapSales, filters])
 
   const handleZipError = useCallback((error: string) => {
     setZipError(error)

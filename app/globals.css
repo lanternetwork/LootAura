@@ -142,11 +142,6 @@ body { min-height: 100vh; }
   background: inherit !important;
 }
 
-/* Ensure cluster markers keep their background on hover */
-.mapboxgl-marker [data-cluster-marker="true"]:hover {
-  background-color: var(--accent-primary) !important;
-}
-
 /* Tooltip popup styling - minimal, no tip pointer */
 .mapboxgl-popup-tooltip .mapboxgl-popup-content {
   padding: 0 !important;

@@ -19,7 +19,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
     return null
   }
 
-  const formatDate = (dateString: string, timeString?: string): string => {
+  const formatDate = (dateString: string, timeString?: string, endDateString?: string): string => {
     try {
       const date = new Date(`${dateString}T${timeString || '00:00'}`)
       const today = new Date()
@@ -28,6 +28,29 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
       tomorrow.setDate(tomorrow.getDate() + 1)
       const saleDate = new Date(date)
       saleDate.setHours(0, 0, 0, 0)
+      
+      // Multi-day sale: show date range with start time
+      if (endDateString && endDateString !== dateString) {
+        const startFormatted = date.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+        const endDate = new Date(endDateString)
+        const endFormatted = endDate.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+        if (timeString) {
+          const [hours, minutes] = timeString.split(':')
+          const hour = parseInt(hours, 10)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const displayHour = hour % 12 || 12
+          return `${startFormatted} – ${endFormatted} • ${displayHour}:${minutes} ${ampm}`
+        }
+        return `${startFormatted} – ${endFormatted}`
+      }
       
       // Check if it's today
       if (saleDate.getTime() === today.getTime()) {
@@ -43,15 +66,30 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
       
       // Check if it's tomorrow
       if (saleDate.getTime() === tomorrow.getTime()) {
+        if (timeString) {
+          const [hours, minutes] = timeString.split(':')
+          const hour = parseInt(hours, 10)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const displayHour = hour % 12 || 12
+          return `Tomorrow, ${displayHour}:${minutes} ${ampm}`
+        }
         return 'Tomorrow'
       }
       
-      // Format as "Sat, Nov 16"
-      return date.toLocaleDateString('en-US', {
+      // Format as "Sat, Nov 16" with time if available
+      const dateFormatted = date.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
       })
+      if (timeString) {
+        const [hours, minutes] = timeString.split(':')
+        const hour = parseInt(hours, 10)
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const displayHour = hour % 12 || 12
+        return `${dateFormatted} • ${displayHour}:${minutes} ${ampm}`
+      }
+      return dateFormatted
     } catch {
       // Fallback to simple date string if parsing fails
       return dateString
@@ -65,7 +103,9 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
         {nearbySales.map((nearbySale) => {
           const cover = getSaleCoverUrl(nearbySale)
           const distanceText = formatDistance(nearbySale.distance_m, 'miles')
-          const dateText = formatDate(nearbySale.date_start, nearbySale.time_start)
+          const dateText = nearbySale.date_start 
+            ? formatDate(nearbySale.date_start, nearbySale.time_start, nearbySale.date_end) || 'Date TBD'
+            : 'Date TBD'
           const locationText = nearbySale.city && nearbySale.state 
             ? `${nearbySale.city}, ${nearbySale.state}`
             : nearbySale.city || nearbySale.state || ''
@@ -107,17 +147,17 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
                   </h4>
                   <div className="text-sm text-gray-600 space-y-0.5">
                     <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      <span>{distanceText} away</span>
+                      <span className="min-w-0">{distanceText} away</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      <span>{dateText}</span>
+                      <span className="min-w-0 break-words">{dateText}</span>
                     </div>
                     {locationText && (
                       <div className="text-xs text-gray-500 truncate">

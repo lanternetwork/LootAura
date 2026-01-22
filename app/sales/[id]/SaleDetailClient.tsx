@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
@@ -245,6 +245,23 @@ export default function SaleDetailClient({
   }
 
   const isOwner = !!currentUser && currentUser.id === sale.owner_id
+
+  // Check if sale is eligible for promotion (matches server-side eligibility rules)
+  const isSaleEligibleForPromotion = useMemo(() => {
+    // Status must be 'published' or 'active'
+    if (sale.status !== 'published' && sale.status !== 'active') {
+      return false
+    }
+    // Sale must not be archived
+    if (sale.archived_at) {
+      return false
+    }
+    // Sale must not be hidden by admin (moderation_status may not be in type, but exists at runtime)
+    if ((sale as any).moderation_status === 'hidden_by_admin') {
+      return false
+    }
+    return true
+  }, [sale.status, sale.archived_at, (sale as any).moderation_status])
 
   // Fetch minimal promotion status for this sale (owner-only, when promotions are enabled)
   useEffect(() => {
@@ -534,14 +551,16 @@ export default function SaleDetailClient({
                 </div>
               </div>
 
-              {sale.date_end && sale.time_end && (
+              {sale.date_end && sale.date_end !== sale.date_start && (
                 <div className="flex gap-3">
                   <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
                     <div className="font-medium text-gray-900 text-sm">Ends: {formatDate(sale.date_end)}</div>
-                    <div className="text-xs text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
+                    {sale.time_end && sale.time_end !== sale.time_start && (
+                      <div className="text-xs text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
+                    )}
                   </div>
                 </div>
               )}
@@ -769,14 +788,16 @@ export default function SaleDetailClient({
                     </div>
                   </div>
 
-                  {sale.date_end && sale.time_end && (
+                  {sale.date_end && sale.date_end !== sale.date_start && (
                     <div className="flex gap-3">
                       <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <div>
                         <div className="font-medium text-gray-900">Ends: {formatDate(sale.date_end)}</div>
-                        <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
+                        {sale.time_end && sale.time_end !== sale.time_start && (
+                          <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -990,13 +1011,17 @@ export default function SaleDetailClient({
                   </p>
                   <button
                     type="button"
-                    disabled={isPromotionLoading || !paymentsEnabled}
+                    disabled={isPromotionLoading || !paymentsEnabled || !isSaleEligibleForPromotion}
                     onClick={() => {
                       if (!paymentsEnabled) {
                         toast.info('Promotions are not available right now. Please check back later.')
                         return
                       }
                       if (isPromotionLoading) {
+                        return
+                      }
+                      if (!isSaleEligibleForPromotion) {
+                        // Sale is not eligible - do not navigate
                         return
                       }
                       // Navigate directly to internal checkout page

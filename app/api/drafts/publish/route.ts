@@ -111,19 +111,25 @@ export async function POST(request: NextRequest) {
       return fail(500, 'DATA_INTEGRITY_ERROR', 'Draft is missing required location data. Please refresh and try again.')
     }
 
+    // Validate required fields are present
+    if (!formData.date_start || formData.date_start.trim() === '') {
+      return fail(400, 'MISSING_START_DATE', 'Start date is required')
+    }
+    if (!normalizedTimeStart || normalizedTimeStart.trim() === '') {
+      return fail(400, 'MISSING_START_TIME', 'Start time is required')
+    }
+
     // Backward compatibility: default date_end to date_start if missing
     let finalDateEnd: string = (formData.date_end && formData.date_end.trim()) || ''
     let finalTimeEnd: string = (formData.time_end && formData.time_end.trim()) || ''
     if (!finalDateEnd) {
-      if (formData.date_start) {
-        finalDateEnd = formData.date_start
-        // Default time_end to time_start if not set
-        finalTimeEnd = (formData.time_start && formData.time_start.trim()) || finalTimeEnd
-      }
+      finalDateEnd = formData.date_start
+      // Default time_end to time_start if not set
+      finalTimeEnd = (formData.time_start && formData.time_start.trim()) || normalizedTimeStart
     }
 
     // Validate date range (max 3 days)
-    if (formData.date_start && finalDateEnd) {
+    if (finalDateEnd) {
       const startDate = new Date(formData.date_start)
       const endDate = new Date(finalDateEnd)
       const maxEndDate = new Date(startDate)

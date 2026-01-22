@@ -66,15 +66,30 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
       
       // Check if it's tomorrow
       if (saleDate.getTime() === tomorrow.getTime()) {
+        if (timeString) {
+          const [hours, minutes] = timeString.split(':')
+          const hour = parseInt(hours, 10)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const displayHour = hour % 12 || 12
+          return `Tomorrow, ${displayHour}:${minutes} ${ampm}`
+        }
         return 'Tomorrow'
       }
       
-      // Format as "Sat, Nov 16"
-      return date.toLocaleDateString('en-US', {
+      // Format as "Sat, Nov 16" with time if available
+      const dateFormatted = date.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
       })
+      if (timeString) {
+        const [hours, minutes] = timeString.split(':')
+        const hour = parseInt(hours, 10)
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const displayHour = hour % 12 || 12
+        return `${dateFormatted} • ${displayHour}:${minutes} ${ampm}`
+      }
+      return dateFormatted
     } catch {
       // Fallback to simple date string if parsing fails
       return dateString

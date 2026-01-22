@@ -1707,7 +1707,8 @@ export default function SellWizardClient({
       description: formData.description,
       date_start: formData.date_start,
       time_start: formData.time_start,
-      duration_hours: formData.duration_hours,
+      date_end: formData.date_end,
+      time_end: formData.time_end,
       pricing_mode: formData.pricing_mode,
       tags: formData.tags,
     })

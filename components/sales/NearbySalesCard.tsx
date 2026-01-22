@@ -29,7 +29,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
       const saleDate = new Date(date)
       saleDate.setHours(0, 0, 0, 0)
       
-      // Multi-day sale: show date range
+      // Multi-day sale: show date range with start time
       if (endDateString && endDateString !== dateString) {
         const startFormatted = date.toLocaleDateString('en-US', {
           weekday: 'short',
@@ -42,7 +42,14 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
           month: 'short',
           day: 'numeric',
         })
-        return `${startFormatted} - ${endFormatted}`
+        if (timeString) {
+          const [hours, minutes] = timeString.split(':')
+          const hour = parseInt(hours, 10)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const displayHour = hour % 12 || 12
+          return `${startFormatted} – ${endFormatted} • ${displayHour}:${minutes} ${ampm}`
+        }
+        return `${startFormatted} – ${endFormatted}`
       }
       
       // Check if it's today

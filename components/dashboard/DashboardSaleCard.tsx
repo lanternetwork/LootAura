@@ -196,7 +196,13 @@ export default function DashboardSaleCard({
           </div>
           {sale.date_start && (
             <div className="text-xs text-neutral-600">
-              {new Date(`${sale.date_start}T${sale.time_start || '00:00'}`).toLocaleString()}
+              {sale.date_end && sale.date_end !== sale.date_start ? (
+                // Multi-day sale: show date range
+                `${new Date(sale.date_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(sale.date_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+              ) : (
+                // Single-day sale: show date and time
+                new Date(`${sale.date_start}T${sale.time_start || '00:00'}`).toLocaleString()
+              )}
             </div>
           )}
           

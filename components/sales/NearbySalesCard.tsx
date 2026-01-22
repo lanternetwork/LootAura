@@ -19,7 +19,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
     return null
   }
 
-  const formatDate = (dateString: string, timeString?: string): string => {
+  const formatDate = (dateString: string, timeString?: string, endDateString?: string): string => {
     try {
       const date = new Date(`${dateString}T${timeString || '00:00'}`)
       const today = new Date()
@@ -28,6 +28,22 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
       tomorrow.setDate(tomorrow.getDate() + 1)
       const saleDate = new Date(date)
       saleDate.setHours(0, 0, 0, 0)
+      
+      // Multi-day sale: show date range
+      if (endDateString && endDateString !== dateString) {
+        const startFormatted = date.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+        const endDate = new Date(endDateString)
+        const endFormatted = endDate.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+        return `${startFormatted} - ${endFormatted}`
+      }
       
       // Check if it's today
       if (saleDate.getTime() === today.getTime()) {
@@ -65,7 +81,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
         {nearbySales.map((nearbySale) => {
           const cover = getSaleCoverUrl(nearbySale)
           const distanceText = formatDistance(nearbySale.distance_m, 'miles')
-          const dateText = formatDate(nearbySale.date_start, nearbySale.time_start)
+          const dateText = formatDate(nearbySale.date_start, nearbySale.time_start, nearbySale.date_end)
           const locationText = nearbySale.city && nearbySale.state 
             ? `${nearbySale.city}, ${nearbySale.state}`
             : nearbySale.city || nearbySale.state || ''

@@ -285,27 +285,42 @@ export default function SellWizardClient({
   }, [])
   
   // Initialize wizard state from initialData if provided
-  const [wizardState, dispatch] = useReducer(wizardReducer, initialWizardState, (initialState) => ({
-    ...initialState,
-    formData: {
-      title: initialData?.title || '',
-      description: initialData?.description || '',
-      address: initialData?.address || '',
-      city: initialData?.city || '',
-      state: initialData?.state || '',
-      zip_code: initialData?.zip_code || '',
-      lat: initialData?.lat,
-      lng: initialData?.lng,
-      date_start: initialData?.date_start || '',
-      time_start: initialData?.time_start || '09:00',
-      date_end: initialData?.date_end || '',
-      time_end: initialData?.time_end || '',
-      duration_hours: initialData?.duration_hours || 4,
-      tags: normalizeTags(initialData?.tags),
-      pricing_mode: initialData?.pricing_mode || 'negotiable',
-      status: initialData?.status || 'draft'
+  const [wizardState, dispatch] = useReducer(wizardReducer, initialWizardState, (initialState) => {
+    const initialDateStart = initialData?.date_start || ''
+    let initialDateEnd = initialData?.date_end || ''
+    let initialTimeEnd = initialData?.time_end || ''
+    
+    // Backward compatibility: if date_end missing, default to date_start
+    if (!initialDateEnd && initialDateStart) {
+      initialDateEnd = initialDateStart
+      // If time_end also missing, default to time_start
+      if (!initialTimeEnd && initialData?.time_start) {
+        initialTimeEnd = initialData.time_start
+      }
     }
-  }))
+    
+    return {
+      ...initialState,
+      formData: {
+        title: initialData?.title || '',
+        description: initialData?.description || '',
+        address: initialData?.address || '',
+        city: initialData?.city || '',
+        state: initialData?.state || '',
+        zip_code: initialData?.zip_code || '',
+        lat: initialData?.lat,
+        lng: initialData?.lng,
+        date_start: initialDateStart,
+        time_start: initialData?.time_start || '09:00',
+        date_end: initialDateEnd,
+        time_end: initialTimeEnd,
+        duration_hours: initialData?.duration_hours || 4, // Keep for backward compat, but not used
+        tags: normalizeTags(initialData?.tags),
+        pricing_mode: initialData?.pricing_mode || 'negotiable',
+        status: initialData?.status || 'draft'
+      }
+    }
+  })
   
   // Extract wizard state for easier access
   const { currentStep, formData, photos, items, wantsPromotion, loading, errors, submitError } = wizardState
@@ -522,7 +537,8 @@ export default function SellWizardClient({
         description: formData.description,
         date_start: formData.date_start,
         time_start: formData.time_start || '09:00',
-        duration_hours: formData.duration_hours,
+        date_end: formData.date_end,
+        time_end: formData.time_end,
         pricing_mode: formData.pricing_mode,
         tags: formData.tags,
       })
@@ -946,6 +962,34 @@ export default function SellWizardClient({
             if (form.time_start) {
               form.time_start = normalizeTimeToNearest30(form.time_start) || form.time_start
             }
+            if (form.time_end) {
+              form.time_end = normalizeTimeToNearest30(form.time_end) || form.time_end
+            }
+            
+            // Handle backward compatibility: migrate duration_hours to date_end if needed
+            if (!form.date_end || form.date_end === '') {
+              if (form.date_start) {
+                // If duration_hours exists, calculate end date once (migration)
+                if (form.duration_hours && form.time_start) {
+                  const startDateTime = new Date(`${form.date_start}T${form.time_start}`)
+                  const durationHours = Math.min(form.duration_hours, 8) // Cap at 8 hours for migration
+                  const endDateTime = new Date(startDateTime.getTime() + durationHours * 60 * 60 * 1000)
+                  form.date_end = endDateTime.toISOString().split('T')[0]
+                  form.time_end = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
+                } else {
+                  // Default to start date
+                  form.date_end = form.date_start
+                  if (!form.time_end && form.time_start) {
+                    // Default end time to start time if not set
+                    form.time_end = form.time_start
+                  }
+                }
+              }
+            } else if (!form.time_end && form.time_start) {
+              // If date_end exists but time_end doesn't, default to start time
+              form.time_end = form.time_start
+            }
+            
             return form as Partial<SaleInput>
           })() : undefined
 
@@ -1065,29 +1109,62 @@ export default function SellWizardClient({
     if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
       updated.time_start = normalizeTimeToNearest30(value)
     }
+
+    // Snap end time to 30-minute increments (nearest 00/30 with carry)
+    if (field === 'time_end' && typeof value === 'string' && value.includes(':')) {
+      updated.time_end = normalizeTimeToNearest30(value)
+    }
     
-    // Calculate end date/time when duration, start date, or start time changes
-    if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
-      const dateStart = updated.date_start || formData.date_start
-      const timeStart = updated.time_start || formData.time_start
-      const durationHours = updated.duration_hours || formData.duration_hours || 4
+    // Handle start date changes: update end date appropriately
+    if (field === 'date_start') {
+      const newDateStart = value
+      const currentDateEnd = updated.date_end || formData.date_end
+      const previousDateStart = formData.date_start
       
-      if (dateStart && timeStart && durationHours) {
-        // Validate duration doesn't exceed 8 hours
-        const maxDuration = 8
-        const actualDuration = Math.min(durationHours, maxDuration)
+      if (newDateStart) {
+        // If no end date exists → set end date = start date
+        if (!currentDateEnd || currentDateEnd === '') {
+          updated.date_end = newDateStart
+        }
+        // If end date equals previous start date → move it to new start date
+        else if (currentDateEnd === previousDateStart) {
+          updated.date_end = newDateStart
+        }
+        // If end date is after previous start date → preserve it, clamp if necessary
+        else if (currentDateEnd && previousDateStart) {
+          const endDate = new Date(currentDateEnd)
+          const startDate = new Date(newDateStart)
+          const maxEndDate = new Date(startDate)
+          maxEndDate.setDate(maxEndDate.getDate() + 2)
+          
+          // Clamp to allowed range if necessary
+          if (endDate < startDate) {
+            updated.date_end = newDateStart
+          } else if (endDate > maxEndDate) {
+            updated.date_end = maxEndDate.toISOString().split('T')[0]
+          }
+          // Otherwise preserve the end date
+        }
+      }
+    }
+    
+    // Validate end date range when end date changes
+    if (field === 'date_end') {
+      const newDateEnd = value
+      const dateStart = updated.date_start || formData.date_start
+      
+      if (newDateEnd && dateStart) {
+        const endDate = new Date(newDateEnd)
+        const startDate = new Date(dateStart)
+        const maxEndDate = new Date(startDate)
+        maxEndDate.setDate(maxEndDate.getDate() + 2)
         
-        // Calculate end time
-        const startDateTime = new Date(`${dateStart}T${timeStart}`)
-        const endDateTime = new Date(startDateTime.getTime() + actualDuration * 60 * 60 * 1000)
-        
-        // Format end date (YYYY-MM-DD)
-        const endDate = endDateTime.toISOString().split('T')[0]
-        // Format end time (HH:MM)
-        const endTime = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
-        
-        updated.date_end = endDate
-        updated.time_end = endTime
+        // Clamp to allowed range
+        if (endDate < startDate) {
+          updated.date_end = dateStart
+        } else if (endDate > maxEndDate) {
+          updated.date_end = maxEndDate.toISOString().split('T')[0]
+        }
       }
     }
     
@@ -1173,7 +1250,8 @@ export default function SellWizardClient({
           description: formData.description,
           date_start: formData.date_start,
           time_start: timeStartForValidation,
-          duration_hours: formData.duration_hours,
+          date_end: formData.date_end,
+          time_end: formData.time_end,
           pricing_mode: formData.pricing_mode,
           tags: formData.tags,
         })
@@ -1535,7 +1613,8 @@ export default function SellWizardClient({
         description: formData.description,
         date_start: formData.date_start,
         time_start: formData.time_start,
-        duration_hours: formData.duration_hours,
+        date_end: formData.date_end,
+        time_end: formData.time_end,
         pricing_mode: formData.pricing_mode,
         tags: formData.tags,
       })
@@ -1628,7 +1707,8 @@ export default function SellWizardClient({
       description: formData.description,
       date_start: formData.date_start,
       time_start: formData.time_start,
-      duration_hours: formData.duration_hours,
+      date_end: formData.date_end,
+      time_end: formData.time_end,
       pricing_mode: formData.pricing_mode,
       tags: formData.tags,
     })
@@ -2253,37 +2333,51 @@ function DetailsStep({ formData, onChange, onPlaceSelected, errors, userLat, use
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Duration (Hours) *
-        </label>
-        <select
-          value={formData.duration_hours || 4}
-          onChange={(e) => {
-            const hours = parseInt(e.target.value, 10)
-            onChange('duration_hours', hours)
-          }}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] bg-white cursor-pointer"
-          required
-        >
-          {Array.from({ length: 8 }, (_, i) => i + 1).map((hours) => (
-            <option key={hours} value={hours}>
-              {hours} {hours === 1 ? 'hour' : 'hours'}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-gray-500">
-          Sale duration (1-8 hours). End time is calculated automatically.
-        </p>
-        {errors?.duration_hours && (
-          <p className="mt-1 text-sm text-red-600">{errors.duration_hours}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="date_end" className="block text-sm font-medium text-gray-700 mb-2 cursor-pointer">
+            End Date *
+          </label>
+          <input
+            id="date_end"
+            type="date"
+            value={formData.date_end || formData.date_start || ''}
+            onChange={(e) => onChange('date_end', e.target.value)}
+            onClick={(e) => e.currentTarget.showPicker?.()}
+            min={formData.date_start || undefined}
+            max={formData.date_start ? (() => {
+              const startDate = new Date(formData.date_start)
+              startDate.setDate(startDate.getDate() + 2)
+              return startDate.toISOString().split('T')[0]
+            })() : undefined}
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] cursor-pointer ${
+              errors?.date_end ? 'border-red-500' : 'border-gray-300'
+            }`}
+            required
+            aria-invalid={!!errors?.date_end}
+            aria-describedby={errors?.date_end ? 'date_end-error' : undefined}
+          />
+        {errors?.date_end && (
+          <p id="date_end-error" className="mt-1 text-sm text-red-600" role="alert">{errors.date_end}</p>
         )}
-        {formData.date_end && formData.time_end && (
-          <p className="mt-1 text-sm text-gray-600">
-            Ends: {new Date(`${formData.date_end}T${formData.time_end}`).toLocaleString()}
-          </p>
-        )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            End Time *
+          </label>
+          <TimePicker30
+            value={formData.time_end || ''}
+            onChange={(t) => onChange('time_end', t)}
+            required
+          />
+          {errors?.time_end && (
+            <p className="mt-1 text-sm text-red-600">{errors.time_end}</p>
+          )}
+        </div>
       </div>
+      <p className="mt-1 text-xs text-gray-500">
+        Sales can last up to 3 days (maximum 2 days after start date).
+      </p>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2515,6 +2609,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
+  const [itemFormInstanceId, setItemFormInstanceId] = useState(0)
   const addButtonRef = useRef<HTMLButtonElement>(null)
   const MAX_ITEMS = 50
 
@@ -2525,6 +2620,8 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
       return
     }
     setEditingItemId(null)
+    // Increment instance ID to force remount when adding a new item (not editing)
+    setItemFormInstanceId(prev => prev + 1)
     setIsModalOpen(true)
   }, [items.length])
 
@@ -2600,6 +2697,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
       </div>
 
       <ItemFormModal
+        key={editingItemId || `new-${itemFormInstanceId}`}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}

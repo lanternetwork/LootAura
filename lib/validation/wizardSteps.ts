@@ -35,7 +35,8 @@ export type DetailsStepData = {
   description?: string
   date_start?: string
   time_start?: string
-  duration_hours?: number
+  date_end?: string
+  time_end?: string
   pricing_mode?: 'negotiable' | 'firm' | 'best_offer' | 'ask'
   tags?: string[]
 }
@@ -152,7 +153,8 @@ export function validateLocationStep(data: LocationStepData): ValidationResult {
  * - description (optional, but if provided checked for unsavory language)
  * - date_start (required)
  * - time_start (required, must be in HH:MM format)
- * - duration_hours (required, must be between 1 and 8)
+ * - date_end (required, must be >= date_start and <= date_start + 2 days)
+ * - time_end (required, must be in HH:MM format)
  * - pricing_mode (optional, must be valid enum value)
  * - tags (optional, but if provided checked for unsavory language)
  * 
@@ -203,12 +205,40 @@ export function validateDetailsStep(data: DetailsStepData): ValidationResult {
     }
   }
 
-  // Duration validation
-  const durationHours = data.duration_hours ?? 4
-  if (typeof durationHours !== 'number' || isNaN(durationHours)) {
-    errors.duration_hours = 'Duration must be a number'
-  } else if (durationHours < 1 || durationHours > 8) {
-    errors.duration_hours = 'Duration must be between 1 and 8 hours'
+  // Date end validation (required)
+  if (!data.date_end || data.date_end.trim().length === 0) {
+    errors.date_end = 'End date is required'
+  } else {
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}/
+    if (!dateRegex.test(data.date_end)) {
+      errors.date_end = 'End date must be in YYYY-MM-DD format'
+    } else if (data.date_start) {
+      // Validate end date >= start date
+      const startDate = new Date(data.date_start)
+      const endDate = new Date(data.date_end)
+      if (endDate < startDate) {
+        errors.date_end = 'End date must be on or after start date'
+      } else {
+        // Validate end date <= start date + 2 days (3 day maximum)
+        const maxEndDate = new Date(startDate)
+        maxEndDate.setDate(maxEndDate.getDate() + 2)
+        if (endDate > maxEndDate) {
+          errors.date_end = 'Sales can last up to 3 days (maximum 2 days after start date)'
+        }
+      }
+    }
+  }
+
+  // Time end validation (required)
+  if (!data.time_end || data.time_end.trim().length === 0) {
+    errors.time_end = 'End time is required'
+  } else {
+    // Validate time format (HH:MM)
+    const timeRegex = /^\d{2}:\d{2}$/
+    if (!timeRegex.test(data.time_end)) {
+      errors.time_end = 'End time must be in HH:MM format'
+    }
   }
 
   // Pricing mode validation (optional, but if provided must be valid)

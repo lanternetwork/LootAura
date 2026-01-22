@@ -139,27 +139,39 @@ export function computePublishability(draft: DraftRecord): PublishabilityResult 
     }
   }
   
-  // Optional: date_end (if provided, must be valid)
-  if (formData.date_end !== undefined && formData.date_end !== null && formData.date_end !== '') {
-    if (typeof formData.date_end !== 'string') {
-      errors.date_end = 'End date must be a string'
-    } else {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}/
-      if (!dateRegex.test(formData.date_end)) {
-        errors.date_end = 'End date must be in YYYY-MM-DD format'
+  // Required: date_end
+  if (!formData.date_end || typeof formData.date_end !== 'string' || formData.date_end.trim().length === 0) {
+    errors.date_end = 'End date is required'
+  } else {
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}/
+    if (!dateRegex.test(formData.date_end)) {
+      errors.date_end = 'End date must be in YYYY-MM-DD format'
+    } else if (formData.date_start) {
+      // Validate end date >= start date
+      const startDate = new Date(formData.date_start)
+      const endDate = new Date(formData.date_end)
+      if (endDate < startDate) {
+        errors.date_end = 'End date must be on or after start date'
+      } else {
+        // Validate end date <= start date + 2 days (3 day maximum)
+        const maxEndDate = new Date(startDate)
+        maxEndDate.setDate(maxEndDate.getDate() + 2)
+        if (endDate > maxEndDate) {
+          errors.date_end = 'Sales can last up to 3 days (maximum 2 days after start date)'
+        }
       }
     }
   }
   
-  // Optional: time_end (if provided, must be valid)
-  if (formData.time_end !== undefined && formData.time_end !== null && formData.time_end !== '') {
-    if (typeof formData.time_end !== 'string') {
-      errors.time_end = 'End time must be a string'
-    } else {
-      const timeRegex = /^\d{2}:\d{2}$/
-      if (!timeRegex.test(formData.time_end)) {
-        errors.time_end = 'End time must be in HH:MM format'
-      }
+  // Required: time_end
+  if (!formData.time_end || typeof formData.time_end !== 'string' || formData.time_end.trim().length === 0) {
+    errors.time_end = 'End time is required'
+  } else {
+    // Validate time format (HH:MM)
+    const timeRegex = /^\d{2}:\d{2}$/
+    if (!timeRegex.test(formData.time_end)) {
+      errors.time_end = 'End time must be in HH:MM format'
     }
   }
   

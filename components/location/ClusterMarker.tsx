@@ -40,9 +40,6 @@ export default function ClusterMarker({
     setIsHovered(false)
   }, [])
 
-  // Fixed size for cluster markers (14px)
-  const sizeClass = 'w-3.5 h-3.5 text-[8px]'
-
   return (
     <Marker
       longitude={cluster.lng}
@@ -50,34 +47,66 @@ export default function ClusterMarker({
       anchor="center"
       data-testid="cluster"
     >
+      {/* Platform-specific hitbox: tight on desktop, forgiving on touch */}
       <div
-        className={`
-          ${sizeClass}
-          text-white font-bold
-          rounded-full flex items-center justify-center
-          shadow-lg select-none
-          cursor-pointer
-        `}
-        style={{ 
-          backgroundColor: 'var(--accent-primary)',
-          border: 'none',
-          padding: 0,
-          margin: 0
+        className="relative flex items-center justify-center transition-transform duration-150 ease-out"
+        style={{
+          // Desktop (mouse): tight hitbox matching SVG size (14px)
+          // Mobile (touch): larger hitbox (44px) for easier tapping
+          width: '44px',
+          height: '44px',
+          minWidth: '44px',
+          minHeight: '44px',
+          // Ensure extra hit area on touch devices is transparent
+          backgroundColor: 'transparent'
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        data-cluster-marker="true"
-        data-cluster-id={cluster.id}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
+        data-cluster-marker="true"
+        data-cluster-id={cluster.id}
         title={`${cluster.count} sales at this location`}
       >
-        <span className={`text-white font-bold leading-none ${isHovered ? 'text-[10.4px]' : ''}`}>
-          {isHovered ? '+' : cluster.count}
-        </span>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 16 16"
+          className="w-3.5 h-3.5"
+          style={{
+            cursor: 'pointer',
+            outline: 'none',
+            position: 'relative',
+            zIndex: 1,
+            pointerEvents: 'none' // Prevent double-click events
+          }}
+        >
+          {/* Orange cluster pin: lighter fill + darker same-hue stroke */}
+          <circle
+            cx="8"
+            cy="8"
+            r="7"
+            fill="#f97316"
+            stroke="#ea580c"
+            strokeWidth="1.5"
+          />
+          {/* Centered text: count or + on hover */}
+          <text
+            x="8"
+            y="8"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="white"
+            fontSize="8"
+            fontWeight="bold"
+            style={{ pointerEvents: 'none' }}
+          >
+            {isHovered ? '+' : cluster.count}
+          </text>
+        </svg>
       </div>
     </Marker>
   )

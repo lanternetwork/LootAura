@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
@@ -245,6 +245,23 @@ export default function SaleDetailClient({
   }
 
   const isOwner = !!currentUser && currentUser.id === sale.owner_id
+
+  // Check if sale is eligible for promotion (matches server-side eligibility rules)
+  const isSaleEligibleForPromotion = useMemo(() => {
+    // Status must be 'published' or 'active'
+    if (sale.status !== 'published' && sale.status !== 'active') {
+      return false
+    }
+    // Sale must not be archived
+    if (sale.archived_at) {
+      return false
+    }
+    // Sale must not be hidden by admin (moderation_status may not be in type, but exists at runtime)
+    if ((sale as any).moderation_status === 'hidden_by_admin') {
+      return false
+    }
+    return true
+  }, [sale.status, sale.archived_at, (sale as any).moderation_status])
 
   // Fetch minimal promotion status for this sale (owner-only, when promotions are enabled)
   useEffect(() => {
@@ -994,13 +1011,17 @@ export default function SaleDetailClient({
                   </p>
                   <button
                     type="button"
-                    disabled={isPromotionLoading || !paymentsEnabled}
+                    disabled={isPromotionLoading || !paymentsEnabled || !isSaleEligibleForPromotion}
                     onClick={() => {
                       if (!paymentsEnabled) {
                         toast.info('Promotions are not available right now. Please check back later.')
                         return
                       }
                       if (isPromotionLoading) {
+                        return
+                      }
+                      if (!isSaleEligibleForPromotion) {
+                        // Sale is not eligible - do not navigate
                         return
                       }
                       // Navigate directly to internal checkout page

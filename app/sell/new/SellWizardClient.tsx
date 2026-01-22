@@ -2609,6 +2609,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
+  const [itemFormInstanceId, setItemFormInstanceId] = useState(0)
   const addButtonRef = useRef<HTMLButtonElement>(null)
   const MAX_ITEMS = 50
 
@@ -2619,6 +2620,8 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
       return
     }
     setEditingItemId(null)
+    // Increment instance ID to force remount when adding a new item (not editing)
+    setItemFormInstanceId(prev => prev + 1)
     setIsModalOpen(true)
   }, [items.length])
 
@@ -2694,6 +2697,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
       </div>
 
       <ItemFormModal
+        key={editingItemId || `new-${itemFormInstanceId}`}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}

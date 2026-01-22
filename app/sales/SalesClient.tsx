@@ -154,6 +154,14 @@ export default function SalesClient({
     effectiveCenter?.lat && effectiveCenter?.lng ? { lat: effectiveCenter.lat, lng: effectiveCenter.lng } : undefined
   )
 
+  // Track latest distance value to avoid stale closures in ZIP search
+  const distanceRef = useRef<number>(filters.distance ?? 10)
+  
+  // Update ref whenever filters.distance changes
+  useEffect(() => {
+    distanceRef.current = filters.distance ?? 10
+  }, [filters.distance])
+
   // Map view state - single source of truth
   // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
   // Otherwise, use resolved viewport
@@ -1280,8 +1288,8 @@ export default function SalesClient({
     }
     
     // Use current distance filter as single source of truth
-    // filters.distance is always defined (defaults to 10 in useFilters), but use nullish coalescing for safety
-    const distanceMiles = filters.distance ?? 10
+    // Read from ref to ensure we always have the latest value, avoiding stale closures
+    const distanceMiles = distanceRef.current
     const radiusKm = distanceMiles * 1.60934 // Convert miles to kilometers
     const latRange = radiusKm / 111.0
     const lngRange = radiusKm / (111.0 * Math.cos(lat * Math.PI / 180))

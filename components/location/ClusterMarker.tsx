@@ -40,8 +40,8 @@ export default function ClusterMarker({
     setIsHovered(false)
   }, [])
 
-  // Fixed size to match individual pins (12px)
-  const sizeClass = 'w-3 h-3 text-[8px]'
+  // Fixed size for cluster markers (14px)
+  const sizeClass = 'w-3.5 h-3.5 text-[8px]'
 
   return (
     <Marker

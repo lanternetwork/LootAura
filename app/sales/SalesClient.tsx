@@ -313,7 +313,8 @@ export default function SalesClient({
 
   // Fetch sales based on buffered bounds (not tight viewport)
   // This function now receives bufferedBounds, which are larger than the viewport
-  const fetchMapSales = useCallback(async (bufferedBbox: Bounds, customFilters?: any) => {
+  // For ZIP search, use near=1 mode by passing null for bufferedBbox and providing nearOptions
+  const fetchMapSales = useCallback(async (bufferedBbox: Bounds | null, customFilters?: any, nearOptions?: { useNear: true; lat: number; lng: number }) => {
     // Cancel any in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -327,16 +328,20 @@ export default function SalesClient({
     const callId = apiCallCounterRef.current
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[FETCH] fetchMapSales called with buffered bbox:', bufferedBbox)
-      console.log('[FETCH] API Call #' + callId + ' - Buffered fetch')
-      console.log('[FETCH] Buffered bbox range:', {
-        latRange: bufferedBbox.north - bufferedBbox.south,
-        lngRange: bufferedBbox.east - bufferedBbox.west,
-        center: {
-          lat: (bufferedBbox.north + bufferedBbox.south) / 2,
-          lng: (bufferedBbox.east + bufferedBbox.west) / 2
-        }
-      })
+      if (nearOptions) {
+        console.log('[FETCH] fetchMapSales called with near=1 mode:', { lat: nearOptions.lat, lng: nearOptions.lng })
+      } else {
+        console.log('[FETCH] fetchMapSales called with buffered bbox:', bufferedBbox)
+        console.log('[FETCH] Buffered bbox range:', {
+          latRange: bufferedBbox!.north - bufferedBbox!.south,
+          lngRange: bufferedBbox!.east - bufferedBbox!.west,
+          center: {
+            lat: (bufferedBbox!.north + bufferedBbox!.south) / 2,
+            lng: (bufferedBbox!.east + bufferedBbox!.west) / 2
+          }
+        })
+      }
+      console.log('[FETCH] API Call #' + callId + (nearOptions ? ' - Near=1 fetch' : ' - Buffered fetch'))
     }
     
     // Set fetching state but keep old data visible
@@ -348,12 +353,41 @@ export default function SalesClient({
 
     try {
       const params = new URLSearchParams()
-      params.set('north', bufferedBbox.north.toString())
-      params.set('south', bufferedBbox.south.toString())
-      params.set('east', bufferedBbox.east.toString())
-      params.set('west', bufferedBbox.west.toString())
-      
       const activeFilters = customFilters || filters
+      
+      if (nearOptions) {
+        // Use near=1 API path for ZIP search (respects radiusKm exactly)
+        params.set('near', '1')
+        params.set('lat', nearOptions.lat.toString())
+        params.set('lng', nearOptions.lng.toString())
+        
+        // Pass distance filter to API (convert miles to km)
+        if (activeFilters.distance) {
+          const distanceKm = activeFilters.distance * 1.60934 // Convert miles to km
+          params.set('radiusKm', distanceKm.toString())
+        }
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] Using near=1 path for ZIP search:', { lat: nearOptions.lat, lng: nearOptions.lng, radiusKm: activeFilters.distance ? activeFilters.distance * 1.60934 : 'none' })
+        }
+      } else {
+        // Use bbox path for map pan/zoom (existing behavior)
+        if (!bufferedBbox) {
+          throw new Error('bufferedBbox is required when not using near=1 mode')
+        }
+        params.set('north', bufferedBbox.north.toString())
+        params.set('south', bufferedBbox.south.toString())
+        params.set('east', bufferedBbox.east.toString())
+        params.set('west', bufferedBbox.west.toString())
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] Buffered bbox area (degrees):', {
+            latRange: bufferedBbox.north - bufferedBbox.south,
+            lngRange: bufferedBbox.east - bufferedBbox.west,
+            area: (bufferedBbox.north - bufferedBbox.south) * (bufferedBbox.east - bufferedBbox.west)
+          })
+        }
+      }
       
       if (activeFilters.dateRange) {
         params.set('dateRange', activeFilters.dateRange)
@@ -361,8 +395,9 @@ export default function SalesClient({
       if (activeFilters.categories && activeFilters.categories.length > 0) {
         params.set('categories', activeFilters.categories.join(','))
       }
-      // Pass distance filter to API (convert miles to km)
-      if (activeFilters.distance) {
+      // Pass distance filter to API for bbox path (convert miles to km)
+      // Note: For near=1 path, radiusKm is already set above
+      if (!nearOptions && activeFilters.distance) {
         const distanceKm = activeFilters.distance * 1.60934 // Convert miles to km
         params.set('radiusKm', distanceKm.toString())
       }
@@ -372,12 +407,9 @@ export default function SalesClient({
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
-        console.log('[FETCH] Buffered fetch with bbox:', bufferedBbox)
-        console.log('[FETCH] Buffered bbox area (degrees):', {
-          latRange: bufferedBbox.north - bufferedBbox.south,
-          lngRange: bufferedBbox.east - bufferedBbox.west,
-          area: (bufferedBbox.north - bufferedBbox.south) * (bufferedBbox.east - bufferedBbox.west)
-        })
+        if (!nearOptions) {
+          console.log('[FETCH] Buffered fetch with bbox:', bufferedBbox)
+        }
       }
 
       const response = await fetch(`/api/sales?${params.toString()}`, {
@@ -426,7 +458,14 @@ export default function SalesClient({
         setFetchedSales(filtered)
         
         // Update bufferedBounds to track what area we fetched
-        setBufferedBounds(bufferedBbox)
+        // For near=1 mode, calculate bounds from response or use null
+        if (nearOptions) {
+          // For near=1, we don't track bufferedBounds (server calculates bbox)
+          // The response may include bbox info, but we'll let the map viewport drive bounds
+          setBufferedBounds(null)
+        } else {
+          setBufferedBounds(bufferedBbox!)
+        }
         
         setMapMarkers(prev => {
           const newMarkers = filtered
@@ -1274,7 +1313,7 @@ export default function SalesClient({
       })
   }, [isMobile, resolvedViewport.source, recenterToUserLocation])
 
-  // Handle ZIP search with bbox support
+  // Handle ZIP search with near=1 API path (respects distance filter exactly)
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
     // ZIP search is explicit user intent - flip authority to user immediately
     flipToUserAuthority()
@@ -1290,11 +1329,13 @@ export default function SalesClient({
     // Use current distance filter as single source of truth
     // Read from ref to ensure we always have the latest value, avoiding stale closures
     const distanceMiles = distanceRef.current
+    
+    // Calculate bounds for map viewport display (server will calculate exact bbox from radiusKm)
     const radiusKm = distanceMiles * 1.60934 // Convert miles to kilometers
     const latRange = radiusKm / 111.0
     const lngRange = radiusKm / (111.0 * Math.cos(lat * Math.PI / 180))
     
-    // Calculate bounds based on selected distance
+    // Calculate bounds based on selected distance (for map viewport only)
     const calculatedBounds = {
       west: lng - lngRange,
       south: lat - latRange,
@@ -1302,15 +1343,13 @@ export default function SalesClient({
       north: lat + latRange
     }
     
-    // Prefetch sales data for this ZIP location immediately
-    // This ensures pins appear as soon as possible
-    // Use expanded bounds for buffer, and pass current filters to ensure distance filter is applied
-    const bufferedBounds = expandBounds(calculatedBounds, MAP_BUFFER_FACTOR)
+    // Fetch sales data using near=1 API path (respects radiusKm exactly, no double expansion)
+    // This ensures pins appear within the exact selected distance
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, distanceMiles, bounds: calculatedBounds, bufferedBounds })
+      console.log('[ZIP] Fetching sales for ZIP location using near=1:', { lat, lng, distanceMiles, radiusKm })
     }
-    fetchMapSales(bufferedBounds, filters).catch(err => {
-      console.error('[ZIP] Failed to prefetch sales:', err)
+    fetchMapSales(null, filters, { useNear: true, lat, lng }).catch(err => {
+      console.error('[ZIP] Failed to fetch sales:', err)
     })
     
     // Initialize or update map center - handle null prev state

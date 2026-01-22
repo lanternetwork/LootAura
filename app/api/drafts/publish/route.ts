@@ -111,6 +111,42 @@ export async function POST(request: NextRequest) {
       return fail(500, 'DATA_INTEGRITY_ERROR', 'Draft is missing required location data. Please refresh and try again.')
     }
 
+    // Backward compatibility: default date_end to date_start if missing
+    let finalDateEnd = formData.date_end
+    let finalTimeEnd = formData.time_end
+    if (!finalDateEnd || finalDateEnd.trim() === '') {
+      if (formData.date_start) {
+        finalDateEnd = formData.date_start
+        // Default time_end to time_start if not set
+        finalTimeEnd = formData.time_start || finalTimeEnd
+      }
+    }
+
+    // Validate date range (max 3 days)
+    if (formData.date_start && finalDateEnd) {
+      const startDate = new Date(formData.date_start)
+      const endDate = new Date(finalDateEnd)
+      const maxEndDate = new Date(startDate)
+      maxEndDate.setDate(maxEndDate.getDate() + 2)
+      
+      if (endDate < startDate) {
+        return fail(400, 'INVALID_DATE_RANGE', 'End date must be on or after start date')
+      }
+      if (endDate > maxEndDate) {
+        return fail(400, 'INVALID_DATE_RANGE', 'Sales can last up to 3 days (maximum 2 days after start date)')
+      }
+    }
+
+    // Validate date_end is present (after backward compat default)
+    if (!finalDateEnd || finalDateEnd.trim() === '') {
+      return fail(400, 'MISSING_END_DATE', 'End date is required')
+    }
+
+    // Validate time_end is present
+    if (!finalTimeEnd || finalTimeEnd.trim() === '') {
+      return fail(400, 'MISSING_END_TIME', 'End time is required')
+    }
+
     // GATE: If promotion is requested, require payment before sale creation
     if (wantsPromotion === true) {
       const { getStripeClient, isPaymentsEnabled, isPromotionsEnabled } = await import('@/lib/stripe/client')
@@ -243,8 +279,8 @@ export async function POST(request: NextRequest) {
       lng: parseFloat(String(lng)),
       date_start: formData.date_start,
       time_start: normalizedTimeStart,
-      date_end: formData.date_end || null,
-      time_end: formData.time_end || null,
+      date_end: finalDateEnd,
+      time_end: finalTimeEnd,
       cover_image_url: photos && photos.length > 0 ? photos[0] : null,
       images: photos && photos.length > 1 ? photos.slice(1) : null,
       pricing_mode: formData.pricing_mode || 'negotiable',

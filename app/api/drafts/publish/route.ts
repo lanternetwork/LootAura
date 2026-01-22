@@ -112,9 +112,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Backward compatibility: default date_end to date_start if missing
-    let finalDateEnd = formData.date_end
-    let finalTimeEnd = formData.time_end
-    if (!finalDateEnd || finalDateEnd.trim() === '') {
+    let finalDateEnd: string = (formData.date_end && formData.date_end.trim()) || ''
+    let finalTimeEnd: string = (formData.time_end && formData.time_end.trim()) || ''
+    if (!finalDateEnd) {
       if (formData.date_start) {
         finalDateEnd = formData.date_start
         // Default time_end to time_start if not set

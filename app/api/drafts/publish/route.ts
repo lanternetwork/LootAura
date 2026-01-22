@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       if (formData.date_start) {
         finalDateEnd = formData.date_start
         // Default time_end to time_start if not set
-        finalTimeEnd = formData.time_start || finalTimeEnd
+        finalTimeEnd = (formData.time_start && formData.time_start.trim()) || finalTimeEnd
       }
     }
 

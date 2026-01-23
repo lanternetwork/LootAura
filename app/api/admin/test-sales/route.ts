@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
   const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
   const adminToolsValue = process.env.ENABLE_ADMIN_TOOLS?.trim().toLowerCase()
   const isExplicitlyDisabled = adminToolsValue === 'false' || adminToolsValue === '0' || adminToolsValue === 'no'
-  const isExplicitlyEnabled = adminToolsValue === 'true' || adminToolsValue === '1' || adminToolsValue === 'yes'
   if (!isDebugMode && isExplicitlyDisabled) {
     return NextResponse.json(
       { error: 'Admin tools are not enabled. Set ENABLE_ADMIN_TOOLS=true to use this endpoint.' },

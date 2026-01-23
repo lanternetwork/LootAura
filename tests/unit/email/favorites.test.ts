@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { sendFavoriteSalesStartingSoonDigestEmail } from '@/lib/email/favorites'
 import { sendEmail } from '@/lib/email/sendEmail'
-import { buildFavoriteSaleStartingSoonSubject } from '@/lib/email/templates/FavoriteSaleStartingSoonEmail'
 import { buildFavoriteSalesStartingSoonDigestSubject } from '@/lib/email/templates/FavoriteSalesStartingSoonDigestEmail'
 import type { Sale } from '@/lib/types'
 

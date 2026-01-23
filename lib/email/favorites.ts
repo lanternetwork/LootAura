@@ -5,7 +5,6 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
-import { FavoriteSaleStartingSoonEmail, buildFavoriteSaleStartingSoonSubject } from './templates/FavoriteSaleStartingSoonEmail'
 import { FavoriteSalesStartingSoonDigestEmail, buildFavoriteSalesStartingSoonDigestSubject, type SaleDigestItem } from './templates/FavoriteSalesStartingSoonDigestEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { recordEmailSend, canSendEmail, generateFavoritesDigestDedupeKey } from './emailLog'

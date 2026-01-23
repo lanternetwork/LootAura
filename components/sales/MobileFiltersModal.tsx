@@ -283,9 +283,9 @@ export default function MobileFiltersModal({
               disabled={isLoading}
               className={`w-full px-3 py-2 border rounded-md ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <option value={10}>10 miles</option>
               <option value={2}>2 miles</option>
               <option value={5}>5 miles</option>
+              <option value={10}>10 miles</option>
               <option value={25}>25 miles</option>
             </select>
           </div>

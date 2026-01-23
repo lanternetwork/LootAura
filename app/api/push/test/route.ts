@@ -10,7 +10,7 @@ function configureWebPushOrReturnError() {
     return 'Missing VAPID keys (VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY)'
   }
   try {
-    webpush.setVapidDetails('mailto:admin@yardsalefinder.com', publicKey, privateKey)
+    webpush.setVapidDetails('mailto:admin@lootaura.com', publicKey, privateKey)
     return null
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown VAPID configuration error'
@@ -19,6 +19,14 @@ function configureWebPushOrReturnError() {
 }
 
 export async function POST(_request: NextRequest) {
+  // Hard-disable in production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Not found' },
+      { status: 404 }
+    )
+  }
+
   try {
     const vapidError = configureWebPushOrReturnError()
     if (vapidError) {
@@ -56,8 +64,8 @@ export async function POST(_request: NextRequest) {
     }
 
     const payload = JSON.stringify({
-      title: 'YardSaleFinder Test',
-      body: 'This is a test notification from YardSaleFinder!',
+      title: 'LootAura Test',
+      body: 'This is a test notification from LootAura!',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
       url: '/explore',

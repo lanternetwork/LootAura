@@ -12,11 +12,11 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Disable in production by default (can be overridden with env var if needed)
-    if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DEBUG_ENDPOINTS !== 'true') {
+    // Hard-disable in production - no env var override
+    if (process.env.NODE_ENV === 'production') {
       return NextResponse.json(
-        { error: 'Debug endpoints are disabled in production' },
-        { status: 403 }
+        { error: 'Not found' },
+        { status: 404 }
       )
     }
     

@@ -36,25 +36,22 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Check if debug endpoints are enabled
-    const debugEnabled = process.env.ENABLE_DEBUG_ENDPOINTS === 'true'
-    const isProduction = process.env.NODE_ENV === 'production'
-
-    if (isProduction && !debugEnabled) {
+    // Hard-disable in production - no env var override
+    if (process.env.NODE_ENV === 'production') {
       return NextResponse.json(
-        { error: 'Debug endpoints are disabled in production' },
-        { status: 403 }
+        { error: 'Not found' },
+        { status: 404 }
       )
     }
 
-    // Check for CI secret header access path
+    // Check for CI secret header access path (non-production only)
     const ciSecret = process.env.FEATURED_EMAIL_DRYRUN_SECRET
     const providedSecret = request.headers.get('X-LootAura-DryRun-Secret')
 
     let isAuthorized = false
 
-    // Path 1: CI secret header (only when ENABLE_DEBUG_ENDPOINTS=true and secret is configured)
-    if (debugEnabled && ciSecret && providedSecret) {
+    // Path 1: CI secret header (non-production only, when secret is configured)
+    if (ciSecret && providedSecret) {
       // Use constant-time comparison to prevent timing attacks
       // Always compare full length to prevent length-based timing leaks
       const maxLength = Math.max(ciSecret.length, providedSecret.length)

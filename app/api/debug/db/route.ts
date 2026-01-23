@@ -6,9 +6,9 @@ import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  // Disable in production by default (can be overridden with env var if needed)
-  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DEBUG_ENDPOINTS !== 'true') {
-    return fail(403, 'FORBIDDEN', 'Debug endpoints are disabled in production')
+  // Hard-disable in production - no env var override
+  if (process.env.NODE_ENV === 'production') {
+    return fail(404, 'NOT_FOUND', 'Not found')
   }
   
   // Require admin access

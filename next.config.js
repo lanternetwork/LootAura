@@ -1,4 +1,5 @@
 const path = require('path')
+const { withSentryConfig } = require('@sentry/nextjs')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -87,20 +88,20 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
         value: "default-src 'self'; " +
-                   // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews; allow Microsoft Clarity; allow Google AdSense; allow Stripe Elements
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google https://js.stripe.com; " +
+                   // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews; allow Microsoft Clarity; allow Google AdSense; allow Stripe Elements; allow Sentry
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google https://js.stripe.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
-                   // Some browsers use script-src-elem separately; must include all script-src domains plus Stripe
-                   "script-src-elem 'self' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google https://js.stripe.com; " +
+                   // Some browsers use script-src-elem separately; must include all script-src domains plus Stripe and Sentry
+                   "script-src-elem 'self' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google https://js.stripe.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io; " +
                    // Some browsers use style-src-elem separately
                    "style-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Permit WebWorkers (Mapbox GL uses blob workers)
                    "worker-src 'self' blob:; child-src blob:; " +
                    // Images and fonts (allow blob: for temporary image previews before upload)
                    "img-src 'self' data: blob: https: https://res.cloudinary.com; font-src 'self' data:; " +
-                   // Network connections - allow Clarity API calls, AdSense, and Stripe API
-                   "connect-src 'self' https: https://api.cloudinary.com https://vercel.live https://www.clarity.ms https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://api.stripe.com https://m.stripe.network https://q.stripe.com; " +
+                   // Network connections - allow Clarity API calls, AdSense, Stripe API, and Sentry
+                   "connect-src 'self' https: https://api.cloudinary.com https://vercel.live https://www.clarity.ms https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://api.stripe.com https://m.stripe.network https://q.stripe.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io; " +
                    // Misc - allow AdSense frames (including safeframes, quality monitoring, and Google domains), Vercel Live, and Stripe Elements
                    "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://ep2.adtrafficquality.google https://www.google.com https://vercel.live https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
@@ -178,4 +179,30 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+// Wrap with Sentry configuration
+module.exports = withSentryConfig(
+  nextConfig,
+  {
+    // Sentry webpack plugin options
+    silent: true, // Suppress source map uploading logs
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    // Hide source maps from public access
+    hideSourceMaps: true,
+    // Disable Sentry logger
+    disableLogger: true,
+    // Do not widen client/server bundle
+    widenClientFileUpload: false,
+    // Transpile client SDK
+    transpileClientSDK: true,
+    // Tunnel requests to Sentry (optional, for ad blockers)
+    tunnelRoute: '/monitoring',
+    // Automatically tree-shake Sentry logger statements
+    automaticVercelMonitors: true,
+  },
+  {
+    // Sentry build-time options
+    // Disable source map upload in non-production
+    dryRun: process.env.NODE_ENV !== 'production',
+  }
+)

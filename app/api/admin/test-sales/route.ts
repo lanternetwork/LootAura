@@ -3,6 +3,14 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
 export async function POST(request: NextRequest) {
+  // Hard-disable in production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Not found' },
+      { status: 404 }
+    )
+  }
+
   // Require admin access
   try {
     await assertAdminOrThrow(request)
@@ -12,6 +20,19 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // Require ENABLE_ADMIN_TOOLS flag (allow in debug mode for development/preview)
+  // Note: Production is already handled by early return above
+  const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
+  const adminToolsValue = process.env.ENABLE_ADMIN_TOOLS?.trim().toLowerCase()
+  const isExplicitlyDisabled = adminToolsValue === 'false' || adminToolsValue === '0' || adminToolsValue === 'no'
+  if (!isDebugMode && isExplicitlyDisabled) {
+    return NextResponse.json(
+      { error: 'Admin tools are not enabled. Set ENABLE_ADMIN_TOOLS=true to use this endpoint.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const { zipCode, dateRange } = await request.json()
     

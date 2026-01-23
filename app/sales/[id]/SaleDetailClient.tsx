@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { isDebugEnabled } from '@/lib/debug'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
@@ -32,7 +33,7 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
   
   // Debug logging (only in debug mode)
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.debug('[ItemImage] Rendering image', { 
         src: src ? `${src.substring(0, 50)}...` : null, 
         srcType: typeof src,
@@ -62,14 +63,14 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
         className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
         onLoad={() => {
           setImageLoading(false)
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.debug('[ItemImage] Fallback image loaded successfully', { src: src?.substring(0, 50) + '...' })
           }
         }}
         onError={(e) => {
           setImageError(true)
           setImageLoading(false)
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.error('[ItemImage] Fallback image failed to load', { src: src?.substring(0, 50) + '...', error: e })
           }
         }}
@@ -100,7 +101,7 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
       onError={(e) => {
         // Try fallback to regular img tag before giving up
         if (!useFallback) {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.warn('[ItemImage] Next.js Image failed, trying fallback img tag', { src: src?.substring(0, 50) + '...' })
           }
           setUseFallback(true)
@@ -108,7 +109,7 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
         } else {
           setImageError(true)
           setImageLoading(false)
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.error('[ItemImage] Image failed to load after fallback', { src: src?.substring(0, 50) + '...', error: e })
           }
         }
@@ -137,7 +138,7 @@ export default function SaleDetailClient({
   paymentsEnabled = false,
 }: SaleDetailClientProps) {
   // Debug logging to diagnose items visibility issue (only in debug mode)
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+  if (isDebugEnabled) {
     console.log('[SALE_DETAIL_CLIENT] Items received', {
       itemsCount: items.length,
       items: items.map(i => ({ id: i.id, name: i.name, hasPhoto: !!i.photo })),

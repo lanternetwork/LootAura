@@ -35,9 +35,7 @@ These variables are exposed to the browser and safe for client-side code.
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | ⚠️ Optional | VAPID public key for push notifications | Vercel dashboard → Environment Variables | Generate with `npx web-push generate-vapid-keys` |
 | `NEXT_PUBLIC_DEBUG` | ⚠️ Optional | Debug mode flag | Vercel dashboard → Environment Variables | Set to `false` in production |
 | `NEXT_PUBLIC_FEATURE_CLUSTERING` | ⚠️ Optional | Enable map clustering | Vercel dashboard → Environment Variables | Default: `true` |
-| `NEXT_PUBLIC_FLAG_OFFLINE_CACHE` | ⚠️ Optional | Enable offline caching | Vercel dashboard → Environment Variables | Default: `false` |
 | `NEXT_PUBLIC_FLAG_SAVED_PRESETS` | ⚠️ Optional | Enable saved presets | Vercel dashboard → Environment Variables | Default: `true` |
-| `NEXT_PUBLIC_FLAG_SHARE_LINKS` | ⚠️ Optional | Enable share links | Vercel dashboard → Environment Variables | Default: `true` |
 | `NEXT_PUBLIC_GOOGLE_ENABLED` | ⚠️ Optional | Enable Google OAuth | Vercel dashboard → Environment Variables | Default: `true` |
 | `NEXT_PUBLIC_CLARITY_ID` | ⚠️ Optional | Microsoft Clarity project ID | Vercel dashboard → Environment Variables | Get from Clarity dashboard → Settings → Project ID |
 

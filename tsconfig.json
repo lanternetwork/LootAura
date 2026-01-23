@@ -17,5 +17,5 @@
     "paths": { "@/*": ["./*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.d.ts"],
-  "exclude": ["node_modules", "supabase/functions/**", "deprecated/**", "mobile/**"]
+  "exclude": ["node_modules", "supabase/functions/**", "deprecated/**", "archive/deprecated/**", "mobile/**"]
 }

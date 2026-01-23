@@ -31,6 +31,14 @@ const TestEmailBodySchema = z.object({
  * Only accessible to admins (debug-mode bypass is controlled in adminGate)
  */
 export async function POST(request: NextRequest) {
+  // Hard-disable in production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Not found' },
+      { status: 404 }
+    )
+  }
+
   try {
     // Require admin access in all environments
     try {
@@ -38,6 +46,18 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: 'Forbidden: Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    // Require ENABLE_ADMIN_TOOLS flag (allow in debug mode for development/preview)
+    // Note: Production is already handled by early return above
+    const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
+    const adminToolsValue = process.env.ENABLE_ADMIN_TOOLS?.trim().toLowerCase()
+    const isExplicitlyDisabled = adminToolsValue === 'false' || adminToolsValue === '0' || adminToolsValue === 'no'
+    if (!isDebugMode && isExplicitlyDisabled) {
+      return NextResponse.json(
+        { error: 'Admin tools are not enabled. Set ENABLE_ADMIN_TOOLS=true to use this endpoint.' },
         { status: 403 }
       )
     }

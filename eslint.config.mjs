@@ -228,6 +228,7 @@ export default [
       '**/.eslintrc.*',
       'public/sw.js',
       'deprecated/**', // Ignore deprecated folder
+      'archive/deprecated/**', // Ignore archived deprecated folder
     ],
   },
 ]

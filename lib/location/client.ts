@@ -3,6 +3,8 @@
  * Handles geolocation API with proper error handling and user feedback
  */
 
+import { isDebugEnabled } from '@/lib/debug'
+
 export interface LocationResult {
   lat: number
   lng: number
@@ -27,7 +29,9 @@ export async function getCurrentLocation(): Promise<LocationResult> {
   try {
     return await getIPLocation()
   } catch (error) {
-    console.warn('IP geolocation failed, using fallback location:', error)
+    if (isDebugEnabled) {
+      console.warn('IP geolocation failed, using fallback location:', error)
+    }
     return getFallbackLocation()
   }
 }
@@ -96,7 +100,9 @@ async function getIPLocation(): Promise<LocationResult> {
       country: data.country
     }
   } catch (error) {
-    console.error('IP geolocation error:', error)
+    if (isDebugEnabled) {
+      console.error('IP geolocation error:', error)
+    }
     throw error
   }
 }
@@ -106,7 +112,9 @@ async function getIPLocation(): Promise<LocationResult> {
  * This is a last resort that indicates a system failure
  */
 function getFallbackLocation(): LocationResult {
-  console.error('CRITICAL: All location detection methods failed - this should not happen in production')
+  if (isDebugEnabled) {
+    console.error('CRITICAL: All location detection methods failed - this should not happen in production')
+  }
   return {
     lat: 39.8283,
     lng: -98.5795,
@@ -196,10 +204,3 @@ export function kmToMiles(km: number): number {
   return km * 0.621371
 }
 
-/**
- * Convert miles to kilometers
- * @deprecated Use utils/geo.ts instead
- */
-export function milesToKm(miles: number): number {
-  return miles * 1.60934
-}

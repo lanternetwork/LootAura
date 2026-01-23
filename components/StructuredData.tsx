@@ -38,7 +38,7 @@ export default function StructuredData({ sale, type = 'Event' }: StructuredDataP
       } : undefined,
       organizer: {
         '@type': 'Organization',
-        name: 'YardSaleFinder',
+        name: 'LootAura',
         url: process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
       },
       eventStatus: sale.status === 'published' ? 'https://schema.org/EventScheduled' : 'https://schema.org/EventCancelled',
@@ -70,7 +70,7 @@ export default function StructuredData({ sale, type = 'Event' }: StructuredDataP
         availability: 'https://schema.org/InStock',
         seller: {
           '@type': 'Organization',
-          name: 'YardSaleFinder'
+          name: 'LootAura'
         }
       } : undefined,
       category: 'Yard Sale Items',

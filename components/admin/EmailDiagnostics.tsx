@@ -295,13 +295,13 @@ export default function EmailDiagnostics() {
           <h4 className="text-md font-semibold mb-3">Quick Actions</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <a
-              href="/api/cron/favorites-starting-soon"
+              href="/api/cron/daily"
               target="_blank"
               rel="noopener noreferrer"
               className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
             >
-              <h5 className="font-medium text-gray-900">Favorite Sales Cron</h5>
-              <p className="text-xs text-gray-600">Test cron endpoint</p>
+              <h5 className="font-medium text-gray-900">Daily Cron</h5>
+              <p className="text-xs text-gray-600">Includes favorite sales emails</p>
             </a>
             <a
               href="/api/cron/seller-weekly-analytics"

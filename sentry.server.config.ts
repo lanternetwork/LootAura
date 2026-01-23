@@ -1,11 +1,29 @@
 import * as Sentry from '@sentry/nextjs'
 
+// Only enable Sentry in production
+const isProduction = process.env.NODE_ENV === 'production'
+const dsn = process.env.SENTRY_DSN
+
 Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  dsn: isProduction ? dsn : undefined,
+  enabled: isProduction && !!dsn,
 
-  // Adjust this value in production, or use tracesSampler for greater control
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  // Performance monitoring
+  tracesSampleRate: 0.1,
 
-  // Setting this option to true will print useful information to the console while you're setting up Sentry.
-  debug: process.env.NODE_ENV === 'development',
+  // Environment
+  environment: process.env.NODE_ENV || 'development',
+
+  // Disable console logging from Sentry
+  debug: false,
+
+  // Ignore common non-actionable errors
+  ignoreErrors: [
+    // Database connection errors (handled by app)
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    // Network errors
+    'NetworkError',
+    'Network request failed',
+  ],
 })

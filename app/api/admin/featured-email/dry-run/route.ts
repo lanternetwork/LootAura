@@ -36,24 +36,14 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Hard-disable in production - no env var override
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json(
-        { error: 'Not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check for CI secret header access path (non-production only)
+    // Check for CI secret header access path first (allowed even in production)
     const ciSecret = process.env.FEATURED_EMAIL_DRYRUN_SECRET
     const providedSecret = request.headers.get('X-LootAura-DryRun-Secret')
-
-    let isAuthorized = false
-
-    // Path 1: CI secret header (non-production only, when secret is configured)
+    
+    // If CI secret is provided and matches, allow access even in production
+    let isCiAuthorized = false
     if (ciSecret && providedSecret) {
       // Use constant-time comparison to prevent timing attacks
-      // Always compare full length to prevent length-based timing leaks
       const maxLength = Math.max(ciSecret.length, providedSecret.length)
       let match = true
       for (let i = 0; i < maxLength; i++) {
@@ -64,9 +54,19 @@ export async function GET(request: NextRequest) {
         }
       }
       if (match && ciSecret.length === providedSecret.length) {
-        isAuthorized = true
+        isCiAuthorized = true
       }
     }
+
+    // Hard-disable in production - no env var override (unless CI secret is provided)
+    if (process.env.NODE_ENV === 'production' && !isCiAuthorized) {
+      return NextResponse.json(
+        { error: 'Not found' },
+        { status: 404 }
+      )
+    }
+
+    let isAuthorized = isCiAuthorized
 
     // Path 2: Admin authentication (for Owner manual testing)
     if (!isAuthorized) {

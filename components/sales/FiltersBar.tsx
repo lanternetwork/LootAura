@@ -400,9 +400,9 @@ export default function FiltersBar({
               disabled={isLoading}
               className={`px-2 py-1 border rounded text-xs lg:text-sm min-w-[70px] lg:min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <option value={10}>10 mi</option>
               <option value={2}>2 mi</option>
               <option value={5}>5 mi</option>
+              <option value={10}>10 mi</option>
               <option value={25}>25 mi</option>
             </select>
           </div>

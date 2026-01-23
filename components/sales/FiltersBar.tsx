@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ZipInput from '@/components/location/ZipInput'
 import { buildDatePresets, type DatePreset } from '@/lib/shared/datePresets'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { isDebugEnabled } from '@/lib/debug'
 
 type FiltersBarProps = {
   // ZIP Search
@@ -135,7 +136,7 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
     }
 
     // Debug logging - only log when result actually changes and in debug mode
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && !isSameResult) {
+    if (isDebugEnabled && !isSameResult) {
       console.log(`[OVERFLOW] centerWidth=${centerWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
     }
   }, [allChips, centerEl, measureEl, hysteresis])

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition, useMemo, useReducer } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { isDebugEnabled } from '@/lib/debug'
 import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
@@ -247,7 +248,7 @@ export default function SellWizardClient({
   const promotionsEnabled = promotionsEnabledProp ?? false
 
   // Defensive assertion: log warning if prop is undefined (indicates prop passing issue)
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true' && promotionsEnabledProp === undefined) {
+  if (isDebugEnabled && promotionsEnabledProp === undefined) {
     console.warn('[SELL_WIZARD] promotionsEnabled prop is undefined - server prop may not have been passed correctly')
   }
 
@@ -578,7 +579,7 @@ export default function SellWizardClient({
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[SELL_WIZARD] Auth check:', { hasUser: !!user, userId: user?.id })
       }
       setUser(user)
@@ -587,7 +588,7 @@ export default function SellWizardClient({
 
     // Listen for auth state changes (e.g., after login)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[SELL_WIZARD] Auth state change:', { event, hasUser: !!session?.user, userId: session?.user?.id })
       }
       if (event === 'SIGNED_IN' && session?.user) {
@@ -741,7 +742,9 @@ export default function SellWizardClient({
               } else {
                 setSaveStatus('error')
                 // Don't show error toast for autosave failures - just log
-                console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
+                if (isDebugEnabled) {
+                  console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
+                }
               }
             })
             .catch((error) => {
@@ -809,8 +812,8 @@ export default function SellWizardClient({
     
     const tagsFromInitialData = initialData.tags
     const normalized = normalizeTags(tagsFromInitialData)
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SELL_WIZARD] Tags useEffect:', {
+      if (isDebugEnabled) {
+        console.log('[SELL_WIZARD] Tags useEffect:', {
         initialDataTags: tagsFromInitialData,
         normalized,
         currentFormDataTags: formData.tags,
@@ -823,7 +826,7 @@ export default function SellWizardClient({
     const currentSorted = [...currentTags].sort()
     const normalizedSorted = [...normalized].sort()
     if (JSON.stringify(currentSorted) !== JSON.stringify(normalizedSorted)) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[SELL_WIZARD] Updating formData.tags:', normalized)
       }
       dispatch({ type: 'SET_FORM_DATA', formData: { ...formData, tags: normalized } })
@@ -863,7 +866,7 @@ export default function SellWizardClient({
             draftToRestore = serverResult.data.payload
             restoredDraftKey = serverResult.data.draft_key
             source = 'server'
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            if (isDebugEnabled) {
               console.log('[SELL_WIZARD] Found specific server draft by key:', specificDraftKey)
             }
             // Clear the sessionStorage key after using it
@@ -877,7 +880,7 @@ export default function SellWizardClient({
           if (serverResult.ok && serverResult.data?.payload) {
             draftToRestore = serverResult.data.payload
             source = 'server'
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            if (isDebugEnabled) {
               console.log('[SELL_WIZARD] Found latest server draft')
             }
           }
@@ -890,7 +893,7 @@ export default function SellWizardClient({
         if (localDraft) {
           draftToRestore = localDraft
           source = 'local'
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.log('[SELL_WIZARD] Found local draft')
           }
         }

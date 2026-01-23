@@ -8,6 +8,7 @@ import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import AddressLink from '@/components/common/AddressLink'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
+import { isDebugEnabled } from '@/lib/debug'
 
 interface SaleCardProps {
   sale: Sale
@@ -20,7 +21,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   const cover = getSaleCoverUrl(sale)
   
   // Debug: log cover image resolution
-  if (!cover && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+  if (!cover && isDebugEnabled) {
     console.log('[SALE_CARD] No cover image found for sale:', {
       id: sale.id,
       title: sale.title,

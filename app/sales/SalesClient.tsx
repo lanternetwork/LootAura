@@ -32,6 +32,7 @@ import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { haversineMeters } from '@/lib/geo/distance'
 import { checkGeolocationPermission } from '@/lib/location/client'
+import { isDebugEnabled } from '@/lib/debug'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -298,7 +299,7 @@ export default function SalesClient({
       return true
     })
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && unique.length !== sales.length) {
+    if (isDebugEnabled && unique.length !== sales.length) {
       console.log('[DEDUPE] input=', sales.length, 'output=unique=', unique.length, 'keys=[', unique.slice(0, 3).map(s => s.id), '...]')
     }
     
@@ -327,7 +328,7 @@ export default function SalesClient({
     apiCallCounterRef.current += 1
     const callId = apiCallCounterRef.current
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       if (nearOptions) {
         console.log('[FETCH] fetchMapSales called with near=1 mode:', { lat: nearOptions.lat, lng: nearOptions.lng })
       } else {
@@ -367,7 +368,7 @@ export default function SalesClient({
           params.set('radiusKm', distanceKm.toString())
         }
         
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[FETCH] Using near=1 path for ZIP search:', { lat: nearOptions.lat, lng: nearOptions.lng, radiusKm: activeFilters.distance ? activeFilters.distance * 1.60934 : 'none' })
         }
       } else {
@@ -380,7 +381,7 @@ export default function SalesClient({
         params.set('east', bufferedBbox.east.toString())
         params.set('west', bufferedBbox.west.toString())
         
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[FETCH] Buffered bbox area (degrees):', {
             latRange: bufferedBbox.north - bufferedBbox.south,
             lngRange: bufferedBbox.east - bufferedBbox.west,
@@ -405,7 +406,7 @@ export default function SalesClient({
       // Request more sales to show all pins in buffered area
       params.set('limit', '200')
       
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
         if (!nearOptions) {
           console.log('[FETCH] Buffered fetch with bbox:', bufferedBbox)
@@ -429,7 +430,7 @@ export default function SalesClient({
       }
       
       if (data.ok && Array.isArray(data.data)) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[FETCH] API Response:', {
             ok: data.ok,
             dataCount: data.data.length,
@@ -444,7 +445,7 @@ export default function SalesClient({
         const deduplicated = deduplicateSales(data.data)
         // Filter out deleted sales
         const filtered = filterDeletedSales(deduplicated)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[FETCH] Sales received:', { 
             raw: data.data.length, 
             deduplicated: deduplicated.length,
@@ -483,7 +484,7 @@ export default function SalesClient({
           )
         })
       } else {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[FETCH] No data in response:', data)
         }
         // Only clear if this was the initial load, otherwise keep old data
@@ -495,7 +496,7 @@ export default function SalesClient({
     } catch (error) {
       // Don't log errors for aborted requests
       if (error instanceof Error && error.name === 'AbortError') {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[FETCH] Request aborted (newer request started)')
         }
         return
@@ -550,14 +551,14 @@ export default function SalesClient({
             
             if (isWithinViewport) {
               shouldRefetch = true
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              if (isDebugEnabled) {
                 console.log('[SALES] New sale created within viewport, refetching:', { saleId: createEvent.id, lat: createEvent.lat, lng: createEvent.lng })
               }
             }
           } else {
             // Location not provided - refetch to be safe
             shouldRefetch = true
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            if (isDebugEnabled) {
               console.log('[SALES] New sale created (location unknown), refetching to be safe:', { saleId: createEvent.id })
             }
           }
@@ -584,7 +585,7 @@ export default function SalesClient({
     const historyState = typeof window !== 'undefined' ? window.history.state : null
     if (historyState && typeof historyState === 'object' && 'filterUpdate' in historyState && historyState.filterUpdate === true) {
       // This is a filter-only update - skip viewport sync
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[VIEWPORT_SYNC] Skipping viewport sync - filter-only update detected in history.state')
       }
       // Clear the flag after checking (one-time use)
@@ -641,7 +642,7 @@ export default function SalesClient({
           return prev
         }
         
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[MAP_VIEW] Updating mapView from URL params:', { newLat, newLng, newZoom })
         }
         
@@ -676,7 +677,7 @@ export default function SalesClient({
         north: mapView.bounds.north
       }, MAP_BUFFER_FACTOR)
       setBufferedBounds(initialBufferedBounds)
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[BUFFER] Initialized bufferedBounds from initial sales:', initialBufferedBounds)
       }
     }
@@ -703,7 +704,7 @@ export default function SalesClient({
       })
       
       if (shouldRefetch) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[SALES] Processing pending create events, refetching:', { count: pendingEvents.length })
         }
         fetchMapSales(bufferedBounds)
@@ -760,7 +761,7 @@ export default function SalesClient({
     
     // Allow clustering regardless of small dataset size to prevent initial pin gaps
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
     }
     
@@ -775,7 +776,7 @@ export default function SalesClient({
       enableVisualClustering: true
     })
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[HYBRID] Clustering completed:', {
         type: result.type,
         pinsCount: result.pins.length,
@@ -899,7 +900,7 @@ export default function SalesClient({
       north: bounds.north
     }
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[SALES] handleViewportChange called with:', {
         center,
         zoom,
@@ -1044,7 +1045,7 @@ export default function SalesClient({
         // Compute new buffered bounds around current viewport
         const newBufferedBounds = expandBounds(viewportBounds, MAP_BUFFER_FACTOR)
         
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[SALES] Viewport outside buffer - fetching new buffered area:', {
             viewportBounds,
             oldBufferedBounds: bufferedBounds,
@@ -1057,7 +1058,7 @@ export default function SalesClient({
       } else {
         // Viewport is inside buffer - no fetch needed
         // visibleSales will be automatically computed from fetchedSales via useMemo
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[SALES] Viewport inside buffer - using cached data, no fetch')
         }
       }
@@ -1075,12 +1076,12 @@ export default function SalesClient({
               radius: filters.distance || 10
             }
           )
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.log('[PERSISTENCE] Saved viewport state:', { lat: center.lat, lng: center.lng, zoom })
           }
         } catch (error) {
           // Silently fail - persistence errors are handled in saveViewportState
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.warn('[PERSISTENCE] Failed to save viewport:', error)
           }
         }
@@ -1102,13 +1103,13 @@ export default function SalesClient({
     source: 'user'
   ) => {
     if (!map) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.warn('[FORCE_RECENTER] Map instance not available')
       }
       return
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log(`[FORCE_RECENTER] Imperative recenter to:`, { lat, lng, source })
     }
 
@@ -1172,7 +1173,7 @@ export default function SalesClient({
     if (source === 'auto') {
       // Only recenter if authority is still system (user hasn't taken control)
       if (isUserAuthority() || userInteractedRef.current) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[GEO] Location found but authority is user or user has interacted, not recentering (auto)')
         }
         return false
@@ -1180,7 +1181,7 @@ export default function SalesClient({
     }
     // For user-initiated GPS, always recenter (no authority check)
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log(`[GEO] Recentering map to user location (source: ${source}):`, location)
     }
 
@@ -1253,7 +1254,7 @@ export default function SalesClient({
 
     // Don't attempt if geolocation is denied
     if (isGeolocationDenied()) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[GEO] Skipping geolocation - previously denied')
       }
       return
@@ -1261,7 +1262,7 @@ export default function SalesClient({
 
     // Don't attempt if geolocation API not available
     if (!isGeolocationAvailable()) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[GEO] Skipping geolocation - API not available')
       }
       return
@@ -1270,7 +1271,7 @@ export default function SalesClient({
     // Mark as attempted to prevent duplicate requests
     geolocationAttemptedRef.current = true
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[GEO] Attempting mobile geolocation (auto)')
     }
 
@@ -1306,7 +1307,7 @@ export default function SalesClient({
         }
       })
       .catch((error) => {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[GEO] Geolocation error:', error)
         }
         // Error handling (denial tracking) is done in requestGeolocation
@@ -1321,7 +1322,7 @@ export default function SalesClient({
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
     // Don't show transition overlay - just update map directly
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[ZIP] Updating map center to:', { lat, lng, zip, city, state })
       console.log('[ZIP] Received coordinates:', { lat, lng })
     }
@@ -1345,7 +1346,7 @@ export default function SalesClient({
     
     // Fetch sales data using near=1 API path (respects radiusKm exactly, no double expansion)
     // This ensures pins appear within the exact selected distance
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[ZIP] Fetching sales for ZIP location using near=1:', { lat, lng, distanceMiles, radiusKm })
     }
     fetchMapSales(null, filters, { useNear: true, lat, lng }).catch(err => {
@@ -1375,7 +1376,7 @@ export default function SalesClient({
           bounds: calculatedBounds,
           zoom: estimatedZoom // Initial zoom, fitBounds will adjust via onViewportChange
         }
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[ZIP] New map view:', newView, 'calculatedBounds:', calculatedBounds)
         }
         
@@ -1385,7 +1386,7 @@ export default function SalesClient({
         // Clear after fitBounds animation completes (300ms duration + buffer)
         // onViewportChange will update the zoom before this clears, preventing zoom flash
         setTimeout(() => {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
           }
           setPendingBounds(null)
@@ -1401,7 +1402,7 @@ export default function SalesClient({
         bounds: calculatedBounds,
         zoom: estimatedZoom // Initial zoom, fitBounds will adjust via onViewportChange
       }
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[ZIP] Updated map view:', newView, 'calculatedBounds:', calculatedBounds)
       }
       
@@ -1411,7 +1412,7 @@ export default function SalesClient({
       // Clear after fitBounds animation completes (300ms duration + buffer)
       // onViewportChange will update the zoom before this clears, preventing zoom flash
       setTimeout(() => {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
         }
         setPendingBounds(null)
@@ -1466,7 +1467,7 @@ export default function SalesClient({
     if (newFilters.distance && newFilters.distance !== filters.distance) {
       // Distance filter change that recenters the map is user intent
       flipToUserAuthority()
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[DISTANCE] Distance filter changed:', { 
           oldDistance: filters.distance, 
           newDistance: newFilters.distance,
@@ -1493,7 +1494,7 @@ export default function SalesClient({
         
         const newZoom = distanceToZoom(newFilters.distance)
         
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[DISTANCE] Calculating new bounds:', {
             center: mapView.center,
             distanceKm,
@@ -1537,7 +1538,7 @@ export default function SalesClient({
         // This prevents the zoom in/out flicker
         setPendingBounds(newBounds)
         setTimeout(() => {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.log('[DISTANCE] Clearing pendingBounds after fitBounds applied')
           }
           setPendingBounds(null)
@@ -1608,7 +1609,7 @@ export default function SalesClient({
       }
       const newBufferedBounds = expandBounds(viewportBounds, MAP_BUFFER_FACTOR)
       
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[FILTERS] Filter change - fetching new buffered area with filters:', {
           newFilters,
           viewportBounds,
@@ -1645,7 +1646,7 @@ export default function SalesClient({
       if (!urlDistance) {
         // No distance in URL, so sync with zoom level
         updateFilters({ distance: correspondingDistance }, true) // skipUrlUpdate to prevent URL change
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[DISTANCE] Synced distance filter with initial zoom:', { zoom: initialZoom, distance: correspondingDistance })
         }
       }
@@ -1673,7 +1674,7 @@ export default function SalesClient({
     
     if (needsClientSideLookup) {
       // Trigger ZIP or city name lookup from URL
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[ZIP] Restoring from URL:', zipFromUrl)
       }
       
@@ -1688,7 +1689,7 @@ export default function SalesClient({
             const data = await response.json()
             
             if (data.ok && data.lat && data.lng) {
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              if (isDebugEnabled) {
                 console.log('[ZIP] Lookup success from URL:', { zip: trimmedQuery, lat: data.lat, lng: data.lng })
               }
               
@@ -1698,12 +1699,12 @@ export default function SalesClient({
               setHasRestoredZip(true)
               return
             } else {
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              if (isDebugEnabled) {
                 console.warn('[ZIP] ZIP lookup failed from URL, trying city name geocoding:', trimmedQuery, data.error)
               }
             }
           } catch (error) {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            if (isDebugEnabled) {
               console.error('[ZIP] ZIP lookup error from URL, trying city name geocoding:', trimmedQuery, error)
             }
           }
@@ -1711,7 +1712,7 @@ export default function SalesClient({
         
         // If ZIP lookup failed or query is not a ZIP format, try city name geocoding
         try {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.log('[ZIP] Attempting city name geocoding for:', trimmedQuery)
           }
           const suggestResponse = await fetch(`/api/geocoding/suggest?q=${encodeURIComponent(trimmedQuery)}&limit=1`)
@@ -1720,7 +1721,7 @@ export default function SalesClient({
           if (suggestData?.ok && suggestData.data && suggestData.data.length > 0) {
             const firstResult = suggestData.data[0]
             if (firstResult.lat && firstResult.lng) {
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              if (isDebugEnabled) {
                 console.log('[ZIP] City name geocoding success from URL:', { 
                   query: trimmedQuery, 
                   lat: firstResult.lat, 
@@ -1743,7 +1744,7 @@ export default function SalesClient({
           }
           
           // Both lookups failed
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugEnabled) {
             console.warn('[ZIP] City name geocoding failed from URL:', trimmedQuery)
           }
           handleZipError('Location not found')
@@ -1774,7 +1775,7 @@ export default function SalesClient({
   
   // Log visible sales count for debugging
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[SALES] Visible sales count:', { 
         fetchedSales: fetchedSales.length, 
         visibleSales: visibleSales.length,
@@ -1890,7 +1891,7 @@ export default function SalesClient({
     const calculatePosition = () => {
       const map = desktopMapRef.current?.getMap?.()
       if (!map || typeof map.project !== 'function') {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[DESKTOP_CALLOUT] Map not ready:', { hasRef: !!desktopMapRef.current, hasGetMap: !!desktopMapRef.current?.getMap, hasProject: typeof map?.project === 'function' })
         }
         return false
@@ -1898,13 +1899,13 @@ export default function SalesClient({
       
       try {
         const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.log('[DESKTOP_CALLOUT] Calculated pin position:', { x: point.x, y: point.y, coords: selectedPinCoords })
         }
         setDesktopPinPosition({ x: point.x, y: point.y })
         return true
       } catch (error) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.error('[DESKTOP_CALLOUT] Error calculating position:', error)
         }
         return false
@@ -1981,14 +1982,14 @@ export default function SalesClient({
   // Handle "Use my location" button click (desktop)
   // User-initiated: Recenter immediately with best available location, then fire GPS in background
   const handleUseMyLocation = useCallback((lat: number, lng: number, source: 'gps' | 'ip') => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (isDebugEnabled) {
       console.log('[USE_MY_LOCATION] Desktop: User-initiated recenter to:', { lat, lng, source })
     }
 
     // Get map instance from desktop ref
     const map = desktopMapRef.current?.getMap?.()
     if (!map) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.warn('[USE_MY_LOCATION] Desktop: Map not ready')
       }
       return
@@ -2014,13 +2015,13 @@ export default function SalesClient({
   // This callback receives the map instance from MobileSalesShell
   const handleUserLocationRequest = useCallback((location: { lat: number; lng: number }, mapInstance?: any, source: 'gps' | 'ip' = 'gps') => {
     try {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.log('[USE_MY_LOCATION] Mobile: User-initiated recenter to:', location, 'hasMap:', !!mapInstance, 'source:', source)
       }
 
       if (!mapInstance) {
         // Fallback: use reactive path (should not happen, but handle gracefully)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugEnabled) {
           console.warn('[USE_MY_LOCATION] Mobile: No map instance provided, using fallback')
         }
         setLastUserLocation({ lat: location.lat, lng: location.lng, source, timestamp: Date.now() })
@@ -2050,7 +2051,7 @@ export default function SalesClient({
       // We trigger a minimal state update to force shouldShowLocationIcon recomputation
       // This happens after the imperative move, so it won't cause double recenter
     } catch (error) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugEnabled) {
         console.error('[USE_MY_LOCATION] Mobile: Error in handleUserLocationRequest:', error)
       }
       throw error // Re-throw to be caught by mobile component
@@ -2071,13 +2072,13 @@ export default function SalesClient({
           onCenteringStart={handleCenteringStart}
           onCenteringEnd={handleCenteringEnd}
           onLocationClick={(locationId) => {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            if (isDebugEnabled) {
               console.log('[SALES] Location clicked:', locationId)
             }
             setSelectedPinId(selectedPinId === locationId ? null : locationId)
           }}
           onClusterClick={({ lat, lng, expandToZoom }) => {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            if (isDebugEnabled) {
               console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
             }
           }}
@@ -2140,7 +2141,7 @@ export default function SalesClient({
                   <UseMyLocationButton
                     onLocationFound={handleUseMyLocation}
                     onError={(error) => {
-                      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      if (isDebugEnabled) {
                         console.log('[USE_MY_LOCATION] Error:', error)
                       }
                     }}
@@ -2164,7 +2165,7 @@ export default function SalesClient({
                       sales: visibleSales,
                       selectedId: selectedPinId,
                       onLocationClick: (locationId) => {
-                        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                        if (isDebugEnabled) {
                           console.log('[SALES] Location clicked:', locationId)
                         }
                         // Track Clarity event for pin click
@@ -2172,7 +2173,7 @@ export default function SalesClient({
                         setSelectedPinId(selectedPinId === locationId ? null : locationId)
                       },
                       onClusterClick: ({ lat, lng, expandToZoom }) => {
-                        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                        if (isDebugEnabled) {
                           console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
                         }
                       },
@@ -2200,7 +2201,7 @@ export default function SalesClient({
                 <MobileSaleCallout
                   sale={selectedSale}
                   onDismiss={() => {
-                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                    if (isDebugEnabled) {
                       console.log('[DESKTOP_CALLOUT] Dismissing callout')
                     }
                     setSelectedPinId(null)

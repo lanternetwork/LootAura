@@ -10,7 +10,7 @@ import type { Sale } from '@/lib/types'
 
 // Mock the sendEmail function and email log helpers
 vi.mock('@/lib/email/sendEmail', () => ({
-  sendEmail: vi.fn(),
+  sendEmail: vi.fn().mockResolvedValue({ ok: true }),
 }))
 
 vi.mock('@/lib/email/emailLog', () => ({

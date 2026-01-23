@@ -3,13 +3,6 @@
  */
 
 /**
- * Check if offline cache is enabled
- */
-export function isOfflineCacheEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_FLAG_OFFLINE_CACHE === 'true'
-}
-
-/**
  * Check if clustering is enabled
  */
 export function isClusteringEnabled(): boolean {
@@ -28,13 +21,6 @@ export function isDebugEnabled(): boolean {
  */
 export function isSavedPresetsEnabled(): boolean {
   return process.env.NEXT_PUBLIC_FLAG_SAVED_PRESETS !== 'false'
-}
-
-/**
- * Check if share links are enabled
- */
-export function isShareLinksEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_FLAG_SHARE_LINKS !== 'false'
 }
 
 /**

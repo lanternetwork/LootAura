@@ -66,7 +66,7 @@ export async function GET(
       // Include owner profile info (public fields only)
       owner_profile: sale.owner_profile ? {
         id: sale.owner_profile.id,
-        display_name: sale.owner_profile.display_name,
+        display_name: sale.owner_profile.full_name, // full_name is mapped from display_name in getSaleWithItems
         username: sale.owner_profile.username,
         avatar_url: sale.owner_profile.avatar_url,
         created_at: sale.owner_profile.created_at,

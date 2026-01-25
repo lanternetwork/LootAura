@@ -17,7 +17,8 @@
       "developmentClient": false,
       "distribution": "store",
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "autoIncrement": true
       },
       "ios": {
         "simulator": false

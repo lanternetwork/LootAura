@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { useRouter } from 'expo-router';
 
 const LOOTAURA_URL = 'https://lootaura.com';
 
@@ -10,6 +11,8 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const router = useRouter();
 
   // Handle Android back button
   useEffect(() => {
@@ -24,18 +27,60 @@ export default function HomeScreen() {
     return () => backHandler.remove();
   }, [canGoBack]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleLoadStart = () => {
     setLoading(true);
     setError(null);
+    
+    // Clear any existing timeout
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+    }
+    
+    // Set a timeout to hide loading after 30 seconds if page doesn't load
+    // This prevents the loading state from getting stuck
+    loadTimeoutRef.current = setTimeout(() => {
+      setLoading(false);
+    }, 30000);
   };
 
   const handleLoadEnd = () => {
+    // Clear timeout since page loaded successfully
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setLoading(false);
+  };
+
+  const handleLoad = () => {
+    // Additional handler for when page fully loads
+    // This is a fallback in case onLoadEnd doesn't fire
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
     setLoading(false);
   };
 
   const handleError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     console.warn('WebView error: ', nativeEvent);
+    
+    // Clear timeout on error
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    
     setError('Failed to load LootAura. Please check your internet connection.');
     setLoading(false);
   };
@@ -43,6 +88,12 @@ export default function HomeScreen() {
   const handleHttpError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     if (nativeEvent.statusCode >= 400) {
+      // Clear timeout on HTTP error
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+      
       setError(`Unable to connect to LootAura (${nativeEvent.statusCode}). Please try again later.`);
       setLoading(false);
     }
@@ -56,9 +107,19 @@ export default function HomeScreen() {
     const { url } = request;
     
     try {
-      // Parse URL to safely check hostname
+      // Parse URL to safely check hostname and path
       const parsedUrl = new URL(url);
       const hostname = parsedUrl.hostname.toLowerCase();
+      const pathname = parsedUrl.pathname;
+      
+      // Intercept sale detail page navigation and route to native screen
+      const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
+      if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
+        const saleId = saleDetailMatch[1];
+        // Navigate to native sale detail screen
+        router.push(`/sales/${saleId}`);
+        return false; // Prevent WebView from loading the URL
+      }
       
       // Allow navigation within lootaura.com domain (exact match or subdomain)
       // This prevents bypasses like lootaura.com.evil.com
@@ -119,6 +180,7 @@ export default function HomeScreen() {
             style={styles.webview}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}
+            onLoad={handleLoad}
             onError={handleError}
             onHttpError={handleHttpError}
             onNavigationStateChange={handleNavigationStateChange}

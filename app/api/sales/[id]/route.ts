@@ -79,7 +79,12 @@ export async function GET(
       items: items || [],
     })
   } catch (error) {
-    console.error('[SALES/ID] Error fetching sale:', error)
+    const { logger } = await import('@/lib/log')
+    logger.error('Error fetching sale', error instanceof Error ? error : new Error(String(error)), {
+      component: 'api/sales/[id]',
+      operation: 'GET',
+      saleId: params.id,
+    })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

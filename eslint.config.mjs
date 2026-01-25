@@ -229,6 +229,7 @@ export default [
       'public/sw.js',
       'deprecated/**', // Ignore deprecated folder
       'archive/deprecated/**', // Ignore archived deprecated folder
+      'mobile/**', // Ignore mobile app (separate Expo project with own config)
     ],
   },
 ]

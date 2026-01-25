@@ -10,6 +10,7 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle Android back button
   useEffect(() => {
@@ -24,18 +25,60 @@ export default function HomeScreen() {
     return () => backHandler.remove();
   }, [canGoBack]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleLoadStart = () => {
     setLoading(true);
     setError(null);
+    
+    // Clear any existing timeout
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+    }
+    
+    // Set a timeout to hide loading after 30 seconds if page doesn't load
+    // This prevents the loading state from getting stuck
+    loadTimeoutRef.current = setTimeout(() => {
+      setLoading(false);
+    }, 30000);
   };
 
   const handleLoadEnd = () => {
+    // Clear timeout since page loaded successfully
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setLoading(false);
+  };
+
+  const handleLoad = () => {
+    // Additional handler for when page fully loads
+    // This is a fallback in case onLoadEnd doesn't fire
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
     setLoading(false);
   };
 
   const handleError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     console.warn('WebView error: ', nativeEvent);
+    
+    // Clear timeout on error
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    
     setError('Failed to load LootAura. Please check your internet connection.');
     setLoading(false);
   };
@@ -43,6 +86,12 @@ export default function HomeScreen() {
   const handleHttpError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     if (nativeEvent.statusCode >= 400) {
+      // Clear timeout on HTTP error
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+      
       setError(`Unable to connect to LootAura (${nativeEvent.statusCode}). Please try again later.`);
       setLoading(false);
     }
@@ -119,6 +168,7 @@ export default function HomeScreen() {
             style={styles.webview}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}
+            onLoad={handleLoad}
             onError={handleError}
             onHttpError={handleHttpError}
             onNavigationStateChange={handleNavigationStateChange}

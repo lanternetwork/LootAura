@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { useRouter } from 'expo-router';
 
 const LOOTAURA_URL = 'https://lootaura.com';
 
@@ -11,6 +12,7 @@ export default function HomeScreen() {
   const [canGoBack, setCanGoBack] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const router = useRouter();
 
   // Handle Android back button
   useEffect(() => {
@@ -105,9 +107,19 @@ export default function HomeScreen() {
     const { url } = request;
     
     try {
-      // Parse URL to safely check hostname
+      // Parse URL to safely check hostname and path
       const parsedUrl = new URL(url);
       const hostname = parsedUrl.hostname.toLowerCase();
+      const pathname = parsedUrl.pathname;
+      
+      // Intercept sale detail page navigation and route to native screen
+      const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
+      if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
+        const saleId = saleDetailMatch[1];
+        // Navigate to native sale detail screen
+        router.push(`/sales/${saleId}`);
+        return false; // Prevent WebView from loading the URL
+      }
       
       // Allow navigation within lootaura.com domain (exact match or subdomain)
       // This prevents bypasses like lootaura.com.evil.com

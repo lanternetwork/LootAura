@@ -12,6 +12,7 @@ export default function HomeScreen() {
   const [canGoBack, setCanGoBack] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isNativeNavigationRef = useRef<boolean>(false);
   const router = useRouter();
 
   // Handle Android back button
@@ -37,6 +38,16 @@ export default function HomeScreen() {
   }, []);
 
   const handleLoadStart = () => {
+    // Skip loading overlay if this is a native navigation interception
+    // onLoadStart may fire even when onShouldStartLoadWithRequest returns false
+    if (isNativeNavigationRef.current) {
+      // Clear the flag after a brief delay to allow navigation to complete
+      setTimeout(() => {
+        isNativeNavigationRef.current = false;
+      }, 100);
+      return; // Don't show loading overlay for intercepted native navigation
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -116,6 +127,9 @@ export default function HomeScreen() {
       const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
       if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
         const saleId = saleDetailMatch[1];
+        // Set flag to prevent loading overlay from appearing
+        // onLoadStart may fire even when we return false, so we need to skip it
+        isNativeNavigationRef.current = true;
         // Navigate to native sale detail screen
         router.push(`/sales/${saleId}`);
         return false; // Prevent WebView from loading the URL

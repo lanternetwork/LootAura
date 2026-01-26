@@ -37,9 +37,31 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const handleLoadStart = () => {
-    // Skip loading overlay if this is a native navigation interception
-    // onLoadStart may fire even when onShouldStartLoadWithRequest returns false
+  const handleLoadStart = (syntheticEvent: any) => {
+    const { nativeEvent } = syntheticEvent;
+    const url = nativeEvent?.url;
+    
+    // Check if this is a /sales/:id navigation that should be intercepted
+    // This check happens deterministically based on URL, not timing
+    if (url) {
+      try {
+        const parsedUrl = new URL(url);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        const pathname = parsedUrl.pathname;
+        
+        // If this is a sale detail page URL, skip loading overlay entirely
+        // This prevents the race condition where onLoadStart fires before onShouldStartLoadWithRequest
+        const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
+        if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
+          // Don't set loading, don't start timeout - this navigation will be intercepted
+          return;
+        }
+      } catch (e) {
+        // If URL parsing fails, continue with normal loading behavior
+      }
+    }
+    
+    // Also check the flag as a fallback (for edge cases)
     if (isNativeNavigationRef.current) {
       // Clear the flag after a brief delay to allow navigation to complete
       setTimeout(() => {

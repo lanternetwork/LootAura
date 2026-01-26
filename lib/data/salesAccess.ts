@@ -518,22 +518,12 @@ export async function getSaleWithItems(
 
     // Fetch owner profile, stats, and items in parallel
     // (tags already fetched above)
-    // Get user context for debug logging (RLS will handle visibility automatically)
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    // Note: RLS policies work automatically based on Supabase client session context
+    // No need to explicitly call getUser() - this was causing blocking delays for anonymous users
+    // The client already has session context from cookies, so RLS will work correctly
     
     // Import logger once at the top of the function for all logging
     const { logger } = await import('@/lib/log')
-    
-    // Verify session is available for RLS (log if not, only in debug mode)
-    if (userError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      logger.debug('Auth error when fetching user for items query', {
-        component: 'salesAccess',
-        operation: 'getSaleWithItems',
-        saleId,
-        error: userError.message,
-        note: 'RLS policies may not work correctly without a valid session',
-      })
-    }
     
     // Load items directly from base table using RLS-aware client
     // RLS policies (items_owner_read and items_public_read) will automatically handle visibility:
@@ -554,11 +544,8 @@ export async function getSaleWithItems(
       .order('created_at', { ascending: false })
     
     // Log query results (PII-safe) - only in debug mode
+    // Note: User context not available without blocking auth lookup, but RLS still works correctly
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const userContext = user ? 'auth' : 'anon'
-      const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
-      const isOwner = user && user.id === ownerId
-      
       logger.debug('Sale detail items query result', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
@@ -567,18 +554,14 @@ export async function getSaleWithItems(
         hasError: !!itemsRes.error,
         errorCode: itemsRes.error?.code || null,
         errorMessage: itemsRes.error?.message || null,
-        userContext,
-        userId: userIdShort,
-        isOwner,
         saleStatus: sale.status,
         ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+        note: 'RLS policies handle visibility automatically based on client session context',
       })
     }
     
     // Log errors but don't fail - return with empty items array
     if (itemsRes.error) {
-      const userContext = user ? 'auth' : 'anon'
-      const isOwner = user && user.id === ownerId
       logger.error('Error fetching items from base table', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
@@ -587,8 +570,6 @@ export async function getSaleWithItems(
         errorMessage: itemsRes.error?.message,
         errorDetails: itemsRes.error?.details,
         errorHint: itemsRes.error?.hint,
-        userContext,
-        isOwner,
         saleStatus: sale.status,
       })
     }
@@ -596,23 +577,8 @@ export async function getSaleWithItems(
     // Use base table query result - RLS policy should now work correctly
     // after migration 114 fixes the items_public_read policy
     const itemsData = itemsRes.data || []
-    if (itemsRes.error) {
-      // Log errors (only in debug mode)
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        logger.error('Error fetching items from base table', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
-          component: 'salesAccess',
-          operation: 'getSaleWithItems',
-          saleId,
-          errorCode: itemsRes.error?.code,
-          errorMessage: itemsRes.error?.message,
-          errorDetails: itemsRes.error?.details,
-          errorHint: itemsRes.error?.hint,
-          userContext: user ? 'auth' : 'anon',
-          isOwner: user && user.id === ownerId,
-          saleStatus: sale.status,
-        })
-      }
-    } else if (itemsData.length > 0 && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    // Note: Error logging already handled above, no need to duplicate
+    if (itemsData.length > 0 && process.env.NEXT_PUBLIC_DEBUG === 'true') {
       logger.debug('Base table query succeeded', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',

@@ -231,6 +231,63 @@ export default function HomeScreen() {
             thirdPartyCookiesEnabled={true}
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
+            injectedJavaScript={`
+              (function() {
+                try {
+                  // a. Mark WebView context
+                  if (document.body) {
+                    document.body.classList.add('is-webview');
+                  }
+                  
+                  // b. Remove footer compensation padding from mobile content wrapper
+                  // Find divs with max-w-screen-sm class (mobile layout wrapper)
+                  const mobileWrappers = document.querySelectorAll('.max-w-screen-sm');
+                  mobileWrappers.forEach(function(wrapper) {
+                    const classes = wrapper.className || '';
+                    // Check if it's the mobile layout wrapper (has md:hidden or mobile-specific classes)
+                    if (classes.includes('md:hidden') || classes.includes('mx-auto')) {
+                      const computedStyle = window.getComputedStyle(wrapper);
+                      const paddingBottom = computedStyle.paddingBottom;
+                      // Remove padding if it's significant (likely the 80px footer compensation)
+                      if (paddingBottom && paddingBottom !== '0px' && paddingBottom !== '0') {
+                        wrapper.style.paddingBottom = '0px';
+                      }
+                    }
+                  });
+                  
+                  // c. Hide the fixed bottom action bar
+                  // Find all elements and check for fixed positioning at bottom
+                  const allElements = document.querySelectorAll('div');
+                  allElements.forEach(function(el) {
+                    const computedStyle = window.getComputedStyle(el);
+                    if (computedStyle.position === 'fixed') {
+                      const bottom = computedStyle.bottom;
+                      const zIndex = computedStyle.zIndex;
+                      // Check if it's at the bottom (0px or 0) and has high z-index (z-40 = 40)
+                      if ((bottom === '0px' || bottom === '0') && 
+                          (zIndex === '40' || parseInt(zIndex) >= 40)) {
+                        const classes = el.className || '';
+                        const text = el.textContent || '';
+                        // Check if it's the action bar (has backdrop-blur, contains buttons, or has action text)
+                        if (classes.includes('backdrop-blur') || 
+                            classes.includes('border-t') ||
+                            text.includes('Navigate') || 
+                            text.includes('Favorite') || 
+                            text.includes('Share') ||
+                            el.querySelector('button') || 
+                            el.querySelector('[role="button"]') ||
+                            el.querySelector('a[href*="maps"]')) {
+                          el.style.display = 'none';
+                        }
+                      }
+                    }
+                  });
+                } catch (e) {
+                  // Silently fail - don't break page if injection fails
+                }
+                return true;
+              })();
+            `}
           />
           {loading && (
             <View style={styles.loadingContainer}>

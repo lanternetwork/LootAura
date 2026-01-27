@@ -12,7 +12,6 @@ export default function HomeScreen() {
   const [canGoBack, setCanGoBack] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isNativeNavigationRef = useRef<boolean>(false);
   const router = useRouter();
 
   // Handle Android back button
@@ -41,33 +40,24 @@ export default function HomeScreen() {
     const { nativeEvent } = syntheticEvent;
     const url = nativeEvent?.url;
     
-    // Check if this is a /sales/:id navigation that should be intercepted
-    // This check happens deterministically based on URL, not timing
+    // Defensive guard: Block /sales/:id from ever triggering loading state
+    // This prevents race conditions where onLoadStart fires before onShouldStartLoadWithRequest
     if (url) {
       try {
         const parsedUrl = new URL(url);
         const hostname = parsedUrl.hostname.toLowerCase();
         const pathname = parsedUrl.pathname;
         
-        // If this is a sale detail page URL, skip loading overlay entirely
-        // This prevents the race condition where onLoadStart fires before onShouldStartLoadWithRequest
+        // If this is a sale detail page URL, immediately return without setting loading state
+        // The WebView must NEVER load sale detail pages - they are always native
         const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
         if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
-          // Don't set loading, don't start timeout - this navigation will be intercepted
+          // Do not set loading, do not start timeout - this navigation is blocked
           return;
         }
       } catch (e) {
         // If URL parsing fails, continue with normal loading behavior
       }
-    }
-    
-    // Also check the flag as a fallback (for edge cases)
-    if (isNativeNavigationRef.current) {
-      // Clear the flag after a brief delay to allow navigation to complete
-      setTimeout(() => {
-        isNativeNavigationRef.current = false;
-      }, 100);
-      return; // Don't show loading overlay for intercepted native navigation
     }
     
     setLoading(true);
@@ -145,16 +135,24 @@ export default function HomeScreen() {
       const hostname = parsedUrl.hostname.toLowerCase();
       const pathname = parsedUrl.pathname;
       
-      // Intercept sale detail page navigation and route to native screen
+      // ENFORCE: Sale detail pages are ALWAYS native - block WebView from loading them
+      // This check must happen FIRST, before any other navigation logic
       const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
       if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
         const saleId = saleDetailMatch[1];
-        // Set flag to prevent loading overlay from appearing
-        // onLoadStart may fire even when we return false, so we need to skip it
-        isNativeNavigationRef.current = true;
+        
         // Navigate to native sale detail screen
-        router.push(`/sales/${saleId}`);
-        return false; // Prevent WebView from loading the URL
+        // Wrap in try/catch to handle any navigation errors gracefully
+        try {
+          router.push(`/sales/${saleId}`);
+        } catch (error) {
+          console.error('[WebView] Failed to navigate to native sale detail screen:', error);
+          // Still return false - we must never allow WebView to load sale detail pages
+        }
+        
+        // Unconditionally block WebView from loading this URL
+        // No fallback, no exceptions - sale detail pages are native-only
+        return false;
       }
       
       // Allow navigation within lootaura.com domain (exact match or subdomain)
@@ -231,63 +229,6 @@ export default function HomeScreen() {
             thirdPartyCookiesEnabled={true}
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
-            injectedJavaScript={`
-              (function() {
-                try {
-                  // a. Mark WebView context
-                  if (document.body) {
-                    document.body.classList.add('is-webview');
-                  }
-                  
-                  // b. Remove footer compensation padding from mobile content wrapper
-                  // Find divs with max-w-screen-sm class (mobile layout wrapper)
-                  const mobileWrappers = document.querySelectorAll('.max-w-screen-sm');
-                  mobileWrappers.forEach(function(wrapper) {
-                    const classes = wrapper.className || '';
-                    // Check if it's the mobile layout wrapper (has md:hidden or mobile-specific classes)
-                    if (classes.includes('md:hidden') || classes.includes('mx-auto')) {
-                      const computedStyle = window.getComputedStyle(wrapper);
-                      const paddingBottom = computedStyle.paddingBottom;
-                      // Remove padding if it's significant (likely the 80px footer compensation)
-                      if (paddingBottom && paddingBottom !== '0px' && paddingBottom !== '0') {
-                        wrapper.style.paddingBottom = '0px';
-                      }
-                    }
-                  });
-                  
-                  // c. Hide the fixed bottom action bar
-                  // Find all elements and check for fixed positioning at bottom
-                  const allElements = document.querySelectorAll('div');
-                  allElements.forEach(function(el) {
-                    const computedStyle = window.getComputedStyle(el);
-                    if (computedStyle.position === 'fixed') {
-                      const bottom = computedStyle.bottom;
-                      const zIndex = computedStyle.zIndex;
-                      // Check if it's at the bottom (0px or 0) and has high z-index (z-40 = 40)
-                      if ((bottom === '0px' || bottom === '0') && 
-                          (zIndex === '40' || parseInt(zIndex) >= 40)) {
-                        const classes = el.className || '';
-                        const text = el.textContent || '';
-                        // Check if it's the action bar (has backdrop-blur, contains buttons, or has action text)
-                        if (classes.includes('backdrop-blur') || 
-                            classes.includes('border-t') ||
-                            text.includes('Navigate') || 
-                            text.includes('Favorite') || 
-                            text.includes('Share') ||
-                            el.querySelector('button') || 
-                            el.querySelector('[role="button"]') ||
-                            el.querySelector('a[href*="maps"]')) {
-                          el.style.display = 'none';
-                        }
-                      }
-                    }
-                  });
-                } catch (e) {
-                  // Silently fail - don't break page if injection fails
-                }
-                return true;
-              })();
-            `}
           />
           {loading && (
             <View style={styles.loadingContainer}>

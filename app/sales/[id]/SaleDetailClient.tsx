@@ -170,6 +170,9 @@ export default function SaleDetailClient({
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
   
+  // Detect if running inside React Native WebView
+  const isWebView = typeof window !== 'undefined' && !!(window as any).ReactNativeWebView
+  
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')
   const lng = searchParams.get('lng')
@@ -453,7 +456,7 @@ export default function SaleDetailClient({
       </nav>
 
       {/* Mobile Layout */}
-      <div className="md:hidden max-w-screen-sm mx-auto px-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] space-y-4">
+      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isWebView ? '' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
         {/* Back to map button - Mobile only */}
         <Link
           href={backUrl}
@@ -1075,7 +1078,8 @@ export default function SaleDetailClient({
         </div>
       </div>
 
-      {/* Sticky Bottom Action Bar - Mobile Only */}
+      {/* Sticky Bottom Action Bar - Mobile Only (hidden in WebView) */}
+      {!isWebView && (
       <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200">
         <div className="max-w-screen-sm mx-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-3">
           <div className="flex gap-3">
@@ -1157,6 +1161,7 @@ export default function SaleDetailClient({
           </div>
         </div>
       </div>
+      )}
 
       {/* Report Sale Modal */}
       {currentUser && currentUser.id !== sale.owner_id && (

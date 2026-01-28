@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Sale } from '@/lib/types'
 import { User } from '@supabase/supabase-js'
 import SimpleMap from '@/components/location/SimpleMap'

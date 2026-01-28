@@ -75,15 +75,19 @@ export default function SaleDetailScreen() {
   const [sale, setSale] = useState<Sale | null>(null);
   const [items, setItems] = useState<SaleItem[]>([]);
 
+  // Normalize id parameter: handle string | string[] | undefined
+  // Expo Router can return arrays for route params, so we normalize to string | null
+  const saleId = Array.isArray(id) ? (id[0] || null) : (id || null);
+
   useEffect(() => {
-    if (!id) {
+    if (!saleId) {
       setError('Sale ID is required');
       setLoading(false);
       return;
     }
 
-    fetchSaleData(id);
-  }, [id]);
+    fetchSaleData(saleId);
+  }, [saleId]);
 
   const fetchSaleData = async (saleId: string) => {
     // Create AbortController for timeout

@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import Image from 'next/image'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
@@ -111,15 +110,25 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
             : nearbySale.city || nearbySale.state || ''
 
           return (
-            <Link
+            <div
               key={nearbySale.id}
-              href={`/sales/${nearbySale.id}`}
-              className="block group hover:bg-gray-50 rounded-lg p-3 transition-colors"
+              className="block group hover:bg-gray-50 rounded-lg p-3 transition-colors cursor-pointer"
               onClick={() => {
                 trackAnalyticsEvent({
                   sale_id: nearbySale.id,
                   event_type: 'click',
                 })
+                
+                // If in React Native WebView, send message to native app
+                if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+                  console.log('[WEB] Sending OPEN_SALE message for sale:', nearbySale.id);
+                  (window as any).ReactNativeWebView.postMessage(
+                    JSON.stringify({ type: 'OPEN_SALE', saleId: nearbySale.id })
+                  );
+                } else {
+                  // Fallback to normal Next.js navigation when not in WebView
+                  window.location.href = `/sales/${nearbySale.id}`;
+                }
               }}
             >
               <div className="flex gap-3">
@@ -186,7 +195,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
                   </svg>
                 </div>
               </div>
-            </Link>
+            </div>
           )
         })}
       </div>

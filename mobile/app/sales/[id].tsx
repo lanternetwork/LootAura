@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
-
-// Footer height constant (excluding safe area)
-const FOOTER_HEIGHT = 64;
 
 // Types matching the API response
 type SaleItem = {
@@ -73,7 +70,6 @@ type SaleDetailResponse = {
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sale, setSale] = useState<Sale | null>(null);
@@ -148,12 +144,6 @@ export default function SaleDetailScreen() {
     Linking.openURL(url).catch(err => console.error('Error opening maps:', err));
   };
 
-  const handleNavigate = () => {
-    if (sale?.lat && sale?.lng) {
-      handleOpenMaps();
-    }
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -181,133 +171,122 @@ export default function SaleDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.mainContainer}>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Header with back button */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Header with back button */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Cover Image */}
+        {sale.cover_image_url && (
+          <Image
+            source={{ uri: sale.cover_image_url }}
+            style={styles.coverImage}
+            resizeMode="cover"
+          />
+        )}
+
+        {/* Title */}
+        <View style={styles.content}>
+          <Text style={styles.title}>{sale.title}</Text>
+
+          {/* Date/Time */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>When</Text>
+            <Text style={styles.sectionText}>
+              {formatDate(sale.date_start, sale.time_start)}
+              {sale.date_end && sale.time_end && (
+                <> - {formatDate(sale.date_end, sale.time_end)}</>
+              )}
+            </Text>
           </View>
 
-          {/* Cover Image */}
-          {sale.cover_image_url && (
-            <Image
-              source={{ uri: sale.cover_image_url }}
-              style={styles.coverImage}
-              resizeMode="cover"
-            />
+          {/* Location */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Location</Text>
+            {sale.address && (
+              <Text style={styles.sectionText}>{sale.address}</Text>
+            )}
+            <Text style={styles.sectionText}>
+              {sale.city}, {sale.state} {sale.zip_code || ''}
+            </Text>
+          </View>
+
+          {/* Description */}
+          {sale.description && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.sectionText}>{sale.description}</Text>
+            </View>
           )}
 
-          {/* Title */}
-          <View style={styles.content}>
-            <Text style={styles.title}>{sale.title}</Text>
-
-            {/* Date/Time */}
+          {/* Price */}
+          {sale.price && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>When</Text>
-              <Text style={styles.sectionText}>
-                {formatDate(sale.date_start, sale.time_start)}
-                {sale.date_end && sale.time_end && (
-                  <> - {formatDate(sale.date_end, sale.time_end)}</>
-                )}
-              </Text>
+              <Text style={styles.sectionTitle}>Price</Text>
+              <Text style={styles.sectionText}>{formatPrice(sale.price)}</Text>
             </View>
+          )}
 
-            {/* Location */}
+          {/* Tags/Categories */}
+          {sale.tags && sale.tags.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Location</Text>
-              {sale.address && (
-                <Text style={styles.sectionText}>{sale.address}</Text>
-              )}
-              <Text style={styles.sectionText}>
-                {sale.city}, {sale.state} {sale.zip_code || ''}
-              </Text>
-            </View>
-
-            {/* Description */}
-            {sale.description && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Description</Text>
-                <Text style={styles.sectionText}>{sale.description}</Text>
-              </View>
-            )}
-
-            {/* Price */}
-            {sale.price && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Price</Text>
-                <Text style={styles.sectionText}>{formatPrice(sale.price)}</Text>
-              </View>
-            )}
-
-            {/* Tags/Categories */}
-            {sale.tags && sale.tags.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Categories</Text>
-                <View style={styles.tagsContainer}>
-                  {sale.tags.map((tag, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Items */}
-            {items.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Items ({items.length})</Text>
-                {items.map((item) => (
-                  <View key={item.id} style={styles.itemCard}>
-                    {item.photo && (
-                      <Image
-                        source={{ uri: item.photo }}
-                        style={styles.itemImage}
-                        resizeMode="cover"
-                      />
-                    )}
-                    <View style={styles.itemContent}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      {item.category && (
-                        <Text style={styles.itemCategory}>{item.category}</Text>
-                      )}
-                      {item.price && (
-                        <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
-                      )}
-                    </View>
+              <Text style={styles.sectionTitle}>Categories</Text>
+              <View style={styles.tagsContainer}>
+                {sale.tags.map((tag, index) => (
+                  <View key={index} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
                   </View>
                 ))}
               </View>
-            )}
+            </View>
+          )}
 
-            {/* Seller Info */}
-            {sale.owner_profile && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Seller</Text>
-                <Text style={styles.sectionText}>
-                  {sale.owner_profile.display_name || sale.owner_profile.username || 'Unknown'}
+          {/* Items */}
+          {items.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Items ({items.length})</Text>
+              {items.map((item) => (
+                <View key={item.id} style={styles.itemCard}>
+                  {item.photo && (
+                    <Image
+                      source={{ uri: item.photo }}
+                      style={styles.itemImage}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <View style={styles.itemContent}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    {item.category && (
+                      <Text style={styles.itemCategory}>{item.category}</Text>
+                    )}
+                    {item.price && (
+                      <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Seller Info */}
+          {sale.owner_profile && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Seller</Text>
+              <Text style={styles.sectionText}>
+                {sale.owner_profile.display_name || sale.owner_profile.username || 'Unknown'}
+              </Text>
+              {sale.owner_stats && sale.owner_stats.ratings_count > 0 && (
+                <Text style={styles.sellerStats}>
+                  {sale.owner_stats.avg_rating.toFixed(1)} ⭐ ({sale.owner_stats.ratings_count} reviews)
                 </Text>
-                {sale.owner_stats && sale.owner_stats.ratings_count > 0 && (
-                  <Text style={styles.sellerStats}>
-                    {sale.owner_stats.avg_rating.toFixed(1)} ⭐ ({sale.owner_stats.ratings_count} reviews)
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
-        </ScrollView>
-
-        {/* Fixed Footer */}
-        {(sale.lat && sale.lng) && (
-          <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
-            <TouchableOpacity onPress={handleNavigate} style={styles.navigateButton}>
-              <Text style={styles.navigateButtonText}>Navigate</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+              )}
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -359,15 +338,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  mainContainer: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    // No flexGrow - content should not expand to fill space
-    // Footer is separate and fixed
   },
   header: {
     padding: 16,
@@ -410,27 +384,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#4B5563',
     lineHeight: 24,
-  },
-  footer: {
-    height: 64, // FOOTER_HEIGHT constant
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    justifyContent: 'center',
-  },
-  navigateButton: {
-    backgroundColor: '#3A2268',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navigateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
   tagsContainer: {
     flexDirection: 'row',

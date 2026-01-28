@@ -88,9 +88,9 @@ describe('Viewport Persistence Navigation', () => {
 
       const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = container.querySelector('a[href*="test-sale-1"]')
-      expect(detailLink).toBeInTheDocument()
-      expect(detailLink?.getAttribute('href')).toBe(
+      const detailButton = container.querySelector('button[data-href*="test-sale-1"]')
+      expect(detailButton).toBeInTheDocument()
+      expect(detailButton?.getAttribute('data-href')).toBe(
         `/sales/test-sale-1?lat=38.2527&lng=-85.7585&zoom=12`
       )
     })
@@ -98,17 +98,17 @@ describe('Viewport Persistence Navigation', () => {
     it('should not include viewport params when viewport is not provided', () => {
       const { container } = renderWithQueryClient(<SaleCard sale={mockSale} />)
 
-      const detailLink = container.querySelector('a[href*="test-sale-1"]')
-      expect(detailLink).toBeInTheDocument()
-      expect(detailLink?.getAttribute('href')).toBe('/sales/test-sale-1')
+      const detailButton = container.querySelector('button[data-href*="test-sale-1"]')
+      expect(detailButton).toBeInTheDocument()
+      expect(detailButton?.getAttribute('data-href')).toBe('/sales/test-sale-1')
     })
 
     it('should handle null viewport gracefully', () => {
       const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={null} />)
 
-      const detailLink = container.querySelector('a[href*="test-sale-1"]')
-      expect(detailLink).toBeInTheDocument()
-      expect(detailLink?.getAttribute('href')).toBe('/sales/test-sale-1')
+      const detailButton = container.querySelector('button[data-href*="test-sale-1"]')
+      expect(detailButton).toBeInTheDocument()
+      expect(detailButton?.getAttribute('data-href')).toBe('/sales/test-sale-1')
     })
 
     it('should format viewport params correctly with decimal values', () => {
@@ -119,8 +119,8 @@ describe('Viewport Persistence Navigation', () => {
 
       const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = container.querySelector('a[href*="test-sale-1"]')
-      const href = detailLink?.getAttribute('href')
+      const detailButton = container.querySelector('button[data-href*="test-sale-1"]')
+      const href = detailButton?.getAttribute('data-href')
       expect(href).toContain('lat=38.123456789')
       expect(href).toContain('lng=-85.987654321')
       expect(href).toContain('zoom=15.5')
@@ -202,8 +202,8 @@ describe('Viewport Persistence Navigation', () => {
 
       const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = container.querySelector('a[href*="test-sale-1"]')
-      const href = detailLink?.getAttribute('href')
+      const detailButton = container.querySelector('button[data-href*="test-sale-1"]')
+      const href = detailButton?.getAttribute('data-href')
       
       // Verify URL can be parsed correctly
       const url = new URL(href || '', 'http://localhost')
@@ -220,8 +220,8 @@ describe('Viewport Persistence Navigation', () => {
 
       const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = container.querySelector('a[href*="test-sale-1"]')
-      const href = detailLink?.getAttribute('href')
+      const detailButton = container.querySelector('button[data-href*="test-sale-1"]')
+      const href = detailButton?.getAttribute('data-href')
       
       expect(href).toContain('lng=-85.7585')
     })
@@ -234,8 +234,8 @@ describe('Viewport Persistence Navigation', () => {
 
       const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = container.querySelector('a[href*="test-sale-1"]')
-      const href = detailLink?.getAttribute('href')
+      const detailButton = container.querySelector('button[data-href*="test-sale-1"]')
+      const href = detailButton?.getAttribute('data-href')
       
       expect(href).toContain('zoom=0')
     })

@@ -150,6 +150,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
         {sale?.id && (
           <button
             className="link-accent hover:text-[var(--accent-hover)] font-medium text-sm text-left"
+            data-href={detailUrl}
             onClick={() => {
               trackAnalyticsEvent({
                 sale_id: sale.id,

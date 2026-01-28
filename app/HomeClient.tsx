@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { Sale } from '@/lib/types'
 import { User } from '@supabase/supabase-js'
 import SimpleMap from '@/components/location/SimpleMap'
@@ -141,10 +140,21 @@ export default function HomeClient({ initialSales, user: _user }: HomeClientProp
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {sales.map((sale) => (
-              <Link
+              <div
                 key={sale.id}
-                href={`/sales/${sale.id}`}
-                className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 hover:border-gray-300"
+                className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 hover:border-gray-300 cursor-pointer"
+                onClick={() => {
+                  // If in React Native WebView, send message to native app
+                  if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+                    console.log('[WEB] Sending OPEN_SALE message for sale:', sale.id);
+                    (window as any).ReactNativeWebView.postMessage(
+                      JSON.stringify({ type: 'OPEN_SALE', saleId: sale.id })
+                    );
+                  } else {
+                    // Fallback to normal Next.js navigation when not in WebView
+                    window.location.href = `/sales/${sale.id}`;
+                  }
+                }}
               >
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-3">
@@ -200,7 +210,7 @@ export default function HomeClient({ initialSales, user: _user }: HomeClientProp
                     </div>
                   )}
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

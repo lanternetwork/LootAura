@@ -149,18 +149,28 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
           </div>
         )}
         {sale?.id && (
-          <Link 
-            className="link-accent hover:text-[var(--accent-hover)] font-medium text-sm" 
-            href={detailUrl}
+          <button
+            className="link-accent hover:text-[var(--accent-hover)] font-medium text-sm text-left"
             onClick={() => {
               trackAnalyticsEvent({
                 sale_id: sale.id,
                 event_type: 'click',
               })
+              
+              // If in React Native WebView, send message to native app
+              if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+                console.log('[WEB] Sending OPEN_SALE message for sale:', sale.id);
+                (window as any).ReactNativeWebView.postMessage(
+                  JSON.stringify({ type: 'OPEN_SALE', saleId: sale.id })
+                );
+              } else {
+                // Fallback to normal Next.js navigation when not in WebView
+                window.location.href = detailUrl;
+              }
             }}
           >
             View Details →
-          </Link>
+          </button>
         )}
       </div>
     </article>

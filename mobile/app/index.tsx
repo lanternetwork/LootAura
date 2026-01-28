@@ -126,6 +126,24 @@ export default function HomeScreen() {
     setCanGoBack(navState.canGoBack);
   };
 
+  const handleMessage = (event: any) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log('[NATIVE] Received message from WebView:', message);
+      
+      if (message.type === 'OPEN_SALE' && message.saleId) {
+        console.log('[NATIVE] Opening native sale detail screen for sale:', message.saleId);
+        try {
+          router.push(`/sales/${message.saleId}`);
+        } catch (error) {
+          console.error('[NATIVE] Failed to navigate to native sale detail screen:', error);
+        }
+      }
+    } catch (error) {
+      console.warn('[NATIVE] Failed to parse message from WebView:', error);
+    }
+  };
+
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;
     
@@ -135,23 +153,14 @@ export default function HomeScreen() {
       const hostname = parsedUrl.hostname.toLowerCase();
       const pathname = parsedUrl.pathname;
       
-      // ENFORCE: Sale detail pages are ALWAYS native - block WebView from loading them
+      // HARD BLOCK: Sale detail pages are ALWAYS native - WebView NEVER navigates to /sales/:id
       // This check must happen FIRST, before any other navigation logic
+      // No fallbacks, no exceptions - sale detail pages are native-only via postMessage
       const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
       if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
-        const saleId = saleDetailMatch[1];
-        
-        // Navigate to native sale detail screen
-        // Wrap in try/catch to handle any navigation errors gracefully
-        try {
-          router.push(`/sales/${saleId}`);
-        } catch (error) {
-          console.error('[WebView] Failed to navigate to native sale detail screen:', error);
-          // Still return false - we must never allow WebView to load sale detail pages
-        }
-        
         // Unconditionally block WebView from loading this URL
-        // No fallback, no exceptions - sale detail pages are native-only
+        // Navigation should happen via postMessage, not URL navigation
+        console.warn('[NATIVE] Blocked WebView navigation to sale detail page. Use postMessage instead.');
         return false;
       }
       
@@ -219,6 +228,7 @@ export default function HomeScreen() {
             onHttpError={handleHttpError}
             onNavigationStateChange={handleNavigationStateChange}
             onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+            onMessage={handleMessage}
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}

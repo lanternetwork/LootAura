@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking, Share, useSafeAreaInsets } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -132,6 +132,9 @@ export default function SaleDetailScreen() {
     return `$${price.toFixed(2)}`;
   };
 
+  const insets = useSafeAreaInsets();
+  const [isFavorited, setIsFavorited] = useState(false);
+
   const handleOpenMaps = () => {
     if (!sale?.lat || !sale?.lng) return;
     
@@ -142,6 +145,28 @@ export default function SaleDetailScreen() {
     // Open in default maps app
     const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
     Linking.openURL(url).catch(err => console.error('Error opening maps:', err));
+  };
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = `${API_URL}/sales/${sale?.id}`;
+      const shareText = sale?.city && sale?.state
+        ? `${sale.city}, ${sale.state}`
+        : undefined;
+      
+      await Share.share({
+        message: shareText ? `${shareText} — ${sale?.title || 'Yard Sale'}\n${shareUrl}` : `${sale?.title || 'Yard Sale'}\n${shareUrl}`,
+        url: shareUrl,
+        title: sale?.title || 'Yard Sale',
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handleFavoriteToggle = () => {
+    // TODO: Implement favorite API call
+    setIsFavorited(!isFavorited);
   };
 
   if (loading) {
@@ -169,127 +194,182 @@ export default function SaleDetailScreen() {
     );
   }
 
+  // Calculate footer height: 12px (top) + 44px (button) + 12px (bottom) + safe area
+  const footerHeight = 12 + 44 + 12 + insets.bottom;
+  // Content bottom padding: 80px + safe area (matches web contract)
+  const contentBottomPadding = 80 + insets.bottom;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.nativeMarker}>
-        <Text style={styles.nativeMarkerText}>NATIVE SALE SCREEN</Text>
-      </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Header with back button */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.mainContainer}>
+        {/* Scrollable Content */}
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: contentBottomPadding }
+          ]}
+          showsVerticalScrollIndicator={true}
+        >
+          {/* Native Marker (debug - can be removed later) */}
+          <View style={styles.nativeMarker}>
+            <Text style={styles.nativeMarkerText}>NATIVE SALE SCREEN</Text>
+          </View>
 
-        {/* Cover Image */}
-        {sale.cover_image_url && (
-          <Image
-            source={{ uri: sale.cover_image_url }}
-            style={styles.coverImage}
-            resizeMode="cover"
-          />
-        )}
+          {/* Header with back button */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Title */}
-        <View style={styles.content}>
-          <Text style={styles.title}>{sale.title}</Text>
+          {/* Cover Image */}
+          {sale.cover_image_url && (
+            <Image
+              source={{ uri: sale.cover_image_url }}
+              style={styles.coverImage}
+              resizeMode="cover"
+            />
+          )}
 
-          {/* Date/Time */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>When</Text>
-            <Text style={styles.sectionText}>
-              {formatDate(sale.date_start, sale.time_start)}
-              {sale.date_end && sale.time_end && (
-                <> - {formatDate(sale.date_end, sale.time_end)}</>
+          {/* Title */}
+          <View style={styles.content}>
+            <Text style={styles.title}>{sale.title}</Text>
+
+            {/* Date/Time */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>When</Text>
+              <Text style={styles.sectionText}>
+                {formatDate(sale.date_start, sale.time_start)}
+                {sale.date_end && sale.time_end && (
+                  <> - {formatDate(sale.date_end, sale.time_end)}</>
+                )}
+              </Text>
+            </View>
+
+            {/* Location */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Location</Text>
+              {sale.address && (
+                <Text style={styles.sectionText}>{sale.address}</Text>
               )}
-            </Text>
-          </View>
+              <Text style={styles.sectionText}>
+                {sale.city}, {sale.state} {sale.zip_code || ''}
+              </Text>
+            </View>
 
-          {/* Location */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Location</Text>
-            {sale.address && (
-              <Text style={styles.sectionText}>{sale.address}</Text>
+            {/* Description */}
+            {sale.description && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Description</Text>
+                <Text style={styles.sectionText}>{sale.description}</Text>
+              </View>
             )}
-            <Text style={styles.sectionText}>
-              {sale.city}, {sale.state} {sale.zip_code || ''}
-            </Text>
-          </View>
 
-          {/* Description */}
-          {sale.description && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.sectionText}>{sale.description}</Text>
-            </View>
-          )}
+            {/* Price */}
+            {sale.price && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Price</Text>
+                <Text style={styles.sectionText}>{formatPrice(sale.price)}</Text>
+              </View>
+            )}
 
-          {/* Price */}
-          {sale.price && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Price</Text>
-              <Text style={styles.sectionText}>{formatPrice(sale.price)}</Text>
-            </View>
-          )}
+            {/* Tags/Categories */}
+            {sale.tags && sale.tags.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Categories</Text>
+                <View style={styles.tagsContainer}>
+                  {sale.tags.map((tag, index) => (
+                    <View key={index} style={styles.tag}>
+                      <Text style={styles.tagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
-          {/* Tags/Categories */}
-          {sale.tags && sale.tags.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Categories</Text>
-              <View style={styles.tagsContainer}>
-                {sale.tags.map((tag, index) => (
-                  <View key={index} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag}</Text>
+            {/* Items */}
+            {items.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Items ({items.length})</Text>
+                {items.map((item) => (
+                  <View key={item.id} style={styles.itemCard}>
+                    {item.photo && (
+                      <Image
+                        source={{ uri: item.photo }}
+                        style={styles.itemImage}
+                        resizeMode="cover"
+                      />
+                    )}
+                    <View style={styles.itemContent}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      {item.category && (
+                        <Text style={styles.itemCategory}>{item.category}</Text>
+                      )}
+                      {item.price && (
+                        <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
+                      )}
+                    </View>
                   </View>
                 ))}
               </View>
-            </View>
-          )}
+            )}
 
-          {/* Items */}
-          {items.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Items ({items.length})</Text>
-              {items.map((item) => (
-                <View key={item.id} style={styles.itemCard}>
-                  {item.photo && (
-                    <Image
-                      source={{ uri: item.photo }}
-                      style={styles.itemImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    {item.category && (
-                      <Text style={styles.itemCategory}>{item.category}</Text>
-                    )}
-                    {item.price && (
-                      <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
-                    )}
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Seller Info */}
-          {sale.owner_profile && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Seller</Text>
-              <Text style={styles.sectionText}>
-                {sale.owner_profile.display_name || sale.owner_profile.username || 'Unknown'}
-              </Text>
-              {sale.owner_stats && sale.owner_stats.ratings_count > 0 && (
-                <Text style={styles.sellerStats}>
-                  {sale.owner_stats.avg_rating.toFixed(1)} ⭐ ({sale.owner_stats.ratings_count} reviews)
+            {/* Seller Info */}
+            {sale.owner_profile && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Seller</Text>
+                <Text style={styles.sectionText}>
+                  {sale.owner_profile.display_name || sale.owner_profile.username || 'Unknown'}
                 </Text>
-              )}
-            </View>
-          )}
+                {sale.owner_stats && sale.owner_stats.ratings_count > 0 && (
+                  <Text style={styles.sellerStats}>
+                    {sale.owner_stats.avg_rating.toFixed(1)} ⭐ ({sale.owner_stats.ratings_count} reviews)
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Fixed Footer - Sibling to ScrollView */}
+        <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+          <View style={styles.footerContent}>
+            {/* Navigate Button (Primary) */}
+            <TouchableOpacity 
+              style={styles.navigateButton}
+              onPress={handleOpenMaps}
+            >
+              <Text style={styles.navigateButtonIcon}>🗺️</Text>
+              <Text style={styles.navigateButtonText}>Navigate</Text>
+            </TouchableOpacity>
+
+            {/* Save Button (Secondary) */}
+            <TouchableOpacity 
+              style={[
+                styles.saveButton,
+                isFavorited ? styles.saveButtonActive : styles.saveButtonInactive
+              ]}
+              onPress={handleFavoriteToggle}
+            >
+              <Text style={[
+                styles.saveButtonIcon,
+                isFavorited ? styles.saveButtonIconActive : styles.saveButtonIconInactive
+              ]}>
+                {isFavorited ? '❤️' : '🤍'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Share Button (Secondary) */}
+            <TouchableOpacity 
+              style={styles.shareButton}
+              onPress={handleShare}
+            >
+              <Text style={styles.shareButtonIcon}>📤</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -341,6 +421,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  mainContainer: {
+    flex: 1,
+    flexDirection: 'column',
+  },
   nativeMarker: {
     height: 40,
     backgroundColor: '#FF0000',
@@ -356,6 +440,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingTop: 16,        // pt-4 from web
+    paddingHorizontal: 16,  // px-4 from web
+    maxWidth: 640,          // max-w-screen-sm from web
+    alignSelf: 'center',
+    width: '100%',
   },
   header: {
     padding: 16,
@@ -454,5 +543,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginTop: 4,
+  },
+  // Fixed Footer Styles (matches web contract)
+  footer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',  // bg-white/95
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',  // border-gray-200
+  },
+  footerContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,  // px-4 from web
+    paddingTop: 12,         // pt-3 from web
+    maxWidth: 640,          // max-w-screen-sm from web
+    alignSelf: 'center',
+    width: '100%',
+  },
+  navigateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#9333EA',  // bg-purple-600
+    paddingHorizontal: 16,      // px-4
+    paddingVertical: 12,         // py-3
+    borderRadius: 8,             // rounded-lg
+    minHeight: 44,               // min-h-[44px]
+    marginRight: 12,             // gap-3 from web (12px gap)
+  },
+  navigateButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  navigateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',  // font-medium
+  },
+  saveButton: {
+    width: 48,   // w-12
+    height: 48,  // h-12
+    minHeight: 44,  // min-h-[44px]
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,  // rounded-lg
+    marginRight: 12,  // gap-3 from web (12px gap)
+  },
+  saveButtonActive: {
+    backgroundColor: '#FEE2E2',  // bg-red-100
+  },
+  saveButtonInactive: {
+    backgroundColor: '#F3F4F6',  // bg-gray-100
+  },
+  saveButtonIcon: {
+    fontSize: 20,
+  },
+  saveButtonIconActive: {
+    color: '#B91C1C',  // text-red-700
+  },
+  saveButtonIconInactive: {
+    color: '#374151',  // text-gray-700
+  },
+  shareButton: {
+    width: 48,   // w-12
+    height: 48,  // h-12
+    minHeight: 44,  // min-h-[44px]
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(147, 51, 234, 0.15)',  // bg-[rgba(147,51,234,0.15)]
+    borderRadius: 8,  // rounded-lg
+  },
+  shareButtonIcon: {
+    fontSize: 20,
+    color: '#3A2268',  // text-[#3A2268]
   },
 });

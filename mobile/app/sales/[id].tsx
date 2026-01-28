@@ -98,7 +98,7 @@ export default function SaleDetailScreen() {
         signal: controller.signal,
       });
       
-      // Clear timeout on successful response
+      // Clear timeout once we have a response (success or error)
       clearTimeout(timeoutId);
       
       if (!response.ok) {

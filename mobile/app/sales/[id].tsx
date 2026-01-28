@@ -86,30 +86,89 @@ export default function SaleDetailScreen() {
   }, [id]);
 
   const fetchSaleData = async (saleId: string) => {
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_URL}/api/sales/${saleId}`);
+      const response = await fetch(`${API_URL}/api/sales/${saleId}`, {
+        signal: controller.signal,
+      });
+      
+      // Clear timeout on successful response
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
+        setLoading(false);
         if (response.status === 404) {
           setError('Sale not found');
         } else {
           setError('Failed to load sale details');
         }
-        setLoading(false);
         return;
       }
 
-      const data: SaleDetailResponse = await response.json();
+      // Validate response has content before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        setLoading(false);
+        setError('Invalid response format from server');
+        return;
+      }
+
+      // Parse JSON with explicit error handling
+      let data: SaleDetailResponse;
+      try {
+        const text = await response.text();
+        if (!text || text.trim().length === 0) {
+          setLoading(false);
+          setError('Empty response from server');
+          return;
+        }
+        data = JSON.parse(text);
+      } catch (parseError) {
+        setLoading(false);
+        console.error('Error parsing JSON:', parseError);
+        setError('Invalid data format received');
+        return;
+      }
+
+      // Validate response structure before setting state
+      if (!data || typeof data !== 'object') {
+        setLoading(false);
+        setError('Invalid response structure');
+        return;
+      }
+
+      if (!data.sale) {
+        setLoading(false);
+        setError('Sale data missing from response');
+        return;
+      }
+
+      // All validations passed - set data
       setSale(data.sale);
       setItems(data.items || []);
-    } catch (err) {
-      console.error('Error fetching sale:', err);
-      setError('Failed to load sale details. Please check your internet connection.');
-    } finally {
       setLoading(false);
+    } catch (err: any) {
+      // Clear timeout if still pending
+      clearTimeout(timeoutId);
+      
+      // Ensure loading is always set to false
+      setLoading(false);
+      
+      // Handle specific error types
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please check your internet connection and try again.');
+      } else if (err.message?.includes('Network request failed') || err.message?.includes('Failed to fetch')) {
+        setError('Network error. Please check your internet connection.');
+      } else {
+        console.error('Error fetching sale:', err);
+        setError('Failed to load sale details. Please try again.');
+      }
     }
   };
 

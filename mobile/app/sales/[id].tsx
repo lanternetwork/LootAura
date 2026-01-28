@@ -171,6 +171,9 @@ export default function SaleDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.nativeMarker}>
+        <Text style={styles.nativeMarkerText}>NATIVE SALE SCREEN</Text>
+      </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Header with back button */}
         <View style={styles.header}>
@@ -337,6 +340,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  nativeMarker: {
+    height: 40,
+    backgroundColor: '#FF0000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nativeMarkerText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
   scrollView: {
     flex: 1,

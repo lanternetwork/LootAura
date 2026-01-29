@@ -68,9 +68,13 @@ type SaleDetailResponse = {
 };
 
 export default function SaleDetailScreen() {
-  // DIAGNOSTIC: Force immediate first frame commit to test if crash is in render
-  // This will be reverted after confirming behavior
-  return <View style={{ flex: 1, backgroundColor: 'red' }} />;
+  // DIAGNOSTIC STEP 1: Re-enable ONLY the outer shell
+  // Testing if SafeAreaView container itself causes crash
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }} edges={['top', 'bottom']}>
+      <View />
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({

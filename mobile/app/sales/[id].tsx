@@ -254,10 +254,9 @@ export default function SaleDetailScreen() {
 
   // Success state - Full UI with items and footer
   if (sale) {
-    // Calculate footer height: 12px (top) + 44px (button) + 12px (bottom) + safe area
-    const footerHeight = 12 + 44 + 12 + insets.bottom;
-    // Content bottom padding: 80px + safe area (matches web contract)
-    const contentBottomPadding = 80 + insets.bottom;
+    // Content bottom padding: 80px (spacing above footer)
+    // SafeAreaView handles bottom safe area inset automatically
+    const contentBottomPadding = 80;
 
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -388,7 +387,7 @@ export default function SaleDetailScreen() {
           </ScrollView>
 
           {/* Fixed Footer - Sibling to ScrollView */}
-          <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+          <View style={styles.footer}>
             <View style={styles.footerContent}>
               {/* Navigate Button (Primary) */}
               <TouchableOpacity

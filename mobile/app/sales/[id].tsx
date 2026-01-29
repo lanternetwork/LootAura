@@ -68,10 +68,6 @@ type SaleDetailResponse = {
 };
 
 export default function SaleDetailScreen() {
-  // DIAGNOSTIC STEP 2: Re-enable hooks only (no usage)
-  // Testing if hooks themselves cause crash, even when results aren't used
-  
-  // Re-introduce all hooks
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -79,16 +75,137 @@ export default function SaleDetailScreen() {
   const [sale, setSale] = useState<Sale | null>(null);
   const [items, setItems] = useState<SaleItem[]>([]);
   const safeAreaInsets = useSafeAreaInsets();
-  
-  // Add useEffect (even if it does nothing)
+
+  // Normalize id parameter: handle string | string[] | undefined
+  // Expo Router can return arrays for route params, so we normalize to string | null
+  const saleId = Array.isArray(id) ? (id[0] || null) : (id || null);
+
   useEffect(() => {
-    // Empty effect - just testing if useEffect causes crash
-  }, []);
-  
-  // Keep JSX exactly the same - do not use any hook results
+    if (!saleId) {
+      setError('Sale ID is required');
+      setLoading(false);
+      return;
+    }
+
+    fetchSaleData(saleId);
+  }, [saleId]);
+
+  const fetchSaleData = async (saleId: string) => {
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${API_URL}/api/sales/${saleId}`, {
+        signal: controller.signal,
+      });
+      
+      // Clear timeout once we have a response (success or error)
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        setLoading(false);
+        if (response.status === 404) {
+          setError('Sale not found');
+        } else {
+          setError('Failed to load sale details');
+        }
+        return;
+      }
+
+      // Validate response has content before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        setLoading(false);
+        setError('Invalid response format from server');
+        return;
+      }
+
+      // Parse JSON with explicit error handling
+      let data: SaleDetailResponse;
+      try {
+        const text = await response.text();
+        if (!text || text.trim().length === 0) {
+          setLoading(false);
+          setError('Empty response from server');
+          return;
+        }
+        data = JSON.parse(text);
+      } catch (parseError) {
+        setLoading(false);
+        console.error('Error parsing JSON:', parseError);
+        setError('Invalid data format received');
+        return;
+      }
+
+      // Validate response structure before setting state
+      if (!data || typeof data !== 'object') {
+        setLoading(false);
+        setError('Invalid response structure');
+        return;
+      }
+
+      if (!data.sale) {
+        setLoading(false);
+        setError('Sale data missing from response');
+        return;
+      }
+
+      // All validations passed - set data
+      setSale(data.sale);
+      setItems(data.items || []);
+      setLoading(false);
+    } catch (err: any) {
+      // Clear timeout if still pending
+      clearTimeout(timeoutId);
+      
+      // Ensure loading is always set to false
+      setLoading(false);
+      
+      // Handle specific error types
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please check your internet connection and try again.');
+      } else if (err.message?.includes('Network request failed') || err.message?.includes('Failed to fetch')) {
+        setError('Network error. Please check your internet connection.');
+      } else {
+        console.error('Error fetching sale:', err);
+        setError('Failed to load sale details. Please try again.');
+      }
+    }
+  };
+
+  // Loading state - render visible loading UI
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3A2268" />
+          <Text style={styles.loadingText}>Loading sale details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Success state - placeholder for now
+  if (sale) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>SALE LOADED</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Error state - placeholder for now
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }} edges={['top', 'bottom']}>
-      <View />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Error: {error || 'Unknown error'}</Text>
+      </View>
     </SafeAreaView>
   );
 }

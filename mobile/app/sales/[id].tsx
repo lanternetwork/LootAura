@@ -90,6 +90,69 @@ export default function SaleDetailScreen() {
     fetchSaleData(saleId);
   }, [saleId]);
 
+  const formatDate = (dateStr: string, timeStr?: string) => {
+    try {
+      const date = timeStr ? new Date(`${dateStr}T${timeStr}`) : new Date(dateStr);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        ...(timeStr ? { hour: 'numeric', minute: '2-digit' } : {}),
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatPrice = (price?: number) => {
+    if (!price) return null;
+    return `$${price.toFixed(2)}`;
+  };
+
+  // Safely get safe area insets - provide safe defaults
+  const insets = {
+    top: safeAreaInsets?.top ?? 0,
+    bottom: safeAreaInsets?.bottom ?? 0,
+    left: safeAreaInsets?.left ?? 0,
+    right: safeAreaInsets?.right ?? 0,
+  };
+
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const handleOpenMaps = () => {
+    if (!sale?.lat || !sale?.lng) return;
+
+    const address = sale.address
+      ? `${sale.address}, ${sale.city}, ${sale.state}`
+      : `${sale.city}, ${sale.state}`;
+
+    // Open in default maps app
+    const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+    Linking.openURL(url).catch(err => console.error('Error opening maps:', err));
+  };
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = `${API_URL}/sales/${sale?.id}`;
+      const shareText = sale?.city && sale?.state
+        ? `${sale.city}, ${sale.state}`
+        : undefined;
+
+      await Share.share({
+        message: shareText ? `${shareText} — ${sale?.title || 'Yard Sale'}\n${shareUrl}` : `${sale?.title || 'Yard Sale'}\n${shareUrl}`,
+        url: shareUrl,
+        title: sale?.title || 'Yard Sale',
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handleFavoriteToggle = () => {
+    // TODO: Implement favorite API call
+    setIsFavorited(!isFavorited);
+  };
+
   const fetchSaleData = async (saleId: string) => {
     // Create AbortController for timeout
     const controller = new AbortController();
@@ -189,22 +252,192 @@ export default function SaleDetailScreen() {
     );
   }
 
-  // Success state - placeholder for now
+  // Success state - Full UI with items and footer
   if (sale) {
+    // Calculate footer height: 12px (top) + 44px (button) + 12px (bottom) + safe area
+    const footerHeight = 12 + 44 + 12 + insets.bottom;
+    // Content bottom padding: 80px + safe area (matches web contract)
+    const contentBottomPadding = 80 + insets.bottom;
+
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>SALE LOADED</Text>
+        <View style={styles.mainContainer}>
+          {/* Scrollable Content */}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: contentBottomPadding }
+            ]}
+            showsVerticalScrollIndicator={true}
+          >
+            {/* Header with back button */}
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <Text style={styles.backButtonText}>← Back</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Cover Image */}
+            {sale.cover_image_url && (
+              <Image
+                source={{ uri: sale.cover_image_url }}
+                style={styles.coverImage}
+                resizeMode="cover"
+              />
+            )}
+
+            {/* Title */}
+            <View style={styles.content}>
+              <Text style={styles.title}>{sale.title}</Text>
+
+              {/* Date/Time */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>When</Text>
+                <Text style={styles.sectionText}>
+                  {formatDate(sale.date_start, sale.time_start)}
+                  {sale.date_end && sale.time_end && (
+                    <> - {formatDate(sale.date_end, sale.time_end)}</>
+                  )}
+                </Text>
+              </View>
+
+              {/* Location */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Location</Text>
+                {sale.address && (
+                  <Text style={styles.sectionText}>{sale.address}</Text>
+                )}
+                <Text style={styles.sectionText}>
+                  {sale.city}, {sale.state} {sale.zip_code || ''}
+                </Text>
+              </View>
+
+              {/* Description */}
+              {sale.description && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Description</Text>
+                  <Text style={styles.sectionText}>{sale.description}</Text>
+                </View>
+              )}
+
+              {/* Price */}
+              {sale.price && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Price</Text>
+                  <Text style={styles.sectionText}>{formatPrice(sale.price)}</Text>
+                </View>
+              )}
+
+              {/* Tags/Categories */}
+              {sale.tags && sale.tags.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Categories</Text>
+                  <View style={styles.tagsContainer}>
+                    {sale.tags.map((tag, index) => (
+                      <View key={index} style={styles.tag}>
+                        <Text style={styles.tagText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Items */}
+              {items && items.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Items ({items.length})</Text>
+                  {items.map((item) => (
+                    <View key={item.id} style={styles.itemCard}>
+                      {item.photo && (
+                        <Image
+                          source={{ uri: item.photo }}
+                          style={styles.itemImage}
+                          resizeMode="cover"
+                        />
+                      )}
+                      <View style={styles.itemContent}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        {item.category && (
+                          <Text style={styles.itemCategory}>{item.category}</Text>
+                        )}
+                        {item.price && (
+                          <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Seller Info */}
+              {sale.owner_profile && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Seller</Text>
+                  <Text style={styles.sectionText}>
+                    {sale.owner_profile.display_name || sale.owner_profile.username || 'Unknown'}
+                  </Text>
+                  {sale.owner_stats && sale.owner_stats.ratings_count > 0 && (
+                    <Text style={styles.sellerStats}>
+                      {sale.owner_stats.avg_rating.toFixed(1)} ⭐ ({sale.owner_stats.ratings_count} reviews)
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Fixed Footer - Sibling to ScrollView */}
+          <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+            <View style={styles.footerContent}>
+              {/* Navigate Button (Primary) */}
+              <TouchableOpacity
+                style={styles.navigateButton}
+                onPress={handleOpenMaps}
+              >
+                <Text style={styles.navigateButtonIcon}>🗺️</Text>
+                <Text style={styles.navigateButtonText}>Navigate</Text>
+              </TouchableOpacity>
+
+              {/* Save Button (Secondary) */}
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  isFavorited ? styles.saveButtonActive : styles.saveButtonInactive
+                ]}
+                onPress={handleFavoriteToggle}
+              >
+                <Text style={[
+                  styles.saveButtonIcon,
+                  isFavorited ? styles.saveButtonIconActive : styles.saveButtonIconInactive
+                ]}>
+                  {isFavorited ? '❤️' : '🤍'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Share Button (Secondary) */}
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={handleShare}
+              >
+                <Text style={styles.shareButtonIcon}>📤</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Error state - placeholder for now
+  // Error state
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Error: {error || 'Unknown error'}</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Unable to load sale</Text>
+        <Text style={styles.errorMessage}>{error || 'Sale not found'}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
+          <Text style={styles.retryButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

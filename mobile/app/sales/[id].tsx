@@ -68,6 +68,11 @@ type SaleDetailResponse = {
 };
 
 export default function SaleDetailScreen() {
+  // DIAGNOSTIC: Force immediate first frame commit to test if crash is in render
+  // This will be reverted after confirming behavior
+  return <View style={{ flex: 1, backgroundColor: 'red' }} />;
+  
+  /* Original code commented out for diagnostic
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -195,7 +200,17 @@ export default function SaleDetailScreen() {
     return `$${price.toFixed(2)}`;
   };
 
-  const insets = useSafeAreaInsets();
+  // Safely get safe area insets - useSafeAreaInsets() should not throw,
+  // but we ensure safe defaults to prevent any render crash that would block native splash dismissal
+  const safeAreaInsets = useSafeAreaInsets();
+  // Provide safe defaults to prevent undefined access
+  const insets = {
+    top: safeAreaInsets?.top ?? 0,
+    bottom: safeAreaInsets?.bottom ?? 0,
+    left: safeAreaInsets?.left ?? 0,
+    right: safeAreaInsets?.right ?? 0,
+  };
+  
   const [isFavorited, setIsFavorited] = useState(false);
 
   const handleOpenMaps = () => {
@@ -435,6 +450,7 @@ export default function SaleDetailScreen() {
       </View>
     </SafeAreaView>
   );
+  */
 }
 
 const styles = StyleSheet.create({

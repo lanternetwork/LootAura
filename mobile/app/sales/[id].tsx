@@ -68,8 +68,24 @@ type SaleDetailResponse = {
 };
 
 export default function SaleDetailScreen() {
-  // DIAGNOSTIC STEP 1: Re-enable ONLY the outer shell
-  // Testing if SafeAreaView container itself causes crash
+  // DIAGNOSTIC STEP 2: Re-enable hooks only (no usage)
+  // Testing if hooks themselves cause crash, even when results aren't used
+  
+  // Re-introduce all hooks
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sale, setSale] = useState<Sale | null>(null);
+  const [items, setItems] = useState<SaleItem[]>([]);
+  const safeAreaInsets = useSafeAreaInsets();
+  
+  // Add useEffect (even if it does nothing)
+  useEffect(() => {
+    // Empty effect - just testing if useEffect causes crash
+  }, []);
+  
+  // Keep JSX exactly the same - do not use any hook results
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }} edges={['top', 'bottom']}>
       <View />

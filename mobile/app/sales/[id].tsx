@@ -515,7 +515,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -534,27 +536,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 18,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   sectionText: {
     fontSize: 16,
     color: '#4B5563',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -617,6 +621,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)',  // bg-white/95
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',  // border-gray-200
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3, // Android shadow
   },
   footerContent: {
     flexDirection: 'row',

@@ -458,7 +458,7 @@ export default function SaleDetailClient({
       )}
 
       {/* Mobile Layout */}
-      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? '' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
+      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
         {/* Back to map button - Mobile only */}
         <Link
           href={backUrl}

@@ -173,9 +173,6 @@ export default function SaleDetailClient({
   // Check for embed mode from searchParams
   const isEmbed = searchParams.get('embed') === '1'
   
-  // Detect if running inside React Native WebView
-  const isWebView = typeof window !== 'undefined' && !!(window as any).ReactNativeWebView
-  
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')
   const lng = searchParams.get('lng')

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Dimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
@@ -40,6 +40,20 @@ export default function SaleDetailScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const safeAreaInsets = useSafeAreaInsets();
+  
+  // Get window dimensions to conditionally hide grid icon on very small screens
+  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width);
+  useEffect(() => {
+    const updateWidth = () => {
+      setWindowWidth(Dimensions.get('window').width);
+    };
+    const subscription = Dimensions.addEventListener('change', updateWidth);
+    return () => subscription?.remove();
+  }, []);
+  
+  // Hide grid icon on screens narrower than 320px to prevent button shrinking
+  // This ensures all visible buttons maintain 44x44 tap target size
+  const shouldShowGridIcon = windowWidth >= 320;
 
   // Normalize id parameter: handle string | string[] | undefined
   // Expo Router can return arrays for route params, so we normalize to string | null
@@ -166,9 +180,11 @@ export default function SaleDetailScreen() {
               <TouchableOpacity onPress={handlePlusClick} style={styles.headerIconButton}>
                 <PlusIcon />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSignInClick} style={styles.headerIconButton}>
-                <GridIcon />
-              </TouchableOpacity>
+              {shouldShowGridIcon && (
+                <TouchableOpacity onPress={handleSignInClick} style={styles.headerIconButton}>
+                  <GridIcon />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -298,8 +314,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4, // gap-1 = 4px (matching web)
-    // Ensure buttons fit within header bounds
-    flexShrink: 1,
+    // Prevent buttons from shrinking - hide grid icon on small screens instead
+    flexShrink: 0,
   },
   headerIconButton: {
     width: 44, // min-w-[44px] = 44px (matching web)
@@ -312,7 +328,8 @@ const styles = StyleSheet.create({
     borderRadius: 8, // rounded-lg
     justifyContent: 'center',
     alignItems: 'center',
-    // No absolute positioning - flows naturally in flex row
+    // Never shrink below 44x44 - buttons maintain tap target size
+    flexShrink: 0,
   },
   // WebView Container
   webViewContainer: {

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking, Share, StatusBar } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import * as SystemUI from 'expo-system-ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 
@@ -93,15 +92,13 @@ export default function SaleDetailScreen() {
 
   // Explicitly restore Android system status bar on screen focus
   // This ensures status bar is visible regardless of prior WebView behavior
+  // Uses react-native StatusBar imperative API to reset Android window flags
   useFocusEffect(() => {
-    // Imperatively reset system UI to ensure status bar is visible
-    // This prevents crashes from StatusBar component and ensures visibility
-    SystemUI.setBackgroundColorAsync('#ffffff').catch(err => {
-      // Silently handle errors - this is a defensive reset
-      if (__DEV__) {
-        console.warn('[SystemUI] Failed to set background color:', err);
-      }
-    });
+    // Imperatively reset status bar state to ensure visibility
+    // This overrides any fullscreen/immersive flags set by WebView
+    StatusBar.setHidden(false);
+    StatusBar.setTranslucent(false);
+    StatusBar.setBackgroundColor('#ffffff', true);
   });
 
   const formatDate = (dateStr: string, timeStr?: string) => {

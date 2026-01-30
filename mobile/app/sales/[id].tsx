@@ -33,7 +33,7 @@ export default function SaleDetailScreen() {
     // This overrides any fullscreen/immersive flags set by WebView
     StatusBar.setHidden(false);
     StatusBar.setTranslucent(false);
-    StatusBar.setBackgroundColor('#3A2268', true); // Purple to match header
+    StatusBar.setBackgroundColor('#FFFFFF', true); // White to match header
   });
 
   // Handle WebView load events
@@ -133,28 +133,27 @@ export default function SaleDetailScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.mainContainer}>
-        {/* Native Header - Purple background matching web */}
+        {/* Native Header - White background matching web mobile */}
         <View style={[styles.header, { paddingTop: insets.top }]}>
           <View style={styles.headerContent}>
-            {/* Logo and app name */}
-            <TouchableOpacity onPress={handleMapClick} style={styles.logoContainer}>
-              <Text style={styles.logoIcon}>📍</Text>
-              <Text style={styles.logoText}>Loot Aura</Text>
+            {/* Left side: Back button */}
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Text style={styles.backButtonIcon}>←</Text>
             </TouchableOpacity>
 
-            {/* Right side buttons */}
+            {/* Right side: Icon buttons matching web */}
             <View style={styles.headerButtons}>
-              <TouchableOpacity onPress={handleMapClick} style={styles.headerButton}>
-                <Text style={styles.headerButtonIcon}>📍</Text>
+              <TouchableOpacity onPress={handleMapClick} style={styles.headerIconButton}>
+                <Text style={styles.headerIconButtonText}>📍</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleHeartClick} style={styles.headerButton}>
-                <Text style={styles.headerButtonIcon}>❤️</Text>
+              <TouchableOpacity onPress={handleHeartClick} style={styles.headerIconButton}>
+                <Text style={styles.headerIconButtonText}>❤️</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handlePlusClick} style={styles.headerButton}>
-                <Text style={styles.headerButtonIcon}>➕</Text>
+              <TouchableOpacity onPress={handlePlusClick} style={styles.headerIconButton}>
+                <Text style={styles.headerIconButtonText}>➕</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSignInClick} style={styles.signInButton}>
-                <Text style={styles.signInButtonText}>Sign In</Text>
+              <TouchableOpacity onPress={handleSignInClick} style={styles.headerIconButton}>
+                <Text style={styles.headerIconButtonText}>☰</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -187,10 +186,10 @@ export default function SaleDetailScreen() {
           )}
         </View>
 
-        {/* Fixed Footer - Sibling to WebView */}
+        {/* Fixed Footer - Matching web sticky action bar */}
         <View style={styles.footer}>
           <View style={styles.footerContent}>
-            {/* Navigate Button (Primary) */}
+            {/* Navigate Button (Primary) - flex-1, purple-600 */}
             <TouchableOpacity
               style={styles.navigateButton}
               onPress={handleOpenMaps}
@@ -199,7 +198,7 @@ export default function SaleDetailScreen() {
               <Text style={styles.navigateButtonText}>Navigate</Text>
             </TouchableOpacity>
 
-            {/* Save Button (Secondary) */}
+            {/* Save Button (Secondary) - w-12 h-12, rounded-lg */}
             <TouchableOpacity
               style={[
                 styles.saveButton,
@@ -215,7 +214,7 @@ export default function SaleDetailScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Share Button (Secondary) */}
+            {/* Share Button (Secondary) - w-12 h-12, purple tint */}
             <TouchableOpacity
               style={styles.shareButton}
               onPress={handleShare}
@@ -245,66 +244,57 @@ export default function SaleDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#3A2268', // Purple to match header
+    backgroundColor: '#FFFFFF',
   },
   mainContainer: {
     flex: 1,
     flexDirection: 'column',
   },
-  // Native Header Styles (matching web)
+  // Native Header Styles (matching web mobile: white bg, h-14, border-bottom)
   header: {
-    backgroundColor: '#3A2268',
-    paddingBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB', // border-gray-200
+    height: 56, // h-14 = 56px
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    minHeight: 48,
+    paddingHorizontal: 12, // px-3 = 12px
+    height: 56,
   },
-  logoContainer: {
-    flexDirection: 'row',
+  backButton: {
+    width: 40, // w-10 = 40px
+    height: 40, // h-10 = 40px
+    borderRadius: 20, // rounded-full
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
   },
-  logoIcon: {
-    fontSize: 20,
-  },
-  logoText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  backButtonIcon: {
+    fontSize: 24,
+    color: '#374151', // text-gray-700
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 4, // gap-1 = 4px
   },
-  headerButton: {
-    width: 40,
-    height: 40,
+  headerIconButton: {
+    width: 44, // min-w-[44px] = 44px
+    height: 44, // min-h-[44px] = 44px
+    minWidth: 44,
+    minHeight: 44,
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB', // border-gray-300
+    borderRadius: 8, // rounded-lg
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerButtonIcon: {
-    fontSize: 18,
-  },
-  signInButton: {
-    backgroundColor: '#F4B63A',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minHeight: 40,
-    justifyContent: 'center',
-  },
-  signInButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+  headerIconButtonText: {
+    fontSize: 20,
+    color: '#374151', // text-gray-700
   },
   // WebView Container
   webViewContainer: {
@@ -361,24 +351,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // Fixed Footer Styles (matches web contract)
+  // Fixed Footer Styles (matches web sticky action bar exactly)
   footer: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',  // bg-white/95
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',  // border-gray-200
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3, // Android shadow
   },
   footerContent: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,  // px-4 from web
     paddingTop: 12,         // pt-3 from web
+    paddingBottom: 12,      // pb-[calc(env(safe-area-inset-bottom,0px)+12px)] - SafeAreaView handles bottom inset
     maxWidth: 640,          // max-w-screen-sm from web
     alignSelf: 'center',
     width: '100%',
+    gap: 12,                // gap-3 = 12px
   },
   navigateButton: {
     flex: 1,
@@ -390,11 +378,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,         // py-3
     borderRadius: 8,             // rounded-lg
     minHeight: 44,               // min-h-[44px]
-    marginRight: 12,             // gap-3 from web (12px gap)
   },
   navigateButtonIcon: {
     fontSize: 20,
     marginRight: 8,
+    color: '#FFFFFF',
   },
   navigateButtonText: {
     color: '#FFFFFF',
@@ -402,13 +390,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',  // font-medium
   },
   saveButton: {
-    width: 48,   // w-12
-    height: 48,  // h-12
+    width: 48,   // w-12 = 48px
+    height: 48,  // h-12 = 48px
     minHeight: 44,  // min-h-[44px]
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,  // rounded-lg
-    marginRight: 12,  // gap-3 from web (12px gap)
   },
   saveButtonActive: {
     backgroundColor: '#FEE2E2',  // bg-red-100
@@ -426,8 +413,8 @@ const styles = StyleSheet.create({
     color: '#374151',  // text-gray-700
   },
   shareButton: {
-    width: 48,   // w-12
-    height: 48,  // h-12
+    width: 48,   // w-12 = 48px
+    height: 48,  // h-12 = 48px
     minHeight: 44,  // min-h-[44px]
     alignItems: 'center',
     justifyContent: 'center',

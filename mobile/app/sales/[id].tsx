@@ -3,11 +3,167 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, S
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
+import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 const LOOTAURA_URL = 'https://lootaura.com';
 
 // Types removed - using WebView to load web sale detail page
+
+// Icon components matching web mobile breakpoint SVG icons
+// Using View-based shapes to approximate the SVG paths
+const MapPinIcon = () => (
+  <View style={iconStyles.mapPinContainer}>
+    <View style={iconStyles.mapPinCircle} />
+    <View style={iconStyles.mapPinDot} />
+  </View>
+);
+
+const HeartIcon = () => (
+  <View style={iconStyles.heartContainer}>
+    <View style={iconStyles.heartShape} />
+  </View>
+);
+
+const PlusIcon = () => (
+  <View style={iconStyles.plusContainer}>
+    <View style={iconStyles.plusHorizontal} />
+    <View style={iconStyles.plusVertical} />
+  </View>
+);
+
+const GridIcon = () => (
+  <View style={iconStyles.gridContainer}>
+    <View style={iconStyles.gridRow}>
+      <View style={iconStyles.gridCell} />
+      <View style={iconStyles.gridCell} />
+    </View>
+    <View style={iconStyles.gridRow}>
+      <View style={iconStyles.gridCell} />
+      <View style={iconStyles.gridCell} />
+    </View>
+  </View>
+);
+
+const BackArrowIcon = () => (
+  <View style={iconStyles.backArrowContainer}>
+    <View style={iconStyles.backArrowTop} />
+    <View style={iconStyles.backArrowBottom} />
+  </View>
+);
+
+const iconStyles = StyleSheet.create({
+  // Map Pin Icon - location marker with circle and dot
+  mapPinContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapPinCircle: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#374151',
+    position: 'absolute',
+    top: 0,
+  },
+  mapPinDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#374151',
+    position: 'absolute',
+    top: 4.5,
+  },
+  // Heart Icon - outline heart shape
+  heartContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heartShape: {
+    width: 12,
+    height: 11,
+    borderWidth: 2,
+    borderColor: '#374151',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 0,
+    transform: [{ rotate: '45deg' }],
+    position: 'absolute',
+    top: 2,
+    left: 4,
+  },
+  // Plus Icon - cross shape
+  plusContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  plusHorizontal: {
+    width: 12,
+    height: 2,
+    backgroundColor: '#374151',
+    position: 'absolute',
+  },
+  plusVertical: {
+    width: 2,
+    height: 12,
+    backgroundColor: '#374151',
+    position: 'absolute',
+  },
+  // Grid Icon - 2x2 grid of squares
+  gridContainer: {
+    width: 20,
+    height: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignContent: 'space-between',
+  },
+  gridRow: {
+    width: '100%',
+    height: '48%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  gridCell: {
+    width: '48%',
+    height: '100%',
+    borderWidth: 1.5,
+    borderColor: '#374151',
+    borderRadius: 1,
+  },
+  // Back Arrow Icon - chevron left
+  backArrowContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  backArrowTop: {
+    width: 8,
+    height: 2,
+    backgroundColor: '#374151',
+    position: 'absolute',
+    top: 9,
+    left: 6,
+    transform: [{ rotate: '-45deg' }],
+  },
+  backArrowBottom: {
+    width: 8,
+    height: 2,
+    backgroundColor: '#374151',
+    position: 'absolute',
+    bottom: 9,
+    left: 6,
+    transform: [{ rotate: '45deg' }],
+  },
+});
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -129,22 +285,22 @@ export default function SaleDetailScreen() {
           <View style={styles.headerContent}>
             {/* Left side: Back button */}
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Text style={styles.backButtonIcon}>‹</Text>
+              <BackArrowIcon />
             </TouchableOpacity>
 
             {/* Right side: Icon buttons matching web */}
             <View style={styles.headerButtons}>
               <TouchableOpacity onPress={handleMapClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconText}>📍</Text>
+                <MapPinIcon />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleHeartClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconText}>♡</Text>
+                <HeartIcon />
               </TouchableOpacity>
               <TouchableOpacity onPress={handlePlusClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconText}>+</Text>
+                <PlusIcon />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleSignInClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconText}>☰</Text>
+                <GridIcon />
               </TouchableOpacity>
             </View>
           </View>
@@ -290,11 +446,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     // No absolute positioning - flows naturally in flex row
-  },
-  headerIconText: {
-    fontSize: 18,
-    color: '#374151', // text-gray-700
-    lineHeight: 18,
   },
   // WebView Container
   webViewContainer: {

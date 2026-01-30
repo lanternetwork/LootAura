@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, S
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
-import Svg, { Path } from 'react-native-svg';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 const LOOTAURA_URL = 'https://lootaura.com';
@@ -130,33 +129,22 @@ export default function SaleDetailScreen() {
           <View style={styles.headerContent}>
             {/* Left side: Back button */}
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </Svg>
+              <Text style={styles.backButtonIcon}>‹</Text>
             </TouchableOpacity>
 
             {/* Right side: Icon buttons matching web */}
             <View style={styles.headerButtons}>
               <TouchableOpacity onPress={handleMapClick} style={styles.headerIconButton}>
-                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </Svg>
+                <Text style={styles.headerIconText}>📍</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleHeartClick} style={styles.headerIconButton}>
-                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </Svg>
+                <Text style={styles.headerIconText}>♡</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handlePlusClick} style={styles.headerIconButton}>
-                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </Svg>
+                <Text style={styles.headerIconText}>+</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleSignInClick} style={styles.headerIconButton}>
-                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </Svg>
+                <Text style={styles.headerIconText}>☰</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -277,6 +265,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     // No absolute positioning - flows naturally in flex row
   },
+  backButtonIcon: {
+    fontSize: 28,
+    color: '#374151', // text-gray-700
+    fontWeight: '300',
+    lineHeight: 28,
+  },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,6 +290,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     // No absolute positioning - flows naturally in flex row
+  },
+  headerIconText: {
+    fontSize: 18,
+    color: '#374151', // text-gray-700
+    lineHeight: 18,
   },
   // WebView Container
   webViewContainer: {

@@ -137,10 +137,6 @@ export default function SaleDetailClient({
   promotionsEnabled = false,
   paymentsEnabled = false,
 }: SaleDetailClientProps) {
-  // Check for embed mode from searchParams
-  const searchParams = useSearchParams()
-  const isEmbed = searchParams?.get('embed') === '1'
-  
   // Debug logging to diagnose items visibility issue (only in debug mode)
   if (isDebugEnabled) {
     console.log('[SALE_DETAIL_CLIENT] Items received', {
@@ -173,6 +169,9 @@ export default function SaleDetailClient({
   }
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
+  
+  // Check for embed mode from searchParams
+  const isEmbed = searchParams.get('embed') === '1'
   
   // Detect if running inside React Native WebView
   const isWebView = typeof window !== 'undefined' && !!(window as any).ReactNativeWebView

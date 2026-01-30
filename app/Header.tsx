@@ -17,9 +17,6 @@ export function Header() {
   const adminRef = useRef<HTMLDivElement | null>(null)
   const userRef = useRef<HTMLDivElement | null>(null)
   
-  // Check for embed mode - hide header when embed=1
-  const isEmbed = searchParams?.get('embed') === '1'
-  
   // Check if we're on a sale detail page
   const isSaleDetailPage = pathname?.startsWith('/sales/') && pathname !== '/sales'
   
@@ -97,7 +94,7 @@ export function Header() {
   }, [])
   
   // Hide header in embed mode
-  const isEmbed = searchParams?.get('embed') === '1'
+  const isEmbed = searchParams.get('embed') === '1'
   if (isEmbed) {
     return null
   }

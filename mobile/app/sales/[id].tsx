@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking, Share } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 
@@ -93,12 +93,16 @@ export default function SaleDetailScreen() {
 
   // Explicitly restore Android system status bar on screen focus
   // This ensures status bar is visible regardless of prior WebView behavior
-  useFocusEffect(
-    useEffect(() => {
-      // Force status bar to be visible when this screen is focused
-      // StatusBar component below will handle the actual rendering
-    }, [])
-  );
+  useFocusEffect(() => {
+    // Imperatively reset system UI to ensure status bar is visible
+    // This prevents crashes from StatusBar component and ensures visibility
+    SystemUI.setBackgroundColorAsync('#ffffff').catch(err => {
+      // Silently handle errors - this is a defensive reset
+      if (__DEV__) {
+        console.warn('[SystemUI] Failed to set background color:', err);
+      }
+    });
+  });
 
   const formatDate = (dateStr: string, timeStr?: string) => {
     try {
@@ -254,7 +258,6 @@ export default function SaleDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <StatusBar hidden={false} translucent={false} backgroundColor="#ffffff" style="dark" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3A2268" />
           <Text style={styles.loadingText}>Loading sale details...</Text>
@@ -271,7 +274,6 @@ export default function SaleDetailScreen() {
 
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <StatusBar hidden={false} translucent={false} backgroundColor="#ffffff" style="dark" />
         <View style={styles.mainContainer}>
           {/* Scrollable Content */}
           <ScrollView
@@ -443,7 +445,6 @@ export default function SaleDetailScreen() {
   // Error state
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar hidden={false} translucent={false} backgroundColor="#ffffff" style="dark" />
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>Unable to load sale</Text>
         <Text style={styles.errorMessage}>{error || 'Sale not found'}</Text>

@@ -93,6 +93,12 @@ export function Header() {
     return () => { cancelAnimationFrame(raf); ro.disconnect() }
   }, [])
   
+  // Hide header in embed mode
+  const isEmbed = searchParams.get('embed') === '1'
+  if (isEmbed) {
+    return null
+  }
+  
   return (
     <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">
       <div ref={containerRef} className="w-full px-3 sm:px-6 lg:px-8 h-full">

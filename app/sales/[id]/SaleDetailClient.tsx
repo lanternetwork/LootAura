@@ -170,8 +170,8 @@ export default function SaleDetailClient({
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
   
-  // Detect if running inside React Native WebView
-  const isWebView = typeof window !== 'undefined' && !!(window as any).ReactNativeWebView
+  // Check for embed mode from searchParams
+  const isEmbed = searchParams.get('embed') === '1'
   
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')
@@ -435,28 +435,30 @@ export default function SaleDetailClient({
   const currentCenter = location || { lat: sale.lat || 38.2527, lng: sale.lng || -85.7585 }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8">
-      {/* Breadcrumb - Desktop only */}
-      <nav className="hidden md:block mb-8">
-        <ol className="flex items-center space-x-2 text-sm text-gray-500">
-          <li>
-            <Link href="/" className="hover:text-gray-700">
-              Home
-            </Link>
-          </li>
-          <li>/</li>
-          <li>
-            <Link href={backUrl} className="hover:text-gray-700">
-              Sales
-            </Link>
-          </li>
-          <li>/</li>
-          <li className="text-gray-900 font-medium">{sale.title}</li>
-        </ol>
-      </nav>
+    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8 ${isEmbed ? 'pb-[88px]' : ''}`}>
+      {/* Breadcrumb - Desktop only (hidden in embed mode) */}
+      {!isEmbed && (
+        <nav className="hidden md:block mb-8">
+          <ol className="flex items-center space-x-2 text-sm text-gray-500">
+            <li>
+              <Link href="/" className="hover:text-gray-700">
+                Home
+              </Link>
+            </li>
+            <li>/</li>
+            <li>
+              <Link href={backUrl} className="hover:text-gray-700">
+                Sales
+              </Link>
+            </li>
+            <li>/</li>
+            <li className="text-gray-900 font-medium">{sale.title}</li>
+          </ol>
+        </nav>
+      )}
 
       {/* Mobile Layout */}
-      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isWebView ? '' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
+      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? '' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
         {/* Back to map button - Mobile only */}
         <Link
           href={backUrl}
@@ -1078,8 +1080,8 @@ export default function SaleDetailClient({
         </div>
       </div>
 
-      {/* Sticky Bottom Action Bar - Mobile Only (hidden in WebView) */}
-      {!isWebView && (
+      {/* Sticky Bottom Action Bar - Mobile Only (hidden in embed mode) */}
+      {!isEmbed && (
       <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200">
         <div className="max-w-screen-sm mx-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-3">
           <div className="flex gap-3">

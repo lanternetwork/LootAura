@@ -1,94 +1,29 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking, Share, StatusBar } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, StatusBar } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { WebView } from 'react-native-webview';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
+const LOOTAURA_URL = 'https://lootaura.com';
 
-// Types matching the API response
-type SaleItem = {
-  id: string;
-  sale_id: string;
-  name: string;
-  category?: string;
-  condition?: string;
-  price?: number;
-  photo?: string;
-  purchased: boolean;
-  created_at?: string;
-};
-
-type OwnerProfile = {
-  id: string;
-  display_name?: string;
-  username?: string;
-  avatar_url?: string;
-  created_at?: string;
-};
-
-type OwnerStats = {
-  total_sales: number;
-  avg_rating: number;
-  ratings_count: number;
-  last_sale_at: string | null;
-};
-
-type Sale = {
-  id: string;
-  title: string;
-  description?: string;
-  address?: string;
-  city: string;
-  state: string;
-  zip_code?: string;
-  lat?: number;
-  lng?: number;
-  date_start: string;
-  time_start: string;
-  date_end?: string;
-  time_end?: string;
-  price?: number;
-  tags?: string[];
-  cover_image_url?: string | null;
-  images?: string[] | null;
-  archived_at?: string | null;
-  status: 'draft' | 'published' | 'archived' | 'active';
-  privacy_mode: 'exact' | 'block_until_24h';
-  is_featured: boolean;
-  pricing_mode?: 'negotiable' | 'firm' | 'best_offer' | 'ask';
-  created_at: string;
-  updated_at: string;
-  owner_profile: OwnerProfile | null;
-  owner_stats: OwnerStats | null;
-};
-
-type SaleDetailResponse = {
-  sale: Sale;
-  items: SaleItem[];
-};
+// Types removed - using WebView to load web sale detail page
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sale, setSale] = useState<Sale | null>(null);
-  const [items, setItems] = useState<SaleItem[]>([]);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const webViewRef = useRef<WebView>(null);
   const safeAreaInsets = useSafeAreaInsets();
 
   // Normalize id parameter: handle string | string[] | undefined
   // Expo Router can return arrays for route params, so we normalize to string | null
   const saleId = Array.isArray(id) ? (id[0] || null) : (id || null);
 
-  useEffect(() => {
-    if (!saleId) {
-      setError('Sale ID is required');
-      setLoading(false);
-      return;
-    }
-
-    fetchSaleData(saleId);
-  }, [saleId]);
+  // WebView URL with embed parameter
+  const webViewUrl = saleId ? `${LOOTAURA_URL}/sales/${saleId}?embed=1` : null;
 
   // Explicitly restore Android system status bar on screen focus
   // This ensures status bar is visible regardless of prior WebView behavior
@@ -98,26 +33,33 @@ export default function SaleDetailScreen() {
     // This overrides any fullscreen/immersive flags set by WebView
     StatusBar.setHidden(false);
     StatusBar.setTranslucent(false);
-    StatusBar.setBackgroundColor('#ffffff', true);
+    StatusBar.setBackgroundColor('#3A2268', true); // Purple to match header
   });
 
-  const formatDate = (dateStr: string, timeStr?: string) => {
-    try {
-      const date = timeStr ? new Date(`${dateStr}T${timeStr}`) : new Date(dateStr);
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        ...(timeStr ? { hour: 'numeric', minute: '2-digit' } : {}),
-      });
-    } catch {
-      return dateStr;
-    }
+  // Handle WebView load events
+  const handleLoadStart = () => {
+    setLoading(true);
+    setError(null);
   };
 
-  const formatPrice = (price?: number) => {
-    if (!price) return null;
-    return `$${price.toFixed(2)}`;
+  const handleLoadEnd = () => {
+    setLoading(false);
+  };
+
+  const handleError = (syntheticEvent: any) => {
+    setLoading(false);
+    setError('Failed to load sale details');
+    console.error('WebView error:', syntheticEvent.nativeEvent);
+  };
+
+  const handleHttpError = (syntheticEvent: any) => {
+    const { statusCode } = syntheticEvent.nativeEvent;
+    setLoading(false);
+    if (statusCode === 404) {
+      setError('Sale not found');
+    } else {
+      setError('Failed to load sale details');
+    }
   };
 
   // Safely get safe area insets - provide safe defaults
@@ -128,31 +70,22 @@ export default function SaleDetailScreen() {
     right: safeAreaInsets?.right ?? 0,
   };
 
-  const [isFavorited, setIsFavorited] = useState(false);
-
+  // Handle footer actions
   const handleOpenMaps = () => {
-    if (!sale?.lat || !sale?.lng) return;
-
-    const address = sale.address
-      ? `${sale.address}, ${sale.city}, ${sale.state}`
-      : `${sale.city}, ${sale.state}`;
-
-    // Open in default maps app
-    const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
-    Linking.openURL(url).catch(err => console.error('Error opening maps:', err));
+    // Extract address from WebView via postMessage or use saleId to construct URL
+    // For now, we'll let the web page handle this via postMessage
+    if (webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({ type: 'navigate' }));
+    }
   };
 
   const handleShare = async () => {
     try {
-      const shareUrl = `${API_URL}/sales/${sale?.id}`;
-      const shareText = sale?.city && sale?.state
-        ? `${sale.city}, ${sale.state}`
-        : undefined;
-
+      const shareUrl = saleId ? `${API_URL}/sales/${saleId}` : API_URL;
       await Share.share({
-        message: shareText ? `${shareText} — ${sale?.title || 'Yard Sale'}\n${shareUrl}` : `${sale?.title || 'Yard Sale'}\n${shareUrl}`,
+        message: `Check out this yard sale!\n${shareUrl}`,
         url: shareUrl,
-        title: sale?.title || 'Yard Sale',
+        title: 'Yard Sale',
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -160,284 +93,140 @@ export default function SaleDetailScreen() {
   };
 
   const handleFavoriteToggle = () => {
-    // TODO: Implement favorite API call
     setIsFavorited(!isFavorited);
-  };
-
-  const fetchSaleData = async (saleId: string) => {
-    // Create AbortController for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`${API_URL}/api/sales/${saleId}`, {
-        signal: controller.signal,
-      });
-      
-      // Clear timeout once we have a response (success or error)
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        setLoading(false);
-        if (response.status === 404) {
-          setError('Sale not found');
-        } else {
-          setError('Failed to load sale details');
-        }
-        return;
-      }
-
-      // Validate response has content before parsing
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        setLoading(false);
-        setError('Invalid response format from server');
-        return;
-      }
-
-      // Parse JSON with explicit error handling
-      let data: SaleDetailResponse;
-      try {
-        const text = await response.text();
-        if (!text || text.trim().length === 0) {
-          setLoading(false);
-          setError('Empty response from server');
-          return;
-        }
-        data = JSON.parse(text);
-      } catch (parseError) {
-        setLoading(false);
-        console.error('Error parsing JSON:', parseError);
-        setError('Invalid data format received');
-        return;
-      }
-
-      // Validate response structure before setting state
-      if (!data || typeof data !== 'object') {
-        setLoading(false);
-        setError('Invalid response structure');
-        return;
-      }
-
-      if (!data.sale) {
-        setLoading(false);
-        setError('Sale data missing from response');
-        return;
-      }
-
-      // All validations passed - set data
-      setSale(data.sale);
-      setItems(data.items || []);
-      setLoading(false);
-    } catch (err: any) {
-      // Clear timeout if still pending
-      clearTimeout(timeoutId);
-      
-      // Ensure loading is always set to false
-      setLoading(false);
-      
-      // Handle specific error types
-      if (err.name === 'AbortError') {
-        setError('Request timed out. Please check your internet connection and try again.');
-      } else if (err.message?.includes('Network request failed') || err.message?.includes('Failed to fetch')) {
-        setError('Network error. Please check your internet connection.');
-      } else {
-        console.error('Error fetching sale:', err);
-        setError('Failed to load sale details. Please try again.');
-      }
+    // Send message to WebView to toggle favorite
+    if (webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({ type: 'toggleFavorite' }));
     }
   };
 
-  // Loading state - render visible loading UI
-  if (loading) {
+  // Handle header button actions
+  const handleMapClick = () => {
+    router.replace('/');
+  };
+
+  const handleHeartClick = () => {
+    router.replace('/');
+  };
+
+  const handlePlusClick = () => {
+    router.replace('/');
+  };
+
+  const handleSignInClick = () => {
+    router.replace('/');
+  };
+
+  if (!saleId || !webViewUrl) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3A2268" />
-          <Text style={styles.loadingText}>Loading sale details...</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Invalid sale ID</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Success state - Full UI with items and footer
-  if (sale) {
-    // Content bottom padding: 80px (spacing above footer)
-    // SafeAreaView handles bottom safe area inset automatically
-    const contentBottomPadding = 80;
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.mainContainer}>
+        {/* Native Header - Purple background matching web */}
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <View style={styles.headerContent}>
+            {/* Logo and app name */}
+            <TouchableOpacity onPress={handleMapClick} style={styles.logoContainer}>
+              <Text style={styles.logoIcon}>📍</Text>
+              <Text style={styles.logoText}>Loot Aura</Text>
+            </TouchableOpacity>
 
-    return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.mainContainer}>
-          {/* Scrollable Content */}
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={[
-              styles.scrollContent,
-              { paddingBottom: contentBottomPadding }
-            ]}
-            showsVerticalScrollIndicator={true}
-          >
-            {/* Header with back button */}
-            <View style={styles.header}>
-              <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                <Text style={styles.backButtonText}>← Back</Text>
+            {/* Right side buttons */}
+            <View style={styles.headerButtons}>
+              <TouchableOpacity onPress={handleMapClick} style={styles.headerButton}>
+                <Text style={styles.headerButtonIcon}>📍</Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Cover Image */}
-            {sale.cover_image_url && (
-              <Image
-                source={{ uri: sale.cover_image_url }}
-                style={styles.coverImage}
-                resizeMode="cover"
-              />
-            )}
-
-            {/* Title */}
-            <View style={styles.content}>
-              <Text style={styles.title}>{sale.title}</Text>
-
-              {/* Date/Time */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>When</Text>
-                <Text style={styles.sectionText}>
-                  {formatDate(sale.date_start, sale.time_start)}
-                  {sale.date_end && sale.time_end && (
-                    <> - {formatDate(sale.date_end, sale.time_end)}</>
-                  )}
-                </Text>
-              </View>
-
-              {/* Location */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Location</Text>
-                {sale.address && (
-                  <Text style={styles.sectionText}>{sale.address}</Text>
-                )}
-                <Text style={styles.sectionText}>
-                  {sale.city}, {sale.state} {sale.zip_code || ''}
-                </Text>
-              </View>
-
-              {/* Description */}
-              {sale.description && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Description</Text>
-                  <Text style={styles.sectionText}>{sale.description}</Text>
-                </View>
-              )}
-
-              {/* Price */}
-              {sale.price && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Price</Text>
-                  <Text style={styles.sectionText}>{formatPrice(sale.price)}</Text>
-                </View>
-              )}
-
-              {/* Tags/Categories */}
-              {sale.tags && sale.tags.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Categories</Text>
-                  <View style={styles.tagsContainer}>
-                    {sale.tags.map((tag, index) => (
-                      <View key={index} style={styles.tag}>
-                        <Text style={styles.tagText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Items */}
-              {items && items.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Items ({items.length})</Text>
-                  {items.map((item) => (
-                    <View key={item.id} style={styles.itemCard}>
-                      {item.photo && (
-                        <Image
-                          source={{ uri: item.photo }}
-                          style={styles.itemImage}
-                          resizeMode="cover"
-                        />
-                      )}
-                      <View style={styles.itemContent}>
-                        <Text style={styles.itemName}>{item.name}</Text>
-                        {item.category && (
-                          <Text style={styles.itemCategory}>{item.category}</Text>
-                        )}
-                        {item.price && (
-                          <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
-                        )}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Seller Info */}
-              {sale.owner_profile && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Seller</Text>
-                  <Text style={styles.sectionText}>
-                    {sale.owner_profile.display_name || sale.owner_profile.username || 'Unknown'}
-                  </Text>
-                  {sale.owner_stats && sale.owner_stats.ratings_count > 0 && (
-                    <Text style={styles.sellerStats}>
-                      {sale.owner_stats.avg_rating.toFixed(1)} ⭐ ({sale.owner_stats.ratings_count} reviews)
-                    </Text>
-                  )}
-                </View>
-              )}
-            </View>
-          </ScrollView>
-
-          {/* Fixed Footer - Sibling to ScrollView */}
-          <View style={styles.footer}>
-            <View style={styles.footerContent}>
-              {/* Navigate Button (Primary) */}
-              <TouchableOpacity
-                style={styles.navigateButton}
-                onPress={handleOpenMaps}
-              >
-                <Text style={styles.navigateButtonIcon}>🗺️</Text>
-                <Text style={styles.navigateButtonText}>Navigate</Text>
+              <TouchableOpacity onPress={handleHeartClick} style={styles.headerButton}>
+                <Text style={styles.headerButtonIcon}>❤️</Text>
               </TouchableOpacity>
-
-              {/* Save Button (Secondary) */}
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  isFavorited ? styles.saveButtonActive : styles.saveButtonInactive
-                ]}
-                onPress={handleFavoriteToggle}
-              >
-                <Text style={[
-                  styles.saveButtonIcon,
-                  isFavorited ? styles.saveButtonIconActive : styles.saveButtonIconInactive
-                ]}>
-                  {isFavorited ? '❤️' : '🤍'}
-                </Text>
+              <TouchableOpacity onPress={handlePlusClick} style={styles.headerButton}>
+                <Text style={styles.headerButtonIcon}>➕</Text>
               </TouchableOpacity>
-
-              {/* Share Button (Secondary) */}
-              <TouchableOpacity
-                style={styles.shareButton}
-                onPress={handleShare}
-              >
-                <Text style={styles.shareButtonIcon}>📤</Text>
+              <TouchableOpacity onPress={handleSignInClick} style={styles.signInButton}>
+                <Text style={styles.signInButtonText}>Sign In</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
-      </SafeAreaView>
-    );
-  }
+
+        {/* WebView Content */}
+        <View style={styles.webViewContainer}>
+          <WebView
+            ref={webViewRef}
+            source={{ uri: webViewUrl }}
+            style={styles.webview}
+            onLoadStart={handleLoadStart}
+            onLoadEnd={handleLoadEnd}
+            onError={handleError}
+            onHttpError={handleHttpError}
+            startInLoadingState={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            sharedCookiesEnabled={true}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            thirdPartyCookiesEnabled={true}
+            mixedContentMode="always"
+          />
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3A2268" />
+              <Text style={styles.loadingText}>Loading sale details...</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Fixed Footer - Sibling to WebView */}
+        <View style={styles.footer}>
+          <View style={styles.footerContent}>
+            {/* Navigate Button (Primary) */}
+            <TouchableOpacity
+              style={styles.navigateButton}
+              onPress={handleOpenMaps}
+            >
+              <Text style={styles.navigateButtonIcon}>🗺️</Text>
+              <Text style={styles.navigateButtonText}>Navigate</Text>
+            </TouchableOpacity>
+
+            {/* Save Button (Secondary) */}
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                isFavorited ? styles.saveButtonActive : styles.saveButtonInactive
+              ]}
+              onPress={handleFavoriteToggle}
+            >
+              <Text style={[
+                styles.saveButtonIcon,
+                isFavorited ? styles.saveButtonIconActive : styles.saveButtonIconInactive
+              ]}>
+                {isFavorited ? '❤️' : '🤍'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Share Button (Secondary) */}
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleShare}
+            >
+              <Text style={styles.shareButtonIcon}>📤</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
 
   // Error state
   return (
@@ -456,10 +245,82 @@ export default function SaleDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#3A2268', // Purple to match header
+  },
+  mainContainer: {
+    flex: 1,
+    flexDirection: 'column',
+  },
+  // Native Header Styles (matching web)
+  header: {
+    backgroundColor: '#3A2268',
+    paddingBottom: 12,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    minHeight: 48,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  logoIcon: {
+    fontSize: 20,
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerButtonIcon: {
+    fontSize: 18,
+  },
+  signInButton: {
+    backgroundColor: '#F4B63A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  signInButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // WebView Container
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  webview: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
@@ -499,133 +360,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  mainContainer: {
-    flex: 1,
-    flexDirection: 'column',
-  },
-  nativeMarker: {
-    height: 40,
-    backgroundColor: '#FF0000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nativeMarkerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 16,        // pt-4 from web
-    paddingHorizontal: 16,  // px-4 from web
-    maxWidth: 640,          // max-w-screen-sm from web
-    alignSelf: 'center',
-    width: '100%',
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#3A2268',
-    fontWeight: '600',
-  },
-  coverImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#F3F4F6',
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 20,
-  },
-  section: {
-    marginBottom: 18,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 6,
-  },
-  sectionText: {
-    fontSize: 16,
-    color: '#4B5563',
-    lineHeight: 22,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  tag: {
-    backgroundColor: '#E5E7EB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  tagText: {
-    fontSize: 14,
-    color: '#4B5563',
-  },
-  itemCard: {
-    flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  itemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#E5E7EB',
-    marginRight: 12,
-  },
-  itemContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  itemCategory: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3A2268',
-  },
-  sellerStats: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
   },
   // Fixed Footer Styles (matches web contract)
   footer: {

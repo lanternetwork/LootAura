@@ -51,15 +51,31 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="auto" />
+      <StatusBar style="light" backgroundColor="#3A2268" />
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { paddingBottom: 0 },
         }}
       >
-        <Stack.Screen name="index" />
-        <Stack.Screen name="sales/[id]" />
+        <Stack.Screen 
+          name="index"
+          options={{
+            statusBarStyle: 'light',
+            statusBarColor: '#3A2268',
+            statusBarTranslucent: false,
+            statusBarHidden: false,
+          }}
+        />
+        <Stack.Screen 
+          name="sales/[id]"
+          options={{
+            statusBarStyle: 'light',
+            statusBarColor: '#3A2268',
+            statusBarTranslucent: false,
+            statusBarHidden: false,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

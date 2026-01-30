@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
+import Svg, { Path } from 'react-native-svg';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 const LOOTAURA_URL = 'https://lootaura.com';
@@ -25,16 +26,7 @@ export default function SaleDetailScreen() {
   // WebView URL with embed parameter
   const webViewUrl = saleId ? `${LOOTAURA_URL}/sales/${saleId}?embed=1` : null;
 
-  // Explicitly restore Android system status bar on screen focus
-  // This ensures status bar is visible regardless of prior WebView behavior
-  // Uses react-native StatusBar imperative API to reset Android window flags
-  useFocusEffect(() => {
-    // Imperatively reset status bar state to ensure visibility
-    // This overrides any fullscreen/immersive flags set by WebView
-    StatusBar.setHidden(false);
-    StatusBar.setTranslucent(false);
-    StatusBar.setBackgroundColor('#FFFFFF', true); // White to match header
-  });
+  // Status bar is handled by Stack.Screen options in _layout.tsx
 
   // Handle WebView load events
   const handleLoadStart = () => {
@@ -138,22 +130,33 @@ export default function SaleDetailScreen() {
           <View style={styles.headerContent}>
             {/* Left side: Back button */}
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Text style={styles.backButtonIcon}>←</Text>
+              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </Svg>
             </TouchableOpacity>
 
             {/* Right side: Icon buttons matching web */}
             <View style={styles.headerButtons}>
               <TouchableOpacity onPress={handleMapClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconButtonText}>📍</Text>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </Svg>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleHeartClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconButtonText}>❤️</Text>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </Svg>
               </TouchableOpacity>
               <TouchableOpacity onPress={handlePlusClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconButtonText}>➕</Text>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </Svg>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleSignInClick} style={styles.headerIconButton}>
-                <Text style={styles.headerIconButtonText}>☰</Text>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </Svg>
               </TouchableOpacity>
             </View>
           </View>
@@ -255,34 +258,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB', // border-gray-200
-    height: 56, // h-14 = 56px
+    // Total height = insets.top + 56px (content row)
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12, // px-3 = 12px
-    height: 56,
+    paddingHorizontal: 16, // px-4 = 16px (matching web)
+    height: 56, // h-14 = 56px (fixed content row height)
   },
   backButton: {
-    width: 40, // w-10 = 40px
-    height: 40, // h-10 = 40px
-    borderRadius: 20, // rounded-full
+    width: 44, // min-w-[44px] = 44px (matching web)
+    height: 44, // min-h-[44px] = 44px (matching web)
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 22, // rounded-full
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  backButtonIcon: {
-    fontSize: 24,
-    color: '#374151', // text-gray-700
+    // No absolute positioning - flows naturally in flex row
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4, // gap-1 = 4px
+    gap: 4, // gap-1 = 4px (matching web)
+    // Ensure buttons fit within header bounds
+    flexShrink: 1,
   },
   headerIconButton: {
-    width: 44, // min-w-[44px] = 44px
-    height: 44, // min-h-[44px] = 44px
+    width: 44, // min-w-[44px] = 44px (matching web)
+    height: 44, // min-h-[44px] = 44px (matching web)
     minWidth: 44,
     minHeight: 44,
     backgroundColor: '#FFFFFF',
@@ -291,10 +295,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, // rounded-lg
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerIconButtonText: {
-    fontSize: 20,
-    color: '#374151', // text-gray-700
+    // No absolute positioning - flows naturally in flex row
   },
   // WebView Container
   webViewContainer: {

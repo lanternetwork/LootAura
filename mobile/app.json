@@ -17,12 +17,18 @@
     ],
     "android": {
       "package": "com.lootaura.app",
-      "versionCode": 33,
+      "versionCode": 34,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A2268"
       },
-      "permissions": []
+      "permissions": [],
+      "statusBar": {
+        "barStyle": "dark-content",
+        "backgroundColor": "#ffffff",
+        "hidden": false,
+        "translucent": false
+      }
     },
     "ios": {
       "supportsTablet": true,

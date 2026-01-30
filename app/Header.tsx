@@ -93,9 +93,11 @@ export function Header() {
     return () => { cancelAnimationFrame(raf); ro.disconnect() }
   }, [])
   
-  // Hide header in embed mode
+  // Hide header in embed mode, but show it when nativeFooter=1 is present
+  // nativeFooter=1 means we're in a native app with native footer, so keep web header visible
   const isEmbed = searchParams.get('embed') === '1'
-  if (isEmbed) {
+  const isNativeFooter = searchParams.get('nativeFooter') === '1'
+  if (isEmbed && !isNativeFooter) {
     return null
   }
   

@@ -1,36 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Dimensions } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
-import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 const LOOTAURA_URL = 'https://lootaura.com';
-
-// Types removed - using WebView to load web sale detail page
-
-// Icon components matching web mobile breakpoint SVG icons
-// Using @expo/vector-icons which comes with Expo and matches web icons
-const MapPinIcon = () => (
-  <MaterialCommunityIcons name="map-marker-outline" size={20} color="#374151" />
-);
-
-const HeartIcon = () => (
-  <MaterialCommunityIcons name="heart-outline" size={20} color="#374151" />
-);
-
-const PlusIcon = () => (
-  <Feather name="plus" size={20} color="#374151" />
-);
-
-const GridIcon = () => (
-  <Feather name="grid" size={20} color="#374151" />
-);
-
-const BackArrowIcon = () => (
-  <Feather name="chevron-left" size={24} color="#374151" />
-);
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,28 +14,13 @@ export default function SaleDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const webViewRef = useRef<WebView>(null);
-  const safeAreaInsets = useSafeAreaInsets();
-  
-  // Get window dimensions to conditionally hide grid icon on very small screens
-  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width);
-  useEffect(() => {
-    const updateWidth = () => {
-      setWindowWidth(Dimensions.get('window').width);
-    };
-    const subscription = Dimensions.addEventListener('change', updateWidth);
-    return () => subscription?.remove();
-  }, []);
-  
-  // Hide grid icon on screens narrower than 320px to prevent button shrinking
-  // This ensures all visible buttons maintain 44x44 tap target size
-  const shouldShowGridIcon = windowWidth >= 320;
 
   // Normalize id parameter: handle string | string[] | undefined
   // Expo Router can return arrays for route params, so we normalize to string | null
   const saleId = Array.isArray(id) ? (id[0] || null) : (id || null);
 
-  // WebView URL with embed parameter
-  const webViewUrl = saleId ? `${LOOTAURA_URL}/sales/${saleId}?embed=1` : null;
+  // WebView URL with nativeFooter parameter (keeps web header visible, hides web footer)
+  const webViewUrl = saleId ? `${LOOTAURA_URL}/sales/${saleId}?nativeFooter=1` : null;
 
   // Status bar is handled by Stack.Screen options in _layout.tsx
 
@@ -90,13 +50,6 @@ export default function SaleDetailScreen() {
     }
   };
 
-  // Safely get safe area insets - provide safe defaults
-  const insets = {
-    top: safeAreaInsets?.top ?? 0,
-    bottom: safeAreaInsets?.bottom ?? 0,
-    left: safeAreaInsets?.left ?? 0,
-    right: safeAreaInsets?.right ?? 0,
-  };
 
   // Handle footer actions
   const handleOpenMaps = () => {
@@ -128,21 +81,45 @@ export default function SaleDetailScreen() {
     }
   };
 
-  // Handle header button actions
-  const handleMapClick = () => {
-    router.replace('/');
-  };
-
-  const handleHeartClick = () => {
-    router.replace('/');
-  };
-
-  const handlePlusClick = () => {
-    router.replace('/');
-  };
-
-  const handleSignInClick = () => {
-    router.replace('/');
+  // Handle navigation interception - block navigation away from /sales/* paths
+  // When header buttons are clicked, they should return to main shell
+  const handleShouldStartLoadWithRequest = (request: any) => {
+    const { url } = request;
+    
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const pathname = parsedUrl.pathname;
+      
+      // Only allow navigation within lootaura.com domain
+      if (hostname !== 'lootaura.com' && !hostname.endsWith('.lootaura.com')) {
+        // External links - open in system browser
+        if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+          Linking.openURL(url);
+        }
+        return false; // Block external navigation in WebView
+      }
+      
+      // Block navigation away from /sales/* paths
+      // If user tries to navigate to a different path (e.g., /sales, /favorites, /sell/new),
+      // block it and return to main shell
+      const isSaleDetailPath = pathname.match(/^\/sales\/([^\/\?]+)/);
+      if (isSaleDetailPath) {
+        // Check if it's the same sale ID (allow query param changes)
+        const matchedSaleId = isSaleDetailPath[1];
+        if (matchedSaleId === saleId) {
+          // Same sale detail page - allow navigation (e.g., query param changes)
+          return true;
+        }
+      }
+      
+      // Navigation away from sale detail - return to main shell
+      router.replace('/');
+      return false; // Block navigation in WebView
+    } catch (e) {
+      // If URL parsing fails, allow navigation (defensive)
+      return true;
+    }
   };
 
   if (!saleId || !webViewUrl) {
@@ -161,35 +138,7 @@ export default function SaleDetailScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.mainContainer}>
-        {/* Native Header - White background matching web mobile */}
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          <View style={styles.headerContent}>
-            {/* Left side: Back button */}
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <BackArrowIcon />
-            </TouchableOpacity>
-
-            {/* Right side: Icon buttons matching web */}
-            <View style={styles.headerButtons}>
-              <TouchableOpacity onPress={handleMapClick} style={styles.headerIconButton}>
-                <MapPinIcon />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleHeartClick} style={styles.headerIconButton}>
-                <HeartIcon />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handlePlusClick} style={styles.headerIconButton}>
-                <PlusIcon />
-              </TouchableOpacity>
-              {shouldShowGridIcon && (
-                <TouchableOpacity onPress={handleSignInClick} style={styles.headerIconButton}>
-                  <GridIcon />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* WebView Content */}
+        {/* WebView Content - Full height, web header is rendered inside WebView */}
         <View style={styles.webViewContainer}>
           <WebView
             ref={webViewRef}
@@ -199,6 +148,7 @@ export default function SaleDetailScreen() {
             onLoadEnd={handleLoadEnd}
             onError={handleError}
             onHttpError={handleHttpError}
+            onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
@@ -279,57 +229,6 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     flexDirection: 'column',
-  },
-  // Native Header Styles (matching web mobile: white bg, h-14, border-bottom)
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB', // border-gray-200
-    // Total height = insets.top + 56px (content row)
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16, // px-4 = 16px (matching web)
-    height: 56, // h-14 = 56px (fixed content row height)
-  },
-  backButton: {
-    width: 44, // min-w-[44px] = 44px (matching web)
-    height: 44, // min-h-[44px] = 44px (matching web)
-    minWidth: 44,
-    minHeight: 44,
-    borderRadius: 22, // rounded-full
-    justifyContent: 'center',
-    alignItems: 'center',
-    // No absolute positioning - flows naturally in flex row
-  },
-  backButtonIcon: {
-    fontSize: 28,
-    color: '#374151', // text-gray-700
-    fontWeight: '300',
-    lineHeight: 28,
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4, // gap-1 = 4px (matching web)
-    // Prevent buttons from shrinking - hide grid icon on small screens instead
-    flexShrink: 0,
-  },
-  headerIconButton: {
-    width: 44, // min-w-[44px] = 44px (matching web)
-    height: 44, // min-h-[44px] = 44px (matching web)
-    minWidth: 44,
-    minHeight: 44,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1D5DB', // border-gray-300
-    borderRadius: 8, // rounded-lg
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Never shrink below 44x44 - buttons maintain tap target size
-    flexShrink: 0,
   },
   // WebView Container
   webViewContainer: {

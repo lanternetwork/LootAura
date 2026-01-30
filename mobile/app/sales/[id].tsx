@@ -11,159 +11,26 @@ const LOOTAURA_URL = 'https://lootaura.com';
 // Types removed - using WebView to load web sale detail page
 
 // Icon components matching web mobile breakpoint SVG icons
-// Using View-based shapes to approximate the SVG paths
+// Using @expo/vector-icons which comes with Expo and matches web icons
 const MapPinIcon = () => (
-  <View style={iconStyles.mapPinContainer}>
-    <View style={iconStyles.mapPinCircle} />
-    <View style={iconStyles.mapPinDot} />
-  </View>
+  <MaterialCommunityIcons name="map-marker-outline" size={20} color="#374151" />
 );
 
 const HeartIcon = () => (
-  <View style={iconStyles.heartContainer}>
-    <View style={iconStyles.heartShape} />
-  </View>
+  <MaterialCommunityIcons name="heart-outline" size={20} color="#374151" />
 );
 
 const PlusIcon = () => (
-  <View style={iconStyles.plusContainer}>
-    <View style={iconStyles.plusHorizontal} />
-    <View style={iconStyles.plusVertical} />
-  </View>
+  <Feather name="plus" size={20} color="#374151" />
 );
 
 const GridIcon = () => (
-  <View style={iconStyles.gridContainer}>
-    <View style={iconStyles.gridRow}>
-      <View style={iconStyles.gridCell} />
-      <View style={iconStyles.gridCell} />
-    </View>
-    <View style={iconStyles.gridRow}>
-      <View style={iconStyles.gridCell} />
-      <View style={iconStyles.gridCell} />
-    </View>
-  </View>
+  <Feather name="grid" size={20} color="#374151" />
 );
 
 const BackArrowIcon = () => (
-  <View style={iconStyles.backArrowContainer}>
-    <View style={iconStyles.backArrowTop} />
-    <View style={iconStyles.backArrowBottom} />
-  </View>
+  <Feather name="chevron-left" size={24} color="#374151" />
 );
-
-const iconStyles = StyleSheet.create({
-  // Map Pin Icon - location marker with circle and dot
-  mapPinContainer: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapPinCircle: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#374151',
-    position: 'absolute',
-    top: 0,
-  },
-  mapPinDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#374151',
-    position: 'absolute',
-    top: 4.5,
-  },
-  // Heart Icon - outline heart shape
-  heartContainer: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heartShape: {
-    width: 12,
-    height: 11,
-    borderWidth: 2,
-    borderColor: '#374151',
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-    borderBottomWidth: 0,
-    transform: [{ rotate: '45deg' }],
-    position: 'absolute',
-    top: 2,
-    left: 4,
-  },
-  // Plus Icon - cross shape
-  plusContainer: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  plusHorizontal: {
-    width: 12,
-    height: 2,
-    backgroundColor: '#374151',
-    position: 'absolute',
-  },
-  plusVertical: {
-    width: 2,
-    height: 12,
-    backgroundColor: '#374151',
-    position: 'absolute',
-  },
-  // Grid Icon - 2x2 grid of squares
-  gridContainer: {
-    width: 20,
-    height: 20,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignContent: 'space-between',
-  },
-  gridRow: {
-    width: '100%',
-    height: '48%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  gridCell: {
-    width: '48%',
-    height: '100%',
-    borderWidth: 1.5,
-    borderColor: '#374151',
-    borderRadius: 1,
-  },
-  // Back Arrow Icon - chevron left
-  backArrowContainer: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  backArrowTop: {
-    width: 8,
-    height: 2,
-    backgroundColor: '#374151',
-    position: 'absolute',
-    top: 9,
-    left: 6,
-    transform: [{ rotate: '-45deg' }],
-  },
-  backArrowBottom: {
-    width: 8,
-    height: 2,
-    backgroundColor: '#374151',
-    position: 'absolute',
-    bottom: 9,
-    left: 6,
-    transform: [{ rotate: '45deg' }],
-  },
-});
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

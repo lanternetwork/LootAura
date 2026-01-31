@@ -192,8 +192,26 @@ export default function HomeScreen() {
       // Decode URL if needed
       const decodedUrl = decodeURIComponent(url);
       
-      // Reject absolute URLs with protocols (http://, https://, javascript:, etc.)
-      if (decodedUrl.includes('://') || decodedUrl.startsWith('javascript:')) {
+      // Reject dangerous URL schemes (comprehensive list)
+      const dangerousSchemes = [
+        'javascript:',
+        'data:',
+        'vbscript:',
+        'file:',
+        'about:',
+        'chrome:',
+        'chrome-extension:',
+        'moz-extension:',
+        'ms-browser-extension:',
+      ];
+      
+      const lowerUrl = decodedUrl.toLowerCase();
+      if (dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme))) {
+        return null;
+      }
+      
+      // Reject absolute URLs with any protocol (http://, https://, etc.)
+      if (decodedUrl.includes('://')) {
         return null;
       }
       

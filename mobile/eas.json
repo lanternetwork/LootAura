@@ -26,7 +26,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://lootaura.com",
-        "EXPO_USE_NPM": "true"
+        "EXPO_USE_NPM": "true",
+        "EXPO_PUBLIC_NAV_DEBUG": "1"
       }
     },
     "development": {

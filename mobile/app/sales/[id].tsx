@@ -85,10 +85,40 @@ export default function SaleDetailScreen() {
   };
 
   const handleFavoriteToggle = () => {
-    setIsFavorited(!isFavorited);
     // Send message to WebView to toggle favorite
+    // Do not optimistically update state - wait for web response
+    // Web will handle auth gating and send back favoriteState
     if (webViewRef.current) {
-      webViewRef.current.postMessage(JSON.stringify({ type: 'toggleFavorite' }));
+      const message = { type: 'toggleFavorite' };
+      if (__DEV__) {
+        console.log('[NATIVE] Sending toggleFavorite message to WebView:', message);
+      }
+      webViewRef.current.postMessage(JSON.stringify(message));
+    }
+  };
+
+  // Handle messages from WebView
+  const handleMessage = (event: any) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      
+      if (__DEV__) {
+        console.log('[NATIVE] Received message from WebView:', message);
+      }
+      
+      if (message && message.type === 'favoriteState') {
+        // Update favorite state from web response
+        const newFavorited = message.isFavorited ?? false;
+        if (__DEV__) {
+          console.log('[NATIVE] Updating favorite state from web:', { isFavorited: newFavorited });
+        }
+        setIsFavorited(newFavorited);
+      }
+    } catch (error) {
+      // Ignore invalid messages
+      if (__DEV__) {
+        console.warn('[NATIVE] Failed to parse message from WebView:', error);
+      }
     }
   };
 
@@ -168,6 +198,7 @@ export default function SaleDetailScreen() {
             onError={handleError}
             onHttpError={handleHttpError}
             onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+            onMessage={handleMessage}
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}

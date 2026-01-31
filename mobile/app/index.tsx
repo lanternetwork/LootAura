@@ -10,10 +10,13 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [webViewReady, setWebViewReady] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ navigateTo?: string }>();
+  const pendingNavigateToRef = useRef<string | null>(null);
+  const lastHandledNavigateToRef = useRef<string | null>(null);
 
   // Handle Android back button
   useEffect(() => {
@@ -69,11 +72,11 @@ export default function HomeScreen() {
       clearTimeout(loadTimeoutRef.current);
     }
     
-    // Set a timeout to hide loading after 30 seconds if page doesn't load
-    // This prevents the loading state from getting stuck
+    // Set a timeout to hide loading after 15 seconds if page doesn't load
+    // This prevents the loading state from getting stuck (reduced from 30s for better UX)
     loadTimeoutRef.current = setTimeout(() => {
       setLoading(false);
-    }, 30000);
+    }, 15000);
   };
 
   const handleLoadEnd = () => {
@@ -83,6 +86,15 @@ export default function HomeScreen() {
       loadTimeoutRef.current = null;
     }
     setLoading(false);
+    // Mark WebView as ready after first successful load
+    setWebViewReady(true);
+    
+    // Execute any pending navigation now that WebView is ready
+    if (pendingNavigateToRef.current && webViewRef.current) {
+      const pendingUrl = pendingNavigateToRef.current;
+      pendingNavigateToRef.current = null;
+      executeNavigation(pendingUrl);
+    }
   };
 
   const handleLoad = () => {
@@ -125,6 +137,25 @@ export default function HomeScreen() {
 
   const handleNavigationStateChange = (navState: any) => {
     setCanGoBack(navState.canGoBack);
+    
+    // Guard against SPA transitions: if URL changed but no load event fired,
+    // clear loading state after a short delay
+    // This handles hash-based navigation and history.pushState() changes
+    if (loading && navState.url) {
+      // If we're in loading state but URL changed, it might be an SPA transition
+      // Give it 500ms, then clear loading if still stuck
+      setTimeout(() => {
+        if (loading) {
+          // Only clear if we're still loading and no actual page load occurred
+          // This is a failsafe for SPA transitions
+          setLoading(false);
+          if (loadTimeoutRef.current) {
+            clearTimeout(loadTimeoutRef.current);
+            loadTimeoutRef.current = null;
+          }
+        }
+      }, 500);
+    }
   };
 
   const handleMessage = (event: any) => {
@@ -142,18 +173,12 @@ export default function HomeScreen() {
       } else if (message.type === 'NAVIGATE' && message.url) {
         // Handle navigation request from sale detail screen
         console.log('[NATIVE] Navigating WebView to:', message.url);
-        const fullUrl = message.url.startsWith('http') 
-          ? message.url 
-          : `${LOOTAURA_URL}${message.url}`;
-        if (webViewRef.current) {
-          // Escape backslashes first, then single quotes for safe injection
-          const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-          webViewRef.current.injectJavaScript(`
-            (function() {
-              window.location.href = '${escapedUrl}';
-            })();
-            true; // Required for iOS
-          `);
+        // Sanitize and validate URL before navigation
+        const sanitizedUrl = sanitizeNavigationUrl(message.url);
+        if (sanitizedUrl) {
+          executeNavigation(sanitizedUrl);
+        } else {
+          console.warn('[NATIVE] Rejected unsafe navigation URL:', message.url);
         }
       }
     } catch (error) {
@@ -161,32 +186,123 @@ export default function HomeScreen() {
     }
   };
 
+  // Security: Sanitize navigation URLs to prevent injection attacks
+  const sanitizeNavigationUrl = (url: string): string | null => {
+    try {
+      // Decode URL if needed
+      const decodedUrl = decodeURIComponent(url);
+      
+      // Reject absolute URLs with protocols (http://, https://, javascript:, etc.)
+      if (decodedUrl.includes('://') || decodedUrl.startsWith('javascript:')) {
+        return null;
+      }
+      
+      // Reject URLs with hostnames (security: prevent open redirects)
+      if (decodedUrl.includes('@') || decodedUrl.match(/^[a-zA-Z0-9.-]+\.[a-zA-Z]/)) {
+        return null;
+      }
+      
+      // Only allow relative paths starting with /
+      if (!decodedUrl.startsWith('/')) {
+        return null;
+      }
+      
+      // Allowlist: only allow specific safe paths
+      const allowedPaths = ['/auth', '/favorites', '/sell', '/sales', '/', '/u'];
+      const pathMatch = decodedUrl.split('?')[0].split('#')[0]; // Get path without query/hash
+      
+      // Check if path starts with any allowed path
+      const isAllowed = allowedPaths.some(allowed => {
+        if (allowed === '/') {
+          return pathMatch === '/';
+        }
+        return pathMatch.startsWith(allowed + '/') || pathMatch === allowed;
+      });
+      
+      if (!isAllowed) {
+        return null;
+      }
+      
+      // Return sanitized relative path
+      return decodedUrl;
+    } catch (e) {
+      // If URL parsing/decoding fails, reject it
+      return null;
+    }
+  };
+
+  // Execute navigation with proper loading lifecycle management
+  const executeNavigation = (relativePath: string) => {
+    if (!webViewRef.current) {
+      return;
+    }
+    
+    // Build full URL
+    const fullUrl = `${LOOTAURA_URL}${relativePath}`;
+    console.log('[NATIVE] Executing navigation to:', fullUrl);
+    
+    // Set loading state BEFORE injection (injectJavaScript may not trigger onLoadStart reliably)
+    setLoading(true);
+    setError(null);
+    
+    // Clear any existing timeout
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+    }
+    
+    // Start timeout fallback (10-15s for better UX)
+    loadTimeoutRef.current = setTimeout(() => {
+      setLoading(false);
+      loadTimeoutRef.current = null;
+    }, 12000); // 12 seconds
+    
+    // Escape backslashes first, then single quotes for safe injection
+    const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    webViewRef.current.injectJavaScript(`
+      (function() {
+        window.location.href = '${escapedUrl}';
+      })();
+      true; // Required for iOS
+    `);
+  };
+
   // Handle navigateTo query param from sale detail screen
   useEffect(() => {
-    if (searchParams.navigateTo && webViewRef.current) {
-      const navigateUrl = decodeURIComponent(searchParams.navigateTo);
-      const fullUrl = navigateUrl.startsWith('http') 
-        ? navigateUrl 
-        : `${LOOTAURA_URL}${navigateUrl}`;
-      
-      console.log('[NATIVE] Navigating WebView from sale detail to:', fullUrl);
-      
-      // Navigate the WebView to the requested URL using injectJavaScript
-      // This works because the WebView has a window object
-      // Escape backslashes first, then single quotes for safe injection
-      const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      webViewRef.current.injectJavaScript(`
-        (function() {
-          window.location.href = '${escapedUrl}';
-        })();
-        true; // Required for iOS
-      `);
-      
-      // Note: We don't clear the query param here to avoid navigation loops
-      // The query param will remain but won't cause re-navigation since we only
-      // navigate when the param changes and webViewRef is available
+    const navigateTo = searchParams.navigateTo;
+    
+    // Skip if no navigateTo param
+    if (!navigateTo) {
+      return;
     }
-  }, [searchParams.navigateTo]);
+    
+    // Skip if we already handled this exact value (prevent retrigger)
+    if (navigateTo === lastHandledNavigateToRef.current) {
+      return;
+    }
+    
+    // Sanitize and validate URL
+    const sanitizedUrl = sanitizeNavigationUrl(navigateTo);
+    if (!sanitizedUrl) {
+      console.warn('[NATIVE] Rejected unsafe navigateTo URL:', navigateTo);
+      // Clear the navigateTo param to prevent retrigger
+      router.replace('/');
+      return;
+    }
+    
+    // Mark as handled immediately to prevent retrigger
+    lastHandledNavigateToRef.current = navigateTo;
+    
+    // Clear navigateTo param immediately (one-shot)
+    router.replace('/');
+    
+    // If WebView is ready, execute immediately
+    if (webViewReady && webViewRef.current) {
+      executeNavigation(sanitizedUrl);
+    } else {
+      // Store as pending navigation - will execute after WebView is ready
+      pendingNavigateToRef.current = sanitizedUrl;
+    }
+  }, [searchParams.navigateTo, webViewReady, router]);
 
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;
@@ -205,6 +321,12 @@ export default function HomeScreen() {
         // Unconditionally block WebView from loading this URL
         // Navigation should happen via postMessage, not URL navigation
         console.warn('[NATIVE] Blocked WebView navigation to sale detail page. Use postMessage instead.');
+        // Clear loading state since we're blocking (onLoadStart may have fired)
+        setLoading(false);
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
         return false;
       }
       
@@ -217,6 +339,12 @@ export default function HomeScreen() {
       // Open external HTTP/HTTPS links in system browser
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
         Linking.openURL(url);
+        // Clear loading state since we're blocking (onLoadStart may have fired)
+        setLoading(false);
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
         return false; // Prevent WebView from loading external URLs
       }
     } catch (e) {
@@ -224,6 +352,12 @@ export default function HomeScreen() {
       // Allow other protocols (mailto:, tel:, etc.) to open in system apps
       if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
         Linking.openURL(url);
+        // Clear loading state since we're blocking (onLoadStart may have fired)
+        setLoading(false);
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
         return false;
       }
       
@@ -234,6 +368,12 @@ export default function HomeScreen() {
     // Allow other protocols (mailto:, tel:, etc.) to open in system apps
     if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
       Linking.openURL(url);
+      // Clear loading state since we're blocking (onLoadStart may have fired)
+      setLoading(false);
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
       return false;
     }
     

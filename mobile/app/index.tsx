@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const LOOTAURA_URL = 'https://lootaura.com';
 
@@ -13,6 +13,7 @@ export default function HomeScreen() {
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
+  const searchParams = useLocalSearchParams<{ navigateTo?: string }>();
 
   // Handle Android back button
   useEffect(() => {
@@ -138,11 +139,54 @@ export default function HomeScreen() {
         } catch (error) {
           console.error('[NATIVE] Failed to navigate to native sale detail screen:', error);
         }
+      } else if (message.type === 'NAVIGATE' && message.url) {
+        // Handle navigation request from sale detail screen
+        console.log('[NATIVE] Navigating WebView to:', message.url);
+        const fullUrl = message.url.startsWith('http') 
+          ? message.url 
+          : `${LOOTAURA_URL}${message.url}`;
+        if (webViewRef.current) {
+          // Escape backslashes first, then single quotes for safe injection
+          const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          webViewRef.current.injectJavaScript(`
+            (function() {
+              window.location.href = '${escapedUrl}';
+            })();
+            true; // Required for iOS
+          `);
+        }
       }
     } catch (error) {
       console.warn('[NATIVE] Failed to parse message from WebView:', error);
     }
   };
+
+  // Handle navigateTo query param from sale detail screen
+  useEffect(() => {
+    if (searchParams.navigateTo && webViewRef.current) {
+      const navigateUrl = decodeURIComponent(searchParams.navigateTo);
+      const fullUrl = navigateUrl.startsWith('http') 
+        ? navigateUrl 
+        : `${LOOTAURA_URL}${navigateUrl}`;
+      
+      console.log('[NATIVE] Navigating WebView from sale detail to:', fullUrl);
+      
+      // Navigate the WebView to the requested URL using injectJavaScript
+      // This works because the WebView has a window object
+      // Escape backslashes first, then single quotes for safe injection
+      const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      webViewRef.current.injectJavaScript(`
+        (function() {
+          window.location.href = '${escapedUrl}';
+        })();
+        true; // Required for iOS
+      `);
+      
+      // Note: We don't clear the query param here to avoid navigation loops
+      // The query param will remain but won't cause re-navigation since we only
+      // navigate when the param changes and webViewRef is available
+    }
+  }, [searchParams.navigateTo]);
 
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;

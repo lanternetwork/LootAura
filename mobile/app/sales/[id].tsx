@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 const LOOTAURA_URL = 'https://lootaura.com';
@@ -14,6 +15,7 @@ export default function SaleDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // Normalize id parameter: handle string | string[] | undefined
   // Expo Router can return arrays for route params, so we normalize to string | null
@@ -31,7 +33,16 @@ export default function SaleDetailScreen() {
   };
 
   const handleLoadEnd = () => {
-    setLoading(false);
+    // Fade out loading overlay before hiding
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setLoading(false);
+      // Reset opacity for next load
+      fadeAnim.setValue(1);
+    });
   };
 
   const handleError = (syntheticEvent: any) => {
@@ -82,7 +93,7 @@ export default function SaleDetailScreen() {
   };
 
   // Handle navigation interception - block navigation away from /sales/* paths
-  // When header buttons are clicked, they should return to main shell
+  // When header buttons are clicked, they should return to main shell with the destination URL
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;
     
@@ -95,6 +106,8 @@ export default function SaleDetailScreen() {
       if (hostname !== 'lootaura.com' && !hostname.endsWith('.lootaura.com')) {
         // External links - open in system browser
         if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+          // Clear loading state before opening external link
+          setLoading(false);
           Linking.openURL(url);
         }
         return false; // Block external navigation in WebView
@@ -102,7 +115,7 @@ export default function SaleDetailScreen() {
       
       // Block navigation away from /sales/* paths
       // If user tries to navigate to a different path (e.g., /sales, /favorites, /sell/new),
-      // block it and return to main shell
+      // block it and return to main shell with the destination URL
       const isSaleDetailPath = pathname.match(/^\/sales\/([^\/\?]+)/);
       if (isSaleDetailPath) {
         // Check if it's the same sale ID (allow query param changes)
@@ -113,8 +126,14 @@ export default function SaleDetailScreen() {
         }
       }
       
-      // Navigation away from sale detail - return to main shell
-      router.replace('/');
+      // Navigation away from sale detail - send URL to main shell and return to main shell
+      // Clear loading state before navigation (same as onLoadEnd)
+      setLoading(false);
+      
+      // Send message to main shell with the blocked URL (path + query)
+      // Pass the URL as a query parameter that the index screen can read
+      const blockedUrl = `${pathname}${parsedUrl.search}`;
+      router.replace(`/?navigateTo=${encodeURIComponent(blockedUrl)}`);
       return false; // Block navigation in WebView
     } catch (e) {
       // If URL parsing fails, allow navigation (defensive)
@@ -159,10 +178,10 @@ export default function SaleDetailScreen() {
             mixedContentMode="always"
           />
           {loading && (
-            <View style={styles.loadingContainer}>
+            <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
               <ActivityIndicator size="large" color="#3A2268" />
               <Text style={styles.loadingText}>Loading sale details...</Text>
-            </View>
+            </Animated.View>
           )}
         </View>
 
@@ -174,7 +193,7 @@ export default function SaleDetailScreen() {
               style={styles.navigateButton}
               onPress={handleOpenMaps}
             >
-              <Text style={styles.navigateButtonIcon}>🗺️</Text>
+              <Feather name="map-pin" size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
               <Text style={styles.navigateButtonText}>Navigate</Text>
             </TouchableOpacity>
 
@@ -186,12 +205,11 @@ export default function SaleDetailScreen() {
               ]}
               onPress={handleFavoriteToggle}
             >
-              <Text style={[
-                styles.saveButtonIcon,
-                isFavorited ? styles.saveButtonIconActive : styles.saveButtonIconInactive
-              ]}>
-                {isFavorited ? '❤️' : '🤍'}
-              </Text>
+              <MaterialCommunityIcons 
+                name={isFavorited ? "heart" : "heart-outline"} 
+                size={20} 
+                color={isFavorited ? '#B91C1C' : '#374151'}
+              />
             </TouchableOpacity>
 
             {/* Share Button (Secondary) - w-12 h-12, purple tint */}
@@ -199,7 +217,7 @@ export default function SaleDetailScreen() {
               style={styles.shareButton}
               onPress={handleShare}
             >
-              <Text style={styles.shareButtonIcon}>📤</Text>
+              <Feather name="share-2" size={20} color="#3A2268" />
             </TouchableOpacity>
           </View>
         </View>
@@ -314,9 +332,7 @@ const styles = StyleSheet.create({
     minHeight: 44,               // min-h-[44px]
   },
   navigateButtonIcon: {
-    fontSize: 20,
     marginRight: 8,
-    color: '#FFFFFF',
   },
   navigateButtonText: {
     color: '#FFFFFF',
@@ -337,15 +353,6 @@ const styles = StyleSheet.create({
   saveButtonInactive: {
     backgroundColor: '#F3F4F6',  // bg-gray-100
   },
-  saveButtonIcon: {
-    fontSize: 20,
-  },
-  saveButtonIconActive: {
-    color: '#B91C1C',  // text-red-700
-  },
-  saveButtonIconInactive: {
-    color: '#374151',  // text-gray-700
-  },
   shareButton: {
     width: 48,   // w-12 = 48px
     height: 48,  // h-12 = 48px
@@ -354,9 +361,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(147, 51, 234, 0.15)',  // bg-[rgba(147,51,234,0.15)]
     borderRadius: 8,  // rounded-lg
-  },
-  shareButtonIcon: {
-    fontSize: 20,
-    color: '#3A2268',  // text-[#3A2268]
   },
 });

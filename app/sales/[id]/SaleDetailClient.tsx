@@ -24,6 +24,7 @@ import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import ReportSaleModal from '@/components/moderation/ReportSaleModal'
 import { BadgeCheck } from 'lucide-react'
+import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -221,6 +222,81 @@ export default function SaleDetailClient({
       trackSaleViewed(sale.id)
     }
   }, [sale.id])
+
+  // Listen for postMessage from native WebView (for Navigate button)
+  useEffect(() => {
+    const handleNavigate = () => {
+      // Use sale location data to build maps URL
+      const address = sale.address 
+        ? `${sale.address}, ${sale.city}, ${sale.state}` 
+        : `${sale.city}, ${sale.state}`
+      
+      // Detect platform (same logic as AddressLink)
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
+      const isDesktopOS = /Macintosh|Windows|Linux|X11/.test(userAgent)
+      const isIOS = !isDesktopOS && /iPhone|iPod/.test(userAgent)
+      const isAndroid = !isDesktopOS && /Android/.test(userAgent) && /Mobile/.test(userAgent)
+      
+      let mapsUrl = ''
+      if (isIOS) {
+        mapsUrl = buildIosNavUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
+      } else if (isAndroid) {
+        mapsUrl = buildAndroidNavUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
+      } else {
+        // Default to desktop Google Maps
+        mapsUrl = buildDesktopGoogleMapsUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
+      }
+      
+      if (mapsUrl) {
+        // Track navigation click event
+        trackAnalyticsEvent({
+          sale_id: sale.id,
+          event_type: 'click',
+        })
+        
+        // Open maps URL - in WebView context, use window.location for better compatibility
+        // window.open may be blocked in some WebView configurations
+        window.location.href = mapsUrl
+      } else {
+        console.warn('[SALE_DETAIL] Could not build maps URL - missing location data')
+      }
+    }
+
+    const handleMessage = (event: MessageEvent | any) => {
+      // React Native WebView sends messages via window.addEventListener('message')
+      // event.data is a string (JSON) when sent via postMessage
+      try {
+        const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+        
+        if (message && message.type === 'navigate') {
+          handleNavigate()
+        }
+      } catch (error) {
+        // Ignore invalid messages or parse errors
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[SALE_DETAIL] Failed to process postMessage:', error)
+        }
+      }
+    }
+
+    // Add event listener for postMessage from React Native WebView
+    // React Native WebView v13+ uses window.addEventListener('message') for both Android and iOS
+    if (typeof window !== 'undefined') {
+      window.addEventListener('message', handleMessage)
+      
+      // Also listen for document-level messages (Android fallback)
+      if (typeof document !== 'undefined') {
+        document.addEventListener('message', handleMessage as any)
+      }
+      
+      return () => {
+        window.removeEventListener('message', handleMessage)
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('message', handleMessage as any)
+        }
+      }
+    }
+  }, [sale.lat, sale.lng, sale.address, sale.city, sale.state, sale.id])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

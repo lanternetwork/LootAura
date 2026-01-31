@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Animated, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
@@ -7,20 +7,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 const LOOTAURA_URL = 'https://lootaura.com';
-const NAV_DEBUG_ENABLED = process.env.EXPO_PUBLIC_NAV_DEBUG === '1';
 
-// Navigation event types
-type NavEventType = 'shouldStart' | 'navState' | 'loadStart' | 'loadEnd' | 'httpError' | 'error';
-
-interface NavEvent {
-  timestamp: string;
-  eventType: NavEventType;
-  url: string; // Full URL stored
-  urlDisplay: string; // Truncated for display
-  decision?: string;
-  destination?: string;
-  destinationDisplay?: string; // Truncated for display
-}
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,11 +18,10 @@ export default function SaleDetailScreen() {
   const webViewRef = useRef<WebView>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   
-  // Debug HUD state
-  const [debugExpanded, setDebugExpanded] = useState(false);
+  // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
-  const navEventsRef = useRef<NavEvent[]>([]);
-  const [navEvents, setNavEvents] = useState<NavEvent[]>([]);
+  const [lastRequestedUrl, setLastRequestedUrl] = useState<string>('');
+  const [lastDecision, setLastDecision] = useState<string>('');
 
   // Normalize id parameter: handle string | string[] | undefined
   // Expo Router can return arrays for route params, so we normalize to string | null
@@ -46,92 +32,15 @@ export default function SaleDetailScreen() {
 
   // Status bar is handled by Stack.Screen options in _layout.tsx
 
-  // Debug: Log navigation event to ring buffer
-  const logNavEvent = (eventType: NavEventType, url: string, decision?: string, destination?: string) => {
-    if (!NAV_DEBUG_ENABLED) return;
-    
-    const now = new Date();
-    const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`;
-    
-    const event: NavEvent = {
-      timestamp,
-      eventType,
-      url, // Store full URL
-      urlDisplay: url.length > 60 ? url.substring(0, 57) + '...' : url, // Truncated for display
-      decision,
-      destination, // Store full destination
-      destinationDisplay: destination ? (destination.length > 60 ? destination.substring(0, 57) + '...' : destination) : undefined,
-    };
-    
-    // Ring buffer: keep last 30 events
-    navEventsRef.current = [event, ...navEventsRef.current].slice(0, 30);
-    setNavEvents([...navEventsRef.current]);
-  };
 
-  // Debug: Generate log text
-  const generateLogText = () => {
-    const logText = navEventsRef.current.map(e => {
-      let line = `[${e.timestamp}] ${e.eventType.toUpperCase()}: ${e.url}`;
-      if (e.decision) line += ` | Decision: ${e.decision}`;
-      if (e.destination) line += ` | Destination: ${e.destination}`;
-      return line;
-    }).join('\n');
-    
-    return `=== Navigation Debug Log ===
-Screen: sales/[id]
-SaleId: ${saleId}
-WebViewUrl: ${webViewUrl}
-Current WebView URL: ${currentWebViewUrl}
-Loading: ${loading}
-Error: ${error || 'none'}
-
-=== Events (newest first) ===
-${logText}`;
-  };
-
-  // Debug: Copy events (using Share as clipboard alternative)
-  const copyEventsToClipboard = async () => {
-    const fullLog = generateLogText();
-    try {
-      await Share.share({
-        message: fullLog,
-        title: 'Navigation Debug Log (Copy this text)',
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to share debug log');
-    }
-  };
-
-  // Debug: Share events
-  const shareEvents = async () => {
-    const fullLog = generateLogText();
-    try {
-      await Share.share({
-        message: fullLog,
-        title: 'Navigation Debug Log',
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to share debug log');
-    }
-  };
-
-  // Debug: Clear events
-  const clearEvents = () => {
-    navEventsRef.current = [];
-    setNavEvents([]);
-  };
 
   // Handle WebView load events
-  const handleLoadStart = (syntheticEvent?: any) => {
-    const url = syntheticEvent?.nativeEvent?.url || webViewUrl || '';
-    logNavEvent('loadStart', url);
+  const handleLoadStart = () => {
     setLoading(true);
     setError(null);
   };
 
-  const handleLoadEnd = (syntheticEvent?: any) => {
-    const url = syntheticEvent?.nativeEvent?.url || currentWebViewUrl || '';
-    logNavEvent('loadEnd', url);
+  const handleLoadEnd = () => {
     // Fade out loading overlay before hiding
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -145,9 +54,6 @@ ${logText}`;
   };
 
   const handleError = (syntheticEvent: any) => {
-    const url = syntheticEvent?.nativeEvent?.url || currentWebViewUrl || '';
-    const errorInfo = syntheticEvent?.nativeEvent?.description || 'Unknown error';
-    logNavEvent('error', url, `Error: ${errorInfo}`);
     setLoading(false);
     setError('Failed to load sale details');
     console.error('WebView error:', syntheticEvent.nativeEvent);
@@ -155,8 +61,6 @@ ${logText}`;
 
   const handleHttpError = (syntheticEvent: any) => {
     const { statusCode } = syntheticEvent.nativeEvent;
-    const url = syntheticEvent?.nativeEvent?.url || currentWebViewUrl || '';
-    logNavEvent('httpError', url, `HTTP ${statusCode}`);
     setLoading(false);
     if (statusCode === 404) {
       setError('Sale not found');
@@ -230,6 +134,7 @@ ${logText}`;
   // When header buttons are clicked, they should return to main shell with the destination URL
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;
+    setLastRequestedUrl(url);
     
     try {
       const parsedUrl = new URL(url);
@@ -242,7 +147,9 @@ ${logText}`;
         if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
           // Clear loading state before opening external link
           setLoading(false);
-          logNavEvent('shouldStart', url, 'BLOCK: external', 'Opened in system browser');
+          const decision = 'BLOCK: external';
+          const destination = 'Opened in system browser';
+          setLastDecision(`${decision} -> ${destination}`);
           Linking.openURL(url);
         }
         return false; // Block external navigation in WebView
@@ -257,7 +164,8 @@ ${logText}`;
         const matchedSaleId = isSaleDetailPath[1];
         if (matchedSaleId === saleId) {
           // Same sale detail page - allow navigation (e.g., query param changes)
-          logNavEvent('shouldStart', url, 'ALLOW: same-sale');
+          const decision = 'ALLOW: same-sale';
+          setLastDecision(decision);
           return true;
         }
       }
@@ -270,12 +178,14 @@ ${logText}`;
       // Pass the URL as a query parameter that the index screen can read
       const blockedUrl = `${pathname}${parsedUrl.search}`;
       const navigateToUrl = `/?navigateTo=${encodeURIComponent(blockedUrl)}`;
-      logNavEvent('shouldStart', url, 'BLOCK: exit-to-index', navigateToUrl);
+      const decision = 'BLOCK: exit-to-index';
+      setLastDecision(`${decision} -> ${navigateToUrl}`);
       router.replace(navigateToUrl);
       return false; // Block navigation in WebView
     } catch (e) {
       // If URL parsing fails, allow navigation (defensive)
-      logNavEvent('shouldStart', url, 'ALLOW: parse-fail');
+      const decision = 'ALLOW: parse-fail';
+      setLastDecision(decision);
       return true;
     }
   };
@@ -284,7 +194,6 @@ ${logText}`;
   const handleNavigationStateChange = (navState: any) => {
     const url = navState.url || '';
     setCurrentWebViewUrl(url);
-    logNavEvent('navState', url);
   };
 
   if (!saleId || !webViewUrl) {
@@ -302,83 +211,12 @@ ${logText}`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Debug HUD */}
-      {NAV_DEBUG_ENABLED && (
-        <View style={styles.debugHud}>
-          <TouchableOpacity
-            style={styles.debugToggle}
-            onPress={() => setDebugExpanded(!debugExpanded)}
-          >
-            <Text style={styles.debugToggleText}>Debug {debugExpanded ? '▼' : '▶'}</Text>
-          </TouchableOpacity>
-          
-          {debugExpanded && (
-            <View style={styles.debugContent}>
-              <ScrollView style={styles.debugScroll} nestedScrollEnabled>
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugLabel}>Screen:</Text>
-                  <Text style={styles.debugValue}>sales/[id]</Text>
-                </View>
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugLabel}>SaleId:</Text>
-                  <Text style={styles.debugValue}>{saleId || 'none'}</Text>
-                </View>
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugLabel}>WebViewUrl:</Text>
-                  <Text style={styles.debugValue} numberOfLines={2}>{webViewUrl || 'none'}</Text>
-                </View>
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugLabel}>Current WebView URL:</Text>
-                  <Text style={styles.debugValue} numberOfLines={2}>{currentWebViewUrl || 'none'}</Text>
-                </View>
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugLabel}>Loading:</Text>
-                  <Text style={styles.debugValue}>{loading ? 'true' : 'false'}</Text>
-                </View>
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugLabel}>Error:</Text>
-                  <Text style={styles.debugValue}>{error || 'none'}</Text>
-                </View>
-                
-                <View style={styles.debugDivider} />
-                <Text style={styles.debugEventsTitle}>Events (newest first, max 30):</Text>
-                
-                {navEvents.length === 0 ? (
-                  <Text style={styles.debugNoEvents}>No events yet</Text>
-                ) : (
-                  navEvents.map((event, index) => (
-                    <View key={index} style={styles.debugEvent}>
-                      <Text style={styles.debugEventTime}>{event.timestamp}</Text>
-                      <Text style={styles.debugEventType}>{event.eventType.toUpperCase()}</Text>
-                      <Text style={styles.debugEventUrl} numberOfLines={1}>{event.urlDisplay}</Text>
-                      {event.decision && (
-                        <Text style={styles.debugEventDecision}>Decision: {event.decision}</Text>
-                      )}
-                      {event.destinationDisplay && (
-                        <Text style={styles.debugEventDestination} numberOfLines={1}>
-                          Destination: {event.destinationDisplay}
-                        </Text>
-                      )}
-                    </View>
-                  ))
-                )}
-              </ScrollView>
-              
-              <View style={styles.debugActions}>
-                <TouchableOpacity style={styles.debugButton} onPress={copyEventsToClipboard}>
-                  <Text style={styles.debugButtonText}>Copy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.debugButton} onPress={shareEvents}>
-                  <Text style={styles.debugButtonText}>Share</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.debugButton} onPress={clearEvents}>
-                  <Text style={styles.debugButtonText}>Clear</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </View>
-      )}
+      {/* Diagnostic HUD - Always visible */}
+      <View style={styles.diagnosticHud} pointerEvents="none">
+        <Text style={styles.diagnosticText} numberOfLines={6}>
+          sales/[id] | saleId={saleId || 'none'} | loading={loading ? 'T' : 'F'} | lastReq={lastRequestedUrl ? (lastRequestedUrl.length > 40 ? lastRequestedUrl.substring(0, 37) + '...' : lastRequestedUrl) : 'none'} | decision={lastDecision || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'}
+        </Text>
+      </View>
       
       <View style={styles.mainContainer}>
         {/* WebView Content - Full height, web header is rendered inside WebView */}
@@ -587,5 +425,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(147, 51, 234, 0.15)',  // bg-[rgba(147,51,234,0.15)]
     borderRadius: 8,  // rounded-lg
+  },
+  // Diagnostic HUD - Always visible
+  diagnosticHud: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    elevation: 9999, // Android
+    backgroundColor: '#000000',
+    padding: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: '#FF0000',
+  },
+  diagnosticText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
   },
 });

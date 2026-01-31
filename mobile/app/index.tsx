@@ -17,6 +17,10 @@ export default function HomeScreen() {
   const searchParams = useLocalSearchParams<{ navigateTo?: string }>();
   const pendingNavigateToRef = useRef<string | null>(null);
   const lastHandledNavigateToRef = useRef<string | null>(null);
+  
+  // Diagnostic HUD state (always visible)
+  const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
+  const [lastNavAction, setLastNavAction] = useState<string>('');
 
   // Handle Android back button
   useEffect(() => {
@@ -137,6 +141,8 @@ export default function HomeScreen() {
 
   const handleNavigationStateChange = (navState: any) => {
     setCanGoBack(navState.canGoBack);
+    const url = navState.url || '';
+    setCurrentWebViewUrl(url);
     
     // Guard against SPA transitions: if URL changed but no load event fired,
     // clear loading state after a short delay
@@ -258,6 +264,7 @@ export default function HomeScreen() {
     // Build full URL
     const fullUrl = `${LOOTAURA_URL}${relativePath}`;
     console.log('[NATIVE] Executing navigation to:', fullUrl);
+    setLastNavAction(`executeNavigation -> ${relativePath}`);
     
     // Set loading state BEFORE injection (injectJavaScript may not trigger onLoadStart reliably)
     setLoading(true);
@@ -302,6 +309,7 @@ export default function HomeScreen() {
     const sanitizedUrl = sanitizeNavigationUrl(navigateTo);
     if (!sanitizedUrl) {
       console.warn('[NATIVE] Rejected unsafe navigateTo URL:', navigateTo);
+      setLastNavAction(`navigateTo rejected: ${navigateTo}`);
       // Clear the navigateTo param to prevent retrigger
       router.replace('/');
       return;
@@ -317,6 +325,7 @@ export default function HomeScreen() {
     if (webViewReady && webViewRef.current) {
       executeNavigation(sanitizedUrl);
     } else {
+      setLastNavAction(`navigateTo pending: ${sanitizedUrl}`);
       // Store as pending navigation - will execute after WebView is ready
       pendingNavigateToRef.current = sanitizedUrl;
     }
@@ -409,6 +418,13 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Diagnostic HUD - Always visible */}
+      <View style={styles.diagnosticHud} pointerEvents="none">
+        <Text style={styles.diagnosticText} numberOfLines={6}>
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | navigateTo={searchParams.navigateTo ? (searchParams.navigateTo.length > 30 ? searchParams.navigateTo.substring(0, 27) + '...' : searchParams.navigateTo) : 'none'} | lastNav={lastNavAction || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'}
+        </Text>
+      </View>
+      
       {error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Can't connect to LootAura right now</Text>
@@ -508,6 +524,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Diagnostic HUD - Always visible
+  diagnosticHud: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    elevation: 9999, // Android
+    backgroundColor: '#000000',
+    padding: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: '#FF0000',
+  },
+  diagnosticText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
   },
 });
 

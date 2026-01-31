@@ -265,11 +265,54 @@ export default function SaleDetailClient({
     const handleMessage = (event: MessageEvent | any) => {
       // React Native WebView sends messages via window.addEventListener('message')
       // event.data is a string (JSON) when sent via postMessage
+      // Also handle document-level messages (Android fallback)
       try {
-        const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+        // Handle both window and document event formats
+        const eventData = event.data || (event as any).data || (event as any).message
+        const message = typeof eventData === 'string' ? JSON.parse(eventData) : eventData
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALE_DETAIL] Received message from native:', message)
+        }
         
         if (message && message.type === 'navigate') {
           handleNavigate()
+        } else if (message && message.type === 'toggleFavorite') {
+          // Handle favorite toggle from native footer
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SALE_DETAIL] Processing toggleFavorite request')
+          }
+          
+          // Reuse existing handleFavoriteToggle which has auth gating
+          handleFavoriteToggle().then((newFavorited) => {
+            // If newFavorited is undefined, user was redirected (not logged in)
+            // Don't send message in that case - navigation is handled by handleFavoriteToggle
+            if (newFavorited !== undefined && typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+              const responseMessage = { 
+                type: 'favoriteState', 
+                isFavorited: newFavorited 
+              }
+              
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[SALE_DETAIL] Sending favoriteState to native:', responseMessage)
+              }
+              
+              (window as any).ReactNativeWebView.postMessage(
+                JSON.stringify(responseMessage)
+              )
+            } else if (newFavorited === undefined) {
+              // User was redirected to sign-in
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[SALE_DETAIL] User not logged in, redirecting to sign-in (no favoriteState sent)')
+              }
+            }
+          }).catch((error) => {
+            // If toggle fails, don't send message
+            // Error handling is done in handleFavoriteToggle (alert shown)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.warn('[SALE_DETAIL] Favorite toggle failed:', error)
+            }
+          })
         }
       } catch (error) {
         // Ignore invalid messages or parse errors
@@ -445,10 +488,10 @@ export default function SaleDetailClient({
     }
   }, [favoriteSales, sale.id, isFavorited])
 
-  const handleFavoriteToggle = async () => {
+  const handleFavoriteToggle = async (): Promise<boolean | void> => {
     if (!currentUser) {
       window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
-      return
+      return // No return value on redirect
     }
 
     const wasFavorited = isFavorited
@@ -465,17 +508,21 @@ export default function SaleDetailClient({
       })
 
       // Update with actual result (in case of any discrepancy)
-      setIsFavorited(result.favorited ?? !wasFavorited)
+      const newFavorited = result.favorited ?? !wasFavorited
+      setIsFavorited(newFavorited)
       
       // Track save event if favoriting (not unfavoriting)
-      if (result.favorited && !wasFavorited) {
+      if (newFavorited && !wasFavorited) {
         trackAnalyticsEvent({
           sale_id: sale.id,
           event_type: 'save',
         })
       }
       // Track Clarity event for favorite toggle
-      trackFavoriteToggled(sale.id, result.favorited ?? !wasFavorited)
+      trackFavoriteToggled(sale.id, newFavorited)
+      
+      // Return the new favorite state for callers that need it
+      return newFavorited
     } catch (error: any) {
       // Rollback optimistic update on error
       setIsFavorited(wasFavorited)
@@ -483,6 +530,7 @@ export default function SaleDetailClient({
         console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
       }
       alert(error?.message || 'Failed to save sale. Please try again.')
+      throw error // Re-throw so caller can handle
     } finally {
       // Allow sync to resume after API call completes
       isOptimisticRef.current = false

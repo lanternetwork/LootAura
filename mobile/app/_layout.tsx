@@ -54,26 +54,15 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: { paddingBottom: 0 },
+          // Global status bar settings - purple background with light icons
+          statusBarStyle: 'light',
+          statusBarColor: '#3A2268',
+          statusBarTranslucent: false,
+          statusBarHidden: false,
         }}
       >
-        <Stack.Screen 
-          name="index"
-          options={{
-            statusBarStyle: 'light',
-            statusBarColor: '#3A2268',
-            statusBarTranslucent: false,
-            statusBarHidden: false,
-          }}
-        />
-        <Stack.Screen 
-          name="sales/[id]"
-          options={{
-            statusBarStyle: 'light',
-            statusBarColor: '#3A2268',
-            statusBarTranslucent: false,
-            statusBarHidden: false,
-          }}
-        />
+        <Stack.Screen name="index" />
+        <Stack.Screen name="sales/[id]" />
       </Stack>
     </SafeAreaProvider>
   );

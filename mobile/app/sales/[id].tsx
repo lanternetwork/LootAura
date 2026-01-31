@@ -224,7 +224,7 @@ export default function SaleDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#3A2268',  // Purple background shows behind status bar area
   },
   mainContainer: {
     flex: 1,

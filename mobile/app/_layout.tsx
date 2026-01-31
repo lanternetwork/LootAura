@@ -62,7 +62,16 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
-        <Stack.Screen name="sales/[id]" />
+        <Stack.Screen 
+          name="sales/[id]"
+          options={{
+            // Route-specific status bar options for sale detail
+            statusBarStyle: 'light',
+            statusBarColor: '#3A2268',
+            statusBarTranslucent: false,
+            statusBarHidden: false,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

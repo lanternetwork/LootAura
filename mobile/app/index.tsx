@@ -146,9 +146,11 @@ export default function HomeScreen() {
           ? message.url 
           : `${LOOTAURA_URL}${message.url}`;
         if (webViewRef.current) {
+          // Escape backslashes first, then single quotes for safe injection
+          const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
           webViewRef.current.injectJavaScript(`
             (function() {
-              window.location.href = '${fullUrl.replace(/'/g, "\\'")}';
+              window.location.href = '${escapedUrl}';
             })();
             true; // Required for iOS
           `);
@@ -171,9 +173,11 @@ export default function HomeScreen() {
       
       // Navigate the WebView to the requested URL using injectJavaScript
       // This works because the WebView has a window object
+      // Escape backslashes first, then single quotes for safe injection
+      const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       webViewRef.current.injectJavaScript(`
         (function() {
-          window.location.href = '${fullUrl.replace(/'/g, "\\'")}';
+          window.location.href = '${escapedUrl}';
         })();
         true; // Required for iOS
       `);

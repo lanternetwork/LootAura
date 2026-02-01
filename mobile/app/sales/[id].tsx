@@ -113,6 +113,30 @@ export default function SaleDetailScreen() {
     }
   };
 
+  // Helper function to exit to main shell with destination URL
+  const exitToMainShell = (destinationPath: string, destinationSearch: string, reason: string) => {
+    // Prevent duplicate exits
+    if (exitingRef.current) {
+      if (__DEV__) {
+        console.log('[NATIVE] Already exiting, ignoring duplicate exit request:', reason);
+      }
+      return;
+    }
+    
+    exitingRef.current = true;
+    setLoading(false);
+    
+    const blockedUrl = `${destinationPath}${destinationSearch}`;
+    const navigateToUrl = `/?navigateTo=${encodeURIComponent(blockedUrl)}`;
+    setLastDecision(`${reason} -> ${navigateToUrl}`);
+    
+    if (__DEV__) {
+      console.log('[NATIVE] Exiting to main shell:', { blockedUrl, navigateToUrl, reason });
+    }
+    
+    router.replace(navigateToUrl);
+  };
+
   // Handle messages from WebView
   const handleMessage = (event: any) => {
     try {
@@ -140,6 +164,66 @@ export default function SaleDetailScreen() {
         // Navigate to main shell with the destination path
         const navigateToUrl = `/?navigateTo=${encodeURIComponent(path)}`;
         router.replace(navigateToUrl);
+      } else if (message && message.type === 'ROUTE_CHANGE') {
+        // Handle route change from injected JavaScript (SPA navigation detection)
+        const { pathname, search, url } = message;
+        
+        if (__DEV__) {
+          console.log('[NATIVE] Received ROUTE_CHANGE message:', { pathname, search, url });
+        }
+        
+        // Skip exit logic on initial load (first route change is the sale page itself)
+        if (isInitialLoadRef.current) {
+          isInitialLoadRef.current = false;
+          if (__DEV__) {
+            console.log('[NATIVE] Ignoring ROUTE_CHANGE on initial load');
+          }
+          return;
+        }
+        
+        // Prevent loops - if we're already exiting, don't process again
+        if (exitingRef.current) {
+          return;
+        }
+        
+        try {
+          // Parse URL to check hostname (safety check)
+          const parsedUrl = new URL(url);
+          const hostname = parsedUrl.hostname.toLowerCase();
+          
+          // Only handle same-origin navigation
+          if (hostname !== 'lootaura.com' && !hostname.endsWith('.lootaura.com')) {
+            if (__DEV__) {
+              console.log('[NATIVE] Ignoring ROUTE_CHANGE for external URL:', hostname);
+            }
+            return; // External URL - ignore
+          }
+          
+          // Check if still on the same sale (allow query param changes)
+          const isSaleDetailPath = pathname.match(/^\/sales\/([^\/\?]+)/);
+          if (isSaleDetailPath) {
+            const matchedSaleId = isSaleDetailPath[1];
+            if (matchedSaleId === saleId) {
+              // Same sale, query might have changed - stay on screen
+              if (__DEV__) {
+                console.log('[NATIVE] ROUTE_CHANGE: Same sale, staying on screen');
+              }
+              return;
+            }
+            // Different sale ID - exit to index
+            if (__DEV__) {
+              console.log('[NATIVE] ROUTE_CHANGE: Different sale ID, exiting');
+            }
+          }
+          
+          // Navigation away from sale detail - exit to index with destination URL
+          exitToMainShell(pathname, search || '', 'ROUTE_CHANGE');
+        } catch (e) {
+          // URL parsing failed - ignore (defensive)
+          if (__DEV__) {
+            console.warn('[NATIVE] Failed to parse URL in ROUTE_CHANGE handler:', e);
+          }
+        }
       }
     } catch (error) {
       // Ignore invalid messages
@@ -190,22 +274,8 @@ export default function SaleDetailScreen() {
       }
       
       // Navigation away from sale detail - send URL to main shell and return to main shell
-      // Clear loading state before navigation (same as onLoadEnd)
-      setLoading(false);
-      
-      // Prevent duplicate exits if onNavigationStateChange already handled it
-      if (exitingRef.current) {
-        return false;
-      }
-      exitingRef.current = true;
-      
-      // Send message to main shell with the blocked URL (path + query)
-      // Pass the URL as a query parameter that the index screen can read
-      const blockedUrl = `${pathname}${parsedUrl.search}`;
-      const navigateToUrl = `/?navigateTo=${encodeURIComponent(blockedUrl)}`;
-      const decision = 'BLOCK: exit-to-index';
-      setLastDecision(`${decision} -> ${navigateToUrl}`);
-      router.replace(navigateToUrl);
+      // Use helper function to ensure consistent exit behavior
+      exitToMainShell(pathname, parsedUrl.search, 'BLOCK: exit-to-index');
       return false; // Block navigation in WebView
     } catch (e) {
       // If URL parsing fails, allow navigation (defensive)
@@ -257,12 +327,8 @@ export default function SaleDetailScreen() {
       }
       
       // Navigation away from sale detail - exit to index with destination URL
-      exitingRef.current = true;
-      setLoading(false);
-      const blockedUrl = `${pathname}${parsedUrl.search}`;
-      const navigateToUrl = `/?navigateTo=${encodeURIComponent(blockedUrl)}`;
-      setLastDecision(`NAV_STATE: exit-to-index -> ${navigateToUrl}`);
-      router.replace(navigateToUrl);
+      // Use helper function to ensure consistent exit behavior
+      exitToMainShell(pathname, parsedUrl.search, 'NAV_STATE: exit-to-index');
     } catch (e) {
       // URL parsing failed - ignore (defensive)
       if (__DEV__) {
@@ -307,6 +373,52 @@ export default function SaleDetailScreen() {
             onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
             onNavigationStateChange={handleNavigationStateChange}
             onMessage={handleMessage}
+            injectedJavaScript={`
+              (function() {
+                if (!window.ReactNativeWebView) return;
+                
+                const reportRouteChange = () => {
+                  try {
+                    const pathname = window.location.pathname;
+                    const search = window.location.search;
+                    const fullUrl = window.location.href;
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'ROUTE_CHANGE',
+                      pathname: pathname,
+                      search: search,
+                      url: fullUrl
+                    }));
+                  } catch (e) {
+                    // Silently fail if postMessage fails
+                  }
+                };
+                
+                // Report initial route after a short delay to ensure Next.js router is initialized
+                setTimeout(reportRouteChange, 100);
+                
+                // Intercept history API to detect SPA navigation
+                const originalPushState = history.pushState;
+                const originalReplaceState = history.replaceState;
+                
+                history.pushState = function(...args) {
+                  originalPushState.apply(history, args);
+                  // Use setTimeout to ensure URL is updated before reporting
+                  setTimeout(reportRouteChange, 0);
+                };
+                
+                history.replaceState = function(...args) {
+                  originalReplaceState.apply(history, args);
+                  // Use setTimeout to ensure URL is updated before reporting
+                  setTimeout(reportRouteChange, 0);
+                };
+                
+                // Listen for browser back/forward navigation
+                window.addEventListener('popstate', () => {
+                  setTimeout(reportRouteChange, 0);
+                });
+              })();
+              true; // Required for iOS
+            `}
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}

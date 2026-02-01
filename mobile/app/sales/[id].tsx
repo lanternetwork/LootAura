@@ -25,6 +25,8 @@ export default function SaleDetailScreen() {
   const [lastRequestedUrl, setLastRequestedUrl] = useState<string>('');
   const [lastDecision, setLastDecision] = useState<string>('');
   const [lastNavigateMessage, setLastNavigateMessage] = useState<string>('');
+  const [lastNavRequest, setLastNavRequest] = useState<string>('');
+  const [lastMessageReceived, setLastMessageReceived] = useState<string>('');
 
   // Normalize id parameter: handle string | string[] | undefined
   // Expo Router can return arrays for route params, so we normalize to string | null
@@ -142,6 +144,8 @@ export default function SaleDetailScreen() {
   const handleMessage = (event: any) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
+      const messageStr = JSON.stringify(message);
+      setLastMessageReceived(messageStr.length > 100 ? messageStr.substring(0, 97) + '...' : messageStr);
       
       if (__DEV__) {
         console.log('[NATIVE] Received message from WebView:', message);
@@ -156,15 +160,18 @@ export default function SaleDetailScreen() {
         setIsFavorited(newFavorited);
       } else if (message && message.type === 'NAVIGATE') {
         // Handle navigation request from web header
+        // IMMEDIATELY exit - do not wait for any other logic
         const path = message.path || '/';
         setLastNavigateMessage(`NAVIGATE: ${path}`);
+        setLastNavRequest(path);
         
         if (__DEV__) {
-          console.log('[NATIVE] Received NAVIGATE message from web:', { path });
+          console.log('[NATIVE] Received NAVIGATE message from web - exiting immediately:', { path });
         }
         
         // Use exitToMainShell helper to ensure consistent exit behavior
         // This ensures exitingRef guard is used and loading state is cleared
+        // Exit immediately - footer must disappear
         exitToMainShell(path, '', 'NAVIGATE: header-click');
       } else if (message && message.type === 'ROUTE_CHANGE') {
         // Handle route change from injected JavaScript (SPA navigation detection)
@@ -356,8 +363,8 @@ export default function SaleDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={8}>
-          sales/[id] | saleId={saleId || 'none'} | loading={loading ? 'T' : 'F'} | lastReq={lastRequestedUrl ? (lastRequestedUrl.length > 40 ? lastRequestedUrl.substring(0, 37) + '...' : lastRequestedUrl) : 'none'} | decision={lastDecision || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'}
+        <Text style={styles.diagnosticText} numberOfLines={10}>
+          sales/[id] | saleId={saleId || 'none'} | loading={loading ? 'T' : 'F'} | lastNavReq={lastNavRequest || 'none'} | lastReq={lastRequestedUrl ? (lastRequestedUrl.length > 40 ? lastRequestedUrl.substring(0, 37) + '...' : lastRequestedUrl) : 'none'} | decision={lastDecision || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'} | lastMsg={lastMessageReceived || 'none'}
         </Text>
       </View>
       

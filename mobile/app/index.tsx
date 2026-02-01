@@ -18,12 +18,17 @@ export default function HomeScreen() {
   const pendingNavigateToRef = useRef<string | null>(null);
   const lastHandledNavigateToRef = useRef<string | null>(null);
   
+  // State-driven WebView navigation (replaces injectJavaScript)
+  const [currentUrl, setCurrentUrl] = useState<string>(LOOTAURA_URL);
+  
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
   const [lastNavAction, setLastNavAction] = useState<string>('');
   const [lastNavigateMessage, setLastNavigateMessage] = useState<string>('');
   const [lastSanitizerDecision, setLastSanitizerDecision] = useState<string>('');
   const [sanitizerRejectionBanner, setSanitizerRejectionBanner] = useState<string>('');
+  const [lastNavRequest, setLastNavRequest] = useState<string>('');
+  const [lastNavSource, setLastNavSource] = useState<string>('');
 
   // Loader management helpers
   const startLoader = (reason: string) => {
@@ -118,7 +123,7 @@ export default function HomeScreen() {
     if (pendingNavigateToRef.current && webViewRef.current) {
       const pendingUrl = pendingNavigateToRef.current;
       pendingNavigateToRef.current = null;
-      executeNavigation(pendingUrl);
+      executeNavigation(pendingUrl, 'navigateTo param (pending)');
     }
   };
 
@@ -204,7 +209,7 @@ export default function HomeScreen() {
         if (sanitizedUrl) {
           setLastSanitizerDecision(`ALLOWED: ${sanitizedUrl}`);
           setSanitizerRejectionBanner(''); // Clear any rejection banner
-          executeNavigation(sanitizedUrl);
+          executeNavigation(sanitizedUrl, 'WebView message');
         } else {
           const rejectionReason = `REJECTED: ${path}`;
           setLastSanitizerDecision(rejectionReason);
@@ -289,28 +294,19 @@ export default function HomeScreen() {
     }
   };
 
-  // Execute navigation with proper loading lifecycle management
-  const executeNavigation = (relativePath: string) => {
-    if (!webViewRef.current) {
-      return;
-    }
-    
+  // Execute navigation using state-driven WebView source (replaces injectJavaScript)
+  const executeNavigation = (relativePath: string, source: string) => {
     // Build full URL
     const fullUrl = `${LOOTAURA_URL}${relativePath}`;
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     setLastNavAction(`executeNavigation -> ${relativePath}`);
+    setLastNavRequest(relativePath);
+    setLastNavSource(source);
     
-    // Use startLoader for injected navigation
-    startLoader(`executeNavigation: ${relativePath}`);
-    
-    // Escape backslashes first, then single quotes for safe injection
-    const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    webViewRef.current.injectJavaScript(`
-      (function() {
-        window.location.href = '${escapedUrl}';
-      })();
-      true; // Required for iOS
-    `);
+    // Use state-driven navigation - update currentUrl to trigger WebView reload
+    // This properly triggers onLoadStart/onLoadEnd lifecycle events
+    setCurrentUrl(fullUrl);
+    startLoader(`executeNavigation: ${relativePath} (${source})`);
   };
 
   // Handle navigateTo query param from sale detail screen
@@ -349,7 +345,7 @@ export default function HomeScreen() {
     
     // If WebView is ready, execute immediately
     if (webViewReady && webViewRef.current) {
-      executeNavigation(sanitizedUrl);
+      executeNavigation(sanitizedUrl, 'navigateTo param');
     } else {
       setLastNavAction(`navigateTo pending: ${sanitizedUrl}`);
       // Store as pending navigation - will execute after WebView is ready
@@ -433,8 +429,8 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={10}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | navigateTo={searchParams.navigateTo ? (searchParams.navigateTo.length > 30 ? searchParams.navigateTo.substring(0, 27) + '...' : searchParams.navigateTo) : 'none'} | lastNav={lastNavAction || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'} | sanitizer={lastSanitizerDecision || 'none'}
+        <Text style={styles.diagnosticText} numberOfLines={12}>
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | lastNavReq={lastNavRequest || 'none'} | lastNavSrc={lastNavSource || 'none'} | navigateTo={searchParams.navigateTo ? (searchParams.navigateTo.length > 30 ? searchParams.navigateTo.substring(0, 27) + '...' : searchParams.navigateTo) : 'none'} | lastNav={lastNavAction || 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'} | sanitizer={lastSanitizerDecision || 'none'}
         </Text>
       </View>
       
@@ -457,7 +453,8 @@ export default function HomeScreen() {
         <>
           <WebView
             ref={webViewRef}
-            source={{ uri: LOOTAURA_URL }}
+            source={{ uri: currentUrl }}
+            key={currentUrl}
             style={styles.webview}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}

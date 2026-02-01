@@ -181,6 +181,7 @@ export function Header() {
             <div className={`${isCollapsed ? 'hidden' : 'hidden sm:flex lg:hidden'} items-center gap-1 shrink-0`} aria-label="Main navigation">
               <Link
                 href="/sales"
+                onClick={(e) => handleNativeNavigation('/sales', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Browse Sales"
               >
@@ -191,6 +192,7 @@ export function Header() {
               </Link>
               <Link
                 href="/favorites"
+                onClick={(e) => handleNativeNavigation('/favorites', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Favorites"
               >
@@ -200,6 +202,7 @@ export function Header() {
               </Link>
               <Link
                 href="/sell/new"
+                onClick={(e) => handleNativeNavigation('/sell/new', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Post Your Sale"
               >
@@ -229,6 +232,7 @@ export function Header() {
               </Link>
               <Link
                 href="/favorites"
+                onClick={(e) => handleNativeNavigation('/favorites', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Favorites"
               >
@@ -238,6 +242,7 @@ export function Header() {
               </Link>
               <Link
                 href="/sell/new"
+                onClick={(e) => handleNativeNavigation('/sell/new', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Post Your Sale"
               >

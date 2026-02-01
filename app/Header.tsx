@@ -97,11 +97,9 @@ export function Header() {
   // nativeFooter=1 means we're in a native app with native footer, so keep web header visible
   const isEmbed = searchParams.get('embed') === '1'
   const isNativeFooter = searchParams.get('nativeFooter') === '1'
-  if (isEmbed && !isNativeFooter) {
-    return null
-  }
-
+  
   // Helper to send navigation message to native when nativeFooter=1
+  // Must be defined before any conditional returns (React Hooks rule)
   const handleNativeNavigation = useCallback((path: string, e?: React.MouseEvent) => {
     if (isNativeFooter && typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
       e?.preventDefault()
@@ -112,6 +110,10 @@ export function Header() {
     }
     return false
   }, [isNativeFooter])
+  
+  if (isEmbed && !isNativeFooter) {
+    return null
+  }
   
   return (
     <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">

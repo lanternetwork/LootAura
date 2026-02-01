@@ -88,7 +88,7 @@ export default function UserProfile() {
       {open && (
         <div role="menu" className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-50">
           <div className="p-2 flex flex-col">
-            <a href="/dashboard" onClick={(e) => { if (handleNativeNavigation('/dashboard', e)) { setOpen(false); return }; setOpen(false) }} className="px-2 py-2 text-sm text-neutral-700 hover:bg-neutral-100 rounded">Dashboard</a>
+            <a href="/dashboard" onClick={(e) => { if (handleNativeNavigation('/dashboard', e)) { setOpen(false); return } setOpen(false) }} className="px-2 py-2 text-sm text-neutral-700 hover:bg-neutral-100 rounded">Dashboard</a>
             <button onClick={handleSignOut} disabled={signOut.isPending} className="mt-1 px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50 rounded">{signOut.isPending ? 'Signing out…' : 'Sign Out'}</button>
           </div>
         </div>

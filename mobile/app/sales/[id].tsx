@@ -24,6 +24,7 @@ export default function SaleDetailScreen() {
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
   const [lastRequestedUrl, setLastRequestedUrl] = useState<string>('');
   const [lastDecision, setLastDecision] = useState<string>('');
+  const [lastNavigateMessage, setLastNavigateMessage] = useState<string>('');
 
   // Normalize id parameter: handle string | string[] | undefined
   // Expo Router can return arrays for route params, so we normalize to string | null
@@ -156,14 +157,15 @@ export default function SaleDetailScreen() {
       } else if (message && message.type === 'NAVIGATE') {
         // Handle navigation request from web header
         const path = message.path || '/';
+        setLastNavigateMessage(`NAVIGATE: ${path}`);
+        
         if (__DEV__) {
           console.log('[NATIVE] Received NAVIGATE message from web:', { path });
         }
-        // Clear loading state
-        setLoading(false);
-        // Navigate to main shell with the destination path
-        const navigateToUrl = `/?navigateTo=${encodeURIComponent(path)}`;
-        router.replace(navigateToUrl);
+        
+        // Use exitToMainShell helper to ensure consistent exit behavior
+        // This ensures exitingRef guard is used and loading state is cleared
+        exitToMainShell(path, '', 'NAVIGATE: header-click');
       } else if (message && message.type === 'ROUTE_CHANGE') {
         // Handle route change from injected JavaScript (SPA navigation detection)
         const { pathname, search, url } = message;
@@ -354,8 +356,8 @@ export default function SaleDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={6}>
-          sales/[id] | saleId={saleId || 'none'} | loading={loading ? 'T' : 'F'} | lastReq={lastRequestedUrl ? (lastRequestedUrl.length > 40 ? lastRequestedUrl.substring(0, 37) + '...' : lastRequestedUrl) : 'none'} | decision={lastDecision || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'}
+        <Text style={styles.diagnosticText} numberOfLines={8}>
+          sales/[id] | saleId={saleId || 'none'} | loading={loading ? 'T' : 'F'} | lastReq={lastRequestedUrl ? (lastRequestedUrl.length > 40 ? lastRequestedUrl.substring(0, 37) + '...' : lastRequestedUrl) : 'none'} | decision={lastDecision || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'}
         </Text>
       </View>
       

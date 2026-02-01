@@ -21,6 +21,9 @@ export default function HomeScreen() {
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
   const [lastNavAction, setLastNavAction] = useState<string>('');
+  const [lastNavigateMessage, setLastNavigateMessage] = useState<string>('');
+  const [lastSanitizerDecision, setLastSanitizerDecision] = useState<string>('');
+  const [sanitizerRejectionBanner, setSanitizerRejectionBanner] = useState<string>('');
 
   // Loader management helpers
   const startLoader = (reason: string) => {
@@ -189,15 +192,26 @@ export default function HomeScreen() {
         } catch (error) {
           console.error('[NATIVE] Failed to navigate to native sale detail screen:', error);
         }
-      } else if (message.type === 'NAVIGATE' && message.url) {
-        // Handle navigation request from sale detail screen
-        console.log('[NATIVE] Navigating WebView to:', message.url);
+      } else if (message.type === 'NAVIGATE') {
+        // Handle navigation request from sale detail screen or header
+        // Header sends 'path', legacy code might send 'url'
+        const path = message.path || message.url || '/';
+        setLastNavigateMessage(`NAVIGATE: ${path}`);
+        
+        console.log('[NATIVE] Navigating WebView to:', path);
         // Sanitize and validate URL before navigation
-        const sanitizedUrl = sanitizeNavigationUrl(message.url);
+        const sanitizedUrl = sanitizeNavigationUrl(path);
         if (sanitizedUrl) {
+          setLastSanitizerDecision(`ALLOWED: ${sanitizedUrl}`);
+          setSanitizerRejectionBanner(''); // Clear any rejection banner
           executeNavigation(sanitizedUrl);
         } else {
-          console.warn('[NATIVE] Rejected unsafe navigation URL:', message.url);
+          const rejectionReason = `REJECTED: ${path}`;
+          setLastSanitizerDecision(rejectionReason);
+          setSanitizerRejectionBanner(rejectionReason);
+          console.warn('[NATIVE] Rejected unsafe navigation URL:', path);
+          // Clear banner after 5 seconds
+          setTimeout(() => setSanitizerRejectionBanner(''), 5000);
         }
       }
     } catch (error) {
@@ -226,21 +240,25 @@ export default function HomeScreen() {
       
       const lowerUrl = decodedUrl.toLowerCase();
       if (dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme))) {
+        setLastSanitizerDecision(`REJECTED: dangerous scheme`);
         return null;
       }
       
       // Reject absolute URLs with any protocol (http://, https://, etc.)
       if (decodedUrl.includes('://')) {
+        setLastSanitizerDecision(`REJECTED: absolute URL`);
         return null;
       }
       
       // Reject URLs with hostnames (security: prevent open redirects)
       if (decodedUrl.includes('@') || decodedUrl.match(/^[a-zA-Z0-9.-]+\.[a-zA-Z]/)) {
+        setLastSanitizerDecision(`REJECTED: hostname detected`);
         return null;
       }
       
       // Only allow relative paths starting with /
       if (!decodedUrl.startsWith('/')) {
+        setLastSanitizerDecision(`REJECTED: not relative path`);
         return null;
       }
       
@@ -257,13 +275,16 @@ export default function HomeScreen() {
       });
       
       if (!isAllowed) {
+        setLastSanitizerDecision(`REJECTED: path not in allowlist (${pathMatch})`);
         return null;
       }
       
       // Return sanitized relative path
+      setLastSanitizerDecision(`ALLOWED: ${decodedUrl}`);
       return decodedUrl;
     } catch (e) {
       // If URL parsing/decoding fails, reject it
+      setLastSanitizerDecision(`REJECTED: parse error`);
       return null;
     }
   };
@@ -309,8 +330,12 @@ export default function HomeScreen() {
     // Sanitize and validate URL
     const sanitizedUrl = sanitizeNavigationUrl(navigateTo);
     if (!sanitizedUrl) {
+      const rejectionReason = `navigateTo REJECTED: ${navigateTo}`;
       console.warn('[NATIVE] Rejected unsafe navigateTo URL:', navigateTo);
-      setLastNavAction(`navigateTo rejected: ${navigateTo}`);
+      setLastNavAction(rejectionReason);
+      setSanitizerRejectionBanner(rejectionReason);
+      // Clear banner after 5 seconds
+      setTimeout(() => setSanitizerRejectionBanner(''), 5000);
       // Clear the navigateTo param to prevent retrigger
       router.replace('/');
       return;
@@ -408,10 +433,17 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={6}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | navigateTo={searchParams.navigateTo ? (searchParams.navigateTo.length > 30 ? searchParams.navigateTo.substring(0, 27) + '...' : searchParams.navigateTo) : 'none'} | lastNav={lastNavAction || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'}
+        <Text style={styles.diagnosticText} numberOfLines={10}>
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | navigateTo={searchParams.navigateTo ? (searchParams.navigateTo.length > 30 ? searchParams.navigateTo.substring(0, 27) + '...' : searchParams.navigateTo) : 'none'} | lastNav={lastNavAction || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'} | sanitizer={lastSanitizerDecision || 'none'}
         </Text>
       </View>
+      
+      {/* Sanitizer Rejection Banner - Visible when navigation is rejected */}
+      {sanitizerRejectionBanner ? (
+        <View style={styles.rejectionBanner}>
+          <Text style={styles.rejectionBannerText}>{sanitizerRejectionBanner}</Text>
+        </View>
+      ) : null}
       
       {error ? (
         <View style={styles.errorContainer}>
@@ -531,6 +563,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     fontFamily: 'monospace',
+  },
+  // Sanitizer Rejection Banner
+  rejectionBanner: {
+    position: 'absolute',
+    top: 80, // Below diagnostic HUD
+    left: 0,
+    right: 0,
+    zIndex: 9998,
+    elevation: 9998, // Android
+    backgroundColor: '#DC2626', // red-600
+    padding: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: '#991B1B', // red-800
+  },
+  rejectionBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    textAlign: 'center',
   },
 });
 

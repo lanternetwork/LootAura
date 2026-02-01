@@ -138,7 +138,7 @@ export function Header() {
               ) : (
                 <Link
                   href={backUrl}
-                  onClick={(e) => handleNativeNavigation('/sales', e)}
+                  onClick={(e) => handleNativeNavigation(backUrl, e)}
                   className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
                   aria-label="Back to sales"
                 >

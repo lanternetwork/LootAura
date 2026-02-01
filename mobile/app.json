@@ -17,7 +17,7 @@
     ],
     "android": {
       "package": "com.lootaura.app",
-      "versionCode": 47,
+      "versionCode": 48,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A2268"

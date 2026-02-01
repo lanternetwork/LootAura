@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,6 +17,8 @@ export default function SaleDetailScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const exitingRef = useRef(false);
+  const isInitialLoadRef = useRef(true);
   
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
@@ -29,6 +31,12 @@ export default function SaleDetailScreen() {
 
   // WebView URL with nativeFooter parameter (keeps web header visible, hides web footer)
   const webViewUrl = saleId ? `${LOOTAURA_URL}/sales/${saleId}?nativeFooter=1` : null;
+
+  // Reset exit tracking when saleId changes (new sale loaded)
+  useEffect(() => {
+    exitingRef.current = false;
+    isInitialLoadRef.current = true;
+  }, [saleId]);
 
   // Status bar is handled by Stack.Screen options in _layout.tsx
 
@@ -185,6 +193,12 @@ export default function SaleDetailScreen() {
       // Clear loading state before navigation (same as onLoadEnd)
       setLoading(false);
       
+      // Prevent duplicate exits if onNavigationStateChange already handled it
+      if (exitingRef.current) {
+        return false;
+      }
+      exitingRef.current = true;
+      
       // Send message to main shell with the blocked URL (path + query)
       // Pass the URL as a query parameter that the index screen can read
       const blockedUrl = `${pathname}${parsedUrl.search}`;
@@ -202,9 +216,59 @@ export default function SaleDetailScreen() {
   };
 
   // Handle navigation state changes
+  // This detects SPA navigation (pushState/replaceState) that onShouldStartLoadWithRequest misses
   const handleNavigationStateChange = (navState: any) => {
     const url = navState.url || '';
     setCurrentWebViewUrl(url);
+    
+    // Skip exit logic on initial load (first navigation is the sale page itself)
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+    
+    // Prevent loops - if we're already exiting, don't process again
+    if (exitingRef.current) {
+      return;
+    }
+    
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const pathname = parsedUrl.pathname;
+      
+      // Only handle same-origin navigation
+      // External URLs are handled by onShouldStartLoadWithRequest
+      if (hostname !== 'lootaura.com' && !hostname.endsWith('.lootaura.com')) {
+        return; // External URL - ignore (onShouldStartLoadWithRequest handles it)
+      }
+      
+      // Check if still on the same sale (allow query param changes)
+      const isSaleDetailPath = pathname.match(/^\/sales\/([^\/\?]+)/);
+      if (isSaleDetailPath) {
+        const matchedSaleId = isSaleDetailPath[1];
+        if (matchedSaleId === saleId) {
+          // Same sale, query might have changed - stay on screen
+          return;
+        }
+        // Different sale ID - exit to index
+        // Note: Main shell blocks /sales/:id URLs, so we just exit to index
+        // The web will handle opening the new sale via postMessage if needed
+      }
+      
+      // Navigation away from sale detail - exit to index with destination URL
+      exitingRef.current = true;
+      setLoading(false);
+      const blockedUrl = `${pathname}${parsedUrl.search}`;
+      const navigateToUrl = `/?navigateTo=${encodeURIComponent(blockedUrl)}`;
+      setLastDecision(`NAV_STATE: exit-to-index -> ${navigateToUrl}`);
+      router.replace(navigateToUrl);
+    } catch (e) {
+      // URL parsing failed - ignore (defensive)
+      if (__DEV__) {
+        console.warn('[NATIVE] Failed to parse URL in handleNavigationStateChange:', e);
+      }
+    }
   };
 
   if (!saleId || !webViewUrl) {

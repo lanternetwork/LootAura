@@ -22,6 +22,33 @@ export default function HomeScreen() {
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
   const [lastNavAction, setLastNavAction] = useState<string>('');
 
+  // Loader management helpers
+  const startLoader = (reason: string) => {
+    setLastNavAction(`startLoader: ${reason}`);
+    // Clear any existing timeout
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setLoading(true);
+    setError(null);
+    // Hard failsafe: always clear loading after 10 seconds
+    loadTimeoutRef.current = setTimeout(() => {
+      setLoading(false);
+      loadTimeoutRef.current = null;
+      setLastNavAction(`loader timeout cleared (10s)`);
+    }, 10000);
+  };
+
+  const stopLoader = (reason: string) => {
+    setLastNavAction(`stopLoader: ${reason}`);
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setLoading(false);
+  };
+
   // Handle Android back button
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -68,28 +95,19 @@ export default function HomeScreen() {
       }
     }
     
-    setLoading(true);
-    setError(null);
-    
-    // Clear any existing timeout
-    if (loadTimeoutRef.current) {
-      clearTimeout(loadTimeoutRef.current);
+    // Only start loader if WebView is not ready (initial load) OR if this is a real document load
+    // After webViewReady, SPA transitions shouldn't trigger loading state
+    if (!webViewReady) {
+      startLoader(`onLoadStart: ${url || 'initial'}`);
+    } else {
+      // After ready, only show loader for real page loads (not SPA transitions)
+      // We'll rely on navState.loading to determine if this is a real load
+      setLastNavAction(`onLoadStart (ready): ${url || 'unknown'}`);
     }
-    
-    // Set a timeout to hide loading after 15 seconds if page doesn't load
-    // This prevents the loading state from getting stuck (reduced from 30s for better UX)
-    loadTimeoutRef.current = setTimeout(() => {
-      setLoading(false);
-    }, 15000);
   };
 
   const handleLoadEnd = () => {
-    // Clear timeout since page loaded successfully
-    if (loadTimeoutRef.current) {
-      clearTimeout(loadTimeoutRef.current);
-      loadTimeoutRef.current = null;
-    }
-    setLoading(false);
+    stopLoader('onLoadEnd');
     // Mark WebView as ready after first successful load
     setWebViewReady(true);
     
@@ -104,25 +122,14 @@ export default function HomeScreen() {
   const handleLoad = () => {
     // Additional handler for when page fully loads
     // This is a fallback in case onLoadEnd doesn't fire
-    if (loadTimeoutRef.current) {
-      clearTimeout(loadTimeoutRef.current);
-      loadTimeoutRef.current = null;
-    }
-    setLoading(false);
+    stopLoader('onLoad');
   };
 
   const handleError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     console.warn('WebView error: ', nativeEvent);
-    
-    // Clear timeout on error
-    if (loadTimeoutRef.current) {
-      clearTimeout(loadTimeoutRef.current);
-      loadTimeoutRef.current = null;
-    }
-    
+    stopLoader('onError');
     setError('Failed to load LootAura. Please check your internet connection.');
-    setLoading(false);
   };
 
   const handleHttpError = (syntheticEvent: any) => {
@@ -144,23 +151,29 @@ export default function HomeScreen() {
     const url = navState.url || '';
     setCurrentWebViewUrl(url);
     
-    // Guard against SPA transitions: if URL changed but no load event fired,
-    // clear loading state after a short delay
-    // This handles hash-based navigation and history.pushState() changes
-    if (loading && navState.url) {
-      // If we're in loading state but URL changed, it might be an SPA transition
-      // Give it 500ms, then clear loading if still stuck
-      setTimeout(() => {
-        if (loading) {
-          // Only clear if we're still loading and no actual page load occurred
-          // This is a failsafe for SPA transitions
-          setLoading(false);
-          if (loadTimeoutRef.current) {
-            clearTimeout(loadTimeoutRef.current);
-            loadTimeoutRef.current = null;
-          }
+    // CRITICAL: If navState.loading === false, force clear loading state
+    // This is the most reliable way to detect when navigation is complete
+    if (navState.loading === false) {
+      stopLoader('navState.loading=false');
+    }
+    
+    // Track navigation action when URL changes
+    if (url && url !== currentWebViewUrl) {
+      try {
+        const parsedUrl = new URL(url);
+        const pathname = parsedUrl.pathname;
+        if (pathname.startsWith('/sales') || pathname === '/') {
+          setLastNavAction(`SPA nav to ${pathname}`);
         }
-      }, 500);
+      } catch (e) {
+        // Ignore URL parse errors
+      }
+    }
+    
+    // After webViewReady, only show loader for real document loads (navState.loading === true)
+    // SPA transitions (pushState) won't have navState.loading === true, so don't start loader
+    if (webViewReady && navState.loading === true && !loading) {
+      startLoader(`navState.loading=true: ${url}`);
     }
   };
 
@@ -266,20 +279,8 @@ export default function HomeScreen() {
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     setLastNavAction(`executeNavigation -> ${relativePath}`);
     
-    // Set loading state BEFORE injection (injectJavaScript may not trigger onLoadStart reliably)
-    setLoading(true);
-    setError(null);
-    
-    // Clear any existing timeout
-    if (loadTimeoutRef.current) {
-      clearTimeout(loadTimeoutRef.current);
-    }
-    
-    // Start timeout fallback (10-15s for better UX)
-    loadTimeoutRef.current = setTimeout(() => {
-      setLoading(false);
-      loadTimeoutRef.current = null;
-    }, 12000); // 12 seconds
+    // Use startLoader for injected navigation
+    startLoader(`executeNavigation: ${relativePath}`);
     
     // Escape backslashes first, then single quotes for safe injection
     const escapedUrl = fullUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -348,12 +349,7 @@ export default function HomeScreen() {
         // Unconditionally block WebView from loading this URL
         // Navigation should happen via postMessage, not URL navigation
         console.warn('[NATIVE] Blocked WebView navigation to sale detail page. Use postMessage instead.');
-        // Clear loading state since we're blocking (onLoadStart may have fired)
-        setLoading(false);
-        if (loadTimeoutRef.current) {
-          clearTimeout(loadTimeoutRef.current);
-          loadTimeoutRef.current = null;
-        }
+        stopLoader('blocked sale detail');
         return false;
       }
       
@@ -365,26 +361,18 @@ export default function HomeScreen() {
       
       // Open external HTTP/HTTPS links in system browser
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+        setLastNavAction(`blocked external link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
-        // Clear loading state since we're blocking (onLoadStart may have fired)
-        setLoading(false);
-        if (loadTimeoutRef.current) {
-          clearTimeout(loadTimeoutRef.current);
-          loadTimeoutRef.current = null;
-        }
+        stopLoader('blocked external link');
         return false; // Prevent WebView from loading external URLs
       }
     } catch (e) {
       // If URL parsing fails, check for non-HTTP protocols
       // Allow other protocols (mailto:, tel:, etc.) to open in system apps
       if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
+        setLastNavAction(`blocked protocol link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
-        // Clear loading state since we're blocking (onLoadStart may have fired)
-        setLoading(false);
-        if (loadTimeoutRef.current) {
-          clearTimeout(loadTimeoutRef.current);
-          loadTimeoutRef.current = null;
-        }
+        stopLoader('blocked protocol link');
         return false;
       }
       

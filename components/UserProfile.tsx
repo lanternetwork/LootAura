@@ -12,7 +12,7 @@ export default function UserProfile() {
   const [open, setOpen] = useState(false)
   const [showLoading, setShowLoading] = useState(true)
   
-  const isNativeFooter = searchParams?.get('nativeFooter') === '1'
+  const isNativeFooter = searchParams.get('nativeFooter') === '1'
   
   // Helper to send navigation message to native when nativeFooter=1
   const handleNativeNavigation = useCallback((path: string, e?: React.MouseEvent) => {

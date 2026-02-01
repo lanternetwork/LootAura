@@ -1,15 +1,30 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth, useProfile, useSignOut } from '@/lib/hooks/useAuth'
 
 export default function UserProfile() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: user, isLoading: authLoading, isError: authError } = useAuth()
   const { data: profile, isLoading: profileLoading } = useProfile()
   const signOut = useSignOut()
   const [open, setOpen] = useState(false)
   const [showLoading, setShowLoading] = useState(true)
+  
+  const isNativeFooter = searchParams.get('nativeFooter') === '1'
+  
+  // Helper to send navigation message to native when nativeFooter=1
+  const handleNativeNavigation = useCallback((path: string, e?: React.MouseEvent) => {
+    if (isNativeFooter && typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      e?.preventDefault()
+      e?.stopPropagation()
+      const message = { type: 'NAVIGATE', path }
+      ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
+      return true
+    }
+    return false
+  }, [isNativeFooter])
 
   // Timeout fallback: if loading takes more than 3 seconds, show sign in button
   useEffect(() => {
@@ -53,7 +68,8 @@ export default function UserProfile() {
   if (!user) {
     return (
       <a 
-        href="/auth/signin" 
+        href="/auth/signin"
+        onClick={(e) => handleNativeNavigation('/auth/signin', e)}
         className="btn-accent-secondary text-sm whitespace-nowrap"
       >
         Sign In
@@ -72,7 +88,7 @@ export default function UserProfile() {
       {open && (
         <div role="menu" className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-50">
           <div className="p-2 flex flex-col">
-            <a href="/dashboard" className="px-2 py-2 text-sm text-neutral-700 hover:bg-neutral-100 rounded" onClick={()=>setOpen(false)}>Dashboard</a>
+            <a href="/dashboard" onClick={(e) => { if (handleNativeNavigation('/dashboard', e)) { setOpen(false); return } setOpen(false) }} className="px-2 py-2 text-sm text-neutral-700 hover:bg-neutral-100 rounded">Dashboard</a>
             <button onClick={handleSignOut} disabled={signOut.isPending} className="mt-1 px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50 rounded">{signOut.isPending ? 'Signing out…' : 'Sign Out'}</button>
           </div>
         </div>

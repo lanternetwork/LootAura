@@ -97,6 +97,20 @@ export function Header() {
   // nativeFooter=1 means we're in a native app with native footer, so keep web header visible
   const isEmbed = searchParams.get('embed') === '1'
   const isNativeFooter = searchParams.get('nativeFooter') === '1'
+  
+  // Helper to send navigation message to native when nativeFooter=1
+  // Must be defined before any conditional returns (React Hooks rule)
+  const handleNativeNavigation = useCallback((path: string, e?: React.MouseEvent) => {
+    if (isNativeFooter && typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      e?.preventDefault()
+      e?.stopPropagation()
+      const message = { type: 'NAVIGATE', path }
+      ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
+      return true
+    }
+    return false
+  }, [isNativeFooter])
+  
   if (isEmbed && !isNativeFooter) {
     return null
   }
@@ -110,7 +124,10 @@ export function Header() {
             <>
               {isSalesPageWithList ? (
                 <button
-                  onClick={handleCloseList}
+                  onClick={(e) => {
+                    if (handleNativeNavigation('/sales', e)) return
+                    handleCloseList()
+                  }}
                   className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
                   aria-label="Return to map"
                 >
@@ -121,6 +138,7 @@ export function Header() {
               ) : (
                 <Link
                   href={backUrl}
+                  onClick={(e) => handleNativeNavigation('/sales', e)}
                   className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
                   aria-label="Back to sales"
                 >
@@ -130,7 +148,7 @@ export function Header() {
                 </Link>
               )}
               {/* Desktop: Always show logo */}
-              <Link ref={logoRef} href="/" className="hidden sm:flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
+              <Link ref={logoRef} href="/" onClick={(e) => handleNativeNavigation('/', e)} className="hidden sm:flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
                 <span className="inline-flex items-center justify-center">
                   <img
                     src="/sitelogo.svg"
@@ -142,7 +160,7 @@ export function Header() {
               </Link>
             </>
           ) : (
-            <Link ref={logoRef} href="/" className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
+            <Link ref={logoRef} href="/" onClick={(e) => handleNativeNavigation('/', e)} className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
               <span className="inline-flex items-center justify-center">
                 <img
                   src="/sitelogo.svg"
@@ -157,14 +175,15 @@ export function Header() {
           <div className="flex gap-2 sm:gap-6 items-center shrink-0">
             {/* Main links cluster - Text links for large screens */}
             <div ref={mainRef} className={`${isCollapsed ? 'hidden' : 'hidden lg:flex'} items-center gap-3 sm:gap-6`} aria-label="Main navigation">
-              <Link href="/sales" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Browse Sales</Link>
-              <Link href="/favorites" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
-              <Link href="/sell/new" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
+              <Link href="/sales" onClick={(e) => handleNativeNavigation('/sales', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Browse Sales</Link>
+              <Link href="/favorites" onClick={(e) => handleNativeNavigation('/favorites', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
+              <Link href="/sell/new" onClick={(e) => handleNativeNavigation('/sell/new', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
             </div>
             {/* Main links cluster - Icon buttons for medium screens (when text would be too tight) */}
             <div className={`${isCollapsed ? 'hidden' : 'hidden sm:flex lg:hidden'} items-center gap-1 shrink-0`} aria-label="Main navigation">
               <Link
                 href="/sales"
+                onClick={(e) => handleNativeNavigation('/sales', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Browse Sales"
               >
@@ -175,6 +194,7 @@ export function Header() {
               </Link>
               <Link
                 href="/favorites"
+                onClick={(e) => handleNativeNavigation('/favorites', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Favorites"
               >
@@ -184,6 +204,7 @@ export function Header() {
               </Link>
               <Link
                 href="/sell/new"
+                onClick={(e) => handleNativeNavigation('/sell/new', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Post Your Sale"
               >
@@ -196,12 +217,13 @@ export function Header() {
             <div className={`${isCollapsed ? 'hidden' : 'hidden md:block'} h-6 w-px bg-slate-200`} aria-hidden="true"></div>
             {/* Admin links cluster */}
             <div ref={adminRef} className={`${isCollapsed ? 'hidden' : 'hidden md:flex'} items-center gap-3`} aria-label="Account">
-              {hasUser && <Link href="/dashboard" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Dashboard</Link>}
+              {hasUser && <Link href="/dashboard" onClick={(e) => handleNativeNavigation('/dashboard', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Dashboard</Link>}
             </div>
             {/* Mobile-only navigation icons */}
             <div className="sm:hidden flex items-center gap-1 shrink-0">
               <Link
                 href="/sales"
+                onClick={(e) => handleNativeNavigation('/sales', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Browse Sales"
               >
@@ -212,6 +234,7 @@ export function Header() {
               </Link>
               <Link
                 href="/favorites"
+                onClick={(e) => handleNativeNavigation('/favorites', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Favorites"
               >
@@ -221,6 +244,7 @@ export function Header() {
               </Link>
               <Link
                 href="/sell/new"
+                onClick={(e) => handleNativeNavigation('/sell/new', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Post Your Sale"
               >
@@ -231,6 +255,7 @@ export function Header() {
               {hasUser && (
                 <Link
                   href="/dashboard"
+                  onClick={(e) => handleNativeNavigation('/dashboard', e)}
                   className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                   aria-label="Dashboard"
                 >

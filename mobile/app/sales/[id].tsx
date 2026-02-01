@@ -121,6 +121,17 @@ export default function SaleDetailScreen() {
           console.log('[NATIVE] Updating favorite state from web:', { isFavorited: newFavorited });
         }
         setIsFavorited(newFavorited);
+      } else if (message && message.type === 'NAVIGATE') {
+        // Handle navigation request from web header
+        const path = message.path || '/';
+        if (__DEV__) {
+          console.log('[NATIVE] Received NAVIGATE message from web:', { path });
+        }
+        // Clear loading state
+        setLoading(false);
+        // Navigate to main shell with the destination path
+        const navigateToUrl = `/?navigateTo=${encodeURIComponent(path)}`;
+        router.replace(navigateToUrl);
       }
     } catch (error) {
       // Ignore invalid messages

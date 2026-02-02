@@ -21,16 +21,13 @@ export function SaleDetailBannerAd({ saleId }: { saleId?: string | null }) {
 
   return (
     <AdsenseGuard hasContent={!!saleId}>
-      {/* Remove extra margins on mobile - parent space-y-4 handles spacing */}
-      <div className="mt-0 mb-0 md:mt-6 md:mb-2">
-        <AdSenseSlot
-          slot="6194845043"
-          format="auto"
-          fullWidthResponsive={true}
-          style={{ minHeight: '90px' }}
-          className="w-full"
-        />
-      </div>
+      <AdSenseSlot
+        slot="6194845043"
+        format="auto"
+        fullWidthResponsive={true}
+        style={{}}
+        className="w-full"
+      />
     </AdsenseGuard>
   )
 }
@@ -42,15 +39,13 @@ export function SaleDetailBannerAd({ saleId }: { saleId?: string | null }) {
  */
 export function MobileListInlineAd() {
   return (
-    <div className="block md:hidden my-3">
-      <AdSenseSlot
-        slot="2129152111"
-        format="auto"
-        fullWidthResponsive={true}
-        style={{ minHeight: '100px' }}
-        className="w-full"
-      />
-    </div>
+    <AdSenseSlot
+      slot="2129152111"
+      format="auto"
+      fullWidthResponsive={true}
+      style={{}}
+      className="w-full"
+    />
   )
 }
 
@@ -62,7 +57,7 @@ export function MobileListInlineAd() {
 export function ListInlineAd() {
   return (
     <div 
-      className="my-3 w-full" 
+      className="w-full" 
       style={{ 
         width: '100%', 
         minWidth: '200px',
@@ -74,7 +69,7 @@ export function ListInlineAd() {
         slot="2129152111"
         format="auto"
         fullWidthResponsive={true}
-        style={{ minHeight: '100px', width: '100%', display: 'block' }}
+        style={{ width: '100%', display: 'block' }}
         className="w-full"
       />
     </div>
@@ -102,12 +97,12 @@ export function DesktopFooterAd() {
   return (
     <AdsenseGuard enabled={isAllowedRoute}>
       <div className="hidden lg:block w-full bg-white border-t border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8">
           <AdSenseSlot
             slot="2367280679"
             format="auto"
             fullWidthResponsive={true}
-            style={{ minHeight: '120px' }}
+            style={{}}
             className="w-full"
           />
         </div>

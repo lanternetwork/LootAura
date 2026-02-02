@@ -763,11 +763,6 @@ export default function SaleDetailClient({
           )}
         </div>
 
-        {/* Ad - Mobile */}
-        <div className="w-full max-w-screen-sm mx-auto">
-          <SaleDetailBannerAd saleId={sale?.id} />
-        </div>
-
         {/* Map Card - Mobile */}
         {typeof sale.lat === 'number' && typeof sale.lng === 'number' && (
           <div className="rounded-2xl border border-gray-200 bg-white p-4">

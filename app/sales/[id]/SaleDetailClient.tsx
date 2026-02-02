@@ -233,7 +233,7 @@ export default function SaleDetailClient({
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[SALE_DETAIL] Sending initial favoriteState to native:', message)
       }
-      ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
     }
   }, [isFavorited, sale.id])
 

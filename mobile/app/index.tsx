@@ -518,8 +518,8 @@ export default function HomeScreen() {
             </View>
           )}
           
-          {/* Native Footer Overlay - Show when on sale detail page */}
-          {routeState.isSaleDetail && (
+          {/* Native Footer Overlay - Show when on sale detail page AND page has loaded */}
+          {routeState.isSaleDetail && !loading && (
             <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
               <View style={styles.footerContent}>
                 {/* Navigate Button (Primary) */}

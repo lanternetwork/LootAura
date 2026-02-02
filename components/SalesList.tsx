@@ -2,7 +2,7 @@
 import SaleCard from './SaleCard'
 import EmptyState from './EmptyState'
 import { Sale } from '@/lib/types'
-import { MobileListInlineAd, ListInlineAd } from '@/components/ads/AdSlots'
+import { ListInlineAd } from '@/components/ads/AdSlots'
 import { AdsenseGuard } from '@/components/ads/AdsenseGuard'
 
 interface SalesListProps {

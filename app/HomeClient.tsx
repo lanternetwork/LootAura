@@ -145,16 +145,8 @@ export default function HomeClient({ initialSales, user: _user }: HomeClientProp
                 key={sale.id}
                 className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 hover:border-gray-300 cursor-pointer"
                 onClick={() => {
-                  // If in React Native WebView, send message to native app
-                  if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-                    console.log('[WEB] Sending OPEN_SALE message for sale:', sale.id);
-                    (window as any).ReactNativeWebView.postMessage(
-                      JSON.stringify({ type: 'OPEN_SALE', saleId: sale.id })
-                    );
-                  } else {
-                    // Fallback to normal Next.js navigation when not in WebView
-                    window.location.href = `/sales/${sale.id}`;
-                  }
+                  // Normal Next.js navigation (works in both web and WebView)
+                  window.location.href = `/sales/${sale.id}`;
                 }}
               >
                 <div className="p-4">

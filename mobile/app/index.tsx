@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const LOOTAURA_URL = 'https://lootaura.com';
 
@@ -29,6 +30,23 @@ export default function HomeScreen() {
   const [sanitizerRejectionBanner, setSanitizerRejectionBanner] = useState<string>('');
   const [lastNavRequest, setLastNavRequest] = useState<string>('');
   const [lastNavSource, setLastNavSource] = useState<string>('');
+  
+  // Route state from web (for footer overlay)
+  const [routeState, setRouteState] = useState<{
+    pathname: string;
+    search: string;
+    isSaleDetail: boolean;
+    saleId: string | null;
+  }>({
+    pathname: '/',
+    search: '',
+    isSaleDetail: false,
+    saleId: null,
+  });
+  
+  // Footer state
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [lastMessageReceived, setLastMessageReceived] = useState<string>('');
 
   // Loader management helpers
   const startLoader = (reason: string) => {
@@ -82,26 +100,6 @@ export default function HomeScreen() {
   const handleLoadStart = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     const url = nativeEvent?.url;
-    
-    // Defensive guard: Block /sales/:id from ever triggering loading state
-    // This prevents race conditions where onLoadStart fires before onShouldStartLoadWithRequest
-    if (url) {
-      try {
-        const parsedUrl = new URL(url);
-        const hostname = parsedUrl.hostname.toLowerCase();
-        const pathname = parsedUrl.pathname;
-        
-        // If this is a sale detail page URL, immediately return without setting loading state
-        // The WebView must NEVER load sale detail pages - they are always native
-        const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
-        if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
-          // Do not set loading, do not start timeout - this navigation is blocked
-          return;
-        }
-      } catch (e) {
-        // If URL parsing fails, continue with normal loading behavior
-      }
-    }
     
     // Only start loader if WebView is not ready (initial load) OR if this is a real document load
     // After webViewReady, SPA transitions shouldn't trigger loading state
@@ -188,18 +186,29 @@ export default function HomeScreen() {
   const handleMessage = (event: any) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
+      const messageStr = JSON.stringify(message);
+      setLastMessageReceived(messageStr.length > 100 ? messageStr.substring(0, 97) + '...' : messageStr);
+      
       console.log('[NATIVE] Received message from WebView:', message);
       
-      if (message.type === 'OPEN_SALE' && message.saleId) {
-        console.log('[NATIVE] Opening native sale detail screen for sale:', message.saleId);
-        try {
-          router.push(`/sales/${message.saleId}`);
-        } catch (error) {
-          console.error('[NATIVE] Failed to navigate to native sale detail screen:', error);
+      if (message.type === 'ROUTE_STATE') {
+        // Route state update from web
+        const { pathname, search, isSaleDetail, saleId } = message;
+        setRouteState({
+          pathname: pathname || '/',
+          search: search || '',
+          isSaleDetail: isSaleDetail === true,
+          saleId: saleId || null,
+        });
+        // Reset favorite state when leaving sale detail
+        if (!isSaleDetail) {
+          setIsFavorited(false);
         }
+      } else if (message.type === 'favoriteState') {
+        // Favorite state update from web
+        setIsFavorited(message.isFavorited === true);
       } else if (message.type === 'NAVIGATE') {
-        // Handle navigation request from sale detail screen or header
-        // Header sends 'path', legacy code might send 'url'
+        // Handle navigation request from header
         const path = message.path || message.url || '/';
         setLastNavigateMessage(`NAVIGATE: ${path}`);
         
@@ -221,6 +230,34 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.warn('[NATIVE] Failed to parse message from WebView:', error);
+    }
+  };
+  
+  // Footer actions
+  const handleFavoriteToggle = () => {
+    if (webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({ type: 'toggleFavorite' }));
+    }
+  };
+  
+  const handleShare = async () => {
+    try {
+      const shareUrl = routeState.saleId 
+        ? `https://lootaura.com/sales/${routeState.saleId}` 
+        : currentWebViewUrl || 'https://lootaura.com';
+      await Share.share({
+        message: `Check out this yard sale!\n${shareUrl}`,
+        url: shareUrl,
+        title: 'Yard Sale',
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+  
+  const handleNavigate = () => {
+    if (webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({ type: 'navigate' }));
     }
   };
 
@@ -309,49 +346,7 @@ export default function HomeScreen() {
     startLoader(`executeNavigation: ${relativePath} (${source})`);
   };
 
-  // Handle navigateTo query param from sale detail screen
-  useEffect(() => {
-    const navigateTo = searchParams.navigateTo;
-    
-    // Skip if no navigateTo param
-    if (!navigateTo) {
-      return;
-    }
-    
-    // Skip if we already handled this exact value (prevent retrigger)
-    if (navigateTo === lastHandledNavigateToRef.current) {
-      return;
-    }
-    
-    // Sanitize and validate URL
-    const sanitizedUrl = sanitizeNavigationUrl(navigateTo);
-    if (!sanitizedUrl) {
-      const rejectionReason = `navigateTo REJECTED: ${navigateTo}`;
-      console.warn('[NATIVE] Rejected unsafe navigateTo URL:', navigateTo);
-      setLastNavAction(rejectionReason);
-      setSanitizerRejectionBanner(rejectionReason);
-      // Clear banner after 5 seconds
-      setTimeout(() => setSanitizerRejectionBanner(''), 5000);
-      // Clear the navigateTo param to prevent retrigger
-      router.replace('/');
-      return;
-    }
-    
-    // Mark as handled immediately to prevent retrigger
-    lastHandledNavigateToRef.current = navigateTo;
-    
-    // Clear navigateTo param immediately (one-shot)
-    router.replace('/');
-    
-    // If WebView is ready, execute immediately
-    if (webViewReady && webViewRef.current) {
-      executeNavigation(sanitizedUrl, 'navigateTo param');
-    } else {
-      setLastNavAction(`navigateTo pending: ${sanitizedUrl}`);
-      // Store as pending navigation - will execute after WebView is ready
-      pendingNavigateToRef.current = sanitizedUrl;
-    }
-  }, [searchParams.navigateTo, webViewReady, router]);
+  // Note: navigateTo param flow removed - no longer needed with single WebView architecture
 
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;
@@ -360,19 +355,6 @@ export default function HomeScreen() {
       // Parse URL to safely check hostname and path
       const parsedUrl = new URL(url);
       const hostname = parsedUrl.hostname.toLowerCase();
-      const pathname = parsedUrl.pathname;
-      
-      // HARD BLOCK: Sale detail pages are ALWAYS native - WebView NEVER navigates to /sales/:id
-      // This check must happen FIRST, before any other navigation logic
-      // No fallbacks, no exceptions - sale detail pages are native-only via postMessage
-      const saleDetailMatch = pathname.match(/^\/sales\/([^\/\?]+)/);
-      if (saleDetailMatch && (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com'))) {
-        // Unconditionally block WebView from loading this URL
-        // Navigation should happen via postMessage, not URL navigation
-        console.warn('[NATIVE] Blocked WebView navigation to sale detail page. Use postMessage instead.');
-        stopLoader('blocked sale detail');
-        return false;
-      }
       
       // Allow navigation within lootaura.com domain (exact match or subdomain)
       // This prevents bypasses like lootaura.com.evil.com
@@ -429,8 +411,8 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={12}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | lastNavReq={lastNavRequest || 'none'} | lastNavSrc={lastNavSource || 'none'} | navigateTo={searchParams.navigateTo ? (searchParams.navigateTo.length > 30 ? searchParams.navigateTo.substring(0, 27) + '...' : searchParams.navigateTo) : 'none'} | lastNav={lastNavAction || 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'} | sanitizer={lastSanitizerDecision || 'none'}
+        <Text style={styles.diagnosticText} numberOfLines={14}>
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'}
         </Text>
       </View>
       
@@ -455,7 +437,10 @@ export default function HomeScreen() {
             ref={webViewRef}
             source={{ uri: currentUrl }}
             key={currentUrl}
-            style={styles.webview}
+            style={[
+              styles.webview,
+              routeState.isSaleDetail && styles.webviewWithFooter
+            ]}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}
             onLoad={handleLoad}
@@ -464,6 +449,54 @@ export default function HomeScreen() {
             onNavigationStateChange={handleNavigationStateChange}
             onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
             onMessage={handleMessage}
+            injectedJavaScript={`
+              (function() {
+                if (!window.ReactNativeWebView) return;
+                
+                const reportRouteState = () => {
+                  try {
+                    const pathname = window.location.pathname;
+                    const search = window.location.search;
+                    const saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
+                    const isSaleDetail = !!saleDetailMatch;
+                    const saleId = isSaleDetail ? saleDetailMatch[1] : null;
+                    
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'ROUTE_STATE',
+                      pathname: pathname,
+                      search: search,
+                      isSaleDetail: isSaleDetail,
+                      saleId: saleId
+                    }));
+                  } catch (e) {
+                    // Silently fail if postMessage fails
+                  }
+                };
+                
+                // Report initial route after a short delay to ensure Next.js router is initialized
+                setTimeout(reportRouteState, 100);
+                
+                // Intercept history API to detect SPA navigation
+                const originalPushState = history.pushState;
+                const originalReplaceState = history.replaceState;
+                
+                history.pushState = function(...args) {
+                  originalPushState.apply(history, args);
+                  setTimeout(reportRouteState, 0);
+                };
+                
+                history.replaceState = function(...args) {
+                  originalReplaceState.apply(history, args);
+                  setTimeout(reportRouteState, 0);
+                };
+                
+                // Listen for browser back/forward navigation
+                window.addEventListener('popstate', () => {
+                  setTimeout(reportRouteState, 0);
+                });
+              })();
+              true; // Required for iOS
+            `}
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
@@ -481,6 +514,45 @@ export default function HomeScreen() {
               <Text style={styles.loadingText}>Loading LootAura...</Text>
             </View>
           )}
+          
+          {/* Native Footer Overlay - Show when on sale detail page */}
+          {routeState.isSaleDetail && (
+            <View style={styles.footer}>
+              <View style={styles.footerContent}>
+                {/* Navigate Button (Primary) */}
+                <TouchableOpacity
+                  style={styles.navigateButton}
+                  onPress={handleNavigate}
+                >
+                  <Feather name="map-pin" size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
+                  <Text style={styles.navigateButtonText}>Navigate</Text>
+                </TouchableOpacity>
+
+                {/* Save Button (Secondary) */}
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    isFavorited ? styles.saveButtonActive : styles.saveButtonInactive
+                  ]}
+                  onPress={handleFavoriteToggle}
+                >
+                  <MaterialCommunityIcons 
+                    name={isFavorited ? "heart" : "heart-outline"} 
+                    size={20} 
+                    color={isFavorited ? '#B91C1C' : '#374151'}
+                  />
+                </TouchableOpacity>
+
+                {/* Share Button (Secondary) */}
+                <TouchableOpacity
+                  style={styles.shareButton}
+                  onPress={handleShare}
+                >
+                  <Feather name="share-2" size={20} color="#3A2268" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </>
       )}
     </SafeAreaView>
@@ -494,6 +566,9 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+  },
+  webviewWithFooter: {
+    paddingBottom: 80, // Space for native footer overlay
   },
   loadingContainer: {
     position: 'absolute',
@@ -580,6 +655,71 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontFamily: 'monospace',
     textAlign: 'center',
+  },
+  // Native Footer Overlay Styles
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    zIndex: 1000,
+    elevation: 1000, // Android
+  },
+  footerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    maxWidth: 640,
+    alignSelf: 'center',
+    width: '100%',
+    gap: 12,
+  },
+  navigateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#9333EA',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minHeight: 44,
+  },
+  navigateButtonIcon: {
+    marginRight: 8,
+  },
+  navigateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  saveButton: {
+    width: 48,
+    height: 48,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  saveButtonActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  saveButtonInactive: {
+    backgroundColor: '#F3F4F6',
+  },
+  shareButton: {
+    width: 48,
+    height: 48,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(147, 51, 234, 0.15)',
+    borderRadius: 8,
   },
 });
 

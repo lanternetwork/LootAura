@@ -222,6 +222,20 @@ export default function SaleDetailClient({
       trackSaleViewed(sale.id)
     }
   }, [sale.id])
+  
+  // Send initial favoriteState to native when component mounts or favorite state changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      const message = {
+        type: 'favoriteState',
+        isFavorited: isFavorited
+      }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALE_DETAIL] Sending initial favoriteState to native:', message)
+      }
+      ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
+    }
+  }, [isFavorited, sale.id])
 
   // Listen for postMessage from native WebView (for Navigate button)
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking, Share } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,9 @@ export default function HomeScreen() {
   const searchParams = useLocalSearchParams<{ navigateTo?: string }>();
   const pendingNavigateToRef = useRef<string | null>(null);
   const lastHandledNavigateToRef = useRef<string | null>(null);
+  
+  // Get safe area insets - footer will handle bottom inset
+  const insets = useSafeAreaInsets();
   
   // State-driven WebView navigation (replaces injectJavaScript)
   const [currentUrl, setCurrentUrl] = useState<string>(LOOTAURA_URL);
@@ -408,11 +411,11 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={14}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'}
+        <Text style={styles.diagnosticText} numberOfLines={15}>
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'}
         </Text>
       </View>
       
@@ -517,7 +520,7 @@ export default function HomeScreen() {
           
           {/* Native Footer Overlay - Show when on sale detail page */}
           {routeState.isSaleDetail && (
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
               <View style={styles.footerContent}>
                 {/* Navigate Button (Primary) */}
                 <TouchableOpacity
@@ -662,7 +665,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#FFFFFF', // Solid white background to cover area behind footer
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     zIndex: 1000,

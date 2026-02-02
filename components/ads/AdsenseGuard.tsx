@@ -49,6 +49,16 @@ export function AdsenseGuard({
     return null
   }
 
+  // Never show ads in Expo WebView (React Native WebView context)
+  if (typeof window !== 'undefined' && (window as any).ReactNativeWebView !== undefined) {
+    return null
+  }
+
+  // Never show ads on mobile breakpoints (< 768px)
+  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+    return null
+  }
+
   // If explicitly disabled, don't render
   if (!enabled) {
     return null

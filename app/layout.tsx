@@ -67,10 +67,15 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Gate AdSense script and meta tag based on feature flag
+  const adsenseEnabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
+
   return (
     <html lang="en">
       <head>
-        <meta name="google-adsense-account" content="ca-pub-8685093412475036" />
+        {adsenseEnabled && (
+          <meta name="google-adsense-account" content="ca-pub-8685093412475036" />
+        )}
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -83,11 +88,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
-        <Script
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-        />
+        {adsenseEnabled && (
+          <Script
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
+          />
+        )}
         <SkipToContent />
         <script
           type="application/ld+json"

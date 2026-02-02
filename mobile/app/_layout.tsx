@@ -62,7 +62,8 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
-        <Stack.Screen 
+        {/* Sale detail route disabled - now handled in main WebView with native footer overlay */}
+        {/* <Stack.Screen 
           name="sales/[id]"
           options={{
             // Route-specific status bar options for sale detail
@@ -71,7 +72,7 @@ export default function RootLayout() {
             statusBarTranslucent: false,
             statusBarHidden: false,
           }}
-        />
+        /> */}
       </Stack>
     </SafeAreaProvider>
   );

@@ -139,16 +139,8 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
       event_type: 'click',
     })
     
-    // If in React Native WebView, send message to native app
-    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-      console.log('[WEB] Sending OPEN_SALE message for sale:', sale.id);
-      (window as any).ReactNativeWebView.postMessage(
-        JSON.stringify({ type: 'OPEN_SALE', saleId: sale.id })
-      );
-    } else {
-      // Fallback to normal Next.js navigation when not in WebView
-      router.push(detailUrl);
-    }
+    // Normal Next.js navigation (works in both web and WebView)
+    router.push(detailUrl);
   }
 
   const formatDate = (dateStr: string, timeStr?: string) => {

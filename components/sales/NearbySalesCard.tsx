@@ -119,16 +119,8 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
                   event_type: 'click',
                 })
                 
-                // If in React Native WebView, send message to native app
-                if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-                  console.log('[WEB] Sending OPEN_SALE message for sale:', nearbySale.id);
-                  (window as any).ReactNativeWebView.postMessage(
-                    JSON.stringify({ type: 'OPEN_SALE', saleId: nearbySale.id })
-                  );
-                } else {
-                  // Fallback to normal Next.js navigation when not in WebView
-                  window.location.href = `/sales/${nearbySale.id}`;
-                }
+                // Normal Next.js navigation (works in both web and WebView)
+                window.location.href = `/sales/${nearbySale.id}`;
               }}
             >
               <div className="flex gap-3">

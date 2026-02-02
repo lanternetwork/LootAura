@@ -574,8 +574,16 @@ export default function SaleDetailClient({
 
   const currentCenter = location || { lat: sale.lat || 38.2527, lng: sale.lng || -85.7585 }
 
+  // Calculate bottom padding for native footer mode
+  // Footer height: 12px (top) + 44px (button min) + 12px (bottom) = 68px
+  // Plus safe area inset (varies by device, typically 0-48px on Android)
+  // Use CSS env() for safe-area-inset-bottom to handle device variations
+  const nativeFooterPadding = isNativeFooter 
+    ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' 
+    : ''
+  
   return (
-    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8 ${isEmbed || isNativeFooter ? 'pb-[88px]' : ''}`}>
+    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8 ${isEmbed ? 'pb-[88px]' : nativeFooterPadding}`}>
       {/* Breadcrumb - Desktop only (hidden in embed mode or nativeFooter mode) */}
       {!isEmbed && !isNativeFooter && (
         <nav className="hidden md:block mb-8">
@@ -598,7 +606,7 @@ export default function SaleDetailClient({
       )}
 
       {/* Mobile Layout */}
-      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed || isNativeFooter ? 'pb-[88px]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
+      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : isNativeFooter ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
         {/* Back to map button - Mobile only */}
         <Link
           href={backUrl}

@@ -21,7 +21,8 @@ export function SaleDetailBannerAd({ saleId }: { saleId?: string | null }) {
 
   return (
     <AdsenseGuard hasContent={!!saleId}>
-      <div className="mt-6 mb-2">
+      {/* Remove extra margins on mobile - parent space-y-4 handles spacing */}
+      <div className="mt-0 mb-0 md:mt-6 md:mb-2">
         <AdSenseSlot
           slot="6194845043"
           format="auto"

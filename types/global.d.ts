@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 // Global type declarations for missing packages
 
 declare module 'web-push' {

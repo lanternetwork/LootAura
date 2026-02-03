@@ -174,7 +174,10 @@ export default function SaleDetailClient({
   // Check for embed mode from searchParams
   const isEmbed = searchParams.get('embed') === '1'
   // nativeFooter=1 means we're in a native app with native footer, so keep web header visible but hide web footer
-  const isNativeFooter = searchParams.get('nativeFooter') === '1'
+  // Also check if running inside Expo WebView (detected via window.ReactNativeWebView)
+  const isNativeFooterParam = searchParams.get('nativeFooter') === '1'
+  const isInWebView = typeof window !== 'undefined' && (window as any).ReactNativeWebView !== undefined
+  const isNativeFooter = isNativeFooterParam || isInWebView
   
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')

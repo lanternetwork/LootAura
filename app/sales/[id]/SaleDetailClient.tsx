@@ -25,6 +25,7 @@ import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import ReportSaleModal from '@/components/moderation/ReportSaleModal'
 import { BadgeCheck } from 'lucide-react'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
+import { isNativeApp } from '@/lib/runtime/isNativeApp'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -174,10 +175,10 @@ export default function SaleDetailClient({
   // Check for embed mode from searchParams
   const isEmbed = searchParams.get('embed') === '1'
   // nativeFooter=1 means we're in a native app with native footer, so keep web header visible but hide web footer
-  // Also check if running inside Expo WebView (detected via window.ReactNativeWebView)
+  // Also check if running inside Expo WebView using centralized runtime detection
   const isNativeFooterParam = searchParams.get('nativeFooter') === '1'
-  const isInWebView = typeof window !== 'undefined' && (window as any).ReactNativeWebView !== undefined
-  const isNativeFooter = isNativeFooterParam || isInWebView
+  const isInNativeApp = isNativeApp()
+  const isNativeFooter = isNativeFooterParam || isInNativeApp
   
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')

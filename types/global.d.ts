@@ -42,6 +42,27 @@ declare namespace jest {
 
 // Removed Google Maps globals and types (not used)
 
+// LootAura Native App WebView Detection
+// These properties are injected by the Expo app's WebView before content loads
+declare global {
+  interface Window {
+    /**
+     * Explicit flag set by LootAura Expo app to indicate WebView context.
+     * Set via injectedJavaScriptBeforeContentLoaded before page scripts run.
+     * This is the primary contract for native app detection.
+     */
+    __LOOTAURA_IN_APP?: boolean
+
+    /**
+     * React Native WebView bridge object (fallback detection method).
+     * Provided by react-native-webview library when running in WebView context.
+     */
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void
+    }
+  }
+}
+
 // Web Vitals
 declare module 'web-vitals' {
   export function getCLS(onPerfEntry: (metric: any) => void): void;

@@ -18,7 +18,10 @@ export function isNativeApp(): boolean {
 
   // Primary detection: explicit in-app flag (set before content loads)
   // Use type assertion to access the property (TypeScript global augmentation)
-  const win = window as Window & { __LOOTAURA_IN_APP?: boolean; ReactNativeWebView?: { postMessage: (message: string) => void } | null }
+  const win = window as Window & { 
+    __LOOTAURA_IN_APP?: boolean;
+    ReactNativeWebView?: { postMessage: (message: string) => void } | null;
+  }
   if (win.__LOOTAURA_IN_APP === true) {
     return true
   }

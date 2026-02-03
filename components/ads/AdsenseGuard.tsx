@@ -3,6 +3,7 @@
 import { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { isAdsenseRoute } from '@/lib/adsense'
+import { isNativeApp } from '@/lib/runtime/isNativeApp'
 
 interface AdsenseGuardProps {
   children: ReactNode
@@ -49,8 +50,8 @@ export function AdsenseGuard({
     return null
   }
 
-  // Never show ads in Expo WebView (React Native WebView context)
-  if (typeof window !== 'undefined' && (window as any).ReactNativeWebView !== undefined) {
+  // Never show ads in Expo WebView (use centralized runtime detection)
+  if (isNativeApp()) {
     return null
   }
 

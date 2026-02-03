@@ -452,6 +452,12 @@ export default function HomeScreen() {
             onNavigationStateChange={handleNavigationStateChange}
             onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
             onMessage={handleMessage}
+            injectedJavaScriptBeforeContentLoaded={`
+              // Set deterministic flag before page scripts run
+              // This ensures the flag is available immediately for web-side runtime checks
+              window.__LOOTAURA_IN_APP = true;
+              true; // Required for iOS
+            `}
             injectedJavaScript={`
               (function() {
                 if (!window.ReactNativeWebView) return;

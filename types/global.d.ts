@@ -63,6 +63,9 @@ declare global {
   }
 }
 
+// Export empty object to make this file a module (required for declare global to work)
+export {}
+
 // Web Vitals
 declare module 'web-vitals' {
   export function getCLS(onPerfEntry: (metric: any) => void): void;

@@ -1,3 +1,4 @@
+/// <reference types="../types/global" />
 import DOMPurify from 'dompurify'
 import { JSDOM } from 'jsdom'
 

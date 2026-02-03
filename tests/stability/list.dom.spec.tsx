@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
+/// <reference types="../../types/global" />
 import { JSDOM } from 'jsdom'
 
 // Setup JSDOM environment

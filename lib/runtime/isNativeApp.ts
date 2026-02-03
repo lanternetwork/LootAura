@@ -17,13 +17,15 @@ export function isNativeApp(): boolean {
   }
 
   // Primary detection: explicit in-app flag (set before content loads)
-  if (window.__LOOTAURA_IN_APP === true) {
+  // Use type assertion to access the property (TypeScript global augmentation)
+  const win = window as Window & { __LOOTAURA_IN_APP?: boolean; ReactNativeWebView?: { postMessage: (message: string) => void } | null }
+  if (win.__LOOTAURA_IN_APP === true) {
     return true
   }
 
   // Fallback detection: React Native WebView bridge (best-effort)
-  if (typeof window.ReactNativeWebView !== 'undefined' && 
-      window.ReactNativeWebView !== null) {
+  if (typeof win.ReactNativeWebView !== 'undefined' && 
+      win.ReactNativeWebView !== null) {
     return true
   }
 

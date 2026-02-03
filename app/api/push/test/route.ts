@@ -1,4 +1,3 @@
-/// <reference types="../../../../types/global" />
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { T as _T } from '@/lib/supabase/tables'

@@ -54,6 +54,27 @@ export default function HomeScreen() {
   // Footer state
   const [isFavorited, setIsFavorited] = useState(false);
   const [lastMessageReceived, setLastMessageReceived] = useState<string>('');
+  
+  // Layout diagnostics state
+  const [layoutDiag, setLayoutDiag] = useState<{
+    bottomEl: string | null;
+    footerH: number | null;
+    footerTop: number | null;
+    footerBottom: number | null;
+    pb: string | null;
+    vh: number | null;
+    y: number | null;
+    sh: number | null;
+  }>({
+    bottomEl: null,
+    footerH: null,
+    footerTop: null,
+    footerBottom: null,
+    pb: null,
+    vh: null,
+    y: null,
+    sh: null,
+  });
 
   // Loader management helpers
   const startLoader = (reason: string) => {
@@ -216,6 +237,18 @@ export default function HomeScreen() {
       } else if (message.type === 'favoriteState') {
         // Favorite state update from web
         setIsFavorited(message.isFavorited === true);
+      } else if (message.type === 'LAYOUT_DIAG') {
+        // Layout diagnostics from web
+        setLayoutDiag({
+          bottomEl: message.bottomEl || null,
+          footerH: message.footerH !== undefined ? message.footerH : null,
+          footerTop: message.footerTop !== undefined ? message.footerTop : null,
+          footerBottom: message.footerBottom !== undefined ? message.footerBottom : null,
+          pb: message.pb || null,
+          vh: message.vh !== undefined ? message.vh : null,
+          y: message.y !== undefined ? message.y : null,
+          sh: message.sh !== undefined ? message.sh : null,
+        });
       } else if (message.type === 'NAVIGATE') {
         // Handle navigation request from header
         const path = message.path || message.url || '/';
@@ -418,10 +451,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Diagnostic HUD - Always visible */}
+          {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={15}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'}
+        <Text style={styles.diagnosticText} numberOfLines={20}>
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'}
         </Text>
       </View>
       
@@ -468,6 +501,74 @@ export default function HomeScreen() {
               (function() {
                 if (!window.ReactNativeWebView) return;
                 
+                const reportLayoutDiagnostics = () => {
+                  try {
+                    const vh = window.innerHeight;
+                    const y = window.scrollY;
+                    const sh = document.documentElement.scrollHeight;
+                    
+                    // Bottom hit-test element (element at x = 50% width, y = viewportHeight - small offset)
+                    let bottomEl = null;
+                    try {
+                      const hitX = window.innerWidth / 2;
+                      const hitY = vh - 10; // Small offset from bottom
+                      const elementAtPoint = document.elementFromPoint(hitX, hitY);
+                      if (elementAtPoint) {
+                        const tag = elementAtPoint.tagName.toLowerCase();
+                        const id = elementAtPoint.id || '';
+                        const className = elementAtPoint.className || '';
+                        const classNamePreview = typeof className === 'string' ? className.substring(0, 80) : '';
+                        bottomEl = tag + (id ? '#' + id : '') + (classNamePreview ? '.' + classNamePreview : '');
+                      }
+                    } catch (e) {
+                      // elementFromPoint may fail in some contexts
+                    }
+                    
+                    // Footer presence + bounds
+                    let footerH = null;
+                    let footerTop = null;
+                    let footerBottom = null;
+                    try {
+                      const footer = document.querySelector('footer') || document.querySelector('footer[role="contentinfo"]');
+                      if (footer) {
+                        const rect = footer.getBoundingClientRect();
+                        footerH = rect.height;
+                        footerTop = rect.top;
+                        footerBottom = rect.bottom;
+                      }
+                    } catch (e) {
+                      // getBoundingClientRect may fail
+                    }
+                    
+                    // Main container padding-bottom
+                    let pb = null;
+                    try {
+                      // Find the mobile sale detail wrapper (md:hidden ... pb-[calc(...)] container)
+                      const mobileContainer = document.querySelector('.md\\:hidden');
+                      if (mobileContainer) {
+                        const computedStyle = window.getComputedStyle(mobileContainer);
+                        pb = computedStyle.paddingBottom || null;
+                      }
+                    } catch (e) {
+                      // getComputedStyle may fail
+                    }
+                    
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'LAYOUT_DIAG',
+                      bottomEl: bottomEl,
+                      footerH: footerH,
+                      footerTop: footerTop,
+                      footerBottom: footerBottom,
+                      pb: pb,
+                      vh: vh,
+                      y: y,
+                      sh: sh
+                    }));
+                  } catch (e) {
+                    // Silently fail if postMessage fails
+                  }
+                };
+                
                 const reportRouteState = () => {
                   try {
                     const pathname = window.location.pathname;
@@ -491,6 +592,9 @@ export default function HomeScreen() {
                       inAppFlag: inAppFlag,
                       hasRNBridge: hasRNBridge
                     }));
+                    
+                    // Report layout diagnostics right after route state
+                    setTimeout(reportLayoutDiagnostics, 50);
                   } catch (e) {
                     // Silently fail if postMessage fails
                   }
@@ -498,6 +602,9 @@ export default function HomeScreen() {
                 
                 // Report initial route after a short delay to ensure Next.js router is initialized
                 setTimeout(reportRouteState, 100);
+                
+                // Also report layout diagnostics on load
+                setTimeout(reportLayoutDiagnostics, 200);
                 
                 // Intercept history API to detect SPA navigation
                 const originalPushState = history.pushState;

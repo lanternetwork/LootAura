@@ -19,6 +19,7 @@ const stableSearchParams = {
 
 vi.mock('next/navigation', () => ({
   useSearchParams: vi.fn(() => stableSearchParams),
+  usePathname: vi.fn(() => '/'),
 }))
 
 // Mock next/link to avoid navigation issues in tests

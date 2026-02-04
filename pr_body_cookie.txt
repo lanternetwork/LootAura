@@ -1,0 +1,61 @@
+## Goal
+
+Implement a server-visible "in-app" runtime mode that permanently hides the web footer inside the Expo WebView, without relying on window timing. This eliminates hydration timing issues by making the decision server-side.
+
+## Changes
+
+### 1. Expo WebView: Send Custom Header
+- **File:** `mobile/app/index.tsx`
+- Added `X-LootAura-InApp: 1` header to WebView source configuration
+- Header is sent on all requests from the native app
+
+### 2. Middleware: Translate Header to Cookie
+- **File:** `middleware.ts`
+- Detects `X-LootAura-InApp: 1` header from WebView requests
+- Sets `lootaura_in_app=1` cookie with:
+  - `httpOnly: false` (readable by client if needed)
+  - `secure: true` (in production/HTTPS)
+  - `sameSite: 'lax'`
+  - `maxAge: 30 days`
+  - `path: '/'`
+- Cookie persists across navigation for subsequent requests
+
+### 3. Server-Side Footer Suppression
+- **Files:** `app/layout.tsx`, `components/layout/ConditionalFooter.tsx`
+- `app/layout.tsx` reads cookie server-side and passes `inAppCookie` prop to `ConditionalFooter`
+- `ConditionalFooter` accepts `inAppCookie` prop and hides footer when true
+- Footer markup is never rendered in HTML when cookie is present (no flash)
+
+### 4. Sale Detail Bottom Padding
+- **File:** `app/sales/[id]/SaleDetailClient.tsx`
+- Checks for `lootaura_in_app=1` cookie client-side
+- Uses cookie to determine native footer mode for bottom padding
+- Ensures content never sits under native footer overlay
+
+### 5. Backward Compatibility
+- Keeps existing `window.__LOOTAURA_IN_APP` flag (optional, not required)
+- Maintains `nativeFooter=1` URL param support (legacy)
+- Preserves `isNativeApp()` runtime detection as fallback
+
+## Impact
+
+- **No hydration timing issues:** Footer decision made server-side
+- **No flash of content:** Footer markup never sent when cookie is present
+- **Enterprise-ready:** Uses standard server-side feature flag pattern
+- **Maintainable:** Single source of truth (cookie), easy to test/debug
+- **Performance:** Reduces HTML size by not rendering footer markup
+- **Version:** Incremented to 60
+
+## Testing
+
+1. **Expo WebView:** Footer should never appear on sale detail pages
+2. **Normal browsers:** Footer behavior unchanged (unless `nativeFooter=1` is present)
+3. **Vercel preview:** Can manually set `lootaura_in_app=1` cookie to test footer suppression
+
+## Definition of Done
+
+✅ In Expo Android sale detail, web footer content never appears (no flash)  
+✅ Gap below map card is gone  
+✅ Normal mobile/desktop browsers show footer as before  
+✅ Cookie persists across navigation (30 days)  
+✅ Backward compatibility maintained

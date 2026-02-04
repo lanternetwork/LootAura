@@ -40,11 +40,15 @@ export default function HomeScreen() {
     search: string;
     isSaleDetail: boolean;
     saleId: string | null;
+    inAppFlag: boolean | null;
+    hasRNBridge: boolean | null;
   }>({
     pathname: '/',
     search: '',
     isSaleDetail: false,
     saleId: null,
+    inAppFlag: null,
+    hasRNBridge: null,
   });
   
   // Footer state
@@ -196,12 +200,14 @@ export default function HomeScreen() {
       
       if (message.type === 'ROUTE_STATE') {
         // Route state update from web
-        const { pathname, search, isSaleDetail, saleId } = message;
+        const { pathname, search, isSaleDetail, saleId, inAppFlag, hasRNBridge } = message;
         setRouteState({
           pathname: pathname || '/',
           search: search || '',
           isSaleDetail: isSaleDetail === true,
           saleId: saleId || null,
+          inAppFlag: inAppFlag === true,
+          hasRNBridge: hasRNBridge === true,
         });
         // Reset favorite state when leaving sale detail
         if (!isSaleDetail) {
@@ -415,7 +421,7 @@ export default function HomeScreen() {
       {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={15}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'}
         </Text>
       </View>
       
@@ -470,12 +476,20 @@ export default function HomeScreen() {
                     const isSaleDetail = !!saleDetailMatch;
                     const saleId = isSaleDetail ? saleDetailMatch[1] : null;
                     
+                    // Diagnostic: Check if in-app flag is set
+                    const inAppFlag = window.__LOOTAURA_IN_APP === true;
+                    
+                    // Diagnostic: Check if React Native WebView bridge exists
+                    const hasRNBridge = typeof window.ReactNativeWebView !== 'undefined' && window.ReactNativeWebView !== null;
+                    
                     window.ReactNativeWebView.postMessage(JSON.stringify({
                       type: 'ROUTE_STATE',
                       pathname: pathname,
                       search: search,
                       isSaleDetail: isSaleDetail,
-                      saleId: saleId
+                      saleId: saleId,
+                      inAppFlag: inAppFlag,
+                      hasRNBridge: hasRNBridge
                     }));
                   } catch (e) {
                     // Silently fail if postMessage fails

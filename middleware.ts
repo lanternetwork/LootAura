@@ -128,22 +128,27 @@ export async function middleware(req: NextRequest) {
     }
   }
   
-  // Helper function to create response with CSRF token
-  const createResponseWithCsrf = (response: NextResponse): NextResponse => {
+  // Check for in-app header from Expo WebView
+  const inAppHeader = req.headers.get('X-LootAura-InApp')
+  const isInApp = inAppHeader === '1'
+  
+  // Helper function to create response with CSRF token and in-app cookie
+  const createResponseWithCookies = (response: NextResponse): NextResponse => {
     // Note: csrfToken should already be set above, but if not, we'll handle it
     // We can't use await here since this is a synchronous function
     
+    // Detect if request is over HTTPS (for Vercel preview deployments)
+    // Vercel previews are HTTPS but NODE_ENV might not be 'production'
+    // Check multiple sources to reliably detect HTTPS
+    const protocol = req.nextUrl.protocol
+    const forwardedProto = req.headers.get('x-forwarded-proto')
+    const isHttps = protocol === 'https:' || 
+                   forwardedProto === 'https' ||
+                   req.url.startsWith('https://') ||
+                   process.env.NODE_ENV === 'production'
+    
+    // Set CSRF token cookie if available
     if (csrfToken && response.cookies) {
-      // Detect if request is over HTTPS (for Vercel preview deployments)
-      // Vercel previews are HTTPS but NODE_ENV might not be 'production'
-      // Check multiple sources to reliably detect HTTPS
-      const protocol = req.nextUrl.protocol
-      const forwardedProto = req.headers.get('x-forwarded-proto')
-      const isHttps = protocol === 'https:' || 
-                     forwardedProto === 'https' ||
-                     req.url.startsWith('https://') ||
-                     process.env.NODE_ENV === 'production'
-      
       // Always set the cookie on every response to ensure it's available
       // This refreshes the cookie expiration and ensures it's sent to the client
       response.cookies.set('csrf-token', csrfToken, {
@@ -177,7 +182,32 @@ export async function middleware(req: NextRequest) {
         })
       }
     }
+    
+    // Set in-app cookie if header is present (for Expo WebView)
+    if (isInApp && response.cookies) {
+      response.cookies.set('lootaura_in_app', '1', {
+        httpOnly: false, // Readable by client if needed
+        secure: isHttps,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: '/'
+      })
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MIDDLEWARE] In-app cookie set on response:', {
+          hasHeader: isInApp,
+          isHttps,
+          pathname: req.nextUrl.pathname
+        })
+      }
+    }
+    
     return response
+  }
+  
+  // Backward-compatible alias (all existing code uses createResponseWithCsrf)
+  const createResponseWithCsrf = (response: NextResponse): NextResponse => {
+    return createResponseWithCookies(response)
   }
   
   // 1. Public pages that don't require authentication

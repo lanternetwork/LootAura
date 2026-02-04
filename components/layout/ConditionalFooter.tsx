@@ -11,21 +11,25 @@ import { isNativeApp } from '@/lib/runtime/isNativeApp'
  * We hide the footer on immersive sell flows (create/edit sale) to avoid
  * visual clutter and accidental navigation while composing a listing.
  * 
- * Also hide when nativeFooter=1 (native app with native footer overlay) or
- * when running inside Expo WebView (detected via centralized runtime detection).
+ * Also hide when nativeFooter=1 (native app with native footer overlay),
+ * when running inside Expo WebView (detected via centralized runtime detection),
+ * or when inAppCookie is true (server-side detection via cookie set by middleware).
  */
-export function ConditionalFooter() {
+export function ConditionalFooter({ inAppCookie = false }: { inAppCookie?: boolean }) {
   const pathname = usePathname() || ''
   const searchParams = useSearchParams()
   const isNativeFooter = searchParams.get('nativeFooter') === '1'
   
   // Use centralized runtime detection (no timing hacks needed)
+  // This is a fallback for cases where cookie isn't available yet
   const hideForNativeApp = isNativeApp()
 
   const isSellNew = pathname === '/sell/new'
   const isSellEdit = /^\/sell\/[^/]+\/edit$/.test(pathname)
 
-  if (isSellNew || isSellEdit || isNativeFooter || hideForNativeApp) {
+  // Hide footer if in-app cookie is set (server-side detection, most reliable)
+  // or if other conditions are met (legacy support)
+  if (isSellNew || isSellEdit || isNativeFooter || inAppCookie || hideForNativeApp) {
     return null
   }
 

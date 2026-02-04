@@ -19,6 +19,7 @@ import ClarityClient from '@/components/analytics/ClarityClient'
 import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
 import { ENV_PUBLIC } from '@/lib/env'
 import { AuthStateRefresher } from '@/components/auth/AuthStateRefresher'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -69,6 +70,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Gate AdSense script and meta tag based on feature flag
   const adsenseEnabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
+  
+  // Read in-app cookie (set by middleware when X-LootAura-InApp header is present)
+  const cookieStore = cookies()
+  const inAppCookie = cookieStore.get('lootaura_in_app')?.value === '1'
 
   return (
     <html lang="en">
@@ -116,7 +121,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main-content" tabIndex={-1}>
               {children}
             </main>
-            <ConditionalFooter />
+            <ConditionalFooter inAppCookie={inAppCookie} />
             <PWAComponents />
             <DebugToggle />
             <ToastContainer

@@ -5,7 +5,7 @@ import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const LOOTAURA_URL = 'https://lootaura.com';
+const LOOTAURA_URL = 'https://lootaura.com/app/sales';
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);

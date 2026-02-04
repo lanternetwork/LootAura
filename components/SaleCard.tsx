@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import SalePlaceholder from './placeholders/SalePlaceholder'
 import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
@@ -17,6 +18,8 @@ interface SaleCardProps {
 
 export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   if (!sale) return null
+  const pathname = usePathname()
+  const isAppNamespace = pathname?.startsWith('/app')
   const cover = getSaleCoverUrl(sale)
   
   // Debug: log cover image resolution
@@ -31,9 +34,11 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   }
   
   // Build detail page URL with viewport params to restore view on back
+  // Use /app prefix if we're in the app namespace
+  const basePath = isAppNamespace ? '/app/sales' : '/sales'
   const detailUrl = viewport 
-    ? `/sales/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
-    : `/sales/${sale.id}`
+    ? `${basePath}/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
+    : `${basePath}/${sale.id}`
 
   return (
     <article 

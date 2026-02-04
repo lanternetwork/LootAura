@@ -603,9 +603,6 @@ export default function HomeScreen() {
                 // Report initial route after a short delay to ensure Next.js router is initialized
                 setTimeout(reportRouteState, 100);
                 
-                // Also report layout diagnostics on load
-                setTimeout(reportLayoutDiagnostics, 200);
-                
                 // Intercept history API to detect SPA navigation
                 const originalPushState = history.pushState;
                 const originalReplaceState = history.replaceState;

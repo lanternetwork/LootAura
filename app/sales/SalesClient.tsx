@@ -47,15 +47,13 @@ interface SalesClientProps {
   initialBufferedBounds: Bounds | null
   initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   user: User | null
-  appNamespace?: boolean
 }
 
 export default function SalesClient({ 
   initialSales, 
   initialBufferedBounds,
   initialCenter, 
-  user: _user,
-  appNamespace: _appNamespace = false
+  user: _user 
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()

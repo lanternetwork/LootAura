@@ -1,7 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import { formatDistance } from '@/lib/utils/distance'
@@ -14,9 +13,6 @@ interface NearbySalesCardProps {
 }
 
 export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
-  const pathname = usePathname()
-  const isAppNamespace = pathname?.startsWith('/app')
-  
   // Don't render if no nearby sales
   if (!nearbySales || nearbySales.length === 0) {
     return null
@@ -124,9 +120,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
                 })
                 
                 // Normal Next.js navigation (works in both web and WebView)
-                // Use /app prefix if we're in the app namespace
-                const basePath = isAppNamespace ? '/app/sales' : '/sales'
-                window.location.href = `${basePath}/${nearbySale.id}`;
+                window.location.href = `/sales/${nearbySale.id}`;
               }}
             >
               <div className="flex gap-3">

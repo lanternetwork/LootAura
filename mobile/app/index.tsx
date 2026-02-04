@@ -444,7 +444,12 @@ export default function HomeScreen() {
         <>
           <WebView
             ref={webViewRef}
-            source={{ uri: currentUrl }}
+            source={{
+              uri: currentUrl,
+              headers: {
+                'X-LootAura-InApp': '1'
+              }
+            }}
             key={currentUrl}
             style={[
               styles.webview,

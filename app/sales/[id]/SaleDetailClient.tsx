@@ -176,9 +176,16 @@ export default function SaleDetailClient({
   const isEmbed = searchParams.get('embed') === '1'
   // nativeFooter=1 means we're in a native app with native footer, so keep web header visible but hide web footer
   // Also check if running inside Expo WebView using centralized runtime detection
+  // or if in-app cookie is set (server-side detection via cookie set by middleware)
   const isNativeFooterParam = searchParams.get('nativeFooter') === '1'
   const isInNativeApp = isNativeApp()
-  const isNativeFooter = isNativeFooterParam || isInNativeApp
+  
+  // Check for in-app cookie (set by middleware when X-LootAura-InApp header is present)
+  const inAppCookie = typeof document !== 'undefined' 
+    ? document.cookie.split(';').some(c => c.trim().startsWith('lootaura_in_app=1'))
+    : false
+  
+  const isNativeFooter = isNativeFooterParam || isInNativeApp || inAppCookie
   
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')

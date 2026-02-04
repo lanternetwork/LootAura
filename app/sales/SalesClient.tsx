@@ -55,7 +55,7 @@ export default function SalesClient({
   initialBufferedBounds,
   initialCenter, 
   user: _user,
-  appNamespace = false
+  appNamespace: _appNamespace = false
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()

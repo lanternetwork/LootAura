@@ -17,9 +17,10 @@ interface SaleCardProps {
 }
 
 export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
-  if (!sale) return null
   const pathname = usePathname()
   const isAppNamespace = pathname?.startsWith('/app')
+  
+  if (!sale) return null
   const cover = getSaleCoverUrl(sale)
   
   // Debug: log cover image resolution

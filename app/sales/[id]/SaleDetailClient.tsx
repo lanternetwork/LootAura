@@ -139,7 +139,7 @@ export default function SaleDetailClient({
   currentUserRating,
   promotionsEnabled = false,
   paymentsEnabled = false,
-  appNamespace = false,
+  appNamespace: _appNamespace = false,
 }: SaleDetailClientProps) {
   // Debug logging to diagnose items visibility issue (only in debug mode)
   if (isDebugEnabled) {

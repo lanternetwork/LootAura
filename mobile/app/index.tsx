@@ -348,8 +348,8 @@ export default function HomeScreen() {
         return null;
       }
       
-      // Allowlist: only allow specific safe paths
-      const allowedPaths = ['/auth', '/favorites', '/sell', '/sales', '/', '/u'];
+      // Allowlist: only allow specific safe paths (including /app for native shell)
+      const allowedPaths = ['/auth', '/favorites', '/sell', '/sales', '/app', '/', '/u'];
       const pathMatch = decodedUrl.split('?')[0].split('#')[0]; // Get path without query/hash
       
       // Check if path starts with any allowed path

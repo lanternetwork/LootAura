@@ -191,16 +191,51 @@ export default function HomeScreen() {
       stopLoader('navState.loading=false');
     }
     
-    // Track navigation action when URL changes
-    if (url && url !== currentWebViewUrl) {
+    // Route detection: Use navState.url as source of truth (more reliable than window.location.pathname)
+    // Extract pathname and search from navState.url and update routeState
+    if (url) {
       try {
         const parsedUrl = new URL(url);
         const pathname = parsedUrl.pathname;
-        if (pathname.startsWith('/sales') || pathname === '/') {
-          setLastNavAction(`SPA nav to ${pathname}`);
+        const search = parsedUrl.search;
+        
+        // Match both /sales/[id] and /app/sales/[id] pathnames
+        const saleDetailMatch = pathname.match(/^\/(?:app\/)?sales\/([^\/\?]+)/);
+        const isSaleDetail = !!saleDetailMatch;
+        const saleId = isSaleDetail ? saleDetailMatch[1] : null;
+        
+        // Update routeState from navState (source of truth)
+        setRouteState(prev => {
+          // Only update if pathname actually changed to avoid unnecessary re-renders
+          if (prev.pathname !== pathname || prev.isSaleDetail !== isSaleDetail) {
+            return {
+              pathname: pathname,
+              search: search,
+              isSaleDetail: isSaleDetail,
+              saleId: saleId,
+              inAppFlag: prev.inAppFlag, // Keep existing value (set by injected JS)
+              hasRNBridge: prev.hasRNBridge, // Keep existing value (set by injected JS)
+            };
+          }
+          return prev;
+        });
+        
+        // Reset favorite state when leaving sale detail
+        if (!isSaleDetail) {
+          setIsFavorited(false);
+        }
+        
+        // Track navigation action when URL changes
+        if (url !== currentWebViewUrl) {
+          if (pathname.startsWith('/sales') || pathname.startsWith('/app/sales') || pathname === '/') {
+            setLastNavAction(`SPA nav to ${pathname}`);
+          }
         }
       } catch (e) {
         // Ignore URL parse errors
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[NATIVE] Failed to parse URL in handleNavigationStateChange:', e);
+        }
       }
     }
     

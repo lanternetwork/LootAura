@@ -608,9 +608,25 @@ export default function HomeScreen() {
                     let contentEnd = null;
                     try {
                       const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
-                      if (mobileContainer && mobileContainer.lastElementChild) {
-                        const rect = mobileContainer.lastElementChild.getBoundingClientRect();
-                        contentEnd = rect.bottom + y;
+                      if (mobileContainer) {
+                        // Find the last actual element child (skip text nodes)
+                        let lastChild = mobileContainer.lastElementChild;
+                        // If lastElementChild is null, try lastChild and walk back to find element
+                        if (!lastChild) {
+                          let node = mobileContainer.lastChild;
+                          while (node && node.nodeType !== 1) { // Node.ELEMENT_NODE = 1
+                            node = node.previousSibling;
+                          }
+                          lastChild = node;
+                        }
+                        if (lastChild) {
+                          const rect = lastChild.getBoundingClientRect();
+                          contentEnd = rect.bottom + y;
+                        } else {
+                          // If no children, use container bottom
+                          const rect = mobileContainer.getBoundingClientRect();
+                          contentEnd = rect.top + y;
+                        }
                       }
                     } catch (e) {
                       // Measurement may fail
@@ -619,46 +635,43 @@ export default function HomeScreen() {
                     // Gap after content: scrollHeight - contentEnd (definitive blank space metric)
                     const gapAfterContentPx = contentEnd !== null && sh !== null ? sh - contentEnd : null;
                     
-                    // Mobile container padding-bottom (computed, in px)
+                    // Mobile container padding-bottom (computed, in px) - always report value
                     let mobilePb = null;
                     try {
                       const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
                       if (mobileContainer) {
                         const computedStyle = window.getComputedStyle(mobileContainer);
                         const pbValue = computedStyle.paddingBottom;
-                        if (pbValue && pbValue !== '0px') {
-                          mobilePb = pbValue;
-                        }
+                        // Always report the value, even if it's "0px" or a calc()
+                        mobilePb = pbValue || '0px';
                       }
                     } catch (e) {
                       // getComputedStyle may fail
                     }
                     
-                    // Body padding-bottom (computed, in px)
+                    // Body padding-bottom (computed, in px) - always report value
                     let bodyPb = null;
                     try {
                       const body = document.body;
                       if (body) {
                         const computedStyle = window.getComputedStyle(body);
                         const pbValue = computedStyle.paddingBottom;
-                        if (pbValue && pbValue !== '0px') {
-                          bodyPb = pbValue;
-                        }
+                        // Always report the value, even if it's "0px"
+                        bodyPb = pbValue || '0px';
                       }
                     } catch (e) {
                       // getComputedStyle may fail
                     }
                     
-                    // Main element padding-bottom (computed, in px)
+                    // Main element padding-bottom (computed, in px) - always report value if element exists
                     let mainPb = null;
                     try {
                       const main = document.querySelector('main');
                       if (main) {
                         const computedStyle = window.getComputedStyle(main);
                         const pbValue = computedStyle.paddingBottom;
-                        if (pbValue && pbValue !== '0px') {
-                          mainPb = pbValue;
-                        }
+                        // Always report the value, even if it's "0px"
+                        mainPb = pbValue || '0px';
                       }
                     } catch (e) {
                       // getComputedStyle may fail

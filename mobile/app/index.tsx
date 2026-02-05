@@ -284,9 +284,10 @@ export default function HomeScreen() {
   
   const handleShare = async () => {
     try {
-      // Use current pathname from route state if available, otherwise fall back to WebView URL
-      const shareUrl = routeState.pathname
-        ? `https://lootaura.com${routeState.pathname}${routeState.search || ''}`
+      // Use canonical /sales/ path for share URLs (not /app/sales/)
+      // Share links should always be canonical so they work everywhere
+      const shareUrl = routeState.saleId
+        ? `https://lootaura.com/sales/${routeState.saleId}`
         : currentWebViewUrl || 'https://lootaura.com';
       await Share.share({
         message: `Check out this yard sale!\n${shareUrl}`,

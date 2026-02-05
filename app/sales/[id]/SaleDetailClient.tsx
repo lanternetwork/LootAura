@@ -557,7 +557,8 @@ export default function SaleDetailClient({
     }
   }
 
-  // Build share URL (canonical, without UTM params)
+  // Build share URL (canonical, always /sales/ regardless of baseSalesPath)
+  // Share links should always use canonical /sales/ path, not /app/sales/
   const shareUrl = typeof window !== 'undefined' 
     ? window.location.origin + `/sales/${sale.id}`
     : `/sales/${sale.id}`
@@ -820,7 +821,7 @@ export default function SaleDetailClient({
         {/* Nearby Sales - Mobile */}
         {nearbySales.length > 0 && (
           <div className="w-full">
-            <NearbySalesCard nearbySales={nearbySales} />
+            <NearbySalesCard nearbySales={nearbySales} baseSalesPath={baseSalesPath} />
           </div>
         )}
 

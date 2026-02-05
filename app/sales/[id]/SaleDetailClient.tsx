@@ -581,10 +581,15 @@ export default function SaleDetailClient({
 
   const currentCenter = location || { lat: sale.lat || 38.2527, lng: sale.lng || -85.7585 }
 
-  // Calculate bottom padding for native footer mode
-  // Footer height: 12px (top) + 44px (button min) + 12px (bottom) = 68px
+  // Calculate bottom padding for native footer mode (deterministic)
+  // Native footer height breakdown:
+  // - paddingTop: 12px
+  // - button minHeight: 44px (Navigate button)
+  // - paddingBottom: 12px
+  // - Total: 68px
   // Plus safe area inset (varies by device, typically 0-48px on Android)
-  // Use CSS env() for safe-area-inset-bottom to handle device variations
+  // This padding ensures content doesn't get hidden behind the native footer overlay
+  // Only apply in native app shell context (/app/* namespace or nativeFooter param)
   const nativeFooterPadding = isNativeFooter 
     ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' 
     : ''
@@ -613,7 +618,7 @@ export default function SaleDetailClient({
       )}
 
       {/* Mobile Layout */}
-      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : isNativeFooter ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
+      <div data-mobile-sale-detail="true" className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : isNativeFooter ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
         {/* Back to map button - Mobile only */}
         <Link
           href={backUrl}
@@ -820,7 +825,7 @@ export default function SaleDetailClient({
 
         {/* Nearby Sales - Mobile */}
         {nearbySales.length > 0 && (
-          <div className="w-full">
+          <div data-nearby-sales="true" className="w-full">
             <NearbySalesCard nearbySales={nearbySales} baseSalesPath={baseSalesPath} />
           </div>
         )}

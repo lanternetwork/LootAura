@@ -135,6 +135,64 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // Handle deep links for OAuth callback (lootaura://auth/callback)
+  useEffect(() => {
+    const handleDeepLink = ({ url }: { url: string }) => {
+      try {
+        // Only handle OAuth callback deep links
+        if (!url.startsWith('lootaura://auth/callback')) {
+          return;
+        }
+
+        console.log('[DEEP_LINK] Handling OAuth callback deep link:', url);
+        setLastNavAction(`deep-link: oauth-callback`);
+
+        // Parse the deep link URL
+        const deepLinkUrl = new URL(url);
+        
+        // Convert to web callback URL: https://lootaura.com/auth/callback + query + fragment
+        const webCallbackUrl = new URL('https://lootaura.com/auth/callback');
+        
+        // Preserve all query parameters from deep link
+        deepLinkUrl.searchParams.forEach((value, key) => {
+          webCallbackUrl.searchParams.set(key, value);
+        });
+        
+        // Preserve fragment if present
+        if (deepLinkUrl.hash) {
+          webCallbackUrl.hash = deepLinkUrl.hash;
+        }
+
+        const finalUrl = webCallbackUrl.toString();
+        console.log('[DEEP_LINK] Converting to web URL:', finalUrl);
+        
+        // Navigate WebView to the web callback URL
+        // This allows the web app to complete the Supabase session exchange
+        setCurrentUrl(finalUrl);
+        startLoader('deep-link: oauth-callback');
+      } catch (e) {
+        console.error('[DEEP_LINK] Failed to handle deep link:', e);
+        setLastNavAction(`deep-link error: ${e instanceof Error ? e.message : 'unknown'}`);
+      }
+    };
+
+    // Handle deep link when app is already open (warm start)
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Handle deep link when app opens from closed state (cold start)
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    }).catch((e) => {
+      console.error('[DEEP_LINK] Failed to get initial URL:', e);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   const handleLoadStart = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     const url = nativeEvent?.url;

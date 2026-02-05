@@ -15,6 +15,7 @@ interface MobileSaleCalloutProps {
   onDismiss: () => void
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
   pinPosition?: { x: number; y: number } | null
+  baseSalesPath?: string // Base path for sale detail links (default: '/sales')
 }
 
 /**
@@ -53,7 +54,7 @@ function detectPlatform(): Platform {
   return 'desktop'
 }
 
-export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPosition }: MobileSaleCalloutProps) {
+export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPosition, baseSalesPath = '/sales' }: MobileSaleCalloutProps) {
   const router = useRouter()
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeDeltaY, setSwipeDeltaY] = useState(0)
@@ -129,8 +130,8 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
   
   // Build detail page URL with viewport params to restore view on back
   const detailUrl = viewport 
-    ? `/sales/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
-    : `/sales/${sale.id}`
+    ? `${baseSalesPath}/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
+    : `${baseSalesPath}/${sale.id}`
 
   const handleViewSale = () => {
     // Track click event

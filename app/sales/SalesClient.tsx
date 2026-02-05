@@ -47,13 +47,15 @@ interface SalesClientProps {
   initialBufferedBounds: Bounds | null
   initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   user: User | null
+  baseSalesPath?: string // Base path for sale detail links (default: '/sales')
 }
 
 export default function SalesClient({ 
   initialSales, 
   initialBufferedBounds,
   initialCenter, 
-  user: _user 
+  user: _user,
+  baseSalesPath = '/sales' // Default to '/sales' for backward compatibility
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -2098,6 +2100,7 @@ export default function SalesClient({
           userLocation={effectiveCenter || null}
           onUserLocationRequest={handleUserLocationRequest}
           shouldShowLocationIcon={shouldShowLocationIcon}
+          baseSalesPath={baseSalesPath}
         />
       ) : (
         /* Desktop Layout - md and above */
@@ -2208,6 +2211,7 @@ export default function SalesClient({
                   }}
                   viewport={mapView ? { center: mapView.center, zoom: mapView.zoom } : null}
                   pinPosition={desktopPinPosition}
+                  baseSalesPath={baseSalesPath}
                 />
               )}
               {process.env.NEXT_PUBLIC_DEBUG === 'true' && selectedPinId && (
@@ -2260,7 +2264,7 @@ export default function SalesClient({
                 )}
 
                 {!loading && visibleSalesDeduplicated.length > 0 && (
-                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} isLoading={loading} />
+                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} isLoading={loading} baseSalesPath={baseSalesPath} />
                 )}
               </div>
             </div>

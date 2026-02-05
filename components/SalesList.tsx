@@ -14,6 +14,7 @@ interface SalesListProps {
    * When true, no ads will be rendered (AdSense policy compliance)
    */
   isLoading?: boolean
+  baseSalesPath?: string // Base path for sale detail links (default: '/sales')
 }
 
 /**
@@ -22,7 +23,7 @@ interface SalesListProps {
  */
 const MIN_SALES_FOR_ADS = 4
 
-export default function SalesList({ sales, _mode, viewport, isLoading = false }: SalesListProps) {
+export default function SalesList({ sales, _mode, viewport, isLoading = false, baseSalesPath = '/sales' }: SalesListProps) {
   const isEmpty = !sales?.length
 
   // AdSense Policy Compliance: Never show ads when loading or empty
@@ -58,7 +59,7 @@ export default function SalesList({ sales, _mode, viewport, isLoading = false }:
       {sales.map((sale, index) => (
         <Fragment key={sale.id}>
           <div>
-            <SaleCard sale={sale} viewport={viewport} />
+            <SaleCard sale={sale} viewport={viewport} baseSalesPath={baseSalesPath} />
           </div>
           {/* Show inline ad after every 6th sale (indices 5, 11, 17, etc.) */}
           {/* Desktop only - mobile ads removed */}

@@ -62,6 +62,9 @@ interface MobileSalesShellProps {
   
   // Visibility flag for location icon (computed in SalesClient)
   shouldShowLocationIcon: boolean
+  
+  // Base path for sale detail links (default: '/sales')
+  baseSalesPath?: string
 }
 
 /**
@@ -97,7 +100,8 @@ export default function MobileSalesShell({
   hybridResult,
   userLocation: _userLocation, // Unused - we use actualUserLocation (GPS) instead of userLocation prop (map center)
   onUserLocationRequest, // Callback for user-initiated GPS (bypasses authority guard)
-  shouldShowLocationIcon // Visibility flag computed in SalesClient
+  shouldShowLocationIcon, // Visibility flag computed in SalesClient
+  baseSalesPath = '/sales' // Base path for sale detail links (default: '/sales')
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -550,6 +554,7 @@ export default function MobileSalesShell({
                 onDismiss={() => onLocationClick(selectedPinId || '')}
                 viewport={mapViewport}
                 pinPosition={pinPosition}
+                baseSalesPath={baseSalesPath}
               />
             )}
           </div>
@@ -637,6 +642,7 @@ export default function MobileSalesShell({
                   _mode="grid" 
                   viewport={mapViewport || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }}
                   isLoading={loading}
+                  baseSalesPath={baseSalesPath}
                 />
               </div>
             )}

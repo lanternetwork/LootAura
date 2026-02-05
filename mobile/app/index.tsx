@@ -284,8 +284,9 @@ export default function HomeScreen() {
   
   const handleShare = async () => {
     try {
-      const shareUrl = routeState.saleId 
-        ? `https://lootaura.com/sales/${routeState.saleId}` 
+      // Use current pathname from route state if available, otherwise fall back to WebView URL
+      const shareUrl = routeState.pathname
+        ? `https://lootaura.com${routeState.pathname}${routeState.search || ''}`
         : currentWebViewUrl || 'https://lootaura.com';
       await Share.share({
         message: `Check out this yard sale!\n${shareUrl}`,
@@ -573,7 +574,8 @@ export default function HomeScreen() {
                   try {
                     const pathname = window.location.pathname;
                     const search = window.location.search;
-                    const saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
+                    // Match both /sales/[id] and /app/sales/[id] pathnames
+                    const saleDetailMatch = pathname.match(/^\/(?:app\/)?sales\/([^\/\?]+)/);
                     const isSaleDetail = !!saleDetailMatch;
                     const saleId = isSaleDetail ? saleDetailMatch[1] : null;
                     

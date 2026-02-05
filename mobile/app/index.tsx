@@ -65,6 +65,11 @@ export default function HomeScreen() {
     vh: number | null;
     y: number | null;
     sh: number | null;
+    contentEnd: number | null;
+    gapAfterContentPx: number | null;
+    mobilePb: string | null;
+    bodyPb: string | null;
+    mainPb: string | null;
   }>({
     bottomEl: null,
     footerH: null,
@@ -74,6 +79,11 @@ export default function HomeScreen() {
     vh: null,
     y: null,
     sh: null,
+    contentEnd: null,
+    gapAfterContentPx: null,
+    mobilePb: null,
+    bodyPb: null,
+    mainPb: null,
   });
 
   // Loader management helpers
@@ -283,6 +293,11 @@ export default function HomeScreen() {
           vh: message.vh !== undefined ? message.vh : null,
           y: message.y !== undefined ? message.y : null,
           sh: message.sh !== undefined ? message.sh : null,
+          contentEnd: message.contentEnd !== undefined ? message.contentEnd : null,
+          gapAfterContentPx: message.gapAfterContentPx !== undefined ? message.gapAfterContentPx : null,
+          mobilePb: message.mobilePb || null,
+          bodyPb: message.bodyPb || null,
+          mainPb: message.mainPb || null,
         });
       } else if (message.type === 'NAVIGATE') {
         // Handle navigation request from header
@@ -491,7 +506,7 @@ export default function HomeScreen() {
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
         </Text>
       </View>
       
@@ -577,14 +592,73 @@ export default function HomeScreen() {
                       // getBoundingClientRect may fail
                     }
                     
-                    // Main container padding-bottom
+                    // Main container padding-bottom (legacy, kept for compatibility)
                     let pb = null;
                     try {
-                      // Find the mobile sale detail wrapper (md:hidden ... pb-[calc(...)] container)
-                      const mobileContainer = document.querySelector('.md\\:hidden');
+                      const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
                       if (mobileContainer) {
                         const computedStyle = window.getComputedStyle(mobileContainer);
                         pb = computedStyle.paddingBottom || null;
+                      }
+                    } catch (e) {
+                      // getComputedStyle may fail
+                    }
+                    
+                    // Content end: bottom of last element child in mobile container (document coordinates)
+                    let contentEnd = null;
+                    try {
+                      const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
+                      if (mobileContainer && mobileContainer.lastElementChild) {
+                        const rect = mobileContainer.lastElementChild.getBoundingClientRect();
+                        contentEnd = rect.bottom + y;
+                      }
+                    } catch (e) {
+                      // Measurement may fail
+                    }
+                    
+                    // Gap after content: scrollHeight - contentEnd (definitive blank space metric)
+                    const gapAfterContentPx = contentEnd !== null && sh !== null ? sh - contentEnd : null;
+                    
+                    // Mobile container padding-bottom (computed, in px)
+                    let mobilePb = null;
+                    try {
+                      const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
+                      if (mobileContainer) {
+                        const computedStyle = window.getComputedStyle(mobileContainer);
+                        const pbValue = computedStyle.paddingBottom;
+                        if (pbValue && pbValue !== '0px') {
+                          mobilePb = pbValue;
+                        }
+                      }
+                    } catch (e) {
+                      // getComputedStyle may fail
+                    }
+                    
+                    // Body padding-bottom (computed, in px)
+                    let bodyPb = null;
+                    try {
+                      const body = document.body;
+                      if (body) {
+                        const computedStyle = window.getComputedStyle(body);
+                        const pbValue = computedStyle.paddingBottom;
+                        if (pbValue && pbValue !== '0px') {
+                          bodyPb = pbValue;
+                        }
+                      }
+                    } catch (e) {
+                      // getComputedStyle may fail
+                    }
+                    
+                    // Main element padding-bottom (computed, in px)
+                    let mainPb = null;
+                    try {
+                      const main = document.querySelector('main');
+                      if (main) {
+                        const computedStyle = window.getComputedStyle(main);
+                        const pbValue = computedStyle.paddingBottom;
+                        if (pbValue && pbValue !== '0px') {
+                          mainPb = pbValue;
+                        }
                       }
                     } catch (e) {
                       // getComputedStyle may fail
@@ -599,7 +673,12 @@ export default function HomeScreen() {
                       pb: pb,
                       vh: vh,
                       y: y,
-                      sh: sh
+                      sh: sh,
+                      contentEnd: contentEnd,
+                      gapAfterContentPx: gapAfterContentPx,
+                      mobilePb: mobilePb,
+                      bodyPb: bodyPb,
+                      mainPb: mainPb
                     }));
                   } catch (e) {
                     // Silently fail if postMessage fails

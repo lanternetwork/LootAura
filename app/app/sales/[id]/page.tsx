@@ -108,6 +108,7 @@ export default async function AppSaleDetailPage({ params }: SaleDetailPageProps)
           currentUserRating={currentUserRating}
           promotionsEnabled={promotionsEnabled}
           paymentsEnabled={paymentsEnabled}
+          baseSalesPath="/app/sales"
         />
       </Suspense>
     </div>

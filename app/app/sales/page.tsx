@@ -311,6 +311,7 @@ export default async function AppSalesPage({ searchParams }: SalesPageProps) {
         initialBufferedBounds={initialBufferedBounds}
         initialCenter={initialCenter}
         user={user}
+        baseSalesPath="/app/sales"
       />
     </div>
   )

@@ -128,6 +128,7 @@ interface SaleDetailClientProps {
   currentUserRating?: number | null
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
+  baseSalesPath?: string // Base path for sale detail links and back navigation (default: '/sales')
 }
 
 export default function SaleDetailClient({
@@ -138,6 +139,7 @@ export default function SaleDetailClient({
   currentUserRating,
   promotionsEnabled = false,
   paymentsEnabled = false,
+  baseSalesPath = '/sales',
 }: SaleDetailClientProps) {
   // Debug logging to diagnose items visibility issue (only in debug mode)
   if (isDebugEnabled) {
@@ -187,8 +189,8 @@ export default function SaleDetailClient({
   
   // Build back link with viewport params if they exist
   const backUrl = lat && lng && zoom
-    ? `/sales?lat=${lat}&lng=${lng}&zoom=${zoom}`
-    : '/sales'
+    ? `${baseSalesPath}?lat=${lat}&lng=${lng}&zoom=${zoom}`
+    : baseSalesPath
   const { location } = useLocationSearch()
   const [isFavorited, setIsFavorited] = useState(false)
   const { data: currentUser } = useAuth()
@@ -1222,7 +1224,7 @@ export default function SaleDetailClient({
 
           {/* Nearby Sales - Desktop: in sidebar */}
           <div className="hidden lg:block">
-            <NearbySalesCard nearbySales={nearbySales} />
+            <NearbySalesCard nearbySales={nearbySales} baseSalesPath={baseSalesPath} />
           </div>
         </div>
       </div>

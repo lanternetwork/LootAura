@@ -10,9 +10,10 @@ import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
 interface NearbySalesCardProps {
   nearbySales: Array<Sale & { distance_m: number }>
+  baseSalesPath?: string // Base path for sale detail links (default: '/sales')
 }
 
-export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
+export function NearbySalesCard({ nearbySales, baseSalesPath = '/sales' }: NearbySalesCardProps) {
   // Don't render if no nearby sales
   if (!nearbySales || nearbySales.length === 0) {
     return null
@@ -120,7 +121,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
                 })
                 
                 // Normal Next.js navigation (works in both web and WebView)
-                window.location.href = `/sales/${nearbySale.id}`;
+                window.location.href = `${baseSalesPath}/${nearbySale.id}`;
               }}
             >
               <div className="flex gap-3">

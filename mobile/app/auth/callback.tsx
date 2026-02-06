@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -8,8 +8,21 @@ export default function AuthCallbackScreen() {
   const [status, setStatus] = useState<'processing' | 'error'>('processing');
   const [error, setError] = useState<string | null>(null);
   const lastProcessedUrlRef = useRef<string | null>(null);
+  const isProcessingRef = useRef<boolean>(false);
 
-  const processCallback = async (url: string) => {
+  const processCallback = useCallback(async (url: string) => {
+    // Lock: prevent concurrent execution
+    if (isProcessingRef.current) {
+      console.log('[AUTH_CALLBACK] Already processing, ignoring duplicate call:', url);
+      return;
+    }
+
+    // Idempotency guard: avoid processing the same URL twice
+    if (lastProcessedUrlRef.current === url) {
+      console.log('[AUTH_CALLBACK] URL already processed, skipping:', url);
+      return;
+    }
+
     try {
       // Only accept lootaura://auth/callback URLs
       if (!url || !url.startsWith('lootaura://auth/callback')) {
@@ -18,10 +31,8 @@ export default function AuthCallbackScreen() {
         return;
       }
 
-      // Avoid processing the same URL twice
-      if (lastProcessedUrlRef.current === url) {
-        return;
-      }
+      // Set lock and idempotency guard
+      isProcessingRef.current = true;
       lastProcessedUrlRef.current = url;
 
       console.log('[AUTH_CALLBACK] Processing OAuth callback deep link:', url);
@@ -56,8 +67,10 @@ export default function AuthCallbackScreen() {
       console.error('[AUTH_CALLBACK] Failed to process callback:', e);
       setError(e instanceof Error ? e.message : 'Unknown error');
       setStatus('error');
+      // Release lock on error
+      isProcessingRef.current = false;
     }
-  };
+  }, [router]);
 
   // Handle cold start (app opens from closed state)
   useEffect(() => {
@@ -75,7 +88,7 @@ export default function AuthCallbackScreen() {
     };
 
     handleColdStart();
-  }, []);
+  }, [processCallback]);
 
   // Handle warm start (app already open)
   useEffect(() => {
@@ -88,7 +101,7 @@ export default function AuthCallbackScreen() {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [processCallback]);
 
   const handleRetry = () => {
     if (lastProcessedUrlRef.current) {

@@ -181,6 +181,8 @@ export default function HomeScreen() {
         if (parsedUrl.origin !== 'https://lootaura.com' || 
             !parsedUrl.pathname.startsWith('/auth/callback')) {
           console.error('[AUTH_CALLBACK] Invalid callback URL origin or path:', decodedUrl);
+          // Clear param even on validation failure
+          router.replace({ pathname: '/', params: {} });
           return;
         }
 
@@ -191,13 +193,14 @@ export default function HomeScreen() {
         setCurrentUrl(decodedUrl);
         startLoader('auth-callback-from-route');
         
-        // Clear the param after consuming to avoid reprocessing on re-render
-        router.setParams({ authCallbackUrl: undefined });
+        // Clear the param deterministically by replacing route with empty params
+        // This ensures the param is removed across all Expo Router versions
+        router.replace({ pathname: '/', params: {} });
       } catch (e) {
         console.error('[AUTH_CALLBACK] Failed to process callback URL:', e);
         setLastNavAction(`auth-callback error: ${e instanceof Error ? e.message : 'unknown'}`);
         // Clear the param even on error to avoid retry loops
-        router.setParams({ authCallbackUrl: undefined });
+        router.replace({ pathname: '/', params: {} });
       }
     }
   }, [searchParams.authCallbackUrl, router]);

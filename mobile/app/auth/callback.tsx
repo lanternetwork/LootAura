@@ -28,6 +28,8 @@ export default function AuthCallbackScreen() {
       if (!url || !url.startsWith('lootaura://auth/callback')) {
         setError('Invalid callback URL');
         setStatus('error');
+        // Release lock on validation failure so retry can work
+        isProcessingRef.current = false;
         return;
       }
 
@@ -104,6 +106,10 @@ export default function AuthCallbackScreen() {
   }, [processCallback]);
 
   const handleRetry = () => {
+    // Explicitly clear the processing lock before retry
+    // This ensures retry always works even if previous attempt failed
+    isProcessingRef.current = false;
+    
     if (lastProcessedUrlRef.current) {
       setStatus('processing');
       setError(null);

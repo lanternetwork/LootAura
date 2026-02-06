@@ -7,6 +7,16 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const LOOTAURA_URL = 'https://lootaura.com/app/sales';
 
+// Extract base origin from LOOTAURA_URL (parse once at module level)
+// Fallback to hardcoded origin if parsing fails (defensive)
+let LOOTAURA_ORIGIN: string;
+try {
+  LOOTAURA_ORIGIN = new URL(LOOTAURA_URL).origin;
+} catch (e) {
+  console.warn('[NATIVE] Failed to parse LOOTAURA_URL, using fallback origin:', e);
+  LOOTAURA_ORIGIN = 'https://lootaura.com';
+}
+
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -497,11 +507,14 @@ export default function HomeScreen() {
 
   // Execute navigation using state-driven WebView source (replaces injectJavaScript)
   const executeNavigation = (relativePath: string, source: string) => {
-    // Extract base origin from LOOTAURA_URL to avoid concatenating paths
-    // LOOTAURA_URL may contain a path (e.g., /app/sales), but we only want the origin
-    const baseOrigin = new URL(LOOTAURA_URL).origin;
+    // Defensive guard: ensure relativePath starts with /
+    if (!relativePath.startsWith('/')) {
+      console.warn('[NATIVE] Invalid relativePath (must start with /):', relativePath);
+      return;
+    }
+    
     // Build full URL: origin + relativePath (relativePath always starts with /)
-    const fullUrl = `${baseOrigin}${relativePath}`;
+    const fullUrl = `${LOOTAURA_ORIGIN}${relativePath}`;
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     setLastNavAction(`executeNavigation -> ${relativePath}`);
     setLastNavRequest(relativePath);

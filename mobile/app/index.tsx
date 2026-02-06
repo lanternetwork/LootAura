@@ -497,8 +497,11 @@ export default function HomeScreen() {
 
   // Execute navigation using state-driven WebView source (replaces injectJavaScript)
   const executeNavigation = (relativePath: string, source: string) => {
-    // Build full URL
-    const fullUrl = `${LOOTAURA_URL}${relativePath}`;
+    // Extract base origin from LOOTAURA_URL to avoid concatenating paths
+    // LOOTAURA_URL may contain a path (e.g., /app/sales), but we only want the origin
+    const baseOrigin = new URL(LOOTAURA_URL).origin;
+    // Build full URL: origin + relativePath (relativePath always starts with /)
+    const fullUrl = `${baseOrigin}${relativePath}`;
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     setLastNavAction(`executeNavigation -> ${relativePath}`);
     setLastNavRequest(relativePath);

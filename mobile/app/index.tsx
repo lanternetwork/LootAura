@@ -32,7 +32,7 @@ export default function HomeScreen() {
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
   
-  // State-driven WebView navigation (replaces injectJavaScript)
+  // WebView URL state (used for tracking and fallback navigation)
   const [currentUrl, setCurrentUrl] = useState<string>(LOOTAURA_URL);
   
   // Diagnostic HUD state (always visible)
@@ -572,9 +572,10 @@ export default function HomeScreen() {
     if (webViewRef.current && webViewReady) {
       try {
         // Escape URL for safe injection (prevent XSS)
-        // Order matters: escape backslashes first, then quotes, then newlines
+        // Order matters: escape backslashes first, then backticks (template literal delimiter), then quotes, then newlines
         const escapedUrl = fullUrl
           .replace(/\\/g, '\\\\')  // Escape backslashes first
+          .replace(/`/g, '\\`')    // Escape backticks (template literal delimiter)
           .replace(/'/g, "\\'")     // Escape single quotes
           .replace(/"/g, '\\"')     // Escape double quotes
           .replace(/\n/g, '\\n')    // Escape newlines

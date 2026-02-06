@@ -15,7 +15,7 @@ export default function HomeScreen() {
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
-  const searchParams = useLocalSearchParams<{ navigateTo?: string }>();
+  const searchParams = useLocalSearchParams<{ navigateTo?: string; authCallbackUrl?: string }>();
   const pendingNavigateToRef = useRef<string | null>(null);
   const lastHandledNavigateToRef = useRef<string | null>(null);
   
@@ -135,44 +135,20 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Handle deep links for OAuth callback (lootaura://auth/callback)
+  // Handle deep links (excluding OAuth callback which is handled by Expo Router)
   useEffect(() => {
     const handleDeepLink = ({ url }: { url: string }) => {
       try {
-        // Only handle OAuth callback deep links
-        if (!url.startsWith('lootaura://auth/callback')) {
+        // Ignore OAuth callback deep links - let Expo Router handle them via /auth/callback route
+        if (url.startsWith('lootaura://auth/callback')) {
+          console.log('[DEEP_LINK] Ignoring OAuth callback - handled by Expo Router');
           return;
         }
 
-        console.log('[DEEP_LINK] Handling OAuth callback deep link:', url);
-        setLastNavAction(`deep-link: oauth-callback`);
-
-        // Parse the deep link URL
-        const deepLinkUrl = new URL(url);
-        
-        // Convert to web callback URL: https://lootaura.com/auth/callback + query + fragment
-        const webCallbackUrl = new URL('https://lootaura.com/auth/callback');
-        
-        // Preserve all query parameters from deep link
-        deepLinkUrl.searchParams.forEach((value, key) => {
-          webCallbackUrl.searchParams.set(key, value);
-        });
-        
-        // Preserve fragment if present
-        if (deepLinkUrl.hash) {
-          webCallbackUrl.hash = deepLinkUrl.hash;
-        }
-
-        const finalUrl = webCallbackUrl.toString();
-        console.log('[DEEP_LINK] Converting to web URL:', finalUrl);
-        
-        // Navigate WebView to the web callback URL
-        // This allows the web app to complete the Supabase session exchange
-        setCurrentUrl(finalUrl);
-        startLoader('deep-link: oauth-callback');
+        // Handle other deep links here if needed in the future
+        console.log('[DEEP_LINK] Unhandled deep link:', url);
       } catch (e) {
         console.error('[DEEP_LINK] Failed to handle deep link:', e);
-        setLastNavAction(`deep-link error: ${e instanceof Error ? e.message : 'unknown'}`);
       }
     };
 
@@ -180,8 +156,9 @@ export default function HomeScreen() {
     const subscription = Linking.addEventListener('url', handleDeepLink);
 
     // Handle deep link when app opens from closed state (cold start)
+    // Note: OAuth callback will be handled by Expo Router, so we skip it here
     Linking.getInitialURL().then((url) => {
-      if (url) {
+      if (url && !url.startsWith('lootaura://auth/callback')) {
         handleDeepLink({ url });
       }
     }).catch((e) => {
@@ -192,6 +169,41 @@ export default function HomeScreen() {
       subscription.remove();
     };
   }, []);
+
+  // Handle auth callback URL from Expo Router (passed from /auth/callback route)
+  useEffect(() => {
+    if (searchParams.authCallbackUrl) {
+      try {
+        const decodedUrl = decodeURIComponent(searchParams.authCallbackUrl);
+        
+        // Security: Only accept https://lootaura.com/auth/callback URLs
+        const parsedUrl = new URL(decodedUrl);
+        if (parsedUrl.origin !== 'https://lootaura.com' || 
+            !parsedUrl.pathname.startsWith('/auth/callback')) {
+          console.error('[AUTH_CALLBACK] Invalid callback URL origin or path:', decodedUrl);
+          // Clear param even on validation failure
+          router.replace({ pathname: '/', params: {} });
+          return;
+        }
+
+        console.log('[AUTH_CALLBACK] Loading web callback URL in WebView:', decodedUrl);
+        setLastNavAction('auth-callback-from-route');
+        
+        // Load the web callback URL in WebView
+        setCurrentUrl(decodedUrl);
+        startLoader('auth-callback-from-route');
+        
+        // Clear the param deterministically by replacing route with empty params
+        // This ensures the param is removed across all Expo Router versions
+        router.replace({ pathname: '/', params: {} });
+      } catch (e) {
+        console.error('[AUTH_CALLBACK] Failed to process callback URL:', e);
+        setLastNavAction(`auth-callback error: ${e instanceof Error ? e.message : 'unknown'}`);
+        // Clear the param even on error to avoid retry loops
+        router.replace({ pathname: '/', params: {} });
+      }
+    }
+  }, [searchParams.authCallbackUrl, router]);
 
   const handleLoadStart = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;

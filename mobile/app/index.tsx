@@ -32,11 +32,16 @@ export default function HomeScreen() {
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
   
-  // HOTFIX: Immutable source - WebView source prop never changes after mount
-  const initialUrlRef = useRef<string>(LOOTAURA_URL);
-  
-  // Navigation tracking (observation only - does not drive WebView source)
+  // Controlled source - syncs to navState.url to prevent mismatch
+  const [currentSourceUrl, setCurrentSourceUrl] = useState<string>(LOOTAURA_URL);
   const [navStateUrl, setNavStateUrl] = useState<string>(''); // From onNavigationStateChange
+  
+  // Deep instrumentation: Track source prop changes and mismatches
+  const sourcePropHistoryRef = useRef<Array<{timestamp: number, url: string, reason: string}>>([]);
+  const [sourceSyncMismatches, setSourceSyncMismatches] = useState<Array<{timestamp: number, sourceUrl: string, navStateUrl: string, duration: number}>>([]);
+  const [webViewLifecycle, setWebViewLifecycle] = useState<Array<{timestamp: number, event: string, url?: string, error?: string}>>([]);
+  const lastSourceUpdateRef = useRef<number>(0);
+  const mismatchStartTimeRef = useRef<number | null>(null);
   
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
@@ -288,7 +293,7 @@ export default function HomeScreen() {
   };
 
   const handleLoadEnd = (syntheticEvent?: any) => {
-    const url = syntheticEvent?.nativeEvent?.url || initialUrlRef.current || '';
+    const url = syntheticEvent?.nativeEvent?.url || currentSourceUrl || '';
     
     // Update diagnostics
     setLastLoadEndUrl(url);
@@ -317,28 +322,42 @@ export default function HomeScreen() {
   };
 
   const handleError = (syntheticEvent: any) => {
+    const timestamp = Date.now();
     const { nativeEvent } = syntheticEvent;
     const errorMsg = nativeEvent?.description || nativeEvent?.message || JSON.stringify(nativeEvent) || 'unknown error';
+    
+    // Deep instrumentation
+    setWebViewLifecycle(prev => [...prev, {
+      timestamp,
+      event: 'webview_error',
+      url: currentSourceUrl,
+      error: errorMsg
+    }].slice(-30));
+    
     console.warn('WebView error: ', nativeEvent);
-    
-    // Update diagnostics
     setLastWebViewError(errorMsg);
-    
     stopLoader('onError');
     setError('Failed to load LootAura. Please check your internet connection.');
   };
 
   const handleHttpError = (syntheticEvent: any) => {
+    const timestamp = Date.now();
     const { nativeEvent } = syntheticEvent;
     if (nativeEvent.statusCode >= 400) {
       const statusCode = nativeEvent.statusCode || 'unknown';
-      const url = nativeEvent?.url || initialUrlRef.current || 'unknown';
+      const url = nativeEvent?.url || currentSourceUrl || 'unknown';
       const errorMsg = `HTTP ${statusCode}: ${url}`;
       
-      // Update diagnostics
+      // Deep instrumentation
+      setWebViewLifecycle(prev => [...prev, {
+        timestamp,
+        event: 'http_error',
+        url: url,
+        error: `HTTP ${statusCode}`
+      }].slice(-30));
+      
       setLastHttpError(errorMsg);
       
-      // Clear timeout on HTTP error
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
         loadTimeoutRef.current = null;
@@ -351,25 +370,91 @@ export default function HomeScreen() {
 
 
   const handleNavigationStateChange = (navState: any) => {
-    setCanGoBack(navState.canGoBack);
+    const timestamp = Date.now();
     const url = navState.url || '';
+    
+    setCanGoBack(navState.canGoBack);
     setCurrentWebViewUrl(url);
     
-    // HOTFIX: Observation only - track navState.url for HUD diagnostics
-    // Do NOT update any state that affects WebView source prop
     if (url) {
-      setNavStateUrl(url); // Track for HUD only
+      setNavStateUrl(url);
       
-      // Detect navigation initiator based on timing/context
-      // (This is diagnostic only, doesn't affect navigation)
-      setNavInitiator('web/spa'); // Default assumption (can be refined if needed)
-      setLastNavEvent(`${Date.now()}: ${url}`);
+      // CRITICAL FIX: Update source prop to match actual WebView URL
+      // RELOAD GUARD: Only update if WebView is not currently loading to prevent reload loops
+      // This prevents mismatch that causes blank pages while avoiding thrashing
+      if (url !== currentSourceUrl && !navState.loading) {
+        const updateReason = `navState.url changed: ${currentSourceUrl} → ${url} (not loading)`;
+        
+        // Track source prop updates for instrumentation
+        const historyEntry = { timestamp, url, reason: updateReason };
+        sourcePropHistoryRef.current = [...sourcePropHistoryRef.current, historyEntry].slice(-20);
+        
+        // Update source prop to match navState.url (only when not loading to prevent reloads)
+        setCurrentSourceUrl(url);
+        lastSourceUpdateRef.current = timestamp;
+        
+        // Track lifecycle event
+        setWebViewLifecycle(prev => [...prev, { timestamp, event: 'source_prop_updated', url }].slice(-30));
+        
+        // Clear any existing mismatch tracking
+        if (mismatchStartTimeRef.current) {
+          const mismatchDuration = timestamp - mismatchStartTimeRef.current;
+          setSourceSyncMismatches(prev => [...prev, {
+            timestamp: mismatchStartTimeRef.current!,
+            sourceUrl: currentSourceUrl,
+            navStateUrl: url,
+            duration: mismatchDuration
+          }].slice(-10));
+          mismatchStartTimeRef.current = null;
+        }
+      } else if (url !== currentSourceUrl && navState.loading) {
+        // URL changed but WebView is loading - defer source prop update until load completes
+        // Track this for instrumentation
+        setWebViewLifecycle(prev => [...prev, {
+          timestamp,
+          event: 'source_update_deferred',
+          url: `deferred: ${currentSourceUrl} → ${url} (loading)`
+        }].slice(-30));
+      } else {
+        // URLs match - check if there was a previous mismatch that's now resolved
+        if (mismatchStartTimeRef.current) {
+          const mismatchDuration = timestamp - mismatchStartTimeRef.current;
+          setSourceSyncMismatches(prev => [...prev, {
+            timestamp: mismatchStartTimeRef.current!,
+            sourceUrl: currentSourceUrl,
+            navStateUrl: url,
+            duration: mismatchDuration
+          }].slice(-10));
+          mismatchStartTimeRef.current = null;
+        }
+      }
+      
+      // Detect navigation initiator
+      setNavInitiator('web/spa');
+      setLastNavEvent(`${timestamp}: ${url}`);
     }
     
     // CRITICAL: If navState.loading === false, force clear loading state
     // This is the most reliable way to detect when navigation is complete
+    // Also sync source prop if URL changed during loading (deferred update)
     if (navState.loading === false) {
       stopLoader('navState.loading=false');
+      setWebViewLifecycle(prev => [...prev, { timestamp: Date.now(), event: 'load_complete', url }].slice(-30));
+      
+      // RELOAD GUARD: Now that loading is complete, sync source prop if it's still mismatched
+      // This handles cases where URL changed during active load
+      if (url && url !== currentSourceUrl) {
+        const deferredUpdateReason = `navState.url synced after load complete: ${currentSourceUrl} → ${url}`;
+        const historyEntry = { timestamp: Date.now(), url, reason: deferredUpdateReason };
+        sourcePropHistoryRef.current = [...sourcePropHistoryRef.current, historyEntry].slice(-20);
+        setCurrentSourceUrl(url);
+        lastSourceUpdateRef.current = Date.now();
+        setWebViewLifecycle(prev => [...prev, {
+          timestamp: Date.now(),
+          event: 'source_prop_updated_deferred',
+          url
+        }].slice(-30));
+      }
     }
     
     // Route detection: Use navState.url as source of truth (more reliable than window.location.pathname)
@@ -419,6 +504,26 @@ export default function HomeScreen() {
         }
       }
     }
+  };
+
+  // Deep instrumentation: Detect and track source/navState mismatches
+  useEffect(() => {
+    const checkInterval = setInterval(() => {
+      if (currentSourceUrl && navStateUrl && currentSourceUrl !== navStateUrl) {
+        // Mismatch detected
+        if (!mismatchStartTimeRef.current) {
+          mismatchStartTimeRef.current = Date.now();
+          setWebViewLifecycle(prev => [...prev, {
+            timestamp: Date.now(),
+            event: 'mismatch_detected',
+            url: `source=${currentSourceUrl} navState=${navStateUrl}`
+          }].slice(-30));
+        }
+      }
+    }, 500); // Check every 500ms
+    
+    return () => clearInterval(checkInterval);
+  }, [currentSourceUrl, navStateUrl]);
     
     // After webViewReady, only show loader for real document loads (navState.loading === true)
     // SPA transitions (pushState) won't have navState.loading === true, so don't start loader
@@ -824,7 +929,7 @@ export default function HomeScreen() {
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | sourceUrl={initialUrlRef.current ? (initialUrlRef.current.length > 40 ? initialUrlRef.current.substring(0, 37) + '...' : initialUrlRef.current) : 'none'} | navStateUrl={navStateUrl ? (navStateUrl.length > 40 ? navStateUrl.substring(0, 37) + '...' : navStateUrl) : 'none'} | navInitiator={navInitiator || 'none'} | lastNavEvent={lastNavEvent ? (lastNavEvent.length > 30 ? lastNavEvent.substring(0, 27) + '...' : lastNavEvent) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navOrigin={lastNavResolvedOrigin ? (lastNavResolvedOrigin.length > 30 ? lastNavResolvedOrigin.substring(0, 27) + '...' : lastNavResolvedOrigin) : 'none'} | navOriginMatch={lastNavOriginMatch || 'none'} | navBlockReason={lastNavBlockReason ? (lastNavBlockReason.length > 30 ? lastNavBlockReason.substring(0, 27) + '...' : lastNavBlockReason) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | sourceUrl={currentSourceUrl ? (currentSourceUrl.length > 40 ? currentSourceUrl.substring(0, 37) + '...' : currentSourceUrl) : 'none'} | navStateUrl={navStateUrl ? (navStateUrl.length > 40 ? navStateUrl.substring(0, 37) + '...' : navStateUrl) : 'none'} | sourceSync={currentSourceUrl === navStateUrl ? 'SYNCED' : 'MISMATCH'} | mismatchCount={sourceSyncMismatches.length} | lastMismatch={sourceSyncMismatches.length > 0 ? `${Math.round((Date.now() - sourceSyncMismatches[sourceSyncMismatches.length - 1].timestamp) / 1000)}s ago` : 'none'} | sourceUpdates={sourcePropHistoryRef.current.length} | lifecycleEvents={webViewLifecycle.length} | lastLifecycle={webViewLifecycle.length > 0 ? webViewLifecycle[webViewLifecycle.length - 1].event : 'none'} | navInitiator={navInitiator || 'none'} | lastNavEvent={lastNavEvent ? (lastNavEvent.length > 30 ? lastNavEvent.substring(0, 27) + '...' : lastNavEvent) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navOrigin={lastNavResolvedOrigin ? (lastNavResolvedOrigin.length > 30 ? lastNavResolvedOrigin.substring(0, 27) + '...' : lastNavResolvedOrigin) : 'none'} | navOriginMatch={lastNavOriginMatch || 'none'} | navBlockReason={lastNavBlockReason ? (lastNavBlockReason.length > 30 ? lastNavBlockReason.substring(0, 27) + '...' : lastNavBlockReason) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
         </Text>
       </View>
       
@@ -847,7 +952,8 @@ export default function HomeScreen() {
         <>
           <WebView
             ref={webViewRef}
-            source={{ uri: initialUrlRef.current }}
+            source={{ uri: currentSourceUrl }}
+            key="main-webview"
             style={[
               styles.webview,
               routeState.isSaleDetail && styles.webviewWithFooter

@@ -380,15 +380,16 @@ export default function HomeScreen() {
       setNavStateUrl(url);
       
       // CRITICAL FIX: Update source prop to match actual WebView URL
-      // This prevents mismatch that causes blank pages
-      if (url !== currentSourceUrl) {
-        const updateReason = `navState.url changed: ${currentSourceUrl} → ${url}`;
+      // RELOAD GUARD: Only update if WebView is not currently loading to prevent reload loops
+      // This prevents mismatch that causes blank pages while avoiding thrashing
+      if (url !== currentSourceUrl && !navState.loading) {
+        const updateReason = `navState.url changed: ${currentSourceUrl} → ${url} (not loading)`;
         
         // Track source prop updates for instrumentation
         const historyEntry = { timestamp, url, reason: updateReason };
         sourcePropHistoryRef.current = [...sourcePropHistoryRef.current, historyEntry].slice(-20);
         
-        // Update source prop to match navState.url
+        // Update source prop to match navState.url (only when not loading to prevent reloads)
         setCurrentSourceUrl(url);
         lastSourceUpdateRef.current = timestamp;
         
@@ -406,6 +407,14 @@ export default function HomeScreen() {
           }].slice(-10));
           mismatchStartTimeRef.current = null;
         }
+      } else if (url !== currentSourceUrl && navState.loading) {
+        // URL changed but WebView is loading - defer source prop update until load completes
+        // Track this for instrumentation
+        setWebViewLifecycle(prev => [...prev, {
+          timestamp,
+          event: 'source_update_deferred',
+          url: `deferred: ${currentSourceUrl} → ${url} (loading)`
+        }].slice(-30));
       } else {
         // URLs match - check if there was a previous mismatch that's now resolved
         if (mismatchStartTimeRef.current) {
@@ -427,9 +436,25 @@ export default function HomeScreen() {
     
     // CRITICAL: If navState.loading === false, force clear loading state
     // This is the most reliable way to detect when navigation is complete
+    // Also sync source prop if URL changed during loading (deferred update)
     if (navState.loading === false) {
       stopLoader('navState.loading=false');
       setWebViewLifecycle(prev => [...prev, { timestamp: Date.now(), event: 'load_complete', url }].slice(-30));
+      
+      // RELOAD GUARD: Now that loading is complete, sync source prop if it's still mismatched
+      // This handles cases where URL changed during active load
+      if (url && url !== currentSourceUrl) {
+        const deferredUpdateReason = `navState.url synced after load complete: ${currentSourceUrl} → ${url}`;
+        const historyEntry = { timestamp: Date.now(), url, reason: deferredUpdateReason };
+        sourcePropHistoryRef.current = [...sourcePropHistoryRef.current, historyEntry].slice(-20);
+        setCurrentSourceUrl(url);
+        lastSourceUpdateRef.current = Date.now();
+        setWebViewLifecycle(prev => [...prev, {
+          timestamp: Date.now(),
+          event: 'source_prop_updated_deferred',
+          url
+        }].slice(-30));
+      }
     }
     
     // Route detection: Use navState.url as source of truth (more reliable than window.location.pathname)

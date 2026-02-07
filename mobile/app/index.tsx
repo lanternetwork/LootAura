@@ -5,17 +5,7 @@ import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const LOOTAURA_URL = 'https://lootaura.com/app/sales';
-
-// Extract base origin from LOOTAURA_URL (parse once at module level)
-// Fallback to hardcoded origin if parsing fails (defensive)
-let LOOTAURA_ORIGIN: string;
-try {
-  LOOTAURA_ORIGIN = new URL(LOOTAURA_URL).origin;
-} catch (e) {
-  console.warn('[NATIVE] Failed to parse LOOTAURA_URL, using fallback origin:', e);
-  LOOTAURA_ORIGIN = 'https://lootaura.com';
-}
+const LOOTAURA_URL = 'https://lootaura.com';
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
@@ -25,23 +15,15 @@ export default function HomeScreen() {
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
-  const searchParams = useLocalSearchParams<{ navigateTo?: string; authCallbackUrl?: string }>();
+  const searchParams = useLocalSearchParams<{ navigateTo?: string }>();
   const pendingNavigateToRef = useRef<string | null>(null);
   const lastHandledNavigateToRef = useRef<string | null>(null);
   
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
   
-  // Controlled source - syncs to navState.url to prevent mismatch
-  const [currentSourceUrl, setCurrentSourceUrl] = useState<string>(LOOTAURA_URL);
-  const [navStateUrl, setNavStateUrl] = useState<string>(''); // From onNavigationStateChange
-  
-  // Deep instrumentation: Track source prop changes and mismatches
-  const sourcePropHistoryRef = useRef<Array<{timestamp: number, url: string, reason: string}>>([]);
-  const [sourceSyncMismatches, setSourceSyncMismatches] = useState<Array<{timestamp: number, sourceUrl: string, navStateUrl: string, duration: number}>>([]);
-  const [webViewLifecycle, setWebViewLifecycle] = useState<Array<{timestamp: number, event: string, url?: string, error?: string}>>([]);
-  const lastSourceUpdateRef = useRef<number>(0);
-  const mismatchStartTimeRef = useRef<number | null>(null);
+  // State-driven WebView navigation (replaces injectJavaScript)
+  const [currentUrl, setCurrentUrl] = useState<string>(LOOTAURA_URL);
   
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
@@ -51,24 +33,6 @@ export default function HomeScreen() {
   const [sanitizerRejectionBanner, setSanitizerRejectionBanner] = useState<string>('');
   const [lastNavRequest, setLastNavRequest] = useState<string>('');
   const [lastNavSource, setLastNavSource] = useState<string>('');
-  
-  // Navigation and load diagnostics (HUD-visible)
-  const [lastNavRequestedPath, setLastNavRequestedPath] = useState<string>('');
-  const [lastNavFullUrl, setLastNavFullUrl] = useState<string>('');
-  const [lastNavResolvedOrigin, setLastNavResolvedOrigin] = useState<string>('');
-  const [lastNavOriginMatch, setLastNavOriginMatch] = useState<string>(''); // 'match' | 'mismatch' | 'unknown'
-  const [lastNavBlockReason, setLastNavBlockReason] = useState<string>('');
-  const [lastNavMethod, setLastNavMethod] = useState<string>(''); // 'explicit' | 'fallback' | 'deferred' | 'blocked'
-  const [lastShouldStartRequestUrl, setLastShouldStartRequestUrl] = useState<string>('');
-  const [lastShouldStartDecision, setLastShouldStartDecision] = useState<string>('');
-  const [lastLoadStartUrl, setLastLoadStartUrl] = useState<string>('');
-  const [lastLoadEndUrl, setLastLoadEndUrl] = useState<string>('');
-  const [lastWebViewError, setLastWebViewError] = useState<string>('');
-  const [lastHttpError, setLastHttpError] = useState<string>('');
-  
-  // Navigation diagnostics (HUD-visible, observation only)
-  const [navInitiator, setNavInitiator] = useState<string>(''); // 'native' | 'web/spa' | 'none'
-  const [lastNavEvent, setLastNavEvent] = useState<string>(''); // timestamp + url
   
   // Route state from web (for footer overlay)
   const [routeState, setRouteState] = useState<{
@@ -101,11 +65,6 @@ export default function HomeScreen() {
     vh: number | null;
     y: number | null;
     sh: number | null;
-    contentEnd: number | null;
-    gapAfterContentPx: number | null;
-    mobilePb: string | null;
-    bodyPb: string | null;
-    mainPb: string | null;
   }>({
     bottomEl: null,
     footerH: null,
@@ -115,11 +74,6 @@ export default function HomeScreen() {
     vh: null,
     y: null,
     sh: null,
-    contentEnd: null,
-    gapAfterContentPx: null,
-    mobilePb: null,
-    bodyPb: null,
-    mainPb: null,
   });
 
   // Loader management helpers
@@ -171,115 +125,9 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Handle deep links (excluding OAuth callback which is handled by Expo Router)
-  useEffect(() => {
-    const handleDeepLink = ({ url }: { url: string }) => {
-      try {
-        // Ignore OAuth callback deep links - let Expo Router handle them via /auth/callback route
-        if (url.startsWith('lootaura://auth/callback')) {
-          console.log('[DEEP_LINK] Ignoring OAuth callback - handled by Expo Router');
-          return;
-        }
-
-        // Handle other deep links here if needed in the future
-        console.log('[DEEP_LINK] Unhandled deep link:', url);
-      } catch (e) {
-        console.error('[DEEP_LINK] Failed to handle deep link:', e);
-      }
-    };
-
-    // Handle deep link when app is already open (warm start)
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Handle deep link when app opens from closed state (cold start)
-    // Note: OAuth callback will be handled by Expo Router, so we skip it here
-    Linking.getInitialURL().then((url) => {
-      if (url && !url.startsWith('lootaura://auth/callback')) {
-        handleDeepLink({ url });
-      }
-    }).catch((e) => {
-      console.error('[DEEP_LINK] Failed to get initial URL:', e);
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  // Handle auth callback URL from Expo Router (passed from /auth/callback route)
-  useEffect(() => {
-    if (searchParams.authCallbackUrl) {
-      try {
-        const decodedUrl = decodeURIComponent(searchParams.authCallbackUrl);
-        
-        // Security: Only accept https://lootaura.com/auth/callback URLs
-        const parsedUrl = new URL(decodedUrl);
-        if (parsedUrl.origin !== 'https://lootaura.com' || 
-            !parsedUrl.pathname.startsWith('/auth/callback')) {
-          console.error('[AUTH_CALLBACK] Invalid callback URL origin or path:', decodedUrl);
-          // Clear param even on validation failure
-          router.replace({ pathname: '/', params: {} });
-          return;
-        }
-
-        console.log('[AUTH_CALLBACK] Loading web callback URL in WebView:', decodedUrl);
-        setLastNavAction('auth-callback-from-route');
-        
-        // Navigate to auth callback URL via injectJavaScript (do NOT update source prop)
-        if (webViewRef.current && webViewReady) {
-          try {
-            const escapedUrl = decodedUrl
-              .replace(/\\/g, '\\\\')
-              .replace(/`/g, '\\`')
-              .replace(/'/g, "\\'")
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, '\\n')
-              .replace(/\r/g, '\\r')
-              .replace(/\u2028/g, '\\u2028')
-              .replace(/\u2029/g, '\\u2029');
-            
-            webViewRef.current.injectJavaScript(`
-              (function() {
-                try {
-                  var targetUrl = '${escapedUrl}';
-                  if (window.location.href !== targetUrl) {
-                    window.location.assign(targetUrl);
-                  }
-                  true;
-                } catch (e) {
-                  console.error('[AUTH_CALLBACK] Navigation failed:', e);
-                  false;
-                }
-              })();
-            `);
-            
-            setNavInitiator('native');
-            setLastNavEvent(`${Date.now()}: ${decodedUrl}`);
-            setLastNavMethod('injectJS');
-          } catch (e) {
-            console.error('[AUTH_CALLBACK] injectJavaScript failed:', e);
-          }
-        }
-        startLoader('auth-callback-from-route');
-        
-        // Clear the param deterministically by replacing route with empty params
-        // This ensures the param is removed across all Expo Router versions
-        router.replace({ pathname: '/', params: {} });
-      } catch (e) {
-        console.error('[AUTH_CALLBACK] Failed to process callback URL:', e);
-        setLastNavAction(`auth-callback error: ${e instanceof Error ? e.message : 'unknown'}`);
-        // Clear the param even on error to avoid retry loops
-        router.replace({ pathname: '/', params: {} });
-      }
-    }
-  }, [searchParams.authCallbackUrl, router]);
-
   const handleLoadStart = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
-    const url = nativeEvent?.url || '';
-    
-    // Update diagnostics
-    setLastLoadStartUrl(url);
+    const url = nativeEvent?.url;
     
     // Only start loader if WebView is not ready (initial load) OR if this is a real document load
     // After webViewReady, SPA transitions shouldn't trigger loading state
@@ -292,17 +140,7 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLoadEnd = (syntheticEvent?: any) => {
-    const url = syntheticEvent?.nativeEvent?.url || currentSourceUrl || '';
-    
-    // Update diagnostics
-    setLastLoadEndUrl(url);
-    
-    // Initialize navStateUrl on first load (observation only)
-    if (!navStateUrl && url) {
-      setNavStateUrl(url);
-    }
-    
+  const handleLoadEnd = () => {
     stopLoader('onLoadEnd');
     // Mark WebView as ready after first successful load
     setWebViewReady(true);
@@ -322,42 +160,16 @@ export default function HomeScreen() {
   };
 
   const handleError = (syntheticEvent: any) => {
-    const timestamp = Date.now();
     const { nativeEvent } = syntheticEvent;
-    const errorMsg = nativeEvent?.description || nativeEvent?.message || JSON.stringify(nativeEvent) || 'unknown error';
-    
-    // Deep instrumentation
-    setWebViewLifecycle(prev => [...prev, {
-      timestamp,
-      event: 'webview_error',
-      url: currentSourceUrl,
-      error: errorMsg
-    }].slice(-30));
-    
     console.warn('WebView error: ', nativeEvent);
-    setLastWebViewError(errorMsg);
     stopLoader('onError');
     setError('Failed to load LootAura. Please check your internet connection.');
   };
 
   const handleHttpError = (syntheticEvent: any) => {
-    const timestamp = Date.now();
     const { nativeEvent } = syntheticEvent;
     if (nativeEvent.statusCode >= 400) {
-      const statusCode = nativeEvent.statusCode || 'unknown';
-      const url = nativeEvent?.url || currentSourceUrl || 'unknown';
-      const errorMsg = `HTTP ${statusCode}: ${url}`;
-      
-      // Deep instrumentation
-      setWebViewLifecycle(prev => [...prev, {
-        timestamp,
-        event: 'http_error',
-        url: url,
-        error: `HTTP ${statusCode}`
-      }].slice(-30));
-      
-      setLastHttpError(errorMsg);
-      
+      // Clear timeout on HTTP error
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
         loadTimeoutRef.current = null;
@@ -368,162 +180,36 @@ export default function HomeScreen() {
     }
   };
 
-
   const handleNavigationStateChange = (navState: any) => {
-    const timestamp = Date.now();
-    const url = navState.url || '';
-    
     setCanGoBack(navState.canGoBack);
+    const url = navState.url || '';
     setCurrentWebViewUrl(url);
-    
-    if (url) {
-      setNavStateUrl(url);
-      
-      // CRITICAL FIX: Update source prop to match actual WebView URL
-      // RELOAD GUARD: Only update if WebView is not currently loading to prevent reload loops
-      // This prevents mismatch that causes blank pages while avoiding thrashing
-      if (url !== currentSourceUrl && !navState.loading) {
-        const updateReason = `navState.url changed: ${currentSourceUrl} → ${url} (not loading)`;
-        
-        // Track source prop updates for instrumentation
-        const historyEntry = { timestamp, url, reason: updateReason };
-        sourcePropHistoryRef.current = [...sourcePropHistoryRef.current, historyEntry].slice(-20);
-        
-        // Update source prop to match navState.url (only when not loading to prevent reloads)
-        setCurrentSourceUrl(url);
-        lastSourceUpdateRef.current = timestamp;
-        
-        // Track lifecycle event
-        setWebViewLifecycle(prev => [...prev, { timestamp, event: 'source_prop_updated', url }].slice(-30));
-        
-        // Clear any existing mismatch tracking
-        if (mismatchStartTimeRef.current) {
-          const mismatchDuration = timestamp - mismatchStartTimeRef.current;
-          setSourceSyncMismatches(prev => [...prev, {
-            timestamp: mismatchStartTimeRef.current!,
-            sourceUrl: currentSourceUrl,
-            navStateUrl: url,
-            duration: mismatchDuration
-          }].slice(-10));
-          mismatchStartTimeRef.current = null;
-        }
-      } else if (url !== currentSourceUrl && navState.loading) {
-        // URL changed but WebView is loading - defer source prop update until load completes
-        // Track this for instrumentation
-        setWebViewLifecycle(prev => [...prev, {
-          timestamp,
-          event: 'source_update_deferred',
-          url: `deferred: ${currentSourceUrl} → ${url} (loading)`
-        }].slice(-30));
-      } else {
-        // URLs match - check if there was a previous mismatch that's now resolved
-        if (mismatchStartTimeRef.current) {
-          const mismatchDuration = timestamp - mismatchStartTimeRef.current;
-          setSourceSyncMismatches(prev => [...prev, {
-            timestamp: mismatchStartTimeRef.current!,
-            sourceUrl: currentSourceUrl,
-            navStateUrl: url,
-            duration: mismatchDuration
-          }].slice(-10));
-          mismatchStartTimeRef.current = null;
-        }
-      }
-      
-      // Detect navigation initiator
-      setNavInitiator('web/spa');
-      setLastNavEvent(`${timestamp}: ${url}`);
-    }
     
     // CRITICAL: If navState.loading === false, force clear loading state
     // This is the most reliable way to detect when navigation is complete
-    // Also sync source prop if URL changed during loading (deferred update)
     if (navState.loading === false) {
       stopLoader('navState.loading=false');
-      setWebViewLifecycle(prev => [...prev, { timestamp: Date.now(), event: 'load_complete', url }].slice(-30));
-      
-      // RELOAD GUARD: Now that loading is complete, sync source prop if it's still mismatched
-      // This handles cases where URL changed during active load
-      if (url && url !== currentSourceUrl) {
-        const deferredUpdateReason = `navState.url synced after load complete: ${currentSourceUrl} → ${url}`;
-        const historyEntry = { timestamp: Date.now(), url, reason: deferredUpdateReason };
-        sourcePropHistoryRef.current = [...sourcePropHistoryRef.current, historyEntry].slice(-20);
-        setCurrentSourceUrl(url);
-        lastSourceUpdateRef.current = Date.now();
-        setWebViewLifecycle(prev => [...prev, {
-          timestamp: Date.now(),
-          event: 'source_prop_updated_deferred',
-          url
-        }].slice(-30));
-      }
     }
     
-    // Route detection: Use navState.url as source of truth (more reliable than window.location.pathname)
-    // Extract pathname and search from navState.url and update routeState
-    if (url) {
+    // Track navigation action when URL changes
+    if (url && url !== currentWebViewUrl) {
       try {
         const parsedUrl = new URL(url);
         const pathname = parsedUrl.pathname;
-        const search = parsedUrl.search;
-        
-        // Match both /sales/[id] and /app/sales/[id] pathnames
-        const saleDetailMatch = pathname.match(/^\/(?:app\/)?sales\/([^\/\?]+)/);
-        const isSaleDetail = !!saleDetailMatch;
-        const saleId = isSaleDetail ? saleDetailMatch[1] : null;
-        
-        // Update routeState from navState (source of truth)
-        setRouteState(prev => {
-          // Only update if pathname actually changed to avoid unnecessary re-renders
-          if (prev.pathname !== pathname || prev.isSaleDetail !== isSaleDetail) {
-            return {
-              pathname: pathname,
-              search: search,
-              isSaleDetail: isSaleDetail,
-              saleId: saleId,
-              inAppFlag: prev.inAppFlag, // Keep existing value (set by injected JS)
-              hasRNBridge: prev.hasRNBridge, // Keep existing value (set by injected JS)
-            };
-          }
-          return prev;
-        });
-        
-        // Reset favorite state when leaving sale detail
-        if (!isSaleDetail) {
-          setIsFavorited(false);
-        }
-        
-        // Track navigation action when URL changes
-        if (url !== currentWebViewUrl) {
-          if (pathname.startsWith('/sales') || pathname.startsWith('/app/sales') || pathname === '/') {
-            setLastNavAction(`SPA nav to ${pathname}`);
-          }
+        if (pathname.startsWith('/sales') || pathname === '/') {
+          setLastNavAction(`SPA nav to ${pathname}`);
         }
       } catch (e) {
         // Ignore URL parse errors
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.warn('[NATIVE] Failed to parse URL in handleNavigationStateChange:', e);
-        }
       }
     }
-  };
-
-  // Deep instrumentation: Detect and track source/navState mismatches
-  useEffect(() => {
-    const checkInterval = setInterval(() => {
-      if (currentSourceUrl && navStateUrl && currentSourceUrl !== navStateUrl) {
-        // Mismatch detected
-        if (!mismatchStartTimeRef.current) {
-          mismatchStartTimeRef.current = Date.now();
-          setWebViewLifecycle(prev => [...prev, {
-            timestamp: Date.now(),
-            event: 'mismatch_detected',
-            url: `source=${currentSourceUrl} navState=${navStateUrl}`
-          }].slice(-30));
-        }
-      }
-    }, 500); // Check every 500ms
     
-    return () => clearInterval(checkInterval);
-  }, [currentSourceUrl, navStateUrl]);
+    // After webViewReady, only show loader for real document loads (navState.loading === true)
+    // SPA transitions (pushState) won't have navState.loading === true, so don't start loader
+    if (webViewReady && navState.loading === true && !loading) {
+      startLoader(`navState.loading=true: ${url}`);
+    }
+  };
 
   const handleMessage = (event: any) => {
     try {
@@ -562,11 +248,6 @@ export default function HomeScreen() {
           vh: message.vh !== undefined ? message.vh : null,
           y: message.y !== undefined ? message.y : null,
           sh: message.sh !== undefined ? message.sh : null,
-          contentEnd: message.contentEnd !== undefined ? message.contentEnd : null,
-          gapAfterContentPx: message.gapAfterContentPx !== undefined ? message.gapAfterContentPx : null,
-          mobilePb: message.mobilePb || null,
-          bodyPb: message.bodyPb || null,
-          mainPb: message.mainPb || null,
         });
       } else if (message.type === 'NAVIGATE') {
         // Handle navigation request from header
@@ -603,10 +284,8 @@ export default function HomeScreen() {
   
   const handleShare = async () => {
     try {
-      // Use canonical /sales/ path for share URLs (not /app/sales/)
-      // Share links should always be canonical so they work everywhere
-      const shareUrl = routeState.saleId
-        ? `https://lootaura.com/sales/${routeState.saleId}`
+      const shareUrl = routeState.saleId 
+        ? `https://lootaura.com/sales/${routeState.saleId}` 
         : currentWebViewUrl || 'https://lootaura.com';
       await Share.share({
         message: `Check out this yard sale!\n${shareUrl}`,
@@ -667,7 +346,23 @@ export default function HomeScreen() {
         return null;
       }
       
-      // Origin-based policy: All relative paths are allowed (origin validation happens in executeNavigation)
+      // Allowlist: only allow specific safe paths
+      const allowedPaths = ['/auth', '/favorites', '/sell', '/sales', '/', '/u'];
+      const pathMatch = decodedUrl.split('?')[0].split('#')[0]; // Get path without query/hash
+      
+      // Check if path starts with any allowed path
+      const isAllowed = allowedPaths.some(allowed => {
+        if (allowed === '/') {
+          return pathMatch === '/';
+        }
+        return pathMatch.startsWith(allowed + '/') || pathMatch === allowed;
+      });
+      
+      if (!isAllowed) {
+        setLastSanitizerDecision(`REJECTED: path not in allowlist (${pathMatch})`);
+        return null;
+      }
+      
       // Return sanitized relative path
       setLastSanitizerDecision(`ALLOWED: ${decodedUrl}`);
       return decodedUrl;
@@ -678,139 +373,18 @@ export default function HomeScreen() {
     }
   };
 
-  // Execute navigation using explicit WebView navigation (not state-driven remounting)
+  // Execute navigation using state-driven WebView source (replaces injectJavaScript)
   const executeNavigation = (relativePath: string, source: string) => {
-    // Defensive guard: ensure relativePath starts with /
-    if (!relativePath.startsWith('/')) {
-      console.warn('[NATIVE] Invalid relativePath (must start with /):', relativePath);
-      setLastNavBlockReason('Invalid relativePath (must start with /)');
-      setLastNavMethod('blocked');
-      return;
-    }
-    
-    // Use proper URL resolution (preserves query + hash automatically)
-    // new URL(relativePath, base) resolves relativePath against base origin
-    let fullUrl: string;
-    let resolvedUrl: URL;
-    try {
-      resolvedUrl = new URL(relativePath, LOOTAURA_ORIGIN);
-      fullUrl = resolvedUrl.href; // href includes query + hash
-    } catch (e) {
-      console.error('[NATIVE] Failed to resolve URL:', e);
-      const errorMsg = `URL resolution failed: ${e instanceof Error ? e.message : 'unknown'}`;
-      setLastWebViewError(errorMsg);
-      setLastNavBlockReason(errorMsg);
-      setLastNavMethod('blocked');
-      // DO NOT call setCurrentUrl() - prevents blank page
-      return;
-    }
-    
-    // Origin-based policy: Validate origin matches LOOTAURA_ORIGIN (exact match)
-    const resolvedOrigin = resolvedUrl.origin;
-    const originMatches = resolvedOrigin === LOOTAURA_ORIGIN;
-    
-    // Update diagnostics before validation
-    setLastNavRequestedPath(relativePath);
-    setLastNavFullUrl(fullUrl);
-    setLastNavResolvedOrigin(resolvedOrigin);
-    setLastNavOriginMatch(originMatches ? 'match' : 'mismatch');
-    
-    // Check for dangerous schemes
-    const dangerousSchemes = [
-      'javascript:', 'data:', 'vbscript:', 'file:', 'about:',
-      'chrome:', 'chrome-extension:', 'moz-extension:', 'ms-browser-extension:',
-      'intent:', 'sms:', 'tel:', 'mailto:'
-    ];
-    const lowerUrl = fullUrl.toLowerCase();
-    const hasDangerousScheme = dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme));
-    
-    // Validate origin and scheme before allowing navigation
-    if (!originMatches) {
-      const blockReason = `BLOCKED: wrong origin (${resolvedOrigin}, expected ${LOOTAURA_ORIGIN})`;
-      console.warn('[NATIVE]', blockReason);
-      setLastNavBlockReason(blockReason);
-      setLastNavMethod('blocked');
-      setLastNavAction(`blocked: ${blockReason}`);
-      // DO NOT call setCurrentUrl() - prevents blank page
-      return;
-    }
-    
-    if (hasDangerousScheme) {
-      const blockReason = `BLOCKED: dangerous scheme detected`;
-      console.warn('[NATIVE]', blockReason);
-      setLastNavBlockReason(blockReason);
-      setLastNavMethod('blocked');
-      setLastNavAction(`blocked: ${blockReason}`);
-      // DO NOT call setCurrentUrl() - prevents blank page
-      return;
-    }
-    
-    // Only allow https protocol
-    if (resolvedUrl.protocol !== 'https:') {
-      const blockReason = `BLOCKED: non-HTTPS protocol (${resolvedUrl.protocol})`;
-      console.warn('[NATIVE]', blockReason);
-      setLastNavBlockReason(blockReason);
-      setLastNavMethod('blocked');
-      setLastNavAction(`blocked: ${blockReason}`);
-      // DO NOT call setCurrentUrl() - prevents blank page
-      return;
-    }
-    
-    // Navigation is allowed - clear block reason and update diagnostics
-    setLastNavBlockReason('');
+    // Build full URL
+    const fullUrl = `${LOOTAURA_URL}${relativePath}`;
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     setLastNavAction(`executeNavigation -> ${relativePath}`);
     setLastNavRequest(relativePath);
     setLastNavSource(source);
-    setNavInitiator('native');
-    setLastNavEvent(`${Date.now()}: ${fullUrl}`);
     
-    // HOTFIX: Navigate ONLY via injectJavaScript - do NOT update source prop state
-    if (webViewRef.current && webViewReady) {
-      try {
-        // Escape URL for safe injection (prevent XSS)
-        // Order matters: escape backslashes first, then backticks (template literal delimiter), then quotes, then newlines
-        const escapedUrl = fullUrl
-          .replace(/\\/g, '\\\\')  // Escape backslashes first
-          .replace(/`/g, '\\`')    // Escape backticks (template literal delimiter)
-          .replace(/'/g, "\\'")     // Escape single quotes
-          .replace(/"/g, '\\"')     // Escape double quotes
-          .replace(/\n/g, '\\n')    // Escape newlines
-          .replace(/\r/g, '\\r')    // Escape carriage returns
-          .replace(/\u2028/g, '\\u2028') // Escape line separator
-          .replace(/\u2029/g, '\\u2029'); // Escape paragraph separator
-        
-        // Navigate via injectJavaScript - use window.location.assign for explicit navigation
-        webViewRef.current.injectJavaScript(`
-          (function() {
-            try {
-              var targetUrl = '${escapedUrl}';
-              if (window.location.href !== targetUrl) {
-                window.location.assign(targetUrl);
-              }
-              true; // Required for iOS
-            } catch (e) {
-              console.error('[NATIVE_NAV] Navigation failed:', e);
-              false;
-            }
-          })();
-        `);
-        
-        setLastNavMethod('injectJS');
-        setLastNavAction(`injectJS nav -> ${relativePath}`);
-        console.log('[NATIVE] Navigation injected via injectJavaScript:', fullUrl);
-      } catch (e) {
-        console.error('[NATIVE] injectJavaScript failed:', e);
-        setLastNavMethod('failed');
-        setLastNavAction(`nav failed: ${e instanceof Error ? e.message : 'unknown'}`);
-        setLastWebViewError(`Navigation injection failed: ${e instanceof Error ? e.message : 'unknown'}`);
-      }
-    } else {
-      console.warn('[NATIVE] WebView not ready for navigation');
-      setLastNavMethod('deferred');
-      setLastNavAction(`deferred nav -> ${relativePath} (WebView not ready)`);
-    }
-    
+    // Use state-driven navigation - update currentUrl to trigger WebView reload
+    // This properly triggers onLoadStart/onLoadEnd lifecycle events
+    setCurrentUrl(fullUrl);
     startLoader(`executeNavigation: ${relativePath} (${source})`);
   };
 
@@ -819,55 +393,19 @@ export default function HomeScreen() {
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;
     
-    // Update diagnostics
-    setLastShouldStartRequestUrl(url);
-    
     try {
-      // Parse URL to safely check origin and scheme
+      // Parse URL to safely check hostname and path
       const parsedUrl = new URL(url);
-      const origin = parsedUrl.origin;
       const hostname = parsedUrl.hostname.toLowerCase();
       
-      // Check for dangerous schemes (consistent with executeNavigation)
-      const dangerousSchemes = [
-        'javascript:', 'data:', 'vbscript:', 'file:', 'about:',
-        'chrome:', 'chrome-extension:', 'moz-extension:', 'ms-browser-extension:',
-        'intent:'
-      ];
-      const lowerUrl = url.toLowerCase();
-      const hasDangerousScheme = dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme));
-      
-      if (hasDangerousScheme) {
-        const decision = `BLOCKED: dangerous scheme`;
-        setLastShouldStartDecision(decision);
-        setLastNavAction(`blocked dangerous scheme: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
-        stopLoader('blocked dangerous scheme');
-        return false;
-      }
-      
-      // Origin-based policy: Allow navigation within LOOTAURA_ORIGIN (exact match or subdomain)
+      // Allow navigation within lootaura.com domain (exact match or subdomain)
       // This prevents bypasses like lootaura.com.evil.com
-      const originMatches = origin === LOOTAURA_ORIGIN || hostname.endsWith('.lootaura.com');
-      
-      if (originMatches) {
-        // Only allow https protocol
-        if (parsedUrl.protocol !== 'https:') {
-          const decision = `BLOCKED: non-HTTPS protocol (${parsedUrl.protocol})`;
-          setLastShouldStartDecision(decision);
-          setLastNavAction(`blocked non-HTTPS: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
-          stopLoader('blocked non-HTTPS');
-          return false;
-        }
-        
-        const decision = `ALLOWED: origin match (${origin})`;
-        setLastShouldStartDecision(decision);
+      if (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com')) {
         return true;
       }
       
       // Open external HTTP/HTTPS links in system browser
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
-        const decision = `BLOCKED: external link (${hostname}, origin: ${origin})`;
-        setLastShouldStartDecision(decision);
         setLastNavAction(`blocked external link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
         stopLoader('blocked external link');
@@ -877,8 +415,6 @@ export default function HomeScreen() {
       // If URL parsing fails, check for non-HTTP protocols
       // Allow other protocols (mailto:, tel:, etc.) to open in system apps
       if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
-        const decision = `BLOCKED: protocol link (${url.split(':')[0]})`;
-        setLastShouldStartDecision(decision);
         setLastNavAction(`blocked protocol link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
         stopLoader('blocked protocol link');
@@ -886,12 +422,22 @@ export default function HomeScreen() {
       }
       
       // For relative URLs or invalid URLs, allow them (they'll be resolved by WebView)
-      setLastShouldStartDecision('ALLOWED: relative/invalid URL (will resolve)');
       return true;
     }
     
-    // Default: allow navigation (fallback for any unhandled cases)
-    setLastShouldStartDecision('ALLOWED: default (fallback)');
+    // Allow other protocols (mailto:, tel:, etc.) to open in system apps
+    if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
+      Linking.openURL(url);
+      // Clear loading state since we're blocking (onLoadStart may have fired)
+      setLoading(false);
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+      return false;
+    }
+    
+    // Default: allow navigation (for relative URLs, data URIs, etc.)
     return true;
   };
 
@@ -908,7 +454,7 @@ export default function HomeScreen() {
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | sourceUrl={currentSourceUrl ? (currentSourceUrl.length > 40 ? currentSourceUrl.substring(0, 37) + '...' : currentSourceUrl) : 'none'} | navStateUrl={navStateUrl ? (navStateUrl.length > 40 ? navStateUrl.substring(0, 37) + '...' : navStateUrl) : 'none'} | sourceSync={currentSourceUrl === navStateUrl ? 'SYNCED' : 'MISMATCH'} | mismatchCount={sourceSyncMismatches.length} | lastMismatch={sourceSyncMismatches.length > 0 ? `${Math.round((Date.now() - sourceSyncMismatches[sourceSyncMismatches.length - 1].timestamp) / 1000)}s ago` : 'none'} | sourceUpdates={sourcePropHistoryRef.current.length} | lifecycleEvents={webViewLifecycle.length} | lastLifecycle={webViewLifecycle.length > 0 ? webViewLifecycle[webViewLifecycle.length - 1].event : 'none'} | navInitiator={navInitiator || 'none'} | lastNavEvent={lastNavEvent ? (lastNavEvent.length > 30 ? lastNavEvent.substring(0, 27) + '...' : lastNavEvent) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navOrigin={lastNavResolvedOrigin ? (lastNavResolvedOrigin.length > 30 ? lastNavResolvedOrigin.substring(0, 27) + '...' : lastNavResolvedOrigin) : 'none'} | navOriginMatch={lastNavOriginMatch || 'none'} | navBlockReason={lastNavBlockReason ? (lastNavBlockReason.length > 30 ? lastNavBlockReason.substring(0, 27) + '...' : lastNavBlockReason) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'}
         </Text>
       </View>
       
@@ -931,8 +477,8 @@ export default function HomeScreen() {
         <>
           <WebView
             ref={webViewRef}
-            source={{ uri: currentSourceUrl }}
-            key="main-webview"
+            source={{ uri: currentUrl }}
+            key={currentUrl}
             style={[
               styles.webview,
               routeState.isSaleDetail && styles.webviewWithFooter
@@ -994,86 +540,14 @@ export default function HomeScreen() {
                       // getBoundingClientRect may fail
                     }
                     
-                    // Main container padding-bottom (legacy, kept for compatibility)
+                    // Main container padding-bottom
                     let pb = null;
                     try {
-                      const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
+                      // Find the mobile sale detail wrapper (md:hidden ... pb-[calc(...)] container)
+                      const mobileContainer = document.querySelector('.md\\:hidden');
                       if (mobileContainer) {
                         const computedStyle = window.getComputedStyle(mobileContainer);
                         pb = computedStyle.paddingBottom || null;
-                      }
-                    } catch (e) {
-                      // getComputedStyle may fail
-                    }
-                    
-                    // Content end: bottom of last element child in mobile container (document coordinates)
-                    let contentEnd = null;
-                    try {
-                      const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
-                      if (mobileContainer) {
-                        // Find the last actual element child (skip text nodes)
-                        let lastChild = mobileContainer.lastElementChild;
-                        // If lastElementChild is null, try lastChild and walk back to find element
-                        if (!lastChild) {
-                          let node = mobileContainer.lastChild;
-                          while (node && node.nodeType !== 1) { // Node.ELEMENT_NODE = 1
-                            node = node.previousSibling;
-                          }
-                          lastChild = node;
-                        }
-                        if (lastChild) {
-                          const rect = lastChild.getBoundingClientRect();
-                          contentEnd = rect.bottom + y;
-                        } else {
-                          // If no children, use container bottom
-                          const rect = mobileContainer.getBoundingClientRect();
-                          contentEnd = rect.top + y;
-                        }
-                      }
-                    } catch (e) {
-                      // Measurement may fail
-                    }
-                    
-                    // Gap after content: scrollHeight - contentEnd (definitive blank space metric)
-                    const gapAfterContentPx = contentEnd !== null && sh !== null ? sh - contentEnd : null;
-                    
-                    // Mobile container padding-bottom (computed, in px) - always report value
-                    let mobilePb = null;
-                    try {
-                      const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
-                      if (mobileContainer) {
-                        const computedStyle = window.getComputedStyle(mobileContainer);
-                        const pbValue = computedStyle.paddingBottom;
-                        // Always report the value, even if it's "0px" or a calc()
-                        mobilePb = pbValue || '0px';
-                      }
-                    } catch (e) {
-                      // getComputedStyle may fail
-                    }
-                    
-                    // Body padding-bottom (computed, in px) - always report value
-                    let bodyPb = null;
-                    try {
-                      const body = document.body;
-                      if (body) {
-                        const computedStyle = window.getComputedStyle(body);
-                        const pbValue = computedStyle.paddingBottom;
-                        // Always report the value, even if it's "0px"
-                        bodyPb = pbValue || '0px';
-                      }
-                    } catch (e) {
-                      // getComputedStyle may fail
-                    }
-                    
-                    // Main element padding-bottom (computed, in px) - always report value if element exists
-                    let mainPb = null;
-                    try {
-                      const main = document.querySelector('main');
-                      if (main) {
-                        const computedStyle = window.getComputedStyle(main);
-                        const pbValue = computedStyle.paddingBottom;
-                        // Always report the value, even if it's "0px"
-                        mainPb = pbValue || '0px';
                       }
                     } catch (e) {
                       // getComputedStyle may fail
@@ -1088,12 +562,7 @@ export default function HomeScreen() {
                       pb: pb,
                       vh: vh,
                       y: y,
-                      sh: sh,
-                      contentEnd: contentEnd,
-                      gapAfterContentPx: gapAfterContentPx,
-                      mobilePb: mobilePb,
-                      bodyPb: bodyPb,
-                      mainPb: mainPb
+                      sh: sh
                     }));
                   } catch (e) {
                     // Silently fail if postMessage fails
@@ -1104,8 +573,7 @@ export default function HomeScreen() {
                   try {
                     const pathname = window.location.pathname;
                     const search = window.location.search;
-                    // Match both /sales/[id] and /app/sales/[id] pathnames
-                    const saleDetailMatch = pathname.match(/^\/(?:app\/)?sales\/([^\/\?]+)/);
+                    const saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
                     const isSaleDetail = !!saleDetailMatch;
                     const saleId = isSaleDetail ? saleDetailMatch[1] : null;
                     
@@ -1125,7 +593,7 @@ export default function HomeScreen() {
                       hasRNBridge: hasRNBridge
                     }));
                     
-                    // Report layout diagnostics
+                    // Report layout diagnostics right after route state
                     setTimeout(reportLayoutDiagnostics, 50);
                   } catch (e) {
                     // Silently fail if postMessage fails

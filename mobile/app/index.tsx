@@ -32,7 +32,7 @@ export default function HomeScreen() {
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
   
-  // WebView URL state (used for tracking and fallback navigation)
+  // State-driven WebView navigation (replaces injectJavaScript)
   const [currentUrl, setCurrentUrl] = useState<string>(LOOTAURA_URL);
   
   // Diagnostic HUD state (always visible)
@@ -47,7 +47,6 @@ export default function HomeScreen() {
   // Navigation and load diagnostics (HUD-visible)
   const [lastNavRequestedPath, setLastNavRequestedPath] = useState<string>('');
   const [lastNavFullUrl, setLastNavFullUrl] = useState<string>('');
-  const [lastNavMethod, setLastNavMethod] = useState<string>(''); // 'explicit' | 'fallback' | 'deferred'
   const [lastShouldStartRequestUrl, setLastShouldStartRequestUrl] = useState<string>('');
   const [lastShouldStartDecision, setLastShouldStartDecision] = useState<string>('');
   const [lastLoadStartUrl, setLastLoadStartUrl] = useState<string>('');
@@ -536,7 +535,7 @@ export default function HomeScreen() {
     }
   };
 
-  // Execute navigation using explicit WebView navigation (not state-driven remounting)
+  // Execute navigation using state-driven WebView source (replaces injectJavaScript)
   const executeNavigation = (relativePath: string, source: string) => {
     // Defensive guard: ensure relativePath starts with /
     if (!relativePath.startsWith('/')) {
@@ -565,63 +564,9 @@ export default function HomeScreen() {
     setLastNavRequestedPath(relativePath);
     setLastNavFullUrl(fullUrl);
     
-    // Update state for tracking (even if we use explicit navigation)
+    // Use state-driven navigation - update currentUrl to trigger WebView reload
+    // This properly triggers onLoadStart/onLoadEnd lifecycle events
     setCurrentUrl(fullUrl);
-    
-    // Explicit navigation via WebView ref (preferred method - more reliable than remounting)
-    if (webViewRef.current && webViewReady) {
-      try {
-        // Escape URL for safe injection (prevent XSS)
-        // Order matters: escape backslashes first, then backticks (template literal delimiter), then quotes, then newlines
-        const escapedUrl = fullUrl
-          .replace(/\\/g, '\\\\')  // Escape backslashes first
-          .replace(/`/g, '\\`')    // Escape backticks (template literal delimiter)
-          .replace(/'/g, "\\'")     // Escape single quotes
-          .replace(/"/g, '\\"')     // Escape double quotes
-          .replace(/\n/g, '\\n')    // Escape newlines
-          .replace(/\r/g, '\\r')    // Escape carriage returns
-          .replace(/\u2028/g, '\\u2028') // Escape line separator
-          .replace(/\u2029/g, '\\u2029'); // Escape paragraph separator
-        
-        // Use window.location.href for SPA navigation (Next.js will intercept)
-        // If SPA navigation fails, window.location.replace provides fallback
-        webViewRef.current.injectJavaScript(`
-          (function() {
-            try {
-              var targetUrl = '${escapedUrl}';
-              if (window.location.href !== targetUrl) {
-                window.location.href = targetUrl;
-              }
-            } catch (e) {
-              // Fallback: force full navigation if SPA navigation fails
-              try {
-                window.location.replace('${escapedUrl}');
-              } catch (e2) {
-                console.error('[NATIVE_NAV] Navigation failed:', e2);
-              }
-            }
-            true; // Required for iOS
-          })();
-        `);
-        
-        setLastNavMethod('explicit');
-        setLastNavAction(`explicit nav -> ${relativePath}`);
-        console.log('[NATIVE] Explicit navigation injected:', fullUrl);
-      } catch (e) {
-        // Fallback to state-driven navigation if injection fails
-        console.warn('[NATIVE] injectJavaScript failed, using fallback:', e);
-        setLastNavMethod('fallback');
-        setLastNavAction(`fallback nav -> ${relativePath}`);
-        // State update + key remount will handle it (existing behavior)
-      }
-    } else {
-      // WebView not ready, use state-driven as fallback
-      console.warn('[NATIVE] WebView not ready, using deferred navigation');
-      setLastNavMethod('deferred');
-      setLastNavAction(`deferred nav -> ${relativePath}`);
-      // State update + key remount will handle it when WebView is ready
-    }
-    
     startLoader(`executeNavigation: ${relativePath} (${source})`);
   };
 
@@ -703,7 +648,7 @@ export default function HomeScreen() {
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
         </Text>
       </View>
       

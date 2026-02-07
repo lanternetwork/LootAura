@@ -32,11 +32,12 @@ export default function HomeScreen() {
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
   
-  // HOTFIX: Immutable source - WebView source prop never changes after mount
-  const initialUrlRef = useRef<string>(LOOTAURA_URL);
+  // Navigation state model: Split URL into commanded (native intent) vs observed (WebView reality)
+  // Commanded URL: What native wants the WebView to load (drives source/key)
+  const [commandedUrl, setCommandedUrl] = useState<string>(LOOTAURA_URL);
+  // Observed URL: What the WebView is actually showing (from navState.url)
+  const [observedUrl, setObservedUrl] = useState<string>('');
   
-  // Navigation tracking (observation only - does not drive WebView source)
-  const [navStateUrl, setNavStateUrl] = useState<string>(''); // From onNavigationStateChange
   
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
@@ -61,7 +62,8 @@ export default function HomeScreen() {
   const [lastWebViewError, setLastWebViewError] = useState<string>('');
   const [lastHttpError, setLastHttpError] = useState<string>('');
   
-  // Navigation diagnostics (HUD-visible, observation only)
+  // Navigation state model diagnostics (HUD-visible)
+  const [urlSyncStatus, setUrlSyncStatus] = useState<string>(''); // 'synced' | 'mismatch'
   const [navInitiator, setNavInitiator] = useState<string>(''); // 'native' | 'web/spa' | 'none'
   const [lastNavEvent, setLastNavEvent] = useState<string>(''); // timestamp + url
   
@@ -220,41 +222,10 @@ export default function HomeScreen() {
         console.log('[AUTH_CALLBACK] Loading web callback URL in WebView:', decodedUrl);
         setLastNavAction('auth-callback-from-route');
         
-        // Navigate to auth callback URL via injectJavaScript (do NOT update source prop)
-        if (webViewRef.current && webViewReady) {
-          try {
-            const escapedUrl = decodedUrl
-              .replace(/\\/g, '\\\\')
-              .replace(/`/g, '\\`')
-              .replace(/'/g, "\\'")
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, '\\n')
-              .replace(/\r/g, '\\r')
-              .replace(/\u2028/g, '\\u2028')
-              .replace(/\u2029/g, '\\u2029');
-            
-            webViewRef.current.injectJavaScript(`
-              (function() {
-                try {
-                  var targetUrl = '${escapedUrl}';
-                  if (window.location.href !== targetUrl) {
-                    window.location.assign(targetUrl);
-                  }
-                  true;
-                } catch (e) {
-                  console.error('[AUTH_CALLBACK] Navigation failed:', e);
-                  false;
-                }
-              })();
-            `);
-            
-            setNavInitiator('native');
-            setLastNavEvent(`${Date.now()}: ${decodedUrl}`);
-            setLastNavMethod('injectJS');
-          } catch (e) {
-            console.error('[AUTH_CALLBACK] injectJavaScript failed:', e);
-          }
-        }
+        // Load the web callback URL in WebView (native-initiated navigation)
+        setCommandedUrl(decodedUrl);
+        setNavInitiator('native');
+        setLastNavEvent(`${Date.now()}: ${decodedUrl}`);
         startLoader('auth-callback-from-route');
         
         // Clear the param deterministically by replacing route with empty params
@@ -288,14 +259,17 @@ export default function HomeScreen() {
   };
 
   const handleLoadEnd = (syntheticEvent?: any) => {
-    const url = syntheticEvent?.nativeEvent?.url || initialUrlRef.current || '';
+    const url = syntheticEvent?.nativeEvent?.url || commandedUrl || '';
     
     // Update diagnostics
     setLastLoadEndUrl(url);
     
-    // Initialize navStateUrl on first load (observation only)
-    if (!navStateUrl && url) {
-      setNavStateUrl(url);
+    // Initialize observedUrl and sync commandedUrl on first load if not set
+    // This ensures initial state is synced
+    if (!observedUrl && url) {
+      setObservedUrl(url);
+      setCommandedUrl(url); // Sync source prop to match actual WebView URL
+      setUrlSyncStatus('synced');
     }
     
     stopLoader('onLoadEnd');
@@ -332,7 +306,7 @@ export default function HomeScreen() {
     const { nativeEvent } = syntheticEvent;
     if (nativeEvent.statusCode >= 400) {
       const statusCode = nativeEvent.statusCode || 'unknown';
-      const url = nativeEvent?.url || initialUrlRef.current || 'unknown';
+      const url = nativeEvent?.url || commandedUrl || 'unknown';
       const errorMsg = `HTTP ${statusCode}: ${url}`;
       
       // Update diagnostics
@@ -355,15 +329,26 @@ export default function HomeScreen() {
     const url = navState.url || '';
     setCurrentWebViewUrl(url);
     
-    // HOTFIX: Observation only - track navState.url for HUD diagnostics
-    // Do NOT update any state that affects WebView source prop
+    // CRITICAL: Treat navState.url as source of truth - sync commandedUrl to match it
+    // This ensures WebView source prop always matches what WebView is actually showing
+    // Prevents blank pages from source/actual URL mismatch
     if (url) {
-      setNavStateUrl(url); // Track for HUD only
+      // Always update observedUrl to match navState.url
+      setObservedUrl(url);
       
-      // Detect navigation initiator based on timing/context
-      // (This is diagnostic only, doesn't affect navigation)
-      setNavInitiator('web/spa'); // Default assumption (can be refined if needed)
-      setLastNavEvent(`${Date.now()}: ${url}`);
+      // Sync commandedUrl to match navState.url if they differ
+      // This handles SPA navigation where WebView navigates but commandedUrl wasn't updated
+      // For native navigation, executeNavigation sets commandedUrl first, so they'll match here
+      if (url !== commandedUrl) {
+        setCommandedUrl(url); // Sync source prop to match actual WebView URL
+        // If URLs didn't match, this was likely web-initiated SPA navigation
+        setNavInitiator('web/spa');
+        setLastNavEvent(`${Date.now()}: ${url}`);
+      } else {
+        // URLs match - likely native-initiated (executeNavigation set commandedUrl first)
+        setNavInitiator('native');
+      }
+      setUrlSyncStatus('synced');
     }
     
     // CRITICAL: If navState.loading === false, force clear loading state
@@ -607,9 +592,10 @@ export default function HomeScreen() {
       return;
     }
     
-    // Origin-based policy: Validate origin matches LOOTAURA_ORIGIN (exact match)
+    // Origin-based policy: Validate origin matches LOOTAURA_ORIGIN
     const resolvedOrigin = resolvedUrl.origin;
-    const originMatches = resolvedOrigin === LOOTAURA_ORIGIN;
+    const originMatches = resolvedOrigin === LOOTAURA_ORIGIN || 
+      resolvedUrl.hostname.toLowerCase().endsWith('.lootaura.com');
     
     // Update diagnostics before validation
     setLastNavRequestedPath(relativePath);
@@ -658,16 +644,19 @@ export default function HomeScreen() {
       return;
     }
     
-    // Navigation is allowed - clear block reason and update diagnostics
+    // Navigation is allowed - clear block reason and update state
     setLastNavBlockReason('');
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     setLastNavAction(`executeNavigation -> ${relativePath}`);
     setLastNavRequest(relativePath);
     setLastNavSource(source);
+    
+    // Update commanded URL (native-initiated navigation)
+    setCommandedUrl(fullUrl);
     setNavInitiator('native');
     setLastNavEvent(`${Date.now()}: ${fullUrl}`);
     
-    // HOTFIX: Navigate ONLY via injectJavaScript - do NOT update source prop state
+    // Explicit navigation via WebView ref (preferred method - more reliable than remounting)
     if (webViewRef.current && webViewReady) {
       try {
         // Escape URL for safe injection (prevent XSS)
@@ -682,35 +671,43 @@ export default function HomeScreen() {
           .replace(/\u2028/g, '\\u2028') // Escape line separator
           .replace(/\u2029/g, '\\u2029'); // Escape paragraph separator
         
-        // Navigate via injectJavaScript - use window.location.assign for explicit navigation
+        // Use window.location.href for SPA navigation (Next.js will intercept)
+        // If SPA navigation fails, window.location.replace provides fallback
         webViewRef.current.injectJavaScript(`
           (function() {
             try {
               var targetUrl = '${escapedUrl}';
               if (window.location.href !== targetUrl) {
-                window.location.assign(targetUrl);
+                window.location.href = targetUrl;
               }
-              true; // Required for iOS
             } catch (e) {
-              console.error('[NATIVE_NAV] Navigation failed:', e);
-              false;
+              // Fallback: force full navigation if SPA navigation fails
+              try {
+                window.location.replace('${escapedUrl}');
+              } catch (e2) {
+                console.error('[NATIVE_NAV] Navigation failed:', e2);
+              }
             }
+            true; // Required for iOS
           })();
         `);
         
-        setLastNavMethod('injectJS');
-        setLastNavAction(`injectJS nav -> ${relativePath}`);
-        console.log('[NATIVE] Navigation injected via injectJavaScript:', fullUrl);
+        setLastNavMethod('explicit');
+        setLastNavAction(`explicit nav -> ${relativePath}`);
+        console.log('[NATIVE] Explicit navigation injected:', fullUrl);
       } catch (e) {
-        console.error('[NATIVE] injectJavaScript failed:', e);
-        setLastNavMethod('failed');
-        setLastNavAction(`nav failed: ${e instanceof Error ? e.message : 'unknown'}`);
-        setLastWebViewError(`Navigation injection failed: ${e instanceof Error ? e.message : 'unknown'}`);
+        // Fallback to state-driven navigation if injection fails
+        console.warn('[NATIVE] injectJavaScript failed, using fallback:', e);
+        setLastNavMethod('fallback');
+        setLastNavAction(`fallback nav -> ${relativePath}`);
+        // State update + key remount will handle it (existing behavior)
       }
     } else {
-      console.warn('[NATIVE] WebView not ready for navigation');
+      // WebView not ready, use state-driven as fallback
+      console.warn('[NATIVE] WebView not ready, using deferred navigation');
       setLastNavMethod('deferred');
-      setLastNavAction(`deferred nav -> ${relativePath} (WebView not ready)`);
+      setLastNavAction(`deferred nav -> ${relativePath}`);
+      // State update + key remount will handle it when WebView is ready
     }
     
     startLoader(`executeNavigation: ${relativePath} (${source})`);
@@ -824,7 +821,7 @@ export default function HomeScreen() {
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | sourceUrl={initialUrlRef.current ? (initialUrlRef.current.length > 40 ? initialUrlRef.current.substring(0, 37) + '...' : initialUrlRef.current) : 'none'} | navStateUrl={navStateUrl ? (navStateUrl.length > 40 ? navStateUrl.substring(0, 37) + '...' : navStateUrl) : 'none'} | navInitiator={navInitiator || 'none'} | lastNavEvent={lastNavEvent ? (lastNavEvent.length > 30 ? lastNavEvent.substring(0, 27) + '...' : lastNavEvent) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navOrigin={lastNavResolvedOrigin ? (lastNavResolvedOrigin.length > 30 ? lastNavResolvedOrigin.substring(0, 27) + '...' : lastNavResolvedOrigin) : 'none'} | navOriginMatch={lastNavOriginMatch || 'none'} | navBlockReason={lastNavBlockReason ? (lastNavBlockReason.length > 30 ? lastNavBlockReason.substring(0, 27) + '...' : lastNavBlockReason) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | cmdUrl={commandedUrl ? (commandedUrl.length > 40 ? commandedUrl.substring(0, 37) + '...' : commandedUrl) : 'none'} | obsUrl={observedUrl ? (observedUrl.length > 40 ? observedUrl.substring(0, 37) + '...' : observedUrl) : 'none'} | urlSync={urlSyncStatus || 'none'} | navInitiator={navInitiator || 'none'} | lastNavEvent={lastNavEvent ? (lastNavEvent.length > 30 ? lastNavEvent.substring(0, 27) + '...' : lastNavEvent) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navOrigin={lastNavResolvedOrigin ? (lastNavResolvedOrigin.length > 30 ? lastNavResolvedOrigin.substring(0, 27) + '...' : lastNavResolvedOrigin) : 'none'} | navOriginMatch={lastNavOriginMatch || 'none'} | navBlockReason={lastNavBlockReason ? (lastNavBlockReason.length > 30 ? lastNavBlockReason.substring(0, 27) + '...' : lastNavBlockReason) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
         </Text>
       </View>
       
@@ -847,7 +844,7 @@ export default function HomeScreen() {
         <>
           <WebView
             ref={webViewRef}
-            source={{ uri: initialUrlRef.current }}
+            source={{ uri: commandedUrl }}
             style={[
               styles.webview,
               routeState.isSaleDetail && styles.webviewWithFooter

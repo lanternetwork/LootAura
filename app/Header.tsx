@@ -102,24 +102,6 @@ export function Header() {
   const isEmbed = searchParams.get('embed') === '1'
   const isNativeFooter = searchParams.get('nativeFooter') === '1'
   
-  // Helper to normalize href for Link components when in WebView mode
-  const normalizeHref = useCallback((path: string) => {
-    if (!isNativeFooter) {
-      // Desktop/browser mode - return path as-is
-      return path
-    }
-    
-    // WebView mode - normalize to /app/* namespace
-    if (path === '/app' || path.startsWith('/app/')) {
-      return path
-    } else if (path === '/') {
-      return '/app/sales'
-    } else {
-      // Preserve query string if present
-      return `/app${path}`
-    }
-  }, [isNativeFooter])
-  
   // Helper to send navigation message to native when nativeFooter=1
   // Must be defined before any conditional returns (React Hooks rule)
   const handleNativeNavigation = useCallback((path: string, e?: React.MouseEvent) => {
@@ -175,7 +157,7 @@ export function Header() {
                 </button>
               ) : (
                 <Link
-                  href={normalizeHref(backUrl)}
+                  href={backUrl}
                   onClick={(e) => handleNativeNavigation(backUrl, e)}
                   className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
                   aria-label="Back to sales"
@@ -198,7 +180,7 @@ export function Header() {
               </Link>
             </>
           ) : (
-            <Link ref={logoRef} href={normalizeHref('/')} onClick={(e) => handleNativeNavigation('/', e)} className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
+            <Link ref={logoRef} href="/" onClick={(e) => handleNativeNavigation('/', e)} className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
               <span className="inline-flex items-center justify-center">
                 <img
                   src="/sitelogo.svg"
@@ -213,14 +195,14 @@ export function Header() {
           <div className="flex gap-2 sm:gap-6 items-center shrink-0">
             {/* Main links cluster - Text links for large screens */}
             <div ref={mainRef} className={`${isCollapsed ? 'hidden' : 'hidden lg:flex'} items-center gap-3 sm:gap-6`} aria-label="Main navigation">
-              <Link href={normalizeHref('/sales')} onClick={(e) => handleNativeNavigation('/sales', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Browse Sales</Link>
-              <Link href={normalizeHref('/favorites')} onClick={(e) => handleNativeNavigation('/favorites', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
-              <Link href={normalizeHref('/sell/new')} onClick={(e) => handleNativeNavigation('/sell/new', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
+              <Link href="/sales" onClick={(e) => handleNativeNavigation('/sales', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Browse Sales</Link>
+              <Link href="/favorites" onClick={(e) => handleNativeNavigation('/favorites', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
+              <Link href="/sell/new" onClick={(e) => handleNativeNavigation('/sell/new', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
             </div>
             {/* Main links cluster - Icon buttons for medium screens (when text would be too tight) */}
             <div className={`${isCollapsed ? 'hidden' : 'hidden sm:flex lg:hidden'} items-center gap-1 shrink-0`} aria-label="Main navigation">
               <Link
-                href={normalizeHref('/sales')}
+                href="/sales"
                 onClick={(e) => handleNativeNavigation('/sales', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Browse Sales"
@@ -231,7 +213,7 @@ export function Header() {
                 </svg>
               </Link>
               <Link
-                href={normalizeHref('/favorites')}
+                href="/favorites"
                 onClick={(e) => handleNativeNavigation('/favorites', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Favorites"
@@ -241,7 +223,7 @@ export function Header() {
                 </svg>
               </Link>
               <Link
-                href={normalizeHref('/sell/new')}
+                href="/sell/new"
                 onClick={(e) => handleNativeNavigation('/sell/new', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Post Your Sale"
@@ -255,12 +237,12 @@ export function Header() {
             <div className={`${isCollapsed ? 'hidden' : 'hidden md:block'} h-6 w-px bg-slate-200`} aria-hidden="true"></div>
             {/* Admin links cluster */}
             <div ref={adminRef} className={`${isCollapsed ? 'hidden' : 'hidden md:flex'} items-center gap-3`} aria-label="Account">
-              {hasUser && <Link href={normalizeHref('/dashboard')} onClick={(e) => handleNativeNavigation('/dashboard', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Dashboard</Link>}
+              {hasUser && <Link href="/dashboard" onClick={(e) => handleNativeNavigation('/dashboard', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Dashboard</Link>}
             </div>
             {/* Mobile-only navigation icons */}
             <div className="sm:hidden flex items-center gap-1 shrink-0">
               <Link
-                href={normalizeHref('/sales')}
+                href="/sales"
                 onClick={(e) => handleNativeNavigation('/sales', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Browse Sales"
@@ -271,7 +253,7 @@ export function Header() {
                 </svg>
               </Link>
               <Link
-                href={normalizeHref('/favorites')}
+                href="/favorites"
                 onClick={(e) => handleNativeNavigation('/favorites', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Favorites"
@@ -281,7 +263,7 @@ export function Header() {
                 </svg>
               </Link>
               <Link
-                href={normalizeHref('/sell/new')}
+                href="/sell/new"
                 onClick={(e) => handleNativeNavigation('/sell/new', e)}
                 className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Post Your Sale"
@@ -292,7 +274,7 @@ export function Header() {
               </Link>
               {hasUser && (
                 <Link
-                  href={normalizeHref('/dashboard')}
+                  href="/dashboard"
                   onClick={(e) => handleNativeNavigation('/dashboard', e)}
                   className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                   aria-label="Dashboard"

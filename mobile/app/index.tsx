@@ -47,10 +47,7 @@ export default function HomeScreen() {
   // Navigation and load diagnostics (HUD-visible)
   const [lastNavRequestedPath, setLastNavRequestedPath] = useState<string>('');
   const [lastNavFullUrl, setLastNavFullUrl] = useState<string>('');
-  const [lastNavResolvedOrigin, setLastNavResolvedOrigin] = useState<string>('');
-  const [lastNavOriginMatch, setLastNavOriginMatch] = useState<string>(''); // 'match' | 'mismatch' | 'unknown'
-  const [lastNavBlockReason, setLastNavBlockReason] = useState<string>('');
-  const [lastNavMethod, setLastNavMethod] = useState<string>(''); // 'explicit' | 'fallback' | 'deferred' | 'blocked'
+  const [lastNavMethod, setLastNavMethod] = useState<string>(''); // 'explicit' | 'fallback' | 'deferred'
   const [lastShouldStartRequestUrl, setLastShouldStartRequestUrl] = useState<string>('');
   const [lastShouldStartDecision, setLastShouldStartDecision] = useState<string>('');
   const [lastLoadStartUrl, setLastLoadStartUrl] = useState<string>('');
@@ -512,7 +509,23 @@ export default function HomeScreen() {
         return null;
       }
       
-      // Origin-based policy: All relative paths are allowed (origin validation happens in executeNavigation)
+      // Allowlist: only allow specific safe paths (including /app for native shell)
+      const allowedPaths = ['/auth', '/favorites', '/sell', '/sales', '/app', '/', '/u'];
+      const pathMatch = decodedUrl.split('?')[0].split('#')[0]; // Get path without query/hash
+      
+      // Check if path starts with any allowed path
+      const isAllowed = allowedPaths.some(allowed => {
+        if (allowed === '/') {
+          return pathMatch === '/';
+        }
+        return pathMatch.startsWith(allowed + '/') || pathMatch === allowed;
+      });
+      
+      if (!isAllowed) {
+        setLastSanitizerDecision(`REJECTED: path not in allowlist (${pathMatch})`);
+        return null;
+      }
+      
       // Return sanitized relative path
       setLastSanitizerDecision(`ALLOWED: ${decodedUrl}`);
       return decodedUrl;
@@ -528,88 +541,31 @@ export default function HomeScreen() {
     // Defensive guard: ensure relativePath starts with /
     if (!relativePath.startsWith('/')) {
       console.warn('[NATIVE] Invalid relativePath (must start with /):', relativePath);
-      setLastNavBlockReason('Invalid relativePath (must start with /)');
-      setLastNavMethod('blocked');
       return;
     }
     
     // Use proper URL resolution (preserves query + hash automatically)
     // new URL(relativePath, base) resolves relativePath against base origin
     let fullUrl: string;
-    let resolvedUrl: URL;
     try {
-      resolvedUrl = new URL(relativePath, LOOTAURA_ORIGIN);
+      const resolvedUrl = new URL(relativePath, LOOTAURA_ORIGIN);
       fullUrl = resolvedUrl.href; // href includes query + hash
     } catch (e) {
       console.error('[NATIVE] Failed to resolve URL:', e);
-      const errorMsg = `URL resolution failed: ${e instanceof Error ? e.message : 'unknown'}`;
-      setLastWebViewError(errorMsg);
-      setLastNavBlockReason(errorMsg);
-      setLastNavMethod('blocked');
-      // DO NOT call setCurrentUrl() - prevents blank page
+      setLastWebViewError(`URL resolution failed: ${e instanceof Error ? e.message : 'unknown'}`);
       return;
     }
     
-    // Origin-based policy: Validate origin matches LOOTAURA_ORIGIN
-    const resolvedOrigin = resolvedUrl.origin;
-    const originMatches = resolvedOrigin === LOOTAURA_ORIGIN || 
-      resolvedUrl.hostname.toLowerCase().endsWith('.lootaura.com');
-    
-    // Update diagnostics before validation
-    setLastNavRequestedPath(relativePath);
-    setLastNavFullUrl(fullUrl);
-    setLastNavResolvedOrigin(resolvedOrigin);
-    setLastNavOriginMatch(originMatches ? 'match' : 'mismatch');
-    
-    // Check for dangerous schemes
-    const dangerousSchemes = [
-      'javascript:', 'data:', 'vbscript:', 'file:', 'about:',
-      'chrome:', 'chrome-extension:', 'moz-extension:', 'ms-browser-extension:',
-      'intent:', 'sms:', 'tel:', 'mailto:'
-    ];
-    const lowerUrl = fullUrl.toLowerCase();
-    const hasDangerousScheme = dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme));
-    
-    // Validate origin and scheme before allowing navigation
-    if (!originMatches) {
-      const blockReason = `BLOCKED: wrong origin (${resolvedOrigin}, expected ${LOOTAURA_ORIGIN})`;
-      console.warn('[NATIVE]', blockReason);
-      setLastNavBlockReason(blockReason);
-      setLastNavMethod('blocked');
-      setLastNavAction(`blocked: ${blockReason}`);
-      // DO NOT call setCurrentUrl() - prevents blank page
-      return;
-    }
-    
-    if (hasDangerousScheme) {
-      const blockReason = `BLOCKED: dangerous scheme detected`;
-      console.warn('[NATIVE]', blockReason);
-      setLastNavBlockReason(blockReason);
-      setLastNavMethod('blocked');
-      setLastNavAction(`blocked: ${blockReason}`);
-      // DO NOT call setCurrentUrl() - prevents blank page
-      return;
-    }
-    
-    // Only allow https protocol
-    if (resolvedUrl.protocol !== 'https:') {
-      const blockReason = `BLOCKED: non-HTTPS protocol (${resolvedUrl.protocol})`;
-      console.warn('[NATIVE]', blockReason);
-      setLastNavBlockReason(blockReason);
-      setLastNavMethod('blocked');
-      setLastNavAction(`blocked: ${blockReason}`);
-      // DO NOT call setCurrentUrl() - prevents blank page
-      return;
-    }
-    
-    // Navigation is allowed - clear block reason and update state
-    setLastNavBlockReason('');
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     setLastNavAction(`executeNavigation -> ${relativePath}`);
     setLastNavRequest(relativePath);
     setLastNavSource(source);
     
-    // Update state for tracking (only if navigation is allowed)
+    // Update diagnostics
+    setLastNavRequestedPath(relativePath);
+    setLastNavFullUrl(fullUrl);
+    
+    // Update state for tracking (even if we use explicit navigation)
     setCurrentUrl(fullUrl);
     
     // Explicit navigation via WebView ref (preferred method - more reliable than remounting)
@@ -678,50 +634,20 @@ export default function HomeScreen() {
     setLastShouldStartRequestUrl(url);
     
     try {
-      // Parse URL to safely check origin and scheme
+      // Parse URL to safely check hostname and path
       const parsedUrl = new URL(url);
-      const origin = parsedUrl.origin;
       const hostname = parsedUrl.hostname.toLowerCase();
       
-      // Check for dangerous schemes (consistent with executeNavigation)
-      const dangerousSchemes = [
-        'javascript:', 'data:', 'vbscript:', 'file:', 'about:',
-        'chrome:', 'chrome-extension:', 'moz-extension:', 'ms-browser-extension:',
-        'intent:'
-      ];
-      const lowerUrl = url.toLowerCase();
-      const hasDangerousScheme = dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme));
-      
-      if (hasDangerousScheme) {
-        const decision = `BLOCKED: dangerous scheme`;
-        setLastShouldStartDecision(decision);
-        setLastNavAction(`blocked dangerous scheme: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
-        stopLoader('blocked dangerous scheme');
-        return false;
-      }
-      
-      // Origin-based policy: Allow navigation within LOOTAURA_ORIGIN (exact match or subdomain)
+      // Allow navigation within lootaura.com domain (exact match or subdomain)
       // This prevents bypasses like lootaura.com.evil.com
-      const originMatches = origin === LOOTAURA_ORIGIN || hostname.endsWith('.lootaura.com');
-      
-      if (originMatches) {
-        // Only allow https protocol
-        if (parsedUrl.protocol !== 'https:') {
-          const decision = `BLOCKED: non-HTTPS protocol (${parsedUrl.protocol})`;
-          setLastShouldStartDecision(decision);
-          setLastNavAction(`blocked non-HTTPS: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
-          stopLoader('blocked non-HTTPS');
-          return false;
-        }
-        
-        const decision = `ALLOWED: origin match (${origin})`;
-        setLastShouldStartDecision(decision);
+      if (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com')) {
+        setLastShouldStartDecision('ALLOWED: lootaura.com domain');
         return true;
       }
       
       // Open external HTTP/HTTPS links in system browser
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
-        const decision = `BLOCKED: external link (${hostname}, origin: ${origin})`;
+        const decision = `BLOCKED: external link (${hostname})`;
         setLastShouldStartDecision(decision);
         setLastNavAction(`blocked external link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
@@ -777,7 +703,7 @@ export default function HomeScreen() {
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navOrigin={lastNavResolvedOrigin ? (lastNavResolvedOrigin.length > 30 ? lastNavResolvedOrigin.substring(0, 27) + '...' : lastNavResolvedOrigin) : 'none'} | navOriginMatch={lastNavOriginMatch || 'none'} | navBlockReason={lastNavBlockReason ? (lastNavBlockReason.length > 30 ? lastNavBlockReason.substring(0, 27) + '...' : lastNavBlockReason) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | navReqPath={lastNavRequestedPath ? (lastNavRequestedPath.length > 30 ? lastNavRequestedPath.substring(0, 27) + '...' : lastNavRequestedPath) : 'none'} | navFullUrl={lastNavFullUrl ? (lastNavFullUrl.length > 40 ? lastNavFullUrl.substring(0, 37) + '...' : lastNavFullUrl) : 'none'} | navMethod={lastNavMethod || 'none'} | shouldStartUrl={lastShouldStartRequestUrl ? (lastShouldStartRequestUrl.length > 40 ? lastShouldStartRequestUrl.substring(0, 37) + '...' : lastShouldStartRequestUrl) : 'none'} | shouldStartDec={lastShouldStartDecision ? (lastShouldStartDecision.length > 30 ? lastShouldStartDecision.substring(0, 27) + '...' : lastShouldStartDecision) : 'none'} | loadStartUrl={lastLoadStartUrl ? (lastLoadStartUrl.length > 40 ? lastLoadStartUrl.substring(0, 37) + '...' : lastLoadStartUrl) : 'none'} | loadEndUrl={lastLoadEndUrl ? (lastLoadEndUrl.length > 40 ? lastLoadEndUrl.substring(0, 37) + '...' : lastLoadEndUrl) : 'none'} | webViewErr={lastWebViewError ? (lastWebViewError.length > 30 ? lastWebViewError.substring(0, 27) + '...' : lastWebViewError) : 'none'} | httpErr={lastHttpError ? (lastHttpError.length > 30 ? lastHttpError.substring(0, 27) + '...' : lastHttpError) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | gapAfterContent={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | mobilePb={layoutDiag.mobilePb ? (layoutDiag.mobilePb.length > 20 ? layoutDiag.mobilePb.substring(0, 17) + '...' : layoutDiag.mobilePb) : 'none'} | bodyPb={layoutDiag.bodyPb ? (layoutDiag.bodyPb.length > 20 ? layoutDiag.bodyPb.substring(0, 17) + '...' : layoutDiag.bodyPb) : 'none'} | mainPb={layoutDiag.mainPb ? (layoutDiag.mainPb.length > 20 ? layoutDiag.mainPb.substring(0, 17) + '...' : layoutDiag.mainPb) : 'none'}
         </Text>
       </View>
       

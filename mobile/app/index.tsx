@@ -264,12 +264,10 @@ export default function HomeScreen() {
     // Update diagnostics
     setLastLoadEndUrl(url);
     
-    // Initialize observedUrl and sync commandedUrl on first load if not set
-    // This ensures initial state is synced
+    // Initialize observedUrl on first load if not set
     if (!observedUrl && url) {
       setObservedUrl(url);
-      setCommandedUrl(url); // Sync source prop to match actual WebView URL
-      setUrlSyncStatus('synced');
+      setUrlSyncStatus(url === commandedUrl ? 'synced' : 'mismatch');
     }
     
     stopLoader('onLoadEnd');
@@ -329,25 +327,22 @@ export default function HomeScreen() {
     const url = navState.url || '';
     setCurrentWebViewUrl(url);
     
-    // CRITICAL: Treat navState.url as source of truth - sync commandedUrl to match it
-    // This ensures WebView source prop always matches what WebView is actually showing
-    // Prevents blank pages from source/actual URL mismatch
-    if (url) {
-      // Always update observedUrl to match navState.url
+    // Update observed URL (what WebView is actually showing)
+    if (url && url !== observedUrl) {
       setObservedUrl(url);
       
-      // Sync commandedUrl to match navState.url if they differ
-      // This handles SPA navigation where WebView navigates but commandedUrl wasn't updated
-      // For native navigation, executeNavigation sets commandedUrl first, so they'll match here
+      // Detect navigation initiator: if URL changed but commandedUrl didn't, it's web-initiated
       if (url !== commandedUrl) {
-        setCommandedUrl(url); // Sync source prop to match actual WebView URL
-        // If URLs didn't match, this was likely web-initiated SPA navigation
         setNavInitiator('web/spa');
         setLastNavEvent(`${Date.now()}: ${url}`);
+        setUrlSyncStatus('mismatch');
       } else {
-        // URLs match - likely native-initiated (executeNavigation set commandedUrl first)
+        // URLs match - navigation was native-initiated or already synced
+        setUrlSyncStatus('synced');
         setNavInitiator('native');
       }
+    } else if (url && url === commandedUrl) {
+      // URLs are in sync
       setUrlSyncStatus('synced');
     }
     
@@ -845,6 +840,7 @@ export default function HomeScreen() {
           <WebView
             ref={webViewRef}
             source={{ uri: commandedUrl }}
+            key={commandedUrl}
             style={[
               styles.webview,
               routeState.isSaleDetail && styles.webviewWithFooter

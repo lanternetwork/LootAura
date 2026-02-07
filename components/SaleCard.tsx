@@ -13,10 +13,9 @@ interface SaleCardProps {
   sale: Sale
   className?: string
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
-  baseSalesPath?: string // Base path for sale detail links (default: '/sales')
 }
 
-export default function SaleCard({ sale, className, viewport, baseSalesPath = '/sales' }: SaleCardProps) {
+export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   if (!sale) return null
   const cover = getSaleCoverUrl(sale)
   
@@ -33,8 +32,8 @@ export default function SaleCard({ sale, className, viewport, baseSalesPath = '/
   
   // Build detail page URL with viewport params to restore view on back
   const detailUrl = viewport 
-    ? `${baseSalesPath}/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
-    : `${baseSalesPath}/${sale.id}`
+    ? `/sales/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
+    : `/sales/${sale.id}`
 
   return (
     <article 

@@ -5,7 +5,7 @@ import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const LOOTAURA_URL = 'https://lootaura.com/app/sales';
+const LOOTAURA_URL = 'https://lootaura.com';
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
@@ -284,10 +284,8 @@ export default function HomeScreen() {
   
   const handleShare = async () => {
     try {
-      // Use canonical /sales/ path for share URLs (not /app/sales/)
-      // Share links should always be canonical so they work everywhere
-      const shareUrl = routeState.saleId
-        ? `https://lootaura.com/sales/${routeState.saleId}`
+      const shareUrl = routeState.saleId 
+        ? `https://lootaura.com/sales/${routeState.saleId}` 
         : currentWebViewUrl || 'https://lootaura.com';
       await Share.share({
         message: `Check out this yard sale!\n${shareUrl}`,
@@ -348,8 +346,8 @@ export default function HomeScreen() {
         return null;
       }
       
-      // Allowlist: only allow specific safe paths (including /app for native shell)
-      const allowedPaths = ['/auth', '/favorites', '/sell', '/sales', '/app', '/', '/u'];
+      // Allowlist: only allow specific safe paths
+      const allowedPaths = ['/auth', '/favorites', '/sell', '/sales', '/', '/u'];
       const pathMatch = decodedUrl.split('?')[0].split('#')[0]; // Get path without query/hash
       
       // Check if path starts with any allowed path
@@ -575,8 +573,7 @@ export default function HomeScreen() {
                   try {
                     const pathname = window.location.pathname;
                     const search = window.location.search;
-                    // Match both /sales/[id] and /app/sales/[id] pathnames
-                    const saleDetailMatch = pathname.match(/^\/(?:app\/)?sales\/([^\/\?]+)/);
+                    const saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
                     const isSaleDetail = !!saleDetailMatch;
                     const saleId = isSaleDetail ? saleDetailMatch[1] : null;
                     

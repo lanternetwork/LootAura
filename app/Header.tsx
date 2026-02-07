@@ -17,28 +17,24 @@ export function Header() {
   const adminRef = useRef<HTMLDivElement | null>(null)
   const userRef = useRef<HTMLDivElement | null>(null)
   
-  // Check if we're on a sale detail page (both /sales/[id] and /app/sales/[id])
-  const isSaleDetailPage = (pathname?.startsWith('/sales/') && pathname !== '/sales') ||
-    (pathname?.startsWith('/app/sales/') && pathname !== '/app/sales')
+  // Check if we're on a sale detail page
+  const isSaleDetailPage = pathname?.startsWith('/sales/') && pathname !== '/sales'
   
   // Check if we're on sales page with list view open
   const isSalesPageWithList = pathname === '/sales' && searchParams?.get('view') === 'list'
   
-  // Determine base path for back navigation (use /app/sales if in /app namespace, otherwise /sales)
-  const baseSalesPath = pathname?.startsWith('/app/') ? '/app/sales' : '/sales'
-  
   // Build back URL with viewport params if they exist
   const backUrl = (() => {
-    if (!isSaleDetailPage) return baseSalesPath
+    if (!isSaleDetailPage) return '/sales'
     try {
       const lat = searchParams?.get('lat')
       const lng = searchParams?.get('lng')
       const zoom = searchParams?.get('zoom')
       return lat && lng && zoom
-        ? `${baseSalesPath}?lat=${lat}&lng=${lng}&zoom=${zoom}`
-        : baseSalesPath
+        ? `/sales?lat=${lat}&lng=${lng}&zoom=${zoom}`
+        : '/sales'
     } catch {
-      return baseSalesPath
+      return '/sales'
     }
   })()
   

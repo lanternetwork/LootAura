@@ -135,64 +135,6 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Handle deep links for OAuth callback (lootaura://auth/callback)
-  useEffect(() => {
-    const handleDeepLink = ({ url }: { url: string }) => {
-      try {
-        // Only handle OAuth callback deep links
-        if (!url.startsWith('lootaura://auth/callback')) {
-          return;
-        }
-
-        console.log('[DEEP_LINK] Handling OAuth callback deep link:', url);
-        setLastNavAction(`deep-link: oauth-callback`);
-
-        // Parse the deep link URL
-        const deepLinkUrl = new URL(url);
-        
-        // Convert to web callback URL: https://lootaura.com/auth/callback + query + fragment
-        const webCallbackUrl = new URL('https://lootaura.com/auth/callback');
-        
-        // Preserve all query parameters from deep link
-        deepLinkUrl.searchParams.forEach((value, key) => {
-          webCallbackUrl.searchParams.set(key, value);
-        });
-        
-        // Preserve fragment if present
-        if (deepLinkUrl.hash) {
-          webCallbackUrl.hash = deepLinkUrl.hash;
-        }
-
-        const finalUrl = webCallbackUrl.toString();
-        console.log('[DEEP_LINK] Converting to web URL:', finalUrl);
-        
-        // Navigate WebView to the web callback URL
-        // This allows the web app to complete the Supabase session exchange
-        setCurrentUrl(finalUrl);
-        startLoader('deep-link: oauth-callback');
-      } catch (e) {
-        console.error('[DEEP_LINK] Failed to handle deep link:', e);
-        setLastNavAction(`deep-link error: ${e instanceof Error ? e.message : 'unknown'}`);
-      }
-    };
-
-    // Handle deep link when app is already open (warm start)
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Handle deep link when app opens from closed state (cold start)
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    }).catch((e) => {
-      console.error('[DEEP_LINK] Failed to get initial URL:', e);
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
   const handleLoadStart = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     const url = nativeEvent?.url;
@@ -666,25 +608,9 @@ export default function HomeScreen() {
                     let contentEnd = null;
                     try {
                       const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
-                      if (mobileContainer) {
-                        // Find the last actual element child (skip text nodes)
-                        let lastChild = mobileContainer.lastElementChild;
-                        // If lastElementChild is null, try lastChild and walk back to find element
-                        if (!lastChild) {
-                          let node = mobileContainer.lastChild;
-                          while (node && node.nodeType !== 1) { // Node.ELEMENT_NODE = 1
-                            node = node.previousSibling;
-                          }
-                          lastChild = node;
-                        }
-                        if (lastChild) {
-                          const rect = lastChild.getBoundingClientRect();
-                          contentEnd = rect.bottom + y;
-                        } else {
-                          // If no children, use container bottom
-                          const rect = mobileContainer.getBoundingClientRect();
-                          contentEnd = rect.top + y;
-                        }
+                      if (mobileContainer && mobileContainer.lastElementChild) {
+                        const rect = mobileContainer.lastElementChild.getBoundingClientRect();
+                        contentEnd = rect.bottom + y;
                       }
                     } catch (e) {
                       // Measurement may fail
@@ -693,43 +619,46 @@ export default function HomeScreen() {
                     // Gap after content: scrollHeight - contentEnd (definitive blank space metric)
                     const gapAfterContentPx = contentEnd !== null && sh !== null ? sh - contentEnd : null;
                     
-                    // Mobile container padding-bottom (computed, in px) - always report value
+                    // Mobile container padding-bottom (computed, in px)
                     let mobilePb = null;
                     try {
                       const mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
                       if (mobileContainer) {
                         const computedStyle = window.getComputedStyle(mobileContainer);
                         const pbValue = computedStyle.paddingBottom;
-                        // Always report the value, even if it's "0px" or a calc()
-                        mobilePb = pbValue || '0px';
+                        if (pbValue && pbValue !== '0px') {
+                          mobilePb = pbValue;
+                        }
                       }
                     } catch (e) {
                       // getComputedStyle may fail
                     }
                     
-                    // Body padding-bottom (computed, in px) - always report value
+                    // Body padding-bottom (computed, in px)
                     let bodyPb = null;
                     try {
                       const body = document.body;
                       if (body) {
                         const computedStyle = window.getComputedStyle(body);
                         const pbValue = computedStyle.paddingBottom;
-                        // Always report the value, even if it's "0px"
-                        bodyPb = pbValue || '0px';
+                        if (pbValue && pbValue !== '0px') {
+                          bodyPb = pbValue;
+                        }
                       }
                     } catch (e) {
                       // getComputedStyle may fail
                     }
                     
-                    // Main element padding-bottom (computed, in px) - always report value if element exists
+                    // Main element padding-bottom (computed, in px)
                     let mainPb = null;
                     try {
                       const main = document.querySelector('main');
                       if (main) {
                         const computedStyle = window.getComputedStyle(main);
                         const pbValue = computedStyle.paddingBottom;
-                        // Always report the value, even if it's "0px"
-                        mainPb = pbValue || '0px';
+                        if (pbValue && pbValue !== '0px') {
+                          mainPb = pbValue;
+                        }
                       }
                     } catch (e) {
                       // getComputedStyle may fail

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { isNativeApp } from '@/lib/runtime/isNativeApp'
 
 export default function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false)
@@ -23,13 +22,8 @@ export default function GoogleSignInButton() {
       const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
       
       // Build callback URL with redirectTo as query parameter
-      // In native app, use custom scheme (lootaura://auth/callback) for deep link return
-      // In web browser, use web URL (https://lootaura.com/auth/callback)
-      const isInNativeApp = isNativeApp()
-      const callbackUrl = isInNativeApp
-        ? new URL('lootaura://auth/callback')
-        : new URL(`${window.location.origin}/auth/callback`)
-      
+      // Supabase's redirectTo option preserves query parameters through the OAuth flow
+      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
       if (redirectParam) {
         // URL-encode the redirectTo to preserve nested query params (e.g., /sell/new?resume=promotion)
         callbackUrl.searchParams.set('redirectTo', redirectParam)

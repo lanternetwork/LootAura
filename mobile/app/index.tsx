@@ -896,24 +896,6 @@ export default function HomeScreen() {
       setLastShouldStartDecision('ALLOWED: relative/invalid URL (will resolve)');
       return true;
     }
-    
-    // Allow other protocols (mailto:, tel:, etc.) to open in system apps
-    if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
-      const decision = `BLOCKED: protocol link (${url.split(':')[0]})`;
-      setLastShouldStartDecision(decision);
-      Linking.openURL(url);
-      // Clear loading state since we're blocking (onLoadStart may have fired)
-      setLoading(false);
-      if (loadTimeoutRef.current) {
-        clearTimeout(loadTimeoutRef.current);
-        loadTimeoutRef.current = null;
-      }
-      return false;
-    }
-    
-    // Default: allow navigation (for relative URLs, data URIs, etc.)
-    setLastShouldStartDecision('ALLOWED: default (relative/data URI)');
-    return true;
   };
 
   const handleRetry = () => {

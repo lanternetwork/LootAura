@@ -108,7 +108,23 @@ export function Header() {
     if (isNativeFooter && typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
       e?.preventDefault()
       e?.stopPropagation()
-      const message = { type: 'NAVIGATE', path }
+      
+      // Normalize path to /app/* namespace when in WebView mode
+      // This prevents white-screen freezes from crossing /app/* ↔ /* boundaries
+      let normalizedPath = path
+      if (path === '/app' || path.startsWith('/app/')) {
+        // Already in /app namespace, leave as-is
+        normalizedPath = path
+      } else if (path === '/') {
+        // Root path - normalize to /app/sales (entry point)
+        normalizedPath = '/app/sales'
+      } else {
+        // Prefix with /app (e.g., /favorites → /app/favorites)
+        // Preserve query string if present (path may include ?key=value)
+        normalizedPath = `/app${path}`
+      }
+      
+      const message = { type: 'NAVIGATE', path: normalizedPath }
       ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
       return true
     }

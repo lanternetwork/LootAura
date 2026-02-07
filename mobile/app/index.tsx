@@ -896,10 +896,6 @@ export default function HomeScreen() {
       setLastShouldStartDecision('ALLOWED: relative/invalid URL (will resolve)');
       return true;
     }
-    
-    // Default: allow navigation (fallback for any unhandled cases)
-    setLastShouldStartDecision('ALLOWED: default (fallback)');
-    return true;
   };
 
   const handleRetry = () => {

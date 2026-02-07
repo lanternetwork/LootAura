@@ -524,6 +524,13 @@ export default function HomeScreen() {
     
     return () => clearInterval(checkInterval);
   }, [currentSourceUrl, navStateUrl]);
+    
+    // After webViewReady, only show loader for real document loads (navState.loading === true)
+    // SPA transitions (pushState) won't have navState.loading === true, so don't start loader
+    if (webViewReady && navState.loading === true && !loading) {
+      startLoader(`navState.loading=true: ${url}`);
+    }
+  };
 
   const handleMessage = (event: any) => {
     try {

@@ -663,7 +663,10 @@ export default function SaleDetailClient({
       )}
 
       {/* Mobile Layout */}
-      <div className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : isNativeFooter ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}>
+      <div 
+        data-mobile-sale-detail="true"
+        className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : isNativeFooter ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}
+      >
         {/* Back to map button - Mobile only */}
         <Link
           href={backUrl}
@@ -870,14 +873,14 @@ export default function SaleDetailClient({
 
         {/* Nearby Sales - Mobile */}
         {nearbySales.length > 0 && (
-          <div className="w-full">
+          <div data-sale-detail-content-end="true" className="w-full">
             <NearbySalesCard nearbySales={nearbySales} />
           </div>
         )}
 
         {/* Report Sale Link - Mobile */}
         {currentUser && currentUser.id !== sale.owner_id && (
-          <div className="w-full pt-4 border-t border-gray-200">
+          <div data-sale-detail-content-end="true" className="w-full pt-4 border-t border-gray-200">
             <button
               onClick={() => setIsReportModalOpen(true)}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"

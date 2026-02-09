@@ -65,6 +65,11 @@ export default function HomeScreen() {
     vh: number | null;
     y: number | null;
     sh: number | null;
+    hasMobileContainer: boolean | null;
+    hasEndEl: boolean | null;
+    contentEnd: number | null;
+    gapAfterContentPx: number | null;
+    gapBelowViewportPx: number | null;
   }>({
     bottomEl: null,
     footerH: null,
@@ -74,6 +79,11 @@ export default function HomeScreen() {
     vh: null,
     y: null,
     sh: null,
+    hasMobileContainer: null,
+    hasEndEl: null,
+    contentEnd: null,
+    gapAfterContentPx: null,
+    gapBelowViewportPx: null,
   });
 
   // Loader management helpers
@@ -248,6 +258,11 @@ export default function HomeScreen() {
           vh: message.vh !== undefined ? message.vh : null,
           y: message.y !== undefined ? message.y : null,
           sh: message.sh !== undefined ? message.sh : null,
+          hasMobileContainer: message.hasMobileContainer !== undefined ? message.hasMobileContainer : null,
+          hasEndEl: message.hasEndEl !== undefined ? message.hasEndEl : null,
+          contentEnd: message.contentEnd !== undefined ? message.contentEnd : null,
+          gapAfterContentPx: message.gapAfterContentPx !== undefined ? message.gapAfterContentPx : null,
+          gapBelowViewportPx: message.gapBelowViewportPx !== undefined ? message.gapBelowViewportPx : null,
         });
       } else if (message.type === 'NAVIGATE') {
         // Handle navigation request from header
@@ -454,7 +469,7 @@ export default function HomeScreen() {
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
         <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'}
+          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | hasEndEl={layoutDiag.hasEndEl !== null ? (layoutDiag.hasEndEl ? 'T' : 'F') : '?'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | gapAfter={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | gapBelow={layoutDiag.gapBelowViewportPx !== null ? layoutDiag.gapBelowViewportPx.toFixed(0) : 'none'}
         </Text>
       </View>
       
@@ -506,6 +521,52 @@ export default function HomeScreen() {
                     const vh = window.innerHeight;
                     const y = window.scrollY;
                     const sh = document.documentElement.scrollHeight;
+                    const viewportBottom = y + vh;
+                    
+                    // Select anchored elements using stable data attributes
+                    let mobileContainer = null;
+                    let endEl = null;
+                    let hasMobileContainer = false;
+                    let hasEndEl = false;
+                    
+                    try {
+                      mobileContainer = document.querySelector('[data-mobile-sale-detail="true"]');
+                      hasMobileContainer = mobileContainer !== null;
+                    } catch (e) {
+                      // querySelector may fail
+                    }
+                    
+                    try {
+                      // Find all elements with the content-end marker, prefer the last one in DOM order
+                      const endElements = document.querySelectorAll('[data-sale-detail-content-end="true"]');
+                      if (endElements.length > 0) {
+                        endEl = endElements[endElements.length - 1]; // Last element in DOM order
+                        hasEndEl = true;
+                      }
+                    } catch (e) {
+                      // querySelectorAll may fail
+                    }
+                    
+                    // Compute deterministic gap metrics
+                    let contentEnd = null;
+                    let gapAfterContentPx = null;
+                    let gapBelowViewportPx = null;
+                    
+                    try {
+                      if (endEl) {
+                        const rect = endEl.getBoundingClientRect();
+                        contentEnd = rect.bottom + y;
+                        gapAfterContentPx = Math.max(0, sh - contentEnd);
+                      }
+                    } catch (e) {
+                      // getBoundingClientRect may fail
+                    }
+                    
+                    try {
+                      gapBelowViewportPx = Math.max(0, sh - viewportBottom);
+                    } catch (e) {
+                      // Calculation may fail
+                    }
                     
                     // Bottom hit-test element (element at x = 50% width, y = viewportHeight - small offset)
                     let bottomEl = null;
@@ -543,8 +604,6 @@ export default function HomeScreen() {
                     // Main container padding-bottom
                     let pb = null;
                     try {
-                      // Find the mobile sale detail wrapper (md:hidden ... pb-[calc(...)] container)
-                      const mobileContainer = document.querySelector('.md\\:hidden');
                       if (mobileContainer) {
                         const computedStyle = window.getComputedStyle(mobileContainer);
                         pb = computedStyle.paddingBottom || null;
@@ -562,7 +621,12 @@ export default function HomeScreen() {
                       pb: pb,
                       vh: vh,
                       y: y,
-                      sh: sh
+                      sh: sh,
+                      hasMobileContainer: hasMobileContainer,
+                      hasEndEl: hasEndEl,
+                      contentEnd: contentEnd,
+                      gapAfterContentPx: gapAfterContentPx,
+                      gapBelowViewportPx: gapBelowViewportPx
                     }));
                   } catch (e) {
                     // Silently fail if postMessage fails

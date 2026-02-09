@@ -873,14 +873,14 @@ export default function SaleDetailClient({
 
         {/* Nearby Sales - Mobile */}
         {nearbySales.length > 0 && (
-          <div data-sale-detail-content-end="true" className="w-full">
+          <div className="w-full">
             <NearbySalesCard nearbySales={nearbySales} />
           </div>
         )}
 
         {/* Report Sale Link - Mobile */}
         {currentUser && currentUser.id !== sale.owner_id && (
-          <div data-sale-detail-content-end="true" className="w-full pt-4 border-t border-gray-200">
+          <div className="w-full pt-4 border-t border-gray-200">
             <button
               onClick={() => setIsReportModalOpen(true)}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -889,6 +889,9 @@ export default function SaleDetailClient({
             </button>
           </div>
         )}
+
+        {/* Unconditional end anchor for gap diagnostics */}
+        <div data-sale-detail-content-end="true" style={{ height: 0, overflow: 'hidden' }} aria-hidden="true" />
       </div>
 
       {/* Desktop Layout */}

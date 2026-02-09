@@ -178,7 +178,28 @@ export default function SaleDetailClient({
   // Also check if running inside Expo WebView using centralized runtime detection
   const isNativeFooterParam = searchParams.get('nativeFooter') === '1'
   const isInNativeApp = isNativeApp()
-  const isNativeFooter = isNativeFooterParam || isInNativeApp
+  
+  // Durable client-side latch for native footer detection
+  // Persists across SPA navigation to prevent losing detection when query param is dropped
+  const [hasNativeFooterLatch, setHasNativeFooterLatch] = useState<boolean>(false)
+  
+  // Initialize and maintain the durable latch (client-only)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    // If either signal is true, set the latch
+    if (isNativeFooterParam || isInNativeApp) {
+      sessionStorage.setItem('lootaura_native_footer', '1')
+      setHasNativeFooterLatch(true)
+    } else {
+      // Read existing latch value
+      const stored = sessionStorage.getItem('lootaura_native_footer')
+      setHasNativeFooterLatch(stored === '1')
+    }
+  }, [isNativeFooterParam, isInNativeApp])
+  
+  // Derive isNativeFooter using all three signals (param, runtime detection, durable latch)
+  const isNativeFooter = isNativeFooterParam || isInNativeApp || hasNativeFooterLatch
   
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')

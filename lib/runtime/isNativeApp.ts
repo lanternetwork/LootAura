@@ -5,11 +5,11 @@
  * inside the LootAura Expo app's WebView.
  * 
  * Detection methods (in priority order):
- * 1. window.__LOOTAURA_IN_APP === true (primary contract, set before content loads)
- * 2. window.ReactNativeWebView exists (authoritative WebView bridge presence)
+ * 1. window.ReactNativeWebView exists (authoritative - checked first)
+ * 2. window.__LOOTAURA_IN_APP === true (fallback if bridge not yet available)
  * 
- * The React Native WebView bridge presence is an authoritative signal that
- * the code is running inside a native WebView, regardless of other flags.
+ * The React Native WebView bridge presence is the authoritative signal that
+ * the code is running inside a native WebView. If it exists, return true immediately.
  * 
  * @returns {boolean} true if running in native app WebView, false otherwise
  */
@@ -26,13 +26,14 @@ export function isNativeApp(): boolean {
   }
 
   // Authoritative detection: React Native WebView bridge presence
-  // This is the most reliable signal that we're in a native WebView
-  if (typeof win.ReactNativeWebView !== 'undefined' && 
-      win.ReactNativeWebView !== null) {
+  // If the bridge exists (truthy), we're definitely in a native WebView
+  // Return true immediately - this is the most reliable signal
+  if (win.ReactNativeWebView) {
     return true
   }
 
-  // Primary detection: explicit in-app flag (set before content loads)
+  // Fallback detection: explicit in-app flag (set before content loads)
+  // Only checked if bridge is not present
   if (win.__LOOTAURA_IN_APP === true) {
     return true
   }

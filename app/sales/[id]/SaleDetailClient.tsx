@@ -635,12 +635,14 @@ export default function SaleDetailClient({
   // Footer height: 12px (top) + 44px (button min) + 12px (bottom) = 68px
   // Plus safe area inset (varies by device, typically 0-48px on Android)
   // Use CSS env() for safe-area-inset-bottom to handle device variations
-  const nativeFooterPadding = isNativeFooter 
-    ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' 
+  // Gate desktop padding to md: breakpoint to prevent mobile contribution
+  const desktopNativeFooterPadding = isNativeFooter 
+    ? 'md:pb-[calc(68px+env(safe-area-inset-bottom,0px))]' 
     : ''
+  const desktopEmbedPadding = isEmbed ? 'md:pb-[88px]' : ''
   
   return (
-    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8 ${isEmbed ? 'pb-[88px]' : nativeFooterPadding}`}>
+    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8 ${desktopEmbedPadding} ${desktopNativeFooterPadding}`}>
       {/* Breadcrumb - Desktop only (hidden in embed mode or nativeFooter mode) */}
       {!isEmbed && !isNativeFooter && (
         <nav className="hidden md:block mb-8">

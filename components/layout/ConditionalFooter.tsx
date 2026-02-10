@@ -1,9 +1,9 @@
 'use client'
 
 import { usePathname, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { DesktopFooterAd } from '@/components/ads/AdSlots'
 import { SiteFooter } from '@/components/layout/SiteFooter'
-import { isNativeApp } from '@/lib/runtime/isNativeApp'
 
 /**
  * Conditionally renders the global footer + desktop footer ad.
@@ -12,20 +12,35 @@ import { isNativeApp } from '@/lib/runtime/isNativeApp'
  * visual clutter and accidental navigation while composing a listing.
  * 
  * We also hide the footer entirely when running in native WebView mode
- * (nativeFooter=1 query param or isNativeApp() detection) to eliminate
+ * (nativeFooter=1 query param or ReactNativeWebView bridge detection) to eliminate
  * stacked bottom space and prevent obstruction of the native footer overlay.
+ * 
+ * Uses client-side mount detection to avoid hydration mismatch: renders footer
+ * normally on first render (matching SSR), then removes it immediately after mount
+ * if native WebView is detected.
  */
 export function ConditionalFooter() {
   const pathname = usePathname() || ''
   const searchParams = useSearchParams()
   const isNativeFooter = searchParams.get('nativeFooter') === '1'
   
-  // Use centralized runtime detection (no timing hacks needed)
-  const hideForNativeApp = isNativeApp()
+  // Client-side mount detection to avoid hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Client-only, authoritative native check (only after mount)
+  // window.ReactNativeWebView is the authoritative signal for native WebView context
+  const isNative = mounted && (
+    typeof window !== 'undefined' && 
+    (!!(window as any).ReactNativeWebView || (window as any).__LOOTAURA_IN_APP === true)
+  )
 
   // Hide footer globally when in native WebView mode (authoritative)
   // This eliminates the footer's layout contribution (278px) and prevents stacking with native footer
-  if (isNativeFooter || hideForNativeApp) {
+  // Only apply native removal after mount to avoid hydration mismatch
+  if (mounted && (isNativeFooter || isNative)) {
     return null
   }
 

@@ -62,6 +62,10 @@ export default function HomeScreen() {
     footerTop: number | null;
     footerBottom: number | null;
     pb: string | null;
+    pbSelectorUsed: string | null;
+    pbElDesc: string | null;
+    pbMobileWrapper: string | null;
+    pbOther: string | null;
     vh: number | null;
     y: number | null;
     sh: number | null;
@@ -76,6 +80,10 @@ export default function HomeScreen() {
     footerTop: null,
     footerBottom: null,
     pb: null,
+    pbSelectorUsed: null,
+    pbElDesc: null,
+    pbMobileWrapper: null,
+    pbOther: null,
     vh: null,
     y: null,
     sh: null,
@@ -255,6 +263,10 @@ export default function HomeScreen() {
           footerTop: message.footerTop !== undefined ? message.footerTop : null,
           footerBottom: message.footerBottom !== undefined ? message.footerBottom : null,
           pb: message.pb || null,
+          pbSelectorUsed: message.pbSelectorUsed || null,
+          pbElDesc: message.pbElDesc || null,
+          pbMobileWrapper: message.pbMobileWrapper || null,
+          pbOther: message.pbOther || null,
           vh: message.vh !== undefined ? message.vh : null,
           y: message.y !== undefined ? message.y : null,
           sh: message.sh !== undefined ? message.sh : null,
@@ -468,9 +480,9 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
           {/* Diagnostic HUD - Always visible */}
       <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={20}>
-          index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | hasMobile={layoutDiag.hasMobileContainer !== null ? (layoutDiag.hasMobileContainer ? 'T' : 'F') : '?'} | hasEndEl={layoutDiag.hasEndEl !== null ? (layoutDiag.hasEndEl ? 'T' : 'F') : '?'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | gapAfter={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | gapBelow={layoutDiag.gapBelowViewportPx !== null ? layoutDiag.gapBelowViewportPx.toFixed(0) : 'none'}
-        </Text>
+          <Text style={styles.diagnosticText} numberOfLines={20}>
+            index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | pbSel={layoutDiag.pbSelectorUsed || 'none'} | pbMobile={layoutDiag.pbMobileWrapper ? (layoutDiag.pbMobileWrapper.length > 20 ? layoutDiag.pbMobileWrapper.substring(0, 17) + '...' : layoutDiag.pbMobileWrapper) : 'none'} | pbOther={layoutDiag.pbOther ? (layoutDiag.pbOther.length > 20 ? layoutDiag.pbOther.substring(0, 17) + '...' : layoutDiag.pbOther) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | hasMobile={layoutDiag.hasMobileContainer !== null ? (layoutDiag.hasMobileContainer ? 'T' : 'F') : '?'} | hasEndEl={layoutDiag.hasEndEl !== null ? (layoutDiag.hasEndEl ? 'T' : 'F') : '?'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | gapAfter={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | gapBelow={layoutDiag.gapBelowViewportPx !== null ? layoutDiag.gapBelowViewportPx.toFixed(0) : 'none'}
+          </Text>
       </View>
       
       {/* Sanitizer Rejection Banner - Visible when navigation is rejected */}
@@ -598,15 +610,38 @@ export default function HomeScreen() {
                       // getBoundingClientRect may fail
                     }
                     
-                    // Main container padding-bottom
+                    // Main container padding-bottom with selector tracking
                     let pb = null;
+                    let pbSelectorUsed = null;
+                    let pbElDesc = null;
+                    let pbMobileWrapper = null;
+                    let pbOther = null;
+                    
                     try {
                       if (mobileContainer) {
                         const computedStyle = window.getComputedStyle(mobileContainer);
                         pb = computedStyle.paddingBottom || null;
+                        pbSelectorUsed = '[data-mobile-sale-detail="true"]';
+                        // Build element descriptor: tag#id.class1.class2
+                        const tag = mobileContainer.tagName.toLowerCase();
+                        const id = mobileContainer.id || '';
+                        const classList = mobileContainer.classList ? Array.from(mobileContainer.classList).slice(0, 2).join('.') : '';
+                        pbElDesc = tag + (id ? '#' + id : '') + (classList ? '.' + classList : '');
+                        pbMobileWrapper = pb;
                       }
                     } catch (e) {
                       // getComputedStyle may fail
+                    }
+                    
+                    // Check for other wrapper (max-w-7xl or similar desktop wrapper) that might contribute padding on mobile
+                    try {
+                      const desktopWrapper = document.querySelector('.max-w-7xl');
+                      if (desktopWrapper) {
+                        const computedStyle = window.getComputedStyle(desktopWrapper);
+                        pbOther = computedStyle.paddingBottom || null;
+                      }
+                    } catch (e) {
+                      // querySelector/getComputedStyle may fail
                     }
                     
                     window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -616,6 +651,10 @@ export default function HomeScreen() {
                       footerTop: footerTop,
                       footerBottom: footerBottom,
                       pb: pb,
+                      pbSelectorUsed: pbSelectorUsed,
+                      pbElDesc: pbElDesc,
+                      pbMobileWrapper: pbMobileWrapper,
+                      pbOther: pbOther,
                       vh: vh,
                       y: y,
                       sh: sh,

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lootaura.app",
+      "sha256_cert_fingerprints": [
+        "19A4ACE759E0CB7369179443CAECB094A5D370E8DD8651DC8341A1F798FB5C34"
+      ]
+    }
+  }
+]

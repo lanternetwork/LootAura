@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 
 const LOOTAURA_URL = 'https://lootaura.com';
 
@@ -15,9 +16,13 @@ export default function HomeScreen() {
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
-  const searchParams = useLocalSearchParams<{ navigateTo?: string }>();
+  const searchParams = useLocalSearchParams<{ navigateTo?: string; authCallbackUrl?: string }>();
   const pendingNavigateToRef = useRef<string | null>(null);
   const lastHandledNavigateToRef = useRef<string | null>(null);
+  
+  // Dedupe refs for OAuth callback handling
+  const lastAuthCallbackUrlRef = useRef<string | null>(null);
+  const lastAuthCallbackAtRef = useRef<number | null>(null);
   
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
@@ -142,6 +147,136 @@ export default function HomeScreen() {
       }
     };
   }, []);
+
+  // Handle OAuth callback: Cold start handoff (via router params from auth/callback.tsx)
+  useEffect(() => {
+    const authCallbackUrl = searchParams.authCallbackUrl;
+    if (!authCallbackUrl) {
+      return;
+    }
+
+    try {
+      // Decode the URL
+      const decodedUrl = decodeURIComponent(authCallbackUrl);
+      
+      // Validate the callback URL
+      const validation = validateAuthCallbackUrl(decodedUrl);
+      
+      if (!validation.isValid) {
+        console.log('[OAUTH] Invalid callback URL from router params, ignoring', {
+          origin: validation.origin,
+          pathname: validation.pathname,
+        });
+        // Clear the param to prevent re-processing
+        router.setParams({ authCallbackUrl: undefined });
+        return;
+      }
+
+      // Dedupe check: same URL within 5 seconds
+      const now = Date.now();
+      if (
+        lastAuthCallbackUrlRef.current === decodedUrl &&
+        lastAuthCallbackAtRef.current !== null &&
+        now - lastAuthCallbackAtRef.current < 5000
+      ) {
+        console.log('[OAUTH] Duplicate callback URL within 5s, ignoring');
+        router.setParams({ authCallbackUrl: undefined });
+        return;
+      }
+
+      // Check if WebView is already at this URL
+      if (currentUrl === decodedUrl) {
+        console.log('[OAUTH] WebView already at callback URL, ignoring');
+        router.setParams({ authCallbackUrl: undefined });
+        return;
+      }
+
+      // Valid callback - navigate WebView
+      console.log('[OAUTH] Cold start: navigating WebView to callback URL', {
+        origin: validation.origin,
+        pathname: validation.pathname,
+        hasCodeParam: validation.hasCodeParam,
+      });
+
+      setCurrentUrl(decodedUrl);
+      startLoader('OAuth callback (cold start)');
+      
+      // Update dedupe refs
+      lastAuthCallbackUrlRef.current = decodedUrl;
+      lastAuthCallbackAtRef.current = now;
+      
+      // Clear the param to prevent re-processing
+      router.setParams({ authCallbackUrl: undefined });
+    } catch (error) {
+      console.error('[OAUTH] Error handling cold start callback:', error);
+      router.setParams({ authCallbackUrl: undefined });
+    }
+  }, [searchParams.authCallbackUrl, currentUrl, router]);
+
+  // Handle OAuth callback: Warm start (Linking events when app is already running)
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) {
+        return;
+      }
+
+      // Validate the callback URL
+      const validation = validateAuthCallbackUrl(url);
+      
+      if (!validation.isValid) {
+        // Not an OAuth callback URL - ignore
+        return;
+      }
+
+      // Dedupe check: same URL within 5 seconds
+      const now = Date.now();
+      if (
+        lastAuthCallbackUrlRef.current === url &&
+        lastAuthCallbackAtRef.current !== null &&
+        now - lastAuthCallbackAtRef.current < 5000
+      ) {
+        console.log('[OAUTH] Duplicate callback URL within 5s (warm start), ignoring');
+        return;
+      }
+
+      // Check if WebView is already at this URL
+      if (currentUrl === url) {
+        console.log('[OAUTH] WebView already at callback URL (warm start), ignoring');
+        return;
+      }
+
+      // Valid callback - navigate WebView
+      console.log('[OAUTH] Warm start: navigating WebView to callback URL', {
+        origin: validation.origin,
+        pathname: validation.pathname,
+        hasCodeParam: validation.hasCodeParam,
+      });
+
+      setCurrentUrl(url);
+      startLoader('OAuth callback (warm start)');
+      
+      // Update dedupe refs
+      lastAuthCallbackUrlRef.current = url;
+      lastAuthCallbackAtRef.current = now;
+    };
+
+    // Handle cold start direct opens (if app opens directly to main screen via link)
+    Linking.getInitialURL().then((url) => {
+      // Only handle if it's a callback URL (not already handled by auth/callback.tsx)
+      if (url && url.includes('/auth/callback')) {
+        handleUrl(url);
+      }
+    });
+
+    // Handle warm start (app already running)
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [currentUrl]);
 
   const handleLoadStart = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;

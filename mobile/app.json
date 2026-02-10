@@ -17,11 +17,28 @@
     ],
     "android": {
       "package": "com.lootaura.app",
-      "versionCode": 88,
+      "versionCode": 89,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A2268"
       },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "lootaura.com",
+              "pathPrefix": "/auth/callback"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [],
       "statusBar": {
         "barStyle": "dark-content",
@@ -33,6 +50,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lootaura.app",
+      "associatedDomains": [
+        "applinks:lootaura.com"
+      ],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "LootAura uses your location to show nearby yard sales."
       }

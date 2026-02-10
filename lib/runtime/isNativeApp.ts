@@ -9,12 +9,12 @@
  * 2. window.__LOOTAURA_IN_APP === true (fallback if bridge not yet available)
  * 
  * The React Native WebView bridge presence is the authoritative signal that
- * the code is running inside a native WebView. If it exists, return true immediately.
+ * the code is running inside a native WebView. If it exists (truthy), return true immediately.
  * 
  * @returns {boolean} true if running in native app WebView, false otherwise
  */
 export function isNativeApp(): boolean {
-  // SSR: always return false during server-side rendering
+  // SSR-safe: always return false during server-side rendering
   if (typeof window === 'undefined') {
     return false
   }
@@ -26,8 +26,8 @@ export function isNativeApp(): boolean {
   }
 
   // Authoritative detection: React Native WebView bridge presence
-  // If the bridge exists (truthy), we're definitely in a native WebView
-  // Return true immediately - this is the most reliable signal
+  // If window.ReactNativeWebView exists (truthy), return true immediately
+  // This is the most reliable and authoritative signal for native WebView context
   if (win.ReactNativeWebView) {
     return true
   }

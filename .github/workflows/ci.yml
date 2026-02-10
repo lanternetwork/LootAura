@@ -43,6 +43,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        # Note: actions/checkout@v4 has built-in retry logic for transient GitHub errors
+        # If checkout fails with 500 errors, it will automatically retry with exponential backoff
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
@@ -303,6 +305,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        # Note: actions/checkout@v4 has built-in retry logic for transient GitHub errors
+        # If checkout fails with 500 errors, it will automatically retry with exponential backoff
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4

@@ -5,7 +5,7 @@
       "namespace": "android_app",
       "package_name": "com.lootaura.app",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_EAS_PRODUCTION_KEYSTORE_SHA256_FINGERPRINT"
+        "19A4ACE759E0CB7369179443CAECB094A5D370E8DD8651DC8341A1F798FB5C34"
       ]
     }
   }

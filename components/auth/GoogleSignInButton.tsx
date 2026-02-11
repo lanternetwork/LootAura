@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { isNativeApp } from '@/lib/runtime/isNativeApp'
 
 export default function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false)
@@ -23,13 +24,20 @@ export default function GoogleSignInButton() {
       
       // Build callback URL with redirectTo as query parameter
       // Supabase's redirectTo option preserves query parameters through the OAuth flow
-      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+      // Use /auth/native-callback for native app (Android App Links), /auth/callback for web
+      const isNative = isNativeApp()
+      const callbackPath = isNative ? '/auth/native-callback' : '/auth/callback'
+      const callbackUrl = new URL(`${window.location.origin}${callbackPath}`)
       if (redirectParam) {
         // URL-encode the redirectTo to preserve nested query params (e.g., /sell/new?resume=promotion)
         callbackUrl.searchParams.set('redirectTo', redirectParam)
       }
       
-      console.log('[GOOGLE_AUTH] Starting OAuth with redirectTo:', { redirectParam, callbackUrl: callbackUrl.toString() })
+      console.log('[GOOGLE_AUTH] Starting OAuth with redirectTo:', { 
+        isNative,
+        redirectParam, 
+        callbackUrl: callbackUrl.toString() 
+      })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

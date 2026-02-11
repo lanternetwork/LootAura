@@ -215,23 +215,65 @@ export default function HomeScreen() {
 
   // Handle OAuth callback: Warm start (Linking events when app is already running)
   useEffect(() => {
+    const convertNativeCallbackToWebCallback = (url: string): string | null => {
+      try {
+        const parsedUrl = new URL(url);
+        
+        // Check if this is a native-callback URL that needs conversion
+        if (
+          parsedUrl.protocol === 'https:' &&
+          parsedUrl.hostname === 'lootaura.com' &&
+          (parsedUrl.pathname === '/auth/native-callback' || parsedUrl.pathname.startsWith('/auth/native-callback/'))
+        ) {
+          // Convert to web callback URL
+          const webCallbackUrl = new URL('https://lootaura.com/auth/callback');
+          
+          // Copy all query parameters
+          parsedUrl.searchParams.forEach((value, key) => {
+            webCallbackUrl.searchParams.set(key, value);
+          });
+
+          // Preserve fragment if present
+          if (parsedUrl.hash) {
+            webCallbackUrl.hash = parsedUrl.hash;
+          }
+
+          console.log('[OAUTH] Converting native-callback to web callback (warm start)', {
+            original: parsedUrl.pathname,
+            converted: webCallbackUrl.pathname,
+          });
+
+          return webCallbackUrl.toString();
+        }
+      } catch (e) {
+        // URL parsing failed
+        return null;
+      }
+      
+      return null;
+    };
+
     const handleUrl = (url: string | null) => {
       if (!url) {
         return;
       }
 
-      // Validate the callback URL
-      const validation = validateAuthCallbackUrl(url);
+      // Check if this is a native-callback URL that needs conversion
+      const convertedUrl = convertNativeCallbackToWebCallback(url);
+      const finalUrl = convertedUrl || url;
+
+      // Validate the callback URL (must be /auth/callback after conversion)
+      const validation = validateAuthCallbackUrl(finalUrl);
       
       if (!validation.isValid) {
-        // Not an OAuth callback URL - ignore
+        // Not a valid OAuth callback URL - ignore
         return;
       }
 
       // Dedupe check: same URL within 5 seconds
       const now = Date.now();
       if (
-        lastAuthCallbackUrlRef.current === url &&
+        lastAuthCallbackUrlRef.current === finalUrl &&
         lastAuthCallbackAtRef.current !== null &&
         now - lastAuthCallbackAtRef.current < 5000
       ) {
@@ -240,7 +282,7 @@ export default function HomeScreen() {
       }
 
       // Check if WebView is already at this URL
-      if (currentUrl === url) {
+      if (currentUrl === finalUrl) {
         console.log('[OAUTH] WebView already at callback URL (warm start), ignoring');
         return;
       }
@@ -252,18 +294,18 @@ export default function HomeScreen() {
         hasCodeParam: validation.hasCodeParam,
       });
 
-      setCurrentUrl(url);
+      setCurrentUrl(finalUrl);
       startLoader('OAuth callback (warm start)');
       
       // Update dedupe refs
-      lastAuthCallbackUrlRef.current = url;
+      lastAuthCallbackUrlRef.current = finalUrl;
       lastAuthCallbackAtRef.current = now;
     };
 
     // Handle cold start direct opens (if app opens directly to main screen via link)
     Linking.getInitialURL().then((url) => {
-      // Only handle if it's a callback URL (not already handled by auth/callback.tsx)
-      if (url && url.includes('/auth/callback')) {
+      // Handle both /auth/callback and /auth/native-callback URLs
+      if (url && (url.includes('/auth/callback') || url.includes('/auth/native-callback'))) {
         handleUrl(url);
       }
     });

@@ -17,96 +17,105 @@ export default function NativeCallbackScreen() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the incoming URL from Android App Link
-        // Try multiple sources: router params, Linking.getInitialURL(), or current URL
+        // Deterministic URL retrieval: prioritize Linking.getInitialURL() for cold start
+        // This is the most reliable source for Android App Links
         let incomingUrl: string | null = null;
 
-        // First, try to get from router params (if passed via deep link)
-        if (params.url) {
+        // Primary source: Linking.getInitialURL() for cold start App Link capture
+        incomingUrl = await Linking.getInitialURL();
+
+        // Secondary fallback: Expo Router params (if present)
+        if (!incomingUrl && params.url) {
           incomingUrl = Array.isArray(params.url) ? params.url[0] : params.url;
         }
 
-        // If not in params, try Linking.getInitialURL() for cold start
-        if (!incomingUrl) {
-          incomingUrl = await Linking.getInitialURL();
-        }
-
+        // If both missing, route to / immediately
         if (!incomingUrl) {
           console.log('[NATIVE_CALLBACK] No incoming URL found, redirecting to home');
           router.replace('/');
           return;
         }
 
-        // Strict validation: must be https://lootaura.com/auth/native-callback
+        // Strict validation + conversion in one try/catch block
         let parsedUrl: URL;
+        let webCallbackUrl: URL;
+        
         try {
+          // Parse incoming URL
           parsedUrl = new URL(incomingUrl);
+
+          // Validate protocol (must be https)
+          if (parsedUrl.protocol !== 'https:') {
+            console.log('[NATIVE_CALLBACK] Invalid protocol, redirecting to home');
+            router.replace('/');
+            return;
+          }
+
+          // Validate host (must be lootaura.com)
+          if (parsedUrl.hostname !== 'lootaura.com') {
+            console.log('[NATIVE_CALLBACK] Invalid host, redirecting to home');
+            router.replace('/');
+            return;
+          }
+
+          // Validate pathname (exact match: /auth/native-callback, tolerate trailing slash)
+          const pathname = parsedUrl.pathname;
+          const normalizedPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+          if (normalizedPath !== '/auth/native-callback') {
+            console.log('[NATIVE_CALLBACK] Invalid path, redirecting to home');
+            router.replace('/');
+            return;
+          }
+
+          // Build the web callback URL: /auth/native-callback -> /auth/callback
+          // Preserve all query parameters and fragment
+          webCallbackUrl = new URL('https://lootaura.com/auth/callback');
+          
+          // Copy all query parameters (preserve OAuth code, state, redirectTo, etc.)
+          parsedUrl.searchParams.forEach((value, key) => {
+            webCallbackUrl.searchParams.set(key, value);
+          });
+
+          // Preserve fragment if present
+          if (parsedUrl.hash) {
+            webCallbackUrl.hash = parsedUrl.hash;
+          }
         } catch (e) {
+          // URL parsing or validation failed
           console.log('[NATIVE_CALLBACK] Invalid URL format, redirecting to home');
           router.replace('/');
           return;
         }
 
-        // Validate protocol
-        if (parsedUrl.protocol !== 'https:') {
-          console.log('[NATIVE_CALLBACK] Invalid protocol, redirecting to home', {
-            protocol: parsedUrl.protocol,
-          });
-          router.replace('/');
-          return;
-        }
-
-        // Validate host
-        if (parsedUrl.hostname !== 'lootaura.com') {
-          console.log('[NATIVE_CALLBACK] Invalid hostname, redirecting to home', {
-            hostname: parsedUrl.hostname,
-          });
-          router.replace('/');
-          return;
-        }
-
-        // Validate pathname (exact match or starts with /auth/native-callback)
-        const pathname = parsedUrl.pathname;
-        if (pathname !== '/auth/native-callback' && !pathname.startsWith('/auth/native-callback/')) {
-          console.log('[NATIVE_CALLBACK] Invalid pathname, redirecting to home', {
-            pathname: pathname,
-          });
-          router.replace('/');
-          return;
-        }
-
-        // Convert to real web callback URL: /auth/native-callback -> /auth/callback
-        // Preserve all query parameters and fragment
-        const webCallbackUrl = new URL('https://lootaura.com/auth/callback');
-        
-        // Copy all query parameters
-        parsedUrl.searchParams.forEach((value, key) => {
-          webCallbackUrl.searchParams.set(key, value);
-        });
-
-        // Preserve fragment if present
-        if (parsedUrl.hash) {
-          webCallbackUrl.hash = parsedUrl.hash;
-        }
-
         const finalCallbackUrl = webCallbackUrl.toString();
 
+        // Log only safe information (no query params or sensitive data)
         console.log('[NATIVE_CALLBACK] Converting native callback to web callback', {
-          origin: parsedUrl.origin,
-          pathname: pathname,
+          host: parsedUrl.hostname,
+          path: '/auth/native-callback',
           hasQueryParams: parsedUrl.searchParams.toString().length > 0,
           hasFragment: !!parsedUrl.hash,
         });
 
+        // Safe handoff: encodeURIComponent must be inside try/catch
+        let encodedUrl: string;
+        try {
+          encodedUrl = encodeURIComponent(finalCallbackUrl);
+        } catch (e) {
+          // Encoding failed - route to home
+          console.log('[NATIVE_CALLBACK] URL encoding failed, redirecting to home');
+          router.replace('/');
+          return;
+        }
+
         // Hand off to WebView host with the converted URL
-        const encodedUrl = encodeURIComponent(finalCallbackUrl);
         router.replace({
           pathname: '/',
           params: { authCallbackUrl: encodedUrl },
         });
       } catch (error) {
-        console.error('[NATIVE_CALLBACK] Error handling callback:', error);
-        // On error, redirect to home
+        // Top-level error handler - fail closed to home
+        console.log('[NATIVE_CALLBACK] Error handling callback, redirecting to home');
         router.replace('/');
       }
     };

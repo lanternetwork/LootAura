@@ -4,9 +4,9 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.lootaura.app",
-      "sha256_cert_fingerprints": [
-        "19A4ACE759E0CB7369179443CAECB094A5D370E8DD8651DC8341A1F798FB5C34"
-      ]
+        "sha256_cert_fingerprints": [
+          "19:A4:AC:E7:59:E0:CB:73:69:17:94:43:CA:EC:B0:94:A5:D3:70:E8:DD:86:51:DC:83:41:A1:F7:98:FB:5C:34"
+        ]
     }
   }
 ]

@@ -4,11 +4,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
 /**
  * GET /api/favorites_v2 - Get user favorites
  */
-export async function GET(_request: NextRequest) {
+async function getFavoritesHandler(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     
@@ -46,6 +48,24 @@ export async function GET(_request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * GET /api/favorites_v2 - Get user favorites (rate-limited)
+ * Rate limiting is per-user for authenticated requests, per-IP for unauthenticated
+ */
+export async function GET(request: NextRequest) {
+  // Extract userId for rate limiting (if authenticated)
+  // If not authenticated, rate limiting will fall back to IP-based
+  const supabase = createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  return withRateLimit(
+    getFavoritesHandler,
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    { userId }
+  )(request)
 }
 
 /**

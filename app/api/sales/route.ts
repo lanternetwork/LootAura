@@ -909,7 +909,7 @@ async function salesHandler(request: NextRequest) {
           distance_m: row.distance_m
         }))
       } else {
-        results = salesWithDistance.map((row: any): PublicSale => ({
+        results = paginatedResults.map((row: any): PublicSale => ({
           id: row.id,
           // owner_id removed for security - not exposed in public API
           title: row.title,

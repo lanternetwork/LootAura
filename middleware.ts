@@ -38,7 +38,8 @@ export async function middleware(req: NextRequest) {
       pathname === '/sitemap.xml' ||
       pathname === '/ads.txt' ||
       pathname === '/sw.js' ||
-      pathname.startsWith('/icon')
+      pathname.startsWith('/icon') ||
+      pathname.startsWith('/.well-known/')
     ) {
       return NextResponse.next();
     }
@@ -60,7 +61,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/icons/') ||
     pathname.startsWith('/images/') ||
-    pathname.endsWith('.json') && pathname.startsWith('/')
+    pathname.startsWith('/.well-known/') ||
+    (pathname.endsWith('.json') && pathname.startsWith('/'))
   ) {
     return NextResponse.next()
   }

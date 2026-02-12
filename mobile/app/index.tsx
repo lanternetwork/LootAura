@@ -9,6 +9,8 @@ import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 const LOOTAURA_URL = 'https://lootaura.com';
 
 export default function HomeScreen() {
+  // Gate diagnostic HUD behind environment variable
+  const isNativeHudEnabled = process.env.EXPO_PUBLIC_NATIVE_HUD === '1';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -655,12 +657,14 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-          {/* Diagnostic HUD - Always visible */}
-      <View style={styles.diagnosticHud} pointerEvents="none">
+      {/* Diagnostic HUD - Only visible when EXPO_PUBLIC_NATIVE_HUD=1 */}
+      {isNativeHudEnabled && (
+        <View style={styles.diagnosticHud} pointerEvents="none">
           <Text style={styles.diagnosticText} numberOfLines={20}>
             index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | pbSel={layoutDiag.pbSelectorUsed || 'none'} | pbMobile={layoutDiag.pbMobileWrapper ? (layoutDiag.pbMobileWrapper.length > 20 ? layoutDiag.pbMobileWrapper.substring(0, 17) + '...' : layoutDiag.pbMobileWrapper) : 'none'} | pbOther={layoutDiag.pbOther ? (layoutDiag.pbOther.length > 20 ? layoutDiag.pbOther.substring(0, 17) + '...' : layoutDiag.pbOther) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | hasMobile={layoutDiag.hasMobileContainer !== null ? (layoutDiag.hasMobileContainer ? 'T' : 'F') : '?'} | hasEndEl={layoutDiag.hasEndEl !== null ? (layoutDiag.hasEndEl ? 'T' : 'F') : '?'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | gapAfter={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | gapBelow={layoutDiag.gapBelowViewportPx !== null ? layoutDiag.gapBelowViewportPx.toFixed(0) : 'none'}
           </Text>
-      </View>
+        </View>
+      )}
       
       {/* Sanitizer Rejection Banner - Visible when navigation is rejected */}
       {sanitizerRejectionBanner ? (

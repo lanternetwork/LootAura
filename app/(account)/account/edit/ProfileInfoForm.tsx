@@ -52,8 +52,8 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
     const payload = {
       display_name: formValues.display_name.trim().slice(0, 80) || null,
       bio: formValues.bio.trim().slice(0, 250) || null,
-      city: formValues.city.trim() || null,
-      region: formValues.region.trim() || null,
+      location_city: formValues.city.trim() || '',
+      location_region: formValues.region.trim() || '',
     }
 
     setSaving(true)
@@ -78,8 +78,8 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
         setFormValues({
           display_name: payload.display_name || '',
           bio: payload.bio || '',
-          city: payload.city || '',
-          region: payload.region || '',
+          city: payload.location_city || '',
+          region: payload.location_region || '',
         })
 
         // Notify parent so it can toast and handle navigation

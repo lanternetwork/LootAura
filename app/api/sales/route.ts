@@ -760,9 +760,6 @@ async function salesHandler(request: NextRequest) {
         bboxUsed: actualBbox ? 'viewport' : 'distance-based'
       })
       
-      // Update results with paginated data
-      results = paginatedResults
-      
       // Debug: Log sample sales and their dates
       if (salesWithDistance.length > 0 && process.env.NEXT_PUBLIC_DEBUG === 'true') {
         logger.debug('Sample filtered sales', { 

@@ -4,8 +4,8 @@ on:
   pull_request:
     branches: ["main"]
   push:
-    branches-ignore:
-      - main
+    # Run on all branches (main and feature branches)
+    # No branch filter means it runs on every push
   workflow_dispatch:
 
 permissions:

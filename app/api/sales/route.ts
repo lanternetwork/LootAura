@@ -331,8 +331,14 @@ async function salesHandler(request: NextRequest) {
       }
     }
     
-    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 200)
-    const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0, 0)
+    // Parse and validate pagination parameters
+    const requestedLimit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24
+    const requestedOffset = searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0
+    
+    // Enforce max limit to prevent unbounded queries
+    const maxLimit = 200
+    const limit = Math.min(Math.max(1, requestedLimit), maxLimit)
+    const offset = Math.max(0, requestedOffset)
     
     // Validate date range parameters
     const dateValidation = dateBounds.validateDateRange(startDate, endDate)
@@ -397,6 +403,7 @@ async function salesHandler(request: NextRequest) {
     let results: PublicSale[] = []
     let degraded = false
     let totalSalesCount = 0
+    let totalFilteredCount = 0 // Track total filtered count for pagination
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
     try {
@@ -538,7 +545,9 @@ async function salesHandler(request: NextRequest) {
       }
       
       // Fetch a wider slice to allow client-side distance filtering
-      const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
+      // Account for offset: we need to fetch enough items to cover offset + limit after filtering
+      // Use a multiplier to account for filtering (distance, date) that may reduce results
+      const fetchWindow = Math.min(1000, Math.max((offset + limit) * 3, 200))
       let { data: salesData, error: salesError } = await query
         .order('id', { ascending: true })
         .range(0, fetchWindow - 1)
@@ -734,16 +743,27 @@ async function salesHandler(request: NextRequest) {
                   // Tertiary sort: id (stable)
                   return a.id.localeCompare(b.id)
                 })
-                .slice(offset, offset + limit)
+      
+      // Apply pagination to filtered and sorted results
+      const totalFilteredCount = salesWithDistance.length
+      const paginatedResults = salesWithDistance.slice(offset, offset + limit)
+      const hasMore = offset + limit < totalFilteredCount
       
       logger.debug('Filtered sales by distance', { 
         component: 'sales',
-        count: salesWithDistance.length,
+        totalFiltered: totalFilteredCount,
+        paginatedCount: paginatedResults.length,
+        offset,
+        limit,
+        hasMore,
         distanceKm,
         windowStart, 
         windowEnd,
         bboxUsed: actualBbox ? 'viewport' : 'distance-based'
       })
+      
+      // Update results with paginated data
+      results = paginatedResults
       
       // Debug: Log sample sales and their dates
       if (salesWithDistance.length > 0 && process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -992,14 +1012,24 @@ async function salesHandler(request: NextRequest) {
       }, { status: 500 })
     }
     
-    // 4. Return normalized response
+    // 4. Return normalized response with pagination metadata
+    // Calculate hasMore: if we got exactly limit items and there are more items available
+    const hasMore = results.length === limit && (offset + limit < totalFilteredCount)
+    
     const response: any = {
       ok: true,
       data: results,
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
-      totalCount: totalSalesCount || 0, // Add total database count to response
+      // Pagination metadata
+      pagination: {
+        limit,
+        offset,
+        hasMore,
+        // Note: totalCount is database count before filtering; actual filtered count may be lower
+      },
+      totalCount: totalSalesCount || 0, // Total database count (before filtering)
       durationMs: Date.now() - startedAt
     }
     

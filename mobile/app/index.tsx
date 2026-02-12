@@ -686,7 +686,8 @@ export default function HomeScreen() {
           <WebView
             ref={webViewRef}
             source={{ uri: currentUrl }}
-            key={currentUrl}
+            // Removed key={currentUrl} to prevent full remount on navigation
+            // Navigation is handled via source prop changes, which triggers onLoadStart/onLoadEnd
             style={[
               styles.webview,
               routeState.isSaleDetail && styles.webviewWithFooter

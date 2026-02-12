@@ -10,7 +10,7 @@ import { Policies } from '@/lib/rateLimit/policies'
 /**
  * GET /api/favorites_v2 - Get user favorites
  */
-async function getFavoritesHandler(request: NextRequest) {
+async function getFavoritesHandler(_request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     

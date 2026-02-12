@@ -734,7 +734,8 @@ async function salesHandler(request: NextRequest) {
                   // Tertiary sort: id (stable)
                   return a.id.localeCompare(b.id)
                 })
-                .slice(offset, offset + limit)
+      
+      const salesWithDistanceSliced = salesWithDistance.slice(offset, offset + limit)
       
       logger.debug('Filtered sales by distance', { 
         component: 'sales',
@@ -888,7 +889,7 @@ async function salesHandler(request: NextRequest) {
           distance_m: row.distance_m
         }))
       } else {
-        results = salesWithDistance.map((row: any): PublicSale => ({
+        results = salesWithDistanceSliced.map((row: any): PublicSale => ({
           id: row.id,
           // owner_id removed for security - not exposed in public API
           title: row.title,

@@ -37,32 +37,44 @@ export function isValidSession(session: any): session is SupabaseSession {
 
 /**
  * Create a Supabase server client bound to request cookies
- * Uses service role key for server-side operations
+ * Uses anon key with RLS-aware authentication (respects RLS policies)
+ * 
+ * SECURITY: This function now uses anon key instead of service role to ensure
+ * RLS policies are enforced. Use getAdminDb() from lib/supabase/clients.ts
+ * only for admin-only operations where RLS bypass is explicitly required.
  */
 export function createServerSupabaseClient(cookieStore: ReturnType<typeof cookies>) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options?: CookieOptions }) => {
-              cookieStore.set(name, value, options)
-            })
-          } catch (error) {
-            // Cookie setting can fail in middleware, that's ok
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[AUTH] Cookie setting failed in middleware:', error)
-            }
-          }
-        },
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  
+  if (!url || !anon) {
+    throw new Error('Supabase credentials missing')
+  }
+  
+  return createServerClient(url, anon, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
       },
-    }
-  )
+      setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options?: CookieOptions }) => {
+            cookieStore.set(name, value, options)
+          })
+        } catch (error) {
+          // Cookie setting can fail in middleware, that's ok
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[AUTH] Cookie setting failed in middleware:', error)
+          }
+        }
+      },
+    },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
+  })
 }
 
 /**

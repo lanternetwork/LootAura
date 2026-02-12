@@ -32,12 +32,14 @@ export async function GET(req: Request) {
     // If decoding fails, use as-is
   }
 
-  console.log('[AUTH_CALLBACK] Processing OAuth callback:', {
-    hasCode: !!code,
-    hasError: !!error,
-    redirectTo,
-    url: url.href
-  })
+    // Log only safe metadata - never log full URL or query params (may contain sensitive codes)
+    console.log('[AUTH_CALLBACK] Processing OAuth callback:', {
+      hasCode: !!code,
+      hasError: !!error,
+      redirectTo: redirectTo ? 'present' : 'missing', // Log presence only, not value
+      hostname: url.hostname,
+      pathname: url.pathname
+    })
 
   const cookieStore = cookies()
 

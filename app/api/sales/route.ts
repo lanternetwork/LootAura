@@ -745,9 +745,8 @@ async function salesHandler(request: NextRequest) {
                 })
       
       // Apply pagination to filtered and sorted results
-      const totalFilteredCount = salesWithDistance.length
+      totalFilteredCount = salesWithDistance.length
       const paginatedResults = salesWithDistance.slice(offset, offset + limit)
-      const hasMore = offset + limit < totalFilteredCount
       
       logger.debug('Filtered sales by distance', { 
         component: 'sales',
@@ -755,7 +754,6 @@ async function salesHandler(request: NextRequest) {
         paginatedCount: paginatedResults.length,
         offset,
         limit,
-        hasMore,
         distanceKm,
         windowStart, 
         windowEnd,
@@ -879,8 +877,10 @@ async function salesHandler(request: NextRequest) {
           })
           .filter((row: any) => row.distance_m <= (distanceKm * 1000))
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
-          .slice(0, limit)
+          .slice(offset, offset + limit)
 
+        // Set totalFilteredCount for pagination metadata (before slicing)
+        totalFilteredCount = fallbackFiltered.length
         results = fallbackFiltered.map((row: any): PublicSale => ({
           id: row.id,
           // owner_id removed for security - not exposed in public API

@@ -332,13 +332,19 @@ async function salesHandler(request: NextRequest) {
     }
     
     // Parse and validate pagination parameters
-    const requestedLimit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24
-    const requestedOffset = searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0
+    const defaultLimit = 24
+    const maxLimit = 200
+    const hasLimitParam = searchParams.has('limit')
+    const hasOffsetParam = searchParams.has('offset')
+    const requestedLimit = hasLimitParam ? parseInt(searchParams.get('limit') || String(defaultLimit)) : defaultLimit
+    const requestedOffset = hasOffsetParam ? parseInt(searchParams.get('offset') || '0') : 0
     
     // Enforce max limit to prevent unbounded queries
-    const maxLimit = 200
     const limit = Math.min(Math.max(1, requestedLimit), maxLimit)
     const offset = Math.max(0, requestedOffset)
+    
+    // Determine if we should use new pagination response shape
+    const usePaginationResponse = hasLimitParam || hasOffsetParam
     
     // Validate date range parameters
     const dateValidation = dateBounds.validateDateRange(startDate, endDate)
@@ -1014,19 +1020,25 @@ async function salesHandler(request: NextRequest) {
     // Calculate hasMore: if we got exactly limit items and there are more items available
     const hasMore = results.length === limit && (offset + limit < totalFilteredCount)
     
-    const response: any = {
+    // Backwards compatibility: if limit/offset not provided, return old shape
+    // If limit/offset provided, return new consistent pagination shape
+    const response: any = usePaginationResponse ? {
+      ok: true,
+      items: results,
+      limit,
+      offset,
+      total: totalFilteredCount,
+      hasMore,
+      center: { lat: latitude, lng: longitude },
+      distanceKm,
+      totalCount: totalSalesCount || 0, // Total database count (before filtering)
+      durationMs: Date.now() - startedAt
+    } : {
       ok: true,
       data: results,
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
-      // Pagination metadata
-      pagination: {
-        limit,
-        offset,
-        hasMore,
-        // Note: totalCount is database count before filtering; actual filtered count may be lower
-      },
       totalCount: totalSalesCount || 0, // Total database count (before filtering)
       durationMs: Date.now() - startedAt
     }

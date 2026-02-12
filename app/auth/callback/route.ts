@@ -7,6 +7,9 @@ export async function GET(req: Request) {
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
   
+  // Generate correlation ID for request tracing
+  const correlationId = Math.random().toString(36).substring(2, 15)
+  
   // Resolve redirect destination in priority order:
   // 1) Explicit redirectTo/next query param (if preserved through OAuth)
   // 2) Default fallback (/sales)
@@ -32,14 +35,13 @@ export async function GET(req: Request) {
     // If decoding fails, use as-is
   }
 
-    // Log only safe metadata - never log full URL or query params (may contain sensitive codes)
-    console.log('[AUTH_CALLBACK] Processing OAuth callback:', {
-      hasCode: !!code,
-      hasError: !!error,
-      redirectTo: redirectTo ? 'present' : 'missing', // Log presence only, not value
-      hostname: url.hostname,
-      pathname: url.pathname
-    })
+  // Log only safe metadata - never log full URL, query params, codes, or redirectTo values
+  console.log('[AUTH_CALLBACK] Processing OAuth callback:', {
+    hasCode: !!code,
+    hasError: !!error,
+    pathname: url.pathname,
+    requestId: correlationId
+  })
 
   const cookieStore = cookies()
 
@@ -48,7 +50,6 @@ export async function GET(req: Request) {
   const forwardedProto = req.headers.get('x-forwarded-proto')
   const isHttps = protocol === 'https:' ||
     forwardedProto === 'https' ||
-    url.href.startsWith('https://') ||
     process.env.NODE_ENV === 'production'
 
   const supabase = createServerClient(
@@ -89,28 +90,48 @@ export async function GET(req: Request) {
 
   // Handle OAuth errors
   if (error) {
-    console.log('[AUTH_CALLBACK] OAuth error received:', error)
+    console.log('[AUTH_CALLBACK] OAuth error received', {
+      hasError: true,
+      pathname: url.pathname,
+      requestId: correlationId
+    })
     return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error)}`, url.origin))
   }
 
   // Handle missing authorization code
   if (!code) {
-    console.log('[AUTH_CALLBACK] Missing authorization code')
+    console.log('[AUTH_CALLBACK] Missing authorization code', {
+      hasCode: false,
+      pathname: url.pathname,
+      requestId: correlationId
+    })
     return NextResponse.redirect(new URL('/auth/error?error=missing_code', url.origin))
   }
 
   try {
     // Exchange authorization code for session
-    console.log('[AUTH_CALLBACK] Exchanging code for session...')
+    console.log('[AUTH_CALLBACK] Exchanging code for session', {
+      hasCode: true,
+      pathname: url.pathname,
+      requestId: correlationId
+    })
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (exchangeError) {
-      console.log('[AUTH_CALLBACK] Code exchange failed:', exchangeError.message)
+      console.log('[AUTH_CALLBACK] Code exchange failed', {
+        hasError: true,
+        pathname: url.pathname,
+        requestId: correlationId
+      })
       return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(exchangeError.message)}`, url.origin))
     }
 
     if (data.session) {
-      console.log('[AUTH_CALLBACK] Code exchange successful, user authenticated:', data.session.user.id)
+      console.log('[AUTH_CALLBACK] Code exchange successful', {
+        hasSession: true,
+        pathname: url.pathname,
+        requestId: correlationId
+      })
 
       // Ensure profile exists for the user (idempotent)
       try {
@@ -123,15 +144,24 @@ export async function GET(req: Request) {
 
         if (profileResponse.ok) {
           const profileData = await profileResponse.json()
-          console.log('[AUTH_CALLBACK] Profile ensured:', {
+          console.log('[AUTH_CALLBACK] Profile ensured', {
             created: profileData.created,
-            userId: data.session.user.id
+            pathname: url.pathname,
+            requestId: correlationId
           })
         } else {
-          console.log('[AUTH_CALLBACK] Profile creation failed, but continuing:', profileResponse.status)
+          console.log('[AUTH_CALLBACK] Profile creation failed, but continuing', {
+            status: profileResponse.status,
+            pathname: url.pathname,
+            requestId: correlationId
+          })
         }
       } catch (profileError) {
-        console.log('[AUTH_CALLBACK] Profile creation error, but continuing:', profileError)
+        console.log('[AUTH_CALLBACK] Profile creation error, but continuing', {
+          hasError: true,
+          pathname: url.pathname,
+          requestId: correlationId
+        })
         // Don't fail the auth flow if profile creation fails
       }
 
@@ -141,13 +171,19 @@ export async function GET(req: Request) {
       
       // Security: Ensure redirectTo is a relative path (starts with /) to prevent open redirects
       if (!finalRedirectTo.startsWith('/')) {
-        console.warn('[AUTH_CALLBACK] Invalid redirectTo path (not relative), defaulting to /sales:', finalRedirectTo)
+        console.warn('[AUTH_CALLBACK] Invalid redirectTo path (not relative), defaulting to /sales', {
+          pathname: url.pathname,
+          requestId: correlationId
+        })
         finalRedirectTo = '/sales'
       }
       
       // Security: Prevent redirect loops - never redirect to auth pages
       if (finalRedirectTo.startsWith('/auth/') || finalRedirectTo.startsWith('/login') || finalRedirectTo.startsWith('/signin')) {
-        console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
+        console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default', {
+          pathname: url.pathname,
+          requestId: correlationId
+        })
         finalRedirectTo = '/sales'
       }
       
@@ -155,7 +191,10 @@ export async function GET(req: Request) {
       try {
         const testUrl = new URL(finalRedirectTo, 'http://localhost')
         if (testUrl.origin !== 'http://localhost') {
-          console.warn('[AUTH_CALLBACK] External redirect detected, defaulting to /sales:', finalRedirectTo)
+          console.warn('[AUTH_CALLBACK] External redirect detected, defaulting to /sales', {
+            pathname: url.pathname,
+            requestId: correlationId
+          })
           finalRedirectTo = '/sales'
         }
       } catch (e) {
@@ -176,14 +215,26 @@ export async function GET(req: Request) {
       redirectUrl.searchParams.delete('code')
       redirectUrl.searchParams.delete('error')
 
-      console.log('[AUTH_CALLBACK] Redirecting to:', redirectUrl.toString())
+      console.log('[AUTH_CALLBACK] Redirecting', {
+        hasRedirect: true,
+        pathname: url.pathname,
+        requestId: correlationId
+      })
       return NextResponse.redirect(redirectUrl)
     } else {
-      console.log('[AUTH_CALLBACK] Code exchange succeeded but no session received')
+      console.log('[AUTH_CALLBACK] Code exchange succeeded but no session received', {
+        hasSession: false,
+        pathname: url.pathname,
+        requestId: correlationId
+      })
       return NextResponse.redirect(new URL('/auth/error?error=no_session', url.origin))
     }
   } catch (error) {
-    console.log('[AUTH_CALLBACK] Unexpected error during code exchange:', error)
+    console.log('[AUTH_CALLBACK] Unexpected error during code exchange', {
+      hasError: true,
+      pathname: url.pathname,
+      requestId: correlationId
+    })
     return NextResponse.redirect(new URL('/auth/error?error=exchange_failed', url.origin))
   }
 }

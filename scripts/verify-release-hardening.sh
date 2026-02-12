@@ -1,0 +1,148 @@
+#!/bin/bash
+# Release Hardening Verification Script
+# Checks for common regressions in security, RLS, rate limiting, and logging
+
+set -euo pipefail
+
+ERRORS=0
+WARNINGS=0
+
+echo "🔍 Running release hardening verification..."
+
+# 1. Check for getAdminDb() or SUPABASE_SERVICE_ROLE in request-path files
+echo ""
+echo "1️⃣ Checking for service role usage in request-path handlers..."
+
+REQUEST_PATH_FILES=$(find app/api app/auth middleware lib/auth/server-session.ts -type f \( -name "*.ts" -o -name "*.tsx" \) 2>/dev/null || true)
+
+if [ -z "$REQUEST_PATH_FILES" ]; then
+  echo "⚠️  No request-path files found to check"
+else
+  VIOLATIONS=$(echo "$REQUEST_PATH_FILES" | xargs grep -l "getAdminDb\|SUPABASE_SERVICE_ROLE" 2>/dev/null || true)
+  
+  if [ -n "$VIOLATIONS" ]; then
+    echo "❌ Service role usage found in request-path files:"
+    echo "$VIOLATIONS" | while read -r file; do
+      echo "   - $file"
+      # Check if it's in an allowed context (webhook, admin route, cron, job)
+      if echo "$file" | grep -qE "(webhook|admin|/cron/|/jobs/)" && ! echo "$file" | grep -qE "(middleware|server-session)"; then
+        echo "     ⚠️  Allowed: webhook/admin/cron/job context"
+      else
+        echo "     ❌ BLOCKER: Service role in request-path handler"
+        ERRORS=$((ERRORS + 1))
+      fi
+    done
+  else
+    echo "✅ No service role usage in request-path handlers"
+  fi
+fi
+
+# 2. Check for missing rate limiting on required endpoints
+echo ""
+echo "2️⃣ Checking rate limiting coverage..."
+
+REQUIRED_RATE_LIMITED=(
+  "app/api/sales/route.ts:GET"
+  "app/api/favorites_v2/route.ts:GET"
+  "app/api/profile/update/route.ts:POST"
+)
+
+for endpoint in "${REQUIRED_RATE_LIMITED[@]}"; do
+  file=$(echo "$endpoint" | cut -d: -f1)
+  method=$(echo "$endpoint" | cut -d: -f2)
+  
+  if [ ! -f "$file" ]; then
+    echo "⚠️  File not found: $file"
+    WARNINGS=$((WARNINGS + 1))
+    continue
+  fi
+  
+  # Check if export is wrapped with withRateLimit
+  if grep -q "export.*$method.*=.*withRateLimit" "$file" || grep -q "export.*function $method" "$file" && grep -A5 "export.*function $method" "$file" | grep -q "withRateLimit"; then
+    # Check if handler is actually wrapped
+    if grep -q "withRateLimit" "$file"; then
+      echo "✅ $file:$method is rate-limited"
+    else
+      echo "❌ $file:$method handler exists but may not be wrapped with withRateLimit"
+      ERRORS=$((ERRORS + 1))
+    fi
+  else
+    # Check if it's a handler function that gets wrapped
+    if grep -q "async function.*Handler\|export async function $method" "$file" && grep -q "withRateLimit.*Handler\|withRateLimit.*$method" "$file"; then
+      echo "✅ $file:$method is rate-limited (via handler wrapper)"
+    else
+      echo "❌ $file:$method is NOT rate-limited"
+      ERRORS=$((ERRORS + 1))
+    fi
+  fi
+done
+
+# 3. Check OAuth callback logging for sensitive data
+echo ""
+echo "3️⃣ Checking OAuth callback logging safety..."
+
+OAUTH_CALLBACK_FILES=$(find app/auth -type f -name "*.ts" -path "*/callback/*" 2>/dev/null || true)
+
+if [ -z "$OAUTH_CALLBACK_FILES" ]; then
+  echo "⚠️  No OAuth callback files found"
+  WARNINGS=$((WARNINGS + 1))
+else
+  for file in $OAUTH_CALLBACK_FILES; do
+    # Check for dangerous logging patterns
+    if grep -qE "(url\.href|searchParams\.get\(['\"]code|redirectTo.*log|console\.(log|warn|error).*url)" "$file" 2>/dev/null; then
+      echo "❌ $file: Potentially unsafe logging detected"
+      echo "   Check for: url.href, searchParams.get('code'), or redirectTo in logs"
+      ERRORS=$((ERRORS + 1))
+    else
+      echo "✅ $file: No unsafe logging patterns detected"
+    fi
+  done
+fi
+
+# 4. Verify pagination parameters are handled correctly
+echo ""
+echo "4️⃣ Checking /api/sales pagination implementation..."
+
+if [ -f "app/api/sales/route.ts" ]; then
+  # Check for limit/offset parsing
+  if grep -qE "(limit.*parseInt|offset.*parseInt|maxLimit|defaultLimit)" "app/api/sales/route.ts"; then
+    echo "✅ Pagination parameters (limit/offset) are parsed"
+    
+    # Check for max limit enforcement
+    if grep -qE "Math\.min.*200|maxLimit.*200" "app/api/sales/route.ts"; then
+      echo "✅ Max limit (200) is enforced"
+    else
+      echo "⚠️  Max limit enforcement not clearly visible"
+      WARNINGS=$((WARNINGS + 1))
+    fi
+  else
+    echo "❌ Pagination parameters not found in /api/sales"
+    ERRORS=$((ERRORS + 1))
+  fi
+else
+  echo "⚠️  app/api/sales/route.ts not found"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# Summary
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 Verification Summary"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Errors: $ERRORS"
+echo "Warnings: $WARNINGS"
+
+if [ $ERRORS -gt 0 ]; then
+  echo ""
+  echo "❌ Release hardening verification FAILED"
+  echo "   Fix the errors above before proceeding with release"
+  exit 1
+elif [ $WARNINGS -gt 0 ]; then
+  echo ""
+  echo "⚠️  Release hardening verification passed with warnings"
+  exit 0
+else
+  echo ""
+  echo "✅ Release hardening verification PASSED"
+  exit 0
+fi

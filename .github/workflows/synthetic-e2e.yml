@@ -2,7 +2,8 @@ name: Synthetic E2E Tests
 
 on:
   push:
-    branches: [main]
+    # Run on all branches (main and feature branches)
+    # No branch filter means it runs on every push
   pull_request:
     branches: [main]
   schedule:
@@ -13,6 +14,10 @@ permissions:
   contents: read
   security-events: write
   actions: read
+
+concurrency:
+  group: synthetic-e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   synthetic-e2e:

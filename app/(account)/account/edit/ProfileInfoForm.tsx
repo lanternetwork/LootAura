@@ -78,8 +78,8 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
         setFormValues({
           display_name: payload.display_name || '',
           bio: payload.bio || '',
-          city: payload.city || '',
-          region: payload.region || '',
+          city: payload.location_city || '',
+          region: payload.location_region || '',
         })
 
         // Notify parent so it can toast and handle navigation

@@ -5,7 +5,8 @@ on:
     # Run on all branches (main and feature branches)
     # No branch filter means it runs on every push
   pull_request:
-    branches: [main]
+    # Run on all pull requests (targeting any branch)
+    # No branch filter means it runs on every PR
   schedule:
     # Run every 6 hours
     - cron: '0 */6 * * *'

@@ -877,11 +877,12 @@ async function salesHandler(request: NextRequest) {
           })
           .filter((row: any) => row.distance_m <= (distanceKm * 1000))
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
-          .slice(offset, offset + limit)
 
         // Set totalFilteredCount for pagination metadata (before slicing)
         totalFilteredCount = fallbackFiltered.length
-        results = fallbackFiltered.map((row: any): PublicSale => ({
+        const paginatedFallback = fallbackFiltered.slice(offset, offset + limit)
+        
+        results = paginatedFallback.map((row: any): PublicSale => ({
           id: row.id,
           // owner_id removed for security - not exposed in public API
           title: row.title,

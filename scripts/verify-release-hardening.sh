@@ -30,8 +30,8 @@ else
     fi
     
     # Check if file contains the pattern in actual code (not comments)
-    # First check if pattern exists at all
-    if ! grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null; then
+    # First check if pattern exists at all (use || true to handle no-match)
+    if ! (grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null || false); then
       continue
     fi
     

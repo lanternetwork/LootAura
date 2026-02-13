@@ -22,7 +22,7 @@ else
   
   if [ -n "$VIOLATIONS" ]; then
     echo "⚠️  Service role usage found in request-path files (checking context):"
-    echo "$VIOLATIONS" | while read -r file; do
+    while IFS= read -r file; do
       # Check if it's in an allowed context (webhook, admin route, cron, job)
       if echo "$file" | grep -qE "(webhook|/admin/|/cron/|/jobs/|health/supabase)"; then
         echo "   ✅ $file - Allowed: webhook/admin/cron/job/health context"
@@ -33,7 +33,7 @@ else
         echo "   ❌ $file - BLOCKER: Service role in request-path handler"
         ERRORS=$((ERRORS + 1))
       fi
-    done
+    done <<< "$VIOLATIONS"
   else
     echo "✅ No service role usage in request-path handlers"
   fi

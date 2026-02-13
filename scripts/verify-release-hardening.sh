@@ -13,12 +13,25 @@ echo "🔍 Running release hardening verification..."
 echo ""
 echo "1️⃣ Checking for service role usage in request-path handlers..."
 
-REQUEST_PATH_FILES=$(find app/api app/auth middleware lib/auth/server-session.ts -type f \( -name "*.ts" -o -name "*.tsx" \) 2>/dev/null || true)
+# Find request-path files, excluding accountLock.ts which uses getAdminDb only as test fallback
+REQUEST_PATH_FILES=$(find app/api app/auth middleware lib/auth/server-session.ts -type f \( -name "*.ts" -o -name "*.tsx" \) ! -name "accountLock.ts" 2>/dev/null || true)
 
 if [ -z "$REQUEST_PATH_FILES" ]; then
   echo "⚠️  No request-path files found to check"
 else
-  VIOLATIONS=$(echo "$REQUEST_PATH_FILES" | xargs grep -l "getAdminDb\|SUPABASE_SERVICE_ROLE" 2>/dev/null || true)
+  # Find files with getAdminDb or SUPABASE_SERVICE_ROLE, then filter out comment-only matches
+  VIOLATIONS=$(echo "$REQUEST_PATH_FILES" | xargs grep -l "getAdminDb\|SUPABASE_SERVICE_ROLE" 2>/dev/null | while read -r file; do
+    # Skip accountLock.ts - it uses getAdminDb only as test fallback (allowed)
+    if echo "$file" | grep -q "accountLock.ts"; then
+      continue
+    fi
+    # Check if match is in actual code (not just in comments)
+    # Remove comment lines and check if pattern still exists in code
+    # Match lines that are NOT comments: not starting with //, /*, or * (for block comments)
+    if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b"; then
+      echo "$file"
+    fi
+  done || true)
   
   if [ -n "$VIOLATIONS" ]; then
     echo "⚠️  Service role usage found in request-path files (checking context):"

@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
+import { redactEmailForLogging } from './logging'
 import { FavoriteSalesStartingSoonDigestEmail, buildFavoriteSalesStartingSoonDigestSubject, type SaleDigestItem } from './templates/FavoriteSalesStartingSoonDigestEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { recordEmailSend, canSendEmail, generateFavoritesDigestDedupeKey } from './emailLog'
@@ -160,7 +161,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
     console.error('[EMAIL_FAVORITES] Cannot send digest email - invalid recipient email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
     })
     return { ok: false, error: 'Invalid recipient email' }
@@ -169,7 +170,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   // Guard: Must have at least one sale
   if (!sales || sales.length === 0) {
     console.error('[EMAIL_FAVORITES] Cannot send digest email - no sales provided:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
     })
     return { ok: false, error: 'No sales provided' }
   }
@@ -191,7 +192,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   if (publishedSales.length === 0) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[EMAIL_FAVORITES] Skipping digest email - no published sales:', {
-        recipientEmail: to,
+        recipientEmail: redactEmailForLogging(to),
         totalSales: sales.length,
       })
     }
@@ -326,7 +327,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL_FAVORITES] Failed to send favorite sales starting soon digest email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
       error: errorMessage,
     })

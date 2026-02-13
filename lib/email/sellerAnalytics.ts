@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
+import { redactEmailForLogging } from './logging'
 import { SellerWeeklyAnalyticsEmail, buildSellerWeeklyAnalyticsSubject } from './templates/SellerWeeklyAnalyticsEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { recordEmailSend, canSendEmail, generateSellerWeeklyDedupeKey } from './emailLog'
@@ -90,7 +91,7 @@ export async function sendSellerWeeklyAnalyticsEmail(
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
     console.error('[EMAIL_SELLER_ANALYTICS] Cannot send email - invalid recipient email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
     })
     return { ok: false, error: 'Invalid recipient email' }
   }
@@ -99,7 +100,7 @@ export async function sendSellerWeeklyAnalyticsEmail(
   if (metrics.totalViews === 0 && metrics.totalSaves === 0 && metrics.totalClicks === 0) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[EMAIL_SELLER_ANALYTICS] Skipping email - no metrics:', {
-        recipientEmail: to,
+        recipientEmail: redactEmailForLogging(to),
       })
     }
     return { ok: false, error: 'No metrics to report' }
@@ -236,7 +237,7 @@ export async function sendSellerWeeklyAnalyticsEmail(
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL_SELLER_ANALYTICS] Failed to send seller weekly analytics email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       error: errorMessage,
     })
 

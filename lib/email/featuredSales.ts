@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
+import { redactEmailForLogging } from './logging'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { FeaturedSalesEmail, buildFeaturedSalesSubject, type FeaturedSaleItem } from './templates/FeaturedSalesEmail'
 import { canSendEmail, recordEmailSend } from './emailLog'
@@ -76,7 +77,7 @@ export async function sendFeaturedSalesEmail(
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
     console.error('[EMAIL_FEATURED_SALES] Cannot send email - invalid recipient email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
     })
     return { ok: false, error: 'Invalid recipient email' }
@@ -85,7 +86,7 @@ export async function sendFeaturedSalesEmail(
   // Guard: Must have exactly 12 sales
   if (!sales || sales.length !== 12) {
     console.error('[EMAIL_FEATURED_SALES] Cannot send email - must have exactly 12 sales:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
     })
     return { ok: false, error: 'Must have exactly 12 sales' }
@@ -200,7 +201,7 @@ export async function sendFeaturedSalesEmail(
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL_FEATURED_SALES] Failed to send featured sales email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       profileId,
       error: errorMessage,
     })

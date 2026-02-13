@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
+import { redactEmailForLogging } from './logging'
 import { SaleCreatedConfirmationEmail, buildSaleCreatedSubject } from './templates/SaleCreatedConfirmationEmail'
 import type { Sale } from '@/lib/types'
 
@@ -176,7 +177,7 @@ export async function sendSaleCreatedEmail(
   if (!owner.email || typeof owner.email !== 'string' || owner.email.trim() === '') {
     console.error('[EMAIL_SALES] Cannot send email - invalid owner email:', {
       saleId: sale.id,
-      ownerEmail: owner.email,
+      ownerEmail: redactEmailForLogging(owner.email),
     })
     return { ok: false, error: 'Invalid owner email' }
   }
@@ -221,7 +222,7 @@ export async function sendSaleCreatedEmail(
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL_SALES] Failed to send sale created email:', {
       saleId: sale.id,
-      ownerEmail: owner.email,
+      ownerEmail: redactEmailForLogging(owner.email),
       error: errorMessage,
     })
 

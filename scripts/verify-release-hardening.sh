@@ -26,16 +26,22 @@ else
     if echo "$file" | grep -q "accountLock.ts"; then
       continue
     fi
-    # Check if file contains the pattern
-    if grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null; then
-      # Check if match is in actual code (not just in comments)
-      # Remove comment lines and check if pattern still exists in code
-      # Match lines that are NOT comments: not starting with //, /*, or * (for block comments)
-      if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b"; then
-        if [ -z "$VIOLATIONS" ]; then
-          VIOLATIONS="$file"
-        else
-          VIOLATIONS="$VIOLATIONS"$'\n'"$file"
+    # Check if file contains the pattern (use || true to handle no-match case)
+    if grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null || true; then
+      # Re-check without || true to see if match actually exists
+      if grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null; then
+        # Check if match is in actual code (not just in comments)
+        # Remove comment lines and check if pattern still exists in code
+        # Match lines that are NOT comments: not starting with //, /*, or * (for block comments)
+        if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b" 2>/dev/null || true; then
+          # Re-check without || true to confirm match in code
+          if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b" 2>/dev/null; then
+            if [ -z "$VIOLATIONS" ]; then
+              VIOLATIONS="$file"
+            else
+              VIOLATIONS="$VIOLATIONS"$'\n'"$file"
+            fi
+          fi
         fi
       fi
     fi

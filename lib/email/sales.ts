@@ -141,6 +141,8 @@ export interface SendSaleCreatedEmailParams {
     displayName?: string
   }
   timezone?: string
+  isFeatured?: boolean
+  dedupeKey?: string
 }
 
 export interface SendSaleCreatedEmailResult {
@@ -160,7 +162,7 @@ export interface SendSaleCreatedEmailResult {
 export async function sendSaleCreatedEmail(
   params: SendSaleCreatedEmailParams
 ): Promise<SendSaleCreatedEmailResult> {
-  const { sale, owner, timezone = 'America/New_York' } = params
+  const { sale, owner, timezone = 'America/New_York', isFeatured = false, dedupeKey } = params
 
   // Guard: Only send for published sales
   if (sale.status !== 'published') {
@@ -201,6 +203,7 @@ export async function sendSaleCreatedEmail(
       timeWindow,
       saleUrl,
       manageUrl,
+      isFeatured,
     })
 
     // Send email (non-blocking, errors are logged internally)
@@ -213,6 +216,8 @@ export async function sendSaleCreatedEmail(
         saleId: sale.id,
         ownerId: sale.owner_id,
         saleTitle: sale.title,
+        isFeatured,
+        ...(dedupeKey && { dedupeKey }),
       },
     })
 

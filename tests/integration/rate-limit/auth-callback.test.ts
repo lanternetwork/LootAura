@@ -81,6 +81,12 @@ describe('Rate Limiting Integration - Auth Callback', () => {
   })
 
   it('should allow requests within rate limit', async () => {
+    // Reset mock to return successful session
+    mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user123' } } },
+      error: null
+    })
+    
     const request = new NextRequest('https://example.com/auth/callback?code=abc123')
     
     // Mock fetch for profile creation

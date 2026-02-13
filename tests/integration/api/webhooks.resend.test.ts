@@ -15,7 +15,7 @@ const mockAdminDb = {
   from: vi.fn(),
 }
 
-let mockFromBaseImpl: (db: any, table: string) => any
+let mockFromBaseImpl: ((db: any, table: string) => any) | undefined
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => mockAdminDb,
@@ -38,12 +38,13 @@ vi.mock('@/lib/log', () => ({
 
 // Mock webhook secret
 const TEST_WEBHOOK_SECRET = 'test-webhook-secret-12345678901234567890'
+const mockGetResendWebhookSecret = vi.fn(() => TEST_WEBHOOK_SECRET)
 
 vi.mock('@/lib/email/webhook', async () => {
   const actual = await vi.importActual('@/lib/email/webhook')
   return {
     ...actual,
-    getResendWebhookSecret: () => TEST_WEBHOOK_SECRET,
+    getResendWebhookSecret: mockGetResendWebhookSecret,
   }
 })
 
@@ -51,7 +52,6 @@ describe('POST /api/webhooks/resend', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFromBaseImpl = undefined
-    mockGetResendWebhookSecret.mockReturnValue(TEST_WEBHOOK_SECRET)
     mockAdminDb.from.mockImplementation((table: string) => {
       const chain = {
         select: vi.fn().mockReturnThis(),

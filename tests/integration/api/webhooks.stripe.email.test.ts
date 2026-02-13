@@ -17,7 +17,7 @@ const mockRlsDb = {
   from: vi.fn(),
 }
 
-let mockFromBaseImpl: (db: any, table: string) => any
+let mockFromBaseImpl: ((db: any, table: string) => any) | undefined
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => mockAdminDb,
@@ -200,6 +200,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
           eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // Event not processed yet
           insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+          update: vi.fn().mockReturnThis(),
         }
       }
       if (table === 'sales') {
@@ -440,8 +441,10 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
       call[0].deliveryStatus === 'failed'
     )
     expect(recordCall).toBeDefined()
-    expect(recordCall[0].deliveryStatus).toBe('failed')
-    expect(recordCall[0].deliveryStatus).not.toBe('sent')
+    if (recordCall) {
+      expect(recordCall[0].deliveryStatus).toBe('failed')
+      expect(recordCall[0].deliveryStatus).not.toBe('sent')
+    }
   })
 
   it('should skip email if user email is not available', async () => {

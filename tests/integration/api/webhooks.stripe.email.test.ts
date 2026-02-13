@@ -400,7 +400,17 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     })
 
     // Mock finding existing promotion (idempotency check at top of finalizeDraftPromotion)
+    // CRITICAL: Must include stripe_webhook_events because webhook handler calls it first
     mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'stripe_webhook_events') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+          update: vi.fn().mockReturnThis(),
+        }
+      }
       if (table === 'promotions') {
         return {
           select: vi.fn().mockReturnThis(),
@@ -418,6 +428,8 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnThis(),
       }
     })
 

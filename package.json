@@ -72,7 +72,7 @@
     "react-share": "^5.1.0",
     "react-spinners": "^0.14.1",
     "react-toastify": "^10.0.5",
-    "nodemailer": "^6.10.0",
+    "nodemailer": "^7.0.11",
     "lucide-react": "^0.263.1",
     "recharts": "^2.12.7",
     "resend": "^4.0.0",
@@ -85,7 +85,7 @@
     "preact": "^10.28.2",
     "cookie": "^0.7.2",
     "prismjs": "^1.29.0",
-    "nodemailer": "^6.10.0"
+    "nodemailer": "^7.0.11"
   },
   "devDependencies": {
     "eslint-config-next": "^14.2.35",

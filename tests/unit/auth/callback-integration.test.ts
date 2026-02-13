@@ -256,14 +256,23 @@ describe('OAuth Callback Route', () => {
       
       await GET(request)
       
+      // Verify that safe logging is used (no redirectTo, no full URLs, no codes)
       expect(consoleSpy).toHaveBeenCalledWith(
-        '🔄 [AUTH FLOW] oauth-callback → start: start',
+        '[AUTH_CALLBACK] Processing OAuth callback:',
         expect.objectContaining({
           hasCode: true,
           hasError: false,
-          redirectTo: '/sales',
+          pathname: '/auth/callback',
+          requestId: expect.any(String),
         })
       )
+      
+      // Verify that redirectTo is NOT logged (security requirement)
+      const logCalls = consoleSpy.mock.calls
+      const hasRedirectToInLogs = logCalls.some(call => 
+        JSON.stringify(call).includes('redirectTo')
+      )
+      expect(hasRedirectToInLogs).toBe(false)
 
       consoleSpy.mockRestore()
     })

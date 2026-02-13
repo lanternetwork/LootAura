@@ -14,6 +14,11 @@ vi.mock('@/lib/email/emailLog', () => ({
   generateSellerWeeklyDedupeKey: vi.fn((_profileId: string, _weekStart: Date) => 'dedupe-week'),
 }))
 
+vi.mock('@/lib/email/unsubscribeTokens', () => ({
+  createUnsubscribeToken: vi.fn().mockResolvedValue('valid-token-123'),
+  buildUnsubscribeUrl: vi.fn((token: string, baseUrl: string) => `${baseUrl}/email/unsubscribe?token=${token}`),
+}))
+
 // Mock console methods
 const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -191,6 +196,58 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
     const sendEmailArgs = vi.mocked(sendEmail).mock.calls[0][0]
     expect(sendEmailArgs.react.props.weekStart).toMatch(/Mon, Jan 6/)
     expect(sendEmailArgs.react.props.weekEnd).toMatch(/Mon, Jan 13/)
+  })
+
+  it('should fail closed when unsubscribe token generation fails', async () => {
+    const { createUnsubscribeToken } = await import('@/lib/email/unsubscribeTokens')
+    const { recordEmailSend } = await import('@/lib/email/emailLog')
+    
+    vi.mocked(createUnsubscribeToken).mockRejectedValueOnce(new Error('Token generation failed'))
+
+    const result = await sendSellerWeeklyAnalyticsEmail({
+      to: 'seller@example.com',
+      metrics: mockMetrics,
+      weekStart: '2025-01-01T00:00:00Z',
+      weekEnd: '2025-01-08T00:00:00Z',
+      profileId: 'test-profile-id',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('Failed to generate unsubscribe token')
+    expect(sendEmail).not.toHaveBeenCalled()
+    expect(recordEmailSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'test-profile-id',
+        emailType: 'seller_weekly',
+        deliveryStatus: 'failed',
+        errorMessage: expect.stringContaining('Unsubscribe token generation failed'),
+        meta: expect.objectContaining({
+          failureReason: 'token_generation_failed',
+        }),
+      })
+    )
+  })
+
+  it('should not use test token URL when token generation fails', async () => {
+    const { createUnsubscribeToken, buildUnsubscribeUrl } = await import('@/lib/email/unsubscribeTokens')
+    
+    vi.mocked(createUnsubscribeToken).mockRejectedValueOnce(new Error('Token generation failed'))
+
+    const result = await sendSellerWeeklyAnalyticsEmail({
+      to: 'seller@example.com',
+      metrics: mockMetrics,
+      weekStart: '2025-01-01T00:00:00Z',
+      weekEnd: '2025-01-08T00:00:00Z',
+      profileId: 'test-profile-id',
+    })
+
+    expect(result.ok).toBe(false)
+    // Verify buildUnsubscribeUrl was never called with a test token
+    const buildUnsubscribeUrlCalls = vi.mocked(buildUnsubscribeUrl).mock.calls
+    const hasTestToken = buildUnsubscribeUrlCalls.some(call => 
+      call[0]?.toString().includes('test-token')
+    )
+    expect(hasTestToken).toBe(false)
   })
 })
 

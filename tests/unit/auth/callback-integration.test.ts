@@ -9,9 +9,14 @@ vi.mock('next/server', async () => {
     ...actual,
     NextResponse: {
       redirect: vi.fn((url) => {
-        const response = new Response(null, { status: 307, headers: { Location: url.toString() } })
-        // Add url property for test assertions
-        Object.defineProperty(response, 'url', { value: url.toString(), writable: false })
+        const urlString = url.toString()
+        const response = new Response(null, { status: 307, headers: { Location: urlString } })
+        // Add url property for test assertions (matching pattern from auth-callback.test.ts)
+        Object.defineProperty(response, 'url', {
+          get: () => urlString,
+          enumerable: true,
+          configurable: true
+        })
         return response
       }),
     }

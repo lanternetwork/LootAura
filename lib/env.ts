@@ -95,6 +95,8 @@ const serverSchema = z.object({
   STRIPE_SECRET_KEY: z.string().startsWith('sk_').optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(10).optional(),
   STRIPE_PRICE_ID_FEATURED_WEEK: z.string().optional(),
+  // Resend webhook secret (required for webhook signature verification)
+  RESEND_WEBHOOK_SECRET: z.string().min(10).optional(),
 })
 
 // Validate public environment variables
@@ -133,6 +135,7 @@ function getEnvServer() {
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
       STRIPE_PRICE_ID_FEATURED_WEEK: process.env.STRIPE_PRICE_ID_FEATURED_WEEK,
+      RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
     })
   }
   return _ENV_SERVER

@@ -28,8 +28,9 @@ const mockSupabaseClient = {
   },
 }
 
-vi.mock('@/lib/auth/server-session', () => ({
-  createServerSupabaseClient: vi.fn(() => mockSupabaseClient),
+// Mock @supabase/ssr createServerClient
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: vi.fn(() => mockSupabaseClient),
 }))
 
 // Mock fetch for profile creation

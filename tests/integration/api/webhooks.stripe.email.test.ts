@@ -159,6 +159,28 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
 
+    // CRITICAL: Set up stripe_webhook_events mock FIRST before any other mocks
+    // The webhook handler calls fromBase(admin, 'stripe_webhook_events').insert() at the very start
+    // This must be set up before vi.clearAllMocks() or immediately after to ensure it's available
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'stripe_webhook_events') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+          update: vi.fn().mockReturnThis(),
+        }
+      }
+      // Default fallback (will be overridden below for specific tables)
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnThis(),
+      }
+    })
+
     // Mock Stripe webhook verification
     mockStripe.webhooks.constructEvent.mockReturnValue({
       type: 'payment_intent.succeeded',

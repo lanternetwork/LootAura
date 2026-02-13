@@ -20,18 +20,26 @@ if [ -z "$REQUEST_PATH_FILES" ]; then
   echo "⚠️  No request-path files found to check"
 else
   # Find files with getAdminDb or SUPABASE_SERVICE_ROLE, then filter out comment-only matches
-  VIOLATIONS=$(echo "$REQUEST_PATH_FILES" | xargs grep -l "getAdminDb\|SUPABASE_SERVICE_ROLE" 2>/dev/null | while read -r file; do
+  VIOLATIONS=""
+  for file in $REQUEST_PATH_FILES; do
     # Skip accountLock.ts - it uses getAdminDb only as test fallback (allowed)
     if echo "$file" | grep -q "accountLock.ts"; then
       continue
     fi
-    # Check if match is in actual code (not just in comments)
-    # Remove comment lines and check if pattern still exists in code
-    # Match lines that are NOT comments: not starting with //, /*, or * (for block comments)
-    if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b"; then
-      echo "$file"
+    # Check if file contains the pattern
+    if grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null; then
+      # Check if match is in actual code (not just in comments)
+      # Remove comment lines and check if pattern still exists in code
+      # Match lines that are NOT comments: not starting with //, /*, or * (for block comments)
+      if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b"; then
+        if [ -z "$VIOLATIONS" ]; then
+          VIOLATIONS="$file"
+        else
+          VIOLATIONS="$VIOLATIONS"$'\n'"$file"
+        fi
+      fi
     fi
-  done || true)
+  done
   
   if [ -n "$VIOLATIONS" ]; then
     echo "⚠️  Service role usage found in request-path files (checking context):"

@@ -27,7 +27,6 @@ async function deleteHandler(req: NextRequest, { params }: { params: { id: strin
   const saleId = params.id
   
   // Use RLS-aware client - sales has RLS DELETE policy that allows owners to delete their own sales
-  const { getRlsDb } = await import('@/lib/supabase/clients')
   const rls = getRlsDb()
   const { error } = await fromBase(rls, 'sales')
     .delete()

@@ -73,7 +73,6 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
   // Dedupe: Check for existing recent report by same reporter for same sale and reason
   // Window: 24 hours
   // Use RLS-aware client - sale_reports has RLS INSERT policy that allows authenticated users to insert their own reports
-  const { getRlsDb } = await import('@/lib/supabase/clients')
   const rlsDb = getRlsDb()
   const twentyFourHoursAgo = new Date()
   twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)

@@ -28,7 +28,6 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
   }
 
   // Verify sale exists and get owner_id using RLS-aware client
-  const { getRlsDb } = await import('@/lib/supabase/clients')
   const rls = getRlsDb()
   const { data: sale, error: saleError } = await fromBase(rls, 'sales')
     .select('id, owner_id')

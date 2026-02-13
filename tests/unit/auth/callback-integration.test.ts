@@ -2,23 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/auth/callback/route'
 
-// Mock NextResponse
+// Mock NextResponse (matching pattern from auth-callback.test.ts)
 vi.mock('next/server', async () => {
   const actual = await vi.importActual('next/server')
   return {
     ...actual,
     NextResponse: {
-      redirect: vi.fn((url) => {
-        const urlString = url.toString()
-        const response = new Response(null, { status: 307, headers: { Location: urlString } })
-        // Add url property for test assertions (matching pattern from auth-callback.test.ts)
-        Object.defineProperty(response, 'url', {
-          get: () => urlString,
-          enumerable: true,
-          configurable: true
-        })
-        return response
-      }),
+      redirect: vi.fn((url) => ({ url: url.toString(), type: 'redirect' })),
     }
   }
 })

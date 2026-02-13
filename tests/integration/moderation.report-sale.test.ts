@@ -52,14 +52,20 @@ const mockSupabaseClient = {
 }
 
 // Mock admin DB and query chains
-const mockReportChain = {
-  select: vi.fn(),
-  insert: vi.fn(),
-  eq: vi.fn(),
-  gte: vi.fn(),
-  maybeSingle: vi.fn(),
-  single: vi.fn(),
+// Create a chainable mock for report operations
+const createReportChain = () => {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    insert: vi.fn(() => chain), // insert returns chain for .select().single()
+    eq: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    single: vi.fn(() => Promise.resolve({ data: { id: 'report-id' }, error: null })),
+  }
+  return chain
 }
+
+const mockReportChain = createReportChain()
 
 const mockSaleChain = {
   select: vi.fn(),

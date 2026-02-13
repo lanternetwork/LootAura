@@ -78,8 +78,10 @@ const mockAdminDb = {
 
 const mockRlsDb = {
   from: vi.fn((table: string) => {
+    if (table === 'sale_reports') return mockReportChain
     if (table === 'sales_v2') return mockSaleChain
-    return mockSaleChain
+    if (table === 'sales') return mockSaleChain
+    return mockReportChain
   }) as any,
 }
 

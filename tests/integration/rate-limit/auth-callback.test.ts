@@ -30,15 +30,17 @@ vi.mock('@/lib/rateLimit/headers', () => ({
   applyRateHeaders: vi.fn((response) => response)
 }))
 
+const mockSupabaseClient = {
+  auth: {
+    exchangeCodeForSession: vi.fn().mockResolvedValue({
+      data: { session: { user: { id: 'user123' } } },
+      error: null
+    })
+  }
+}
+
 vi.mock('@/lib/auth/server-session', () => ({
-  createServerSupabaseClient: vi.fn(() => ({
-    auth: {
-      exchangeCodeForSession: vi.fn().mockResolvedValue({
-        data: { session: { user: { id: 'user123' } } },
-        error: null
-      })
-    }
-  }))
+  createServerSupabaseClient: vi.fn(() => mockSupabaseClient)
 }))
 
 vi.mock('next/headers', () => ({
@@ -96,7 +98,19 @@ describe('Rate Limiting Integration - Auth Callback', () => {
   })
 
   it('should return 429 when rate limit exceeded', async () => {
+    // Reset mock to return successful session
+    mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user123' } } },
+      error: null
+    })
+    
     const request = new NextRequest('https://example.com/auth/callback?code=abc123')
+    
+    // Mock fetch for profile creation
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ created: true })
+    })
     
     const response = await GET(request)
     
@@ -106,6 +120,12 @@ describe('Rate Limiting Integration - Auth Callback', () => {
   })
 
   it('should handle soft limiting correctly', async () => {
+    // Reset mock to return successful session
+    mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user123' } } },
+      error: null
+    })
+    
     const request = new NextRequest('https://example.com/auth/callback?code=abc123')
     
     global.fetch = vi.fn().mockResolvedValue({
@@ -121,6 +141,12 @@ describe('Rate Limiting Integration - Auth Callback', () => {
   })
 
   it('should bypass rate limiting when disabled', async () => {
+    // Reset mock to return successful session
+    mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user123' } } },
+      error: null
+    })
+    
     vi.doMock('@/lib/rateLimit/config', () => ({
       isRateLimitingEnabled: vi.fn(() => false),
       isPreviewEnv: vi.fn(() => true),

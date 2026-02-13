@@ -458,6 +458,22 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
       error: 'Resend API error',
     })
 
+    // Ensure RLS DB mock is set up for draft query (from beforeEach should be fine, but ensure it's there)
+    mockRlsDb.from.mockImplementation((table: string) => {
+      if (table === 'sale_drafts') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: mockDraft, error: null }),
+        }
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
+    })
+
     // Override mock to ensure all tables are properly mocked
     // The beforeEach sets up mocks, but we need to ensure sales counter works correctly
     let salesCallCount = 0

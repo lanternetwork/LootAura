@@ -127,18 +127,11 @@ describe('POST /api/webhooks/resend', () => {
     }
 
     // Mock getResendWebhookSecret to throw (simulating missing secret)
-    const webhookModule = await vi.importMock<typeof import('@/lib/email/webhook')>('@/lib/email/webhook')
-    const mockGetResendWebhookSecret = webhookModule.getResendWebhookSecret as ReturnType<typeof vi.fn>
-    if (typeof mockGetResendWebhookSecret === 'function' && 'mockImplementationOnce' in mockGetResendWebhookSecret) {
-      mockGetResendWebhookSecret.mockImplementationOnce(() => {
-        throw new Error('RESEND_WEBHOOK_SECRET is not configured. Webhook signature verification requires this secret.')
-      })
-    } else {
-      // Fallback: replace the entire function
-      vi.mocked(webhookModule).getResendWebhookSecret.mockImplementationOnce(() => {
-        throw new Error('RESEND_WEBHOOK_SECRET is not configured. Webhook signature verification requires this secret.')
-      })
-    }
+    // Use vi.spyOn to properly mock the function
+    const { getResendWebhookSecret } = await import('@/lib/email/webhook')
+    vi.spyOn(await import('@/lib/email/webhook'), 'getResendWebhookSecret').mockImplementationOnce(() => {
+      throw new Error('RESEND_WEBHOOK_SECRET is not configured. Webhook signature verification requires this secret.')
+    })
 
     const headers = new Headers({
       'svix-id': 'test-id-123',

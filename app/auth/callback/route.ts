@@ -76,7 +76,10 @@ export async function GET(req: Request) {
               })
             })
           } catch (error) {
-            console.log('[AUTH_CALLBACK] Cookie setting failed:', error)
+            console.log('[AUTH_CALLBACK] Cookie setting failed', {
+              pathname: url.pathname,
+              requestId: correlationId
+            })
           }
         },
       },
@@ -171,7 +174,7 @@ export async function GET(req: Request) {
       
       // Security: Ensure redirectTo is a relative path (starts with /) to prevent open redirects
       if (!finalRedirectTo.startsWith('/')) {
-        console.warn('[AUTH_CALLBACK] Invalid redirectTo path (not relative), defaulting to /sales', {
+        console.warn('[AUTH_CALLBACK] Invalid redirect path (not relative), using default', {
           pathname: url.pathname,
           requestId: correlationId
         })
@@ -180,7 +183,7 @@ export async function GET(req: Request) {
       
       // Security: Prevent redirect loops - never redirect to auth pages
       if (finalRedirectTo.startsWith('/auth/') || finalRedirectTo.startsWith('/login') || finalRedirectTo.startsWith('/signin')) {
-        console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default', {
+        console.warn('[AUTH_CALLBACK] Preventing redirect loop - auth page detected, using default', {
           pathname: url.pathname,
           requestId: correlationId
         })
@@ -191,7 +194,7 @@ export async function GET(req: Request) {
       try {
         const testUrl = new URL(finalRedirectTo, 'http://localhost')
         if (testUrl.origin !== 'http://localhost') {
-          console.warn('[AUTH_CALLBACK] External redirect detected, defaulting to /sales', {
+          console.warn('[AUTH_CALLBACK] External redirect detected, using default', {
             pathname: url.pathname,
             requestId: correlationId
           })

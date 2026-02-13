@@ -11,6 +11,7 @@ import { NextRequest } from 'next/server'
 
 const mockFromBase = vi.fn()
 const mockAdminDb = vi.fn()
+const mockRlsDb = vi.fn()
 let currentUser: any = { id: 'user-1', email: 'user@example.test' }
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -27,6 +28,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
+  getRlsDb: () => mockRlsDb,
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => mockFromBase(db, table),
 }))

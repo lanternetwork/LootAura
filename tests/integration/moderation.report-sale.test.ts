@@ -84,10 +84,10 @@ const mockAdminDb = {
 
 const mockRlsDb = {
   from: vi.fn((table: string) => {
-    if (table === 'sale_reports') return mockReportChain
+    if (table === 'sale_reports') return createReportChain() // Return fresh chain each time
     if (table === 'sales_v2') return mockSaleChain
     if (table === 'sales') return mockSaleChain
-    return mockReportChain
+    return createReportChain()
   }) as any,
 }
 
@@ -121,9 +121,12 @@ vi.mock('@/lib/supabase/clients', () => ({
     if (table === 'profiles') {
       return createQueryChain()
     }
+    if (table === 'sale_reports') {
+      return createReportChain() // Return fresh chain for sale_reports
+    }
     const result = db.from(table)
     // Ensure we always return a chain, even if db.from returns undefined
-    return result || mockReportChain
+    return result || createReportChain()
   },
 }))
 

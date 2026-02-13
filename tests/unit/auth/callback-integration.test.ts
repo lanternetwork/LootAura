@@ -40,6 +40,9 @@ describe('OAuth Callback Route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     delete process.env.NEXT_PUBLIC_DEBUG
+    // Set required environment variables
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
   })
 
   describe('Error Handling', () => {

@@ -449,6 +449,9 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
   })
 
   it('should handle email send failure gracefully without breaking webhook', async () => {
+    // Ensure email can be sent (idempotency check passes)
+    mockCanSendEmail.mockResolvedValueOnce(true)
+    
     // Mock email send failure
     mockSendSaleCreatedEmail.mockResolvedValueOnce({
       ok: false,

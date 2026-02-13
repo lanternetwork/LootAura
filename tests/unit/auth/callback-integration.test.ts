@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { GET } from '@/app/api/auth/callback/route'
+import { GET } from '@/app/auth/callback/route'
 
 // Mock NextResponse
 vi.mock('next/server', async () => {

@@ -261,7 +261,7 @@ describe('sendFavoriteSalesStartingSoonDigestEmail', () => {
         profileId: 'test-profile-id',
         emailType: 'favorites_digest',
         deliveryStatus: 'failed',
-        errorMessage: expect.stringContaining('Unsubscribe token generation failed'),
+        errorMessage: 'Unsubscribe token generation failed',
         meta: expect.objectContaining({
           failureReason: 'token_generation_failed',
         }),

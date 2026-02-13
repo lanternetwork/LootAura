@@ -220,7 +220,7 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
         profileId: 'test-profile-id',
         emailType: 'seller_weekly',
         deliveryStatus: 'failed',
-        errorMessage: expect.stringContaining('Unsubscribe token generation failed'),
+        errorMessage: 'Unsubscribe token generation failed',
         meta: expect.objectContaining({
           failureReason: 'token_generation_failed',
         }),

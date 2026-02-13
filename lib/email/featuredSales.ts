@@ -133,12 +133,17 @@ export async function sendFeaturedSalesEmail(
     } catch (error) {
       // Fail closed: token generation failure prevents email send
       const errorMessage = error instanceof Error ? error.message : String(error)
+      // Extract non-sensitive error code if available (Supabase errors have a code property)
+      const errorCode = (error as any)?.code && typeof (error as any).code === 'string' 
+        ? (error as any).code 
+        : undefined
+      
       console.error('[EMAIL_FEATURED_SALES] Failed to generate unsubscribe token, aborting email send:', {
         profileId: profileId.substring(0, 8) + '...',
         error: errorMessage,
       })
       
-      // Record failed attempt in email_log
+      // Record failed attempt in email_log with fixed, non-sensitive error message
       await recordEmailSend({
         profileId,
         emailType: 'featured_sales',
@@ -146,11 +151,12 @@ export async function sendFeaturedSalesEmail(
         subject,
         dedupeKey,
         deliveryStatus: 'failed',
-        errorMessage: `Unsubscribe token generation failed: ${errorMessage}`,
+        errorMessage: 'Unsubscribe token generation failed',
         meta: {
           salesCount: sales.length,
           weekKey,
           failureReason: 'token_generation_failed',
+          ...(errorCode && { errorCode }),
         },
       })
       

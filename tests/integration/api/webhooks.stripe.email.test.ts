@@ -155,7 +155,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     vi.clearAllMocks()
     mockFromBaseImpl = undefined
 
-    // Setup default mocks
+    // Setup environment variables for Admin API
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
 
@@ -194,6 +194,14 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     // Mock Admin DB for sale creation
     let saleInsertCallCount = 0
     mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'stripe_webhook_events') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // Event not processed yet
+          insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      }
       if (table === 'sales') {
         return {
           insert: vi.fn().mockReturnThis(),

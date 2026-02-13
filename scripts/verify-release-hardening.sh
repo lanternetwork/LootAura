@@ -50,14 +50,15 @@ else
   if [ -n "$VIOLATIONS" ]; then
     echo "⚠️  Service role usage found in request-path files (checking context):"
     while IFS= read -r file; do
-      # Check if it's in an allowed context (webhook, admin route, cron, job, debug, analytics, geocoding writeback, sale reports)
+      # Check if it's in an allowed context (webhook, admin route, cron, job, debug, analytics, geocoding writeback, sale reports, drafts publish)
       # Also allow promotions/intent since it requires service role for INSERT (no RLS INSERT policy exists)
       # Allow analytics/track since analytics_events has no RLS INSERT policy
       # Allow debug routes since they're admin-only
       # Allow geocoding/zip since it only uses admin for optional writeback (ENABLE_ZIP_WRITEBACK)
       # Allow sales/[id]/report since it needs admin to check reports from other users (no SELECT policy) and update moderation status
-      if echo "$file" | grep -qE "(webhook|/admin/|/cron/|/jobs/|health/supabase|promotions/intent|/debug/|analytics/track|geocoding/zip|sales/.*/report)"; then
-        echo "   ✅ $file - Allowed: webhook/admin/cron/job/health/promotions-intent/debug/analytics/geocoding/sale-reports context"
+      # Allow drafts/publish since it needs admin for transactional consistency (create sale + items + delete draft) and rollback operations
+      if echo "$file" | grep -qE "(webhook|/admin/|/cron/|/jobs/|health/supabase|promotions/intent|/debug/|analytics/track|geocoding/zip|sales/.*/report|drafts/publish)"; then
+        echo "   ✅ $file - Allowed: webhook/admin/cron/job/health/promotions-intent/debug/analytics/geocoding/sale-reports/drafts-publish context"
       elif echo "$file" | grep -qE "(middleware|server-session)"; then
         echo "   ❌ $file - BLOCKER: Service role in middleware/auth session"
         ERRORS=$((ERRORS + 1))

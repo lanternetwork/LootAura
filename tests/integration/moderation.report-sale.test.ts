@@ -93,9 +93,11 @@ const mockAdminDb = {
 
 const mockRlsDb = {
   from: vi.fn((table: string) => {
-    if (table === 'sale_reports') return createReportChain() // Return fresh chain each time
+    // Always return a chain with insert for sale_reports
+    if (table === 'sale_reports') return createReportChain()
     if (table === 'sales_v2') return mockSaleChain
     if (table === 'sales') return mockSaleChain
+    // Default: return a chain with insert for other tables
     return createReportChain()
   }) as any,
 }
@@ -292,7 +294,11 @@ describe('POST /api/sales/[id]/report', () => {
         // Return fresh chain with insert method for sale_reports
         return createReportChain()
       }
-      return mockSaleChain
+      if (table === 'sales') {
+        return mockSaleChain
+      }
+      // Default: return a chain with insert for any other table
+      return createReportChain()
     })
     
     // Configure mockSupabaseClient.from for sales_v2 (used by report route)

@@ -8,7 +8,12 @@ vi.mock('next/server', async () => {
   return {
     ...actual,
     NextResponse: {
-      redirect: vi.fn((url) => ({ url: url.toString(), type: 'redirect' })),
+      redirect: vi.fn((url) => {
+        const response = new Response(null, { status: 307, headers: { Location: url.toString() } })
+        // Add url property for test assertions
+        Object.defineProperty(response, 'url', { value: url.toString(), writable: false })
+        return response
+      }),
     }
   }
 })

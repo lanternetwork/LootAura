@@ -56,10 +56,12 @@ async function webhookHandler(request: NextRequest) {
     return fail(401, 'MISSING_SIGNATURE', 'Missing webhook signature header')
   }
 
-  // Get webhook secret
-  const webhookSecret = getResendWebhookSecret()
-  if (!webhookSecret) {
-    logger.error('Resend webhook secret not configured', new Error('RESEND_WEBHOOK_SECRET not set'), {
+  // Get webhook secret (required - throws if missing)
+  let webhookSecret: string
+  try {
+    webhookSecret = getResendWebhookSecret()
+  } catch (error) {
+    logger.error('Resend webhook secret not configured', error instanceof Error ? error : new Error(String(error)), {
       component: 'webhooks/resend',
       operation: 'verify_signature',
     })

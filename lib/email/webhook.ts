@@ -10,9 +10,16 @@ import { ENV_SERVER } from '@/lib/env'
 
 /**
  * Get Resend webhook secret
+ * 
+ * @throws Error if RESEND_WEBHOOK_SECRET is not configured (treats as misconfig)
+ * @returns The webhook secret string
  */
-export function getResendWebhookSecret(): string | null {
-  return ENV_SERVER.RESEND_WEBHOOK_SECRET || null
+export function getResendWebhookSecret(): string {
+  const secret = ENV_SERVER.RESEND_WEBHOOK_SECRET
+  if (!secret) {
+    throw new Error('RESEND_WEBHOOK_SECRET is not configured. Webhook signature verification requires this secret.')
+  }
+  return secret
 }
 
 /**

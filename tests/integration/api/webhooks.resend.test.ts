@@ -51,6 +51,7 @@ describe('POST /api/webhooks/resend', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFromBaseImpl = undefined
+    mockGetResendWebhookSecret.mockReturnValue(TEST_WEBHOOK_SECRET)
     mockAdminDb.from.mockImplementation((table: string) => {
       const chain = {
         select: vi.fn().mockReturnThis(),
@@ -115,6 +116,43 @@ describe('POST /api/webhooks/resend', () => {
     expect(response.status).toBe(401)
     expect(data.ok).toBe(false)
     expect(data.code).toBe('INVALID_SIGNATURE')
+  })
+
+  it('should return 500 when webhook secret is missing', async () => {
+    const payload = {
+      type: 'email.delivered',
+      data: {
+        email_id: 'test-email-id-123',
+        created_at: new Date().toISOString(),
+      },
+    }
+
+    // Mock getResendWebhookSecret to throw (simulating missing secret)
+    mockGetResendWebhookSecret.mockImplementationOnce(() => {
+      throw new Error('RESEND_WEBHOOK_SECRET is not configured. Webhook signature verification requires this secret.')
+    })
+
+    const headers = new Headers({
+      'svix-id': 'test-id-123',
+      'svix-timestamp': Math.floor(Date.now() / 1000).toString(),
+      'svix-signature': 'v1,test-signature',
+      'content-type': 'application/json',
+    })
+
+    const request = new NextRequest('http://localhost:3000/api/webhooks/resend', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    })
+
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('CONFIG_ERROR')
+    expect(data.error).toBe('Webhook secret not configured')
+    expect(mockGetResendWebhookSecret).toHaveBeenCalled()
   })
 
   it('should reject missing signature with 401', async () => {

@@ -288,6 +288,10 @@ describe('POST /api/sales/[id]/report', () => {
           })),
         }
       }
+      if (table === 'sale_reports') {
+        // Return fresh chain with insert method for sale_reports
+        return createReportChain()
+      }
       return mockSaleChain
     })
     

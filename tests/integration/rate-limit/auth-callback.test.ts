@@ -69,6 +69,12 @@ describe('Rate Limiting Integration - Auth Callback', () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
     
+    // Reset Supabase client mock to default successful response
+    mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValue({
+      data: { session: { user: { id: 'user123' } } },
+      error: null
+    })
+    
     // Default successful mocks
     mockDeriveKey.mockResolvedValue('ip:192.168.1.1')
     mockCheck.mockResolvedValue({

@@ -16,7 +16,7 @@ vi.mock('next/server', async () => {
 // Mock cookies
 vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({
-    get: vi.fn(),
+    getAll: vi.fn(() => []),
     set: vi.fn(),
   })),
 }))

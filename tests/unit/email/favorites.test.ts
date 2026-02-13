@@ -200,7 +200,7 @@ describe('sendFavoriteSalesStartingSoonDigestEmail', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[EMAIL_FAVORITES] Failed to send favorite sales starting soon digest email:',
       expect.objectContaining({
-        recipientEmail: 'user@example.com',
+        recipientEmail: 'u***@example.com', // Email is redacted in logs for PII protection
         salesCount: 2,
         error: errorMessage,
       })

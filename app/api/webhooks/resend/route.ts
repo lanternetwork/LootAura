@@ -96,7 +96,7 @@ async function webhookHandler(request: NextRequest) {
   }
   
   try {
-    event = JSON.parse(body)
+    event = JSON.parse(body) as typeof event
   } catch (error) {
     logger.error('Resend webhook payload parse failed', error instanceof Error ? error : new Error(String(error)), {
       component: 'webhooks/resend',

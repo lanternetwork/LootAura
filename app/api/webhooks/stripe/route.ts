@@ -448,7 +448,6 @@ async function finalizeDraftPromotion(
               operation: 'send_email',
               saleId: createdSaleId,
               paymentIntentId,
-              dedupeKey,
             })
           }
         }

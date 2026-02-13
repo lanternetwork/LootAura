@@ -43,7 +43,9 @@ vi.mock('@/lib/auth/server-session', () => ({
 
 vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({
-    get: vi.fn(() => ({ value: 'mock-cookie-value' }))
+    getAll: vi.fn(() => []),
+    get: vi.fn(() => ({ value: 'mock-cookie-value' })),
+    set: vi.fn()
   }))
 }))
 
@@ -60,6 +62,10 @@ const mockApplyHeaders = applyRateHeaders as any
 describe('Rate Limiting Integration - Auth Callback', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    
+    // Set required environment variables
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
     
     // Default successful mocks
     mockDeriveKey.mockResolvedValue('ip:192.168.1.1')

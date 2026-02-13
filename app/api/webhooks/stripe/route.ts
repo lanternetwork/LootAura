@@ -329,11 +329,22 @@ async function finalizeDraftPromotion(
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL
       const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE
       
-      if (url && key) {
+      if (!url || !key) {
+        // Skip email if env vars not available
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.info('Skipping sale created email - env vars not available', {
+            component: 'webhooks/stripe',
+            operation: 'send_email',
+            saleId: createdSaleId,
+            hasUrl: !!url,
+            hasKey: !!key,
+          })
+        }
+      } else {
         const { createClient } = await import('@supabase/supabase-js')
-        const adminBase = createClient(url as string, key as string, {
+        const adminBase = createClient(url, key, {
           auth: { persistSession: false },
-          global: { headers: { 'apikey': key as string } }
+          global: { headers: { 'apikey': key } }
         })
 
         const { data: userData, error: userError } = await adminBase.auth.admin.getUserById(userId)

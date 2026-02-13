@@ -458,6 +458,67 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
       error: 'Resend API error',
     })
 
+    // Override mock to ensure all tables are properly mocked
+    // The beforeEach sets up mocks, but we need to ensure sales counter works correctly
+    let salesCallCount = 0
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'stripe_webhook_events') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+          update: vi.fn().mockReturnThis(),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockImplementation(() => {
+            salesCallCount++
+            if (salesCallCount === 1) {
+              // First call: sale creation
+              return Promise.resolve({ data: { id: TEST_SALE_ID }, error: null })
+            }
+            // Subsequent calls: sale fetch for email
+            return Promise.resolve({ data: mockSaleData, error: null })
+          }),
+        }
+      }
+      if (table === 'items') {
+        return {
+          insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      }
+      if (table === 'promotions') {
+        return {
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: { id: TEST_PROMOTION_ID },
+            error: null,
+          }),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      }
+      if (table === 'sale_drafts') {
+        return {
+          delete: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+        }
+      }
+      // Default fallback
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnThis(),
+      }
+    })
+
     const request = createStripeWebhookRequest()
     const response = await POST(request)
     const data = await response.json()

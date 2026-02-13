@@ -331,9 +331,9 @@ async function finalizeDraftPromotion(
       
       if (url && key) {
         const { createClient } = await import('@supabase/supabase-js')
-        const adminBase = createClient(url, key, {
+        const adminBase = createClient(url as string, key as string, {
           auth: { persistSession: false },
-          global: { headers: { 'apikey': key } }
+          global: { headers: { 'apikey': key as string } }
         })
 
         const { data: userData, error: userError } = await adminBase.auth.admin.getUserById(userId)

@@ -10,7 +10,24 @@ import { POST } from '@/app/api/webhooks/stripe/route'
 
 // Mock Supabase clients
 const mockAdminDb = {
-  from: vi.fn(),
+  from: vi.fn().mockImplementation((table: string) => {
+    // Default implementation for stripe_webhook_events to ensure insert is always available
+    if (table === 'stripe_webhook_events') {
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnThis(),
+      }
+    }
+    return {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+      update: vi.fn().mockReturnThis(),
+    }
+  }),
 }
 
 const mockRlsDb = {

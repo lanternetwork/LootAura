@@ -35,12 +35,11 @@ async function callbackHandler(request: NextRequest) {
     
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {
       hasCode: !!code,
-      hasError: !!error,
-      redirectTo
+      hasError: !!error
     })
 
     if (error) {
-      authDebug.logAuthFlow('oauth-callback', 'oauth-error', 'error', { error })
+      authDebug.logAuthFlow('oauth-callback', 'oauth-error', 'error', { hasError: true })
       return NextResponse.redirect(new URL(`/auth/error?error=${error}`, url.origin))
     }
 
@@ -111,7 +110,7 @@ async function callbackHandler(request: NextRequest) {
         ? '/sales'
         : redirectTo
       
-      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { redirectTo: finalRedirectTo })
+      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { hasRedirect: true })
       return NextResponse.redirect(new URL(finalRedirectTo, url.origin))
     }
 

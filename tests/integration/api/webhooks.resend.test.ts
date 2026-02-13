@@ -38,13 +38,12 @@ vi.mock('@/lib/log', () => ({
 
 // Mock webhook secret
 const TEST_WEBHOOK_SECRET = 'test-webhook-secret-12345678901234567890'
-const mockGetResendWebhookSecret = vi.fn(() => TEST_WEBHOOK_SECRET)
 
 vi.mock('@/lib/email/webhook', async () => {
   const actual = await vi.importActual('@/lib/email/webhook')
   return {
     ...actual,
-    getResendWebhookSecret: mockGetResendWebhookSecret,
+    getResendWebhookSecret: vi.fn(() => TEST_WEBHOOK_SECRET),
   }
 })
 
@@ -128,7 +127,8 @@ describe('POST /api/webhooks/resend', () => {
     }
 
     // Mock getResendWebhookSecret to throw (simulating missing secret)
-    mockGetResendWebhookSecret.mockImplementationOnce(() => {
+    const { getResendWebhookSecret } = await vi.importMock('@/lib/email/webhook')
+    vi.mocked(getResendWebhookSecret).mockImplementationOnce(() => {
       throw new Error('RESEND_WEBHOOK_SECRET is not configured. Webhook signature verification requires this secret.')
     })
 

@@ -14,11 +14,15 @@ function parsePaginationParams(
   const defaultLimit = 24
   const maxLimit = 200
   
-  const requestedLimit = limitParam ? parseInt(limitParam || '24') : defaultLimit
-  const requestedOffset = offsetParam ? parseInt(offsetParam || '0') : 0
+  const requestedLimit = limitParam ? parseInt(limitParam || '24', 10) : defaultLimit
+  const requestedOffset = offsetParam ? parseInt(offsetParam || '0', 10) : 0
 
-  const limit = Math.min(Math.max(1, requestedLimit), maxLimit)
-  const offset = Math.max(0, requestedOffset)
+  // Handle NaN from invalid parseInt
+  const validLimit = isNaN(requestedLimit) ? defaultLimit : requestedLimit
+  const validOffset = isNaN(requestedOffset) ? 0 : requestedOffset
+
+  const limit = Math.min(Math.max(1, validLimit), maxLimit)
+  const offset = Math.max(0, validOffset)
 
   return { limit, offset }
 }

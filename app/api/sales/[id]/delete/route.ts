@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 
@@ -26,11 +26,13 @@ async function deleteHandler(req: NextRequest, { params }: { params: { id: strin
   
   const saleId = params.id
   
-  // Write to base table using admin client (bypasses RLS, but we've already verified auth and ownership)
-  const admin = getAdminDb()
-  const { error } = await fromBase(admin, 'sales')
+  // Use RLS-aware client - sales has RLS DELETE policy that allows owners to delete their own sales
+  const { getRlsDb } = await import('@/lib/supabase/clients')
+  const rls = getRlsDb()
+  const { error } = await fromBase(rls, 'sales')
     .delete()
     .eq('id', saleId)
+    // RLS policy sales_owner_delete already enforces owner_id = auth.uid(), but we keep the explicit filter for clarity
     .eq('owner_id', user.user.id)
   
   if (error) {

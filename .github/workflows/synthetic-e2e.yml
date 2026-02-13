@@ -5,8 +5,9 @@ on:
     # Run on all branches (main and feature branches)
     # No branch filter means it runs on every push
   pull_request:
-    # Run on all pull requests (targeting any branch)
-    # No branch filter means it runs on every PR
+    branches: [main]
+    # Run on PRs targeting main to match CodeQL/Vercel behavior
+    # This ensures full check suite (110+ checks) runs on main PRs
   schedule:
     # Run every 6 hours
     - cron: '0 */6 * * *'

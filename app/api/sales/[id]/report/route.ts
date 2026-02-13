@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getAdminDb, getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { ReportSaleSchema } from '@/lib/validators/reportSale'
@@ -72,10 +72,15 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
 
   // Dedupe: Check for existing recent report by same reporter for same sale and reason
   // Window: 24 hours
-  const adminDb = getAdminDb()
+  // Use RLS-aware client - sale_reports has RLS INSERT policy that allows authenticated users to insert their own reports
+  const { getRlsDb } = await import('@/lib/supabase/clients')
+  const rlsDb = getRlsDb()
   const twentyFourHoursAgo = new Date()
   twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
 
+  // Note: sale_reports has no SELECT policy for regular users, so we can't check for duplicates via RLS
+  // We'll need to use admin client for the dedupe check, but use RLS for the insert
+  const adminDb = getAdminDb()
   const { data: existingReport } = await fromBase(adminDb, 'sale_reports')
     .select('id')
     .eq('sale_id', saleId)
@@ -96,8 +101,8 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
     return ok({ reported: true })
   }
 
-  // Insert new report
-  const { error: insertError } = await fromBase(adminDb, 'sale_reports')
+  // Insert new report using RLS-aware client (sale_reports has RLS INSERT policy)
+  const { error: insertError } = await fromBase(rlsDb, 'sale_reports')
     .insert({
       sale_id: saleId,
       reporter_profile_id: user.id, // profile_id = user.id

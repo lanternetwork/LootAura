@@ -50,10 +50,13 @@ else
   if [ -n "$VIOLATIONS" ]; then
     echo "⚠️  Service role usage found in request-path files (checking context):"
     while IFS= read -r file; do
-      # Check if it's in an allowed context (webhook, admin route, cron, job)
+      # Check if it's in an allowed context (webhook, admin route, cron, job, debug, analytics, geocoding writeback)
       # Also allow promotions/intent since it requires service role for INSERT (no RLS INSERT policy exists)
-      if echo "$file" | grep -qE "(webhook|/admin/|/cron/|/jobs/|health/supabase|promotions/intent)"; then
-        echo "   ✅ $file - Allowed: webhook/admin/cron/job/health/promotions-intent context"
+      # Allow analytics/track since analytics_events has no RLS INSERT policy
+      # Allow debug routes since they're admin-only
+      # Allow geocoding/zip since it only uses admin for optional writeback (ENABLE_ZIP_WRITEBACK)
+      if echo "$file" | grep -qE "(webhook|/admin/|/cron/|/jobs/|health/supabase|promotions/intent|/debug/|analytics/track|geocoding/zip)"; then
+        echo "   ✅ $file - Allowed: webhook/admin/cron/job/health/promotions-intent/debug/analytics/geocoding context"
       elif echo "$file" | grep -qE "(middleware|server-session)"; then
         echo "   ❌ $file - BLOCKER: Service role in middleware/auth session"
         ERRORS=$((ERRORS + 1))
@@ -111,9 +114,9 @@ if [ -z "$OAUTH_CALLBACK_FILES" ]; then
   WARNINGS=$((WARNINGS + 1))
 else
   for file in $OAUTH_CALLBACK_FILES; do
-    # Check for dangerous logging patterns (more specific to avoid false positives)
-    # Look for url.href in log statements, searchParams.get('code') in logs, or redirectTo values being logged
-    if grep -qE "(console\.(log|warn|error).*url\.href|logger\.(info|warn|error).*url\.href|searchParams\.get\(['\"]code['\"]\).*log|redirectTo.*:.*url|log.*redirectTo)" "$file" 2>/dev/null; then
+    # Check for dangerous logging patterns (only in actual log statements, not assignments)
+    # Look for url.href, searchParams.get('code'), or redirectTo in console.log/logger calls
+    if grep -qE "(console\.(log|warn|error).*url\.href|logger\.(info|warn|error).*url\.href|console\.(log|warn|error).*searchParams\.get\(['\"]code|logger\.(info|warn|error).*searchParams\.get\(['\"]code|console\.(log|warn|error).*redirectTo|logger\.(info|warn|error).*redirectTo)" "$file" 2>/dev/null; then
       echo "❌ $file: Potentially unsafe logging detected"
       echo "   Check for: url.href, searchParams.get('code'), or redirectTo in logs"
       ERRORS=$((ERRORS + 1))

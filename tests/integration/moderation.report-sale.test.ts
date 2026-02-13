@@ -52,11 +52,20 @@ const mockSupabaseClient = {
 }
 
 // Mock admin DB and query chains
+// Shared insert spy so we can track calls across all chains
+const insertSpy = vi.fn((payload: any) => ({
+  select: vi.fn(() => ({
+    single: vi.fn(() => Promise.resolve({ data: { id: 'report-id' }, error: null })),
+  })),
+}))
+
 // Create a chainable mock for report operations
 const createReportChain = () => {
   const chain: any = {
     select: vi.fn(() => chain),
-    insert: vi.fn(() => chain), // insert returns chain for .select().single()
+    // insert() returns an object with select(), which returns an object with single()
+    // Use the shared spy so we can track calls
+    insert: insertSpy,
     eq: vi.fn(() => chain),
     gte: vi.fn(() => chain),
     maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
@@ -121,9 +130,14 @@ vi.mock('@/lib/supabase/clients', () => ({
     if (table === 'profiles') {
       return createQueryChain()
     }
+    // For sale_reports, use db.from(table) to get the appropriate chain
+    // This allows adminDb queries to use mockReportChain, and rlsDb to use fresh chains
     if (table === 'sale_reports') {
-      return createReportChain() // Return fresh chain for sale_reports
+      const result = db.from(table)
+      // If db.from returns something, use it; otherwise return fresh chain
+      return result || createReportChain()
     }
+    // For other tables, use db.from(table) to get the chain
     const result = db.from(table)
     // Ensure we always return a chain, even if db.from returns undefined
     return result || createReportChain()
@@ -240,9 +254,16 @@ describe('POST /api/sales/[id]/report', () => {
       error: null,
     })
     
+    // Reset insert spy (shared across all chains)
+    insertSpy.mockClear()
+    insertSpy.mockImplementation((payload: any) => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: 'report-id' }, error: null })),
+      })),
+    }))
+    
     // Reset chain mocks
     mockReportChain.select.mockReturnValue(mockReportChain)
-    mockReportChain.insert.mockReturnValue(mockReportChain)
     mockReportChain.eq.mockReturnValue(mockReportChain)
     mockReportChain.gte.mockReturnValue(mockReportChain)
     mockSaleChain.select.mockReturnValue(mockSaleChain)
@@ -347,8 +368,8 @@ describe('POST /api/sales/[id]/report', () => {
       expect(data.ok).toBe(true)
       expect(data.reported).toBe(true)
       
-      // Verify report was inserted
-      expect(mockReportChain.insert).toHaveBeenCalledWith(
+      // Verify report was inserted (using shared insert spy)
+      expect(insertSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           sale_id: saleId,
           reporter_profile_id: userId,
@@ -409,8 +430,8 @@ describe('POST /api/sales/[id]/report', () => {
       expect(data.ok).toBe(true)
       expect(data.reported).toBe(true)
       
-      // Verify no new report was inserted
-      expect(mockReportChain.insert).not.toHaveBeenCalled()
+      // Verify no new report was inserted (using shared insert spy)
+      expect(insertSpy).not.toHaveBeenCalled()
     })
   })
 

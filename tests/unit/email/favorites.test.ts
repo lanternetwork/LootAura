@@ -269,6 +269,36 @@ describe('sendFavoriteSalesStartingSoonDigestEmail', () => {
     )
   })
 
+  it('should include resendEmailId in meta when sendEmail returns it', async () => {
+    const { recordEmailSend } = await import('@/lib/email/emailLog')
+    const { sendEmail } = await import('@/lib/email/sendEmail')
+    
+    // Mock sendEmail to return a resendEmailId
+    vi.mocked(sendEmail).mockResolvedValueOnce({ 
+      ok: true, 
+      resendEmailId: 'resend-id-123' 
+    })
+
+    const result = await sendFavoriteSalesStartingSoonDigestEmail({
+      to: 'user@example.com',
+      sales: [mockSale1],
+      hoursBeforeStart: 24,
+      profileId: 'test-profile-id',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(recordEmailSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'test-profile-id',
+        emailType: 'favorites_digest',
+        deliveryStatus: 'sent',
+        meta: expect.objectContaining({
+          resendEmailId: 'resend-id-123',
+        }),
+      })
+    )
+  })
+
   it('should not use test token URL when token generation fails', async () => {
     const { createUnsubscribeToken, buildUnsubscribeUrl } = await import('@/lib/email/unsubscribeTokens')
     

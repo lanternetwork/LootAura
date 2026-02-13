@@ -200,6 +200,7 @@ export async function sendFeaturedSalesEmail(
         meta: {
           salesCount: sales.length,
           weekKey,
+          ...(sendResult.resendEmailId && { resendEmailId: sendResult.resendEmailId }),
         },
       })
     } catch (error) {

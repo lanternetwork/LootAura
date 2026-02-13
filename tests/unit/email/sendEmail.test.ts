@@ -38,7 +38,7 @@ describe('sendEmail', () => {
 
     const result = await sendEmail(baseParams)
 
-    expect(result).toEqual({ ok: true })
+    expect(result).toEqual({ ok: true, resendEmailId: 'test-email-id' })
     expect(sendMock).toHaveBeenCalledTimes(1)
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -48,6 +48,33 @@ describe('sendEmail', () => {
       }),
     )
     expect(consoleErrorSpy).not.toHaveBeenCalled()
+  })
+
+  it('returns resendEmailId when Resend returns a message ID', async () => {
+    vi.stubEnv('LOOTAURA_ENABLE_EMAILS', 'true')
+    vi.stubEnv('RESEND_FROM_EMAIL', 'from@example.com')
+    vi.stubEnv('RESEND_API_KEY', 'test-resend-key')
+    
+    const customResendId = 'custom-resend-id-123'
+    sendMock.mockResolvedValueOnce({ data: { id: customResendId } })
+
+    const result = await sendEmail(baseParams)
+
+    expect(result.ok).toBe(true)
+    expect(result.resendEmailId).toBe(customResendId)
+  })
+
+  it('returns undefined resendEmailId when Resend does not return an ID', async () => {
+    vi.stubEnv('LOOTAURA_ENABLE_EMAILS', 'true')
+    vi.stubEnv('RESEND_FROM_EMAIL', 'from@example.com')
+    vi.stubEnv('RESEND_API_KEY', 'test-resend-key')
+    
+    sendMock.mockResolvedValueOnce({ data: null })
+
+    const result = await sendEmail(baseParams)
+
+    expect(result.ok).toBe(true)
+    expect(result.resendEmailId).toBeUndefined()
   })
 
   it('fails fast when from address configuration is missing and does not call Resend', async () => {

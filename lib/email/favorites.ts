@@ -330,6 +330,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
       meta: {
         salesCount: digestItems.length,
         hoursBeforeStart,
+        ...(sendResult.resendEmailId && { resendEmailId: sendResult.resendEmailId }),
       },
     })
 

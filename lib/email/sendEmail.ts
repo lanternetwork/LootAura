@@ -15,6 +15,7 @@ export interface SendEmailParams extends EmailSendOptions {
 export interface SendEmailResult {
   ok: boolean
   error?: string
+  resendEmailId?: string // Resend message ID for webhook correlation
 }
 
 /**
@@ -93,14 +94,15 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     })
 
     // Always log success (not just in debug mode) - this confirms it reached Resend
+    const resendEmailId = result.data?.id
     console.log('[EMAIL] Email sent successfully via Resend:', {
       type,
       to: redactEmailForLogging(to),
       subject,
-      resendEmailId: result.data?.id,
+      resendEmailId,
       metadata: redactMetadataForLogging(metadata),
     })
-    return { ok: true }
+    return { ok: true, resendEmailId }
   } catch (error) {
     // Log structured error but don't throw - emails are non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)

@@ -245,6 +245,7 @@ export async function sendSellerWeeklyAnalyticsEmail(
         topSalesCount: metrics.topSales.length,
         weekStart,
         weekEnd,
+        ...(sendResult.resendEmailId && { resendEmailId: sendResult.resendEmailId }),
       },
     })
 

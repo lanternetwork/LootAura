@@ -57,6 +57,7 @@ export async function sendModerationDailyDigestEmail(
       meta: {
         reportCount: reports.length,
         dateWindow,
+        ...(result.resendEmailId && { resendEmailId: result.resendEmailId }),
       },
     })
 
@@ -75,6 +76,7 @@ export async function sendModerationDailyDigestEmail(
       meta: {
         reportCount: reports.length,
         dateWindow,
+        // Note: resendEmailId not available on failure (email was never sent)
       },
     })
 

@@ -231,8 +231,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
 
     // Mock Admin DB for sale creation
     let saleInsertCallCount = 0
-    // Reset and set up mock implementation (vi.clearAllMocks() clears the default implementation)
-    mockAdminDb.from.mockReset()
+    // Override mock implementation (stripe_webhook_events is already set up above, but we override to include all tables)
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'stripe_webhook_events') {
         return {

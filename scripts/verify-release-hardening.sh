@@ -23,26 +23,26 @@ else
   VIOLATIONS=""
   for file in $REQUEST_PATH_FILES; do
     # Skip accountLock.ts - it uses getAdminDb only as test fallback (allowed)
-    if echo "$file" | grep -q "accountLock.ts"; then
+    if echo "$file" | grep -q "accountLock.ts" || [ $? -ne 0 ]; then
+      if echo "$file" | grep -q "accountLock.ts"; then
+        continue
+      fi
+    fi
+    
+    # Check if file contains the pattern in actual code (not comments)
+    # First check if pattern exists at all
+    if ! grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null; then
       continue
     fi
-    # Check if file contains the pattern (use || true to handle no-match case)
-    if grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null || true; then
-      # Re-check without || true to see if match actually exists
-      if grep -q "getAdminDb\|SUPABASE_SERVICE_ROLE" "$file" 2>/dev/null; then
-        # Check if match is in actual code (not just in comments)
-        # Remove comment lines and check if pattern still exists in code
-        # Match lines that are NOT comments: not starting with //, /*, or * (for block comments)
-        if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b" 2>/dev/null || true; then
-          # Re-check without || true to confirm match in code
-          if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b" 2>/dev/null; then
-            if [ -z "$VIOLATIONS" ]; then
-              VIOLATIONS="$file"
-            else
-              VIOLATIONS="$VIOLATIONS"$'\n'"$file"
-            fi
-          fi
-        fi
+    
+    # Check if match is in actual code (not just in comments)
+    # Remove comment lines and check if pattern still exists in code
+    # Match lines that are NOT comments: not starting with //, /*, or * (for block comments)
+    if grep -vE "^\s*(//|/\*|\*)" "$file" 2>/dev/null | grep -qE "\b(getAdminDb|SUPABASE_SERVICE_ROLE)\b" 2>/dev/null; then
+      if [ -z "$VIOLATIONS" ]; then
+        VIOLATIONS="$file"
+      else
+        VIOLATIONS="$VIOLATIONS"$'\n'"$file"
       fi
     fi
   done

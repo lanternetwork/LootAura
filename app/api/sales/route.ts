@@ -15,7 +15,6 @@ import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
-// See docs/AI_ASSISTANT_RULES.md for full guidelines
 export const dynamic = 'force-dynamic'
 
 // Bbox validation schema

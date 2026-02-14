@@ -9,6 +9,7 @@ import { redactEmailForLogging } from './logging'
 import { SellerWeeklyAnalyticsEmail, buildSellerWeeklyAnalyticsSubject } from './templates/SellerWeeklyAnalyticsEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { recordEmailSend, canSendEmail, generateSellerWeeklyDedupeKey } from './emailLog'
+import { logger } from '@/lib/log'
 import type { SellerWeeklyAnalytics } from '@/lib/data/sellerAnalytics'
 
 export interface SendSellerWeeklyAnalyticsEmailParams {
@@ -146,12 +147,11 @@ export async function sendSellerWeeklyAnalyticsEmail(
       try {
         const token = await createUnsubscribeToken(profileId)
         unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[EMAIL_SELLER_ANALYTICS] Generated unsubscribe URL successfully', {
-            profileId: profileId.substring(0, 8) + '...',
-            hasUnsubscribeUrl: !!unsubscribeUrl,
-          })
-        }
+        logger.debug('Generated unsubscribe URL successfully', {
+          component: 'email',
+          operation: 'seller_analytics',
+          hasUnsubscribeUrl: !!unsubscribeUrl,
+        })
       } catch (error) {
         // Fail closed: token generation failure prevents email send
         const errorMessage = error instanceof Error ? error.message : String(error)

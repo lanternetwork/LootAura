@@ -9,8 +9,8 @@
  * - CI secret header (X-LootAura-DryRun-Secret) when ENABLE_DEBUG_ENDPOINTS=true
  * - ENABLE_DEBUG_ENDPOINTS flag (disabled by default in production)
  * 
- * NOTE: This is a temporary debug endpoint for CI synthetic E2E tests.
- * Should be removed or disabled once full featured email system is implemented.
+ * Used by CI synthetic E2E tests for featured email selection validation.
+ * Protected by CI secret header in production, admin auth in development.
  */
 
 import { NextRequest, NextResponse } from 'next/server'

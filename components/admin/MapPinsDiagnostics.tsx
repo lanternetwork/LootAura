@@ -147,7 +147,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
             const pinButton = pinButtons[0] as HTMLButtonElement
             let clickEventFired = false
             
-            // Add temporary click listener to verify click works
+            // Add click listener to verify click works
             const testClickHandler = (e: Event) => {
               clickEventFired = true
               console.log('[PIN_INTERACTION] Pin click event fired:', e)

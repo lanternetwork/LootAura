@@ -22,11 +22,14 @@ const mockRlsDb = {
   from: vi.fn(),
 }
 
+// Use vi.hoisted() to ensure variables are available when vi.mock is hoisted
+const { mockFromBase } = vi.hoisted(() => ({
+  mockFromBase: vi.fn(),
+}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
 }))
-
-const mockFromBase = vi.fn()
 
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockRlsDb,

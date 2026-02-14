@@ -9,7 +9,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/sales/route'
-import { makeThenableQuery, createCallTracker, type QueryResult } from '../../helpers/mockSupabaseQuery'
+import { makeThenableQuery, createCallTracker } from '@/tests/helpers/mockSupabaseQuery'
+import type { QueryResult } from '@/tests/helpers/mockSupabaseQuery'
 
 // Mock Supabase clients
 const mockSupabaseClient = {

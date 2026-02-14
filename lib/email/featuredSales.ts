@@ -9,6 +9,7 @@ import { redactEmailForLogging } from './logging'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { FeaturedSalesEmail, buildFeaturedSalesSubject, type FeaturedSaleItem } from './templates/FeaturedSalesEmail'
 import { canSendEmail, recordEmailSend } from './emailLog'
+import { logger } from '@/lib/log'
 
 export interface SendFeaturedSalesEmailParams {
   to: string
@@ -124,12 +125,11 @@ export async function sendFeaturedSalesEmail(
     try {
       const token = await createUnsubscribeToken(profileId)
       unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[EMAIL_FEATURED_SALES] Generated unsubscribe URL successfully', {
-          profileId: profileId.substring(0, 8) + '...',
-          hasUnsubscribeUrl: !!unsubscribeUrl,
-        })
-      }
+      logger.debug('Generated unsubscribe URL successfully', {
+        component: 'email',
+        operation: 'featured_sales',
+        hasUnsubscribeUrl: !!unsubscribeUrl,
+      })
     } catch (error) {
       // Fail closed: token generation failure prevents email send
       const errorMessage = error instanceof Error ? error.message : String(error)

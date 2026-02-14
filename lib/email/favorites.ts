@@ -9,6 +9,7 @@ import { redactEmailForLogging } from './logging'
 import { FavoriteSalesStartingSoonDigestEmail, buildFavoriteSalesStartingSoonDigestSubject, type SaleDigestItem } from './templates/FavoriteSalesStartingSoonDigestEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { recordEmailSend, canSendEmail, generateFavoritesDigestDedupeKey } from './emailLog'
+import { logger } from '@/lib/log'
 import type { Sale } from '@/lib/types'
 
 /**
@@ -253,12 +254,11 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
       try {
         const token = await createUnsubscribeToken(profileId)
         unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[EMAIL_FAVORITES] Generated unsubscribe URL successfully', {
-            profileId: profileId.substring(0, 8) + '...',
-            hasUnsubscribeUrl: !!unsubscribeUrl,
-          })
-        }
+        logger.debug('Generated unsubscribe URL successfully', {
+          component: 'email',
+          operation: 'favorites_digest',
+          hasUnsubscribeUrl: !!unsubscribeUrl,
+        })
       } catch (error) {
         // Fail closed: token generation failure prevents email send
         const errorMessage = error instanceof Error ? error.message : String(error)

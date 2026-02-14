@@ -25,7 +25,22 @@ export async function sendModerationDailyDigestEmail(
 ): Promise<{ ok: boolean; error?: string }> {
   const { reports, dateWindow, baseUrl = 'https://lootaura.com' } = params
 
-  const toEmail = process.env.MODERATION_DIGEST_EMAIL || 'lanternetwork@gmail.com'
+  // Require MODERATION_DIGEST_EMAIL to be set (fail closed if missing)
+  const toEmail = process.env.MODERATION_DIGEST_EMAIL
+  if (!toEmail) {
+    // Log warning (non-PII) and skip sending
+    const { logger } = await import('@/lib/log')
+    logger.warn('Moderation digest email skipped - MODERATION_DIGEST_EMAIL not configured', {
+      component: 'email',
+      operation: 'moderation_digest',
+      reportCount: reports.length,
+    })
+    return {
+      ok: false,
+      error: 'MODERATION_DIGEST_EMAIL not configured',
+    }
+  }
+
   const subject = buildModerationDigestSubject(reports.length)
 
   try {

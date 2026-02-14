@@ -76,7 +76,7 @@ const content = `# Loot Aura Repository Status
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on ${nowIso()}
+Updated on ${nowIso()}
 `
 
 writeFileSync('STATUS.md', content)

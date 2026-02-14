@@ -241,8 +241,8 @@ Draft {
 
 ## Related Documents
 
-- [Production Environment Variables](../docs/PRODUCTION_ENV.md)
-- [Security Audit Reports](../SUPABASE_SECURITY_RLS_AUDIT_REPORT.md)
+- [Environment Variables](env.md)
+- [Operations Runbook](runbook.md)
 
 ---
 

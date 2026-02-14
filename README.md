@@ -23,7 +23,7 @@ A modern web application for discovering and managing yard sales, garage sales, 
    # Edit .env.local with your configuration
    ```
    
-   See [docs/PRODUCTION_ENV.md](docs/PRODUCTION_ENV.md) for all required environment variables.
+   See [docs/env.md](docs/env.md) for all required environment variables.
 
 4. **Run the development server**
    ```bash

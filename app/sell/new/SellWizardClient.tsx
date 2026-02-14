@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode, startTransition, useMemo, useReducer } from 'react'
+import { useState, useEffect, useCallback, useRef, startTransition, useMemo, useReducer } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isDebugEnabled } from '@/lib/debug'
 import { SaleInput } from '@/lib/data'
@@ -21,51 +21,6 @@ import { saveDraftServer, getLatestDraftServer, getDraftByKeyServer, deleteDraft
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
-// DIAGNOSTIC ERROR BOUNDARY - TEMPORARY FOR DEBUGGING
-// This component logs the full error and stack trace to help identify React errors #418/#422
-class DiagnosticErrorBoundary extends Component<
-  { children: ReactNode; componentName: string },
-  { hasError: boolean; error: Error | null; errorInfo: ErrorInfo | null }
-> {
-  constructor(props: { children: ReactNode; componentName: string }) {
-    super(props)
-    this.state = { hasError: false, error: null, errorInfo: null }
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the FULL unminified error with stack trace (gated for production)
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error(`[DIAGNOSTIC_ERROR_BOUNDARY] ${this.props.componentName} threw an error:`, {
-        error,
-        errorMessage: error.message,
-        errorStack: error.stack,
-        errorName: error.name,
-        componentStack: errorInfo.componentStack,
-        errorInfo: errorInfo,
-        timestamp: new Date().toISOString(),
-      })
-    }
-    
-    this.setState({ error, errorInfo })
-  }
-
-  render() {
-    if (this.state.hasError) {
-      // Minimal fallback - just render a placeholder so the app continues
-      return (
-        <div className="border-2 border-red-300 bg-red-50 p-2 text-xs text-red-700">
-          [DIAGNOSTIC] {this.props.componentName} error caught - check console for details
-        </div>
-      )
-    }
-
-    return this.props.children
-  }
-}
 
 interface WizardStep {
   id: string
@@ -2386,8 +2341,7 @@ function DetailsStep({ formData, onChange, onPlaceSelected, errors, userLat, use
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Address *
         </label>
-        <DiagnosticErrorBoundary componentName="AddressAutocomplete">
-          <AddressAutocomplete
+        <AddressAutocomplete
             value={formData.address || ''}
             onChange={(address) => onChange('address', address)}
             onPlaceSelected={onPlaceSelected}
@@ -2398,7 +2352,6 @@ function DetailsStep({ formData, onChange, onPlaceSelected, errors, userLat, use
             required
             error={errors?.address}
           />
-        </DiagnosticErrorBoundary>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2729,8 +2682,7 @@ function PromotionStep({
   blockingErrors?: Record<string, string>
 }) {
   return (
-    <DiagnosticErrorBoundary componentName="PromotionStep-Content">
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Primary Panel */}
         <div className={`bg-white border-2 rounded-lg p-6 shadow-sm transition-colors ${
           wantsPromotion 
@@ -2834,7 +2786,6 @@ function PromotionStep({
           </p>
         </div>
       </div>
-    </DiagnosticErrorBoundary>
   )
 }
 
@@ -2897,8 +2848,7 @@ function ReviewStep({
   }
 
   return (
-    <DiagnosticErrorBoundary componentName="ReviewStep-Content">
-      <div className="space-y-6">
+    <div className="space-y-6">
         <h3 className="text-lg font-medium text-gray-900">Review Your Sale</h3>
         
         <div className="bg-gray-50 rounded-lg p-6 space-y-4">
@@ -3108,8 +3058,7 @@ function ReviewStep({
           )}
         </button>
       </div>
-      </div>
-    </DiagnosticErrorBoundary>
+    </div>
   )
 }
 

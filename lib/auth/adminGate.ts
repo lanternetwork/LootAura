@@ -43,9 +43,9 @@ export async function assertAdminOrThrow(_req: Request): Promise<{ user: { id: s
 
 /**
  * Require admin access for /admin/tools page
- * Checks if the current user is the specific admin email (lanternetwork@gmail.com)
+ * Checks if the current user is in the ADMIN_EMAILS list
  * Redirects to sign-in if not authenticated
- * Returns 404 if authenticated but not the admin email
+ * Returns 404 if authenticated but not an admin
  */
 export async function requireAdminToolsAccess(): Promise<{ user: { id: string; email: string } }> {
   const supabase = createSupabaseServerClient()
@@ -64,12 +64,18 @@ export async function requireAdminToolsAccess(): Promise<{ user: { id: string; e
     notFound()
   }
 
-  // Check if user is the specific admin email
-  const ADMIN_EMAIL = 'lanternetwork@gmail.com'
-  const isAdmin = userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+  // Check if user is in ADMIN_EMAILS list (required env var)
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+  
+  if (adminEmails.length === 0) {
+    // ADMIN_EMAILS not configured - fail closed for security
+    notFound()
+  }
+
+  const isAdmin = adminEmails.includes(userEmail.toLowerCase())
 
   if (!isAdmin) {
-    // Authenticated but not the admin - return 404
+    // Authenticated but not an admin - return 404
     notFound()
   }
 

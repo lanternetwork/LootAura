@@ -3,7 +3,7 @@
     "name": "LootAura",
     "slug": "LootAura",
     "scheme": "lootaura",
-    "version": "1.0.0",
+    "version": "96",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +17,7 @@
     ],
     "android": {
       "package": "com.lootaura.app",
-      "versionCode": 94,
+      "versionCode": 96,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A2268",

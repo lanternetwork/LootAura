@@ -85,6 +85,7 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
         in: vi.fn(() => chain),
         gte: vi.fn(() => chain),
         lte: vi.fn(() => chain),
+        neq: vi.fn(() => chain),
         or: vi.fn((filter: string) => {
           if (captureOr) captureOr(filter)
           return chain
@@ -157,6 +158,7 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
         in: vi.fn(() => chain),
         gte: vi.fn(() => chain),
         lte: vi.fn(() => chain),
+        neq: vi.fn(() => chain),
         or: vi.fn((filter: string) => {
           capturedFilter = filter
           return chain
@@ -442,6 +444,7 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
         in: vi.fn(() => chain),
         gte: vi.fn(() => chain),
         lte: vi.fn(() => chain),
+        neq: vi.fn(() => chain),
         or: vi.fn(() => chain),
         order: vi.fn(() => chain),
         range: vi.fn(() => Promise.resolve({
@@ -486,6 +489,7 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
         in: vi.fn(() => chain),
         gte: vi.fn(() => chain),
         lte: vi.fn(() => chain),
+        neq: vi.fn(() => chain),
         or: vi.fn(() => chain),
         order: vi.fn(() => chain),
         range: vi.fn(() => Promise.resolve({

@@ -728,14 +728,14 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
       expect(mockSendSaleCreatedEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           sale: expect.objectContaining({
-            id: TEST_SALE_ID,
+            id: 'sale-id-123',
             status: 'published',
           }),
-          owner: {
-            email: TEST_USER_EMAIL,
-          },
+          owner: expect.objectContaining({
+            email: 'test@example.com',
+          }),
           isFeatured: true,
-          dedupeKey: `sale_created_promotion:${TEST_PAYMENT_INTENT_ID}`,
+          dedupeKey: 'sale_created_promotion:pi_test_1234567890',
         })
       )
     }

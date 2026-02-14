@@ -76,8 +76,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {adsenseEnabled && (
           <meta name="google-adsense-account" content="ca-pub-8685093412475036" />
         )}
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="LootAura" />

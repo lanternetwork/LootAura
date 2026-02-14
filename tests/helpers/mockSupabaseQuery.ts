@@ -9,16 +9,21 @@
  */
 
 export interface QueryResult {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: any
   count?: number | null
 }
 
 export interface CallTracker {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   calls: Array<{ method: string; args: any[] }>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getCalls: (method: string) => any[][]
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function makeThenableQuery(
   result: QueryResult = { data: [], error: null, count: 0 },
   tracker?: CallTracker
@@ -27,7 +32,9 @@ export function makeThenableQuery(
   const promise = Promise.resolve(result)
 
   // Create the proxy handler
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handler: ProxyHandler<any> = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     get(_target: any, prop: string | symbol) {
       const propName = String(prop)
 
@@ -45,6 +52,7 @@ export function makeThenableQuery(
       // For any other property, return a function that:
       // 1. Tracks the call if tracker is provided
       // 2. Returns the same proxy for chaining
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return function (...args: any[]) {
         if (tracker) {
           tracker.calls.push({ method: propName, args })

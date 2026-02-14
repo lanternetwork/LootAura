@@ -142,6 +142,7 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     }
     url.searchParams.set('lat', lat)
     url.searchParams.set('lng', lng)
+    url.searchParams.set('distanceKm', '25') // Ensure distanceKm is set for bbox calculation
     return new NextRequest(url)
   }
 

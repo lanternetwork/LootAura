@@ -77,43 +77,59 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     
-    // Setup default mocks for count query
+    // Create a reusable query chain factory that properly chains all methods
+    const createQueryChain = (captureOr?: (filter: string) => void) => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn((filter: string) => {
+          if (captureOr) captureOr(filter)
+          return chain
+        }),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
+    }
+    
+    // Setup default mocks for count query and main query
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        // Count query returns { count, error }
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        // Main query chain
+        const mainChain = createQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
       // Default query chain
-      return {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        in: vi.fn().mockReturnThis(),
-        or: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        range: vi.fn().mockResolvedValue({
-          data: [],
-          error: null,
-        }),
-        gte: vi.fn().mockReturnThis(),
-        lte: vi.fn().mockReturnThis(),
-      }
+      return createQueryChain()
     })
     
     // Mock items_v2 query (for category filtering)
     mockFromBase.mockImplementation((db: any, table: string) => {
       if (table === 'items_v2') {
         return {
-          select: vi.fn().mockResolvedValue({ 
+          select: vi.fn(() => Promise.resolve({ 
             data: [], 
             error: null 
-          }),
+          })),
         }
       }
       return {
-        select: vi.fn().mockResolvedValue({ data: [], error: null }),
+        select: vi.fn(() => Promise.resolve({ data: [], error: null })),
       }
     })
   })
@@ -133,39 +149,41 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     
     let capturedFilter: string | null = null
     
-    // Mock query chain that captures the filter
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn((filter: string) => {
-        capturedFilter = filter
-        return {
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null,
-          }),
-        }
-      }),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    // Create query chain that captures the filter
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn((filter: string) => {
+          capturedFilter = filter
+          return chain
+        }),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)
@@ -186,38 +204,40 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     
     let capturedFilter: string | null = null
     
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn((filter: string) => {
-        capturedFilter = filter
-        return {
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null,
-          }),
-        }
-      }),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn((filter: string) => {
+          capturedFilter = filter
+          return chain
+        }),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)
@@ -238,38 +258,40 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     
     let capturedFilter: string | null = null
     
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn((filter: string) => {
-        capturedFilter = filter
-        return {
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null,
-          }),
-        }
-      }),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn((filter: string) => {
+          capturedFilter = filter
+          return chain
+        }),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)
@@ -291,38 +313,40 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     
     let capturedFilter: string | null = null
     
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn((filter: string) => {
-        capturedFilter = filter
-        return {
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null,
-          }),
-        }
-      }),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn((filter: string) => {
+          capturedFilter = filter
+          return chain
+        }),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)
@@ -342,38 +366,40 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     
     let capturedFilter: string | null = null
     
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn((filter: string) => {
-        capturedFilter = filter
-        return {
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null,
-          }),
-        }
-      }),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn((filter: string) => {
+          capturedFilter = filter
+          return chain
+        }),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)
@@ -409,29 +435,37 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
   it('should handle empty search query', async () => {
     const request = createRequest('')
     
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn(() => chain),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)
@@ -445,29 +479,37 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
   it('should handle null search query', async () => {
     const request = createRequest(null)
     
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn(() => chain),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)
@@ -485,38 +527,40 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     
     let capturedFilter: string | null = null
     
-    const mockQueryChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      or: vi.fn((filter: string) => {
-        capturedFilter = filter
-        return {
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null,
-          }),
-        }
-      }),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    const createMockQueryChain = () => {
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        gte: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        or: vi.fn((filter: string) => {
+          capturedFilter = filter
+          return chain
+        }),
+        order: vi.fn(() => chain),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      }
+      return chain
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
+        const countChain = {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+          })),
+        }
+        const mainChain = createMockQueryChain()
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-          }),
+          ...mainChain,
+          ...countChain,
         }
       }
-      return mockQueryChain
+      return createMockQueryChain()
     })
 
     const response = await GET(request)

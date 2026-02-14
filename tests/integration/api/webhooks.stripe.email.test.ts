@@ -568,12 +568,110 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     })
 
     // Gate condition 6: canSendEmail() returns true (email not already sent)
+    // Explicitly mock and track calls
+    mockCanSendEmail.mockClear()
     mockCanSendEmail.mockResolvedValueOnce(true)
 
     // Gate condition 7: sendSaleCreatedEmail() fails
+    // Explicitly mock and track calls
+    mockSendSaleCreatedEmail.mockClear()
     mockSendSaleCreatedEmail.mockResolvedValueOnce({
       ok: false,
       error: 'Resend API error',
+    })
+
+    // Clear recordEmailSend to track calls
+    mockRecordEmailSend.mockClear()
+
+    // Track DB calls to diagnose early returns
+    const stripeWebhookEventsSelect = vi.fn().mockReturnThis()
+    const stripeWebhookEventsEq = vi.fn().mockReturnThis()
+    const stripeWebhookEventsMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+    const stripeWebhookEventsInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+
+    const saleDraftsSelect = vi.fn().mockReturnThis()
+    const saleDraftsEq = vi.fn().mockReturnThis()
+    const saleDraftsMaybeSingle = vi.fn().mockResolvedValue({ data: mockDraft, error: null })
+
+    const salesInsert = vi.fn()
+    const salesSelect = vi.fn().mockReturnThis()
+    const salesEq = vi.fn().mockReturnThis()
+
+    // Update mocks to use tracked functions
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'stripe_webhook_events') {
+        return {
+          select: stripeWebhookEventsSelect,
+          eq: stripeWebhookEventsEq,
+          maybeSingle: stripeWebhookEventsMaybeSingle,
+          insert: stripeWebhookEventsInsert,
+          update: vi.fn().mockReturnThis(),
+        }
+      }
+      if (table === 'sales') {
+        const salesChain = {
+          select: salesSelect,
+          eq: salesEq,
+          single: vi.fn().mockImplementation(() => {
+            salesCallCount++
+            if (salesCallCount === 1) {
+              return Promise.resolve({ data: { id: TEST_SALE_ID }, error: null })
+            }
+            return Promise.resolve({ data: mockSaleData, error: null })
+          }),
+        }
+        return {
+          insert: salesInsert.mockReturnValue(salesChain),
+          ...salesChain,
+        }
+      }
+      if (table === 'items') {
+        return {
+          insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      }
+      if (table === 'promotions') {
+        const promotionsChain = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: { id: TEST_PROMOTION_ID },
+            error: null,
+          }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+        return {
+          insert: vi.fn().mockReturnValue(promotionsChain),
+          ...promotionsChain,
+        }
+      }
+      if (table === 'sale_drafts') {
+        return {
+          delete: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+        }
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnThis(),
+      }
+    })
+
+    mockRlsDb.from.mockImplementation((table: string) => {
+      if (table === 'sale_drafts') {
+        return {
+          select: saleDraftsSelect,
+          eq: saleDraftsEq,
+          maybeSingle: saleDraftsMaybeSingle,
+        }
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
     })
 
     const request = createStripeWebhookRequest()
@@ -584,8 +682,65 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
 
+    // Diagnostic assertions: Check if we reached the email block
+    const canSendEmailCallCount = mockCanSendEmail.mock.calls.length
+    const sendSaleCreatedEmailCallCount = mockSendSaleCreatedEmail.mock.calls.length
+    const recordEmailSendCallCount = mockRecordEmailSend.mock.calls.length
+
+    // Assert: canSendEmail was called (proves we reached the email block)
+    expect(canSendEmailCallCount).toBeGreaterThan(0)
+    if (canSendEmailCallCount > 0) {
+      expect(mockCanSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileId: TEST_USER_ID,
+          emailType: 'sale_created_confirmation',
+          dedupeKey: `sale_created_promotion:${TEST_PAYMENT_INTENT_ID}`,
+        })
+      )
+      const canSendResult = await mockCanSendEmail.mock.results[0].value
+      expect(canSendResult).toBe(true)
+    }
+
+    // Assert: sendSaleCreatedEmail was called once (proves we attempted to send)
+    expect(sendSaleCreatedEmailCallCount).toBe(1)
+    if (sendSaleCreatedEmailCallCount > 0) {
+      expect(mockSendSaleCreatedEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sale: expect.objectContaining({
+            id: TEST_SALE_ID,
+            status: 'published',
+          }),
+          owner: {
+            email: TEST_USER_EMAIL,
+          },
+          isFeatured: true,
+          dedupeKey: `sale_created_promotion:${TEST_PAYMENT_INTENT_ID}`,
+        })
+      )
+    }
+
+    // If email functions weren't called, diagnose which earlier branch was taken
+    if (canSendEmailCallCount === 0 || sendSaleCreatedEmailCallCount === 0) {
+      // Check if webhook event was already processed (early return)
+      expect(stripeWebhookEventsMaybeSingle).toHaveBeenCalled()
+      
+      // Check if draft lookup happened
+      expect(saleDraftsSelect).toHaveBeenCalled()
+      expect(saleDraftsMaybeSingle).toHaveBeenCalled()
+      
+      // Check if sale creation happened
+      expect(salesInsert).toHaveBeenCalled()
+      
+      // If we got here but email wasn't called, something blocked the email path
+      throw new Error(
+        `Email block not reached. canSendEmail calls: ${canSendEmailCallCount}, ` +
+        `sendSaleCreatedEmail calls: ${sendSaleCreatedEmailCallCount}. ` +
+        `Check if paymentIntentId, user email, or env vars are missing.`
+      )
+    }
+
     // Assert: recordEmailSend is called once with deliveryStatus: 'failed'
-    expect(mockRecordEmailSend).toHaveBeenCalledTimes(1)
+    expect(recordEmailSendCallCount).toBe(1)
     expect(mockRecordEmailSend).toHaveBeenCalledWith(
       expect.objectContaining({
         profileId: TEST_USER_ID,

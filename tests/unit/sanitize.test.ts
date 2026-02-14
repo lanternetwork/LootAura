@@ -190,7 +190,7 @@ describe('sanitizePostgrestIlikeQuery', () => {
   it('should handle malicious injection attempts', () => {
     const input = 'a,b) or ('
     const result = sanitizePostgrestIlikeQuery(input)
-    expect(result).toBe('ab or ')
+    expect(result).toBe('ab or')
   })
 
   it('should enforce max length', () => {

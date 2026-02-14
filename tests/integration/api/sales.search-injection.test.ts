@@ -258,9 +258,14 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     expect(data.ok).toBe(true)
     
     // Check that .or() was called with sanitized filter
+    // Find the .or() call that contains title.ilike (search query filter, not date filter)
     const orCalls = orTracker.getCalls('or')
-    if (orCalls.length > 0) {
-      const filterStr = String(orCalls[0][0])
+    const searchQueryCall = orCalls.find(call => {
+      const filterStr = String(call[0])
+      return filterStr.includes('title.ilike')
+    })
+    if (searchQueryCall) {
+      const filterStr = String(searchQueryCall[0])
       expect(filterStr).toContain('garage sale')
       expect(filterStr).not.toContain(',')
       expect(filterStr).not.toContain('(')
@@ -324,9 +329,14 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     expect(data.ok).toBe(true)
     
     // Verify comma is removed from filter
+    // Find the .or() call that contains title.ilike (search query filter, not date filter)
     const orCalls = orTracker.getCalls('or')
-    if (orCalls.length > 0) {
-      const filterStr = String(orCalls[0][0])
+    const searchQueryCall = orCalls.find(call => {
+      const filterStr = String(call[0])
+      return filterStr.includes('title.ilike')
+    })
+    if (searchQueryCall) {
+      const filterStr = String(searchQueryCall[0])
       expect(filterStr).not.toContain(',')
       expect(filterStr).toContain('test')
       expect(filterStr).toContain('value')
@@ -389,9 +399,14 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     expect(data.ok).toBe(true)
     
     // Verify parentheses are removed
+    // Find the .or() call that contains title.ilike (search query filter, not date filter)
     const orCalls = orTracker.getCalls('or')
-    if (orCalls.length > 0) {
-      const filterStr = String(orCalls[0][0])
+    const searchQueryCall = orCalls.find(call => {
+      const filterStr = String(call[0])
+      return filterStr.includes('title.ilike')
+    })
+    if (searchQueryCall) {
+      const filterStr = String(searchQueryCall[0])
       expect(filterStr).not.toContain('(')
       expect(filterStr).not.toContain(')')
       expect(filterStr).toContain('test')
@@ -455,9 +470,14 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     expect(data.ok).toBe(true)
     
     // Verify wildcards are escaped (doubled)
+    // Find the .or() call that contains title.ilike (search query filter, not date filter)
     const orCalls = orTracker.getCalls('or')
-    if (orCalls.length > 0) {
-      const filterStr = String(orCalls[0][0])
+    const searchQueryCall = orCalls.find(call => {
+      const filterStr = String(call[0])
+      return filterStr.includes('title.ilike')
+    })
+    if (searchQueryCall) {
+      const filterStr = String(searchQueryCall[0])
       expect(filterStr).toContain('%%')
       expect(filterStr).toContain('__')
     }
@@ -519,9 +539,14 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     expect(data.ok).toBe(true)
     
     // Verify dangerous characters are removed
+    // Find the .or() call that contains title.ilike (search query filter, not date filter)
     const orCalls = orTracker.getCalls('or')
-    if (orCalls.length > 0) {
-      const filterStr = String(orCalls[0][0])
+    const searchQueryCall = orCalls.find(call => {
+      const filterStr = String(call[0])
+      return filterStr.includes('title.ilike')
+    })
+    if (searchQueryCall) {
+      const filterStr = String(searchQueryCall[0])
       expect(filterStr).not.toContain(',')
       expect(filterStr).not.toContain('(')
       expect(filterStr).not.toContain(')')
@@ -712,11 +737,16 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
 
     expect(data.ok).toBe(true)
     
+    // Find the .or() call that contains title.ilike (search query filter, not date filter)
     const orCalls = orTracker.getCalls('or')
-    expect(orCalls.length).toBeGreaterThan(0)
+    const searchQueryCall = orCalls.find(call => {
+      const filterStr = String(call[0])
+      return filterStr.includes('title.ilike')
+    })
+    expect(searchQueryCall).toBeDefined()
     
-    if (orCalls.length > 0) {
-      const filterStr = String(orCalls[0][0])
+    if (searchQueryCall) {
+      const filterStr = String(searchQueryCall[0])
       // Verify the filter structure is intact
       expect(filterStr).toContain('title.ilike')
       expect(filterStr).toContain('description.ilike')

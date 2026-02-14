@@ -3,9 +3,11 @@ name: ci
 on:
   pull_request:
     branches: ["main"]
+    # Run on PRs targeting main to match CodeQL/Vercel behavior
+    # This ensures full check suite (110+ checks) runs on main PRs
   push:
-    branches-ignore:
-      - main
+    # Run on all branches (main and feature branches)
+    # No branch filter means it runs on every push
   workflow_dispatch:
 
 permissions:
@@ -54,9 +56,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -99,9 +106,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -144,9 +156,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -210,9 +227,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -262,9 +284,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -316,9 +343,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -392,9 +424,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -450,9 +487,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -506,10 +548,24 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
 
+  release-hardening:
+    name: release-hardening
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Make script executable
+        run: chmod +x scripts/verify-release-hardening.sh
+
+      - name: Run release hardening verification
+        run: ./scripts/verify-release-hardening.sh
+
   notify-completion:
     name: notify-completion
     runs-on: ubuntu-latest
-    needs: [env-presence, lint, typecheck, test-unit, test-integration, test-e2e-smoke, build, css-scan, migration-verify]
+    needs: [env-presence, lint, typecheck, test-unit, test-integration, test-e2e-smoke, build, css-scan, migration-verify, release-hardening]
     if: always()
     steps:
       - name: Emit ci_completed event

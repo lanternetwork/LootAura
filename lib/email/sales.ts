@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
+import { redactEmailForLogging } from './logging'
 import { SaleCreatedConfirmationEmail, buildSaleCreatedSubject } from './templates/SaleCreatedConfirmationEmail'
 import type { Sale } from '@/lib/types'
 
@@ -140,6 +141,8 @@ export interface SendSaleCreatedEmailParams {
     displayName?: string
   }
   timezone?: string
+  isFeatured?: boolean
+  dedupeKey?: string
 }
 
 export interface SendSaleCreatedEmailResult {
@@ -159,7 +162,7 @@ export interface SendSaleCreatedEmailResult {
 export async function sendSaleCreatedEmail(
   params: SendSaleCreatedEmailParams
 ): Promise<SendSaleCreatedEmailResult> {
-  const { sale, owner, timezone = 'America/New_York' } = params
+  const { sale, owner, timezone = 'America/New_York', isFeatured = false, dedupeKey } = params
 
   // Guard: Only send for published sales
   if (sale.status !== 'published') {
@@ -176,7 +179,7 @@ export async function sendSaleCreatedEmail(
   if (!owner.email || typeof owner.email !== 'string' || owner.email.trim() === '') {
     console.error('[EMAIL_SALES] Cannot send email - invalid owner email:', {
       saleId: sale.id,
-      ownerEmail: owner.email,
+      ownerEmail: redactEmailForLogging(owner.email),
     })
     return { ok: false, error: 'Invalid owner email' }
   }
@@ -200,6 +203,7 @@ export async function sendSaleCreatedEmail(
       timeWindow,
       saleUrl,
       manageUrl,
+      isFeatured,
     })
 
     // Send email (non-blocking, errors are logged internally)
@@ -212,6 +216,8 @@ export async function sendSaleCreatedEmail(
         saleId: sale.id,
         ownerId: sale.owner_id,
         saleTitle: sale.title,
+        isFeatured,
+        ...(dedupeKey && { dedupeKey }),
       },
     })
 
@@ -221,7 +227,7 @@ export async function sendSaleCreatedEmail(
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL_SALES] Failed to send sale created email:', {
       saleId: sale.id,
-      ownerEmail: owner.email,
+      ownerEmail: redactEmailForLogging(owner.email),
       error: errorMessage,
     })
 

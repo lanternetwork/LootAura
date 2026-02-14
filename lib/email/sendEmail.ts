@@ -5,6 +5,7 @@
 
 import { ReactElement } from 'react'
 import { getResendClient } from './client'
+import { redactEmailForLogging, redactMetadataForLogging } from './logging'
 import type { EmailSendOptions } from './types'
 
 export interface SendEmailParams extends EmailSendOptions {
@@ -14,6 +15,7 @@ export interface SendEmailParams extends EmailSendOptions {
 export interface SendEmailResult {
   ok: boolean
   error?: string
+  resendEmailId?: string // Resend message ID for webhook correlation
 }
 
 /**
@@ -33,7 +35,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     // Always log this - it's important for debugging
     console.log('[EMAIL] Skipping email send (LOOTAURA_ENABLE_EMAILS not enabled):', {
       type,
-      to,
+      to: redactEmailForLogging(to),
       subject,
       actualValue: process.env.LOOTAURA_ENABLE_EMAILS,
       expectedValue: 'true',
@@ -50,7 +52,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     const error = new Error('RESEND_FROM_EMAIL (or EMAIL_FROM) is not set')
     console.error('[EMAIL] Configuration error:', {
       type,
-      to,
+      to: redactEmailForLogging(to),
       error: error.message,
       checkedVars: {
         hasResendFromEmail: !!process.env.RESEND_FROM_EMAIL,
@@ -73,7 +75,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     // Log before attempting to send (always, not just in debug mode)
     console.log('[EMAIL] Attempting to send email via Resend:', {
       type,
-      to,
+      to: redactEmailForLogging(to),
       subject,
       from: fromAddress,
       hasResendApiKey: !!process.env.RESEND_API_KEY,
@@ -92,23 +94,24 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     })
 
     // Always log success (not just in debug mode) - this confirms it reached Resend
+    const resendEmailId = result.data?.id
     console.log('[EMAIL] Email sent successfully via Resend:', {
       type,
-      to,
+      to: redactEmailForLogging(to),
       subject,
-      resendEmailId: result.data?.id,
-      metadata,
+      resendEmailId,
+      metadata: redactMetadataForLogging(metadata),
     })
-    return { ok: true }
+    return { ok: true, resendEmailId }
   } catch (error) {
     // Log structured error but don't throw - emails are non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL] Failed to send email:', {
       type,
-      to,
+      to: redactEmailForLogging(to),
       subject,
       error: errorMessage,
-      metadata,
+      metadata: redactMetadataForLogging(metadata),
     })
 
     // Optionally log to Sentry if available
@@ -120,9 +123,9 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
           emailType: type,
         },
         extra: {
-          to,
+          to: redactEmailForLogging(to),
           subject,
-          metadata,
+          metadata: redactMetadataForLogging(metadata),
         },
       })
     } catch {

@@ -8,7 +8,7 @@
 
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
@@ -27,9 +27,9 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
     return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   }
 
-  // Verify sale exists and get owner_id
-  const admin = getAdminDb()
-  const { data: sale, error: saleError } = await fromBase(admin, 'sales')
+  // Verify sale exists and get owner_id using RLS-aware client
+  const rls = getRlsDb()
+  const { data: sale, error: saleError } = await fromBase(rls, 'sales')
     .select('id, owner_id')
     .eq('id', saleId)
     .single()
@@ -50,9 +50,9 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
     }
   }
 
-  // Get current active promotion
+  // Get current active promotion using RLS-aware client (promotions has RLS SELECT policy)
   const now = new Date().toISOString()
-  const { data: activePromotion } = await fromBase(admin, 'promotions')
+  const { data: activePromotion } = await fromBase(rls, 'promotions')
     .select('id, status, tier, starts_at, ends_at, amount_cents, currency')
     .eq('sale_id', saleId)
     .eq('status', 'active')
@@ -60,8 +60,8 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
     .gte('ends_at', now)
     .maybeSingle()
 
-  // Get all promotions for this sale (for history)
-  const { data: allPromotions } = await fromBase(admin, 'promotions')
+  // Get all promotions for this sale (for history) using RLS-aware client
+  const { data: allPromotions } = await fromBase(rls, 'promotions')
     .select('id, status, tier, starts_at, ends_at, created_at')
     .eq('sale_id', saleId)
     .order('created_at', { ascending: false })

@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
 import { computePublishability, type DraftRecord } from '@/lib/drafts/computePublishability'
@@ -235,11 +235,10 @@ async function postDraftHandler(request: NextRequest) {
       })
     }
     
-    // Use admin client for writes (bypasses RLS, but we've already verified auth)
-    const admin = getAdminDb()
+    // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
+    const rls = getRlsDb()
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
-    const rls = getRlsDb()
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
       .select('id')
       .eq('user_id', user.id)
@@ -251,8 +250,8 @@ async function postDraftHandler(request: NextRequest) {
     let error: any
 
     if (existingDraft) {
-      // Update existing draft - write to base table using admin client
-      const { data: updatedDraft, error: updateError } = await fromBase(admin, 'sale_drafts')
+      // Update existing draft using RLS-aware client (sale_drafts has RLS UPDATE policy)
+      const { data: updatedDraft, error: updateError } = await fromBase(rls, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -265,8 +264,8 @@ async function postDraftHandler(request: NextRequest) {
       draft = updatedDraft
       error = updateError
     } else {
-      // Insert new draft - write to base table using admin client
-      const { data: newDraft, error: insertError } = await fromBase(admin, 'sale_drafts')
+      // Insert new draft using RLS-aware client (sale_drafts has RLS INSERT policy)
+      const { data: newDraft, error: insertError } = await fromBase(rls, 'sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -356,9 +355,9 @@ async function deleteDraftHandler(request: NextRequest) {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
-    // Mark draft as archived (soft delete) - write to base table using admin client (bypasses RLS, but we've already verified auth)
-    const admin = getAdminDb()
-    const { error } = await fromBase(admin, 'sale_drafts')
+    // Mark draft as archived (soft delete) using RLS-aware client (sale_drafts has RLS UPDATE policy)
+    const rls = getRlsDb()
+    const { error } = await fromBase(rls, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

@@ -10,7 +10,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const mockFromBase = vi.fn()
-const mockAdminDb = vi.fn()
+const mockAdminDb = {
+  from: vi.fn(),
+}
+const mockRlsDb = {
+  from: vi.fn(),
+}
 let currentUser: any = { id: 'user-1', email: 'user@example.test' }
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -27,8 +32,15 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
+  getRlsDb: () => mockRlsDb,
   getAdminDb: () => mockAdminDb,
-  fromBase: (db: any, table: string) => mockFromBase(db, table),
+  fromBase: (db: any, table: string) => {
+    // fromBase internally calls db.from(table), so we need to support that
+    if (db === mockRlsDb || db === mockAdminDb) {
+      return db.from(table)
+    }
+    return mockFromBase(db, table)
+  },
 }))
 
 const mockAssertAdminOrThrow = vi.fn()
@@ -51,6 +63,39 @@ describe('GET /api/promotions/status', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     currentUser = { id: 'user-1', email: 'user@example.test' }
+
+    // Configure mockRlsDb.from to return a chainable query for promotions
+    mockRlsDb.from.mockImplementation((table: string) => {
+      if (table === 'promotions') {
+        const result = {
+          data: [
+            {
+              sale_id: 'sale-1',
+              status: 'active',
+              tier: 'featured_week',
+              ends_at: '2030-01-01T00:00:00.000Z',
+              owner_profile_id: 'user-1',
+            },
+          ],
+          error: null,
+        }
+        const chain: any = {
+          select: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          eq: vi.fn(() => Promise.resolve(result)),
+          // Make chain awaitable (thenable) so it can be awaited directly
+          then: (onFulfilled: any, onRejected: any) => Promise.resolve(result).then(onFulfilled, onRejected),
+        }
+        return chain
+      }
+      return {
+        select: vi.fn(() => ({
+          in: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        })),
+      }
+    })
 
     // Default fromBase mock returns a simple chainable query for promotions
     mockFromBase.mockImplementation((_db: any, table: string) => {
@@ -107,6 +152,44 @@ describe('GET /api/promotions/status', () => {
     })
 
     // Configure promotions query to include both owned and non-owned promotions
+    mockRlsDb.from.mockImplementation((table: string) => {
+      if (table === 'promotions') {
+        const chain: any = {}
+        chain.select = vi.fn(() => chain)
+        chain.in = vi.fn(() => chain)
+        chain.eq = vi.fn((field: string, value: string) => {
+          if (field === 'owner_profile_id' && value === 'user-1') {
+            const result = {
+              data: [
+                {
+                  sale_id: 'sale-1',
+                  status: 'active',
+                  tier: 'featured_week',
+                  ends_at: '2030-01-01T00:00:00.000Z',
+                  owner_profile_id: 'user-1',
+                },
+              ],
+              error: null,
+            }
+            return Promise.resolve(result)
+          }
+          return Promise.resolve({ data: [], error: null })
+        })
+        // Make chain awaitable (thenable) so it can be awaited directly
+        chain.then = (onFulfilled: any, onRejected: any) => 
+          Promise.resolve({ data: [], error: null }).then(onFulfilled, onRejected)
+        return chain
+      }
+      return {
+        select: vi.fn(() => ({
+          in: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        })),
+      }
+    })
+
+    // Also update mockFromBase for backward compatibility
     mockFromBase.mockImplementation((_db: any, table: string) => {
       if (table === 'promotions') {
         const chain: any = {}

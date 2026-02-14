@@ -37,12 +37,15 @@ export async function createUnsubscribeToken(profileId: string): Promise<string>
   })
   
   if (error) {
-    // Log error but don't expose token in logs
-    console.error('[UNSUBSCRIBE_TOKEN] Failed to create unsubscribe token:', {
-      profileId,
-      error: error.message,
-      errorCode: error.code,
-      errorDetails: error.details,
+    // Log error with PII-safe fields only (no tokens, no full profileId, no raw error messages)
+    // Extract safe error code if available (PostgreSQL/Supabase error codes are non-sensitive)
+    const safeErrorCode = error.code && typeof error.code === 'string' ? error.code : undefined
+    const redactedProfileId = profileId ? `${profileId.substring(0, 8)}...` : '[no-profile-id]'
+    
+    console.error('[UNSUBSCRIBE_TOKEN] Failed to create unsubscribe token', {
+      profileId: redactedProfileId,
+      ...(safeErrorCode && { errorCode: safeErrorCode }),
+      // Do not log error.message or error.details as they may contain tokens/secrets
     })
     throw new Error(`Failed to create unsubscribe token: ${error.message}`)
   }

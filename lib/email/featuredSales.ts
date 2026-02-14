@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
+import { redactEmailForLogging } from './logging'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { FeaturedSalesEmail, buildFeaturedSalesSubject, type FeaturedSaleItem } from './templates/FeaturedSalesEmail'
 import { canSendEmail, recordEmailSend } from './emailLog'
@@ -76,7 +77,7 @@ export async function sendFeaturedSalesEmail(
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
     console.error('[EMAIL_FEATURED_SALES] Cannot send email - invalid recipient email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
     })
     return { ok: false, error: 'Invalid recipient email' }
@@ -85,7 +86,7 @@ export async function sendFeaturedSalesEmail(
   // Guard: Must have exactly 12 sales
   if (!sales || sales.length !== 12) {
     console.error('[EMAIL_FEATURED_SALES] Cannot send email - must have exactly 12 sales:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
     })
     return { ok: false, error: 'Must have exactly 12 sales' }
@@ -94,6 +95,9 @@ export async function sendFeaturedSalesEmail(
   try {
     // Build base URL for unsubscribe links
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+
+    // Build subject early (needed for error logging if token generation fails)
+    const subject = buildFeaturedSalesSubject(sales.length)
 
     // Generate dedupe key and check if email was already sent
     const dedupeKey = generateFeaturedSalesDedupeKey(profileId, weekKey)
@@ -122,27 +126,41 @@ export async function sendFeaturedSalesEmail(
       unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[EMAIL_FEATURED_SALES] Generated unsubscribe URL successfully', {
-          profileId,
+          profileId: profileId.substring(0, 8) + '...',
           hasUnsubscribeUrl: !!unsubscribeUrl,
         })
       }
     } catch (error) {
-      // Log but don't fail - email can still be sent without unsubscribe link
+      // Fail closed: token generation failure prevents email send
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('[EMAIL_FEATURED_SALES] Failed to generate unsubscribe token:', {
-        profileId,
+      // Extract non-sensitive error code if available (Supabase errors have a code property)
+      const errorCode = (error as any)?.code && typeof (error as any).code === 'string' 
+        ? (error as any).code 
+        : undefined
+      
+      console.error('[EMAIL_FEATURED_SALES] Failed to generate unsubscribe token, aborting email send:', {
+        profileId: profileId.substring(0, 8) + '...',
         error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
       })
       
-      // Generate a test token URL when token generation fails (for display purposes)
-      const testToken = 'test-token-' + profileId.substring(0, 8)
-      unsubscribeUrl = buildUnsubscribeUrl(testToken, baseUrl)
-      console.warn('[EMAIL_FEATURED_SALES] Using test unsubscribe URL (token generation failed):', {
+      // Record failed attempt in email_log with fixed, non-sensitive error message
+      await recordEmailSend({
         profileId,
-        testToken: testToken.substring(0, 20) + '...',
-        note: 'This is a test URL for display purposes only',
+        emailType: 'featured_sales',
+        toEmail: to.trim(),
+        subject,
+        dedupeKey,
+        deliveryStatus: 'failed',
+        errorMessage: 'Unsubscribe token generation failed',
+        meta: {
+          salesCount: sales.length,
+          weekKey,
+          failureReason: 'token_generation_failed',
+          ...(errorCode && { errorCode }),
+        },
       })
+      
+      return { ok: false, error: `Failed to generate unsubscribe token: ${errorMessage}` }
     }
 
     // Compose email
@@ -152,8 +170,6 @@ export async function sendFeaturedSalesEmail(
       baseUrl,
       unsubscribeUrl,
     })
-
-    const subject = buildFeaturedSalesSubject(sales.length)
 
     // Send email (non-blocking, errors are logged internally)
     const sendResult = await sendEmail({
@@ -184,6 +200,7 @@ export async function sendFeaturedSalesEmail(
         meta: {
           salesCount: sales.length,
           weekKey,
+          ...(sendResult.resendEmailId && { resendEmailId: sendResult.resendEmailId }),
         },
       })
     } catch (error) {
@@ -200,7 +217,7 @@ export async function sendFeaturedSalesEmail(
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL_FEATURED_SALES] Failed to send featured sales email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       profileId,
       error: errorMessage,
     })

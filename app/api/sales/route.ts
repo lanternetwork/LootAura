@@ -2,7 +2,7 @@
 // NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
 import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
@@ -936,67 +936,15 @@ async function salesHandler(request: NextRequest) {
         
       logger.debug('Direct query success', { component: 'sales', resultCount: results.length })
       
-      // 5. Compute isFeatured from active promotions (batch query)
+      // 5. Compute isFeatured from is_featured column (RLS-safe for public endpoint)
+      // Note: Promotion-based isFeatured requires admin client, which is not appropriate
+      // for public request-path endpoints. We rely on the is_featured column instead.
       if (results.length > 0) {
-        try {
-          const admin = getAdminDb()
-          const nowStr = new Date().toISOString()
-          const saleIds = results.map((s) => s.id)
-          
-          // Batch query active promotions for all sales
-          const { data: activePromotions, error: promoQueryError } = await fromBase(admin, 'promotions')
-            .select('sale_id, starts_at, ends_at, status')
-            .eq('status', 'active')
-            .lte('starts_at', nowStr)
-            .gte('ends_at', nowStr)
-            .in('sale_id', saleIds)
-          
-          if (promoQueryError) {
-            logger.error('Promotion query error', promoQueryError instanceof Error ? promoQueryError : new Error(String(promoQueryError)), {
-              component: 'sales',
-              operation: 'compute_isFeatured',
-              error: promoQueryError,
-            })
-          }
-          
-          // Create Set of featured sale IDs for O(1) lookup
-          const featuredSaleIds = new Set<string>()
-          if (activePromotions) {
-            activePromotions.forEach((p) => {
-              if (p.sale_id) {
-                featuredSaleIds.add(p.sale_id)
-              }
-            })
-            
-            // Debug logging in development
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true' && activePromotions.length > 0) {
-              logger.debug('Active promotions found', {
-                component: 'sales',
-                operation: 'compute_isFeatured',
-                count: activePromotions.length,
-                now: nowStr,
-                promotions: activePromotions.map(p => ({
-                  sale_id: p.sale_id,
-                  starts_at: p.starts_at,
-                  ends_at: p.ends_at,
-                  status: p.status,
-                })),
-              })
-            }
-          }
-          
-          // Attach isFeatured to each sale
-          results = results.map((sale) => ({
-            ...sale,
-            isFeatured: featuredSaleIds.has(sale.id),
-          }))
-        } catch (promoError) {
-          // Log error but don't fail - isFeatured will be undefined (fallback to is_featured)
-          logger.error('Failed to query promotions for isFeatured', promoError instanceof Error ? promoError : new Error(String(promoError)), {
-            component: 'sales',
-            operation: 'compute_isFeatured',
-          })
-        }
+        // Attach isFeatured from is_featured column (already present in results)
+        results = results.map((sale) => ({
+          ...sale,
+          isFeatured: sale.is_featured === true,
+        }))
       }
       
     } catch (queryError: any) {
@@ -1239,9 +1187,10 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert to base table using admin client (bypasses RLS, but we've already verified auth)
-    const admin = getAdminDb()
-    const fromSales = fromBase(admin, 'sales')
+    // Insert to base table using RLS-aware client (respects RLS policies)
+    // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
+    const rls = getRlsDb()
+    const fromSales = fromBase(rls, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {
@@ -1356,10 +1305,11 @@ async function postHandler(request: NextRequest) {
     }
     
     // Handle items if provided
+    // Use RLS-aware client for items insertion (RLS policy items_owner_insert ensures sale ownership)
     let itemCount = 0
     if (body.items?.length) {
       const withSale = body.items.map((it: any) => ({ ...it, sale_id: data.id }))
-      const { error: iErr } = await fromBase(admin, 'items').insert(withSale)
+      const { error: iErr } = await fromBase(rls, 'items').insert(withSale)
       if (iErr) {
         const { logger } = await import('@/lib/log')
         logger.error('Failed to create items', iErr instanceof Error ? iErr : new Error(String(iErr)), {

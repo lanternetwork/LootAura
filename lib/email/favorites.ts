@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
+import { redactEmailForLogging } from './logging'
 import { FavoriteSalesStartingSoonDigestEmail, buildFavoriteSalesStartingSoonDigestSubject, type SaleDigestItem } from './templates/FavoriteSalesStartingSoonDigestEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { recordEmailSend, canSendEmail, generateFavoritesDigestDedupeKey } from './emailLog'
@@ -160,7 +161,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
     console.error('[EMAIL_FAVORITES] Cannot send digest email - invalid recipient email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
     })
     return { ok: false, error: 'Invalid recipient email' }
@@ -169,7 +170,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   // Guard: Must have at least one sale
   if (!sales || sales.length === 0) {
     console.error('[EMAIL_FAVORITES] Cannot send digest email - no sales provided:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
     })
     return { ok: false, error: 'No sales provided' }
   }
@@ -191,7 +192,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   if (publishedSales.length === 0) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[EMAIL_FAVORITES] Skipping digest email - no published sales:', {
-        recipientEmail: to,
+        recipientEmail: redactEmailForLogging(to),
         totalSales: sales.length,
       })
     }
@@ -254,30 +255,41 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
         unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[EMAIL_FAVORITES] Generated unsubscribe URL successfully', {
-            profileId,
+            profileId: profileId.substring(0, 8) + '...',
             hasUnsubscribeUrl: !!unsubscribeUrl,
           })
         }
       } catch (error) {
-        // Log but don't fail - email can still be sent without unsubscribe link
+        // Fail closed: token generation failure prevents email send
         const errorMessage = error instanceof Error ? error.message : String(error)
-        console.error('[EMAIL_FAVORITES] Failed to generate unsubscribe token:', {
-          profileId,
+        // Extract non-sensitive error code if available (Supabase errors have a code property)
+        const errorCode = (error as any)?.code && typeof (error as any).code === 'string' 
+          ? (error as any).code 
+          : undefined
+        
+        console.error('[EMAIL_FAVORITES] Failed to generate unsubscribe token, aborting email send:', {
+          profileId: profileId.substring(0, 8) + '...',
           error: errorMessage,
-          stack: error instanceof Error ? error.stack : undefined,
         })
         
-        // Always generate a test token URL when token generation fails
-        // This ensures the unsubscribe link appears in emails even if the profileId doesn't exist
-        // The test token won't work (not in database), but shows the link for testing/display purposes
-        // In production with real profileIds, token generation should succeed, so this is mainly for testing
-        const testToken = 'test-token-' + profileId.substring(0, 8)
-        unsubscribeUrl = buildUnsubscribeUrl(testToken, baseUrl)
-        console.warn('[EMAIL_FAVORITES] Using test unsubscribe URL (token generation failed, likely profileId does not exist):', {
+        // Record failed attempt in email_log with fixed, non-sensitive error message
+        await recordEmailSend({
           profileId,
-          testToken: testToken.substring(0, 20) + '...',
-          note: 'This is a test URL for display purposes only',
+          emailType: 'favorites_digest',
+          toEmail: to.trim(),
+          subject,
+          dedupeKey,
+          deliveryStatus: 'failed',
+          errorMessage: 'Unsubscribe token generation failed',
+          meta: {
+            salesCount: digestItems.length,
+            hoursBeforeStart,
+            failureReason: 'token_generation_failed',
+            ...(errorCode && { errorCode }),
+          },
         })
+        
+        return { ok: false, error: `Failed to generate unsubscribe token: ${errorMessage}` }
       }
     } else {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -318,6 +330,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
       meta: {
         salesCount: digestItems.length,
         hoursBeforeStart,
+        ...(sendResult.resendEmailId && { resendEmailId: sendResult.resendEmailId }),
       },
     })
 
@@ -326,7 +339,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('[EMAIL_FAVORITES] Failed to send favorite sales starting soon digest email:', {
-      recipientEmail: to,
+      recipientEmail: redactEmailForLogging(to),
       salesCount: sales.length,
       error: errorMessage,
     })

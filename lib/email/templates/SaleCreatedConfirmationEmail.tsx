@@ -20,6 +20,7 @@ export interface SaleCreatedConfirmationEmailProps {
   timeWindow?: string
   saleUrl: string
   manageUrl: string
+  isFeatured?: boolean
 }
 
 export function SaleCreatedConfirmationEmail({
@@ -30,6 +31,7 @@ export function SaleCreatedConfirmationEmail({
   timeWindow,
   saleUrl,
   manageUrl,
+  isFeatured = false,
 }: SaleCreatedConfirmationEmailProps) {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
 
@@ -51,7 +53,12 @@ export function SaleCreatedConfirmationEmail({
 
       <Text style={textStyle}>
         Great news! Your yard sale has been successfully published and is now live on LootAura. 
-        Shoppers can now find and view your sale on the map.
+        {isFeatured && (
+          <>
+            {' '}Your sale is <strong>featured</strong>, which means it will be highlighted to shoppers and appear in our weekly featured sales email.
+          </>
+        )}
+        {' '}Shoppers can now find and view your sale on the map.
       </Text>
 
       <Section style={detailsSectionStyle}>

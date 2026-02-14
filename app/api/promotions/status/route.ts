@@ -12,7 +12,7 @@
 
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { fail, ok } from '@/lib/http/json'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
@@ -149,7 +149,9 @@ export async function GET(request: NextRequest) {
       return ok({ statuses: [] })
     }
 
-    const adminDb = getAdminDb()
+    // Use RLS-aware client - promotions_owner_select policy ensures users can only read their own promotions
+    // Admins can read all via promotions_admin_select policy
+    const rlsDb = getRlsDb()
 
     // Determine if caller is admin
     let isAdmin = false
@@ -163,12 +165,16 @@ export async function GET(request: NextRequest) {
     const now = new Date().toISOString()
 
     // Query promotions for these sale IDs (include starts_at for active check)
-    let query = fromBase(adminDb, 'promotions')
+    // RLS policies will automatically filter to user's own promotions (or all if admin)
+    let query = fromBase(rlsDb, 'promotions')
       .select('sale_id, status, tier, starts_at, ends_at, owner_profile_id')
       .in('sale_id', saleIds)
 
+    // RLS policy promotions_owner_select already restricts to owner_profile_id = auth.uid()
+    // For non-admins, RLS will automatically filter. For admins, promotions_admin_select allows all.
+    // The .eq() filter below is redundant but kept for explicit clarity
     if (!isAdmin) {
-      // Restrict to caller's own promotions (non-admins cannot see other owners)
+      // Explicitly filter to caller's own promotions (RLS also enforces this)
       query = query.eq('owner_profile_id', user.id)
     }
 

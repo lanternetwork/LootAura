@@ -320,6 +320,149 @@ async function finalizeDraftPromotion(
     draft_key: draftKey,
     payment_intent_id: paymentIntentId,
   })
+
+  // Send sale created confirmation email (with promotion indicator)
+  // Use idempotency to prevent duplicate emails on webhook retries
+  if (paymentIntentId) {
+    try {
+      // Get user email using Admin API
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE
+      
+      if (!url || !key) {
+        // Skip email if env vars not available
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.info('Skipping sale created email - env vars not available', {
+            component: 'webhooks/stripe',
+            operation: 'send_email',
+            saleId: createdSaleId,
+            hasUrl: !!url,
+            hasKey: !!key,
+          })
+        }
+      } else {
+        const { createClient } = await import('@supabase/supabase-js')
+        const adminBase = createClient(url, key, {
+          auth: { persistSession: false },
+          global: { headers: { 'apikey': key } }
+        })
+
+        const { data: userData, error: userError } = await adminBase.auth.admin.getUserById(userId)
+        
+        if (!userError && userData?.user?.email) {
+          // Check idempotency using dedupe key based on payment intent ID
+          const { canSendEmail, recordEmailSend } = await import('@/lib/email/emailLog')
+          const dedupeKey = `sale_created_promotion:${paymentIntentId}`
+          
+          const canSend = await canSendEmail({
+            profileId: userId,
+            emailType: 'sale_created_confirmation',
+            dedupeKey,
+            lookbackWindow: '7 days', // Prevent duplicates for a week
+          })
+
+          if (canSend) {
+            // Fetch full sale data for email
+            const { data: saleData } = await fromBase(admin, 'sales')
+              .select('*')
+              .eq('id', createdSaleId)
+              .single()
+
+            if (saleData && saleData.status === 'published') {
+              // Get user profile for display name (optional)
+              let displayName: string | undefined
+              try {
+                const { getUserProfile } = await import('@/lib/data/profileAccess')
+                const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+                const supabase = createSupabaseServerClient()
+                const profile = await getUserProfile(supabase, userId)
+                displayName = profile?.display_name ?? undefined
+              } catch {
+                // Profile fetch failed - continue without display name
+              }
+
+              // Use user's timezone or default to America/New_York
+              const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
+
+              // Send email using the comprehensive function (non-blocking)
+              const { sendSaleCreatedEmail } = await import('@/lib/email/sales')
+              const emailResult = await sendSaleCreatedEmail({
+                sale: saleData as any, // Type assertion needed due to Supabase query result type
+                owner: {
+                  email: userData.user.email,
+                  displayName,
+                },
+                timezone,
+                isFeatured: true, // Sale is promoted
+                dedupeKey,
+              })
+
+              // Record email send for idempotency (even if send failed, record the attempt)
+              if (emailResult.ok) {
+                await recordEmailSend({
+                  profileId: userId,
+                  emailType: 'sale_created_confirmation',
+                  toEmail: userData.user.email,
+                  subject: `Your yard sale is live on LootAura 🚀`,
+                  dedupeKey,
+                  deliveryStatus: 'sent',
+                  meta: {
+                    saleId: createdSaleId,
+                    promotionId: promotion?.id,
+                    paymentIntentId,
+                    isFeatured: true,
+                  },
+                })
+              } else {
+                // Record failed attempt with fixed non-sensitive error message
+                await recordEmailSend({
+                  profileId: userId,
+                  emailType: 'sale_created_confirmation',
+                  toEmail: userData.user.email,
+                  subject: `Your yard sale is live on LootAura 🚀`,
+                  dedupeKey,
+                  deliveryStatus: 'failed',
+                  errorMessage: 'Email send failed',
+                  meta: {
+                    saleId: createdSaleId,
+                    promotionId: promotion?.id,
+                    paymentIntentId,
+                    isFeatured: true,
+                  },
+                })
+              }
+
+              if (!emailResult.ok && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                logger.warn('Sale created email send failed (non-critical)', {
+                  component: 'webhooks/stripe',
+                  operation: 'send_email',
+                  saleId: createdSaleId,
+                  userId,
+                  error: emailResult.error || 'Unknown error',
+                })
+              }
+            }
+          } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            logger.info('Sale created email skipped - already sent (idempotent)', {
+              component: 'webhooks/stripe',
+              operation: 'send_email',
+              saleId: createdSaleId,
+              paymentIntentId,
+            })
+          }
+        }
+      }
+    } catch (emailError) {
+      // Log but don't fail - email sending is non-critical
+      logger.warn('Failed to send sale created confirmation email (non-critical)', {
+        component: 'webhooks/stripe',
+        operation: 'send_email',
+        saleId: createdSaleId,
+        userId,
+        error: emailError instanceof Error ? emailError.message : String(emailError),
+      })
+    }
+  }
   
   return { saleId: createdSaleId, promotionId: promotion?.id || null }
 }

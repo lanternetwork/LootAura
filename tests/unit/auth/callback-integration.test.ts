@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { GET } from '@/app/api/auth/callback/route'
+import { GET } from '@/app/auth/callback/route'
 
-// Mock NextResponse
+// Mock NextResponse (matching pattern from auth-callback.test.ts)
 vi.mock('next/server', async () => {
   const actual = await vi.importActual('next/server')
   return {
@@ -16,7 +16,7 @@ vi.mock('next/server', async () => {
 // Mock cookies
 vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({
-    get: vi.fn(),
+    getAll: vi.fn(() => []),
     set: vi.fn(),
   })),
 }))
@@ -28,8 +28,9 @@ const mockSupabaseClient = {
   },
 }
 
-vi.mock('@/lib/auth/server-session', () => ({
-  createServerSupabaseClient: vi.fn(() => mockSupabaseClient),
+// Mock @supabase/ssr createServerClient
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: vi.fn(() => mockSupabaseClient),
 }))
 
 // Mock fetch for profile creation
@@ -39,6 +40,9 @@ describe('OAuth Callback Route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     delete process.env.NEXT_PUBLIC_DEBUG
+    // Set required environment variables
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
   })
 
   describe('Error Handling', () => {
@@ -252,14 +256,23 @@ describe('OAuth Callback Route', () => {
       
       await GET(request)
       
+      // Verify that safe logging is used (no redirectTo, no full URLs, no codes)
       expect(consoleSpy).toHaveBeenCalledWith(
-        '🔄 [AUTH FLOW] oauth-callback → start: start',
+        '[AUTH_CALLBACK] Processing OAuth callback:',
         expect.objectContaining({
           hasCode: true,
           hasError: false,
-          redirectTo: '/sales',
+          pathname: '/auth/callback',
+          requestId: expect.any(String),
         })
       )
+      
+      // Verify that redirectTo is NOT logged (security requirement)
+      const logCalls = consoleSpy.mock.calls
+      const hasRedirectToInLogs = logCalls.some(call => 
+        JSON.stringify(call).includes('redirectTo')
+      )
+      expect(hasRedirectToInLogs).toBe(false)
 
       consoleSpy.mockRestore()
     })

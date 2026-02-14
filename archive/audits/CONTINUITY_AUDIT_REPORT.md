@@ -317,7 +317,6 @@ The PR is production-ready with one minor cleanup required. All security control
 
 ---
 
-**Audit completed by:** AI Assistant  
 **Review status:** Ready for owner review and merge
 
 

@@ -525,15 +525,18 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
         }
       }
       if (table === 'promotions') {
-        return {
-          insert: vi.fn().mockReturnThis(),
+        const promotionsChain = {
           select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue({
             data: { id: TEST_PROMOTION_ID },
             error: null,
           }),
-          eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // No existing promotion
+        }
+        return {
+          insert: vi.fn().mockReturnValue(promotionsChain), // insert() returns chainable object with select()
+          ...promotionsChain,
         }
       }
       if (table === 'sale_drafts') {

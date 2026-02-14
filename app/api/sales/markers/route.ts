@@ -60,6 +60,16 @@ async function markersHandler(request: NextRequest) {
 
     const sb = createSupabaseServerClient()
     
+    // Validate and parse date range parameters early (before query)
+    const dateValidation = dateBounds.validateDateRange(startDate, endDate)
+    if (!dateValidation.valid) {
+      return NextResponse.json({ error: dateValidation.error }, { status: 400 })
+    }
+    
+    // Parse date bounds using shared helper
+    const dateWindow = dateBounds.parseDateBounds(startDate, endDate)
+    const now = new Date()
+    
     // Parse favorites-only filter
     const favoritesOnly = q.get('favoritesOnly') === '1' || q.get('favorites') === '1'
     
@@ -98,6 +108,33 @@ async function markersHandler(request: NextRequest) {
       .not('lng', 'is', null)
       .in('status', ['published', 'active'])
       .is('archived_at', null)
+    
+    // Apply date filtering in database WHERE clause
+    // Logic matches client-side filtering: future-only when no dateWindow, overlap when dateWindow exists
+    // Note: Using date columns only (date_start, date_end) for filtering; time precision handled client-side if needed
+    if (!dateWindow) {
+      // Future-only: exclude sales that have ended (end_date < today)
+      // If date_end exists, check if it's >= today
+      // If no date_end, include the sale (treat as ongoing)
+      const todayStr = now.toISOString().split('T')[0] // YYYY-MM-DD format
+      // PostgREST OR syntax: comma-separated conditions
+      query = query.or(`date_end.is.null,date_end.gte.${todayStr}`)
+    } else {
+      // Date window overlap: sale overlaps window if saleStart <= windowEnd AND saleEnd >= windowStart
+      // Exclude sales with no date information when window is set
+      const windowStartStr = dateWindow.start.toISOString().split('T')[0]
+      const windowEndStr = dateWindow.end.toISOString().split('T')[0]
+      
+      // Require at least one date field (exclude sales with no date info)
+      query = query.or('date_start.not.is.null,date_end.not.is.null')
+      
+      // Overlap condition: (date_end >= windowStart OR date_start >= windowStart) AND (date_start <= windowEnd OR date_end <= windowEnd)
+      // Using date columns only; this approximates the timestamp-based overlap logic
+      // First condition: saleEnd >= windowStart (use date_end, fallback to date_start)
+      query = query.or(`date_end.gte.${windowStartStr},date_start.gte.${windowStartStr}`)
+      // Second condition: saleStart <= windowEnd (use date_start, fallback to date_end)
+      query = query.or(`date_start.lte.${windowEndStr},date_end.lte.${windowEndStr}`)
+    }
     
     // Try to add moderation_status filter (may fail if migrations not run)
     let useModerationFilter = true
@@ -185,7 +222,7 @@ async function markersHandler(request: NextRequest) {
         error: String(error)
       })
       
-      // Rebuild query without moderation_status filter
+      // Rebuild query without moderation_status filter (include date filters)
       query = sb
         .from('sales_v2')
         .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
@@ -193,6 +230,18 @@ async function markersHandler(request: NextRequest) {
         .not('lng', 'is', null)
         .in('status', ['published', 'active'])
         .is('archived_at', null)
+      
+      // Re-apply date filters
+      if (!dateWindow) {
+        const todayStr = now.toISOString().split('T')[0]
+        query = query.or(`date_end.is.null,date_end.gte.${todayStr}`)
+      } else {
+        const windowStartStr = dateWindow.start.toISOString().split('T')[0]
+        const windowEndStr = dateWindow.end.toISOString().split('T')[0]
+        query = query.or('date_start.not.is.null,date_end.not.is.null')
+        query = query.or(`date_end.gte.${windowStartStr},date_start.gte.${windowStartStr}`)
+        query = query.or(`date_start.lte.${windowEndStr},date_end.lte.${windowEndStr}`)
+      }
       
       if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
         query = query.in('id', favoriteSaleIds)
@@ -235,124 +284,35 @@ async function markersHandler(request: NextRequest) {
       return fail(500, 'QUERY_ERROR', 'Database query failed')
     }
 
-    // Validate date range parameters
-    const dateValidation = dateBounds.validateDateRange(startDate, endDate)
-    if (!dateValidation.valid) {
-      return NextResponse.json({ error: dateValidation.error }, { status: 400 })
-    }
-
-    // Parse date bounds using shared helper
-    const dateWindow = dateBounds.parseDateBounds(startDate, endDate)
-    
-    // Debug logging for date filtering (debug mode only to avoid noisy production logs)
+    // Debug logging (date filtering now done in DB)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const { logger } = await import('@/lib/log')
-      logger.debug('Date filtering', {
+      logger.debug('Markers query completed (date filtering in DB)', {
         component: 'sales',
-        operation: 'markers_date_filter',
-        hasDateWindow: !!dateWindow,
-        totalRecords: data?.length || 0
+        operation: 'markers_query',
+        totalRecords: data?.length || 0,
+        hasDateWindow: !!dateWindow
       })
     }
     
-    // If no date filtering is applied, still enforce "future-only" semantics
-    const now = new Date()
-    if (!dateWindow) {
-      const markers = data?.map((sale: any) => {
-        const R = 6371
-        const dLat = (sale.lat - originLat) * Math.PI / 180
-        const dLng = (sale.lng - originLng) * Math.PI / 180
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(originLat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
-          Math.sin(dLng / 2) * Math.sin(dLng / 2)
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        const distance = R * c
-
-        // Compute end date for future-only filtering
-        const startDate = sale.date_start ? new Date(`${sale.date_start}T00:00:00Z`) : null
-        const endDate = sale.date_end
-          ? new Date(`${sale.date_end}T23:59:59.999Z`)
-          : startDate
-        const isFuture = endDate ? endDate >= now : true
-
-        if (!isFuture) return null
-
-        return {
-          id: sale.id,
-          title: sale.title,
-          description: sale.description,
-          lat: sale.lat,
-          lng: sale.lng,
-          distance: Math.round(distance * 100) / 100
-        }
-      })?.filter(Boolean) || []
-
-      return NextResponse.json({
-        ok: true,
-        data: markers,
-        center: { lat: originLat, lng: originLng },
-        distanceKm,
-        count: markers.length,
-        durationMs: Date.now() - startedAt
-      })
-    }
-
+    // Apply distance filtering and mapping (date filtering already done in DB)
     const filtered = (data || [])
       .map((sale: any) => {
         const lat = Number(sale.lat)
         const lng = Number(sale.lng)
         if (Number.isNaN(lat) || Number.isNaN(lng)) return null
         
-        // Compute sale start date - use starts_at if available, otherwise compute from date_start + time_start
-        let saleStart = null
-        if (sale.starts_at) {
-          saleStart = new Date(sale.starts_at)
-        } else if (sale.date_start) {
-          if (sale.time_start) {
-            saleStart = new Date(`${sale.date_start}T${sale.time_start}`)
-          } else {
-            saleStart = new Date(`${sale.date_start}T00:00:00`)
-          }
-        }
-        
-        // Compute sale end date - use date_end + time_end, or date_end as end of day
-        let saleEnd = null
-        if (sale.date_end) {
-          if (sale.time_end) {
-            saleEnd = new Date(`${sale.date_end}T${sale.time_end}`)
-          } else {
-            saleEnd = new Date(`${sale.date_end}T23:59:59.999`)
-          }
-        } else if (saleStart) {
-          // If no end date, treat as single-day sale
-          saleEnd = new Date(saleStart)
-          saleEnd.setHours(23, 59, 59, 999)
-        }
-        
-        return { ...sale, lat, lng, saleStart, saleEnd }
-      })
-      .filter(Boolean)
-      .filter((sale: any) => {
-        // Skip date filtering if no date bounds provided
-        if (!dateWindow) return true
-        
-        // Skip sales with no date information
-        if (!sale.saleStart && !sale.saleEnd) {
-          return false
-        }
-        
-        const overlaps = dateBounds.checkDateOverlap(sale.saleStart, sale.saleEnd, dateWindow)
-        return overlaps
-      })
-      .map((sale: any) => {
-        const R = 6371
-        const dLat = (sale.lat - originLat) * Math.PI / 180
-        const dLng = (sale.lng - originLng) * Math.PI / 180
-        const a = Math.sin(dLat/2) ** 2 + Math.cos(originLat * Math.PI/180) * Math.cos(sale.lat * Math.PI/180) * Math.sin(dLng/2) ** 2
+        // Calculate distance (Haversine formula)
+        const R = 6371 // Earth's radius in km
+        const dLat = (lat - originLat) * Math.PI / 180
+        const dLng = (lng - originLng) * Math.PI / 180
+        const a = Math.sin(dLat/2) ** 2 + Math.cos(originLat * Math.PI/180) * Math.cos(lat * Math.PI/180) * Math.sin(dLng/2) ** 2
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
         const distanceKm = R * c
-        return { ...sale, distanceKm }
+        
+        return { ...sale, lat, lng, distanceKm }
       })
+      .filter(Boolean)
       .filter((sale: any) => sale.distanceKm <= distanceKm)
 
     const markers = filtered

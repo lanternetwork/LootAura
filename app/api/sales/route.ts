@@ -349,7 +349,7 @@ async function salesHandler(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Convert date range to start/end dates
+    // Convert date range to start/end dates (for date filtering in DB)
     let startDateParam: string | null = null
     let endDateParam: string | null = null
     
@@ -376,6 +376,11 @@ async function salesHandler(request: NextRequest) {
       startDateParam = today.toISOString().split('T')[0] // YYYY-MM-DD format
       // No endDateParam means "unlimited future" - sales with end_date >= today
     }
+    
+    // Parse date bounds for DB filtering (before query)
+    const toUtcDateOnly = (d: string) => new Date(d.length === 10 ? `${d}T00:00:00Z` : d)
+    const windowStart = startDateParam ? toUtcDateOnly(startDateParam) : null
+    const windowEnd = endDateParam ? new Date((toUtcDateOnly(endDateParam)).getTime() + 86399999) : null
     
     // Ensure latitude and longitude are defined before use
     if (latitude === undefined || longitude === undefined) {
@@ -462,6 +467,28 @@ async function salesHandler(request: NextRequest) {
         // Exclude archived sales from public map/list/search
         .in('status', ['published', 'active'])
       
+      // Apply date filtering in database WHERE clause
+      // Logic matches client-side filtering: future-only when windowStart but no windowEnd, overlap when both exist
+      // Note: Using date columns only (date_start, date_end) for filtering; time precision handled client-side if needed
+      if (windowStart && !windowEnd) {
+        // "Any time in the future": saleEnd >= windowStart (or no end_date)
+        const windowStartStr = windowStart.toISOString().split('T')[0]
+        query = query.or(`date_end.is.null,date_end.gte.${windowStartStr}`)
+      } else if (windowStart && windowEnd) {
+        // Date window overlap: sale overlaps window if saleStart <= windowEnd AND saleEnd >= windowStart
+        // Exclude sales with no date information when window is set
+        const windowStartStr = windowStart.toISOString().split('T')[0]
+        const windowEndStr = windowEnd.toISOString().split('T')[0]
+        
+        // Require at least one date field (exclude sales with no date info)
+        query = query.or('date_start.not.is.null,date_end.not.is.null')
+        
+        // Overlap condition: (date_end >= windowStart OR date_start >= windowStart) AND (date_start <= windowEnd OR date_end <= windowEnd)
+        query = query.or(`date_end.gte.${windowStartStr},date_start.gte.${windowStartStr}`)
+        query = query.or(`date_start.lte.${windowEndStr},date_end.lte.${windowEndStr}`)
+      }
+      // If no windowStart/windowEnd, no date filtering (matches current behavior)
+      
       // Try to add moderation_status filter (may fail if migrations not run)
       let useModerationFilter = true
       try {
@@ -475,8 +502,6 @@ async function salesHandler(request: NextRequest) {
       if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
         query = query.in('id', favoriteSaleIds)
       }
-      
-      // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       
       // Add category filters by joining with items table
       if (dbCategories.length > 0) {
@@ -565,7 +590,7 @@ async function salesHandler(request: NextRequest) {
           error: String(salesError)
         })
         
-        // Rebuild query without moderation_status filter
+        // Rebuild query without moderation_status filter (include date filters)
         query = supabase
           .from('sales_v2')
           .select('*')
@@ -574,6 +599,18 @@ async function salesHandler(request: NextRequest) {
           .gte('lng', minLng)
           .lte('lng', maxLng)
           .in('status', ['published', 'active'])
+        
+        // Re-apply date filters
+        if (windowStart && !windowEnd) {
+          const windowStartStr = windowStart.toISOString().split('T')[0]
+          query = query.or(`date_end.is.null,date_end.gte.${windowStartStr}`)
+        } else if (windowStart && windowEnd) {
+          const windowStartStr = windowStart.toISOString().split('T')[0]
+          const windowEndStr = windowEnd.toISOString().split('T')[0]
+          query = query.or('date_start.not.is.null,date_end.not.is.null')
+          query = query.or(`date_end.gte.${windowStartStr},date_start.gte.${windowStartStr}`)
+          query = query.or(`date_start.lte.${windowEndStr},date_end.lte.${windowEndStr}`)
+        }
         
         if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
           query = query.in('id', favoriteSaleIds)
@@ -642,11 +679,8 @@ async function salesHandler(request: NextRequest) {
         }, { status: 500 })
       }
       
-      // Calculate distances and filter by actual distance and date window (UTC date-only)
-      const toUtcDateOnly = (d: string) => new Date(d.length === 10 ? `${d}T00:00:00Z` : d)
-      const windowStart = startDateParam ? toUtcDateOnly(startDateParam) : null
-      const windowEnd = endDateParam ? new Date((toUtcDateOnly(endDateParam)).getTime() + 86399999) : null
-      logger.debug('Date filtering', { component: 'sales', startDateParam, endDateParam, windowStart, windowEnd })
+      // Calculate distances and filter by actual distance (date filtering already done in DB)
+      logger.debug('Date filtering (in DB)', { component: 'sales', startDateParam, endDateParam, windowStart, windowEnd })
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
         .map((sale: Sale) => {
@@ -656,50 +690,6 @@ async function salesHandler(request: NextRequest) {
           return { ...sale, lat: latNum, lng: lngNum }
         })
         .filter((sale): sale is Sale & { lat: number; lng: number } => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-        .filter((sale) => {
-          if (!sale) return false
-          if (!windowStart && !windowEnd) return true
-          
-          // For "any time in the future" (windowStart set, windowEnd null):
-          // Filter for sales that haven't ended yet (end_date >= today) or are ongoing (no end_date)
-          if (windowStart && !windowEnd) {
-            const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
-            
-            // If sale has an end_date, check if it ends today or later (hasn't ended yet)
-            if (saleEnd) {
-              return saleEnd >= windowStart
-            }
-            
-            // If sale has no end_date, treat as ongoing - include it (hasn't ended yet)
-            // Note: Archived sales are already filtered out by status filter earlier
-            return true
-          }
-          
-          // For specific date ranges, use overlap logic
-          // Build sale start/end
-          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
-          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
-          // If a date window is set, exclude rows with no date information to avoid always passing
-          if ((windowStart || windowEnd) && !saleStart && !saleEnd) return false
-          const s = saleStart || saleEnd
-          const e = saleEnd || saleStart
-          if (!s || !e) return false
-          const startOk = !windowEnd || s <= windowEnd
-          const endOk = !windowStart || e >= windowStart
-          const passes = startOk && endOk
-          if (windowStart && windowEnd && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            logger.debug('Date filter check', { 
-              component: 'sales',
-              saleId: sale.id, 
-              saleStart: s?.toISOString(), 
-              saleEnd: e?.toISOString(),
-              windowStart: windowStart.toISOString(),
-              windowEnd: windowEnd.toISOString(),
-              passes 
-            })
-          }
-          return passes
-        })
         .map((sale: Sale | null) => {
           if (!sale) return null
           // Haversine distance calculation

@@ -270,12 +270,10 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
       // The commas are part of PostgREST .or() syntax (separating conditions), not from user input
       expect(filterStr).toContain('garage sale')
       expect(filterStr).toContain('title.ilike')
-      // Verify user input doesn't contain dangerous chars (check the sanitized query value, not the full filter)
-      // The filter structure has commas, but the user's sanitized input should not
-      const sanitizedQuery = 'garage sale' // This is what was sanitized from user input
-      expect(sanitizedQuery).not.toContain(',')
-      expect(sanitizedQuery).not.toContain('(')
-      expect(sanitizedQuery).not.toContain(')')
+      expect(filterStr).toContain('description.ilike')
+      expect(filterStr).toContain('address.ilike')
+      // For benign input 'garage sale', no dangerous chars to verify removal
+      // But verify the filter structure is correct (has 3 parts separated by commas)
     }
   })
 

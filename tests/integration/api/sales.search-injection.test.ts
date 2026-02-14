@@ -142,6 +142,7 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
                 return countPromise.finally.bind(countPromise)
               }
               // For any other method (eq, in, etc.), return the same proxy for chaining
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               return function(...args: any[]) {
                 return createCountQuery()
               }
@@ -158,6 +159,7 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
         return new Proxy(mainQuery, {
           get(target, prop) {
             if (prop === 'select') {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               return function(columns?: string, options?: any) {
                 // If options has count, return count query
                 if (options?.count || options?.head) {

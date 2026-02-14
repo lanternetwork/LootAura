@@ -3060,7 +3060,7 @@ function ReviewStep({
         </button>
       </div>
       </div>
-    </DiagnosticErrorBoundary>
+    </div>
   )
 }
 

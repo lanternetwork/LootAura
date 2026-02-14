@@ -13,6 +13,7 @@ import { Policies } from '@/lib/rateLimit/policies'
 import { z } from 'zod'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
+import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -287,8 +288,11 @@ async function salesHandler(request: NextRequest) {
       })
     }
     
-    const q = searchParams.get('q')
-    if (q && q.length > 64) {
+    const qRaw = searchParams.get('q')
+    // Sanitize search query to prevent PostgREST filter injection
+    // Max length enforced in sanitization function (200 chars)
+    const q = qRaw ? sanitizePostgrestIlikeQuery(qRaw, 200) : null
+    if (qRaw && qRaw.length > 200) {
       return fail(400, 'QUERY_TOO_LONG', 'Search query too long')
     }
     

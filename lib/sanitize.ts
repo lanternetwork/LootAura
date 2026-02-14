@@ -275,6 +275,42 @@ export function sanitizeSearchQuery(input: string): string {
   return sanitized.trim()
 }
 
+/**
+ * Sanitize search query for PostgREST .or() ilike filters
+ * Prevents filter injection by escaping wildcards and removing syntax-breaking characters
+ * 
+ * @param input - Raw search query string
+ * @param maxLength - Maximum allowed length (default: 200)
+ * @returns Sanitized string safe for use in PostgREST .or() ilike filters
+ */
+export function sanitizePostgrestIlikeQuery(input: string, maxLength: number = 200): string {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Trim and limit length first
+  let sanitized = input.trim()
+  if (sanitized.length > maxLength) {
+    sanitized = sanitized.substring(0, maxLength)
+  }
+  
+  // Remove characters that can break PostgREST .or() syntax:
+  // - Commas (,) - separate filter expressions in .or()
+  // - Parentheses () - can break filter grouping
+  // - Quotes (single and double) - can break string boundaries
+  sanitized = sanitized.replace(/[,()'"]/g, '')
+  
+  // Escape PostgreSQL ILIKE wildcards:
+  // - % matches any sequence of characters
+  // - _ matches any single character
+  // Escape them by doubling (PostgreSQL standard)
+  sanitized = sanitized.replace(/%/g, '%%')
+  sanitized = sanitized.replace(/_/g, '__')
+  
+  // Remove any remaining control characters
+  sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, '')
+  
+  return sanitized.trim()
+}
+
 // Validation helpers
 export function isValidUuid(input: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i

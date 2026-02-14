@@ -8,6 +8,7 @@ import {
   sanitizeAddress, 
   sanitizeTags,
   sanitizeSearchQuery,
+  sanitizePostgrestIlikeQuery,
   isValidUuid,
   isValidLatitude,
   isValidLongitude,
@@ -149,9 +150,75 @@ describe('sanitizeSearchQuery', () => {
   })
 
   it('should remove dangerous characters', () => {
-    const input = 'garage sale <>&"\''
+    const input = 'garage sale <>&"\'' 
     const result = sanitizeSearchQuery(input)
     expect(result).toBe('garage sale')
+  })
+})
+
+describe('sanitizePostgrestIlikeQuery', () => {
+  it('should handle benign queries', () => {
+    const input = 'garage sale'
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('garage sale')
+  })
+
+  it('should escape PostgreSQL wildcards', () => {
+    const input = 'test%value_here'
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('test%%value__here')
+  })
+
+  it('should remove commas that break .or() syntax', () => {
+    const input = 'test,value'
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('testvalue')
+  })
+
+  it('should remove parentheses that break filter syntax', () => {
+    const input = 'test(value)'
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('testvalue')
+  })
+
+  it('should remove quotes that break string boundaries', () => {
+    const input = "test'value\"here"
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('testvaluehere')
+  })
+
+  it('should handle malicious injection attempts', () => {
+    const input = 'a,b) or ('
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('ab or ')
+  })
+
+  it('should enforce max length', () => {
+    const input = 'a'.repeat(300)
+    const result = sanitizePostgrestIlikeQuery(input, 200)
+    expect(result.length).toBe(200)
+  })
+
+  it('should remove control characters', () => {
+    const input = 'test\x00\x1F\x7Fvalue'
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('testvalue')
+  })
+
+  it('should handle empty string', () => {
+    const result = sanitizePostgrestIlikeQuery('')
+    expect(result).toBe('')
+  })
+
+  it('should handle null/undefined', () => {
+    expect(sanitizePostgrestIlikeQuery(null as any)).toBe('')
+    expect(sanitizePostgrestIlikeQuery(undefined as any)).toBe('')
+  })
+
+  it('should trim whitespace', () => {
+    const input = '  test value  '
+    const result = sanitizePostgrestIlikeQuery(input)
+    expect(result).toBe('test value')
   })
 })
 

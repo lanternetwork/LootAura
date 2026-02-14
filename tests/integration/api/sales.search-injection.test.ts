@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/sales/route'
+import { makeThenableQuery, createCallTracker, type QueryResult } from '../../helpers/mockSupabaseQuery'
 
 // Mock Supabase clients
 const mockSupabaseClient = {
@@ -69,69 +70,119 @@ vi.mock('@/lib/shared/dateBounds', () => ({
 
 // Mock bbox validation
 vi.mock('@/lib/shared/bboxValidation', () => ({
-  validateBboxSize: vi.fn(() => ({ valid: true })),
+  validateBboxSize: vi.fn(() => null), // Return null (no error) for valid bbox
   getBboxSummary: vi.fn(() => ({})),
 }))
+
+/**
+ * Helper to assert response status and log detailed error if it fails
+ */
+async function assertResponseStatus(
+  response: Response,
+  expectedStatus: number,
+  context?: string
+): Promise<void> {
+  if (response.status !== expectedStatus) {
+    // Try to get error details
+    let errorBody: any = null
+    let errorText = ''
+    
+    try {
+      const cloned = response.clone()
+      errorBody = await cloned.json().catch(() => null)
+    } catch {
+      // Ignore JSON parse errors
+    }
+    
+    try {
+      const cloned = response.clone()
+      errorText = await cloned.text().catch(() => '')
+    } catch {
+      // Ignore text parse errors
+    }
+    
+    // Truncate to ~2k chars
+    const errorBodyStr = errorBody ? JSON.stringify(errorBody, null, 2).substring(0, 2000) : 'null'
+    const errorTextStr = errorText.substring(0, 2000)
+    
+    console.error(`[TEST ERROR] Expected status ${expectedStatus}, got ${response.status}${context ? ` (${context})` : ''}`)
+    console.error(`[TEST ERROR] Response body (JSON):`, errorBodyStr)
+    console.error(`[TEST ERROR] Response body (text):`, errorTextStr)
+    
+    expect(response.status).toBe(expectedStatus)
+  }
+}
 
 describe('GET /api/sales - Search Query Injection Prevention', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     
-    // Create a reusable query chain factory that properly chains all methods
-    const createQueryChain = (captureOr?: (filter: string) => void) => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        neq: vi.fn(() => chain),
-        or: vi.fn((filter: string) => {
-          if (captureOr) captureOr(filter)
-          return chain
-        }),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
-    }
+    // Default query result
+    const defaultResult: QueryResult = { data: [], error: null, count: 0 }
     
-    // Setup default mocks for count query and main query
+    // Setup default mocks for sales_v2 queries
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        // Count query returns { count, error }
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
+        // For count queries: .select('*', { count: 'exact', head: true })
+        // This returns { count, error } (not { data, error, count })
+        // Create a thenable that supports chaining and returns { count, error }
+        const createCountQuery = () => {
+          const countPromise = Promise.resolve({ count: 0, error: null })
+          return new Proxy({}, {
+            get(_target, prop) {
+              const propName = String(prop)
+              if (propName === 'then') {
+                return countPromise.then.bind(countPromise)
+              }
+              if (propName === 'catch') {
+                return countPromise.catch.bind(countPromise)
+              }
+              if (propName === 'finally') {
+                return countPromise.finally.bind(countPromise)
+              }
+              // For any other method (eq, in, etc.), return the same proxy for chaining
+              return function(...args: any[]) {
+                return createCountQuery()
+              }
+            }
+          })
         }
-        // Main query chain
-        const mainChain = createQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        
+        // For main queries: regular select chain
+        const mainQuery = makeThenableQuery(defaultResult)
+        
+        // Return an object that has both behaviors
+        // When .select() is called with count options, return count query
+        // Otherwise return main query
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                // If options has count, return count query
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                // Otherwise return main query (which is chainable)
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      // Default query chain
-      return createQueryChain()
+      // Default for other tables
+      return makeThenableQuery(defaultResult)
     })
     
     // Mock items_v2 query (for category filtering)
     mockFromBase.mockImplementation((db: any, table: string) => {
       if (table === 'items_v2') {
-        return {
-          select: vi.fn(() => Promise.resolve({ 
-            data: [], 
-            error: null 
-          })),
-        }
+        return makeThenableQuery({ 
+          data: [], 
+          error: null 
+        })
       }
-      return {
-        select: vi.fn(() => Promise.resolve({ data: [], error: null })),
-      }
+      return makeThenableQuery({ data: [], error: null })
     })
   })
 
@@ -149,276 +200,332 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
   it('should handle benign search query', async () => {
     const request = createRequest('garage sale')
     
-    let capturedFilter: string | null = null
+    const tracker = createCallTracker()
+    const orTracker = createCallTracker()
     
-    // Create query chain that captures the filter
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        neq: vi.fn(() => chain),
-        or: vi.fn((filter: string) => {
-          capturedFilter = filter
-          return chain
-        }),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    // Create query that tracks .or() calls
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null }, orTracker)
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'benign search query')
     const data = await response.json()
 
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    if (capturedFilter) {
-      expect(capturedFilter).toContain('garage sale')
-      expect(capturedFilter).not.toContain(',')
-      expect(capturedFilter).not.toContain('(')
-      expect(capturedFilter).not.toContain(')')
+    
+    // Check that .or() was called with sanitized filter
+    const orCalls = orTracker.getCalls('or')
+    if (orCalls.length > 0) {
+      const filterStr = String(orCalls[0][0])
+      expect(filterStr).toContain('garage sale')
+      expect(filterStr).not.toContain(',')
+      expect(filterStr).not.toContain('(')
+      expect(filterStr).not.toContain(')')
     }
   })
 
   it('should sanitize commas that break .or() syntax', async () => {
     const request = createRequest('test,value')
     
-    let capturedFilter: string | null = null
+    const orTracker = createCallTracker()
     
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        or: vi.fn((filter: string) => {
-          capturedFilter = filter
-          return chain
-        }),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null }, orTracker)
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'sanitize commas')
     const data = await response.json()
 
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    if (capturedFilter) {
-      // Verify comma is removed from filter
-      expect(capturedFilter).not.toContain(',')
-      expect(capturedFilter).toContain('test')
-      expect(capturedFilter).toContain('value')
+    
+    // Verify comma is removed from filter
+    const orCalls = orTracker.getCalls('or')
+    if (orCalls.length > 0) {
+      const filterStr = String(orCalls[0][0])
+      expect(filterStr).not.toContain(',')
+      expect(filterStr).toContain('test')
+      expect(filterStr).toContain('value')
     }
   })
 
   it('should sanitize parentheses that break filter syntax', async () => {
     const request = createRequest('test(value)')
     
-    let capturedFilter: string | null = null
+    const orTracker = createCallTracker()
     
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        or: vi.fn((filter: string) => {
-          capturedFilter = filter
-          return chain
-        }),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null }, orTracker)
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'sanitize parentheses')
     const data = await response.json()
 
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    if (capturedFilter) {
-      // Verify parentheses are removed
-      expect(capturedFilter).not.toContain('(')
-      expect(capturedFilter).not.toContain(')')
-      expect(capturedFilter).toContain('test')
-      expect(capturedFilter).toContain('value')
+    
+    // Verify parentheses are removed
+    const orCalls = orTracker.getCalls('or')
+    if (orCalls.length > 0) {
+      const filterStr = String(orCalls[0][0])
+      expect(filterStr).not.toContain('(')
+      expect(filterStr).not.toContain(')')
+      expect(filterStr).toContain('test')
+      expect(filterStr).toContain('value')
     }
   })
 
   it('should escape PostgreSQL wildcards (% and _)', async () => {
     const request = createRequest('test%value_here')
     
-    let capturedFilter: string | null = null
+    const orTracker = createCallTracker()
     
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        or: vi.fn((filter: string) => {
-          capturedFilter = filter
-          return chain
-        }),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null }, orTracker)
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'escape wildcards')
     const data = await response.json()
 
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    if (capturedFilter) {
-      // Verify wildcards are escaped (doubled)
-      expect(capturedFilter).toContain('%%')
-      expect(capturedFilter).toContain('__')
+    
+    // Verify wildcards are escaped (doubled)
+    const orCalls = orTracker.getCalls('or')
+    if (orCalls.length > 0) {
+      const filterStr = String(orCalls[0][0])
+      expect(filterStr).toContain('%%')
+      expect(filterStr).toContain('__')
     }
   })
 
   it('should handle malicious injection attempt: a,b) or (', async () => {
     const request = createRequest('a,b) or (')
     
-    let capturedFilter: string | null = null
+    const orTracker = createCallTracker()
     
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        or: vi.fn((filter: string) => {
-          capturedFilter = filter
-          return chain
-        }),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null }, orTracker)
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'malicious injection')
     const data = await response.json()
 
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    if (capturedFilter) {
-      // Verify dangerous characters are removed
-      expect(capturedFilter).not.toContain(',')
-      expect(capturedFilter).not.toContain('(')
-      expect(capturedFilter).not.toContain(')')
+    
+    // Verify dangerous characters are removed
+    const orCalls = orTracker.getCalls('or')
+    if (orCalls.length > 0) {
+      const filterStr = String(orCalls[0][0])
+      expect(filterStr).not.toContain(',')
+      expect(filterStr).not.toContain('(')
+      expect(filterStr).not.toContain(')')
       // Query should still be valid
-      expect(capturedFilter).toContain('title.ilike')
-      expect(capturedFilter).toContain('description.ilike')
-      expect(capturedFilter).toContain('address.ilike')
+      expect(filterStr).toContain('title.ilike')
+      expect(filterStr).toContain('description.ilike')
+      expect(filterStr).toContain('address.ilike')
     }
   })
 
@@ -427,10 +534,10 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     const request = createRequest(longQuery)
     
     const response = await GET(request)
+    await assertResponseStatus(response, 400, 'max length')
     const data = await response.json()
 
     // Should return 400 for query too long
-    expect(response.status).toBe(400)
     expect(data.ok).toBe(false)
     expect(data.code).toBe('QUERY_TOO_LONG')
   })
@@ -438,90 +545,110 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
   it('should handle empty search query', async () => {
     const request = createRequest('')
     
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        neq: vi.fn(() => chain),
-        or: vi.fn(() => chain),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null })
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'empty query')
     const data = await response.json()
 
     // Empty query should not trigger .or() call
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
   })
 
   it('should handle null search query', async () => {
     const request = createRequest(null)
     
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        neq: vi.fn(() => chain),
-        or: vi.fn(() => chain),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null })
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'null query')
     const data = await response.json()
 
     // Null query should not trigger .or() call
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
   })
 
@@ -530,60 +657,71 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
     // to return more results than it should
     const request = createRequest('test%')
     
-    let capturedFilter: string | null = null
+    const orTracker = createCallTracker()
     
-    const createMockQueryChain = () => {
-      const chain: any = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        gte: vi.fn(() => chain),
-        lte: vi.fn(() => chain),
-        or: vi.fn((filter: string) => {
-          capturedFilter = filter
-          return chain
-        }),
-        order: vi.fn(() => chain),
-        range: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
-      }
-      return chain
+    const createCountQuery = () => {
+      const countPromise = Promise.resolve({ count: 0, error: null })
+      return new Proxy({}, {
+        get(_target, prop) {
+          const propName = String(prop)
+          if (propName === 'then') {
+            return countPromise.then.bind(countPromise)
+          }
+          if (propName === 'catch') {
+            return countPromise.catch.bind(countPromise)
+          }
+          if (propName === 'finally') {
+            return countPromise.finally.bind(countPromise)
+          }
+          return function(...args: any[]) {
+            return createCountQuery()
+          }
+        }
+      })
     }
     
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
-        const countChain = {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-          })),
-        }
-        const mainChain = createMockQueryChain()
-        return {
-          ...mainChain,
-          ...countChain,
-        }
+        const mainQuery = makeThenableQuery({ data: [], error: null }, orTracker)
+        
+        return new Proxy(mainQuery, {
+          get(target, prop) {
+            if (prop === 'select') {
+              return function(columns?: string, options?: any) {
+                if (options?.count || options?.head) {
+                  return createCountQuery()
+                }
+                return target
+              }
+            }
+            return (target as any)[prop]
+          }
+        })
       }
-      return createMockQueryChain()
+      return makeThenableQuery({ data: [], error: null })
     })
+    
+    mockFromBase.mockImplementation(() => makeThenableQuery({ data: [], error: null }))
 
     const response = await GET(request)
+    await assertResponseStatus(response, 200, 'malicious input scope')
     const data = await response.json()
 
-    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    expect(capturedFilter).not.toBeNull()
-    if (capturedFilter) {
+    
+    const orCalls = orTracker.getCalls('or')
+    expect(orCalls.length).toBeGreaterThan(0)
+    
+    if (orCalls.length > 0) {
+      const filterStr = String(orCalls[0][0])
       // Verify the filter structure is intact
-      expect(capturedFilter).toContain('title.ilike')
-      expect(capturedFilter).toContain('description.ilike')
-      expect(capturedFilter).toContain('address.ilike')
+      expect(filterStr).toContain('title.ilike')
+      expect(filterStr).toContain('description.ilike')
+      expect(filterStr).toContain('address.ilike')
       // Verify wildcard is escaped
-      expect(capturedFilter).toContain('%%')
+      expect(filterStr).toContain('%%')
       // Verify filter has exactly 3 parts (title, description, address)
       // Split by comma to count parts (commas separate filter expressions in .or())
-      const filterStr: string = String(capturedFilter)
       const parts = filterStr.split(',')
       expect(parts.length).toBe(3)
     }

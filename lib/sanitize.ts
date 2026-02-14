@@ -306,6 +306,7 @@ export function sanitizePostgrestIlikeQuery(input: string, maxLength: number = 2
   sanitized = sanitized.replace(/_/g, '__')
   
   // Remove any remaining control characters
+  // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, '')
   
   return sanitized.trim()

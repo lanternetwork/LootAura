@@ -22,11 +22,11 @@ const mockRlsDb = {
   from: vi.fn(),
 }
 
-const mockFromBase = vi.fn()
-
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
 }))
+
+const mockFromBase = vi.fn()
 
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockRlsDb,
@@ -531,7 +531,8 @@ describe('GET /api/sales - Search Query Injection Prevention', () => {
       expect(capturedFilter).toContain('%%')
       // Verify filter has exactly 3 parts (title, description, address)
       // Split by comma to count parts (commas separate filter expressions in .or())
-      const parts = capturedFilter.split(',')
+      const filterStr: string = String(capturedFilter)
+      const parts = filterStr.split(',')
       expect(parts.length).toBe(3)
     }
   })

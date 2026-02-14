@@ -56,9 +56,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -101,9 +106,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -146,9 +156,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -212,9 +227,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -264,9 +284,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -318,9 +343,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -394,9 +424,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -452,9 +487,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Retry logic for network issues
+          # Retry logic for network issues and file system race conditions
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            # Clean node_modules before retry to avoid ETXTBSY errors
+            if [ $attempt -gt 1 ]; then
+              echo "Cleaning node_modules before retry..."
+              rm -rf node_modules
+            fi
             if [ -f package-lock.json ]; then
               npm ci
             else

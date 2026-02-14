@@ -284,8 +284,12 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     })
 
     // Default: email can be sent (not already sent)
+    // Reset to default state - each test should explicitly set its own expectations
+    mockCanSendEmail.mockReset()
     mockCanSendEmail.mockResolvedValue(true)
+    mockSendSaleCreatedEmail.mockReset()
     mockSendSaleCreatedEmail.mockResolvedValue({ ok: true })
+    mockRecordEmailSend.mockReset()
     mockRecordEmailSend.mockResolvedValue(undefined)
   })
 
@@ -673,6 +677,23 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
         maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }
     })
+
+    // CRITICAL: Explicitly set canSendEmail to return true RIGHT BEFORE invoking handler
+    // This ensures test isolation - no prior test state affects this test
+    // We need canSendEmail to return true so the email block is reached
+    mockCanSendEmail.mockReset()
+    mockCanSendEmail.mockResolvedValueOnce(true)
+
+    // Ensure sendSaleCreatedEmail is set to fail (already set above, but be explicit)
+    mockSendSaleCreatedEmail.mockReset()
+    mockSendSaleCreatedEmail.mockResolvedValueOnce({
+      ok: false,
+      error: 'Resend API error',
+    })
+
+    // Ensure recordEmailSend is reset
+    mockRecordEmailSend.mockReset()
+    mockRecordEmailSend.mockResolvedValue(undefined)
 
     const request = createStripeWebhookRequest()
     const response = await POST(request)

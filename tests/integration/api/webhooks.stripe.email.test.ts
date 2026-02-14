@@ -449,22 +449,33 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
   })
 
   it('should handle email send failure gracefully without breaking webhook', async () => {
-    // Ensure email can be sent (idempotency check passes)
-    mockCanSendEmail.mockResolvedValueOnce(true)
-    
-    // Mock email send failure
-    mockSendSaleCreatedEmail.mockResolvedValueOnce({
-      ok: false,
-      error: 'Resend API error',
+    // Gate condition 1: Webhook event not already processed (no early return)
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'stripe_webhook_events') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // Event not processed yet
+          insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+          update: vi.fn().mockReturnThis(),
+        }
+      }
+      // Default fallback for other tables
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnThis(),
+      }
     })
 
-    // Ensure RLS DB mock is set up for draft query (from beforeEach should be fine, but ensure it's there)
+    // Gate condition 2: Draft exists (no early return due to "draft not found")
     mockRlsDb.from.mockImplementation((table: string) => {
       if (table === 'sale_drafts') {
         return {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
-          maybeSingle: vi.fn().mockResolvedValue({ data: mockDraft, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: mockDraft, error: null }), // Draft found
         }
       }
       return {
@@ -474,8 +485,10 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
       }
     })
 
-    // Override mock to ensure all tables are properly mocked
-    // The beforeEach sets up mocks, but we need to ensure sales counter works correctly
+    // Gate condition 3: No existing promotion (draft exists, so this check won't run, but set up for safety)
+    // This is handled by the promotions mock below returning null for maybeSingle
+
+    // Gate condition 4: Admin DB for sale creation and promotion
     let salesCallCount = 0
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'stripe_webhook_events') {
@@ -488,19 +501,22 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
         }
       }
       if (table === 'sales') {
-        return {
-          insert: vi.fn().mockReturnThis(),
+        const salesChain = {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           single: vi.fn().mockImplementation(() => {
             salesCallCount++
             if (salesCallCount === 1) {
-              // First call: sale creation
+              // First call: sale creation returns just ID (from insert().select().single())
               return Promise.resolve({ data: { id: TEST_SALE_ID }, error: null })
             }
-            // Subsequent calls: sale fetch for email
+            // Subsequent calls: sale fetch for email returns full published sale data (from select().eq().single())
             return Promise.resolve({ data: mockSaleData, error: null })
           }),
+        }
+        return {
+          insert: vi.fn().mockReturnValue(salesChain), // insert() returns chainable object with select()
+          ...salesChain,
         }
       }
       if (table === 'items') {
@@ -517,7 +533,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
             error: null,
           }),
           eq: vi.fn().mockReturnThis(),
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // No existing promotion
         }
       }
       if (table === 'sale_drafts') {
@@ -535,31 +551,61 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
       }
     })
 
+    // Gate condition 5: Valid paymentIntentId and user email are present
+    // paymentIntentId comes from webhook event metadata (already in createStripeWebhookRequest)
+    // User email comes from Admin API
+    mockAdminBase.auth.admin.getUserById.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: TEST_USER_ID,
+          email: TEST_USER_EMAIL,
+        },
+      },
+      error: null,
+    })
+
+    // Gate condition 6: canSendEmail() returns true (email not already sent)
+    mockCanSendEmail.mockResolvedValueOnce(true)
+
+    // Gate condition 7: sendSaleCreatedEmail() fails
+    mockSendSaleCreatedEmail.mockResolvedValueOnce({
+      ok: false,
+      error: 'Resend API error',
+    })
+
     const request = createStripeWebhookRequest()
     const response = await POST(request)
     const data = await response.json()
 
-    // Webhook should still succeed
+    // Assert: Webhook still returns success (2xx)
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
 
-    // Verify failed email was recorded with deliveryStatus: 'failed' (not 'sent')
+    // Assert: recordEmailSend is called once with deliveryStatus: 'failed'
+    expect(mockRecordEmailSend).toHaveBeenCalledTimes(1)
     expect(mockRecordEmailSend).toHaveBeenCalledWith(
       expect.objectContaining({
+        profileId: TEST_USER_ID,
+        emailType: 'sale_created_confirmation',
+        toEmail: TEST_USER_EMAIL,
+        dedupeKey: `sale_created_promotion:${TEST_PAYMENT_INTENT_ID}`,
         deliveryStatus: 'failed',
-        errorMessage: 'Email send failed', // Fixed non-sensitive error message
+        errorMessage: 'Email send failed', // Fixed non-sensitive error message (no raw exception)
+        subject: 'Your yard sale is live on LootAura 🚀',
+        meta: expect.objectContaining({
+          saleId: TEST_SALE_ID,
+          promotionId: TEST_PROMOTION_ID,
+          paymentIntentId: TEST_PAYMENT_INTENT_ID,
+          isFeatured: true,
+        }),
       })
     )
 
     // Explicitly verify deliveryStatus is 'failed' and not 'sent'
-    const recordCall = mockRecordEmailSend.mock.calls.find(call => 
-      call[0].deliveryStatus === 'failed'
-    )
-    expect(recordCall).toBeDefined()
-    if (recordCall) {
-      expect(recordCall[0].deliveryStatus).toBe('failed')
-      expect(recordCall[0].deliveryStatus).not.toBe('sent')
-    }
+    const recordCall = mockRecordEmailSend.mock.calls[0]
+    expect(recordCall[0].deliveryStatus).toBe('failed')
+    expect(recordCall[0].deliveryStatus).not.toBe('sent')
+    expect(recordCall[0].errorMessage).toBe('Email send failed')
   })
 
   it('should skip email if user email is not available', async () => {

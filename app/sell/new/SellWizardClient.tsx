@@ -2786,7 +2786,6 @@ function PromotionStep({
           </p>
         </div>
       </div>
-    </div>
   )
 }
 
@@ -3058,7 +3057,6 @@ function ReviewStep({
             </>
           )}
         </button>
-      </div>
       </div>
     </div>
   )

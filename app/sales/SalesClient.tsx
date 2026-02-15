@@ -348,8 +348,10 @@ export default function SalesClient({
     // Set fetching state but keep old data visible
     setIsFetching(true)
     // Only set loading=true on initial load (when fetchedSales is empty)
-    if (fetchedSales.length === 0) {
+    const isInitialLoad = fetchedSales.length === 0
+    if (isInitialLoad) {
       setLoading(true)
+      markPerformance('sales_fetch_start')
     }
 
     try {
@@ -458,6 +460,11 @@ export default function SalesClient({
         // This replaces the old buffered data, not merging (we want clean buffer boundaries)
         setFetchedSales(filtered)
         
+        // Mark performance for initial load completion
+        if (isInitialLoad) {
+          markPerformance('sales_fetch_complete')
+        }
+        
         // Update bufferedBounds to track what area we fetched
         // For near=1 mode, calculate bounds from response or use null
         if (nearOptions) {
@@ -512,6 +519,9 @@ export default function SalesClient({
       // Mark that initial load has completed after first fetch attempt
       if (!hasCompletedInitialLoad) {
         setHasCompletedInitialLoad(true)
+        if (isInitialLoad) {
+          markPerformance('sales_initial_load_complete')
+        }
       }
     }
   }, [filters.dateRange, filters.categories, deduplicateSales, filterDeletedSales, fetchedSales.length])
@@ -745,49 +755,117 @@ export default function SalesClient({
     return filterSalesForViewport(fetchedSales, viewportBounds)
   }, [fetchedSales, viewportBounds])
 
-  // Hybrid system: Create location groups and apply clustering
-  const hybridResult = useMemo(() => {
-    // Early return for empty sales - no need to run clustering
-    if (!currentViewport || visibleSales.length === 0) {
-      return {
-        type: 'individual' as const,
-        pins: [],
-        locations: [],
-        clusters: []
+  // Performance marker helper (debug-only)
+  const markPerformance = useCallback((name: string) => {
+    if (isDebugEnabled && typeof performance !== 'undefined' && performance.mark) {
+      performance.mark(name)
+      const measureName = `${name}_measure`
+      if (performance.getEntriesByName(measureName).length === 0) {
+        try {
+          performance.measure(measureName, 'navigationStart', name)
+          const measure = performance.getEntriesByName(measureName)[0]
+          console.log(`[PERF] ${name}:`, `${Math.round(measure.duration)}ms`)
+        } catch (e) {
+          // Ignore measurement errors
+        }
       }
     }
-    
-    // Do not hide pins during fetch; always render using last-known fetchedSales
-    
-    // Allow clustering regardless of small dataset size to prevent initial pin gaps
-    
-    if (isDebugEnabled) {
-      console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
+  }, [])
+
+  // Mark first render
+  useEffect(() => {
+    markPerformance('sales_page_first_render')
+  }, [markPerformance])
+
+  // Hybrid system: Create location groups and apply clustering
+  // DEFERRED: Run clustering after first paint to improve initial load time
+  const [hybridResult, setHybridResult] = useState<ReturnType<typeof createHybridPins>>({
+    type: 'individual' as const,
+    pins: [],
+    locations: [],
+    clusters: []
+  })
+  const [clusteringDeferred, setClusteringDeferred] = useState(true)
+  
+  // Defer clustering until after first paint
+  useEffect(() => {
+    if (clusteringDeferred) {
+      // Use requestIdleCallback if available, otherwise setTimeout
+      const scheduleClustering = () => {
+        if (!currentViewport || visibleSales.length === 0) {
+          setHybridResult({
+            type: 'individual' as const,
+            pins: [],
+            locations: [],
+            clusters: []
+          })
+          setClusteringDeferred(false)
+          return
+        }
+        
+        if (isDebugEnabled) {
+          console.log('[HYBRID] Clustering (deferred)', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
+        }
+        
+        // Only run clustering on visible sales - touch-only clustering
+        // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
+        const result = createHybridPins(visibleSales, currentViewport, {
+          coordinatePrecision: 6, // high precision to avoid accidental grouping
+          clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
+          minClusterSize: 2, // allow clustering for 2+ points
+          maxZoom: 16,
+          enableLocationGrouping: true,
+          enableVisualClustering: true
+        })
+        
+        if (isDebugEnabled) {
+          console.log('[HYBRID] Clustering completed (deferred):', {
+            type: result.type,
+            pinsCount: result.pins.length,
+            locationsCount: result.locations.length,
+            visibleSalesCount: visibleSales.length,
+            totalFetchedCount: fetchedSales.length
+          })
+        }
+        
+        setHybridResult(result)
+        setClusteringDeferred(false)
+        markPerformance('sales_map_clustering_complete')
+      }
+      
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(scheduleClustering, { timeout: 100 })
+      } else {
+        // Fallback for browsers without requestIdleCallback
+        setTimeout(scheduleClustering, 0)
+      }
     }
-    
-    // Only run clustering on visible sales - touch-only clustering
-    // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
-    const result = createHybridPins(visibleSales, currentViewport, {
-      coordinatePrecision: 6, // high precision to avoid accidental grouping
-      clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
-      minClusterSize: 2, // allow clustering for 2+ points
-      maxZoom: 16,
-      enableLocationGrouping: true,
-      enableVisualClustering: true
-    })
-    
-    if (isDebugEnabled) {
-      console.log('[HYBRID] Clustering completed:', {
-        type: result.type,
-        pinsCount: result.pins.length,
-        locationsCount: result.locations.length,
-        visibleSalesCount: visibleSales.length,
-        totalFetchedCount: fetchedSales.length
-      })
+  }, [clusteringDeferred, currentViewport, visibleSales, fetchedSales.length, markPerformance])
+  
+  // Update clustering when inputs change (after initial deferral)
+  useEffect(() => {
+    if (!clusteringDeferred) {
+      // Re-cluster on viewport/sales changes (after initial deferral)
+      if (currentViewport && visibleSales.length > 0) {
+        const result = createHybridPins(visibleSales, currentViewport, {
+          coordinatePrecision: 6,
+          clusterRadius: 6.5,
+          minClusterSize: 2,
+          maxZoom: 16,
+          enableLocationGrouping: true,
+          enableVisualClustering: true
+        })
+        setHybridResult(result)
+      } else {
+        setHybridResult({
+          type: 'individual' as const,
+          pins: [],
+          locations: [],
+          clusters: []
+        })
+      }
     }
-    
-    return result
-  }, [visibleSales, currentViewport, fetchedSales.length])
+  }, [clusteringDeferred, currentViewport, visibleSales])
 
   // Preloaded bounds - track the area we've already loaded sales for
   const preloadedBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -1233,7 +1311,18 @@ export default function SalesClient({
     return true
   }, [filters.dateRange, filters.categories, filters.distance, handleViewportChange])
 
-  // Mobile geolocation prompting (only on mount, if no URL/persisted viewport, and not denied)
+  // Track map visibility for deferred geolocation
+  const [mapVisible, setMapVisible] = useState(false)
+  
+  // Mark when map becomes visible (for performance tracking)
+  useEffect(() => {
+    if (mapView && !mapVisible) {
+      setMapVisible(true)
+      markPerformance('sales_map_visible')
+    }
+  }, [mapView, mapVisible, markPerformance])
+
+  // Mobile geolocation prompting (DEFERRED: only after map is visible or user interaction)
   // NOTE: Must be defined after recenterToUserLocation since it depends on it
   // 
   // IMPORTANT: Automatic GPS vs User-Initiated GPS
@@ -1244,6 +1333,12 @@ export default function SalesClient({
   useEffect(() => {
     // Only attempt on mobile, if resolver indicated geolocation should be attempted
     if (!isMobile || resolvedViewport.source !== 'geo') {
+      return
+    }
+
+    // DEFERRED: Wait for map to be visible before requesting geolocation
+    // This improves initial load time by not blocking on GPS permission prompt
+    if (!mapVisible && !userInteractedRef.current) {
       return
     }
 
@@ -1272,8 +1367,10 @@ export default function SalesClient({
     geolocationAttemptedRef.current = true
 
     if (isDebugEnabled) {
-      console.log('[GEO] Attempting mobile geolocation (auto)')
+      console.log('[GEO] Attempting mobile geolocation (auto, deferred)')
     }
+
+    markPerformance('sales_geolocation_request_start')
 
     requestGeolocation({
       enableHighAccuracy: true,
@@ -1281,6 +1378,8 @@ export default function SalesClient({
       maximumAge: 300000 // 5 minutes
     })
       .then((location) => {
+        markPerformance('sales_geolocation_request_complete')
+        
         // Store last known user location (triggers visibility recomputation)
         setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
         // Update permission state immediately (GPS success means permission was granted)
@@ -1312,7 +1411,7 @@ export default function SalesClient({
         }
         // Error handling (denial tracking) is done in requestGeolocation
       })
-  }, [isMobile, resolvedViewport.source, recenterToUserLocation])
+  }, [isMobile, resolvedViewport.source, recenterToUserLocation, mapVisible, markPerformance])
 
   // Handle ZIP search with near=1 API path (respects distance filter exactly)
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {

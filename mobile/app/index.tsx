@@ -11,12 +11,17 @@ const LOOTAURA_URL = 'https://lootaura.com/sales';
 export default function HomeScreen() {
   // Gate diagnostic HUD behind environment variable
   const isNativeHudEnabled = process.env.EXPO_PUBLIC_NATIVE_HUD === '1';
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start hidden, show only when needed
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [webViewReady, setWebViewReady] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const delayedOverlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loaderStartTimeRef = useRef<number | null>(null);
+  const isLoaderHiddenRef = useRef<boolean>(true); // Track if loader is currently hidden
+  const currentNavIdRef = useRef<number>(0); // Navigation ID for performance tracking
+  const overlayShownRef = useRef<boolean>(false); // Track if overlay actually became visible
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ navigateTo?: string; authCallbackUrl?: string }>();
   const pendingNavigateToRef = useRef<string | null>(null);
@@ -101,31 +106,123 @@ export default function HomeScreen() {
     gapBelowViewportPx: null,
   });
 
-  // Loader management helpers
+  // Performance instrumentation helper (debug-only)
+  const logLoaderPerformance = (signal: string, path: string, attempt?: number) => {
+    if (process.env.NEXT_PUBLIC_DEBUG !== 'true') {
+      return;
+    }
+    
+    if (!loaderStartTimeRef.current) {
+      return; // No active loader session
+    }
+    
+    const elapsedMs = Date.now() - loaderStartTimeRef.current;
+    const navId = currentNavIdRef.current;
+    const overlayShown = overlayShownRef.current;
+    
+    const logData: any = {
+      signal,
+      elapsedMs,
+      overlayShown,
+      path,
+      navId
+    };
+    
+    // Include retry attempt if provided (for APP_READY)
+    if (attempt !== undefined) {
+      logData.appReadyAttempt = attempt;
+    }
+    
+    console.log('[MOBILE_LOADER_PERF]', logData);
+  };
+
+  // Enterprise-ready loader management with idempotent state control
   const startLoader = (reason: string) => {
     setLastNavAction(`startLoader: ${reason}`);
-    // Clear any existing timeout
+    
+    // Clear any existing timeouts
     if (loadTimeoutRef.current) {
       clearTimeout(loadTimeoutRef.current);
       loadTimeoutRef.current = null;
     }
-    setLoading(true);
+    if (delayedOverlayTimeoutRef.current) {
+      clearTimeout(delayedOverlayTimeoutRef.current);
+      delayedOverlayTimeoutRef.current = null;
+    }
+    
+    // If already showing, don't restart (idempotent)
+    if (!isLoaderHiddenRef.current) {
+      return;
+    }
+    
+    // Start new navigation session: generate navId, reset overlayShown, record start time
+    currentNavIdRef.current += 1;
+    overlayShownRef.current = false;
+    isLoaderHiddenRef.current = false;
+    loaderStartTimeRef.current = Date.now();
     setError(null);
+    
+    // Delayed overlay: wait 250ms before showing to prevent flash on fast loads
+    delayedOverlayTimeoutRef.current = setTimeout(() => {
+      // Only show if loader hasn't been hidden in the meantime
+      if (!isLoaderHiddenRef.current) {
+        setLoading(true);
+        overlayShownRef.current = true; // Mark overlay as actually visible
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const elapsed = loaderStartTimeRef.current ? Date.now() - loaderStartTimeRef.current : 0;
+          console.log('[LOADER] Overlay displayed', { reason, elapsedMs: elapsed });
+        }
+      }
+      delayedOverlayTimeoutRef.current = null;
+    }, 250);
+    
     // Hard failsafe: always clear loading after 5 seconds
     loadTimeoutRef.current = setTimeout(() => {
-      setLoading(false);
+      if (!isLoaderHiddenRef.current) {
+        // Extract path for logging
+        let path = '/';
+        try {
+          const url = new URL(currentUrl);
+          path = url.pathname;
+        } catch {
+          // Ignore URL parse errors
+        }
+        stopLoader('timeout', path);
+      }
       loadTimeoutRef.current = null;
-      setLastNavAction(`loader timeout cleared (5s)`);
     }, 5000);
   };
 
-  const stopLoader = (reason: string) => {
-    setLastNavAction(`stopLoader: ${reason}`);
+  const stopLoader = (signal: string, path?: string, attempt?: number) => {
+    // Idempotent: if already hidden, ignore duplicate calls
+    if (isLoaderHiddenRef.current) {
+      return;
+    }
+    
+    setLastNavAction(`stopLoader: ${signal}`);
+    
+    // Clear all timeouts
     if (loadTimeoutRef.current) {
       clearTimeout(loadTimeoutRef.current);
       loadTimeoutRef.current = null;
     }
+    if (delayedOverlayTimeoutRef.current) {
+      clearTimeout(delayedOverlayTimeoutRef.current);
+      delayedOverlayTimeoutRef.current = null;
+    }
+    
+    isLoaderHiddenRef.current = true;
     setLoading(false);
+    
+    // Extract pathname only (no query strings for PII safety)
+    const pathOnly = path ? path.split('?')[0] : 'unknown';
+    
+    // Log performance data (debug-only)
+    logLoaderPerformance(signal, pathOnly, attempt);
+    
+    // Reset session state
+    loaderStartTimeRef.current = null;
+    overlayShownRef.current = false;
   };
 
   // Handle Android back button
@@ -141,11 +238,16 @@ export default function HomeScreen() {
     return () => backHandler.remove();
   }, [canGoBack]);
 
-  // Cleanup timeout on unmount
+  // Cleanup all timeouts on unmount
   useEffect(() => {
     return () => {
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+      if (delayedOverlayTimeoutRef.current) {
+        clearTimeout(delayedOverlayTimeoutRef.current);
+        delayedOverlayTimeoutRef.current = null;
       }
     };
   }, []);
@@ -326,6 +428,11 @@ export default function HomeScreen() {
     const { nativeEvent } = syntheticEvent;
     const url = nativeEvent?.url;
     
+    // Reset loader state on navigation start
+    isLoaderHiddenRef.current = true;
+    loaderStartTimeRef.current = null;
+    overlayShownRef.current = false;
+    
     // Only start loader if WebView is not ready (initial load) OR if this is a real document load
     // After webViewReady, SPA transitions shouldn't trigger loading state
     if (!webViewReady) {
@@ -338,7 +445,15 @@ export default function HomeScreen() {
   };
 
   const handleLoadEnd = () => {
-    stopLoader('onLoadEnd');
+    // Extract path from current URL for logging
+    let path = '/';
+    try {
+      const url = new URL(currentUrl);
+      path = url.pathname;
+    } catch {
+      // Ignore URL parse errors
+    }
+    stopLoader('onLoadEnd', path);
     // Mark WebView as ready after first successful load
     setWebViewReady(true);
     
@@ -353,27 +468,53 @@ export default function HomeScreen() {
   const handleLoad = () => {
     // Additional handler for when page fully loads
     // This is a fallback in case onLoadEnd doesn't fire
-    stopLoader('onLoad');
+    let path = '/';
+    try {
+      const url = new URL(currentUrl);
+      path = url.pathname;
+    } catch {
+      // Ignore URL parse errors
+    }
+    stopLoader('onLoad', path);
   };
 
   const handleError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     console.warn('WebView error: ', nativeEvent);
-    stopLoader('onError');
+    let path = '/';
+    try {
+      const url = new URL(currentUrl);
+      path = url.pathname;
+    } catch {
+      // Ignore URL parse errors
+    }
+    stopLoader('error', path);
     setError('Failed to load LootAura. Please check your internet connection.');
   };
 
   const handleHttpError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     if (nativeEvent.statusCode >= 400) {
-      // Clear timeout on HTTP error
+      // Clear all timeouts on HTTP error
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
         loadTimeoutRef.current = null;
       }
+      if (delayedOverlayTimeoutRef.current) {
+        clearTimeout(delayedOverlayTimeoutRef.current);
+        delayedOverlayTimeoutRef.current = null;
+      }
+      
+      let path = '/';
+      try {
+        const url = new URL(currentUrl);
+        path = url.pathname;
+      } catch {
+        // Ignore URL parse errors
+      }
       
       setError(`Unable to connect to LootAura (${nativeEvent.statusCode}). Please try again later.`);
-      setLoading(false);
+      stopLoader('httpError', path);
     }
   };
 
@@ -385,7 +526,14 @@ export default function HomeScreen() {
     // CRITICAL: If navState.loading === false, force clear loading state
     // This is the most reliable way to detect when navigation is complete
     if (navState.loading === false) {
-      stopLoader('navState.loading=false');
+      let path = '/';
+      try {
+        const parsedUrl = new URL(url);
+        path = parsedUrl.pathname;
+      } catch {
+        // Ignore URL parse errors
+      }
+      stopLoader('navState.loading=false', path);
     }
     
     // Track navigation action when URL changes
@@ -403,7 +551,7 @@ export default function HomeScreen() {
     
     // After webViewReady, only show loader for real document loads (navState.loading === true)
     // SPA transitions (pushState) won't have navState.loading === true, so don't start loader
-    if (webViewReady && navState.loading === true && !loading) {
+    if (webViewReady && navState.loading === true && isLoaderHiddenRef.current) {
       startLoader(`navState.loading=true: ${url}`);
     }
   };
@@ -414,7 +562,37 @@ export default function HomeScreen() {
       const messageStr = JSON.stringify(message);
       setLastMessageReceived(messageStr.length > 100 ? messageStr.substring(0, 97) + '...' : messageStr);
       
-      console.log('[NATIVE] Received message from WebView:', message);
+      // Enterprise-ready APP_READY signal handling with strict validation
+      if (message.type === 'APP_READY') {
+        // Validate message structure
+        if (typeof message.path !== 'string' || !message.path.startsWith('/')) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[LOADER] Invalid APP_READY message: path validation failed', {
+              hasPath: typeof message.path === 'string',
+              pathStartsWithSlash: typeof message.path === 'string' && message.path.startsWith('/')
+            });
+          }
+          return; // Reject malformed message
+        }
+        
+        // Extract path only (no query strings for security)
+        const pathOnly = message.path.split('?')[0];
+        
+        // Extract retry attempt number if provided (for debug logging)
+        const attempt = typeof message.attempt === 'number' ? message.attempt : 0;
+        
+        // Immediately hide overlay and mark ready
+        stopLoader('APP_READY', pathOnly, attempt);
+        if (!webViewReady) {
+          setWebViewReady(true);
+        }
+        
+        return; // Handled, don't process further
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && message.type !== 'ROUTE_STATE' && message.type !== 'LAYOUT_DIAG' && message.type !== 'favoriteState' && message.type !== 'NAVIGATE') {
+        console.log('[NATIVE] Received message from WebView:', { type: message.type });
+      }
       
       if (message.type === 'ROUTE_STATE') {
         // Route state update from web
@@ -581,6 +759,11 @@ export default function HomeScreen() {
 
   // Execute navigation using state-driven WebView source (replaces injectJavaScript)
   const executeNavigation = (relativePath: string, source: string) => {
+    // Reset loader state on navigation start
+    isLoaderHiddenRef.current = true;
+    loaderStartTimeRef.current = null;
+    overlayShownRef.current = false;
+    
     // Build full URL
     const fullUrl = `${LOOTAURA_URL}${relativePath}`;
     console.log('[NATIVE] Executing navigation to:', fullUrl);
@@ -614,7 +797,7 @@ export default function HomeScreen() {
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
         setLastNavAction(`blocked external link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
-        stopLoader('blocked external link');
+        stopLoader('blockedExternalLink', parsedUrl.pathname);
         return false; // Prevent WebView from loading external URLs
       }
     } catch (e) {
@@ -623,7 +806,7 @@ export default function HomeScreen() {
       if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
         setLastNavAction(`blocked protocol link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
-        stopLoader('blocked protocol link');
+        stopLoader('blockedProtocolLink', '/');
         return false;
       }
       
@@ -635,11 +818,7 @@ export default function HomeScreen() {
     if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
       Linking.openURL(url);
       // Clear loading state since we're blocking (onLoadStart may have fired)
-      setLoading(false);
-      if (loadTimeoutRef.current) {
-        clearTimeout(loadTimeoutRef.current);
-        loadTimeoutRef.current = null;
-      }
+      stopLoader('blockedProtocolLink', '/');
       return false;
     }
     
@@ -649,7 +828,10 @@ export default function HomeScreen() {
 
   const handleRetry = () => {
     setError(null);
-    setLoading(true);
+    // Reset loader state and start fresh
+    isLoaderHiddenRef.current = true;
+    loaderStartTimeRef.current = null;
+    startLoader('retry');
     if (webViewRef.current) {
       webViewRef.current.reload();
     }
@@ -887,22 +1069,157 @@ export default function HomeScreen() {
                 // Report initial route after a short delay to ensure Next.js router is initialized
                 setTimeout(reportRouteState, 100);
                 
+                // Store listener references and retry timers for cleanup (declare before sendAppReady)
+                let appReadyListeners: Array<{ event: string; handler: () => void }> = [];
+                let appReadyRetryTimer: number | null = null;
+                
+                // Helper to add listener with tracking
+                const addAppReadyListener = (target: Document | Window, event: string, handler: () => void) => {
+                  target.addEventListener(event, handler, { once: true });
+                  appReadyListeners.push({ event, handler });
+                };
+                
+                // Helper to cleanup all listeners and timers
+                const cleanupAppReadyListeners = () => {
+                  // Clear retry timer
+                  if (appReadyRetryTimer !== null) {
+                    clearTimeout(appReadyRetryTimer);
+                    appReadyRetryTimer = null;
+                  }
+                  
+                  // Remove event listeners
+                  appReadyListeners.forEach(({ event, handler }) => {
+                    try {
+                      if (event === 'DOMContentLoaded') {
+                        document.removeEventListener(event, handler);
+                      } else {
+                        window.removeEventListener(event, handler);
+                      }
+                    } catch (e) {
+                      // Ignore cleanup errors
+                    }
+                  });
+                  appReadyListeners = [];
+                };
+                
+                // Enterprise-ready APP_READY signal: send when page is interactive
+                // Hydration-aware with retry mechanism
+                const sendAppReady = (attempt = 0) => {
+                  // Guard flag: only send once per navigation
+                  if (window.__LOOTAURA_APP_READY_SENT) {
+                    return;
+                  }
+                  
+                  // Conservative readiness checks: document ready + Next.js presence + main content exists
+                  const isDocumentReady = document.readyState === 'complete';
+                  const hasNextJs = !!window.__NEXT_DATA__;
+                  const hasReactNativeWebView = !!window.ReactNativeWebView;
+                  
+                  // Check for main content existence (safe DOM query)
+                  // Look for common Next.js content selectors or main element
+                  let hasMainContent = false;
+                  try {
+                    // Check for main element, Next.js root div, or body with content
+                    hasMainContent = !!(
+                      document.querySelector('main') ||
+                      document.querySelector('#__next') ||
+                      document.querySelector('[data-main-content]') ||
+                      (document.body && document.body.children.length > 0)
+                    );
+                  } catch (e) {
+                    // DOM query failed, assume not ready
+                    hasMainContent = false;
+                  }
+                  
+                  if (isDocumentReady && hasNextJs && hasReactNativeWebView && hasMainContent) {
+                    // Use requestAnimationFrame twice to ensure paint + JS tick
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        // Re-check conditions after RAF (hydration may complete)
+                        if (
+                          document.readyState === 'complete' &&
+                          window.__NEXT_DATA__ &&
+                          window.ReactNativeWebView
+                        ) {
+                          try {
+                            // Extract pathname only (never include query strings)
+                            const path = window.location.pathname;
+                            
+                            window.ReactNativeWebView.postMessage(JSON.stringify({
+                              type: 'APP_READY',
+                              path: path,
+                              attempt: attempt
+                            }));
+                            
+                            window.__LOOTAURA_APP_READY_SENT = true;
+                          } catch (e) {
+                            // postMessage failed, retry with exponential backoff
+                            const maxAttempts = 3;
+                            if (attempt < maxAttempts) {
+                              const delay = Math.min(50 * Math.pow(2, attempt), 200); // 50ms, 100ms, 200ms
+                              appReadyRetryTimer = setTimeout(() => {
+                                appReadyRetryTimer = null;
+                                sendAppReady(attempt + 1);
+                              }, delay);
+                            }
+                          }
+                        } else if (attempt < 3) {
+                          // Conditions not met, retry with delay
+                          const delay = Math.min(50 * Math.pow(2, attempt), 200);
+                          appReadyRetryTimer = setTimeout(() => {
+                            appReadyRetryTimer = null;
+                            sendAppReady(attempt + 1);
+                          }, delay);
+                        }
+                      });
+                    });
+                  } else if (attempt < 3) {
+                    // Conditions not met, retry with exponential backoff
+                    const delay = Math.min(50 * Math.pow(2, attempt), 200);
+                    appReadyRetryTimer = setTimeout(() => {
+                      appReadyRetryTimer = null;
+                      sendAppReady(attempt + 1);
+                    }, delay);
+                  }
+                };
+                
+                // Try to send immediately if already ready
+                if (document.readyState === 'complete') {
+                  sendAppReady(0);
+                } else {
+                  // Wait for DOMContentLoaded or load event
+                  if (document.readyState === 'loading') {
+                    addAppReadyListener(document, 'DOMContentLoaded', () => sendAppReady(0));
+                  }
+                  addAppReadyListener(window, 'load', () => sendAppReady(0));
+                }
+                
+                // Reset guard flag on navigation (SPA) and cleanup listeners
+                const resetAppReadyFlag = () => {
+                  cleanupAppReadyListeners();
+                  window.__LOOTAURA_APP_READY_SENT = false;
+                  sendAppReady(0);
+                };
+                
                 // Intercept history API to detect SPA navigation
                 const originalPushState = history.pushState;
                 const originalReplaceState = history.replaceState;
                 
                 history.pushState = function(...args) {
                   originalPushState.apply(history, args);
+                  resetAppReadyFlag();
                   setTimeout(reportRouteState, 0);
                 };
                 
                 history.replaceState = function(...args) {
                   originalReplaceState.apply(history, args);
+                  resetAppReadyFlag();
                   setTimeout(reportRouteState, 0);
                 };
                 
                 // Listen for browser back/forward navigation
                 window.addEventListener('popstate', () => {
+                  resetAppReadyFlag();
                   setTimeout(reportRouteState, 0);
                 });
                 

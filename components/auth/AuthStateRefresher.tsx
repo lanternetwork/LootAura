@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useSearchParams, usePathname } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { isDebugEnabled } from '@/lib/debug'
 
 /**
  * Component that refreshes auth state after OAuth callback.
@@ -26,21 +27,29 @@ export function AuthStateRefresher() {
         const { data: { user }, error } = await sb.auth.getUser()
         
         if (error) {
-          console.log('[AUTH_REFRESHER] Error getting user:', error.message)
+          if (isDebugEnabled) {
+            console.log('[AUTH_REFRESHER] Error getting user:', error.message)
+          }
           return
         }
         
         // If we have a user, invalidate the auth query cache to force a refetch
         // This ensures the UI updates immediately after OAuth redirect
         if (user) {
-          console.log('[AUTH_REFRESHER] User found, invalidating queries:', user.id)
+          if (isDebugEnabled) {
+            console.log('[AUTH_REFRESHER] User found, invalidating queries:', user.id)
+          }
           queryClient.invalidateQueries({ queryKey: ['auth'] })
           queryClient.invalidateQueries({ queryKey: ['profile'] })
         } else {
-          console.log('[AUTH_REFRESHER] No user found')
+          if (isDebugEnabled) {
+            console.log('[AUTH_REFRESHER] No user found')
+          }
         }
       } catch (error) {
-        console.error('[AUTH_REFRESHER] Error checking auth:', error)
+        if (isDebugEnabled) {
+          console.error('[AUTH_REFRESHER] Error checking auth:', error)
+        }
       }
     }
 
@@ -49,7 +58,9 @@ export function AuthStateRefresher() {
 
     // Also listen for auth state changes from Supabase
     const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
-      console.log('[AUTH_REFRESHER] Auth state changed:', event, session?.user?.id)
+      if (isDebugEnabled) {
+        console.log('[AUTH_REFRESHER] Auth state changed:', event, session?.user?.id)
+      }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         // Invalidate queries when auth state changes
         queryClient.invalidateQueries({ queryKey: ['auth'] })

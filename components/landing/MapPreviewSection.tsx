@@ -3,8 +3,22 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import SimpleMap from '@/components/location/SimpleMap'
+import dynamic from 'next/dynamic'
 import { Sale } from '@/lib/types'
+
+// Dynamically import SimpleMap to code-split Mapbox from initial bundle
+// This reduces initial JS cost for the / route since MapPreviewSection is below the fold
+const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#F9FFF2] to-[#FFF8E7]">
+      <div className="text-center text-[#3A2268]/40">
+        <div className="text-4xl mb-2">🗺️</div>
+        <p className="text-sm font-medium">Loading map...</p>
+      </div>
+    </div>
+  )
+})
 
 interface LocationState {
   zip?: string

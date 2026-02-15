@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 
-const LOOTAURA_URL = 'https://lootaura.com';
+const LOOTAURA_URL = 'https://lootaura.com/sales';
 
 export default function HomeScreen() {
   // Gate diagnostic HUD behind environment variable
@@ -111,12 +111,12 @@ export default function HomeScreen() {
     }
     setLoading(true);
     setError(null);
-    // Hard failsafe: always clear loading after 10 seconds
+    // Hard failsafe: always clear loading after 5 seconds
     loadTimeoutRef.current = setTimeout(() => {
       setLoading(false);
       loadTimeoutRef.current = null;
-      setLastNavAction(`loader timeout cleared (10s)`);
-    }, 10000);
+      setLastNavAction(`loader timeout cleared (5s)`);
+    }, 5000);
   };
 
   const stopLoader = (reason: string) => {

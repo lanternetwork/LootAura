@@ -1432,6 +1432,14 @@ export default function SellWizardClient({
     }
   }, [])
 
+  // Helper to map error codes/messages to user-facing messages
+  const toUserFacingSubmitError = useCallback(({ error, code, details }: { error?: string; code?: string; details?: string }): string => {
+    if (code === 'account_locked' || error === 'account_locked') {
+      return 'This account has been locked. Please contact support if you believe this is an error.'
+    }
+    return error || details || 'An unexpected error occurred. Please try again.'
+  }, [])
+
   // Helper to submit sale payload (used by both handleSubmit and auto-resume)
   const submitSalePayload = useCallback(async (payload: { saleData: any; items: any[] }) => {
     dispatch({ type: 'SET_LOADING', loading: true })
@@ -1473,7 +1481,11 @@ export default function SellWizardClient({
           code: errorData.code,
           fullResponse: errorData
         })
-        const errorMessage = errorData.error || errorData.details || `Failed to create sale (${response.status})`
+        const errorMessage = toUserFacingSubmitError({
+          error: errorData.error,
+          code: errorData.code,
+          details: errorData.details
+        }) || `Failed to create sale (${response.status})`
         dispatch({ type: 'SET_SUBMIT_ERROR', error: errorMessage })
         dispatch({ type: 'SET_LOADING', loading: false })
         return
@@ -1548,7 +1560,7 @@ export default function SellWizardClient({
     } finally {
       dispatch({ type: 'SET_LOADING', loading: false })
     }
-  }, [router, createItemsForSale])
+  }, [router, createItemsForSale, toUserFacingSubmitError])
 
   // Auto-resume after login (resume=1 param)
   // If user returns after login and has a draft, auto-publish it
@@ -1790,7 +1802,12 @@ export default function SellWizardClient({
             return
           }
           
-          dispatch({ type: 'SET_SUBMIT_ERROR', error: result.error || 'Failed to publish sale' })
+          const errorMessage = toUserFacingSubmitError({
+            error: result.error,
+            code: result.code,
+            details: result.details
+          }) || 'Failed to publish sale'
+          dispatch({ type: 'SET_SUBMIT_ERROR', error: errorMessage })
           dispatch({ type: 'SET_LOADING', loading: false })
           return
         }
@@ -3022,46 +3039,6 @@ function ReviewStep({
             </ul>
           </div>
         )}
-        <button
-          onClick={(e) => {
-            // Debug-only verification logs for promotion/checkout invariants
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[VERIFY_PROMOTION] ReviewStep button clicked:', {
-                wantsPromotion,
-                canStartCheckout,
-                isPublishable,
-                buttonDisabled: loading || (wantsPromotion && !canStartCheckout) || !isPublishable,
-                buttonText: wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale',
-                loading,
-                timestamp: new Date().toISOString()
-              })
-              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion, canStartCheckout, isPublishable })
-            }
-            e.preventDefault()
-            e.stopPropagation()
-            onPublish()
-          }}
-          disabled={loading || (wantsPromotion && !canStartCheckout) || !isPublishable}
-          aria-label={isPublishable ? (wantsPromotion ? "Checkout for promotion" : "Publish sale") : "Complete required fields to publish"}
-          title={!isPublishable && blockingErrors && Object.keys(blockingErrors).length > 0 
-            ? Object.values(blockingErrors).join(', ')
-            : undefined}
-          className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
-        >
-          {loading ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              {wantsPromotion ? 'Processing...' : 'Publishing...'}
-            </>
-          ) : (
-            <>
-              {wantsPromotion ? 'Checkout – $2.99' : 'Publish Sale'}
-              <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </>
-          )}
-        </button>
       </div>
     </div>
   )

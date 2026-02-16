@@ -2126,7 +2126,12 @@ export default function SellWizardClient({
       </div>
 
       {/* Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 overflow-x-hidden">
+      <div 
+        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 overflow-x-hidden"
+        style={{
+          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
+        }}
+      >
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center gap-2">
         <button
           onClick={handlePrevious}

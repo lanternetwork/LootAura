@@ -77,6 +77,9 @@ export async function assertAccountNotLocked(
  * @param userId - The user ID to check
  * @param db - Optional database client (if not provided, will try to get one)
  * @returns true if account is locked, false otherwise
+ * 
+ * Returns true ONLY when a profile row exists AND is_locked === true.
+ * Returns false if profile is missing (new user) or query errors (fail open).
  */
 export async function isAccountLocked(
   userId: string,
@@ -95,10 +98,26 @@ export async function isAccountLocked(
           try {
             client = getAdminDb()
           } catch {
-            return true // Fail closed: assume locked if we can't check
+            // Fail open: if we can't get a client, assume not locked
+            const { logger } = await import('@/lib/log')
+            logger.warn('Could not get database client for account lock check, assuming not locked', {
+              component: 'accountLock',
+              operation: 'isAccountLocked',
+              userId: userId.substring(0, 8) + '...',
+              error: error instanceof Error ? error.message : String(error),
+            })
+            return false
           }
         } else {
-          return true // Fail closed on unexpected error
+          // Fail open: unexpected error getting client, assume not locked
+          const { logger } = await import('@/lib/log')
+          logger.warn('Unexpected error getting database client for account lock check, assuming not locked', {
+            component: 'accountLock',
+            operation: 'isAccountLocked',
+            userId: userId.substring(0, 8) + '...',
+            error: error instanceof Error ? error.message : String(error),
+          })
+          return false
         }
       }
     }
@@ -108,13 +127,33 @@ export async function isAccountLocked(
       .eq('id', userId)
       .maybeSingle()
 
-    if (error || !profile) {
-      return true // Fail closed if we can't confirm
+    if (error) {
+      // Fail open: if query errors, assume not locked (but log the error)
+      const { logger } = await import('@/lib/log')
+      logger.error('Failed to check account lock status', error instanceof Error ? error : new Error(String(error)), {
+        component: 'accountLock',
+        operation: 'isAccountLocked',
+        userId: userId.substring(0, 8) + '...',
+      })
+      return false
     }
 
+    // If profile is missing, assume not locked (new user)
+    if (!profile) {
+      return false
+    }
+
+    // Only return true if profile exists AND is_locked === true
     return profile.is_locked === true
-  } catch {
-    return true // Fail closed on error
+  } catch (error) {
+    // Fail open: unexpected error, assume not locked (but log)
+    const { logger } = await import('@/lib/log')
+    logger.error('Unexpected error in isAccountLocked', error instanceof Error ? error : new Error(String(error)), {
+      component: 'accountLock',
+      operation: 'isAccountLocked',
+      userId: userId.substring(0, 8) + '...',
+    })
+    return false
   }
 }
 

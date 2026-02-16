@@ -115,21 +115,18 @@ describe('isAccountLocked', () => {
     const userId = 'test-user-id-1234567890'
     const queryError = { message: 'Database connection failed', code: 'NETWORK_ERROR' }
     
-    mockRlsDb.from.mockReturnValue(
-      makeThenableQuery({
-        data: null,
-        error: queryError,
-      })
-    )
+    mockAdminDb.from.mockReturnValue(createProfileChain(null, queryError))
 
     const result = await isAccountLocked(userId)
     
     expect(result).toBe(false)
     // Verify only first 8 chars of userId are logged
     expect(mockLogger.error).toHaveBeenCalledWith(
-      expect.any(String),
+      'Failed to check account lock status',
       expect.any(Error),
       expect.objectContaining({
+        component: 'accountLock',
+        operation: 'isAccountLocked',
         userId: 'test-use...',
       })
     )

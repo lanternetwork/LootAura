@@ -40,6 +40,16 @@ export function getRlsDb(_request?: NextRequest) {
     },
   })
 
+  // Ensure session is loaded before returning schema-scoped client
+  // This ensures auth.uid() is available in RLS policies
+  // We call getSession() to trigger session loading from cookies
+  // Don't throw if session is missing - let the caller handle that
+  try {
+    await sb.auth.getSession()
+  } catch {
+    // Session might not exist - that's ok, caller will handle auth errors
+  }
+
   return sb.schema('lootaura_v2')
 }
 

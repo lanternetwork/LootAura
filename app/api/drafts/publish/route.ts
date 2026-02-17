@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
-    // Read draft with RLS
-    const rls = getRlsDb()
+    // Read draft with RLS - pass request to ensure cookie context matches authenticated user
+    const rls = getRlsDb(request)
     const { data: draftData, error: dErr } = await fromBase(rls, 'sale_drafts')
       .select('*')
       .eq('draft_key', draftKey)

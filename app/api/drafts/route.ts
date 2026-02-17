@@ -258,7 +258,7 @@ async function postDraftHandler(request: NextRequest) {
           hasRefreshTokenCookie: hasRefreshToken,
           supabaseCookieCount: supabaseCookies.length,
         })
-      } catch (error) {
+      } catch (_error) {
         // Ignore cookie access errors in test environments
         // cookies() may not be available in all test contexts
       }

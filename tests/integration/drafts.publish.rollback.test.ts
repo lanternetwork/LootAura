@@ -21,11 +21,16 @@ vi.mock('@/lib/data/draftsPublishRollback', () => ({
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
+    getSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
+      error: null,
+    }),
   },
 }
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
+  createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
 // Mock Supabase clients for database operations

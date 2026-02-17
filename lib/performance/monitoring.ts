@@ -287,10 +287,18 @@ export function monitorApiPerformance() {
 }
 
 // Memory monitoring
+let memoryIntervalId: ReturnType<typeof setInterval> | null = null
+
 export function monitorMemoryUsage() {
   if (typeof window === 'undefined') return
 
-  setInterval(() => {
+  // Clear existing interval if any (prevent duplicates)
+  if (memoryIntervalId) {
+    clearInterval(memoryIntervalId)
+    memoryIntervalId = null
+  }
+
+  memoryIntervalId = setInterval(() => {
     if ('memory' in performance) {
       const memory = (performance as any).memory
       const usedMB = memory.usedJSHeapSize / 1024 / 1024
@@ -303,7 +311,16 @@ export function monitorMemoryUsage() {
   }, 30000) // Every 30 seconds
 }
 
+export function stopMemoryMonitoring() {
+  if (memoryIntervalId) {
+    clearInterval(memoryIntervalId)
+    memoryIntervalId = null
+  }
+}
+
 // Initialize monitoring
+let alertsIntervalId: ReturnType<typeof setInterval> | null = null
+
 export function initializePerformanceMonitoring() {
   if (typeof window === 'undefined') return
 
@@ -311,10 +328,24 @@ export function initializePerformanceMonitoring() {
   monitorApiPerformance()
   monitorMemoryUsage()
 
+  // Clear existing interval if any (prevent duplicates)
+  if (alertsIntervalId) {
+    clearInterval(alertsIntervalId)
+    alertsIntervalId = null
+  }
+
   // Clear old alerts every hour
-  setInterval(() => {
+  alertsIntervalId = setInterval(() => {
     performanceMonitor.clearOldAlerts()
   }, 60 * 60 * 1000)
+}
+
+export function stopPerformanceMonitoring() {
+  stopMemoryMonitoring()
+  if (alertsIntervalId) {
+    clearInterval(alertsIntervalId)
+    alertsIntervalId = null
+  }
 }
 
 // Performance dashboard data

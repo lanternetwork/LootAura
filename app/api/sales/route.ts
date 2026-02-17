@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 // NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
@@ -1182,8 +1183,31 @@ async function postHandler(request: NextRequest) {
     // Never trust client payload for owner_id
     // Insert to base table using RLS-aware client (respects RLS policies)
     // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
-    // Pass request to ensure cookie context matches the authenticated user
+    // Uses cookies() from next/headers for consistent cookie reading with auth client
     const rls = getRlsDb(request)
+    
+    // Debug-only: verify cookie existence before RLS write
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      try {
+        const cookieStore = cookies()
+        // Check common Supabase cookie patterns
+        const allCookies = cookieStore.getAll()
+        const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))
+        const hasAccessToken = supabaseCookies.some(c => c.name.includes('access-token') || c.name.includes('auth-token'))
+        const hasRefreshToken = supabaseCookies.some(c => c.name.includes('refresh-token'))
+        
+        logger.debug('RLS write cookie check', {
+          component: 'sales',
+          operation: 'sale_create',
+          hasAccessTokenCookie: hasAccessToken,
+          hasRefreshTokenCookie: hasRefreshToken,
+          supabaseCookieCount: supabaseCookies.length,
+        })
+      } catch (_error) {
+        // Ignore cookie access errors in test environments
+        // cookies() may not be available in all test contexts
+      }
+    }
     const fromSales = fromBase(rls, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {

@@ -1,5 +1,6 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
@@ -236,8 +237,32 @@ async function postDraftHandler(request: NextRequest) {
     }
     
     // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
-    // Pass request to ensure cookie context matches the authenticated user
+    // Uses cookies() from next/headers for consistent cookie reading with auth client
     const rls = getRlsDb(request)
+    
+    // Debug-only: verify cookie existence before RLS write
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      try {
+        const cookieStore = cookies()
+        // Check common Supabase cookie patterns
+        const allCookies = cookieStore.getAll()
+        const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))
+        const hasAccessToken = supabaseCookies.some(c => c.name.includes('access-token') || c.name.includes('auth-token'))
+        const hasRefreshToken = supabaseCookies.some(c => c.name.includes('refresh-token'))
+        
+        const { logger } = await import('@/lib/log')
+        logger.debug('RLS write cookie check', {
+          component: 'drafts',
+          operation: 'saveDraft',
+          hasAccessTokenCookie: hasAccessToken,
+          hasRefreshTokenCookie: hasRefreshToken,
+          supabaseCookieCount: supabaseCookies.length,
+        })
+      } catch (_error) {
+        // Ignore cookie access errors in test environments
+        // cookies() may not be available in all test contexts
+      }
+    }
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')

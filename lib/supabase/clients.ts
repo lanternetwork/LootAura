@@ -42,14 +42,44 @@ export async function getRlsDb(_request?: NextRequest) {
 
   // Load session from cookies to ensure JWT is available for RLS policies
   // RLS policies need auth.uid() which comes from the JWT token in request headers
-  // getSession() reads from cookies (local operation) and makes the session available
-  // for the client to include the JWT in subsequent database requests
+  // getUser() is more reliable than getSession() for SSR - it validates the JWT and loads the session
+  // This makes the session available for the client to include the JWT in subsequent database requests
   // Don't throw if session is missing - let the caller handle auth errors
   try {
-    await sb.auth.getSession()
-  } catch {
+    // Use getUser() instead of getSession() - it's more reliable for SSR and ensures JWT is validated
+    // getUser() will load the session from cookies and validate it, making it available for RLS
+    const { data: { user }, error } = await sb.auth.getUser()
+    
+    // Debug logging to diagnose session loading issues
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (error) {
+        const { logger } = await import('@/lib/log')
+        logger.debug('getRlsDb: getUser() error', {
+          component: 'supabase',
+          operation: 'getRlsDb',
+          error: error.message,
+          errorCode: error.status,
+        })
+      } else if (!user) {
+        const { logger } = await import('@/lib/log')
+        logger.debug('getRlsDb: getUser() returned null user', {
+          component: 'supabase',
+          operation: 'getRlsDb',
+          hasUser: false,
+        })
+      }
+    }
+  } catch (error) {
     // Session might not exist - that's ok, caller will handle auth errors
     // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('getRlsDb: getUser() exception', {
+        component: 'supabase',
+        operation: 'getRlsDb',
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   return sb.schema('lootaura_v2')

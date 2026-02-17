@@ -1188,20 +1188,25 @@ async function postHandler(request: NextRequest) {
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const cookieStore = cookies()
-      // Check common Supabase cookie patterns
-      const allCookies = cookieStore.getAll()
-      const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))
-      const hasAccessToken = supabaseCookies.some(c => c.name.includes('access-token') || c.name.includes('auth-token'))
-      const hasRefreshToken = supabaseCookies.some(c => c.name.includes('refresh-token'))
-      
-      logger.debug('RLS write cookie check', {
-        component: 'sales',
-        operation: 'sale_create',
-        hasAccessTokenCookie: hasAccessToken,
-        hasRefreshTokenCookie: hasRefreshToken,
-        supabaseCookieCount: supabaseCookies.length,
-      })
+      try {
+        const cookieStore = cookies()
+        // Check common Supabase cookie patterns
+        const allCookies = cookieStore.getAll()
+        const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))
+        const hasAccessToken = supabaseCookies.some(c => c.name.includes('access-token') || c.name.includes('auth-token'))
+        const hasRefreshToken = supabaseCookies.some(c => c.name.includes('refresh-token'))
+        
+        logger.debug('RLS write cookie check', {
+          component: 'sales',
+          operation: 'sale_create',
+          hasAccessTokenCookie: hasAccessToken,
+          hasRefreshTokenCookie: hasRefreshToken,
+          supabaseCookieCount: supabaseCookies.length,
+        })
+      } catch (error) {
+        // Ignore cookie access errors in test environments
+        // cookies() may not be available in all test contexts
+      }
     }
     const fromSales = fromBase(rls, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'

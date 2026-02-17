@@ -238,10 +238,8 @@ async function postDraftHandler(request: NextRequest) {
     
     // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
     // Uses cookies() from next/headers for consistent cookie reading with auth client
-    // Create a temporary base client to verify session before schema scoping
-    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const baseClient = createSupabaseServerClient()
-    const { data: { session } } = await baseClient.auth.getSession()
+    // Verify session exists before RLS writes (both clients use same cookies())
+    const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       const { logger } = await import('@/lib/log')
       logger.warn('RLS client has no session, auth context may be invalid', {

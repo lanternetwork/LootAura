@@ -1290,6 +1290,18 @@ async function postHandler(request: NextRequest) {
         component: 'sales',
         operation: 'sale_create'
       })
+      
+      // Check for RLS/permission errors
+      const errorCode = error?.code || error?.message || ''
+      const errorMessage = String(error?.message || error || '')
+      const isRlsError = /42501|PGRST301|permission denied|row-level security/i.test(String(errorCode) + ' ' + errorMessage)
+      
+      if (isRlsError) {
+        return fail(403, 'PERMISSION_DENIED', 'permission_denied', {
+          message: 'Permission denied. Please refresh and try again.'
+        })
+      }
+      
       return fail(500, 'SALE_CREATE_FAILED', 'Failed to create sale', error)
     }
     

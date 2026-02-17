@@ -236,8 +236,29 @@ async function postDraftHandler(request: NextRequest) {
     }
     
     // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
-    // Pass request to ensure cookie context matches the authenticated user
+    // Uses cookies() from next/headers for consistent cookie reading with auth client
     const rls = getRlsDb(request)
+    
+    // Debug-only: verify cookie existence before RLS write
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const cookieStore = (await import('next/headers')).cookies()
+      const hasAccessTokenCookie = !!cookieStore.get('sb-access-token') || !!cookieStore.get('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token')
+      const hasRefreshTokenCookie = !!cookieStore.get('sb-refresh-token') || !!cookieStore.get('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token.0')
+      // Check common Supabase cookie patterns
+      const allCookies = cookieStore.getAll()
+      const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))
+      const hasAccessToken = supabaseCookies.some(c => c.name.includes('access-token') || c.name.includes('auth-token'))
+      const hasRefreshToken = supabaseCookies.some(c => c.name.includes('refresh-token'))
+      
+      const { logger } = await import('@/lib/log')
+      logger.debug('RLS write cookie check', {
+        component: 'drafts',
+        operation: 'saveDraft',
+        hasAccessTokenCookie: hasAccessToken || hasAccessTokenCookie,
+        hasRefreshTokenCookie: hasRefreshToken || hasRefreshTokenCookie,
+        supabaseCookieCount: supabaseCookies.length,
+      })
+    }
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')

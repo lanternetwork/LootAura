@@ -1439,7 +1439,9 @@ export default function SellWizardClient({
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create items'
-      console.error('[SELL_WIZARD] Item creation failed:', errorMessage)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SELL_WIZARD] Item creation failed:', errorMessage)
+      }
       throw new Error(`Failed to create some items: ${errorMessage}`)
     }
   }, [])

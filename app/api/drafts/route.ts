@@ -26,7 +26,7 @@ export async function GET(_request: NextRequest) {
 
     if (allDrafts) {
       // Return all active drafts for user (read from base table via schema-scoped client)
-      const db = getRlsDb()
+      const db = getRlsDb(_request)
       const { data: drafts, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
@@ -62,7 +62,7 @@ export async function GET(_request: NextRequest) {
 
     // If draftKey is provided, fetch that specific draft
     if (draftKey) {
-      const db = getRlsDb()
+      const db = getRlsDb(_request)
       const { data: draft, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, payload, updated_at')
         .eq('user_id', user.id)
@@ -111,7 +111,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Fetch latest active draft for user (read from base table via schema-scoped client)
-    const db = getRlsDb()
+    const db = getRlsDb(_request)
     const { data: draft, error } = await fromBase(db, 'sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
@@ -294,7 +294,7 @@ async function postDraftHandler(request: NextRequest) {
         logger.warn('Draft save failed due to RLS/auth context mismatch', {
           component: 'drafts',
           operation: 'saveDraft',
-          userId: user.id,
+          userId: user.id.substring(0, 8) + '...',
           errorCode: error?.code,
           errorMessage: error?.message,
         })
@@ -312,7 +312,7 @@ async function postDraftHandler(request: NextRequest) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
           draftKey,
-          userId: user.id,
+          userId: user.id.substring(0, 8) + '...',
           operation: existingDraft ? 'update' : 'insert',
         })
       }

@@ -22,7 +22,9 @@ export default function PushNotificationButton() {
           const subscribed = await pushService.isSubscribed()
           setIsSubscribed(subscribed)
         } catch (error) {
-          console.error('Error checking subscription status:', error)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('Error checking subscription status:', error)
+          }
         }
       }
     }

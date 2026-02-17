@@ -16,6 +16,10 @@ const mockSupabaseClient = {
   from: vi.fn(),
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+    getSession: vi.fn().mockResolvedValue({
+      data: { session: null },
+      error: null,
+    }),
   },
 }
 

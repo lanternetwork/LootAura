@@ -15,6 +15,10 @@ const mockSupabaseClient = {
       data: { user: { id: 'test-user-id' } }, 
       error: null 
     }),
+    getSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
+      error: null,
+    }),
   },
 }
 

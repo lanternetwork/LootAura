@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 // NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
@@ -1187,8 +1188,7 @@ async function postHandler(request: NextRequest) {
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const { cookies: getCookies } = await import('next/headers')
-      const cookieStore = getCookies()
+      const cookieStore = cookies()
       // Check common Supabase cookie patterns
       const allCookies = cookieStore.getAll()
       const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))

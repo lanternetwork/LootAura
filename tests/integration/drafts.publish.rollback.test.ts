@@ -200,6 +200,11 @@ describe('Draft publish rollback', () => {
       error: null,
     })
     
+    mockSupabaseClient.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: userId } } },
+      error: null,
+    })
+    
     // Reset all chain mocks to return themselves for chaining
     mockDraftChain.eq.mockReturnValue(mockDraftChain)
     mockDraftChain.select.mockReturnValue(mockDraftChain)

@@ -1,7 +1,7 @@
 // Service Worker for LootAura PWA
 // const CACHE_NAME = 'yardsalefinder-v1'
-const STATIC_CACHE = 'static-v2' // Force cache update
-const DYNAMIC_CACHE = 'dynamic-v2' // Force cache update
+const STATIC_CACHE = 'static-v3' // Force cache update
+const DYNAMIC_CACHE = 'dynamic-v3' // Force cache update
 
 // Files to cache for offline use
 // NOTE: Removed '/' from cache to prevent OAuth callback interference
@@ -86,6 +86,30 @@ self.addEventListener('fetch', (event) => {
   // Skip external resources - validate hostname properly
   const allowedExternalHosts = ['googleapis.com', 'fonts.googleapis.com', 'fonts.gstatic.com']
   if (allowedExternalHosts.some(host => url.hostname === host || url.hostname.endsWith('.' + host))) {
+    return
+  }
+
+  // Network-first strategy for manifest and icons to allow updates
+  if (url.pathname === '/manifest.webmanifest' || 
+      url.pathname === '/manifest.json' ||
+      url.pathname.startsWith('/icons/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Cache successful responses for offline fallback
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone()
+            caches.open(DYNAMIC_CACHE).then((cache) => {
+              cache.put(request, responseToCache)
+            })
+          }
+          return response
+        })
+        .catch(() => {
+          // Fallback to cache if network fails
+          return caches.match(request)
+        })
+    )
     return
   }
 

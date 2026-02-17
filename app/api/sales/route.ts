@@ -1182,7 +1182,8 @@ async function postHandler(request: NextRequest) {
     // Never trust client payload for owner_id
     // Insert to base table using RLS-aware client (respects RLS policies)
     // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
-    const rls = getRlsDb()
+    // Pass request to ensure cookie context matches the authenticated user
+    const rls = getRlsDb(request)
     const fromSales = fromBase(rls, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
@@ -1297,6 +1298,17 @@ async function postHandler(request: NextRequest) {
       const isRlsError = /42501|PGRST301|permission denied|row-level security/i.test(String(errorCode) + ' ' + errorMessage)
       
       if (isRlsError) {
+        // Distinguish between auth context invalid (401) vs permission denied (403)
+        // Only treat as 401 if error message explicitly mentions JWT/auth/token issues
+        // Otherwise, treat as 403 (true permission denial)
+        const isAuthContextError = 
+          /JWT|token.*expired|unauthorized|not authenticated|auth\.uid.*null/i.test(errorMessage)
+        
+        if (isAuthContextError) {
+          return fail(401, 'AUTH_CONTEXT_INVALID', 'Your session expired. Please refresh and try again.')
+        }
+        
+        // True permission denial (user authenticated but policy denies)
         return fail(403, 'PERMISSION_DENIED', 'permission_denied', {
           message: 'Permission denied. Please refresh and try again.'
         })

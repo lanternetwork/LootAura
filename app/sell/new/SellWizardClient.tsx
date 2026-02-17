@@ -352,6 +352,7 @@ export default function SellWizardClient({
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
   const lastSavedPayloadRef = useRef<string | null>(null) // Track last saved normalized payload (JSON string)
+  const authContextInvalidRef = useRef<boolean>(false) // Flag to stop autosave spam when session is invalid
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -679,7 +680,8 @@ export default function SellWizardClient({
       }
 
       // Save to server if authenticated and draft key exists (throttle to max 1x per 10s)
-      if (user && draftKeyRef.current && !isPublishingRef.current) {
+      // Skip if auth context is invalid to prevent retry spam
+      if (user && draftKeyRef.current && !isPublishingRef.current && !authContextInvalidRef.current) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
@@ -694,11 +696,21 @@ export default function SellWizardClient({
               if (result.ok) {
                 lastServerSaveRef.current = Date.now()
                 setSaveStatus('saved')
+                // Reset auth context invalid flag on successful save
+                authContextInvalidRef.current = false
               } else {
                 setSaveStatus('error')
-                // Don't show error toast for autosave failures - just log
-                if (isDebugEnabled) {
-                  console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
+                // If auth context is invalid, stop autosave retries
+                if (result.code === 'AUTH_CONTEXT_INVALID') {
+                  authContextInvalidRef.current = true
+                  if (isDebugEnabled) {
+                    console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context')
+                  }
+                } else {
+                  // Don't show error toast for autosave failures - just log
+                  if (isDebugEnabled) {
+                    console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
+                  }
                 }
               }
             })
@@ -1427,7 +1439,9 @@ export default function SellWizardClient({
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create items'
-      console.error('[SELL_WIZARD] Item creation failed:', errorMessage)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SELL_WIZARD] Item creation failed:', errorMessage)
+      }
       throw new Error(`Failed to create some items: ${errorMessage}`)
     }
   }, [])
@@ -1439,6 +1453,9 @@ export default function SellWizardClient({
     }
     if (error === 'rate_limited' || code === 'RATE_LIMITED') {
       return 'Too many attempts. Please wait a moment and try again.'
+    }
+    if (code === 'AUTH_CONTEXT_INVALID') {
+      return 'Your session expired. Please refresh and try again.'
     }
     if (code === 'PERMISSION_DENIED') {
       return 'We couldn\'t publish this sale due to a permission issue. Please refresh and try again.'

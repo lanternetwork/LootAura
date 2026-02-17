@@ -1,9 +1,12 @@
 import { cookies } from 'next/headers'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import type { NextRequest } from 'next/server'
 
 // RLS-aware client for API routes
-export function getRlsDb() {
+// Accepts optional request to ensure cookie context matches the request
+// This ensures auth.uid() in RLS policies matches the authenticated user
+export function getRlsDb(request?: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -11,20 +14,38 @@ export function getRlsDb() {
     throw new Error('Supabase credentials missing')
   }
 
-  const cookieStore = cookies()
-
+  // If request is provided, use its cookies for RLS context
+  // Otherwise fall back to next/headers cookies() (for backward compatibility)
   const sb = createServerClient(url, anon, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        cookieStore.set({ name, value, ...options })
-      },
-      remove(name: string, options: CookieOptions) {
-        cookieStore.set({ name, value: '', ...options, maxAge: 0 })
-      },
-    },
+    cookies: request
+      ? {
+          // Use request cookies directly for RLS context
+          // This ensures the RLS client sees the same session as supabase.auth.getUser()
+          get(name: string) {
+            return request.cookies.get(name)?.value
+          },
+          set(_name: string, _value: string, _options: CookieOptions) {
+            // Cookie setting is handled by response headers in API routes
+            // This is read-only for RLS context evaluation
+          },
+          remove(_name: string, _options: CookieOptions) {
+            // Cookie removal is handled by response headers
+          },
+        }
+      : (() => {
+          const cookieStore = cookies()
+          return {
+            get(name: string) {
+              return cookieStore.get(name)?.value
+            },
+            set(name: string, value: string, options: CookieOptions) {
+              cookieStore.set({ name, value, ...options })
+            },
+            remove(name: string, options: CookieOptions) {
+              cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+            },
+          }
+        })(),
     // Explicitly set auth persistence to ensure session is available
     auth: {
       persistSession: true,

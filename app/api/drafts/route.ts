@@ -26,7 +26,7 @@ export async function GET(_request: NextRequest) {
 
     if (allDrafts) {
       // Return all active drafts for user (read from base table via schema-scoped client)
-      const db = getRlsDb()
+      const db = getRlsDb(_request)
       const { data: drafts, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
@@ -62,7 +62,7 @@ export async function GET(_request: NextRequest) {
 
     // If draftKey is provided, fetch that specific draft
     if (draftKey) {
-      const db = getRlsDb()
+      const db = getRlsDb(_request)
       const { data: draft, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, payload, updated_at')
         .eq('user_id', user.id)
@@ -111,7 +111,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Fetch latest active draft for user (read from base table via schema-scoped client)
-    const db = getRlsDb()
+    const db = getRlsDb(_request)
     const { data: draft, error } = await fromBase(db, 'sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
@@ -236,7 +236,8 @@ async function postDraftHandler(request: NextRequest) {
     }
     
     // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
-    const rls = getRlsDb()
+    // Pass request to ensure cookie context matches the authenticated user
+    const rls = getRlsDb(request)
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
@@ -281,6 +282,25 @@ async function postDraftHandler(request: NextRequest) {
     }
 
     if (error) {
+      // Check for RLS/permission errors - likely auth context mismatch
+      const errorCode = error?.code || error?.message || ''
+      const errorMessage = String(error?.message || error || '')
+      const isRlsError = /42501|PGRST301|permission denied|row-level security/i.test(String(errorCode) + ' ' + errorMessage)
+      
+      if (isRlsError) {
+        // If getUser() succeeded but RLS denies, it's an auth context issue
+        // Return 401 to prompt session refresh
+        const { logger } = await import('@/lib/log')
+        logger.warn('Draft save failed due to RLS/auth context mismatch', {
+          component: 'drafts',
+          operation: 'saveDraft',
+          userId: user.id.substring(0, 8) + '...',
+          errorCode: error?.code,
+          errorMessage: error?.message,
+        })
+        return fail(401, 'AUTH_CONTEXT_INVALID', 'Your session expired. Please refresh and try again.')
+      }
+      
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('[DRAFTS/POST] supabase error:', error)
       }
@@ -292,7 +312,7 @@ async function postDraftHandler(request: NextRequest) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
           draftKey,
-          userId: user.id,
+          userId: user.id.substring(0, 8) + '...',
           operation: existingDraft ? 'update' : 'insert',
         })
       }

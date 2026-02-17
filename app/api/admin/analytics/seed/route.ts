@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (saleId) {
       // Use specific sale
-      const db = getRlsDb()
+      const db = await getRlsDb()
       const { data: sale, error: saleError } = await fromBase(db, 'sales')
         .select('id, owner_id')
         .eq('id', saleId)
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       targetSales = [sale]
     } else if (ownerId) {
       // Fetch up to 25 recent sales for owner
-      const db = getRlsDb()
+      const db = await getRlsDb()
       const { data: sales, error: salesError } = await fromBase(db, 'sales')
         .select('id, owner_id')
         .eq('owner_id', ownerId)
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       targetSales = sales || []
     } else {
       // Use current user's sales
-      const db = getRlsDb()
+      const db = await getRlsDb()
       const { data: sales, error: salesError } = await fromBase(db, 'sales')
         .select('id, owner_id')
         .eq('owner_id', user.id)

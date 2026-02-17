@@ -242,7 +242,7 @@ export async function createItem(saleId: string, input: ItemInput): Promise<Acti
     })
     
     // Write to base table using schema-scoped client (base table is authoritative)
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { data, error } = await fromBase(db, 'items')
       .insert({
         sale_id: saleId,

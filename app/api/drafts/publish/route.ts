@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Read draft with RLS - pass request to ensure cookie context matches authenticated user
-    const rls = getRlsDb(request)
+    const rls = await getRlsDb(request)
     const { data: draftData, error: dErr } = await fromBase(rls, 'sale_drafts')
       .select('*')
       .eq('draft_key', draftKey)

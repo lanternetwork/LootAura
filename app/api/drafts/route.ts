@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
 
     if (allDrafts) {
       // Return all active drafts for user (read from base table via schema-scoped client)
-      const db = getRlsDb(_request)
+      const db = await getRlsDb(_request)
       const { data: drafts, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
@@ -63,7 +63,7 @@ export async function GET(_request: NextRequest) {
 
     // If draftKey is provided, fetch that specific draft
     if (draftKey) {
-      const db = getRlsDb(_request)
+      const db = await getRlsDb(_request)
       const { data: draft, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, payload, updated_at')
         .eq('user_id', user.id)
@@ -112,7 +112,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Fetch latest active draft for user (read from base table via schema-scoped client)
-    const db = getRlsDb(_request)
+    const db = await getRlsDb(_request)
     const { data: draft, error } = await fromBase(db, 'sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
@@ -238,19 +238,9 @@ async function postDraftHandler(request: NextRequest) {
     
     // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
     // Uses cookies() from next/headers for consistent cookie reading with auth client
-    // Verify session exists before RLS writes (both clients use same cookies())
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      const { logger } = await import('@/lib/log')
-      logger.warn('RLS client has no session, auth context may be invalid', {
-        component: 'drafts',
-        operation: 'saveDraft',
-        userId: user.id.substring(0, 8) + '...',
-      })
-      return fail(401, 'AUTH_CONTEXT_INVALID', 'Your session expired. Please refresh and try again.')
-    }
-    
-    const rls = getRlsDb(request)
+    // Both clients use the same cookies(), so if getUser() succeeded, RLS client should have session
+    // If RLS write fails with auth error, we'll handle it in the error handler below
+    const rls = await getRlsDb(request)
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -413,7 +403,7 @@ async function deleteDraftHandler(request: NextRequest) {
     }
 
     // Mark draft as archived (soft delete) using RLS-aware client (sale_drafts has RLS UPDATE policy)
-    const rls = getRlsDb(request)
+    const rls = await getRlsDb(request)
     const { error } = await fromBase(rls, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)

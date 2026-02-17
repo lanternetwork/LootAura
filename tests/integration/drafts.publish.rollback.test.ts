@@ -82,7 +82,7 @@ const mockAdminDb = {
 }
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: (_request?: any) => mockRlsDb, // Return mock RLS DB instead of throwing, accept request param for compatibility
+  getRlsDb: async (_request?: any) => mockRlsDb, // Return mock RLS DB instead of throwing, accept request param for compatibility
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => {
     if (table === 'profiles') {

@@ -179,7 +179,7 @@ export async function getUserSales(
   // Fallback: query base table directly using schema-scoped client
   try {
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-    const db = getRlsDb()
+    const db = await getRlsDb()
     let query = fromBase(db, 'sales')
       .select('*')
       .eq('owner_id', userId)
@@ -290,7 +290,7 @@ export async function getArchivedSalesCount(
   // Fallback: query base table directly
   try {
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { count, error } = await fromBase(db, 'sales')
       .select('id', { count: 'exact', head: true })
       .eq('owner_id', userId)
@@ -324,7 +324,7 @@ export async function getUserDrafts(
   try {
     // Read from base table via schema-scoped client
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-    const db = getRlsDb()
+    const db = await getRlsDb()
     
     const { data: drafts, error } = await fromBase(db, 'sale_drafts')
       .select('id, draft_key, title, updated_at, payload')
@@ -530,7 +530,7 @@ export async function getSaleWithItems(
     // - Owners see items for their own sales (any status)
     // - Public/anon see items only when sale is published
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-    const db = getRlsDb()
+    const db = await getRlsDb()
     
     // Query base table - RLS policies will filter results based on auth context
     // Select image_url and images (if available) - images array is preferred, image_url is fallback
@@ -796,7 +796,7 @@ export async function getNearestSalesForSale(
 
     try {
       const { getRlsDb } = await import('@/lib/supabase/clients')
-      const rlsDb = getRlsDb() // This returns a client scoped to lootaura_v2 schema
+      const rlsDb = await getRlsDb() // This returns a client scoped to lootaura_v2 schema
       const rpcResult = await rlsDb.rpc('get_sales_within_distance', {
         user_lat: currentSale.lat,
         user_lng: currentSale.lng,

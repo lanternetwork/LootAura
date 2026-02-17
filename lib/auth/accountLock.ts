@@ -15,7 +15,7 @@ import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
  */
 export async function assertAccountNotLocked(
   userId: string,
-  db?: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>
+  db?: Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>
 ): Promise<void> {
   let client = db
   
@@ -23,7 +23,7 @@ export async function assertAccountNotLocked(
   if (!client) {
     try {
       // Try RLS client first (for production use)
-      client = getRlsDb()
+      client = await getRlsDb()
     } catch (error: any) {
       // If cookies() is not available (e.g., in tests), fall back to admin client
       // This is safe because in test contexts, account locks are typically mocked
@@ -83,7 +83,7 @@ export async function assertAccountNotLocked(
  */
 export async function isAccountLocked(
   userId: string,
-  db?: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>
+  db?: Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>
 ): Promise<boolean> {
   try {
     let client = db
@@ -91,7 +91,7 @@ export async function isAccountLocked(
     // If no client provided, try to get one
     if (!client) {
       try {
-        client = getRlsDb()
+        client = await getRlsDb()
       } catch (error: any) {
         // If cookies() is not available (e.g., in tests), fall back to admin client
         if (error?.message?.includes('cookies') || error?.message?.includes('request scope')) {

@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
 
     // Use RLS-aware client - promotions_owner_select policy ensures users can only read their own promotions
     // Admins can read all via promotions_admin_select policy
-    const rlsDb = getRlsDb()
+    const rlsDb = await getRlsDb()
 
     // Determine if caller is admin
     let isAdmin = false

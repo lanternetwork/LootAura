@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   
   // Write to base table using schema-scoped client
-  const db = getRlsDb()
+  const db = await getRlsDb()
   const updateData: { status: 'draft' | 'published' | 'archived' | 'active'; archived_at?: string } = { status }
   
   // Set archived_at timestamp when archiving

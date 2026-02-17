@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const includeTest = searchParams.get('includeTest') === 'true'
 
     const supabase = createSupabaseServerClient()
-    const db = getRlsDb()
+    const db = await getRlsDb()
 
     // Check if table exists and is readable
     let tableExists = false

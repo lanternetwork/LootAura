@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update profile using RLS client with schema scope
-    const rls = getRlsDb()
+    const rls = await getRlsDb()
     const updateResult = await fromBase(rls, 'profiles')
       .update(updateData)
       .eq('id', user.id)

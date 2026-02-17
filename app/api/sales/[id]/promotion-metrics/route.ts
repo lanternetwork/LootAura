@@ -28,7 +28,7 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
   }
 
   // Verify sale exists and get owner_id using RLS-aware client
-  const rls = getRlsDb()
+  const rls = await getRlsDb()
   const { data: sale, error: saleError } = await fromBase(rls, 'sales')
     .select('id, owner_id')
     .eq('id', saleId)

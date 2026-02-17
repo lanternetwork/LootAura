@@ -149,7 +149,7 @@ async function finalizeDraftPromotion(
   const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
   
   // Check idempotency: has this draft already been finalized?
-  const rls = getRlsDb()
+  const rls = await getRlsDb()
   const { data: draft, error: draftError } = await fromBase(rls, 'sale_drafts')
     .select('*')
     .eq('draft_key', draftKey)

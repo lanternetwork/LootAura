@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server'
 // In API routes, always use cookies() from next/headers for consistent cookie reading
 // This ensures auth.uid() in RLS policies matches the authenticated user
 // The request parameter is kept for backward compatibility but not used for cookie reads/writes
-export function getRlsDb(_request?: NextRequest) {
+export async function getRlsDb(_request?: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -40,6 +40,11 @@ export function getRlsDb(_request?: NextRequest) {
     },
   })
 
+  // Session is loaded lazily from cookies by the SSR client when queries run
+  // RLS policies will have access to auth.uid() via the cookie adapter
+  // Eager getSession() call is avoided for performance (no per-request network I/O)
+  // The session will be read from cookies automatically when needed
+
   return sb.schema('lootaura_v2')
 }
 
@@ -58,7 +63,7 @@ export function getAdminDb() {
 
 // Guard wrapper: block qualified names
 export function fromBase(
-  db: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>,
+  db: Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>,
   table: string
 ) {
   if (table.includes('.')) {

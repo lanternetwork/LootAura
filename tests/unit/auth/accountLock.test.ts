@@ -27,7 +27,7 @@ const mockAdminDb = {
 
 // Mock the clients module
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: vi.fn(() => {
+  getRlsDb: vi.fn(async () => {
     // Simulate cookies() error in test environment - this triggers fallback to getAdminDb
     throw new Error('cookies() can only be called inside a Server Component or Route Handler')
   }),

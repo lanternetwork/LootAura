@@ -1184,17 +1184,8 @@ async function postHandler(request: NextRequest) {
     // Insert to base table using RLS-aware client (respects RLS policies)
     // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
     // Uses cookies() from next/headers for consistent cookie reading with auth client
-    // Verify session exists before RLS writes (both clients use same cookies())
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      logger.warn('RLS client has no session, auth context may be invalid', {
-        component: 'sales',
-        operation: 'sale_create',
-        userId: user!.id.substring(0, 8) + '...',
-      })
-      return fail(401, 'AUTH_CONTEXT_INVALID', 'Your session expired. Please refresh and try again.')
-    }
-    
+    // Both clients use the same cookies(), so if getUser() succeeded, RLS client should have session
+    // If RLS write fails with auth error, we'll handle it in the error handler below
     const rls = getRlsDb(request)
     
     // Debug-only: verify cookie existence before RLS write

@@ -287,7 +287,7 @@ export function monitorApiPerformance() {
 }
 
 // Memory monitoring
-let memoryIntervalId: NodeJS.Timeout | null = null
+let memoryIntervalId: ReturnType<typeof setInterval> | null = null
 
 export function monitorMemoryUsage() {
   if (typeof window === 'undefined') return
@@ -319,7 +319,7 @@ export function stopMemoryMonitoring() {
 }
 
 // Initialize monitoring
-let alertsIntervalId: NodeJS.Timeout | null = null
+let alertsIntervalId: ReturnType<typeof setInterval> | null = null
 
 export function initializePerformanceMonitoring() {
   if (typeof window === 'undefined') return

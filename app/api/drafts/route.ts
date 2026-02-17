@@ -238,6 +238,20 @@ async function postDraftHandler(request: NextRequest) {
     
     // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
     // Uses cookies() from next/headers for consistent cookie reading with auth client
+    // Create a temporary base client to verify session before schema scoping
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    const baseClient = createSupabaseServerClient()
+    const { data: { session } } = await baseClient.auth.getSession()
+    if (!session) {
+      const { logger } = await import('@/lib/log')
+      logger.warn('RLS client has no session, auth context may be invalid', {
+        component: 'drafts',
+        operation: 'saveDraft',
+        userId: user.id.substring(0, 8) + '...',
+      })
+      return fail(401, 'AUTH_CONTEXT_INVALID', 'Your session expired. Please refresh and try again.')
+    }
+    
     const rls = getRlsDb(request)
     
     // Debug-only: verify cookie existence before RLS write
@@ -401,7 +415,7 @@ async function deleteDraftHandler(request: NextRequest) {
     }
 
     // Mark draft as archived (soft delete) using RLS-aware client (sale_drafts has RLS UPDATE policy)
-    const rls = getRlsDb()
+    const rls = getRlsDb(request)
     const { error } = await fromBase(rls, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)

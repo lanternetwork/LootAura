@@ -1437,6 +1437,12 @@ export default function SellWizardClient({
     if (code === 'account_locked' || error === 'account_locked') {
       return 'This account has been locked. Please contact support if you believe this is an error.'
     }
+    if (error === 'rate_limited' || code === 'RATE_LIMITED') {
+      return 'Too many attempts. Please wait a moment and try again.'
+    }
+    if (code === 'PERMISSION_DENIED') {
+      return 'We couldn\'t publish this sale due to a permission issue. Please refresh and try again.'
+    }
     return error || details || 'An unexpected error occurred. Please try again.'
   }, [])
 
@@ -1473,14 +1479,22 @@ export default function SellWizardClient({
 
       if (!response.ok) {
         const errorData = result || { error: 'Failed to create sale' }
-        console.error('[SELL_WIZARD] Failed to create sale:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData.error,
-          details: errorData.details,
-          code: errorData.code,
-          fullResponse: errorData
-        })
+        
+        // Debug-only structured logging
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.error('Sale creation failed', new Error('Sale creation failed'), {
+            component: 'sellWizard',
+            operation: 'submitSalePayload',
+            status: response.status,
+            statusText: response.statusText,
+            code: errorData.code,
+            error: errorData.error,
+            hasDetails: !!errorData.details,
+            path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+          })
+        }
+        
         const errorMessage = toUserFacingSubmitError({
           error: errorData.error,
           code: errorData.code,
@@ -1800,6 +1814,19 @@ export default function SellWizardClient({
             await submitSalePayload(payload)
             dispatch({ type: 'SET_LOADING', loading: false })
             return
+          }
+          
+          // Debug-only structured logging
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            const { logger } = await import('@/lib/log')
+            logger.error('Draft publish failed', new Error('Draft publish failed'), {
+              component: 'sellWizard',
+              operation: 'handleSubmit',
+              code: result.code,
+              error: result.error,
+              hasDetails: !!result.details,
+              path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+            })
           }
           
           const errorMessage = toUserFacingSubmitError({

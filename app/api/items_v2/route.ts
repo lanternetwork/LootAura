@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Write to base table using schema-scoped client
-    const db = getRlsDb()
+    const db = await getRlsDb()
     
     // Validate that the sale belongs to the authenticated user
     // Read from base table to check ownership (sales_v2 view doesn't include owner_id for security)
@@ -328,7 +328,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // Write to base table using schema-scoped client
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { data: item, error } = await fromBase(db, 'items')
       .update(updatePayload)
       .eq('id', itemId)
@@ -396,7 +396,7 @@ export async function DELETE(request: NextRequest) {
     }
     
     // Write to base table using schema-scoped client
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { error } = await fromBase(db, 'items')
       .delete()
       .eq('id', itemId)

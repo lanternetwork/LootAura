@@ -154,7 +154,7 @@ async function zipHandler(request: NextRequest) {
     })
     // Read from base table via schema-scoped client
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { data: localData, error: localError } = await fromBase(db, 'zipcodes')
       .select('zip, lat, lng, city, state')
       .eq('zip', normalizedZip) // TEXT comparison, no parseInt

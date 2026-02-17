@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Get sale to retrieve owner_id
     const { getRlsDb } = await import('@/lib/supabase/clients')
-    const rls = getRlsDb()
+    const rls = await getRlsDb()
     const { data: sale, error: saleError } = await fromBase(rls, 'sales')
       .select('owner_id')
       .eq('id', sale_id)

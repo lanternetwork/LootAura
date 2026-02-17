@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         : 'draft'
 
     // Write to base table using schema-scoped client
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { data: sale, error } = await fromBase(db, 'sales')
       .insert({
         owner_id: user.id,
@@ -156,7 +156,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // Write to base table using schema-scoped client
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { data: sale, error } = await fromBase(db, 'sales')
       .update(body)
       .eq('id', saleId)
@@ -204,7 +204,7 @@ export async function DELETE(request: NextRequest) {
     }
     
     // Write to base table using schema-scoped client
-    const db = getRlsDb()
+    const db = await getRlsDb()
     const { error } = await fromBase(db, 'sales')
       .delete()
       .eq('id', saleId)

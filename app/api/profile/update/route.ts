@@ -120,7 +120,7 @@ async function updateProfileHandler(request: NextRequest): Promise<NextResponse>
 
     // Update profile using RLS client with schema scope
     // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
-    const rls = getRlsDb()
+    const rls = await getRlsDb()
     const updateResult = await fromBase(rls, 'profiles')
       .update(updateData)
       .eq('id', user.id)

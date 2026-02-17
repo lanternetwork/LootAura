@@ -10,12 +10,17 @@ import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 const mockSupabase = {
   auth: {
     getUser: vi.fn(),
+    getSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
+      error: null,
+    }),
   },
   from: vi.fn(),
 }
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabase,
+  createSupabaseWriteClient: () => mockSupabase,
 }))
 
 describe('Drafts API', () => {

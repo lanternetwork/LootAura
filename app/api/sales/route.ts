@@ -1299,11 +1299,10 @@ async function postHandler(request: NextRequest) {
       
       if (isRlsError) {
         // Distinguish between auth context invalid (401) vs permission denied (403)
-        // If getUser() succeeded but RLS denies, it's likely an auth context mismatch
-        // Check for JWT/auth-related errors to classify as 401
+        // Only treat as 401 if error message explicitly mentions JWT/auth/token issues
+        // Otherwise, treat as 403 (true permission denial)
         const isAuthContextError = 
-          /JWT|token|expired|unauthorized|not authenticated|auth\.uid/i.test(errorMessage) ||
-          (user && errorCode === '42501') // RLS violation when user is authenticated suggests auth context issue
+          /JWT|token.*expired|unauthorized|not authenticated|auth\.uid.*null/i.test(errorMessage)
         
         if (isAuthContextError) {
           return fail(401, 'AUTH_CONTEXT_INVALID', 'Your session expired. Please refresh and try again.')

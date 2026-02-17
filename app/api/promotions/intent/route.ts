@@ -148,7 +148,7 @@ async function intentHandler(request: NextRequest) {
     // Handle draft mode
     if (mode === 'draft' && draft_key) {
       // Fetch draft and validate ownership
-      const rls = getRlsDb()
+      const rls = await getRlsDb()
       const { data: draft, error: draftError } = await fromBase(rls, 'sale_drafts')
         .select('*')
         .eq('draft_key', draft_key)

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         console.log('[DEBUG/DB] Admin client failed, trying RLS client:', adminErr.message)
       }
       try {
-        db = getRlsDb()
+        db = await getRlsDb()
         const rlsResult = await fromBase(db, 'sales').select('id').limit(1)
         data = rlsResult.data
         error = rlsResult.error

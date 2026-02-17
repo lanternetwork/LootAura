@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
 
     if (allDrafts) {
       // Return all active drafts for user (read from base table via schema-scoped client)
-      const db = getRlsDb(_request)
+      const db = await getRlsDb(_request)
       const { data: drafts, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
@@ -63,7 +63,7 @@ export async function GET(_request: NextRequest) {
 
     // If draftKey is provided, fetch that specific draft
     if (draftKey) {
-      const db = getRlsDb(_request)
+      const db = await getRlsDb(_request)
       const { data: draft, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, payload, updated_at')
         .eq('user_id', user.id)
@@ -112,7 +112,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Fetch latest active draft for user (read from base table via schema-scoped client)
-    const db = getRlsDb(_request)
+    const db = await getRlsDb(_request)
     const { data: draft, error } = await fromBase(db, 'sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
@@ -240,7 +240,7 @@ async function postDraftHandler(request: NextRequest) {
     // Uses cookies() from next/headers for consistent cookie reading with auth client
     // Both clients use the same cookies(), so if getUser() succeeded, RLS client should have session
     // If RLS write fails with auth error, we'll handle it in the error handler below
-    const rls = getRlsDb(request)
+    const rls = await getRlsDb(request)
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -403,7 +403,7 @@ async function deleteDraftHandler(request: NextRequest) {
     }
 
     // Mark draft as archived (soft delete) using RLS-aware client (sale_drafts has RLS UPDATE policy)
-    const rls = getRlsDb(request)
+    const rls = await getRlsDb(request)
     const { error } = await fromBase(rls, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)

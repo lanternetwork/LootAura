@@ -1186,7 +1186,7 @@ async function postHandler(request: NextRequest) {
     // Uses cookies() from next/headers for consistent cookie reading with auth client
     // Both clients use the same cookies(), so if getUser() succeeded, RLS client should have session
     // If RLS write fails with auth error, we'll handle it in the error handler below
-    const rls = getRlsDb(request)
+    const rls = await getRlsDb(request)
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

@@ -16,8 +16,6 @@ export function getRlsDb(request?: NextRequest) {
 
   // If request is provided, use its cookies for RLS context
   // Otherwise fall back to next/headers cookies() (for backward compatibility)
-  const cookieStore = request ? undefined : cookies()
-
   const sb = createServerClient(url, anon, {
     cookies: request
       ? {
@@ -34,17 +32,20 @@ export function getRlsDb(request?: NextRequest) {
             // Cookie removal is handled by response headers
           },
         }
-      : {
-          get(name: string) {
-            return cookieStore!.get(name)?.value
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            cookieStore!.set({ name, value, ...options })
-          },
-          remove(name: string, options: CookieOptions) {
-            cookieStore!.set({ name, value: '', ...options, maxAge: 0 })
-          },
-        },
+      : (() => {
+          const cookieStore = cookies()
+          return {
+            get(name: string) {
+              return cookieStore.get(name)?.value
+            },
+            set(name: string, value: string, options: CookieOptions) {
+              cookieStore.set({ name, value, ...options })
+            },
+            remove(name: string, options: CookieOptions) {
+              cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+            },
+          }
+        })(),
     // Explicitly set auth persistence to ensure session is available
     auth: {
       persistSession: true,

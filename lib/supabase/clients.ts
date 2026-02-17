@@ -40,15 +40,10 @@ export async function getRlsDb(_request?: NextRequest) {
     },
   })
 
-  // Ensure session is loaded before returning schema-scoped client
-  // This ensures auth.uid() is available in RLS policies
-  // We call getSession() to trigger session loading from cookies
-  // Don't throw if session is missing - let the caller handle that
-  try {
-    await sb.auth.getSession()
-  } catch {
-    // Session might not exist - that's ok, caller will handle auth errors
-  }
+  // Session is loaded lazily from cookies by the SSR client when queries run
+  // RLS policies will have access to auth.uid() via the cookie adapter
+  // Eager getSession() call is avoided for performance (no per-request network I/O)
+  // The session will be read from cookies automatically when needed
 
   return sb.schema('lootaura_v2')
 }

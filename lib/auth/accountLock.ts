@@ -15,7 +15,7 @@ import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
  */
 export async function assertAccountNotLocked(
   userId: string,
-  db?: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>
+  db?: Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>
 ): Promise<void> {
   let client = db
   
@@ -83,7 +83,7 @@ export async function assertAccountNotLocked(
  */
 export async function isAccountLocked(
   userId: string,
-  db?: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>
+  db?: Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>
 ): Promise<boolean> {
   try {
     let client = db

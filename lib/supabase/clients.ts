@@ -68,7 +68,7 @@ export function getAdminDb() {
 
 // Guard wrapper: block qualified names
 export function fromBase(
-  db: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>,
+  db: Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>,
   table: string
 ) {
   if (table.includes('.')) {

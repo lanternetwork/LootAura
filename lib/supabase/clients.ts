@@ -24,11 +24,11 @@ export function getRlsDb(request?: NextRequest) {
           get(name: string) {
             return request.cookies.get(name)?.value
           },
-          set(name: string, value: string, options: CookieOptions) {
+          set(_name: string, _value: string, _options: CookieOptions) {
             // Cookie setting is handled by response headers in API routes
             // This is read-only for RLS context evaluation
           },
-          remove(name: string, options: CookieOptions) {
+          remove(_name: string, _options: CookieOptions) {
             // Cookie removal is handled by response headers
           },
         }

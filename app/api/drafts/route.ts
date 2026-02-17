@@ -241,9 +241,8 @@ async function postDraftHandler(request: NextRequest) {
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const cookieStore = (await import('next/headers')).cookies()
-      const hasAccessTokenCookie = !!cookieStore.get('sb-access-token') || !!cookieStore.get('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token')
-      const hasRefreshTokenCookie = !!cookieStore.get('sb-refresh-token') || !!cookieStore.get('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token.0')
+      const { cookies: getCookies } = await import('next/headers')
+      const cookieStore = getCookies()
       // Check common Supabase cookie patterns
       const allCookies = cookieStore.getAll()
       const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))
@@ -254,8 +253,8 @@ async function postDraftHandler(request: NextRequest) {
       logger.debug('RLS write cookie check', {
         component: 'drafts',
         operation: 'saveDraft',
-        hasAccessTokenCookie: hasAccessToken || hasAccessTokenCookie,
-        hasRefreshTokenCookie: hasRefreshToken || hasRefreshTokenCookie,
+        hasAccessTokenCookie: hasAccessToken,
+        hasRefreshTokenCookie: hasRefreshToken,
         supabaseCookieCount: supabaseCookies.length,
       })
     }

@@ -1187,7 +1187,8 @@ async function postHandler(request: NextRequest) {
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const cookieStore = (await import('next/headers')).cookies()
+      const { cookies: getCookies } = await import('next/headers')
+      const cookieStore = getCookies()
       // Check common Supabase cookie patterns
       const allCookies = cookieStore.getAll()
       const supabaseCookies = allCookies.filter(c => c.name.includes('sb-') || c.name.includes('supabase'))

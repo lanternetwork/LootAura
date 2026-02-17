@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server'
 // In API routes, always use cookies() from next/headers for consistent cookie reading
 // This ensures auth.uid() in RLS policies matches the authenticated user
 // The request parameter is kept for backward compatibility but not used for cookie reads/writes
-export function getRlsDb(request?: NextRequest) {
+export function getRlsDb(_request?: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 

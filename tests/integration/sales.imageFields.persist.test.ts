@@ -35,7 +35,11 @@ const fromChain = {
 
 const mockSupabaseClient = {
   auth: {
-    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
+    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+    getSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
+      error: null,
+    }),
   },
   from: vi.fn((table: string) => {
     // For profiles table (account lock checks), return a query chain
@@ -111,6 +115,11 @@ describe('Sales API - Image Support', () => {
 		
 		// Reset auth mock to return user
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
+		// Reset session mock to return valid session
+		mockSupabaseClient.auth.getSession.mockResolvedValue({
+			data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
+			error: null,
+		})
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
 		// CRITICAL: Re-initialize from() and fromChain.insert after clearAllMocks()

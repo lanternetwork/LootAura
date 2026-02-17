@@ -40,10 +40,17 @@ export async function getRlsDb(_request?: NextRequest) {
     },
   })
 
-  // Session is loaded lazily from cookies by the SSR client when queries run
-  // RLS policies will have access to auth.uid() via the cookie adapter
-  // Eager getSession() call is avoided for performance (no per-request network I/O)
-  // The session will be read from cookies automatically when needed
+  // Load session from cookies to ensure JWT is available for RLS policies
+  // RLS policies need auth.uid() which comes from the JWT token in request headers
+  // getSession() reads from cookies (local operation) and makes the session available
+  // for the client to include the JWT in subsequent database requests
+  // Don't throw if session is missing - let the caller handle auth errors
+  try {
+    await sb.auth.getSession()
+  } catch {
+    // Session might not exist - that's ok, caller will handle auth errors
+    // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
+  }
 
   return sb.schema('lootaura_v2')
 }

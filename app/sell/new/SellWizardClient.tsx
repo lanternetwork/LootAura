@@ -88,7 +88,7 @@ type WizardState = {
 }
 
 // Sale API response type
-interface SaleResponse {
+type SaleResponse = {
   ok?: boolean
   saleId?: string
   sale?: { id: string }

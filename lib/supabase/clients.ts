@@ -51,26 +51,56 @@ export async function getRlsDb(_request?: NextRequest) {
     
     // If user is valid, load the full session (needed for RLS access_token)
     if (user && !userError) {
-      await sb.auth.getSession()
-    }
-    
-    // Debug logging to diagnose session loading issues
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      if (userError) {
+      const { data: { session }, error: sessionError } = await sb.auth.getSession()
+      
+      // Debug logging to diagnose session loading issues
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         const { logger } = await import('@/lib/log')
-        logger.debug('getRlsDb: getUser() error', {
-          component: 'supabase',
-          operation: 'getRlsDb',
-          error: userError.message,
-          errorCode: userError.status,
-        })
-      } else if (!user) {
+        if (sessionError) {
+          logger.debug('getRlsDb: getSession() error after getUser() success', {
+            component: 'supabase',
+            operation: 'getRlsDb',
+            error: sessionError.message,
+            hasUser: true,
+            userId: user.id.substring(0, 8) + '...',
+          })
+        } else if (!session) {
+          logger.debug('getRlsDb: getSession() returned null session after getUser() success', {
+            component: 'supabase',
+            operation: 'getRlsDb',
+            hasUser: true,
+            hasSession: false,
+            userId: user.id.substring(0, 8) + '...',
+          })
+        } else {
+          logger.debug('getRlsDb: session loaded successfully', {
+            component: 'supabase',
+            operation: 'getRlsDb',
+            hasUser: true,
+            hasSession: true,
+            hasAccessToken: !!session.access_token,
+            userId: user.id.substring(0, 8) + '...',
+          })
+        }
+      }
+    } else {
+      // Debug logging for getUser() failures
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         const { logger } = await import('@/lib/log')
-        logger.debug('getRlsDb: getUser() returned null user', {
-          component: 'supabase',
-          operation: 'getRlsDb',
-          hasUser: false,
-        })
+        if (userError) {
+          logger.debug('getRlsDb: getUser() error', {
+            component: 'supabase',
+            operation: 'getRlsDb',
+            error: userError.message,
+            errorCode: userError.status,
+          })
+        } else if (!user) {
+          logger.debug('getRlsDb: getUser() returned null user', {
+            component: 'supabase',
+            operation: 'getRlsDb',
+            hasUser: false,
+          })
+        }
       }
     }
   } catch (error) {

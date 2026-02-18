@@ -56,9 +56,19 @@ export async function getRlsDb(_request?: NextRequest) {
   // Load session from cookies to ensure JWT is available for RLS policies
   // The SSR client reads from cookies automatically, but we need to trigger the initial load
   // getSession() reads from cookies and makes the session available for RLS to evaluate auth.uid()
-  // Don't throw if session is missing - let the caller handle auth errors
+  // CRITICAL: We must explicitly set the session on the client BEFORE calling .schema()
+  // This ensures the schema-scoped client inherits the Authorization header with the JWT
+  // Without this, RLS policies will evaluate auth.uid() as null even though the session exists
   try {
-    await sb.auth.getSession()
+    const { data: { session } } = await sb.auth.getSession()
+    if (session) {
+      // Explicitly set the session on the client to ensure JWT is in Authorization header
+      // This is critical for schema-scoped clients to have access to the JWT for RLS evaluation
+      await sb.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
   } catch {
     // Session might not exist - that's ok, caller will handle auth errors
     // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests

@@ -33,7 +33,7 @@ const fromChain = {
   }),
 }
 
-// Schema-scoped client (returned by getRlsDb())
+// Schema-scoped client (returned by .schema('lootaura_v2'))
 const mockRlsDb = {
   from: vi.fn((table: string) => {
     // For profiles table (account lock checks), return a query chain
@@ -52,9 +52,14 @@ const mockSupabaseClient = {
     }
     return fromChain
   }),
+  schema: vi.fn(() => mockRlsDb), // schema() returns the schema-scoped client
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
     getSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
+      error: null,
+    }),
+    setSession: vi.fn().mockResolvedValue({
       data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
       error: null,
     }),
@@ -66,9 +71,8 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
-// Mock schema-scoped clients - route now uses getRlsDb() which is async
+// Mock schema-scoped clients - route now uses createSupabaseServerClient().schema('lootaura_v2')
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: vi.fn((_request?: any) => Promise.resolve(mockRlsDb)),
   getAdminDb: () => mockSupabaseClient,
   fromBase: (db: any, table: string) => {
     // fromBase() receives a schema-scoped client, so just use .from() directly
@@ -131,11 +135,17 @@ describe('Sales API - Image Support', () => {
 			data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
 			error: null,
 		})
+		// Reset setSession mock
+		mockSupabaseClient.auth.setSession.mockResolvedValue({
+			data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
+			error: null,
+		})
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
 		// CRITICAL: Re-initialize from() and fromChain.insert after clearAllMocks()
 		// clearAllMocks() clears implementations of ALL vi.fn() mocks, including fromChain.insert
-		// Route now uses getRlsDb() which returns mockRlsDb, so we need to reset mockRlsDb.from
+		// Route now uses createSupabaseServerClient().schema() which returns mockRlsDb
+		mockSupabaseClient.schema.mockReturnValue(mockRlsDb)
 		mockRlsDb.from.mockImplementation((table: string) => {
 			if (table === 'profiles') {
 				return createQueryChain()

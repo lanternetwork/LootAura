@@ -1026,6 +1026,17 @@ async function postHandler(request: NextRequest) {
     const authResponse = await supabase.auth.getUser()
     user = authResponse?.data?.user as { id: string } | null
     
+    // CRITICAL: Load session into client state before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    // getSession() reads from cookies and makes the session available for RLS to evaluate auth.uid()
+    // Without this, .schema() might not include the Authorization header
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+      // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
+    }
+    
     // Debug-only: Log auth.getUser() and auth.getSession() results
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const { logger } = await import('@/lib/log')

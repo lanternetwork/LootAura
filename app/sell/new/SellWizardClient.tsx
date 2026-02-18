@@ -1524,7 +1524,12 @@ export default function SellWizardClient({
 
       // API returns { ok: true, saleId: '...' } or { ok: true, sale: {...} } or { sale: {...} }
       // Handle both saleId (new format) and sale.id (legacy format)
-      type SaleResponse = { ok?: boolean; saleId?: string; sale?: { id: string }; id?: string }
+      interface SaleResponse {
+        ok?: boolean
+        saleId?: string
+        sale?: { id: string }
+        id?: string
+      }
       const response = result as SaleResponse
       const saleId = response.saleId || response.sale?.id || response.id
       if (!saleId) {

@@ -1487,7 +1487,7 @@ export default function SellWizardClient({
         body: JSON.stringify(payload.saleData),
       })
 
-      const result = await response.json()
+      const result: unknown = await response.json()
 
       if (response.status === 401) {
         // Save draft to sessionStorage
@@ -1503,7 +1503,7 @@ export default function SellWizardClient({
       }
 
       if (!response.ok) {
-        const errorData = result || { error: 'Failed to create sale' }
+        const errorData = (result as { error?: string; code?: string; details?: string }) || { error: 'Failed to create sale' }
         
         // Debug-only structured logging
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

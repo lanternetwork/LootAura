@@ -133,10 +133,10 @@ describe('Sales API - Image Support', () => {
 		})
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// CRITICAL: Re-initialize schema(), from() and fromChain.insert after clearAllMocks()
+		// CRITICAL: Re-initialize from() and fromChain.insert after clearAllMocks()
 		// clearAllMocks() clears implementations of ALL vi.fn() mocks, including fromChain.insert
-		mockSupabaseClient.schema.mockReturnValue(mockSchemaClient)
-		mockSchemaClient.from.mockImplementation((table: string) => {
+		// Route now uses getRlsDb() which returns mockRlsDb, so we need to reset mockRlsDb.from
+		mockRlsDb.from.mockImplementation((table: string) => {
 			if (table === 'profiles') {
 				return createQueryChain()
 			}

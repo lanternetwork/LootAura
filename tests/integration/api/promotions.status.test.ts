@@ -36,7 +36,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: async (_request?: any) => mockRlsDb,
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => {
     // fromBase internally calls db.from(table), so we need to support that

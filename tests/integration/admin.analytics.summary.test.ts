@@ -25,7 +25,7 @@ const mockRlsDb = {
 }
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: async (_request?: any) => mockRlsDb,
   fromBase: vi.fn((db: any, table: string) => {
     const query = {
       select: vi.fn().mockReturnThis(),

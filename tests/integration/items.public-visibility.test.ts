@@ -68,7 +68,7 @@ vi.mock('next/headers', () => ({
 
 // Mock schema-scoped clients
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: async (_request?: any) => mockRlsDb,
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => {
     if (table.includes('.')) {

@@ -85,6 +85,7 @@ describe('POST /api/sales - RLS Error Handling', () => {
     // Reset the insert chain mocks
     mockInsertChain.insert.mockReturnValue(mockInsertChain)
     mockInsertChain.select.mockReturnValue(mockInsertChain)
+    mockRlsDb.from.mockReturnValue(mockInsertChain)
     // Reset auth mocks
     mockSupabaseClient.auth.getUser.mockResolvedValue({ 
       data: { user: { id: 'test-user-id' } }, 

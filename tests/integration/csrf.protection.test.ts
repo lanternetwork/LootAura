@@ -62,7 +62,7 @@ vi.mock('@/lib/data/ratingsAccess', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockSupabaseClient,
+  getRlsDb: async (_request?: any) => mockSupabaseClient,
   getAdminDb: () => mockSupabaseClient,
   fromBase: (db: any, table: string) => {
     // Always return a proper chainable mock

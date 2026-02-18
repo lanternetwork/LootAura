@@ -77,7 +77,7 @@ vi.mock('@/lib/supabase/clients', () => {
   })
   
   return {
-    getRlsDb: vi.fn(() => {
+    getRlsDb: vi.fn(async (_request?: any) => {
       // getRlsDb() returns a schema-scoped client that fromBase can use
       // fromBase calls db.from(table), which should return the query chain
       if (!mockState.currentMockChain) {

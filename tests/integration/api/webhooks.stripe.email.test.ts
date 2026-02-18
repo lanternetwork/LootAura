@@ -21,7 +21,7 @@ let mockFromBaseImpl: ((db: any, table: string) => any) | undefined
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => mockAdminDb,
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: async (_request?: any) => mockRlsDb,
   fromBase: (db: any, table: string) => {
     if (db === mockAdminDb) {
       return db.from(table)

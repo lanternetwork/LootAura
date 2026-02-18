@@ -66,7 +66,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: async (_request?: any) => mockRlsDb,
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => db.from(table),
 }))

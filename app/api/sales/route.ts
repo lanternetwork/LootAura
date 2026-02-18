@@ -1027,11 +1027,23 @@ async function postHandler(request: NextRequest) {
     const authResponse = await supabase.auth.getUser()
     user = authResponse?.data?.user as { id: string } | null
     
+    // CRITICAL: Load session into the SAME client instance before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    // getSession() reads from cookies and makes the session available for RLS to evaluate auth.uid()
+    // Without this, .schema() might not include the Authorization header
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+      // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
+    }
+    
     // Debug-only: Log auth.getUser() results
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const { logger } = await import('@/lib/log')
       const sessionResponse = await supabase.auth.getSession()
       const hasAccessToken = !!sessionResponse?.data?.session?.access_token
+      const sessionUserId = sessionResponse?.data?.session?.user?.id
       
       logger.debug('Auth context check', {
         component: 'sales',
@@ -1040,6 +1052,8 @@ async function postHandler(request: NextRequest) {
         getUserError: !!authResponse?.error,
         getSessionHasAccessToken: hasAccessToken,
         getSessionError: !!sessionResponse?.error,
+        sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
+        userIdsMatch: sessionUserId === user?.id,
       })
     }
     
@@ -1196,27 +1210,31 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Use getRlsDb() which uses getAll/setAll cookie pattern (recommended for Next.js App Router)
+    // CRITICAL: Use getRlsDb() which uses getAll/setAll cookie pattern (recommended for Next.js App Router)
     // and explicitly loads the session before returning schema-scoped client
-    // This ensures the JWT is available for RLS policies to evaluate auth.uid()
+    // Even though createSupabaseServerClient() has the session, .schema() might not inherit it properly
+    // getRlsDb() ensures the session is loaded and available for RLS policies to evaluate auth.uid()
     // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
     const rls = await getRlsDb(request)
     
-    // Debug-only: Check if Authorization header will be sent on the write
+    // Debug-only: Verify session is available on RLS client
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const sessionResponse = await supabase.auth.getSession()
-      const hasAccessToken = !!sessionResponse?.data?.session?.access_token
-      const sessionUserId = sessionResponse?.data?.session?.user?.id
+      // Get session from the auth client (for comparison)
+      const authSessionResponse = await supabase.auth.getSession()
+      const authHasAccessToken = !!authSessionResponse?.data?.session?.access_token
+      const authSessionUserId = authSessionResponse?.data?.session?.user?.id
+      
+      // Try to get session from RLS client (if it has auth methods)
+      // Note: schema-scoped client might not have auth methods, so we check the parent
       const { logger } = await import('@/lib/log')
       logger.debug('RLS write auth context', {
         component: 'sales',
         operation: 'sale_create',
         usingGetRlsDb: true,
-        hasAccessToken: hasAccessToken,
-        willSendAuthorizationHeader: hasAccessToken,
-        sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
+        authClientHasAccessToken: authHasAccessToken,
+        authSessionUserId: authSessionUserId ? authSessionUserId.substring(0, 8) + '...' : 'null',
         ownerIdToInsert: user?.id ? user.id.substring(0, 8) + '...' : 'null',
-        userIdsMatch: sessionUserId === user?.id,
+        userIdsMatch: authSessionUserId === user?.id,
       })
     }
     

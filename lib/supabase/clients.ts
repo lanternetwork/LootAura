@@ -57,10 +57,32 @@ export async function getRlsDb(_request?: NextRequest) {
       // This is critical: RLS policies need the JWT token in the Authorization header
       // getSession() loads from cookies but doesn't automatically attach to client for RLS
       if (session && !sessionError) {
-        await sb.auth.setSession({
+        const setSessionResult = await sb.auth.setSession({
           access_token: session.access_token,
           refresh_token: session.refresh_token,
         })
+        
+        // Log setSession result for diagnosis
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || setSessionResult.error) {
+          const { logger } = await import('@/lib/log')
+          if (setSessionResult.error) {
+            logger.warn('getRlsDb: setSession() failed', {
+              component: 'supabase',
+              operation: 'getRlsDb',
+              error: setSessionResult.error.message,
+              hasUser: true,
+              userId: user.id.substring(0, 8) + '...',
+            })
+          } else {
+            logger.debug('getRlsDb: setSession() succeeded', {
+              component: 'supabase',
+              operation: 'getRlsDb',
+              hasUser: true,
+              hasSession: true,
+              userId: user.id.substring(0, 8) + '...',
+            })
+          }
+        }
       }
       
       // Log session loading issues (warn level for production visibility)

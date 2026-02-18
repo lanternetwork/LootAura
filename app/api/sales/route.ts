@@ -1209,31 +1209,37 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Use THE SAME client instance used for auth.getUser() and load session
-    // Then use .schema('lootaura_v2') on that SAME client to ensure session is shared
-    // This ensures the JWT is available for RLS policies to evaluate auth.uid()
+    // CRITICAL: Use getRlsDb() which uses getAll/setAll cookie pattern (recommended for Next.js App Router)
+    // and explicitly loads the session before returning schema-scoped client
+    // Even though createSupabaseServerClient() has the session, .schema() might not inherit it properly
+    // getRlsDb() ensures the session is loaded and available for RLS policies to evaluate auth.uid()
     // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
-    const rls = supabase.schema('lootaura_v2')
+    const { getRlsDb } = await import('@/lib/supabase/clients')
+    const rls = await getRlsDb(request)
     
-    // Debug-only: Check if Authorization header will be sent on the write
+    // Debug-only: Verify session is available on RLS client
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const sessionResponse = await supabase.auth.getSession()
-      const hasAccessToken = !!sessionResponse?.data?.session?.access_token
-      const sessionUserId = sessionResponse?.data?.session?.user?.id
+      // Get session from the auth client (for comparison)
+      const authSessionResponse = await supabase.auth.getSession()
+      const authHasAccessToken = !!authSessionResponse?.data?.session?.access_token
+      const authSessionUserId = authSessionResponse?.data?.session?.user?.id
+      
+      // Try to get session from RLS client (if it has auth methods)
+      // Note: schema-scoped client might not have auth methods, so we check the parent
       const { logger } = await import('@/lib/log')
       logger.debug('RLS write auth context', {
         component: 'sales',
         operation: 'sale_create',
-        usingSameClientAsAuth: true,
-        hasAccessToken: hasAccessToken,
-        willSendAuthorizationHeader: hasAccessToken,
-        sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
+        usingGetRlsDb: true,
+        authClientHasAccessToken: authHasAccessToken,
+        authSessionUserId: authSessionUserId ? authSessionUserId.substring(0, 8) + '...' : 'null',
         ownerIdToInsert: user?.id ? user.id.substring(0, 8) + '...' : 'null',
-        userIdsMatch: sessionUserId === user?.id,
+        userIdsMatch: authSessionUserId === user?.id,
       })
     }
     
-    const fromSales = rls.from('sales')
+    const { fromBase } = await import('@/lib/supabase/clients')
+    const fromSales = fromBase(rls, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {
@@ -1425,7 +1431,8 @@ async function postHandler(request: NextRequest) {
     let itemCount = 0
     if (body.items?.length) {
       const withSale = body.items.map((it: any) => ({ ...it, sale_id: data.id }))
-      const { error: iErr } = await rls.from('items').insert(withSale)
+      const { fromBase } = await import('@/lib/supabase/clients')
+      const { error: iErr } = await fromBase(rls, 'items').insert(withSale)
       if (iErr) {
         const { logger } = await import('@/lib/log')
         logger.error('Failed to create items', iErr instanceof Error ? iErr : new Error(String(iErr)), {

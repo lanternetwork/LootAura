@@ -1206,6 +1206,7 @@ async function postHandler(request: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const sessionResponse = await supabase.auth.getSession()
       const hasAccessToken = !!sessionResponse?.data?.session?.access_token
+      const sessionUserId = sessionResponse?.data?.session?.user?.id
       const { logger } = await import('@/lib/log')
       logger.debug('RLS write auth context', {
         component: 'sales',
@@ -1213,6 +1214,9 @@ async function postHandler(request: NextRequest) {
         usingGetRlsDb: true,
         hasAccessToken: hasAccessToken,
         willSendAuthorizationHeader: hasAccessToken,
+        sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
+        ownerIdToInsert: user?.id ? user.id.substring(0, 8) + '...' : 'null',
+        userIdsMatch: sessionUserId === user?.id,
       })
     }
     
@@ -1286,12 +1290,21 @@ async function postHandler(request: NextRequest) {
       // Debug-only: Log error code and message for RLS diagnosis
       if (error && process.env.NEXT_PUBLIC_DEBUG === 'true') {
         const { logger } = await import('@/lib/log')
+        const sessionResponse = await supabase.auth.getSession()
+        const sessionUserId = sessionResponse?.data?.session?.user?.id
         logger.debug('Sale insert error (first attempt)', {
           component: 'sales',
           operation: 'sale_insert',
           attempt: 1,
           errorCode: error?.code || 'unknown',
           errorMessage: error?.message || String(error),
+          errorDetails: error?.details || null,
+          errorHint: error?.hint || null,
+          ownerIdAttempted: user?.id ? user.id.substring(0, 8) + '...' : 'null',
+          sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
+          userIdsMatch: sessionUserId === user?.id,
+          // RLS policy requires: auth.uid() = owner_id
+          // This log helps diagnose if auth.uid() is null or mismatched
         })
       }
       
@@ -1339,14 +1352,27 @@ async function postHandler(request: NextRequest) {
       
       // Always log RLS errors with full details for diagnosis (even in production)
       if (isRlsError) {
+        // Get session info for RLS diagnosis (even in production, this is critical for debugging)
+        const sessionResponse = await supabase.auth.getSession()
+        const sessionUserId = sessionResponse?.data?.session?.user?.id
+        const hasAccessToken = !!sessionResponse?.data?.session?.access_token
+        
         logger.error('RLS error in sale creation', error instanceof Error ? error : new Error(String(error)), {
           component: 'sales',
           operation: 'sale_create',
           errorCode: String(errorCode),
           errorMessage: errorMessage,
+          errorDetails: error?.details || null,
+          errorHint: error?.hint || null,
           isRlsError: true,
           userId: user?.id ? user.id.substring(0, 8) + '...' : 'unknown',
           hasUser: !!user,
+          sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
+          hasAccessToken: hasAccessToken,
+          userIdsMatch: sessionUserId === user?.id,
+          // RLS policy: WITH CHECK (auth.uid() = owner_id)
+          // If auth.uid() is null, RLS will deny. If auth.uid() != owner_id, RLS will deny.
+          // This log helps diagnose which case it is.
         })
         
         // Distinguish between auth context invalid (401) vs permission denied (403)

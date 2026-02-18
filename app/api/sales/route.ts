@@ -2,7 +2,7 @@
 // NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
 import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
@@ -1210,31 +1210,41 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // CRITICAL: Use getRlsDb() which uses getAll/setAll cookie pattern (recommended for Next.js App Router)
-    // and explicitly loads the session before returning schema-scoped client
-    // Even though createSupabaseServerClient() has the session, .schema() might not inherit it properly
-    // getRlsDb() ensures the session is loaded and available for RLS policies to evaluate auth.uid()
+    // CRITICAL: Use the SAME client instance for both auth checks and database operations
+    // This ensures the JWT from getSession() is available when .schema() is called
+    // We must call getSession() and setSession() on the same client BEFORE calling .schema()
+    // This ensures the schema-scoped client inherits the Authorization header with the JWT
     // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
-    const rls = await getRlsDb(request)
+    
+    // Load and explicitly set the session on the client to ensure JWT is attached
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      // Explicitly set the session to ensure JWT is in Authorization header
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+    
+    // Use the same client instance for database operations
+    // This ensures the JWT is available for RLS policies
+    const rls = supabase.schema('lootaura_v2')
     
     // Debug-only: Verify session is available on RLS client
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      // Get session from the auth client (for comparison)
-      const authSessionResponse = await supabase.auth.getSession()
-      const authHasAccessToken = !!authSessionResponse?.data?.session?.access_token
-      const authSessionUserId = authSessionResponse?.data?.session?.user?.id
-      
-      // Try to get session from RLS client (if it has auth methods)
-      // Note: schema-scoped client might not have auth methods, so we check the parent
       const { logger } = await import('@/lib/log')
+      const sessionCheck = await supabase.auth.getSession()
+      const hasAccessToken = !!sessionCheck?.data?.session?.access_token
+      const sessionUserId = sessionCheck?.data?.session?.user?.id
+      
       logger.debug('RLS write auth context', {
         component: 'sales',
         operation: 'sale_create',
-        usingGetRlsDb: true,
-        authClientHasAccessToken: authHasAccessToken,
-        authSessionUserId: authSessionUserId ? authSessionUserId.substring(0, 8) + '...' : 'null',
+        usingSameClient: true,
+        hasAccessToken: hasAccessToken,
+        sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
         ownerIdToInsert: user?.id ? user.id.substring(0, 8) + '...' : 'null',
-        userIdsMatch: authSessionUserId === user?.id,
+        userIdsMatch: sessionUserId === user?.id,
       })
     }
     

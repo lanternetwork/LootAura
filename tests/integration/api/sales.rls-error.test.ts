@@ -39,7 +39,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: vi.fn().mockResolvedValue(mockRlsDb),
+  getRlsDb: vi.fn((_request?: any) => Promise.resolve(mockRlsDb)),
   fromBase: vi.fn((db, table) => {
     if (table === 'sales') {
       return mockInsertChain

@@ -8,7 +8,7 @@ import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/sales/route'
 
 // Mock Supabase clients
-// The route now uses getRlsDb() which returns a schema-scoped client
+// The route now uses createSupabaseServerClient().schema('lootaura_v2') for database operations
 // and fromBase() helper to access tables
 const mockInsertChain = {
   insert: vi.fn(),
@@ -22,12 +22,17 @@ const mockRlsDb = {
 
 const mockSupabaseClient = {
   from: vi.fn(),
+  schema: vi.fn(() => mockRlsDb), // schema() returns the schema-scoped client
   auth: {
     getUser: vi.fn().mockResolvedValue({ 
       data: { user: { id: 'test-user-id' } }, 
       error: null 
     }),
     getSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
+      error: null,
+    }),
+    setSession: vi.fn().mockResolvedValue({
       data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
       error: null,
     }),
@@ -39,7 +44,6 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: vi.fn((_request?: any) => Promise.resolve(mockRlsDb)),
   fromBase: vi.fn((db, table) => {
     if (table === 'sales') {
       return mockInsertChain
@@ -86,12 +90,18 @@ describe('POST /api/sales - RLS Error Handling', () => {
     mockInsertChain.insert.mockReturnValue(mockInsertChain)
     mockInsertChain.select.mockReturnValue(mockInsertChain)
     mockRlsDb.from.mockReturnValue(mockInsertChain)
+    // Reset schema mock
+    mockSupabaseClient.schema.mockReturnValue(mockRlsDb)
     // Reset auth mocks
     mockSupabaseClient.auth.getUser.mockResolvedValue({ 
       data: { user: { id: 'test-user-id' } }, 
       error: null 
     })
     mockSupabaseClient.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
+      error: null,
+    })
+    mockSupabaseClient.auth.setSession.mockResolvedValue({
       data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
       error: null,
     })

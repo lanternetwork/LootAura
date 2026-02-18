@@ -1524,7 +1524,7 @@ export default function SellWizardClient({
 
       // API returns { ok: true, saleId: '...' } or { ok: true, sale: {...} } or { sale: {...} }
       // Handle both saleId (new format) and sale.id (legacy format)
-      const saleId = result.saleId || result.sale?.id || result.id
+      const saleId: string | undefined = (result as any).saleId || (result as any).sale?.id || (result as any).id
       if (!saleId) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.error('Invalid sale response:', result)

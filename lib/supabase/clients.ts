@@ -53,10 +53,16 @@ export async function getRlsDb(_request?: NextRequest) {
     },
   })
 
-  // Supabase SSR client automatically reads session from cookies and includes JWT in requests
-  // No need to manually call getUser()/getSession()/setSession() - the client handles it automatically
-  // The cookie adapter ensures the session is available for RLS policies to evaluate auth.uid()
-  // If session is missing, RLS will fail (expected) and the caller will handle auth errors
+  // Load session from cookies to ensure JWT is available for RLS policies
+  // The SSR client reads from cookies automatically, but we need to trigger the initial load
+  // getSession() reads from cookies and makes the session available for RLS to evaluate auth.uid()
+  // Don't throw if session is missing - let the caller handle auth errors
+  try {
+    await sb.auth.getSession()
+  } catch {
+    // Session might not exist - that's ok, caller will handle auth errors
+    // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
+  }
 
   return sb.schema('lootaura_v2')
 }

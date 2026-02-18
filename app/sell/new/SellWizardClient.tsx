@@ -1522,15 +1522,17 @@ export default function SellWizardClient({
         return
       }
 
-      // API returns { ok: true, sale: {...} } or { sale: {...} }
-      const sale = result.sale || result
-      if (!sale || !sale.id) {
-        console.error('Invalid sale response:', result)
+      // API returns { ok: true, saleId: '...' } or { ok: true, sale: {...} } or { sale: {...} }
+      // Handle both saleId (new format) and sale.id (legacy format)
+      const saleId = result.saleId || result.sale?.id || result.id
+      if (!saleId) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('Invalid sale response:', result)
+        }
         dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Invalid response from server' })
         dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
-      const saleId = sale.id
 
       // Create items for the sale
       if (payload.items && payload.items.length > 0) {

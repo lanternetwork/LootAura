@@ -37,7 +37,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: async (_request?: any) => mockRlsDb,
   fromBase: mockFromBase,
 }))
 

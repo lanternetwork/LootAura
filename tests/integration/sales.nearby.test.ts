@@ -9,7 +9,7 @@ const mockGetRlsDb = vi.fn(() => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockGetRlsDb(),
+  getRlsDb: async (_request?: any) => mockGetRlsDb(),
 }))
 
 describe('getNearestSalesForSale', () => {

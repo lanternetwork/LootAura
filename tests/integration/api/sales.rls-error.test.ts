@@ -8,7 +8,20 @@ import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/sales/route'
 
 // Mock Supabase clients
+// The route now uses supabase.schema('lootaura_v2').from('sales')
+// So we need to mock a client with schema() method that returns a client with from() method
+const mockInsertChain = {
+  insert: vi.fn(),
+  select: vi.fn(),
+  single: vi.fn(),
+}
+
+const mockSchemaClient = {
+  from: vi.fn(() => mockInsertChain),
+}
+
 const mockSupabaseClient = {
+  schema: vi.fn(() => mockSchemaClient),
   from: vi.fn(),
   auth: {
     getUser: vi.fn().mockResolvedValue({ 
@@ -22,22 +35,8 @@ const mockSupabaseClient = {
   },
 }
 
-const mockRlsDb = {
-  from: vi.fn(),
-}
-
-// Use vi.hoisted() to ensure variables are available when vi.mock is hoisted
-const { mockFromBase } = vi.hoisted(() => ({
-  mockFromBase: vi.fn(),
-}))
-
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
-}))
-
-vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
-  fromBase: mockFromBase,
 }))
 
 // Mock CSRF check
@@ -74,21 +73,18 @@ vi.mock('@/lib/images/validateImageUrl', () => ({
 describe('POST /api/sales - RLS Error Handling', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFromBase.mockReset()
+    // Reset the insert chain mocks
+    mockInsertChain.insert.mockReturnValue(mockInsertChain)
+    mockInsertChain.select.mockReturnValue(mockInsertChain)
+    mockSchemaClient.from.mockReturnValue(mockInsertChain)
   })
 
   it('returns 403 PERMISSION_DENIED for RLS error code 42501', async () => {
     // Mock the insert chain to return RLS error
-    const mockInsertChain = {
-      insert: vi.fn(() => mockInsertChain),
-      select: vi.fn(() => mockInsertChain),
-      single: vi.fn(() => Promise.resolve({
-        data: null,
-        error: { code: '42501', message: 'new row violates row-level security policy' },
-      })),
-    }
-    
-    mockFromBase.mockReturnValue(mockInsertChain)
+    mockInsertChain.single.mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'new row violates row-level security policy' },
+    })
 
     const requestBody = {
       title: 'Test Sale',
@@ -124,16 +120,10 @@ describe('POST /api/sales - RLS Error Handling', () => {
 
   it('returns 403 PERMISSION_DENIED for PGRST301 error code', async () => {
     // Mock the insert chain to return PGRST301 error
-    const mockInsertChain = {
-      insert: vi.fn(() => mockInsertChain),
-      select: vi.fn(() => mockInsertChain),
-      single: vi.fn(() => Promise.resolve({
-        data: null,
-        error: { code: 'PGRST301', message: 'permission denied' },
-      })),
-    }
-    
-    mockFromBase.mockReturnValue(mockInsertChain)
+    mockInsertChain.single.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST301', message: 'permission denied' },
+    })
 
     const requestBody = {
       title: 'Test Sale',
@@ -163,16 +153,10 @@ describe('POST /api/sales - RLS Error Handling', () => {
 
   it('returns 403 PERMISSION_DENIED for error message containing "permission denied"', async () => {
     // Mock the insert chain to return error with permission denied message
-    const mockInsertChain = {
-      insert: vi.fn(() => mockInsertChain),
-      select: vi.fn(() => mockInsertChain),
-      single: vi.fn(() => Promise.resolve({
-        data: null,
-        error: { message: 'permission denied for table sales' },
-      })),
-    }
-    
-    mockFromBase.mockReturnValue(mockInsertChain)
+    mockInsertChain.single.mockResolvedValue({
+      data: null,
+      error: { message: 'permission denied for table sales' },
+    })
 
     const requestBody = {
       title: 'Test Sale',
@@ -202,16 +186,10 @@ describe('POST /api/sales - RLS Error Handling', () => {
 
   it('returns 500 SALE_CREATE_FAILED for non-RLS errors', async () => {
     // Mock the insert chain to return a non-RLS error
-    const mockInsertChain = {
-      insert: vi.fn(() => mockInsertChain),
-      select: vi.fn(() => mockInsertChain),
-      single: vi.fn(() => Promise.resolve({
-        data: null,
-        error: { code: 'PGRST204', message: 'Column does not exist' },
-      })),
-    }
-    
-    mockFromBase.mockReturnValue(mockInsertChain)
+    mockInsertChain.single.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST204', message: 'Column does not exist' },
+    })
 
     const requestBody = {
       title: 'Test Sale',

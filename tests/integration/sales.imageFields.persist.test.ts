@@ -33,7 +33,19 @@ const fromChain = {
   }),
 }
 
+// Schema-scoped client (returned by .schema('lootaura_v2'))
+const mockSchemaClient = {
+  from: vi.fn((table: string) => {
+    // For profiles table (account lock checks), return a query chain
+    if (table === 'profiles') {
+      return createQueryChain()
+    }
+    return fromChain
+  })
+}
+
 const mockSupabaseClient = {
+  schema: vi.fn(() => mockSchemaClient),
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
     getSession: vi.fn().mockResolvedValue({
@@ -55,9 +67,9 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
-// Mock schema-scoped clients - use same mock since tests don't need RLS bypass
+// Mock schema-scoped clients - no longer used by route, but keep for other tests that might use them
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockSupabaseClient,
+  getRlsDb: () => mockSchemaClient,
   getAdminDb: () => mockSupabaseClient,
   fromBase: (db: any, table: string) => {
     // fromBase() receives a schema-scoped client, so just use .from() directly
@@ -122,9 +134,21 @@ describe('Sales API - Image Support', () => {
 		})
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// CRITICAL: Re-initialize from() and fromChain.insert after clearAllMocks()
+		// CRITICAL: Re-initialize schema(), from() and fromChain.insert after clearAllMocks()
 		// clearAllMocks() clears implementations of ALL vi.fn() mocks, including fromChain.insert
-		mockSupabaseClient.from.mockImplementation(() => fromChain)
+		mockSupabaseClient.schema.mockReturnValue(mockSchemaClient)
+		mockSchemaClient.from.mockImplementation((table: string) => {
+			if (table === 'profiles') {
+				return createQueryChain()
+			}
+			return fromChain
+		})
+		mockSupabaseClient.from.mockImplementation((table: string) => {
+			if (table === 'profiles') {
+				return createQueryChain()
+			}
+			return fromChain
+		})
 		fromChain.insert = vi.fn((payload: any) => {
 			lastInsertedPayload = payload
 			return {

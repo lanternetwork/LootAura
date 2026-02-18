@@ -2,6 +2,7 @@
 // NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
 import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
@@ -1214,7 +1215,6 @@ async function postHandler(request: NextRequest) {
     // Even though createSupabaseServerClient() has the session, .schema() might not inherit it properly
     // getRlsDb() ensures the session is loaded and available for RLS policies to evaluate auth.uid()
     // RLS policy sales_owner_insert ensures owner_id matches auth.uid()
-    const { getRlsDb } = await import('@/lib/supabase/clients')
     const rls = await getRlsDb(request)
     
     // Debug-only: Verify session is available on RLS client
@@ -1238,7 +1238,6 @@ async function postHandler(request: NextRequest) {
       })
     }
     
-    const { fromBase } = await import('@/lib/supabase/clients')
     const fromSales = fromBase(rls, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
@@ -1431,7 +1430,6 @@ async function postHandler(request: NextRequest) {
     let itemCount = 0
     if (body.items?.length) {
       const withSale = body.items.map((it: any) => ({ ...it, sale_id: data.id }))
-      const { fromBase } = await import('@/lib/supabase/clients')
       const { error: iErr } = await fromBase(rls, 'items').insert(withSale)
       if (iErr) {
         const { logger } = await import('@/lib/log')

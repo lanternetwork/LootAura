@@ -1313,17 +1313,24 @@ async function postHandler(request: NextRequest) {
     
     if (error) {
       const { logger } = await import('@/lib/log')
-      logger.error('Supabase error in sale creation', error instanceof Error ? error : new Error(String(error)), {
-        component: 'sales',
-        operation: 'sale_create'
-      })
       
       // Check for RLS/permission errors
       const errorCode = error?.code || error?.message || ''
       const errorMessage = String(error?.message || error || '')
       const isRlsError = /42501|PGRST301|permission denied|row-level security/i.test(String(errorCode) + ' ' + errorMessage)
       
+      // Always log RLS errors with full details for diagnosis (even in production)
       if (isRlsError) {
+        logger.error('RLS error in sale creation', error instanceof Error ? error : new Error(String(error)), {
+          component: 'sales',
+          operation: 'sale_create',
+          errorCode: String(errorCode),
+          errorMessage: errorMessage,
+          isRlsError: true,
+          userId: user?.id ? user.id.substring(0, 8) + '...' : 'unknown',
+          hasUser: !!user,
+        })
+        
         // Distinguish between auth context invalid (401) vs permission denied (403)
         // Only treat as 401 if error message explicitly mentions JWT/auth/token issues
         // Otherwise, treat as 403 (true permission denial)
@@ -1339,6 +1346,15 @@ async function postHandler(request: NextRequest) {
           message: 'Permission denied. Please refresh and try again.'
         })
       }
+      
+      // Log non-RLS errors
+      logger.error('Supabase error in sale creation', error instanceof Error ? error : new Error(String(error)), {
+        component: 'sales',
+        operation: 'sale_create',
+        errorCode: String(errorCode),
+        errorMessage: errorMessage,
+        userId: user?.id ? user.id.substring(0, 8) + '...' : 'unknown',
+      })
       
       return fail(500, 'SALE_CREATE_FAILED', 'Failed to create sale', error)
     }

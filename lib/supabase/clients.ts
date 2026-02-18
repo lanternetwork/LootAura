@@ -20,16 +20,29 @@ export async function getRlsDb(_request?: NextRequest) {
   // The request parameter is kept for backward compatibility but not used for cookie reading
   const cookieStore = cookies()
   
+  // Use getAll/setAll pattern (recommended for Next.js App Router)
+  // This ensures all cookies are read/written correctly, especially for OAuth flows
   const sb = createServerClient(url, anon, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
+      getAll() {
+        return cookieStore.getAll()
       },
-      set(name: string, value: string, options: CookieOptions) {
-        cookieStore.set({ name, value, ...options })
-      },
-      remove(name: string, options: CookieOptions) {
-        cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+      setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set({ name, value, ...options })
+          })
+        } catch (error) {
+          // Cookie setting can fail in some contexts, that's ok
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            const { logger } = await import('@/lib/log')
+            logger.debug('getRlsDb: cookie setting failed', {
+              component: 'supabase',
+              operation: 'getRlsDb',
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+        }
       },
     },
     // Explicitly set auth persistence to ensure session is available

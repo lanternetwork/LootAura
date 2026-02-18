@@ -53,6 +53,16 @@ export async function getRlsDb(_request?: NextRequest) {
     if (user && !userError) {
       const { data: { session }, error: sessionError } = await sb.auth.getSession()
       
+      // Explicitly set the session on the client to ensure JWT is in request headers for RLS
+      // This is critical: RLS policies need the JWT token in the Authorization header
+      // getSession() loads from cookies but doesn't automatically attach to client for RLS
+      if (session && !sessionError) {
+        await sb.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        })
+      }
+      
       // Log session loading issues (warn level for production visibility)
       // This helps diagnose RLS failures even without debug mode
       if (sessionError || !session) {

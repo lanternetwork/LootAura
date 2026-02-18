@@ -67,9 +67,9 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
-// Mock schema-scoped clients - no longer used by route, but keep for other tests that might use them
+// Mock schema-scoped clients - route now uses getRlsDb(request) which is async
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockSchemaClient,
+  getRlsDb: vi.fn((_request?: any) => Promise.resolve(mockSchemaClient)),
   getAdminDb: () => mockSupabaseClient,
   fromBase: (db: any, table: string) => {
     // fromBase() receives a schema-scoped client, so just use .from() directly

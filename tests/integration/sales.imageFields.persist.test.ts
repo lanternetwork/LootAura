@@ -33,8 +33,8 @@ const fromChain = {
   }),
 }
 
-// Schema-scoped client (returned by .schema('lootaura_v2'))
-const mockSchemaClient = {
+// Schema-scoped client (returned by getRlsDb())
+const mockRlsDb = {
   from: vi.fn((table: string) => {
     // For profiles table (account lock checks), return a query chain
     if (table === 'profiles') {
@@ -45,7 +45,13 @@ const mockSchemaClient = {
 }
 
 const mockSupabaseClient = {
-  schema: vi.fn(() => mockSchemaClient),
+  from: vi.fn((table: string) => {
+    // For profiles table (account lock checks), return a query chain
+    if (table === 'profiles') {
+      return createQueryChain()
+    }
+    return fromChain
+  }),
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
     getSession: vi.fn().mockResolvedValue({
@@ -53,13 +59,6 @@ const mockSupabaseClient = {
       error: null,
     }),
   },
-  from: vi.fn((table: string) => {
-    // For profiles table (account lock checks), return a query chain
-    if (table === 'profiles') {
-      return createQueryChain()
-    }
-    return fromChain
-  })
 }
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -67,9 +66,9 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
-// Mock schema-scoped clients - route now uses createSupabaseServerClient().schema()
-// No need to mock getRlsDb since route uses .schema() directly on the same client
+// Mock schema-scoped clients - route now uses getRlsDb() which is async
 vi.mock('@/lib/supabase/clients', () => ({
+  getRlsDb: vi.fn((_request?: any) => Promise.resolve(mockRlsDb)),
   getAdminDb: () => mockSupabaseClient,
   fromBase: (db: any, table: string) => {
     // fromBase() receives a schema-scoped client, so just use .from() directly

@@ -8,19 +8,20 @@ import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/sales/route'
 
 // Mock Supabase clients
-// The route now uses getRlsDb() which returns a schema-scoped client
-// and fromBase() helper to access tables
+// The route now uses createSupabaseServerClient().schema('lootaura_v2')
+// So we need to mock a client with schema() method that returns a client with from() method
 const mockInsertChain = {
   insert: vi.fn(),
   select: vi.fn(),
   single: vi.fn(),
 }
 
-const mockRlsDb = {
+const mockSchemaClient = {
   from: vi.fn(() => mockInsertChain),
 }
 
 const mockSupabaseClient = {
+  schema: vi.fn(() => mockSchemaClient),
   from: vi.fn(),
   auth: {
     getUser: vi.fn().mockResolvedValue({ 
@@ -36,16 +37,6 @@ const mockSupabaseClient = {
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
-}))
-
-vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: vi.fn((_request?: any) => Promise.resolve(mockRlsDb)),
-  fromBase: vi.fn((db, table) => {
-    if (table === 'sales') {
-      return mockInsertChain
-    }
-    return { insert: vi.fn() }
-  }),
 }))
 
 // Mock CSRF check
@@ -85,6 +76,7 @@ describe('POST /api/sales - RLS Error Handling', () => {
     // Reset the insert chain mocks
     mockInsertChain.insert.mockReturnValue(mockInsertChain)
     mockInsertChain.select.mockReturnValue(mockInsertChain)
+    mockSchemaClient.from.mockReturnValue(mockInsertChain)
     // Reset auth mocks
     mockSupabaseClient.auth.getUser.mockResolvedValue({ 
       data: { user: { id: 'test-user-id' } }, 
@@ -94,6 +86,8 @@ describe('POST /api/sales - RLS Error Handling', () => {
       data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
       error: null,
     })
+    // Reset schema mock
+    mockSupabaseClient.schema.mockReturnValue(mockSchemaClient)
   })
 
   it('returns 403 PERMISSION_DENIED for RLS error code 42501', async () => {

@@ -87,6 +87,14 @@ type WizardState = {
   submitError: string | null
 }
 
+// Sale API response type
+interface SaleResponse {
+  ok?: boolean
+  saleId?: string
+  sale?: { id: string }
+  id?: string
+}
+
 // Wizard actions
 type WizardAction =
   | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
@@ -1524,12 +1532,6 @@ export default function SellWizardClient({
 
       // API returns { ok: true, saleId: '...' } or { ok: true, sale: {...} } or { sale: {...} }
       // Handle both saleId (new format) and sale.id (legacy format)
-      interface SaleResponse {
-        ok?: boolean
-        saleId?: string
-        sale?: { id: string }
-        id?: string
-      }
       const response = result as SaleResponse
       const saleId = response.saleId || response.sale?.id || response.id
       if (!saleId) {

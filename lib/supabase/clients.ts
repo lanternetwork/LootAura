@@ -53,7 +53,22 @@ export async function getRlsDb(_request?: NextRequest) {
     if (user && !userError) {
       const { data: { session }, error: sessionError } = await sb.auth.getSession()
       
-      // Debug logging to diagnose session loading issues
+      // Log session loading issues (warn level for production visibility)
+      // This helps diagnose RLS failures even without debug mode
+      if (sessionError || !session) {
+        const { logger } = await import('@/lib/log')
+        logger.warn('getRlsDb: session loading issue (may cause RLS failures)', {
+          component: 'supabase',
+          operation: 'getRlsDb',
+          hasUser: true,
+          hasSession: !!session,
+          hasSessionError: !!sessionError,
+          sessionError: sessionError?.message,
+          userId: user.id.substring(0, 8) + '...',
+        })
+      }
+      
+      // Debug logging with more detail
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         const { logger } = await import('@/lib/log')
         if (sessionError) {
@@ -84,17 +99,21 @@ export async function getRlsDb(_request?: NextRequest) {
         }
       }
     } else {
-      // Debug logging for getUser() failures
+      // Log getUser() failures (warn level for production visibility)
+      if (userError) {
+        const { logger } = await import('@/lib/log')
+        logger.warn('getRlsDb: getUser() failed (RLS will fail)', {
+          component: 'supabase',
+          operation: 'getRlsDb',
+          error: userError.message,
+          errorCode: userError.status,
+        })
+      }
+      
+      // Debug logging with more detail
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         const { logger } = await import('@/lib/log')
-        if (userError) {
-          logger.debug('getRlsDb: getUser() error', {
-            component: 'supabase',
-            operation: 'getRlsDb',
-            error: userError.message,
-            errorCode: userError.status,
-          })
-        } else if (!user) {
+        if (!user) {
           logger.debug('getRlsDb: getUser() returned null user', {
             component: 'supabase',
             operation: 'getRlsDb',
@@ -106,14 +125,12 @@ export async function getRlsDb(_request?: NextRequest) {
   } catch (error) {
     // Session might not exist - that's ok, caller will handle auth errors
     // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const { logger } = await import('@/lib/log')
-      logger.debug('getRlsDb: session loading exception', {
-        component: 'supabase',
-        operation: 'getRlsDb',
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
+    const { logger } = await import('@/lib/log')
+    logger.warn('getRlsDb: session loading exception', {
+      component: 'supabase',
+      operation: 'getRlsDb',
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 
   return sb.schema('lootaura_v2')

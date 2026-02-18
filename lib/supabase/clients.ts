@@ -42,23 +42,27 @@ export async function getRlsDb(_request?: NextRequest) {
 
   // Load session from cookies to ensure JWT is available for RLS policies
   // RLS policies need auth.uid() which comes from the JWT token in request headers
-  // getUser() is more reliable than getSession() for SSR - it validates the JWT and loads the session
-  // This makes the session available for the client to include the JWT in subsequent database requests
+  // We call both getUser() (validates JWT) and getSession() (loads session with access_token)
+  // This ensures the session is fully loaded into the client for RLS to work
   // Don't throw if session is missing - let the caller handle auth errors
   try {
-    // Use getUser() instead of getSession() - it's more reliable for SSR and ensures JWT is validated
-    // getUser() will load the session from cookies and validate it, making it available for RLS
-    const { data: { user }, error } = await sb.auth.getUser()
+    // First validate the user (getUser() is more reliable for SSR)
+    const { data: { user }, error: userError } = await sb.auth.getUser()
+    
+    // If user is valid, load the full session (needed for RLS access_token)
+    if (user && !userError) {
+      await sb.auth.getSession()
+    }
     
     // Debug logging to diagnose session loading issues
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      if (error) {
+      if (userError) {
         const { logger } = await import('@/lib/log')
         logger.debug('getRlsDb: getUser() error', {
           component: 'supabase',
           operation: 'getRlsDb',
-          error: error.message,
-          errorCode: error.status,
+          error: userError.message,
+          errorCode: userError.status,
         })
       } else if (!user) {
         const { logger } = await import('@/lib/log')
@@ -74,7 +78,7 @@ export async function getRlsDb(_request?: NextRequest) {
     // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const { logger } = await import('@/lib/log')
-      logger.debug('getRlsDb: getUser() exception', {
+      logger.debug('getRlsDb: session loading exception', {
         component: 'supabase',
         operation: 'getRlsDb',
         error: error instanceof Error ? error.message : String(error),

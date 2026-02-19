@@ -11,10 +11,17 @@ const mockSupabase = {
   auth: {
     getUser: vi.fn(),
     getSession: vi.fn().mockResolvedValue({
-      data: { session: { access_token: 'test-token', user: { id: 'test-user-id' } } },
+      data: { session: { access_token: 'test-token', refresh_token: 'test-refresh-token', user: { id: 'test-user-id' } } },
+      error: null,
+    }),
+    setSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', refresh_token: 'test-refresh-token', user: { id: 'test-user-id' } } },
       error: null,
     }),
   },
+  schema: vi.fn(() => ({
+    from: vi.fn(),
+  })),
   from: vi.fn(),
 }
 

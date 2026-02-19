@@ -174,8 +174,7 @@ async function postDraftHandler(request: NextRequest) {
   }
 
   try {
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseWriteClient()
+    const supabase = createSupabaseServerClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -236,11 +235,27 @@ async function postDraftHandler(request: NextRequest) {
       })
     }
     
-    // Use RLS-aware client for writes - sale_drafts has RLS INSERT/UPDATE policies
-    // Uses cookies() from next/headers for consistent cookie reading with auth client
-    // Both clients use the same cookies(), so if getUser() succeeded, RLS client should have session
-    // If RLS write fails with auth error, we'll handle it in the error handler below
-    const rls = await getRlsDb(request)
+    // CRITICAL: Load session into the SAME client instance before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+    }
+    
+    // Load and explicitly set the session on the client to ensure JWT is attached
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      // Explicitly set the session to ensure JWT is in Authorization header
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+    
+    // Use the same client instance for database operations
+    // This ensures the JWT is available for RLS policies
+    const rls = supabase.schema('lootaura_v2')
     
     // Debug-only: verify cookie existence before RLS write
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -402,8 +417,27 @@ async function deleteDraftHandler(request: NextRequest) {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
-    // Mark draft as archived (soft delete) using RLS-aware client (sale_drafts has RLS UPDATE policy)
-    const rls = await getRlsDb(request)
+    // CRITICAL: Load session into the SAME client instance before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+    }
+    
+    // Load and explicitly set the session on the client to ensure JWT is attached
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      // Explicitly set the session to ensure JWT is in Authorization header
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+    
+    // Use the same client instance for database operations
+    // This ensures the JWT is available for RLS policies
+    const rls = supabase.schema('lootaura_v2')
     const { error } = await fromBase(rls, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)

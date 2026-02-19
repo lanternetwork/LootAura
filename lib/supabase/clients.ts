@@ -35,13 +35,6 @@ export async function getRlsDb(_request?: NextRequest) {
           })
         } catch (error) {
           // Cookie setting can fail in some contexts, that's ok
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            logger.debug('getRlsDb: cookie setting failed', {
-              component: 'supabase',
-              operation: 'getRlsDb',
-              error: error instanceof Error ? error.message : String(error),
-            })
-          }
         }
       },
     },

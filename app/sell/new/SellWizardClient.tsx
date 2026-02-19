@@ -737,17 +737,24 @@ export default function SellWizardClient({
       
       // Save locally (always, even for partial drafts)
       if (draftKeyRef.current) {
-        saveLocalDraft(payload)
-        // Update last saved payload reference (store normalized version)
-        const normalized = normalizeDraftPayload(payload)
-        lastSavedPayloadRef.current = JSON.stringify(normalized)
-        setSaveStatus('saved')
-        
-        if (isDebugEnabled) {
-          console.log('[SELL_WIZARD] Autosave: Draft saved locally', {
-            draftKey: draftKeyRef.current,
-            hasMinimumData: hasMinimumViableData()
-          })
+        const saved = saveLocalDraft(payload)
+        if (saved) {
+          // Update last saved payload reference (store normalized version)
+          const normalized = normalizeDraftPayload(payload)
+          lastSavedPayloadRef.current = JSON.stringify(normalized)
+          setSaveStatus('saved')
+          
+          if (isDebugEnabled) {
+            console.log('[SELL_WIZARD] Autosave: Draft saved locally', {
+              draftKey: draftKeyRef.current,
+              hasMinimumData: hasMinimumViableData()
+            })
+          }
+        } else {
+          // localStorage save failed, but don't block server save
+          if (isDebugEnabled) {
+            console.warn('[SELL_WIZARD] Autosave: Local save failed (localStorage quota or error)')
+          }
         }
       }
 

@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { fromBase } from '@/lib/supabase/clients'
 import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 import { z } from 'zod'
 
@@ -127,12 +127,34 @@ export async function POST(request: NextRequest) {
       throw error
     }
     
-    // Write to base table using schema-scoped client
-    const db = await getRlsDb()
+    // CRITICAL: Load session into the SAME client instance before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    // getSession() reads from cookies and makes the session available for RLS to evaluate auth.uid()
+    // Without this, .schema() might not include the Authorization header
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+      // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
+    }
+    
+    // Load and explicitly set the session on the client to ensure JWT is attached
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      // Explicitly set the session to ensure JWT is in Authorization header
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+    
+    // Use the same client instance for database operations
+    // This ensures the JWT is available for RLS policies
+    const rls = supabase.schema('lootaura_v2')
     
     // Validate that the sale belongs to the authenticated user
     // Read from base table to check ownership (sales_v2 view doesn't include owner_id for security)
-    const { data: sale, error: saleError } = await fromBase(db, 'sales')
+    const { data: sale, error: saleError } = await fromBase(rls, 'sales')
       .select('id, owner_id')
       .eq('id', validatedBody.sale_id)
       .single()
@@ -178,7 +200,7 @@ export async function POST(request: NextRequest) {
       })
     }
     
-    const { data: item, error } = await fromBase(db, 'items')
+    const { data: item, error } = await fromBase(rls, 'items')
       .insert(insertPayload)
       .select()
       .single()
@@ -299,6 +321,26 @@ export async function PUT(request: NextRequest) {
       throw error
     }
     
+    // CRITICAL: Load session into the SAME client instance before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+    }
+    
+    // Load and explicitly set the session on the client to ensure JWT is attached
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+    
+    // Use the same client instance for database operations
+    const rls = supabase.schema('lootaura_v2')
+    
     // Normalize image fields if present in update body
     const updatePayload: any = {}
     // Normalize name/title: accept both 'name' and 'title', prefer 'title', fallback to 'name'
@@ -328,8 +370,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // Write to base table using schema-scoped client
-    const db = await getRlsDb()
-    const { data: item, error } = await fromBase(db, 'items')
+    const { data: item, error } = await fromBase(rls, 'items')
       .update(updatePayload)
       .eq('id', itemId)
       .select()
@@ -395,9 +436,28 @@ export async function DELETE(request: NextRequest) {
       throw error
     }
     
+    // CRITICAL: Load session into the SAME client instance before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+    }
+    
+    // Load and explicitly set the session on the client to ensure JWT is attached
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+    
+    // Use the same client instance for database operations
+    const rls = supabase.schema('lootaura_v2')
+    
     // Write to base table using schema-scoped client
-    const db = await getRlsDb()
-    const { error } = await fromBase(db, 'items')
+    const { error } = await fromBase(rls, 'items')
       .delete()
       .eq('id', itemId)
     

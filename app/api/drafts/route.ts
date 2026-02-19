@@ -205,6 +205,29 @@ async function postDraftHandler(request: NextRequest) {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
+    // Validate draft key format (UUID v4 format)
+    // Prevents injection attacks and ensures data integrity
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(draftKey)) {
+      return fail(400, 'INVALID_INPUT', 'draftKey must be a valid UUID format')
+    }
+
+    // Validate payload size to prevent DoS attacks
+    // Estimate payload size (rough calculation)
+    const payloadSize = JSON.stringify(payload).length
+    const MAX_PAYLOAD_SIZE = 500 * 1024 // 500KB limit
+    if (payloadSize > MAX_PAYLOAD_SIZE) {
+      const { logger } = await import('@/lib/log')
+      logger.warn('Draft payload too large', {
+        component: 'drafts',
+        operation: 'saveDraft',
+        payloadSize,
+        maxSize: MAX_PAYLOAD_SIZE,
+        userId: user.id.substring(0, 8) + '...',
+      })
+      return fail(400, 'PAYLOAD_TOO_LARGE', `Draft payload exceeds maximum size of ${MAX_PAYLOAD_SIZE / 1024}KB`)
+    }
+
     // Validate payload
     const validationResult = SaleDraftPayloadSchema.safeParse(payload)
     if (!validationResult.success) {

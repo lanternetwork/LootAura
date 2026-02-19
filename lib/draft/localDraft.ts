@@ -48,16 +48,45 @@ export function getDraftKey(): string {
 
 /**
  * Save draft to localStorage
+ * Enterprise-ready: Includes error recovery and size validation
  */
-export function saveLocalDraft(payload: SaleDraftPayload): void {
-  if (typeof window === 'undefined') return
+export function saveLocalDraft(payload: SaleDraftPayload): boolean {
+  if (typeof window === 'undefined') return false
   
   try {
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload))
+    const serialized = JSON.stringify(payload)
+    
+    // Check payload size (localStorage typically has 5-10MB limit)
+    // Use conservative 2MB limit to prevent issues
+    const MAX_LOCAL_STORAGE_SIZE = 2 * 1024 * 1024 // 2MB
+    if (serialized.length > MAX_LOCAL_STORAGE_SIZE) {
+      console.warn('[LOCAL_DRAFT] Payload too large for localStorage:', {
+        size: serialized.length,
+        maxSize: MAX_LOCAL_STORAGE_SIZE
+      })
+      return false
+    }
+    
+    localStorage.setItem(DRAFT_STORAGE_KEY, serialized)
     // Ensure draft key exists
     getDraftKey()
+    return true
   } catch (error) {
+    // Handle QuotaExceededError specifically
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      console.warn('[LOCAL_DRAFT] localStorage quota exceeded, attempting cleanup')
+      // Try to clear old drafts and retry
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY)
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload))
+        return true
+      } catch (retryError) {
+        console.error('[LOCAL_DRAFT] Failed to save after cleanup:', retryError)
+        return false
+      }
+    }
     console.error('[LOCAL_DRAFT] Error saving to localStorage:', error)
+    return false
   }
 }
 

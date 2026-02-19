@@ -41,7 +41,7 @@ export const SaleDraftPayloadSchema = z.object({
   // Items
   items: z.array(SaleDraftItemSchema).default([]),
   // Current step in wizard
-  currentStep: z.number().int().min(0).max(3).default(0),
+  currentStep: z.number().int().min(0).max(4).default(0),
   // Promotion intent (user wants to feature the sale)
   wantsPromotion: z.boolean().default(false),
 })

@@ -608,12 +608,16 @@ export default function SellWizardClient({
     }
   }, [])
 
-  // Initialize draft key only when minimum viable data exists
-  // This prevents creating empty drafts
+  // Initialize draft key when any meaningful data exists
+  // This allows saving partial drafts while user is still filling out the form
   useEffect(() => {
-    // Don't create draft key if minimum viable data doesn't exist
-    if (!hasMinimumViableData()) {
-      // Clear any existing draft key if data becomes invalid
+    // Check if we have any meaningful data to save
+    const hasAnyData = !!(formData.title || formData.description || formData.address || 
+                         formData.date_start || (photos && photos.length > 0) || 
+                         (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
+    
+    if (!hasAnyData) {
+      // No data at all, clear draft key if it exists
       if (draftKeyRef.current) {
         draftKeyRef.current = null
         // Also clear from localStorage
@@ -624,15 +628,15 @@ export default function SellWizardClient({
       return
     }
     
-    // Only create draft key when minimum viable data exists
+    // Create draft key when any meaningful data exists (allows partial drafts)
     if (!draftKeyRef.current) {
       draftKeyRef.current = getDraftKey()
     }
-  }, [hasMinimumViableData])
+  }, [formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags])
 
   // Debounced autosave (local + server)
   // Only saves when:
-  // 1. Minimum viable data exists (category + location valid)
+  // 1. Minimum viable data exists (category + location valid) - OR partial data exists
   // 2. Current step is valid (no validation errors)
   // 3. Normalized payload differs from last saved payload (meaningful change)
   useEffect(() => {
@@ -646,19 +650,44 @@ export default function SellWizardClient({
       return
     }
     
-    // CRITICAL: Only autosave when minimum viable data exists
-    // This prevents creating empty drafts
-    if (!hasMinimumViableData()) {
-      // Clear save status if data becomes invalid
+    // Check if we have any meaningful data to save (even if not complete)
+    const hasAnyData = !!(formData.title || formData.description || formData.address || 
+                         formData.date_start || (photos && photos.length > 0) || 
+                         (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
+    
+    if (!hasAnyData) {
+      // No data at all, don't save
       if (saveStatus !== 'idle') {
         setSaveStatus('idle')
       }
       return
     }
+    
+    // CRITICAL: Only autosave when minimum viable data exists OR we have partial data
+    // This allows saving partial drafts while user is still filling out the form
+    const hasMinimumData = hasMinimumViableData()
+    if (!hasMinimumData) {
+      // Still allow saving partial drafts, but only locally (not to server)
+      // Server saves require minimum viable data to prevent empty drafts
+      if (isDebugEnabled) {
+        console.log('[SELL_WIZARD] Autosave: Partial data detected, saving locally only', {
+          hasTitle: !!formData.title,
+          hasAddress: !!formData.address,
+          hasTags: !!(formData.tags && formData.tags.length > 0),
+          hasLocation: !!(formData.lat && formData.lng)
+        })
+      }
+    }
 
     // CRITICAL: Only autosave when current step is valid
     // This prevents saving invalid states
     if (!isCurrentStepValid()) {
+      if (isDebugEnabled) {
+        console.log('[SELL_WIZARD] Autosave: Current step invalid, skipping save', {
+          currentStep,
+          errors: Object.keys(errors || {})
+        })
+      }
       // Don't save invalid states
       return
     }
@@ -676,8 +705,11 @@ export default function SellWizardClient({
         return
       }
       
-      // Double-check minimum viable data still exists
-      if (!hasMinimumViableData()) {
+      // Double-check we still have some data
+      const stillHasData = !!(formData.title || formData.description || formData.address || 
+                               formData.date_start || (photos && photos.length > 0) || 
+                               (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
+      if (!stillHasData) {
         return
       }
 
@@ -692,21 +724,38 @@ export default function SellWizardClient({
       // This prevents unnecessary saves when values haven't actually changed
       if (!hasMeaningfulChange(payload)) {
         // No meaningful change, skip save
+        if (isDebugEnabled) {
+          console.log('[SELL_WIZARD] Autosave: No meaningful change detected, skipping save')
+        }
         return
       }
       
-      // Only save locally if draft key exists (created when minimum viable data exists)
+      // Create draft key if it doesn't exist (even for partial drafts)
+      if (!draftKeyRef.current) {
+        draftKeyRef.current = getDraftKey()
+      }
+      
+      // Save locally (always, even for partial drafts)
       if (draftKeyRef.current) {
         saveLocalDraft(payload)
         // Update last saved payload reference (store normalized version)
         const normalized = normalizeDraftPayload(payload)
         lastSavedPayloadRef.current = JSON.stringify(normalized)
         setSaveStatus('saved')
+        
+        if (isDebugEnabled) {
+          console.log('[SELL_WIZARD] Autosave: Draft saved locally', {
+            draftKey: draftKeyRef.current,
+            hasMinimumData: hasMinimumViableData()
+          })
+        }
       }
 
-      // Save to server if authenticated and draft key exists (throttle to max 1x per 10s)
+      // Save to server if authenticated and draft key exists AND minimum viable data exists
+      // Server saves require minimum viable data to prevent empty drafts
       // Skip if auth context is invalid to prevent retry spam
-      if (user && draftKeyRef.current && !isPublishingRef.current && !authContextInvalidRef.current) {
+      const hasMinimumData = hasMinimumViableData()
+      if (user && draftKeyRef.current && hasMinimumData && !isPublishingRef.current && !authContextInvalidRef.current) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
@@ -757,11 +806,15 @@ export default function SellWizardClient({
     }
   }, [formData, photos, items, currentStep, user, buildDraftPayload, hasMinimumViableData, isCurrentStepValid, hasMeaningfulChange, normalizeDraftPayload, saveStatus])
 
-  // Save on beforeunload (only if minimum viable data exists and meaningful change)
+  // Save on beforeunload (if any meaningful data exists and meaningful change)
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Only save if minimum viable data exists and draft key exists
-      if (!hasMinimumViableData() || !draftKeyRef.current) {
+      // Check if we have any meaningful data to save
+      const hasAnyData = !!(formData.title || formData.description || formData.address || 
+                           formData.date_start || (photos && photos.length > 0) || 
+                           (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
+      
+      if (!hasAnyData || !draftKeyRef.current) {
         return
       }
       
@@ -773,7 +826,8 @@ export default function SellWizardClient({
       }
       
       saveLocalDraft(payload)
-      if (user && draftKeyRef.current) {
+      // Only save to server if minimum viable data exists (prevents empty drafts on server)
+      if (user && draftKeyRef.current && hasMinimumViableData()) {
         // Fire and forget - don't wait for response
         saveDraftServer(payload, draftKeyRef.current).catch(() => {})
       }
@@ -783,7 +837,7 @@ export default function SellWizardClient({
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [buildDraftPayload, user, hasMinimumViableData, hasMeaningfulChange])
+  }, [buildDraftPayload, user, hasMinimumViableData, hasMeaningfulChange, formData, photos, items])
 
 
   // Ensure tags are properly set when initialData is provided (edit mode)

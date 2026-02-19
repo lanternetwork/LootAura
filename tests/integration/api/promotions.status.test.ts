@@ -18,25 +18,31 @@ const mockRlsDb = {
 }
 let currentUser: any = { id: 'user-1', email: 'user@example.test' }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: () => ({
-    auth: {
-      getUser: vi.fn(() =>
-        Promise.resolve({
-          data: { user: currentUser },
-          error: null,
-        })
-      ),
-      getSession: vi.fn().mockResolvedValue({
-        data: { session: { access_token: 'test-token', user: currentUser } },
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn(() =>
+      Promise.resolve({
+        data: { user: currentUser },
         error: null,
-      }),
-    },
-  }),
+      })
+    ),
+    getSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: currentUser, refresh_token: 'refresh-token' } },
+      error: null,
+    }),
+    setSession: vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: currentUser, refresh_token: 'refresh-token' } },
+      error: null,
+    }),
+  },
+  schema: vi.fn(() => mockRlsDb),
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: () => mockSupabaseClient,
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: async (_request?: any) => mockRlsDb,
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => {
     // fromBase internally calls db.from(table), so we need to support that

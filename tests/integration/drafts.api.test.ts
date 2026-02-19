@@ -74,7 +74,7 @@ describe('Drafts API', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSupabase.from.mockReturnValue({
+    const mockQueryBuilder = {
       select: vi.fn().mockReturnThis(),
       insert: vi.fn().mockReturnThis(),
       upsert: vi.fn().mockReturnThis(),
@@ -87,6 +87,10 @@ describe('Drafts API', () => {
       range: vi.fn().mockReturnThis(),
       single: vi.fn(),
       maybeSingle: vi.fn(),
+    }
+    mockSupabase.from.mockReturnValue(mockQueryBuilder)
+    mockSupabase.schema.mockReturnValue({
+      from: vi.fn(() => mockQueryBuilder),
     })
   })
 

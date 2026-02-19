@@ -2,7 +2,6 @@ import { cookies } from 'next/headers'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
-import { logger } from '@/lib/log'
 
 // RLS-aware client for API routes
 // In API routes, always use cookies() from next/headers for consistent cookie reading

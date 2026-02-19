@@ -1505,7 +1505,7 @@ export default function SellWizardClient({
       if (!response.ok) {
         const errorData: { error?: string; code?: string; details?: string } = 
           (result && typeof result === 'object' && result !== null && ('error' in result || 'code' in result))
-            ? (result as { error?: string; code?: string; details?: string })
+            ? result as { error?: string; code?: string; details?: string }
             : { error: 'Failed to create sale' }
         
         // Debug-only structured logging

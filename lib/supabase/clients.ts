@@ -2,7 +2,6 @@ import { cookies } from 'next/headers'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
-import { logger } from '@/lib/log'
 
 // RLS-aware client for API routes
 // In API routes, always use cookies() from next/headers for consistent cookie reading
@@ -35,13 +34,6 @@ export async function getRlsDb(_request?: NextRequest) {
           })
         } catch (error) {
           // Cookie setting can fail in some contexts, that's ok
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            logger.debug('getRlsDb: cookie setting failed', {
-              component: 'supabase',
-              operation: 'getRlsDb',
-              error: error instanceof Error ? error.message : String(error),
-            })
-          }
         }
       },
     },

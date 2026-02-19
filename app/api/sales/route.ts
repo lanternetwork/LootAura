@@ -1038,25 +1038,6 @@ async function postHandler(request: NextRequest) {
       // RLS policies will evaluate auth.uid() as null, which is expected for unauthenticated requests
     }
     
-    // Debug-only: Log auth.getUser() results
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const { logger } = await import('@/lib/log')
-      const sessionResponse = await supabase.auth.getSession()
-      const hasAccessToken = !!sessionResponse?.data?.session?.access_token
-      const sessionUserId = sessionResponse?.data?.session?.user?.id
-      
-      logger.debug('Auth context check', {
-        component: 'sales',
-        operation: 'auth_check',
-        getUserSuccess: !!user,
-        getUserError: !!authResponse?.error,
-        getSessionHasAccessToken: hasAccessToken,
-        getSessionError: !!sessionResponse?.error,
-        sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
-        userIdsMatch: sessionUserId === user?.id,
-      })
-    }
-    
     // Debug: Log auth response to diagnose Google OAuth session issues (non-debug path for errors)
     if (!user && process.env.NEXT_PUBLIC_DEBUG !== 'true') {
       const { logger } = await import('@/lib/log')
@@ -1230,24 +1211,6 @@ async function postHandler(request: NextRequest) {
     // This ensures the JWT is available for RLS policies
     const rls = supabase.schema('lootaura_v2')
     
-    // Debug-only: Verify session is available on RLS client
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const { logger } = await import('@/lib/log')
-      const sessionCheck = await supabase.auth.getSession()
-      const hasAccessToken = !!sessionCheck?.data?.session?.access_token
-      const sessionUserId = sessionCheck?.data?.session?.user?.id
-      
-      logger.debug('RLS write auth context', {
-        component: 'sales',
-        operation: 'sale_create',
-        usingSameClient: true,
-        hasAccessToken: hasAccessToken,
-        sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
-        ownerIdToInsert: user?.id ? user.id.substring(0, 8) + '...' : 'null',
-        userIdsMatch: sessionUserId === user?.id,
-      })
-    }
-    
     const fromSales = fromBase(rls, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
@@ -1314,27 +1277,6 @@ async function postHandler(request: NextRequest) {
       const res = await fromSales.insert(firstTryPayload).select().single()
       data = res?.data
       error = res?.error
-      
-      // Debug-only: Log error code and message for RLS diagnosis
-      if (error && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        const { logger } = await import('@/lib/log')
-        const sessionResponse = await supabase.auth.getSession()
-        const sessionUserId = sessionResponse?.data?.session?.user?.id
-        logger.debug('Sale insert error (first attempt)', {
-          component: 'sales',
-          operation: 'sale_insert',
-          attempt: 1,
-          errorCode: error?.code || 'unknown',
-          errorMessage: error?.message || String(error),
-          errorDetails: error?.details || null,
-          errorHint: error?.hint || null,
-          ownerIdAttempted: user?.id ? user.id.substring(0, 8) + '...' : 'null',
-          sessionUserId: sessionUserId ? sessionUserId.substring(0, 8) + '...' : 'null',
-          userIdsMatch: sessionUserId === user?.id,
-          // RLS policy requires: auth.uid() = owner_id
-          // This log helps diagnose if auth.uid() is null or mismatched
-        })
-      }
       
       // Log the error immediately for debugging (non-debug path for production monitoring)
       if (error && process.env.NEXT_PUBLIC_DEBUG !== 'true') {

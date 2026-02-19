@@ -12,7 +12,7 @@
 
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { fail, ok } from '@/lib/http/json'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
@@ -149,9 +149,27 @@ export async function GET(request: NextRequest) {
       return ok({ statuses: [] })
     }
 
-    // Use RLS-aware client - promotions_owner_select policy ensures users can only read their own promotions
-    // Admins can read all via promotions_admin_select policy
-    const rlsDb = await getRlsDb()
+    // CRITICAL: Load session into the SAME client instance before using .schema()
+    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    try {
+      await supabase.auth.getSession()
+    } catch {
+      // Session might not exist - that's ok, caller will handle auth errors
+    }
+    
+    // Load and explicitly set the session on the client to ensure JWT is attached
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      // Explicitly set the session to ensure JWT is in Authorization header
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+    
+    // Use the same client instance for database operations
+    // This ensures the JWT is available for RLS policies
+    const rls = supabase.schema('lootaura_v2')
 
     // Determine if caller is admin
     let isAdmin = false
@@ -166,7 +184,7 @@ export async function GET(request: NextRequest) {
 
     // Query promotions for these sale IDs (include starts_at for active check)
     // RLS policies will automatically filter to user's own promotions (or all if admin)
-    let query = fromBase(rlsDb, 'promotions')
+    let query = fromBase(rls, 'promotions')
       .select('sale_id, status, tier, starts_at, ends_at, owner_profile_id')
       .in('sale_id', saleIds)
 

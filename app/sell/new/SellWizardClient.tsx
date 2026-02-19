@@ -103,11 +103,12 @@ type ErrorResponse = {
 
 // Type guard for error response
 function isErrorResponse(value: unknown): value is ErrorResponse {
-  if (value === null || typeof value !== 'object') {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false
   }
   const obj = value as Record<string, unknown>
-  return 'error' in obj || 'code' in obj
+  return ('error' in obj && typeof obj.error === 'string') || 
+         ('code' in obj && typeof obj.code === 'string')
 }
 
 

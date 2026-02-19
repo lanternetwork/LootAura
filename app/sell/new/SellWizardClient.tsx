@@ -95,6 +95,11 @@ type SaleResponse = {
   id?: string
 }
 
+// Type guard for error response
+function isErrorResponse(value: unknown): value is { error?: string; code?: string; details?: string } {
+  return value !== null && typeof value === 'object' && ('error' in value || 'code' in value)
+}
+
 // Wizard actions
 type WizardAction =
   | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
@@ -1504,9 +1509,7 @@ export default function SellWizardClient({
 
       if (!response.ok) {
         const errorData: { error?: string; code?: string; details?: string } = 
-          (result && typeof result === 'object' && result !== null && ('error' in result || 'code' in result))
-            ? result as { error?: string; code?: string; details?: string }
-            : { error: 'Failed to create sale' }
+          isErrorResponse(result) ? result : { error: 'Failed to create sale' }
         
         // Debug-only structured logging
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

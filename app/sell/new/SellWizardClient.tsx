@@ -97,7 +97,11 @@ type SaleResponse = {
 
 // Type guard for error response
 function isErrorResponse(value: unknown): value is { error?: string; code?: string; details?: string } {
-  return value !== null && typeof value === 'object' && ('error' in value || 'code' in value)
+  if (value === null || typeof value !== 'object') {
+    return false
+  }
+  const obj = value as Record<string, unknown>
+  return 'error' in obj || 'code' in obj
 }
 
 // Wizard actions

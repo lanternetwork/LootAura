@@ -87,6 +87,31 @@ type WizardState = {
   submitError: string | null
 }
 
+// Sale API response type
+type SaleResponse = {
+  ok?: boolean
+  saleId?: string
+  sale?: { id: string }
+  id?: string
+}
+
+type ErrorResponse = {
+  error?: string
+  code?: string
+  details?: string
+}
+
+// Type guard for error response
+function isErrorResponse(value: unknown): value is ErrorResponse {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const obj = value as Record<string, unknown>
+  // Check if it has error or code property (values can be string or undefined per ErrorResponse type)
+  return ('error' in obj || 'code' in obj)
+}
+
+
 // Wizard actions
 type WizardAction =
   | { type: 'RESUME_DRAFT'; payload: { formData?: Partial<SaleInput>; photos?: string[]; items?: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>; wantsPromotion?: boolean; currentStep?: number } }
@@ -1479,7 +1504,7 @@ export default function SellWizardClient({
         body: JSON.stringify(payload.saleData),
       })
 
-      const result = await response.json()
+      const result: unknown = await response.json()
 
       if (response.status === 401) {
         // Save draft to sessionStorage
@@ -1495,7 +1520,10 @@ export default function SellWizardClient({
       }
 
       if (!response.ok) {
-        const errorData = result || { error: 'Failed to create sale' }
+        // Type-safe error data extraction
+        const errorData: ErrorResponse = isErrorResponse(result)
+          ? { error: result.error, code: result.code, details: result.details }
+          : { error: 'Failed to create sale' }
         
         // Debug-only structured logging
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1522,15 +1550,18 @@ export default function SellWizardClient({
         return
       }
 
-      // API returns { ok: true, sale: {...} } or { sale: {...} }
-      const sale = result.sale || result
-      if (!sale || !sale.id) {
-        console.error('Invalid sale response:', result)
+      // API returns { ok: true, saleId: '...' } or { ok: true, sale: {...} } or { sale: {...} }
+      // Handle both saleId (new format) and sale.id (legacy format)
+      const saleResponse = result as SaleResponse
+      const saleId = saleResponse.saleId || saleResponse.sale?.id || saleResponse.id
+      if (!saleId) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('Invalid sale response:', result)
+        }
         dispatch({ type: 'SET_SUBMIT_ERROR', error: 'Invalid response from server' })
         dispatch({ type: 'SET_LOADING', loading: false })
         return
       }
-      const saleId = sale.id
 
       // Create items for the sale
       if (payload.items && payload.items.length > 0) {
@@ -1569,13 +1600,13 @@ export default function SellWizardClient({
       draftKeyRef.current = null
 
       // Dispatch sales:mutated event with sale location so SalesClient can refetch if needed
-      if (typeof window !== 'undefined' && sale.lat && sale.lng) {
+      if (typeof window !== 'undefined' && payload.saleData.lat && payload.saleData.lng) {
         window.dispatchEvent(new CustomEvent('sales:mutated', {
           detail: {
             type: 'create',
             id: saleId,
-            lat: sale.lat,
-            lng: sale.lng
+            lat: payload.saleData.lat,
+            lng: payload.saleData.lng
           }
         }))
       }

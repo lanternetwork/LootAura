@@ -73,6 +73,9 @@ describe('GET /api/promotions/status', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     currentUser = { id: 'user-1', email: 'user@example.test' }
+    
+    // Reset schema mock to return mockRlsDb
+    mockSupabaseClient.schema.mockReturnValue(mockRlsDb)
 
     // Configure mockRlsDb.from to return a chainable query for promotions
     mockRlsDb.from.mockImplementation((table: string) => {

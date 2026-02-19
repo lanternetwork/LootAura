@@ -1520,12 +1520,10 @@ export default function SellWizardClient({
       }
 
       if (!response.ok) {
-        let errorData: ErrorResponse
-        if (isErrorResponse(result)) {
-          errorData = result
-        } else {
-          errorData = { error: 'Failed to create sale' }
-        }
+        // Type-safe error data extraction
+        const errorData: ErrorResponse = isErrorResponse(result)
+          ? { error: result.error, code: result.code, details: result.details }
+          : { error: 'Failed to create sale' }
         
         // Debug-only structured logging
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

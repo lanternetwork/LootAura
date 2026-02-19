@@ -1600,13 +1600,13 @@ export default function SellWizardClient({
       draftKeyRef.current = null
 
       // Dispatch sales:mutated event with sale location so SalesClient can refetch if needed
-      if (typeof window !== 'undefined' && sale.lat && sale.lng) {
+      if (typeof window !== 'undefined' && payload.saleData.lat && payload.saleData.lng) {
         window.dispatchEvent(new CustomEvent('sales:mutated', {
           detail: {
             type: 'create',
             id: saleId,
-            lat: sale.lat,
-            lng: sale.lng
+            lat: payload.saleData.lat,
+            lng: payload.saleData.lng
           }
         }))
       }

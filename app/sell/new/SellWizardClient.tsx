@@ -95,14 +95,6 @@ type SaleResponse = {
   id?: string
 }
 
-// Type guard for error response
-function isErrorResponse(value: unknown): value is { error?: string; code?: string; details?: string } {
-  if (value === null || typeof value !== 'object') {
-    return false
-  }
-  const obj = value as Record<string, unknown>
-  return 'error' in obj || 'code' in obj
-}
 
 // Wizard actions
 type WizardAction =
@@ -1512,8 +1504,9 @@ export default function SellWizardClient({
       }
 
       if (!response.ok) {
-        const errorData: { error?: string; code?: string; details?: string } = 
-          isErrorResponse(result) ? result : { error: 'Failed to create sale' }
+        const errorData = (result && typeof result === 'object' && result !== null)
+          ? (result as { error?: string; code?: string; details?: string })
+          : { error: 'Failed to create sale' }
         
         // Debug-only structured logging
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

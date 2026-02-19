@@ -107,8 +107,8 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
     return false
   }
   const obj = value as Record<string, unknown>
-  return ('error' in obj && typeof obj.error === 'string') || 
-         ('code' in obj && typeof obj.code === 'string')
+  // Check if it has error or code property (values can be string or undefined per ErrorResponse type)
+  return ('error' in obj || 'code' in obj)
 }
 
 

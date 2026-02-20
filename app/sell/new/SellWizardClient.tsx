@@ -428,6 +428,7 @@ export default function SellWizardClient({
   const lastSavedPayloadRef = useRef<string | null>(null) // Track last saved normalized payload (JSON string)
   const authContextInvalidRef = useRef<boolean>(false) // Flag to stop autosave spam when session is invalid
   const rateLimitBackoffRef = useRef<number>(10000) // Minimum time between server saves (increases on 429)
+  const isSavingToServerRef = useRef<boolean>(false) // Flag to prevent concurrent server save attempts
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -829,17 +830,19 @@ export default function SellWizardClient({
       // Server-side validation will handle empty drafts, so we can save partial drafts
       // to allow users to see their work-in-progress in the dashboard
       // Skip if auth context is invalid to prevent retry spam
-      if (user && draftKeyRef.current && !isPublishingRef.current && !authContextInvalidRef.current) {
+      if (user && draftKeyRef.current && !isPublishingRef.current && !authContextInvalidRef.current && !isSavingToServerRef.current) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
         // Use dynamic backoff that increases on rate limit errors
         if (timeSinceLastSave >= rateLimitBackoffRef.current) {
+          isSavingToServerRef.current = true
           setSaveStatus('saving')
           saveDraftServer(payload, draftKeyRef.current)
             .then((result) => {
               // Check again before updating state
               if (isPublishingRef.current) {
+                isSavingToServerRef.current = false
                 return
               }
               if (result.ok) {
@@ -849,22 +852,28 @@ export default function SellWizardClient({
                 authContextInvalidRef.current = false
                 // Reset backoff to default on successful save
                 rateLimitBackoffRef.current = 10000
+                isSavingToServerRef.current = false
               } else {
                 setSaveStatus('error')
                 // If auth context is invalid, stop autosave retries
                 if (result.code === 'AUTH_CONTEXT_INVALID') {
                   authContextInvalidRef.current = true
+                  isSavingToServerRef.current = false
                   if (isDebugEnabled) {
                     console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context')
                   }
                 } else if (result.code === 'rate_limited' || result.error === 'rate_limited') {
-                  // Rate limited - increase backoff exponentially (max 60 seconds)
+                  // Rate limited - update lastServerSaveRef to current time so next attempt respects backoff
+                  lastServerSaveRef.current = Date.now()
+                  // Increase backoff exponentially (max 60 seconds)
                   rateLimitBackoffRef.current = Math.min(60000, rateLimitBackoffRef.current * 2)
+                  isSavingToServerRef.current = false
                   if (isDebugEnabled) {
                     console.warn('[SELL_WIZARD] Autosave rate limited, backing off to', rateLimitBackoffRef.current, 'ms')
                   }
                 } else {
                   // Don't show error toast for autosave failures - just log
+                  isSavingToServerRef.current = false
                   if (isDebugEnabled) {
                     console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
                   }
@@ -873,9 +882,11 @@ export default function SellWizardClient({
             })
             .catch((error) => {
               if (isPublishingRef.current) {
+                isSavingToServerRef.current = false
                 return
               }
               setSaveStatus('error')
+              isSavingToServerRef.current = false
               console.error('[SELL_WIZARD] Autosave error:', error)
             })
         }

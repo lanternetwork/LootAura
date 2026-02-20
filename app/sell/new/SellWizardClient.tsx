@@ -836,7 +836,10 @@ export default function SellWizardClient({
         
         // Use dynamic backoff that increases on rate limit errors
         if (timeSinceLastSave >= rateLimitBackoffRef.current) {
+          // CRITICAL: Set flag and update timestamp IMMEDIATELY to prevent race conditions
+          // This ensures that if multiple debounced callbacks pass the check, only one will proceed
           isSavingToServerRef.current = true
+          lastServerSaveRef.current = now // Update immediately so other callbacks see the new timestamp
           setSaveStatus('saving')
           saveDraftServer(payload, draftKeyRef.current)
             .then((result) => {
@@ -846,7 +849,6 @@ export default function SellWizardClient({
                 return
               }
               if (result.ok) {
-                lastServerSaveRef.current = Date.now()
                 setSaveStatus('saved')
                 // Reset auth context invalid flag on successful save
                 authContextInvalidRef.current = false
@@ -863,9 +865,9 @@ export default function SellWizardClient({
                     console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context')
                   }
                 } else if (result.code === 'rate_limited' || result.error === 'rate_limited') {
-                  // Rate limited - update lastServerSaveRef to current time so next attempt respects backoff
-                  lastServerSaveRef.current = Date.now()
-                  // Increase backoff exponentially (max 60 seconds)
+                  // Rate limited - increase backoff exponentially (max 60 seconds)
+                  // Note: lastServerSaveRef was already updated when we started the save,
+                  // so the next attempt will respect the backoff period
                   rateLimitBackoffRef.current = Math.min(60000, rateLimitBackoffRef.current * 2)
                   isSavingToServerRef.current = false
                   if (isDebugEnabled) {
@@ -889,6 +891,16 @@ export default function SellWizardClient({
               isSavingToServerRef.current = false
               console.error('[SELL_WIZARD] Autosave error:', error)
             })
+        } else {
+          // Backoff period hasn't elapsed yet - skip this save attempt
+          // This prevents queued debounced callbacks from all trying to save at once
+          if (isDebugEnabled) {
+            console.log('[SELL_WIZARD] Autosave: Backoff period not elapsed, skipping save', {
+              timeSinceLastSave,
+              requiredBackoff: rateLimitBackoffRef.current,
+              remaining: rateLimitBackoffRef.current - timeSinceLastSave
+            })
+          }
         }
       }
     }, 1500)

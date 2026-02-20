@@ -157,26 +157,72 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, currentStep: action.step }
     case 'UPDATE_FORM':
       // Update a single form field (for manual typing)
-      return { ...state, formData: { ...state.formData, [action.field]: action.value } }
+      // Clear errors for this field when it's edited
+      const updatedErrors = { ...state.errors }
+      const fieldToClear = action.field
+      
+      // Remove error for this field
+      delete updatedErrors[fieldToClear]
+      
+      // Special case: if tags field changes, clear all tags[ errors
+      if (fieldToClear === 'tags') {
+        Object.keys(updatedErrors).forEach(key => {
+          if (key.startsWith('tags[')) {
+            delete updatedErrors[key]
+          }
+        })
+      }
+      
+      return { 
+        ...state, 
+        formData: { ...state.formData, [action.field]: action.value },
+        errors: updatedErrors
+      }
     case 'ADDRESS_SELECTED':
       // Atomic update of all address fields from autocomplete selection
       // This is the authoritative source for address fields
+      // Clear all address-related errors when address is selected
+      const addressErrors = { ...state.errors }
+      const addressFields = ['address', 'city', 'state', 'zip_code', 'lat', 'lng']
+      addressFields.forEach(field => {
+        delete addressErrors[field]
+      })
+      
       return {
         ...state,
         formData: {
           ...state.formData,
           ...action.fields
-        }
+        },
+        errors: addressErrors
       }
     case 'SET_FORM_DATA':
       // Merge new formData into existing formData instead of replacing it
       // This prevents derived field calculations from overwriting address fields
+      // Clear errors for all fields being updated
+      const formDataErrors = { ...state.errors }
+      const updatedFields = Object.keys(action.formData)
+      
+      updatedFields.forEach(field => {
+        delete formDataErrors[field]
+        
+        // Special case: if tags field is updated, clear all tags[ errors
+        if (field === 'tags') {
+          Object.keys(formDataErrors).forEach(key => {
+            if (key.startsWith('tags[')) {
+              delete formDataErrors[key]
+            }
+          })
+        }
+      })
+      
       return {
         ...state,
         formData: {
           ...state.formData,
           ...action.formData
-        }
+        },
+        errors: formDataErrors
       }
     case 'SET_PHOTOS':
       return { ...state, photos: action.photos }

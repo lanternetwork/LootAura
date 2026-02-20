@@ -3,27 +3,47 @@
  * 
  * Derives rate limiting keys based on request context and policy scope.
  * Trusts x-forwarded-for/x-real-ip headers; falls back to request.ip if available.
+ * Includes HTTP method and pathname to prevent cross-endpoint collisions.
  */
 
+import type { NextRequest } from 'next/server'
+
 export async function deriveKey(
-  req: Request, 
+  req: Request | NextRequest, 
   scope: 'ip' | 'user' | 'ip-auth', 
   userId?: string
 ): Promise<string> {
+  // Extract method and pathname from request
+  const method = req.method || 'GET'
+  let pathname = '/'
+  
+  // Handle NextRequest (has nextUrl) or regular Request (parse URL)
+  if ('nextUrl' in req && req.nextUrl) {
+    pathname = req.nextUrl.pathname
+  } else {
+    try {
+      const url = new URL(req.url)
+      pathname = url.pathname
+    } catch {
+      // Fallback if URL parsing fails
+      pathname = '/'
+    }
+  }
+  
   // For auth routes, always use IP even if user is available
   if (scope === 'ip-auth' || scope === 'ip') {
     const ip = getClientIp(req)
-    return `ip:${ip}`
+    return `ip:${ip}:${method}:${pathname}`
   }
   
   // For user-scoped policies, prefer userId if available
   if (scope === 'user' && userId) {
-    return `user:${userId}`
+    return `user:${userId}:${method}:${pathname}`
   }
   
   // Fallback to IP for user-scoped policies when no userId
   const ip = getClientIp(req)
-  return `ip:${ip}`
+  return `ip:${ip}:${method}:${pathname}`
 }
 
 function getClientIp(req: Request): string {

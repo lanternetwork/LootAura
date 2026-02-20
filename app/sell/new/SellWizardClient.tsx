@@ -766,8 +766,12 @@ export default function SellWizardClient({
     const now = Date.now()
     const timeSinceLastServerSave = now - lastServerSaveRef.current
     const remainingBackoff = rateLimitBackoffRef.current - timeSinceLastServerSave
-    // Use max of debounce delay (1.5s) and remaining backoff to respect rate limits
-    const delay = remainingBackoff > 0 ? Math.max(1500, remainingBackoff) : 1500
+    
+    // Calculate delay: if in backoff, wait until backoff elapses, otherwise use debounce delay
+    // This ensures we don't schedule callbacks that will fire during backoff
+    const delay = remainingBackoff > 0 
+      ? Math.max(1500, remainingBackoff + 100) // Add 100ms buffer to ensure backoff has fully elapsed
+      : 1500
 
     // Set new timeout for debounced save (respects backoff period)
     // This prevents saving during typing AND during rate-limit backoff
@@ -878,6 +882,15 @@ export default function SellWizardClient({
                   // so the next attempt will respect the backoff period
                   rateLimitBackoffRef.current = Math.min(60000, rateLimitBackoffRef.current * 2)
                   isSavingToServerRef.current = false
+                  
+                  // CRITICAL: Cancel any pending autosave timeouts and let them be rescheduled
+                  // with the new backoff period. This prevents queued callbacks from firing
+                  // during the extended backoff period.
+                  if (autosaveTimeoutRef.current) {
+                    clearTimeout(autosaveTimeoutRef.current)
+                    autosaveTimeoutRef.current = null
+                  }
+                  
                   if (isDebugEnabled) {
                     console.warn('[SELL_WIZARD] Autosave rate limited, backing off to', rateLimitBackoffRef.current, 'ms')
                   }

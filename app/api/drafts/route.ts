@@ -1,8 +1,10 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getRlsBaseClient, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
+import { normalizeDraftPayload } from '@/lib/draft/normalize'
 import { ok, fail } from '@/lib/http/json'
 import { computePublishability, type DraftRecord } from '@/lib/drafts/computePublishability'
 import * as Sentry from '@sentry/nextjs'
@@ -250,6 +252,14 @@ async function postDraftHandler(request: NextRequest) {
     const validatedPayload = validationResult.data
     const title = validatedPayload.formData?.title || null
 
+    // Normalize payload for consistent hashing (server-side normalization)
+    const normalizedPayload = normalizeDraftPayload(validatedPayload)
+    
+    // Compute SHA256 hash of normalized payload for deduplication
+    const contentHash = createHash('sha256')
+      .update(JSON.stringify(normalizedPayload))
+      .digest('hex')
+
     // Upsert draft (insert or update by user_id + draft_key)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[DRAFTS] Saving draft:', {
@@ -258,6 +268,7 @@ async function postDraftHandler(request: NextRequest) {
         title,
         hasPayload: !!validatedPayload,
         payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
+        contentHash: contentHash.substring(0, 8) + '...',
       })
     }
     
@@ -266,42 +277,79 @@ async function postDraftHandler(request: NextRequest) {
     const rls = supabase.schema('lootaura_v2')
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
-    const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
-      .select('id')
+    // Fetch content_hash and version for deduplication check
+    const { data: existingDraft, error: fetchError } = await fromBase(rls, 'sale_drafts')
+      .select('id, content_hash, version, updated_at')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
       .eq('status', 'active')
       .maybeSingle()
 
+    if (fetchError) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS] Error fetching existing draft:', fetchError)
+      }
+      Sentry.captureException(fetchError, { tags: { operation: 'fetchExistingDraft' } })
+      return fail(500, 'FETCH_ERROR', 'Failed to check existing draft', fetchError)
+    }
+
+    // If draft exists and content hash matches, return no-op response
+    if (existingDraft && existingDraft.content_hash === contentHash) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFTS] Content hash matches, returning no-op:', {
+          draftKey,
+          contentHash: contentHash.substring(0, 8) + '...',
+          version: existingDraft.version,
+        })
+      }
+      return ok({
+        ok: true,
+        noop: true,
+        data: {
+          id: existingDraft.id,
+          contentHash,
+          version: existingDraft.version,
+          updatedAt: existingDraft.updated_at,
+        },
+      })
+    }
+
+    // Content hash differs or draft doesn't exist - perform write
     let draft: any
     let error: any
 
     if (existingDraft) {
       // Update existing draft using RLS-aware client (sale_drafts has RLS UPDATE policy)
+      // Increment version and set new content_hash
       const { data: updatedDraft, error: updateError } = await fromBase(rls, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
+          content_hash: contentHash,
+          version: (existingDraft.version || 1) + 1,
           status: 'active',
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .eq('id', existingDraft.id)
-        .select('id, draft_key, title, status, updated_at')
+        .select('id, draft_key, title, status, updated_at, version, content_hash')
         .single()
       draft = updatedDraft
       error = updateError
     } else {
       // Insert new draft using RLS-aware client (sale_drafts has RLS INSERT policy)
+      // Set content_hash and version = 1
       const { data: newDraft, error: insertError } = await fromBase(rls, 'sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
           title,
           payload: validatedPayload,
+          content_hash: contentHash,
+          version: 1,
           status: 'active',
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
-        .select('id, draft_key, title, status, updated_at')
+        .select('id, draft_key, title, status, updated_at, version, content_hash')
         .single()
       draft = newDraft
       error = insertError
@@ -345,7 +393,17 @@ async function postDraftHandler(request: NextRequest) {
       return fail(500, 'NO_DATA_ERROR', 'Draft save succeeded but no data returned')
     }
 
-    return ok({ data: { id: draft.id } })
+    // Return success response with noop=false (actual write occurred)
+    return ok({
+      ok: true,
+      noop: false,
+      data: {
+        id: draft.id,
+        contentHash: draft.content_hash || contentHash,
+        version: draft.version || (existingDraft ? (existingDraft.version || 1) + 1 : 1),
+        updatedAt: draft.updated_at,
+      },
+    })
   } catch (e: any) {
     if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/POST] thrown:', e)
     Sentry.captureException(e, { tags: { operation: 'saveDraft' } })
@@ -354,8 +412,8 @@ async function postDraftHandler(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  // Get user ID for rate limiting
-  const supabase = createSupabaseServerClient()
+  // Get user ID for rate limiting - use getRlsBaseClient to ensure session is loaded
+  const supabase = await getRlsBaseClient(request)
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 

@@ -18,6 +18,7 @@ import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
 import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
 import { saveDraftServer, getLatestDraftServer, getDraftByKeyServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
+import { normalizeDraftPayload } from '@/lib/draft/normalize'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
@@ -499,53 +500,8 @@ export default function SellWizardClient({
   }, [formData, photos, items, currentStep, wantsPromotion])
 
   // Normalize draft payload for comparison (trim strings, stable array ordering, canonical values)
-  const normalizeDraftPayload = useCallback((payload: SaleDraftPayload): SaleDraftPayload => {
-    // Normalize formData strings (trim whitespace)
-    const normalizedFormData = {
-      ...payload.formData,
-      title: payload.formData.title?.trim() || '',
-      description: payload.formData.description?.trim() || '',
-      address: payload.formData.address?.trim() || '',
-      city: payload.formData.city?.trim() || '',
-      state: payload.formData.state?.trim() || '',
-      zip_code: payload.formData.zip_code?.trim() || '',
-      date_start: payload.formData.date_start?.trim() || '',
-      time_start: payload.formData.time_start?.trim() || '',
-      date_end: payload.formData.date_end?.trim() || '',
-      time_end: payload.formData.time_end?.trim() || '',
-      // Tags: sort for stable ordering, trim each tag
-      tags: (payload.formData.tags || [])
-        .map(tag => tag?.trim())
-        .filter(Boolean)
-        .sort(), // Stable ordering
-      pricing_mode: payload.formData.pricing_mode || 'negotiable',
-    }
-
-    // Photos: stable ordering (sort by URL)
-    const normalizedPhotos = [...(payload.photos || [])]
-      .filter(Boolean)
-      .sort() // Stable ordering
-
-    // Items: stable ordering (sort by id), normalize item fields
-    const normalizedItems = [...(payload.items || [])]
-      .map(item => ({
-        id: item.id || '',
-        name: (item.name || '').trim(),
-        price: item.price,
-        description: (item.description || '').trim(),
-        image_url: (item.image_url || '').trim(),
-        category: item.category,
-      }))
-      .sort((a, b) => a.id.localeCompare(b.id)) // Stable ordering by id
-
-    return {
-      formData: normalizedFormData,
-      photos: normalizedPhotos,
-      items: normalizedItems,
-      currentStep: payload.currentStep,
-      wantsPromotion: payload.wantsPromotion || false,
-    }
-  }, [])
+  // Use shared normalization function for consistency with server-side hashing
+  // This ensures client and server produce identical hashes for the same content
 
   // Check if current step is valid (no validation errors)
   const isCurrentStepValid = useCallback((): boolean => {
@@ -869,12 +825,12 @@ export default function SellWizardClient({
                 isSavingToServerRef.current = false
               } else {
                 setSaveStatus('error')
-                // If auth context is invalid, stop autosave retries
-                if (result.code === 'AUTH_CONTEXT_INVALID') {
+                // If auth context is invalid or authentication is required, stop autosave retries
+                if (result.code === 'AUTH_CONTEXT_INVALID' || result.code === 'AUTH_REQUIRED') {
                   authContextInvalidRef.current = true
                   isSavingToServerRef.current = false
                   if (isDebugEnabled) {
-                    console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context')
+                    console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context or missing authentication')
                   }
                 } else if (result.code === 'rate_limited' || result.error === 'rate_limited') {
                   // Rate limited - increase backoff exponentially (max 60 seconds)

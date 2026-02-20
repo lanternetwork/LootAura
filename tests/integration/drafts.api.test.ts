@@ -123,6 +123,67 @@ describe('Drafts API', () => {
       const result2 = SaleDraftPayloadSchema.safeParse(invalidPayload2)
       expect(result2.success).toBe(false)
     })
+
+    it('should normalize payload consistently for content hashing', async () => {
+      const { normalizeDraftPayload } = await import('@/lib/draft/normalize')
+      const { createHash } = await import('crypto')
+
+      // Normalize the same payload twice with different formatting
+      const payload1 = { ...mockDraftPayload }
+      const payload2 = {
+        ...mockDraftPayload,
+        formData: {
+          ...mockDraftPayload.formData,
+          title: '  Test Sale  ', // Extra whitespace
+          tags: ['tools', '  '], // Extra whitespace in tags
+        },
+      }
+
+      const normalized1 = normalizeDraftPayload(payload1)
+      const normalized2 = normalizeDraftPayload(payload2)
+
+      // Compute hashes
+      const hash1 = createHash('sha256')
+        .update(JSON.stringify(normalized1))
+        .digest('hex')
+      const hash2 = createHash('sha256')
+        .update(JSON.stringify(normalized2))
+        .digest('hex')
+
+      // Hashes should match (normalization removes whitespace)
+      expect(hash1).toBe(hash2)
+      expect(normalized1.formData.title).toBe('Test Sale')
+      expect(normalized2.formData.title).toBe('Test Sale')
+      expect(normalized1.formData.tags).toEqual(['tools'])
+      expect(normalized2.formData.tags).toEqual(['tools'])
+    })
+
+    it('should produce different hashes for different payloads', async () => {
+      const { normalizeDraftPayload } = await import('@/lib/draft/normalize')
+      const { createHash } = await import('crypto')
+
+      const payload1 = { ...mockDraftPayload }
+      const payload2 = {
+        ...mockDraftPayload,
+        formData: {
+          ...mockDraftPayload.formData,
+          title: 'Different Title',
+        },
+      }
+
+      const normalized1 = normalizeDraftPayload(payload1)
+      const normalized2 = normalizeDraftPayload(payload2)
+
+      const hash1 = createHash('sha256')
+        .update(JSON.stringify(normalized1))
+        .digest('hex')
+      const hash2 = createHash('sha256')
+        .update(JSON.stringify(normalized2))
+        .digest('hex')
+
+      // Hashes should differ for different content
+      expect(hash1).not.toBe(hash2)
+    })
   })
 
   describe('GET /api/drafts', () => {

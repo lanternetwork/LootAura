@@ -28,6 +28,7 @@ export async function saveDraftServer(
         'Content-Type': 'application/json',
         ...getCsrfHeaders(),
       },
+      credentials: 'include',
       body: JSON.stringify({ payload, draftKey }),
     })
 

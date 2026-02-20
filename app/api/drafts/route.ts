@@ -174,6 +174,21 @@ async function postDraftHandler(request: NextRequest) {
 
   try {
     const supabase = createSupabaseServerClient()
+    
+    // CRITICAL: Load session first before calling getUser()
+    // This ensures the session cookies are read and the JWT is available
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+    
+    // Explicitly set the session to ensure JWT is in Authorization header
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    })
+    
+    // Now get the user - session is already loaded
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -257,25 +272,7 @@ async function postDraftHandler(request: NextRequest) {
       })
     }
     
-    // CRITICAL: Load session into the SAME client instance before using .schema()
-    // This ensures the JWT is available for RLS policies when using schema-scoped client
-    try {
-      await supabase.auth.getSession()
-    } catch {
-      // Session might not exist - that's ok, caller will handle auth errors
-    }
-    
-    // Load and explicitly set the session on the client to ensure JWT is attached
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) {
-      // Explicitly set the session to ensure JWT is in Authorization header
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      })
-    }
-    
-    // Use the same client instance for database operations
+    // Use the same client instance for database operations (session already set above)
     // This ensures the JWT is available for RLS policies
     const rls = supabase.schema('lootaura_v2')
     

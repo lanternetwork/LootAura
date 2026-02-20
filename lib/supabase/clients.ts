@@ -69,6 +69,56 @@ export async function getRlsDb(_request?: NextRequest) {
   return sb.schema('lootaura_v2')
 }
 
+// Get the base RLS client (for auth checks) - uses the same client instance as getRlsDb()
+// This ensures auth checks and DB operations use the same session
+export async function getRlsBaseClient(_request?: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  if (!url || !anon) {
+    throw new Error('Supabase credentials missing')
+  }
+
+  const cookieStore = cookies()
+  
+  const sb = createServerClient(url, anon, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set({ name, value, ...options })
+          })
+        } catch (error) {
+          // Cookie setting can fail in some contexts, that's ok
+        }
+      },
+    },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
+  })
+
+  // Load and set session (same logic as getRlsDb)
+  try {
+    const { data: { session } } = await sb.auth.getSession()
+    if (session) {
+      await sb.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+    }
+  } catch {
+    // Session might not exist - that's ok, caller will handle auth errors
+  }
+
+  return sb
+}
+
 // Service-role client (server-only)
 export function getAdminDb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!

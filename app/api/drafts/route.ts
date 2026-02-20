@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, getRlsBaseClient, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
 import { computePublishability, type DraftRecord } from '@/lib/drafts/computePublishability'
@@ -173,22 +173,11 @@ async function postDraftHandler(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    // Use getRlsBaseClient() for auth checks - this ensures we use the same client
+    // that will be used for DB operations, with the session properly loaded
+    const supabase = await getRlsBaseClient(request)
     
-    // CRITICAL: Load session first before calling getUser()
-    // This ensures the session cookies are read and the JWT is available
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
-    }
-    
-    // Explicitly set the session to ensure JWT is in Authorization header
-    await supabase.auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    })
-    
-    // Now get the user - session is already loaded
+    // Get the user - session is already loaded by getRlsBaseClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -272,9 +261,9 @@ async function postDraftHandler(request: NextRequest) {
       })
     }
     
-    // Use getRlsDb() which properly loads and sets the session before calling .schema()
-    // This ensures the JWT is available for RLS policies
-    const rls = await getRlsDb(request)
+    // Use the same base client's schema-scoped version for DB operations
+    // This ensures the session is properly propagated from the auth check
+    const rls = supabase.schema('lootaura_v2')
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')

@@ -720,10 +720,14 @@ export default function SellWizardClient({
         return
       }
 
-      // Double-check current step is still valid
-      if (!isCurrentStepValid()) {
+      // Double-check step validity (only for complete drafts)
+      // For partial drafts, we allow saving even if step isn't fully valid
+      const stillHasMinimumData = hasMinimumViableData()
+      if (stillHasMinimumData && !isCurrentStepValid()) {
+        // Complete draft but step is invalid - don't save
         return
       }
+      // Partial draft or valid step - allow save
       
       const payload = buildDraftPayload()
       

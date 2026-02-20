@@ -155,29 +155,78 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       }
     case 'SET_STEP':
       return { ...state, currentStep: action.step }
-    case 'UPDATE_FORM':
+    case 'UPDATE_FORM': {
       // Update a single form field (for manual typing)
-      return { ...state, formData: { ...state.formData, [action.field]: action.value } }
-    case 'ADDRESS_SELECTED':
+      // Clear errors for this field when it's edited
+      const updatedErrors = { ...state.errors }
+      const fieldToClear = action.field
+      
+      // Remove error for this field
+      delete updatedErrors[fieldToClear]
+      
+      // Special case: if tags field changes, clear all tags[ errors
+      if (fieldToClear === 'tags') {
+        Object.keys(updatedErrors).forEach(key => {
+          if (key.startsWith('tags[')) {
+            delete updatedErrors[key]
+          }
+        })
+      }
+      
+      return { 
+        ...state, 
+        formData: { ...state.formData, [action.field]: action.value },
+        errors: updatedErrors
+      }
+    }
+    case 'ADDRESS_SELECTED': {
       // Atomic update of all address fields from autocomplete selection
       // This is the authoritative source for address fields
+      // Clear all address-related errors when address is selected
+      const addressErrors = { ...state.errors }
+      const addressFields = ['address', 'city', 'state', 'zip_code', 'lat', 'lng']
+      addressFields.forEach(field => {
+        delete addressErrors[field]
+      })
+      
       return {
         ...state,
         formData: {
           ...state.formData,
           ...action.fields
-        }
+        },
+        errors: addressErrors
       }
-    case 'SET_FORM_DATA':
+    }
+    case 'SET_FORM_DATA': {
       // Merge new formData into existing formData instead of replacing it
       // This prevents derived field calculations from overwriting address fields
+      // Clear errors for all fields being updated
+      const formDataErrors = { ...state.errors }
+      const updatedFields = Object.keys(action.formData)
+      
+      updatedFields.forEach(field => {
+        delete formDataErrors[field]
+        
+        // Special case: if tags field is updated, clear all tags[ errors
+        if (field === 'tags') {
+          Object.keys(formDataErrors).forEach(key => {
+            if (key.startsWith('tags[')) {
+              delete formDataErrors[key]
+            }
+          })
+        }
+      })
+      
       return {
         ...state,
         formData: {
           ...state.formData,
           ...action.formData
-        }
+        },
+        errors: formDataErrors
       }
+    }
     case 'SET_PHOTOS':
       return { ...state, photos: action.photos }
     case 'SET_ITEMS':
@@ -666,30 +715,37 @@ export default function SellWizardClient({
     // CRITICAL: Only autosave when minimum viable data exists OR we have partial data
     // This allows saving partial drafts while user is still filling out the form
     const hasMinimumData = hasMinimumViableData()
+    const isStepValid = isCurrentStepValid()
+    
     if (!hasMinimumData) {
       // Still allow saving partial drafts, but only locally (not to server)
       // Server saves require minimum viable data to prevent empty drafts
+      // For partial drafts, we allow saving even if step isn't fully valid yet
+      // (user is still filling out the form)
       if (isDebugEnabled) {
         console.log('[SELL_WIZARD] Autosave: Partial data detected, saving locally only', {
           hasTitle: !!formData.title,
           hasAddress: !!formData.address,
           hasTags: !!(formData.tags && formData.tags.length > 0),
-          hasLocation: !!(formData.lat && formData.lng)
+          hasLocation: !!(formData.lat && formData.lng),
+          isStepValid
         })
       }
-    }
-
-    // CRITICAL: Only autosave when current step is valid
-    // This prevents saving invalid states
-    if (!isCurrentStepValid()) {
-      if (isDebugEnabled) {
-        console.log('[SELL_WIZARD] Autosave: Current step invalid, skipping save', {
-          currentStep,
-          errors: Object.keys(errors || {})
-        })
+      // For partial drafts, skip step validation - allow saving work in progress
+      // The step validation will be enforced when they try to proceed to next step
+    } else {
+      // CRITICAL: For complete drafts (minimum viable data exists), only autosave when current step is valid
+      // This prevents saving invalid states for complete drafts
+      if (!isStepValid) {
+        if (isDebugEnabled) {
+          console.log('[SELL_WIZARD] Autosave: Current step invalid, skipping save', {
+            currentStep,
+            errors: Object.keys(errors || {})
+          })
+        }
+        // Don't save invalid states for complete drafts
+        return
       }
-      // Don't save invalid states
-      return
     }
     
     // Clear existing timeout
@@ -713,10 +769,14 @@ export default function SellWizardClient({
         return
       }
 
-      // Double-check current step is still valid
-      if (!isCurrentStepValid()) {
+      // Double-check step validity (only for complete drafts)
+      // For partial drafts, we allow saving even if step isn't fully valid
+      const stillHasMinimumData = hasMinimumViableData()
+      if (stillHasMinimumData && !isCurrentStepValid()) {
+        // Complete draft but step is invalid - don't save
         return
       }
+      // Partial draft or valid step - allow save
       
       const payload = buildDraftPayload()
       

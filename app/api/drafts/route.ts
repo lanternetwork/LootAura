@@ -205,10 +205,17 @@ async function postDraftHandler(request: NextRequest) {
       return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
     
-    const { payload, draftKey } = body
+    const { payload, draftKey, ifVersion } = body
 
     if (!draftKey || typeof draftKey !== 'string') {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
+    }
+
+    // Validate ifVersion if provided (must be a positive integer)
+    if (ifVersion !== undefined) {
+      if (typeof ifVersion !== 'number' || !Number.isInteger(ifVersion) || ifVersion < 1) {
+        return fail(400, 'INVALID_INPUT', 'ifVersion must be a positive integer')
+      }
     }
 
     // Validate draft key format (UUID v4 format)
@@ -363,7 +370,8 @@ async function postDraftHandler(request: NextRequest) {
     if (existingDraft) {
       // Update existing draft using RLS-aware client (sale_drafts has RLS UPDATE policy)
       // Increment version and set new content_hash
-      const { data: updatedDraft, error: updateError } = await fromBase(rls, 'sale_drafts')
+      // If ifVersion was provided, add it to WHERE clause for atomic OCC check
+      const updateBuilder = fromBase(rls, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -373,8 +381,40 @@ async function postDraftHandler(request: NextRequest) {
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .eq('id', existingDraft.id)
+      
+      // Add version check to WHERE clause if ifVersion was provided (atomic OCC)
+      if (ifVersion !== undefined) {
+        updateBuilder.eq('version', ifVersion)
+      }
+      
+      const { data: updatedDraft, error: updateError } = await updateBuilder
         .select('id, draft_key, title, status, updated_at, version, content_hash')
         .single()
+      
+      // If update returned no rows and ifVersion was provided, version check failed
+      if (!error && !updatedDraft && ifVersion !== undefined) {
+        // Re-fetch to get current version for conflict response
+        const { data: currentDraft } = await fromBase(rls, 'sale_drafts')
+          .select('version, updated_at')
+          .eq('id', existingDraft.id)
+          .single()
+        
+        if (currentDraft) {
+          return NextResponse.json(
+            {
+              ok: false,
+              code: 'DRAFT_VERSION_CONFLICT',
+              error: 'Draft was modified by another session. Please refresh and try again.',
+              details: {
+                serverVersion: currentDraft.version,
+                serverUpdatedAt: currentDraft.updated_at,
+              },
+            },
+            { status: 409 }
+          )
+        }
+      }
+      
       draft = updatedDraft
       error = updateError
     } else {
@@ -436,13 +476,15 @@ async function postDraftHandler(request: NextRequest) {
     }
 
     // Return success response with noop=false (actual write occurred)
+    // Version is incremented on write, so return the new version
+    const newVersion = draft.version || (existingDraft ? (existingDraft.version || 1) + 1 : 1)
     return ok({
       ok: true,
       noop: false,
       data: {
         id: draft.id,
         contentHash: draft.content_hash || contentHash,
-        version: draft.version || (existingDraft ? (existingDraft.version || 1) + 1 : 1),
+        version: newVersion,
         updatedAt: draft.updated_at,
       },
     })

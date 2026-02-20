@@ -8,7 +8,16 @@ import { describe, it, expect, vi } from 'vitest'
 import { deriveKey } from '@/lib/rateLimit/keys'
 
 // Mock NextRequest
-const createMockRequest = (headers: Record<string, string> = {}) => ({
+const createMockRequest = (
+  headers: Record<string, string> = {},
+  method: string = 'GET',
+  pathname: string = '/api/test'
+) => ({
+  method,
+  nextUrl: {
+    pathname
+  },
+  url: `https://example.com${pathname}`,
   headers: {
     get: (name: string) => headers[name.toLowerCase()] || null
   }
@@ -22,7 +31,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'ip')
     
-    expect(key).toBe('ip:192.168.1.1')
+    expect(key).toBe('ip:192.168.1.1:GET:/api/test')
   })
 
   it('should derive IP key from x-real-ip when x-forwarded-for missing', async () => {
@@ -32,7 +41,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'ip')
     
-    expect(key).toBe('ip:203.0.113.1')
+    expect(key).toBe('ip:203.0.113.1:GET:/api/test')
   })
 
   it('should fallback to cf-connecting-ip', async () => {
@@ -42,7 +51,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'ip')
     
-    expect(key).toBe('ip:198.51.100.1')
+    expect(key).toBe('ip:198.51.100.1:GET:/api/test')
   })
 
   it('should fallback to unknown when no IP headers', async () => {
@@ -50,7 +59,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'ip')
     
-    expect(key).toBe('ip:unknown')
+    expect(key).toBe('ip:unknown:GET:/api/test')
   })
 
   it('should derive user key when userId provided', async () => {
@@ -60,7 +69,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'user', 'user123')
     
-    expect(key).toBe('user:user123')
+    expect(key).toBe('user:user123:GET:/api/test')
   })
 
   it('should fallback to IP for user scope when no userId', async () => {
@@ -70,7 +79,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'user')
     
-    expect(key).toBe('ip:192.168.1.1')
+    expect(key).toBe('ip:192.168.1.1:GET:/api/test')
   })
 
   it('should force IP for ip-auth scope even with userId', async () => {
@@ -80,7 +89,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'ip-auth', 'user123')
     
-    expect(key).toBe('ip:192.168.1.1')
+    expect(key).toBe('ip:192.168.1.1:GET:/api/test')
   })
 
   it('should handle comma-separated x-forwarded-for correctly', async () => {
@@ -90,7 +99,7 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'ip')
     
-    expect(key).toBe('ip:203.0.113.195')
+    expect(key).toBe('ip:203.0.113.195:GET:/api/test')
   })
 
   it('should trim whitespace from IP addresses', async () => {
@@ -100,6 +109,22 @@ describe('Rate Limiting - Key Derivation', () => {
     
     const key = await deriveKey(request, 'ip')
     
-    expect(key).toBe('ip:192.168.1.1')
+    expect(key).toBe('ip:192.168.1.1:GET:/api/test')
+  })
+
+  it('should include HTTP method in key', async () => {
+    const request = createMockRequest({}, 'POST', '/api/drafts')
+    
+    const key = await deriveKey(request, 'ip')
+    
+    expect(key).toBe('ip:unknown:POST:/api/drafts')
+  })
+
+  it('should include pathname in key', async () => {
+    const request = createMockRequest({}, 'GET', '/api/sales')
+    
+    const key = await deriveKey(request, 'user', 'user123')
+    
+    expect(key).toBe('user:user123:GET:/api/sales')
   })
 })

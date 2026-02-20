@@ -6,8 +6,10 @@
  * Includes HTTP method and pathname to prevent cross-endpoint collisions.
  */
 
+import type { NextRequest } from 'next/server'
+
 export async function deriveKey(
-  req: Request, 
+  req: Request | NextRequest, 
   scope: 'ip' | 'user' | 'ip-auth', 
   userId?: string
 ): Promise<string> {

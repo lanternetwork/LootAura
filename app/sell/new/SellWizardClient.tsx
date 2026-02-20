@@ -418,7 +418,7 @@ export default function SellWizardClient({
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'paused'>('idle')
   const hasResumedRef = useRef(false)
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -824,15 +824,18 @@ export default function SellWizardClient({
                 rateLimitBackoffRef.current = 10000
                 isSavingToServerRef.current = false
               } else {
-                setSaveStatus('error')
                 // If auth context is invalid or authentication is required, stop autosave retries
                 if (result.code === 'AUTH_CONTEXT_INVALID' || result.code === 'AUTH_REQUIRED') {
+                  setSaveStatus('error')
                   authContextInvalidRef.current = true
                   isSavingToServerRef.current = false
                   if (isDebugEnabled) {
                     console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context or missing authentication')
                   }
                 } else if (result.code === 'rate_limited' || result.error === 'rate_limited') {
+                  // Rate limited - set status to "paused" (not "error") to avoid alarming user
+                  // Autosave will resume automatically after backoff period
+                  setSaveStatus('paused')
                   // Rate limited - increase backoff exponentially (max 60 seconds)
                   // Note: lastServerSaveRef was already updated when we started the save,
                   // so the next attempt will respect the backoff period
@@ -851,6 +854,8 @@ export default function SellWizardClient({
                     console.warn('[SELL_WIZARD] Autosave rate limited, backing off to', rateLimitBackoffRef.current, 'ms')
                   }
                 } else {
+                  // Other errors - set to error status
+                  setSaveStatus('error')
                   // Don't show error toast for autosave failures - just log
                   isSavingToServerRef.current = false
                   if (isDebugEnabled) {
@@ -2259,6 +2264,14 @@ export default function SellWizardClient({
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                   Saved
+                </span>
+              )}
+              {saveStatus === 'paused' && (
+                <span className="text-sm text-amber-600 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Saving paused
                 </span>
               )}
               {saveStatus === 'error' && (

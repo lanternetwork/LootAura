@@ -666,30 +666,37 @@ export default function SellWizardClient({
     // CRITICAL: Only autosave when minimum viable data exists OR we have partial data
     // This allows saving partial drafts while user is still filling out the form
     const hasMinimumData = hasMinimumViableData()
+    const isStepValid = isCurrentStepValid()
+    
     if (!hasMinimumData) {
       // Still allow saving partial drafts, but only locally (not to server)
       // Server saves require minimum viable data to prevent empty drafts
+      // For partial drafts, we allow saving even if step isn't fully valid yet
+      // (user is still filling out the form)
       if (isDebugEnabled) {
         console.log('[SELL_WIZARD] Autosave: Partial data detected, saving locally only', {
           hasTitle: !!formData.title,
           hasAddress: !!formData.address,
           hasTags: !!(formData.tags && formData.tags.length > 0),
-          hasLocation: !!(formData.lat && formData.lng)
+          hasLocation: !!(formData.lat && formData.lng),
+          isStepValid
         })
       }
-    }
-
-    // CRITICAL: Only autosave when current step is valid
-    // This prevents saving invalid states
-    if (!isCurrentStepValid()) {
-      if (isDebugEnabled) {
-        console.log('[SELL_WIZARD] Autosave: Current step invalid, skipping save', {
-          currentStep,
-          errors: Object.keys(errors || {})
-        })
+      // For partial drafts, skip step validation - allow saving work in progress
+      // The step validation will be enforced when they try to proceed to next step
+    } else {
+      // CRITICAL: For complete drafts (minimum viable data exists), only autosave when current step is valid
+      // This prevents saving invalid states for complete drafts
+      if (!isStepValid) {
+        if (isDebugEnabled) {
+          console.log('[SELL_WIZARD] Autosave: Current step invalid, skipping save', {
+            currentStep,
+            errors: Object.keys(errors || {})
+          })
+        }
+        // Don't save invalid states for complete drafts
+        return
       }
-      // Don't save invalid states
-      return
     }
     
     // Clear existing timeout

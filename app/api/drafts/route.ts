@@ -272,9 +272,9 @@ async function postDraftHandler(request: NextRequest) {
       })
     }
     
-    // Use the same client instance for database operations (session already set above)
+    // Use getRlsDb() which properly loads and sets the session before calling .schema()
     // This ensures the JWT is available for RLS policies
-    const rls = supabase.schema('lootaura_v2')
+    const rls = await getRlsDb(request)
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')

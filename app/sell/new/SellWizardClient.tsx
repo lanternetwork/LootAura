@@ -761,8 +761,16 @@ export default function SellWizardClient({
       clearTimeout(autosaveTimeoutRef.current)
     }
 
-    // Set new timeout for debounced save (1.5s)
-    // This prevents saving during typing
+    // Calculate delay respecting rate-limit backoff
+    // This prevents queued callbacks from firing during backoff period
+    const now = Date.now()
+    const timeSinceLastServerSave = now - lastServerSaveRef.current
+    const remainingBackoff = rateLimitBackoffRef.current - timeSinceLastServerSave
+    // Use max of debounce delay (1.5s) and remaining backoff to respect rate limits
+    const delay = remainingBackoff > 0 ? Math.max(1500, remainingBackoff) : 1500
+
+    // Set new timeout for debounced save (respects backoff period)
+    // This prevents saving during typing AND during rate-limit backoff
     autosaveTimeoutRef.current = setTimeout(() => {
       // Double-check we're not publishing before saving
       if (isPublishingRef.current) {
@@ -903,7 +911,7 @@ export default function SellWizardClient({
           }
         }
       }
-    }, 1500)
+    }, delay)
 
     return () => {
       if (autosaveTimeoutRef.current) {

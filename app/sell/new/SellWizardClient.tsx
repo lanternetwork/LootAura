@@ -427,6 +427,7 @@ export default function SellWizardClient({
   const isNavigatingRef = useRef(false)
   const lastSavedPayloadRef = useRef<string | null>(null) // Track last saved normalized payload (JSON string)
   const authContextInvalidRef = useRef<boolean>(false) // Flag to stop autosave spam when session is invalid
+  const rateLimitBackoffRef = useRef<number>(10000) // Minimum time between server saves (increases on 429)
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -832,7 +833,8 @@ export default function SellWizardClient({
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
-        if (timeSinceLastSave >= 10000) {
+        // Use dynamic backoff that increases on rate limit errors
+        if (timeSinceLastSave >= rateLimitBackoffRef.current) {
           setSaveStatus('saving')
           saveDraftServer(payload, draftKeyRef.current)
             .then((result) => {
@@ -845,6 +847,8 @@ export default function SellWizardClient({
                 setSaveStatus('saved')
                 // Reset auth context invalid flag on successful save
                 authContextInvalidRef.current = false
+                // Reset backoff to default on successful save
+                rateLimitBackoffRef.current = 10000
               } else {
                 setSaveStatus('error')
                 // If auth context is invalid, stop autosave retries
@@ -852,6 +856,12 @@ export default function SellWizardClient({
                   authContextInvalidRef.current = true
                   if (isDebugEnabled) {
                     console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context')
+                  }
+                } else if (result.code === 'rate_limited' || result.error === 'rate_limited') {
+                  // Rate limited - increase backoff exponentially (max 60 seconds)
+                  rateLimitBackoffRef.current = Math.min(60000, rateLimitBackoffRef.current * 2)
+                  if (isDebugEnabled) {
+                    console.warn('[SELL_WIZARD] Autosave rate limited, backing off to', rateLimitBackoffRef.current, 'ms')
                   }
                 } else {
                   // Don't show error toast for autosave failures - just log

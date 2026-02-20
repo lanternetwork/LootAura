@@ -175,20 +175,7 @@ async function postDraftHandler(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     
-    // CRITICAL: Load session first before calling getUser()
-    // This ensures the session cookies are read and the JWT is available
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
-    }
-    
-    // Explicitly set the session to ensure JWT is in Authorization header
-    await supabase.auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    })
-    
-    // Now get the user - session is already loaded
+    // Get user first to check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -272,9 +259,10 @@ async function postDraftHandler(request: NextRequest) {
       })
     }
     
-    // Use the same client instance for database operations (session already set above)
+    // Use getRlsDb() which properly loads and sets the session before calling .schema()
     // This ensures the JWT is available for RLS policies
-    const rls = supabase.schema('lootaura_v2')
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const rls = await getRlsDb(request)
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')

@@ -41,20 +41,24 @@ export async function saveDraftServer(
         errorData = { error: response.statusText || 'Failed to save draft' }
       }
       
+      // Detect rate limit errors
+      const isRateLimited = response.status === 429 || errorData.error === 'rate_limited'
+      
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('[DRAFT_CLIENT] Save failed:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData.error,
           code: errorData.code,
-          details: errorData.details
+          details: errorData.details,
+          isRateLimited
         })
       }
       
       return {
         ok: false,
         error: errorData.error || `Failed to save draft (${response.status})`,
-        code: errorData.code || 'SAVE_ERROR',
+        code: isRateLimited ? 'rate_limited' : (errorData.code || 'SAVE_ERROR'),
         details: errorData.details
       }
     }

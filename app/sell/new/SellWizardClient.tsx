@@ -636,13 +636,18 @@ export default function SellWizardClient({
   // Save local draft to server when user signs in mid-wizard
   // Only if minimum viable data exists
   useEffect(() => {
-    if (user && draftKeyRef.current && hasLocalDraft() && hasMinimumViableData()) {
+    // Save to server when user logs in if we have any meaningful data
+    // This allows partial drafts to be synced to the server
+    const hasAnyData = !!(formData.title || formData.description || formData.address || 
+                         formData.date_start || (photos && photos.length > 0) || 
+                         (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
+    if (user && draftKeyRef.current && hasLocalDraft() && hasAnyData) {
       const payload = buildDraftPayload()
       saveDraftServer(payload, draftKeyRef.current).catch(() => {
         // Silent fail - already saved locally
       })
     }
-  }, [user, buildDraftPayload, hasMinimumViableData])
+  }, [user, buildDraftPayload, formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags])
 
   // Save draft to localStorage whenever form data changes
   useEffect(() => {
@@ -718,12 +723,13 @@ export default function SellWizardClient({
     const isStepValid = isCurrentStepValid()
     
     if (!hasMinimumData) {
-      // Still allow saving partial drafts, but only locally (not to server)
-      // Server saves require minimum viable data to prevent empty drafts
+      // Allow saving partial drafts (both locally and to server)
+      // Server-side validation will handle empty drafts, so we can save partial drafts
+      // to allow users to see their work-in-progress in the dashboard
       // For partial drafts, we allow saving even if step isn't fully valid yet
       // (user is still filling out the form)
       if (isDebugEnabled) {
-        console.log('[SELL_WIZARD] Autosave: Partial data detected, saving locally only', {
+        console.log('[SELL_WIZARD] Autosave: Partial data detected, saving locally and to server', {
           hasTitle: !!formData.title,
           hasAddress: !!formData.address,
           hasTags: !!(formData.tags && formData.tags.length > 0),
@@ -818,11 +824,11 @@ export default function SellWizardClient({
         }
       }
 
-      // Save to server if authenticated and draft key exists AND minimum viable data exists
-      // Server saves require minimum viable data to prevent empty drafts
+      // Save to server if authenticated and draft key exists AND we have any meaningful data
+      // Server-side validation will handle empty drafts, so we can save partial drafts
+      // to allow users to see their work-in-progress in the dashboard
       // Skip if auth context is invalid to prevent retry spam
-      const hasMinimumData = hasMinimumViableData()
-      if (user && draftKeyRef.current && hasMinimumData && !isPublishingRef.current && !authContextInvalidRef.current) {
+      if (user && draftKeyRef.current && !isPublishingRef.current && !authContextInvalidRef.current) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
@@ -893,8 +899,9 @@ export default function SellWizardClient({
       }
       
       saveLocalDraft(payload)
-      // Only save to server if minimum viable data exists (prevents empty drafts on server)
-      if (user && draftKeyRef.current && hasMinimumViableData()) {
+      // Save to server if we have any meaningful data (allows partial drafts to sync)
+      // Server-side validation will handle empty drafts
+      if (user && draftKeyRef.current) {
         // Fire and forget - don't wait for response
         saveDraftServer(payload, draftKeyRef.current).catch(() => {})
       }

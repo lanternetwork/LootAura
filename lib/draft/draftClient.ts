@@ -19,8 +19,9 @@ type ApiResponse<T = any> = {
  */
 export async function saveDraftServer(
   payload: SaleDraftPayload,
-  draftKey: string
-): Promise<ApiResponse<{ id: string }>> {
+  draftKey: string,
+  ifVersion?: number
+): Promise<ApiResponse<{ id: string; contentHash?: string; version?: number; updatedAt?: string }>> {
   try {
     const response = await fetch('/api/drafts', {
       method: 'POST',
@@ -29,7 +30,7 @@ export async function saveDraftServer(
         ...getCsrfHeaders(),
       },
       credentials: 'include',
-      body: JSON.stringify({ payload, draftKey }),
+      body: JSON.stringify({ payload, draftKey, ifVersion }),
     })
 
     if (!response.ok) {

@@ -315,6 +315,48 @@ async function postDraftHandler(request: NextRequest) {
     }
 
     // Content hash differs or draft doesn't exist - perform write
+    // Apply per-minute rate limit only when a write will occur (noop=false)
+    const { check } = await import('@/lib/rateLimit/limiter')
+    const { deriveKey } = await import('@/lib/rateLimit/keys')
+    const { Policies } = await import('@/lib/rateLimit/policies')
+    
+    const writeRateLimitKey = await deriveKey(request, Policies.DRAFT_AUTOSAVE_MINUTE.scope, user.id)
+    const writeRateLimitResult = await check(Policies.DRAFT_AUTOSAVE_MINUTE, writeRateLimitKey)
+    
+    if (!writeRateLimitResult.allowed) {
+      const { logger } = await import('@/lib/log')
+      logger.warn('Draft write rate-limited', {
+        component: 'drafts',
+        operation: 'saveDraft',
+        userId: user.id.substring(0, 8) + '...',
+        policy: Policies.DRAFT_AUTOSAVE_MINUTE.name,
+        remaining: writeRateLimitResult.remaining,
+      })
+      
+      // Return 429 with rate limit details
+      const errorResponse = NextResponse.json(
+        { 
+          ok: false,
+          code: 'RATE_LIMITED', 
+          error: 'Too many draft writes. Please slow down.',
+          details: {
+            remaining: writeRateLimitResult.remaining,
+            resetAt: writeRateLimitResult.resetAt,
+          }
+        },
+        { status: 429 }
+      )
+      
+      // Apply rate limit headers
+      const { applyRateHeaders } = await import('@/lib/rateLimit/headers')
+      return applyRateHeaders(
+        errorResponse,
+        Policies.DRAFT_AUTOSAVE_MINUTE,
+        writeRateLimitResult.remaining,
+        writeRateLimitResult.resetAt,
+        writeRateLimitResult.softLimited
+      ) as NextResponse
+    }
     let draft: any
     let error: any
 
@@ -420,9 +462,10 @@ export async function POST(request: NextRequest) {
   const { withRateLimit } = await import('@/lib/rateLimit/withRateLimit')
   const { Policies } = await import('@/lib/rateLimit/policies')
 
+  // Apply only MUTATE_DAILY at wrapper level (per-minute limit is applied inside handler only on writes)
   return withRateLimit(
     postDraftHandler,
-    [Policies.DRAFT_AUTOSAVE_MINUTE, Policies.MUTATE_DAILY],
+    [Policies.MUTATE_DAILY],
     { userId }
   )(request)
 }

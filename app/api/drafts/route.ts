@@ -261,7 +261,6 @@ async function postDraftHandler(request: NextRequest) {
     
     // Use getRlsDb() which properly loads and sets the session before calling .schema()
     // This ensures the JWT is available for RLS policies
-    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
     const rls = await getRlsDb(request)
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)

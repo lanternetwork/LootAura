@@ -155,7 +155,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       }
     case 'SET_STEP':
       return { ...state, currentStep: action.step }
-    case 'UPDATE_FORM':
+    case 'UPDATE_FORM': {
       // Update a single form field (for manual typing)
       // Clear errors for this field when it's edited
       const updatedErrors = { ...state.errors }
@@ -178,7 +178,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         formData: { ...state.formData, [action.field]: action.value },
         errors: updatedErrors
       }
-    case 'ADDRESS_SELECTED':
+    }
+    case 'ADDRESS_SELECTED': {
       // Atomic update of all address fields from autocomplete selection
       // This is the authoritative source for address fields
       // Clear all address-related errors when address is selected
@@ -196,7 +197,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         },
         errors: addressErrors
       }
-    case 'SET_FORM_DATA':
+    }
+    case 'SET_FORM_DATA': {
       // Merge new formData into existing formData instead of replacing it
       // This prevents derived field calculations from overwriting address fields
       // Clear errors for all fields being updated
@@ -224,6 +226,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         },
         errors: formDataErrors
       }
+    }
     case 'SET_PHOTOS':
       return { ...state, photos: action.photos }
     case 'SET_ITEMS':

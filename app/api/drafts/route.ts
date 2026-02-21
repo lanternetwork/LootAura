@@ -1,8 +1,10 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getRlsBaseClient, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
+import { normalizeDraftPayload } from '@/lib/draft/normalize'
 import { ok, fail } from '@/lib/http/json'
 import { computePublishability, type DraftRecord } from '@/lib/drafts/computePublishability'
 import * as Sentry from '@sentry/nextjs'
@@ -203,10 +205,17 @@ async function postDraftHandler(request: NextRequest) {
       return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
     
-    const { payload, draftKey } = body
+    const { payload, draftKey, ifVersion } = body
 
     if (!draftKey || typeof draftKey !== 'string') {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
+    }
+
+    // Validate ifVersion if provided (must be a positive integer)
+    if (ifVersion !== undefined) {
+      if (typeof ifVersion !== 'number' || !Number.isInteger(ifVersion) || ifVersion < 1) {
+        return fail(400, 'INVALID_INPUT', 'ifVersion must be a positive integer')
+      }
     }
 
     // Validate draft key format (UUID v4 format)
@@ -250,6 +259,14 @@ async function postDraftHandler(request: NextRequest) {
     const validatedPayload = validationResult.data
     const title = validatedPayload.formData?.title || null
 
+    // Normalize payload for consistent hashing (server-side normalization)
+    const normalizedPayload = normalizeDraftPayload(validatedPayload)
+    
+    // Compute SHA256 hash of normalized payload for deduplication
+    const contentHash = createHash('sha256')
+      .update(JSON.stringify(normalizedPayload))
+      .digest('hex')
+
     // Upsert draft (insert or update by user_id + draft_key)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[DRAFTS] Saving draft:', {
@@ -258,6 +275,7 @@ async function postDraftHandler(request: NextRequest) {
         title,
         hasPayload: !!validatedPayload,
         payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
+        contentHash: contentHash.substring(0, 8) + '...',
       })
     }
     
@@ -266,42 +284,154 @@ async function postDraftHandler(request: NextRequest) {
     const rls = supabase.schema('lootaura_v2')
     
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
-    const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
-      .select('id')
+    // Fetch content_hash and version for deduplication check
+    const { data: existingDraft, error: fetchError } = await fromBase(rls, 'sale_drafts')
+      .select('id, content_hash, version, updated_at')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
       .eq('status', 'active')
       .maybeSingle()
 
+    if (fetchError) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[DRAFTS] Error fetching existing draft:', fetchError)
+      }
+      Sentry.captureException(fetchError, { tags: { operation: 'fetchExistingDraft' } })
+      return fail(500, 'FETCH_ERROR', 'Failed to check existing draft', fetchError)
+    }
+
+    // If draft exists and content hash matches, return no-op response
+    if (existingDraft && existingDraft.content_hash === contentHash) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFTS] Content hash matches, returning no-op:', {
+          draftKey,
+          contentHash: contentHash.substring(0, 8) + '...',
+          version: existingDraft.version,
+        })
+      }
+      return ok({
+        ok: true,
+        noop: true,
+        data: {
+          id: existingDraft.id,
+          contentHash,
+          version: existingDraft.version,
+          updatedAt: existingDraft.updated_at,
+        },
+      })
+    }
+
+    // Content hash differs or draft doesn't exist - perform write
+    // Apply per-minute rate limit only when a write will occur (noop=false)
+    const { check } = await import('@/lib/rateLimit/limiter')
+    const { deriveKey } = await import('@/lib/rateLimit/keys')
+    const { Policies } = await import('@/lib/rateLimit/policies')
+    
+    const writeRateLimitKey = await deriveKey(request, Policies.DRAFT_AUTOSAVE_MINUTE.scope, user.id)
+    const writeRateLimitResult = await check(Policies.DRAFT_AUTOSAVE_MINUTE, writeRateLimitKey)
+    
+    if (!writeRateLimitResult.allowed) {
+      const { logger } = await import('@/lib/log')
+      logger.warn('Draft write rate-limited', {
+        component: 'drafts',
+        operation: 'saveDraft',
+        userId: user.id.substring(0, 8) + '...',
+        policy: Policies.DRAFT_AUTOSAVE_MINUTE.name,
+        remaining: writeRateLimitResult.remaining,
+      })
+      
+      // Return 429 with rate limit details
+      const errorResponse = NextResponse.json(
+        { 
+          ok: false,
+          code: 'RATE_LIMITED', 
+          error: 'Too many draft writes. Please slow down.',
+          details: {
+            remaining: writeRateLimitResult.remaining,
+            resetAt: writeRateLimitResult.resetAt,
+          }
+        },
+        { status: 429 }
+      )
+      
+      // Apply rate limit headers
+      const { applyRateHeaders } = await import('@/lib/rateLimit/headers')
+      return applyRateHeaders(
+        errorResponse,
+        Policies.DRAFT_AUTOSAVE_MINUTE,
+        writeRateLimitResult.remaining,
+        writeRateLimitResult.resetAt,
+        writeRateLimitResult.softLimited
+      ) as NextResponse
+    }
     let draft: any
     let error: any
 
     if (existingDraft) {
       // Update existing draft using RLS-aware client (sale_drafts has RLS UPDATE policy)
-      const { data: updatedDraft, error: updateError } = await fromBase(rls, 'sale_drafts')
+      // Increment version and set new content_hash
+      // If ifVersion was provided, add it to WHERE clause for atomic OCC check
+      const updateBuilder = fromBase(rls, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
+          content_hash: contentHash,
+          version: (existingDraft.version || 1) + 1,
           status: 'active',
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .eq('id', existingDraft.id)
-        .select('id, draft_key, title, status, updated_at')
+      
+      // Add version check to WHERE clause if ifVersion was provided (atomic OCC)
+      if (ifVersion !== undefined) {
+        updateBuilder.eq('version', ifVersion)
+      }
+      
+      const { data: updatedDraft, error: updateError } = await updateBuilder
+        .select('id, draft_key, title, status, updated_at, version, content_hash')
         .single()
+      
+      // If update returned no rows and ifVersion was provided, version check failed
+      if (!error && !updatedDraft && ifVersion !== undefined) {
+        // Re-fetch to get current version for conflict response
+        const { data: currentDraft } = await fromBase(rls, 'sale_drafts')
+          .select('version, updated_at')
+          .eq('id', existingDraft.id)
+          .single()
+        
+        if (currentDraft) {
+          return NextResponse.json(
+            {
+              ok: false,
+              code: 'DRAFT_VERSION_CONFLICT',
+              error: 'Draft was modified by another session. Please refresh and try again.',
+              details: {
+                serverVersion: currentDraft.version,
+                serverUpdatedAt: currentDraft.updated_at,
+              },
+            },
+            { status: 409 }
+          )
+        }
+      }
+      
       draft = updatedDraft
       error = updateError
     } else {
       // Insert new draft using RLS-aware client (sale_drafts has RLS INSERT policy)
+      // Set content_hash and version = 1
       const { data: newDraft, error: insertError } = await fromBase(rls, 'sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
           title,
           payload: validatedPayload,
+          content_hash: contentHash,
+          version: 1,
           status: 'active',
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
-        .select('id, draft_key, title, status, updated_at')
+        .select('id, draft_key, title, status, updated_at, version, content_hash')
         .single()
       draft = newDraft
       error = insertError
@@ -345,7 +475,19 @@ async function postDraftHandler(request: NextRequest) {
       return fail(500, 'NO_DATA_ERROR', 'Draft save succeeded but no data returned')
     }
 
-    return ok({ data: { id: draft.id } })
+    // Return success response with noop=false (actual write occurred)
+    // Version is incremented on write, so return the new version
+    const newVersion = draft.version || (existingDraft ? (existingDraft.version || 1) + 1 : 1)
+    return ok({
+      ok: true,
+      noop: false,
+      data: {
+        id: draft.id,
+        contentHash: draft.content_hash || contentHash,
+        version: newVersion,
+        updatedAt: draft.updated_at,
+      },
+    })
   } catch (e: any) {
     if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/POST] thrown:', e)
     Sentry.captureException(e, { tags: { operation: 'saveDraft' } })
@@ -354,17 +496,18 @@ async function postDraftHandler(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  // Get user ID for rate limiting
-  const supabase = createSupabaseServerClient()
+  // Get user ID for rate limiting - use getRlsBaseClient to ensure session is loaded
+  const supabase = await getRlsBaseClient(request)
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 
   const { withRateLimit } = await import('@/lib/rateLimit/withRateLimit')
   const { Policies } = await import('@/lib/rateLimit/policies')
 
+  // Apply only MUTATE_DAILY at wrapper level (per-minute limit is applied inside handler only on writes)
   return withRateLimit(
     postDraftHandler,
-    [Policies.DRAFT_AUTOSAVE_MINUTE, Policies.MUTATE_DAILY],
+    [Policies.MUTATE_DAILY],
     { userId }
   )(request)
 }

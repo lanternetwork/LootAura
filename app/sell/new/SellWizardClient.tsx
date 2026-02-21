@@ -18,6 +18,7 @@ import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
 import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
 import { saveDraftServer, getLatestDraftServer, getDraftByKeyServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
+import { normalizeDraftPayload } from '@/lib/draft/normalize'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
@@ -417,7 +418,7 @@ export default function SellWizardClient({
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'paused'>('idle')
   const hasResumedRef = useRef(false)
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -429,6 +430,9 @@ export default function SellWizardClient({
   const authContextInvalidRef = useRef<boolean>(false) // Flag to stop autosave spam when session is invalid
   const rateLimitBackoffRef = useRef<number>(10000) // Minimum time between server saves (increases on 429)
   const isSavingToServerRef = useRef<boolean>(false) // Flag to prevent concurrent server save attempts
+  const dirtySinceLastRequestRef = useRef<boolean>(false) // Flag to track if changes occurred while request in-flight
+  const lastAckedContentHashRef = useRef<string | null>(null) // Server-acked content hash from last successful save
+  const lastAckedVersionRef = useRef<number | null>(null) // Server-acked version from last successful save
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -499,53 +503,8 @@ export default function SellWizardClient({
   }, [formData, photos, items, currentStep, wantsPromotion])
 
   // Normalize draft payload for comparison (trim strings, stable array ordering, canonical values)
-  const normalizeDraftPayload = useCallback((payload: SaleDraftPayload): SaleDraftPayload => {
-    // Normalize formData strings (trim whitespace)
-    const normalizedFormData = {
-      ...payload.formData,
-      title: payload.formData.title?.trim() || '',
-      description: payload.formData.description?.trim() || '',
-      address: payload.formData.address?.trim() || '',
-      city: payload.formData.city?.trim() || '',
-      state: payload.formData.state?.trim() || '',
-      zip_code: payload.formData.zip_code?.trim() || '',
-      date_start: payload.formData.date_start?.trim() || '',
-      time_start: payload.formData.time_start?.trim() || '',
-      date_end: payload.formData.date_end?.trim() || '',
-      time_end: payload.formData.time_end?.trim() || '',
-      // Tags: sort for stable ordering, trim each tag
-      tags: (payload.formData.tags || [])
-        .map(tag => tag?.trim())
-        .filter(Boolean)
-        .sort(), // Stable ordering
-      pricing_mode: payload.formData.pricing_mode || 'negotiable',
-    }
-
-    // Photos: stable ordering (sort by URL)
-    const normalizedPhotos = [...(payload.photos || [])]
-      .filter(Boolean)
-      .sort() // Stable ordering
-
-    // Items: stable ordering (sort by id), normalize item fields
-    const normalizedItems = [...(payload.items || [])]
-      .map(item => ({
-        id: item.id || '',
-        name: (item.name || '').trim(),
-        price: item.price,
-        description: (item.description || '').trim(),
-        image_url: (item.image_url || '').trim(),
-        category: item.category,
-      }))
-      .sort((a, b) => a.id.localeCompare(b.id)) // Stable ordering by id
-
-    return {
-      formData: normalizedFormData,
-      photos: normalizedPhotos,
-      items: normalizedItems,
-      currentStep: payload.currentStep,
-      wantsPromotion: payload.wantsPromotion || false,
-    }
-  }, [])
+  // Use shared normalization function for consistency with server-side hashing
+  // This ensures client and server produce identical hashes for the same content
 
   // Check if current step is valid (no validation errors)
   const isCurrentStepValid = useCallback((): boolean => {
@@ -690,11 +649,153 @@ export default function SellWizardClient({
     }
   }, [formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags])
 
-  // Debounced autosave (local + server)
-  // Only saves when:
-  // 1. Minimum viable data exists (category + location valid) - OR partial data exists
-  // 2. Current step is valid (no validation errors)
-  // 3. Normalized payload differs from last saved payload (meaningful change)
+  // Extract server save logic to a reusable function for single-flight pattern
+  const attemptServerSave = useCallback(() => {
+    // Don't save if publishing, restoring, or no data
+    if (isPublishingRef.current || isRestoringDraftRef.current || !user || !draftKeyRef.current || authContextInvalidRef.current) {
+      return
+    }
+    
+    // Check if we have any meaningful data
+    const hasAnyData = !!(formData.title || formData.description || formData.address || 
+                         formData.date_start || (photos && photos.length > 0) || 
+                         (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
+    if (!hasAnyData) {
+      dirtySinceLastRequestRef.current = false
+      return
+    }
+    
+    // Check step validity for complete drafts
+    const hasMinimumData = hasMinimumViableData()
+    if (hasMinimumData && !isCurrentStepValid()) {
+      return
+    }
+    
+    const payload = buildDraftPayload()
+    
+    // Only save if payload has meaningfully changed
+    if (!hasMeaningfulChange(payload)) {
+      dirtySinceLastRequestRef.current = false
+      return
+    }
+    
+    // Single-flight pattern: if request already in-flight, leave dirty=true and return
+    if (isSavingToServerRef.current) {
+      if (isDebugEnabled) {
+        console.log('[SELL_WIZARD] Autosave: Request in-flight, marking dirty for follow-up save')
+      }
+      return
+    }
+    
+    const now = Date.now()
+    const timeSinceLastSave = now - lastServerSaveRef.current
+    
+    // Check backoff period
+    if (timeSinceLastSave < rateLimitBackoffRef.current) {
+      // Backoff period hasn't elapsed - schedule save after backoff
+      const remainingBackoff = rateLimitBackoffRef.current - timeSinceLastSave
+      const backoffDelay = Math.max(1500, remainingBackoff + 100)
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
+      autosaveTimeoutRef.current = setTimeout(() => {
+        autosaveTimeoutRef.current = null
+        attemptServerSave()
+      }, backoffDelay)
+      return
+    }
+    
+    // Start save: set in-flight=true, dirty=false
+    isSavingToServerRef.current = true
+    dirtySinceLastRequestRef.current = false
+    lastServerSaveRef.current = now
+    setSaveStatus('saving')
+    
+    // Include ifVersion for optimistic concurrency control
+    const ifVersion = lastAckedVersionRef.current ?? undefined
+    
+    saveDraftServer(payload, draftKeyRef.current, ifVersion)
+      .then((result) => {
+        if (isPublishingRef.current) {
+          isSavingToServerRef.current = false
+          return
+        }
+        
+        // Set in-flight=false
+        isSavingToServerRef.current = false
+        
+        if (result.ok && result.data) {
+          setSaveStatus('saved')
+          authContextInvalidRef.current = false
+          rateLimitBackoffRef.current = 10000
+          
+          // Store server ack (contentHash, version) from response
+          if (result.data.contentHash) {
+            lastAckedContentHashRef.current = result.data.contentHash
+          }
+          if (result.data.version !== undefined) {
+            lastAckedVersionRef.current = result.data.version
+          }
+          
+          // If dirty became true while in-flight → schedule another save after debounce/min interval
+          if (dirtySinceLastRequestRef.current) {
+            if (isDebugEnabled) {
+              console.log('[SELL_WIZARD] Autosave: Changes occurred during save, scheduling follow-up')
+            }
+            const minInterval = Math.max(1500, rateLimitBackoffRef.current)
+            if (autosaveTimeoutRef.current) {
+              clearTimeout(autosaveTimeoutRef.current)
+            }
+            autosaveTimeoutRef.current = setTimeout(() => {
+              autosaveTimeoutRef.current = null
+              attemptServerSave()
+            }, minInterval)
+          }
+        } else {
+          if (result.code === 'AUTH_CONTEXT_INVALID' || result.code === 'AUTH_REQUIRED') {
+            setSaveStatus('error')
+            authContextInvalidRef.current = true
+            dirtySinceLastRequestRef.current = false
+          } else if (result.code === 'rate_limited' || result.error === 'rate_limited') {
+            setSaveStatus('paused')
+            rateLimitBackoffRef.current = Math.min(60000, rateLimitBackoffRef.current * 2)
+            
+            // If dirty, schedule another save after backoff period
+            if (dirtySinceLastRequestRef.current) {
+              const backoffDelay = Math.max(1500, rateLimitBackoffRef.current + 100)
+              if (autosaveTimeoutRef.current) {
+                clearTimeout(autosaveTimeoutRef.current)
+              }
+              autosaveTimeoutRef.current = setTimeout(() => {
+                autosaveTimeoutRef.current = null
+                attemptServerSave()
+              }, backoffDelay)
+            }
+          } else if (result.code === 'DRAFT_VERSION_CONFLICT') {
+            setSaveStatus('error')
+            dirtySinceLastRequestRef.current = false
+          } else {
+            setSaveStatus('error')
+            dirtySinceLastRequestRef.current = false
+          }
+        }
+      })
+      .catch((error) => {
+        if (isPublishingRef.current) {
+          isSavingToServerRef.current = false
+          return
+        }
+        isSavingToServerRef.current = false
+        setSaveStatus('error')
+        dirtySinceLastRequestRef.current = false
+        console.error('[SELL_WIZARD] Autosave error:', error)
+      })
+  }, [formData, photos, items, currentStep, user, buildDraftPayload, hasMinimumViableData, isCurrentStepValid, hasMeaningfulChange, normalizeDraftPayload, isDebugEnabled])
+
+  // Debounced autosave (local + server) - single-flight pattern with dirty follow-up
+  // When changes happen: mark dirty, schedule debounce timer
+  // When debounce fires: if request in-flight → leave dirty=true and return; else start save, set in-flight=true, dirty=false
+  // On response: set in-flight=false; if dirty became true while in-flight → schedule another save
   useEffect(() => {
     // Don't autosave if we're publishing or have already published
     if (isPublishingRef.current) {
@@ -716,6 +817,7 @@ export default function SellWizardClient({
       if (saveStatus !== 'idle') {
         setSaveStatus('idle')
       }
+      dirtySinceLastRequestRef.current = false
       return
     }
     
@@ -756,25 +858,19 @@ export default function SellWizardClient({
       }
     }
     
+    // Mark as dirty when changes occur
+    dirtySinceLastRequestRef.current = true
+    
     // Clear existing timeout
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
+      autosaveTimeoutRef.current = null
     }
 
-    // Calculate delay respecting rate-limit backoff
-    // This prevents queued callbacks from firing during backoff period
-    const now = Date.now()
-    const timeSinceLastServerSave = now - lastServerSaveRef.current
-    const remainingBackoff = rateLimitBackoffRef.current - timeSinceLastServerSave
-    
-    // Calculate delay: if in backoff, wait until backoff elapses, otherwise use debounce delay
-    // This ensures we don't schedule callbacks that will fire during backoff
-    const delay = remainingBackoff > 0 
-      ? Math.max(1500, remainingBackoff + 100) // Add 100ms buffer to ensure backoff has fully elapsed
-      : 1500
+    // Simple debounce delay (backoff is handled in attemptServerSave)
+    const delay = 1500
 
-    // Set new timeout for debounced save (respects backoff period)
-    // This prevents saving during typing AND during rate-limit backoff
+    // Set new timeout for debounced save
     autosaveTimeoutRef.current = setTimeout(() => {
       // Double-check we're not publishing before saving
       if (isPublishingRef.current) {
@@ -786,6 +882,7 @@ export default function SellWizardClient({
                                formData.date_start || (photos && photos.length > 0) || 
                                (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
       if (!stillHasData) {
+        dirtySinceLastRequestRef.current = false
         return
       }
 
@@ -804,6 +901,7 @@ export default function SellWizardClient({
       // This prevents unnecessary saves when values haven't actually changed
       if (!hasMeaningfulChange(payload)) {
         // No meaningful change, skip save
+        dirtySinceLastRequestRef.current = false
         if (isDebugEnabled) {
           console.log('[SELL_WIZARD] Autosave: No meaningful change detected, skipping save')
         }
@@ -838,100 +936,17 @@ export default function SellWizardClient({
         }
       }
 
-      // Save to server if authenticated and draft key exists AND we have any meaningful data
-      // Server-side validation will handle empty drafts, so we can save partial drafts
-      // to allow users to see their work-in-progress in the dashboard
-      // Skip if auth context is invalid to prevent retry spam
-      if (user && draftKeyRef.current && !isPublishingRef.current && !authContextInvalidRef.current && !isSavingToServerRef.current) {
-        const now = Date.now()
-        const timeSinceLastSave = now - lastServerSaveRef.current
-        
-        // Use dynamic backoff that increases on rate limit errors
-        if (timeSinceLastSave >= rateLimitBackoffRef.current) {
-          // CRITICAL: Set flag and update timestamp IMMEDIATELY to prevent race conditions
-          // This ensures that if multiple debounced callbacks pass the check, only one will proceed
-          isSavingToServerRef.current = true
-          lastServerSaveRef.current = now // Update immediately so other callbacks see the new timestamp
-          setSaveStatus('saving')
-          saveDraftServer(payload, draftKeyRef.current)
-            .then((result) => {
-              // Check again before updating state
-              if (isPublishingRef.current) {
-                isSavingToServerRef.current = false
-                return
-              }
-              if (result.ok) {
-                setSaveStatus('saved')
-                // Reset auth context invalid flag on successful save
-                authContextInvalidRef.current = false
-                // Reset backoff to default on successful save
-                rateLimitBackoffRef.current = 10000
-                isSavingToServerRef.current = false
-              } else {
-                setSaveStatus('error')
-                // If auth context is invalid, stop autosave retries
-                if (result.code === 'AUTH_CONTEXT_INVALID') {
-                  authContextInvalidRef.current = true
-                  isSavingToServerRef.current = false
-                  if (isDebugEnabled) {
-                    console.warn('[SELL_WIZARD] Autosave stopped due to invalid auth context')
-                  }
-                } else if (result.code === 'rate_limited' || result.error === 'rate_limited') {
-                  // Rate limited - increase backoff exponentially (max 60 seconds)
-                  // Note: lastServerSaveRef was already updated when we started the save,
-                  // so the next attempt will respect the backoff period
-                  rateLimitBackoffRef.current = Math.min(60000, rateLimitBackoffRef.current * 2)
-                  isSavingToServerRef.current = false
-                  
-                  // CRITICAL: Cancel any pending autosave timeouts and let them be rescheduled
-                  // with the new backoff period. This prevents queued callbacks from firing
-                  // during the extended backoff period.
-                  if (autosaveTimeoutRef.current) {
-                    clearTimeout(autosaveTimeoutRef.current)
-                    autosaveTimeoutRef.current = null
-                  }
-                  
-                  if (isDebugEnabled) {
-                    console.warn('[SELL_WIZARD] Autosave rate limited, backing off to', rateLimitBackoffRef.current, 'ms')
-                  }
-                } else {
-                  // Don't show error toast for autosave failures - just log
-                  isSavingToServerRef.current = false
-                  if (isDebugEnabled) {
-                    console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
-                  }
-                }
-              }
-            })
-            .catch((error) => {
-              if (isPublishingRef.current) {
-                isSavingToServerRef.current = false
-                return
-              }
-              setSaveStatus('error')
-              isSavingToServerRef.current = false
-              console.error('[SELL_WIZARD] Autosave error:', error)
-            })
-        } else {
-          // Backoff period hasn't elapsed yet - skip this save attempt
-          // This prevents queued debounced callbacks from all trying to save at once
-          if (isDebugEnabled) {
-            console.log('[SELL_WIZARD] Autosave: Backoff period not elapsed, skipping save', {
-              timeSinceLastSave,
-              requiredBackoff: rateLimitBackoffRef.current,
-              remaining: rateLimitBackoffRef.current - timeSinceLastSave
-            })
-          }
-        }
-      }
+      // Attempt server save (single-flight pattern)
+      attemptServerSave()
     }, delay)
 
     return () => {
       if (autosaveTimeoutRef.current) {
         clearTimeout(autosaveTimeoutRef.current)
+        autosaveTimeoutRef.current = null
       }
     }
-  }, [formData, photos, items, currentStep, user, buildDraftPayload, hasMinimumViableData, isCurrentStepValid, hasMeaningfulChange, normalizeDraftPayload, saveStatus])
+  }, [formData, photos, items, currentStep, user, buildDraftPayload, hasMinimumViableData, isCurrentStepValid, hasMeaningfulChange, normalizeDraftPayload, saveStatus, attemptServerSave])
 
   // Save on beforeunload (if any meaningful data exists and meaningful change)
   useEffect(() => {
@@ -957,7 +972,9 @@ export default function SellWizardClient({
       // Server-side validation will handle empty drafts
       if (user && draftKeyRef.current) {
         // Fire and forget - don't wait for response
-        saveDraftServer(payload, draftKeyRef.current).catch(() => {})
+        // Include ifVersion for optimistic concurrency control
+        const ifVersion = lastAckedVersionRef.current ?? undefined
+        saveDraftServer(payload, draftKeyRef.current, ifVersion).catch(() => {})
       }
     }
 
@@ -2303,6 +2320,14 @@ export default function SellWizardClient({
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                   Saved
+                </span>
+              )}
+              {saveStatus === 'paused' && (
+                <span className="text-sm text-amber-600 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Saving paused
                 </span>
               )}
               {saveStatus === 'error' && (

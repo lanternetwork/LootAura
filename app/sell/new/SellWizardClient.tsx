@@ -707,12 +707,12 @@ export default function SellWizardClient({
     }
     
     // Pause-to-write: If the most recent dirty change was a text edit (title/description),
-    // wait for user to pause typing (4-5 seconds) before writing to server
-    const TEXT_EDIT_PAUSE_MS = 4000 // 4 seconds pause after last text edit
+    // wait for user to pause typing (4.5 seconds) before writing to server
+    const TEXT_EDIT_PAUSE_MS = 4500 // 4.5 seconds pause after last text edit
     const timeSinceLastTextEdit = now - lastTextEditAtRef.current
     
     if (lastTextEditAtRef.current > 0 && timeSinceLastTextEdit < TEXT_EDIT_PAUSE_MS) {
-      // Recent text edit detected - schedule save for when pause period elapses
+      // Recent text edit detected - schedule save for exactly when pause period elapses
       const remainingPause = TEXT_EDIT_PAUSE_MS - timeSinceLastTextEdit
       if (autosaveTimeoutRef.current) {
         clearTimeout(autosaveTimeoutRef.current)

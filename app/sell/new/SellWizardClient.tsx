@@ -617,7 +617,7 @@ export default function SellWizardClient({
         // Silent fail - already saved locally or hash unchanged
       })
     }
-  }, [user, buildDraftPayload, formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags, attemptServerSave])
+  }, [user, buildDraftPayload, formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags])
 
   // Save draft to localStorage whenever form data changes
   useEffect(() => {

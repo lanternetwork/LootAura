@@ -434,6 +434,7 @@ export default function SellWizardClient({
   const lastAckedContentHashRef = useRef<string | null>(null) // Server-acked content hash from last successful save
   const lastAckedVersionRef = useRef<number | null>(null) // Server-acked version from last successful save
   const lastTextEditAtRef = useRef<number>(0) // Timestamp of last title/description edit (for pause-to-write)
+  const hasHydratedRef = useRef<boolean>(false) // Flag to track if initial draft hydration has completed
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -598,6 +599,11 @@ export default function SellWizardClient({
   // Save local draft to server when user signs in mid-wizard
   // Only if minimum viable data exists
   useEffect(() => {
+    // Don't save during initial hydration
+    if (!hasHydratedRef.current) {
+      return
+    }
+    
     // Save to server when user logs in if we have any meaningful data
     // This allows partial drafts to be synced to the server
     const hasAnyData = !!(formData.title || formData.description || formData.address || 
@@ -652,8 +658,8 @@ export default function SellWizardClient({
 
   // Extract server save logic to a reusable function for single-flight pattern
   const attemptServerSave = useCallback(() => {
-    // Don't save if publishing, restoring, or no data
-    if (isPublishingRef.current || isRestoringDraftRef.current || !user || !draftKeyRef.current || authContextInvalidRef.current) {
+    // Don't save if publishing, restoring, not hydrated, or no data
+    if (isPublishingRef.current || isRestoringDraftRef.current || !hasHydratedRef.current || !user || !draftKeyRef.current || authContextInvalidRef.current) {
       return
     }
     
@@ -829,6 +835,11 @@ export default function SellWizardClient({
       return
     }
     
+    // Don't autosave if initial hydration hasn't completed (prevents server writes during draft load)
+    if (!hasHydratedRef.current) {
+      return
+    }
+    
     // Check if we have any meaningful data to save (even if not complete)
     const hasAnyData = !!(formData.title || formData.description || formData.address || 
                          formData.date_start || (photos && photos.length > 0) || 
@@ -973,6 +984,11 @@ export default function SellWizardClient({
   // Save on beforeunload (if any meaningful data exists and meaningful change)
   useEffect(() => {
     const handleBeforeUnload = () => {
+      // Don't save during initial hydration
+      if (!hasHydratedRef.current) {
+        return
+      }
+      
       // Check if we have any meaningful data to save
       const hasAnyData = !!(formData.title || formData.description || formData.address || 
                            formData.date_start || (photos && photos.length > 0) || 
@@ -1268,28 +1284,36 @@ export default function SellWizardClient({
             })
           }
 
-          // If user is authenticated and we restored local draft, save to server
-          if (user && source === 'local' && draftKeyRef.current) {
-            saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
-              // Silent fail - already saved locally
-            })
-          }
+          // Note: We no longer save local drafts to server during hydration
+          // This prevents server writes during initial draft load
+          // Server saves will occur naturally when user makes changes after hydration
           
           // Clear restoration flag after autosave debounce period (2s to be safe)
           // This allows state to settle before autosave can trigger
           setTimeout(() => {
             isRestoringDraftRef.current = false
+            // Mark hydration as complete after restoration settles
+            // This prevents server writes during initial draft load
+            hasHydratedRef.current = true
           }, 2000)
         } else if (isPromotionResume) {
           // Draft not found but resume=promotion - still go to Promotion step
           dispatch({ type: 'SET_STEP', step: STEPS.PROMOTION })
           setToastMessage('Draft not found; please promote your sale.')
           setShowToast(true)
+          // Mark hydration as complete even if no draft found
+          hasHydratedRef.current = true
         } else if (isReviewResume) {
           // Draft not found but resume=review - still go to Review step
           dispatch({ type: 'SET_STEP', step: STEPS.REVIEW })
           setToastMessage('Draft not found; please review details.')
           setShowToast(true)
+          // Mark hydration as complete even if no draft found
+          hasHydratedRef.current = true
+        } else {
+          // No draft found and no resume param - mark hydration complete immediately
+          // This allows autosave to work for new drafts
+          hasHydratedRef.current = true
         }
 
       // Clear sessionStorage keys after resume
@@ -1561,8 +1585,8 @@ export default function SellWizardClient({
       }
 
       // Fire-and-forget server save (throttled, non-blocking)
-      // Only save if minimum viable data exists
-      if (hasMinimumViableData()) {
+      // Only save if minimum viable data exists and hydration is complete
+      if (hasHydratedRef.current && hasMinimumViableData()) {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
         if (currentUser && draftKeyRef.current) {
           const payload = buildDraftPayload()

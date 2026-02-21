@@ -657,7 +657,7 @@ export default function SellWizardClient({
   }, [formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags])
 
   // Extract server save logic to a reusable function for single-flight pattern
-  const attemptServerSave = useCallback(() => {
+  const attemptServerSave = useCallback(async () => {
     // Don't save if publishing, restoring, not hydrated, or no data
     if (isPublishingRef.current || isRestoringDraftRef.current || !hasHydratedRef.current || !user || !draftKeyRef.current || authContextInvalidRef.current) {
       return
@@ -682,6 +682,46 @@ export default function SellWizardClient({
     
     // Only save if payload has meaningfully changed
     if (!hasMeaningfulChange(payload)) {
+      dirtySinceLastRequestRef.current = false
+      return
+    }
+    
+    // Client-side hash gate: prevent server saves when content hash hasn't changed
+    // This prevents unnecessary /api/drafts requests when only step navigation occurs
+    const normalizedPayload = normalizeDraftPayload(payload)
+    const normalizedJson = JSON.stringify(normalizedPayload)
+    
+    // Compute SHA256 hash using Web Crypto API (browser-compatible, matches server)
+    let contentHash: string
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      try {
+        const encoder = new TextEncoder()
+        const data = encoder.encode(normalizedJson)
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+        const hashArray = Array.from(new Uint8Array(hashBuffer))
+        contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+      } catch (error) {
+        // Hash computation failed - proceed with save as fallback
+        if (isDebugEnabled) {
+          console.warn('[SELL_WIZARD] Autosave: Hash computation failed, proceeding with save', error)
+        }
+        contentHash = '' // Will not match, so save will proceed
+      }
+    } else {
+      // Fallback: simple hash (shouldn't happen in modern browsers)
+      // Server will do final SHA256 check anyway
+      contentHash = normalizedJson.split('').reduce((acc, char) => {
+        const hash = ((acc << 5) - acc) + char.charCodeAt(0)
+        return hash & hash
+      }, 0).toString(16)
+    }
+    
+    // Check if content hash matches last acked hash
+    if (lastAckedContentHashRef.current && contentHash === lastAckedContentHashRef.current) {
+      // Content hash unchanged - no need to save
+      if (isDebugEnabled) {
+        console.log('[SELL_WIZARD] Autosave: Content hash unchanged, skipping server save')
+      }
       dirtySinceLastRequestRef.current = false
       return
     }

@@ -10,8 +10,9 @@ import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
  * - Trims whitespace from strings
  * - Sorts arrays for stable ordering (except photos, which preserve user-defined order)
  * - Normalizes empty strings to empty strings
+ * - Excludes currentStep from normalization (step navigation should not trigger writes)
  */
-export function normalizeDraftPayload(payload: SaleDraftPayload): SaleDraftPayload {
+export function normalizeDraftPayload(payload: SaleDraftPayload): Omit<SaleDraftPayload, 'currentStep'> {
   // Normalize formData strings (trim whitespace)
   const normalizedFormData = {
     ...payload.formData,
@@ -54,7 +55,9 @@ export function normalizeDraftPayload(payload: SaleDraftPayload): SaleDraftPaylo
     formData: normalizedFormData,
     photos: normalizedPhotos,
     items: normalizedItems,
-    currentStep: payload.currentStep,
+    // Note: currentStep is excluded from normalization/hashing
+    // Step navigation (Next/Previous/resume) should not trigger draft writes
+    // Only content changes should trigger writes
     wantsPromotion: payload.wantsPromotion || false,
   }
 }

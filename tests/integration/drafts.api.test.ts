@@ -253,6 +253,37 @@ describe('Drafts API', () => {
       expect(normalized1.photos).toEqual(normalized2.photos)
     })
 
+    it('should produce same hash for payloads with different currentStep', async () => {
+      const { normalizeDraftPayload } = await import('@/lib/draft/normalize')
+      const { createHash } = await import('crypto')
+
+      // Same content, different currentStep
+      const payload1 = {
+        ...mockDraftPayload,
+        currentStep: 0,
+      }
+      const payload2 = {
+        ...mockDraftPayload,
+        currentStep: 3, // Different step
+      }
+
+      const normalized1 = normalizeDraftPayload(payload1)
+      const normalized2 = normalizeDraftPayload(payload2)
+
+      const hash1 = createHash('sha256')
+        .update(JSON.stringify(normalized1))
+        .digest('hex')
+      const hash2 = createHash('sha256')
+        .update(JSON.stringify(normalized2))
+        .digest('hex')
+
+      // Hashes should match because currentStep is excluded from normalization
+      expect(hash1).toBe(hash2)
+      // Normalized payloads should not include currentStep
+      expect(normalized1).not.toHaveProperty('currentStep')
+      expect(normalized2).not.toHaveProperty('currentStep')
+    })
+
     it('should return version in response after successful write', async () => {
       // This test verifies that version is returned in the response
       // The actual version increment is tested in integration with the database

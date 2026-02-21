@@ -606,13 +606,15 @@ export default function SellWizardClient({
     
     // Save to server when user logs in if we have any meaningful data
     // This allows partial drafts to be synced to the server
+    // Use attemptServerSave to inherit hash gate + single-flight protection
     const hasAnyData = !!(formData.title || formData.description || formData.address || 
                          formData.date_start || (photos && photos.length > 0) || 
                          (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
     if (user && draftKeyRef.current && hasLocalDraft() && hasAnyData) {
-      const payload = buildDraftPayload()
-      saveDraftServer(payload, draftKeyRef.current).catch(() => {
-        // Silent fail - already saved locally
+      // Use attemptServerSave to inherit hash gate and single-flight protection
+      // This prevents unnecessary saves when content hasn't changed
+      attemptServerSave().catch(() => {
+        // Silent fail - already saved locally or hash unchanged
       })
     }
   }, [user, buildDraftPayload, formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags])
@@ -1624,20 +1626,15 @@ export default function SellWizardClient({
         }
       }
 
-      // Fire-and-forget server save (throttled, non-blocking)
+      // Fire-and-forget server save (uses attemptServerSave for hash gate + single-flight protection)
       // Only save if minimum viable data exists and hydration is complete
+      // attemptServerSave handles: hash gate, single-flight, backoff, and pause-to-write
       if (hasHydratedRef.current && hasMinimumViableData()) {
-        const { data: { user: currentUser } } = await supabase.auth.getUser()
-        if (currentUser && draftKeyRef.current) {
-          const payload = buildDraftPayload()
-          const now = Date.now()
-          if (now - lastServerSaveRef.current > 10000) {
-            lastServerSaveRef.current = now
-            saveDraftServer(payload, draftKeyRef.current).catch(() => {
-              // Silent fail - already saved locally
-            })
-          }
-        }
+        // Use attemptServerSave to inherit hash gate and single-flight protection
+        // This prevents unnecessary saves when only step navigation occurs
+        attemptServerSave().catch(() => {
+          // Silent fail - already saved locally or hash unchanged
+        })
       }
 
       // Normal navigation - skip promotion step if disabled

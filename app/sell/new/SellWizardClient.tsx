@@ -1624,20 +1624,15 @@ export default function SellWizardClient({
         }
       }
 
-      // Fire-and-forget server save (throttled, non-blocking)
+      // Fire-and-forget server save (uses attemptServerSave for hash gate + single-flight protection)
       // Only save if minimum viable data exists and hydration is complete
+      // attemptServerSave handles: hash gate, single-flight, backoff, and pause-to-write
       if (hasHydratedRef.current && hasMinimumViableData()) {
-        const { data: { user: currentUser } } = await supabase.auth.getUser()
-        if (currentUser && draftKeyRef.current) {
-          const payload = buildDraftPayload()
-          const now = Date.now()
-          if (now - lastServerSaveRef.current > 10000) {
-            lastServerSaveRef.current = now
-            saveDraftServer(payload, draftKeyRef.current).catch(() => {
-              // Silent fail - already saved locally
-            })
-          }
-        }
+        // Use attemptServerSave to inherit hash gate and single-flight protection
+        // This prevents unnecessary saves when only step navigation occurs
+        attemptServerSave().catch(() => {
+          // Silent fail - already saved locally or hash unchanged
+        })
       }
 
       // Normal navigation - skip promotion step if disabled

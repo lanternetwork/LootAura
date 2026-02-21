@@ -8,7 +8,7 @@ import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 /**
  * Normalize a draft payload for consistent comparison and hashing
  * - Trims whitespace from strings
- * - Sorts arrays for stable ordering
+ * - Sorts arrays for stable ordering (except photos, which preserve user-defined order)
  * - Normalizes empty strings to empty strings
  */
 export function normalizeDraftPayload(payload: SaleDraftPayload): SaleDraftPayload {
@@ -33,10 +33,10 @@ export function normalizeDraftPayload(payload: SaleDraftPayload): SaleDraftPaylo
     pricing_mode: payload.formData.pricing_mode || 'negotiable',
   }
 
-  // Photos: stable ordering (sort by URL)
+  // Photos: preserve user-defined order (do not sort)
+  // Users can reorder photos, so order is meaningful and must be preserved
   const normalizedPhotos = [...(payload.photos || [])]
     .filter(Boolean)
-    .sort() // Stable ordering
 
   // Items: stable ordering (sort by id), normalize item fields
   const normalizedItems = [...(payload.items || [])]

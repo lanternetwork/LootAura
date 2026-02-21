@@ -185,6 +185,73 @@ describe('Drafts API', () => {
       expect(hash1).not.toBe(hash2)
     })
 
+    it('should produce different hashes for same photos in different order', async () => {
+      const { normalizeDraftPayload } = await import('@/lib/draft/normalize')
+      const { createHash } = await import('crypto')
+
+      const photo1 = 'https://example.com/photo1.jpg'
+      const photo2 = 'https://example.com/photo2.jpg'
+      const photo3 = 'https://example.com/photo3.jpg'
+
+      // Same photos, different order
+      const payload1 = {
+        ...mockDraftPayload,
+        photos: [photo1, photo2, photo3],
+      }
+      const payload2 = {
+        ...mockDraftPayload,
+        photos: [photo3, photo1, photo2], // Different order
+      }
+
+      const normalized1 = normalizeDraftPayload(payload1)
+      const normalized2 = normalizeDraftPayload(payload2)
+
+      const hash1 = createHash('sha256')
+        .update(JSON.stringify(normalized1))
+        .digest('hex')
+      const hash2 = createHash('sha256')
+        .update(JSON.stringify(normalized2))
+        .digest('hex')
+
+      // Hashes should differ because photo order is meaningful
+      expect(hash1).not.toBe(hash2)
+      // Photos should preserve their original order
+      expect(normalized1.photos).toEqual([photo1, photo2, photo3])
+      expect(normalized2.photos).toEqual([photo3, photo1, photo2])
+    })
+
+    it('should produce same hash for same photos in same order', async () => {
+      const { normalizeDraftPayload } = await import('@/lib/draft/normalize')
+      const { createHash } = await import('crypto')
+
+      const photo1 = 'https://example.com/photo1.jpg'
+      const photo2 = 'https://example.com/photo2.jpg'
+
+      // Same photos, same order
+      const payload1 = {
+        ...mockDraftPayload,
+        photos: [photo1, photo2],
+      }
+      const payload2 = {
+        ...mockDraftPayload,
+        photos: [photo1, photo2], // Same order
+      }
+
+      const normalized1 = normalizeDraftPayload(payload1)
+      const normalized2 = normalizeDraftPayload(payload2)
+
+      const hash1 = createHash('sha256')
+        .update(JSON.stringify(normalized1))
+        .digest('hex')
+      const hash2 = createHash('sha256')
+        .update(JSON.stringify(normalized2))
+        .digest('hex')
+
+      // Hashes should match because photos are in the same order
+      expect(hash1).toBe(hash2)
+      expect(normalized1.photos).toEqual(normalized2.photos)
+    })
+
     it('should return version in response after successful write', async () => {
       // This test verifies that version is returned in the response
       // The actual version increment is tested in integration with the database

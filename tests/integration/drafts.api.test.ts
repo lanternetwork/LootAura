@@ -70,6 +70,7 @@ describe('Drafts API', () => {
       },
     ],
     currentStep: 3,
+    wantsPromotion: false,
   }
 
   beforeEach(() => {

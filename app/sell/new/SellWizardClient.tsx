@@ -606,16 +606,18 @@ export default function SellWizardClient({
     
     // Save to server when user logs in if we have any meaningful data
     // This allows partial drafts to be synced to the server
+    // Use attemptServerSave to inherit hash gate + single-flight protection
     const hasAnyData = !!(formData.title || formData.description || formData.address || 
                          formData.date_start || (photos && photos.length > 0) || 
                          (items && items.length > 0) || (formData.tags && formData.tags.length > 0))
     if (user && draftKeyRef.current && hasLocalDraft() && hasAnyData) {
-      const payload = buildDraftPayload()
-      saveDraftServer(payload, draftKeyRef.current).catch(() => {
-        // Silent fail - already saved locally
+      // Use attemptServerSave to inherit hash gate and single-flight protection
+      // This prevents unnecessary saves when content hasn't changed
+      attemptServerSave().catch(() => {
+        // Silent fail - already saved locally or hash unchanged
       })
     }
-  }, [user, buildDraftPayload, formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags])
+  }, [user, buildDraftPayload, formData.title, formData.description, formData.address, formData.date_start, photos, items, formData.tags, attemptServerSave])
 
   // Save draft to localStorage whenever form data changes
   useEffect(() => {

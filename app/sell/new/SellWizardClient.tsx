@@ -433,6 +433,7 @@ export default function SellWizardClient({
   const dirtySinceLastRequestRef = useRef<boolean>(false) // Flag to track if changes occurred while request in-flight
   const lastAckedContentHashRef = useRef<string | null>(null) // Server-acked content hash from last successful save
   const lastAckedVersionRef = useRef<number | null>(null) // Server-acked version from last successful save
+  const lastTextEditAtRef = useRef<number>(0) // Timestamp of last title/description edit (for pause-to-write)
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -702,6 +703,27 @@ export default function SellWizardClient({
         autosaveTimeoutRef.current = null
         attemptServerSave()
       }, backoffDelay)
+      return
+    }
+    
+    // Pause-to-write: If the most recent dirty change was a text edit (title/description),
+    // wait for user to pause typing (4-5 seconds) before writing to server
+    const TEXT_EDIT_PAUSE_MS = 4000 // 4 seconds pause after last text edit
+    const timeSinceLastTextEdit = now - lastTextEditAtRef.current
+    
+    if (lastTextEditAtRef.current > 0 && timeSinceLastTextEdit < TEXT_EDIT_PAUSE_MS) {
+      // Recent text edit detected - schedule save for when pause period elapses
+      const remainingPause = TEXT_EDIT_PAUSE_MS - timeSinceLastTextEdit
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
+      autosaveTimeoutRef.current = setTimeout(() => {
+        autosaveTimeoutRef.current = null
+        attemptServerSave()
+      }, remainingPause)
+      if (isDebugEnabled) {
+        console.log('[SELL_WIZARD] Autosave: Text edit pause active, scheduling save after', remainingPause, 'ms')
+      }
       return
     }
     
@@ -1285,6 +1307,14 @@ export default function SellWizardClient({
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
     
+    // Track text edits (title/description) for pause-to-write
+    if (field === 'title' || field === 'description') {
+      lastTextEditAtRef.current = Date.now()
+    } else {
+      // Reset text edit timestamp for non-text fields - they should save promptly
+      lastTextEditAtRef.current = 0
+    }
+    
     // For address field, use UPDATE_FORM to update only the address field
     // This is for manual typing - autocomplete uses ADDRESS_SELECTED instead
     if (field === 'address') {
@@ -1373,6 +1403,8 @@ export default function SellWizardClient({
   // Handler for autocomplete place selection - updates all address fields atomically
   // This is the authoritative source for address fields - no onChange is called after this
   const handlePlaceSelected = (place: { address?: string; city?: string; state?: string; zip?: string; lat?: number; lng?: number }) => {
+    // Reset text edit timestamp - address selection is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] handlePlaceSelected called:', { place })
     }
@@ -2206,11 +2238,15 @@ export default function SellWizardClient({
   }
 
   const handlePhotoUpload = useCallback((urls: string[]) => {
+    // Reset text edit timestamp - photo upload is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     // Replace photos array with new URLs (ImageUploadCard emits all done URLs)
     dispatch({ type: 'SET_PHOTOS', photos: urls })
   }, [])
 
   const handleReorderPhotos = (fromIndex: number, toIndex: number) => {
+    // Reset text edit timestamp - photo reorder is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     const next = [...photos]
     const [moved] = next.splice(fromIndex, 1)
     next.splice(toIndex, 0, moved)
@@ -2219,6 +2255,8 @@ export default function SellWizardClient({
 
   const handleSetCover = (index: number) => {
     if (index <= 0 || index >= photos.length) return
+    // Reset text edit timestamp - setting cover photo is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     const next = [...photos]
     const [moved] = next.splice(index, 1)
     next.unshift(moved)
@@ -2226,19 +2264,27 @@ export default function SellWizardClient({
   }
 
   const handleRemovePhoto = (index: number) => {
+    // Reset text edit timestamp - removing photo is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     dispatch({ type: 'SET_PHOTOS', photos: photos.filter((_, i) => i !== index) })
   }
 
   const handleAddItem = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => {
     if (items.length >= 50) return
+    // Reset text edit timestamp - adding item is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     dispatch({ type: 'ADD_ITEM', item })
   }, [items.length])
 
   const handleUpdateItem = useCallback((updated: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }) => {
+    // Reset text edit timestamp - updating item is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     dispatch({ type: 'UPDATE_ITEM', item: updated })
   }, [])
 
   const handleRemoveItem = useCallback((id: string) => {
+    // Reset text edit timestamp - removing item is not a text edit, should save promptly
+    lastTextEditAtRef.current = 0
     dispatch({ type: 'REMOVE_ITEM', id })
   }, [])
 

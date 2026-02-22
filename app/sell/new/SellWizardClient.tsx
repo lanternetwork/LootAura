@@ -2033,7 +2033,7 @@ export default function SellWizardClient({
       // CRITICAL: Save current draft payload (including wantsPromotion) before publishing
       // Use flushDraftBeforePublish to respect hash gate + single-flight
       // Wrap in async IIFE since useEffect callback cannot be async
-      ;(async () => {
+      (async () => {
         try {
           await flushDraftBeforePublish(draftKeyToPublish)
         } catch (error) {

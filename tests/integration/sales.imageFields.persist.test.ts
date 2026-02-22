@@ -260,6 +260,33 @@ describe('Sales API - Image Support', () => {
 		expect(data.error).toBe('Invalid cover_image_url')
 	})
 
+	it('should reject past date_start', async () => {
+		// Calculate yesterday's date in YYYY-MM-DD format
+		const yesterday = new Date()
+		yesterday.setUTCDate(yesterday.getUTCDate() - 1)
+		const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: yesterdayStr,
+			time_start: '09:00',
+		})
+
+		const response = await POST(request)
+		const data = await response.json()
+
+		expect(response.status).toBe(400)
+		expect(data.ok).toBe(false)
+		expect(data.code).toBe('INVALID_START_DATE')
+	})
+
 	it('should reject invalid image URLs in images array', async () => {
 		// Set mock to return false for the malicious URL
 		mockIsAllowedImageUrl.mockImplementation((url: string) => {

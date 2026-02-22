@@ -1919,6 +1919,73 @@ export default function SellWizardClient({
     }
   }, [router, createItemsForSale, toUserFacingSubmitError])
 
+  // Helper to flush draft before publish: respects hash gate + single-flight
+  // Waits for in-flight saves, checks hash, only saves if content changed
+  const flushDraftBeforePublish = useCallback(async (draftKey: string): Promise<void> => {
+    // Wait for any in-flight save to complete (single-flight protection)
+    // Poll with short intervals until save completes or timeout
+    const MAX_WAIT_MS = 2000 // Max 2 seconds wait
+    const POLL_INTERVAL_MS = 50
+    const startTime = Date.now()
+    
+    while (isSavingToServerRef.current && (Date.now() - startTime) < MAX_WAIT_MS) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+    }
+    
+    // Build and normalize payload
+    const payload = buildDraftPayload()
+    const normalizedPayload = normalizeDraftPayload(payload)
+    const normalizedJson = JSON.stringify(normalizedPayload)
+    
+    // Compute SHA256 hash using Web Crypto API (browser-compatible, matches server)
+    let contentHash: string
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      try {
+        const encoder = new TextEncoder()
+        const data = encoder.encode(normalizedJson)
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+        const hashArray = Array.from(new Uint8Array(hashBuffer))
+        contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+      } catch (error) {
+        // Hash computation failed - proceed with save as fallback
+        if (isDebugEnabled) {
+          console.warn('[SELL_WIZARD] Flush: Hash computation failed, proceeding with save', error)
+        }
+        contentHash = '' // Will not match, so save will proceed
+      }
+    } else {
+      // Fallback: simple hash (shouldn't happen in modern browsers)
+      contentHash = normalizedJson.split('').reduce((acc, char) => {
+        const hash = ((acc << 5) - acc) + char.charCodeAt(0)
+        return hash & hash
+      }, 0).toString(16)
+    }
+    
+    // Check if content hash matches last acked hash
+    if (lastAckedContentHashRef.current && contentHash === lastAckedContentHashRef.current) {
+      // Content hash unchanged - no need to save
+      if (isDebugEnabled) {
+        console.log('[SELL_WIZARD] Flush: Content hash unchanged, skipping server save before publish')
+      }
+      return
+    }
+    
+    // Hash differs - need to save before publish
+    // Use ifVersion for optimistic concurrency control
+    const ifVersion = lastAckedVersionRef.current ?? undefined
+    const result = await saveDraftServer(payload, draftKey, ifVersion)
+    
+    // Update ack refs from response
+    if (result.ok && result.data) {
+      if (result.data.contentHash) {
+        lastAckedContentHashRef.current = result.data.contentHash
+      }
+      if (result.data.version !== undefined) {
+        lastAckedVersionRef.current = result.data.version
+      }
+    }
+  }, [buildDraftPayload, normalizeDraftPayload, isDebugEnabled])
+
   // Auto-resume after login (resume=1 param)
   // If user returns after login and has a draft, auto-publish it
   useEffect(() => {
@@ -1964,18 +2031,17 @@ export default function SellWizardClient({
       }
       
       // CRITICAL: Save current draft payload (including wantsPromotion) before publishing
-      const currentPayload = buildDraftPayload()
-      saveDraftServer(currentPayload, draftKeyToPublish)
-        .then(() => {
-          // After save completes, publish the draft
-          return publishDraftServer(draftKeyToPublish)
-        })
-        .catch((error) => {
-          // If save fails, log warning but continue with publish anyway
-          console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
-          // Continue with publish - might already exist on server
-          return publishDraftServer(draftKeyToPublish)
-        })
+      // Use flushDraftBeforePublish to respect hash gate + single-flight
+      try {
+        await flushDraftBeforePublish(draftKeyToPublish)
+      } catch (error) {
+        // If save fails, log warning but continue with publish anyway
+        console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
+        // Continue with publish - might already exist on server
+      }
+      
+      // After save completes (or skipped if hash unchanged), publish the draft
+      publishDraftServer(draftKeyToPublish)
         .then((result) => {
           if (result.ok && result.data && 'saleId' in result.data) {
             clearLocalDraft()
@@ -2085,9 +2151,9 @@ export default function SellWizardClient({
       }
       
       // First, ensure draft is saved to server (in case it's only local)
-      const localPayload = buildDraftPayload()
+      // Use flushDraftBeforePublish to respect hash gate + single-flight
       try {
-        await saveDraftServer(localPayload, draftKeyRef.current)
+        await flushDraftBeforePublish(draftKeyRef.current)
       } catch (error) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.warn('[SELL_WIZARD] Failed to save draft to server before publish:', error)

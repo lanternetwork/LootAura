@@ -24,7 +24,6 @@ export const CSRF_PROTECTED_ROUTES = [
   '/api/favorites', // POST/DELETE
   '/api/items', // POST/PUT/DELETE
   '/api/items_v2', // POST/PUT/DELETE
-  '/api/sales_v2', // POST/PUT/DELETE
   '/api/v2/sales', // POST
   '/api/v2/profiles', // POST
   '/api/preferences', // PUT

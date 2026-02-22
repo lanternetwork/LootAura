@@ -1,11 +1,24 @@
 import { cookies } from 'next/headers'
-import { randomBytes } from 'crypto'
 
 const CSRF_TOKEN_COOKIE = 'csrf-token'
 const CSRF_HEADER = 'x-csrf-token'
 
+/**
+ * Generate a CSRF token using Web Crypto API (Edge-compatible)
+ * 
+ * Generates 32 random bytes and encodes them as a 64-character hex string.
+ * This matches the previous Node crypto.randomBytes() output format for compatibility.
+ */
 export function generateCsrfToken(): string {
-  return randomBytes(32).toString('hex')
+  // Use Web Crypto API (available in Edge runtime and Node.js)
+  // Generate 32 random bytes (same as randomBytes(32))
+  const bytes = new Uint8Array(32)
+  globalThis.crypto.getRandomValues(bytes)
+  
+  // Convert to hex string (same format as randomBytes().toString('hex'))
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 export function setCsrfToken(token: string): void {

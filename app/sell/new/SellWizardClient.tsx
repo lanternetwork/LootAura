@@ -1048,13 +1048,16 @@ export default function SellWizardClient({
       }
       
       saveLocalDraft(payload)
-      // Save to server if we have any meaningful data (allows partial drafts to sync)
-      // Server-side validation will handle empty drafts
+      // Save to server using attemptServerSave to inherit hash gate + single-flight protection
+      // This prevents redundant server writes when content hasn't changed
+      // Best-effort: fire and forget, don't block unload
       if (user && draftKeyRef.current) {
-        // Fire and forget - don't wait for response
-        // Include ifVersion for optimistic concurrency control
-        const ifVersion = lastAckedVersionRef.current ?? undefined
-        saveDraftServer(payload, draftKeyRef.current, ifVersion).catch(() => {})
+        // Use attemptServerSave to inherit hash gate and single-flight protection
+        // If hash matches, it will skip the server call entirely
+        // If hash differs, it will attempt a best-effort save (async, won't block unload)
+        attemptServerSave().catch(() => {
+          // Silent fail - best effort only, don't block unload
+        })
       }
     }
 

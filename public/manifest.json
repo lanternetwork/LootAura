@@ -14,16 +14,28 @@
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icons/icon-192-v2.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/icon-512-v2.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192-v2.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512-v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["shopping", "lifestyle", "utilities"],
@@ -54,7 +66,7 @@
       "url": "/explore",
       "icons": [
         {
-          "src": "/icons/icon-192.png",
+          "src": "/icons/icon-192-v2.png",
           "sizes": "192x192"
         }
       ]
@@ -66,7 +78,7 @@
       "url": "/explore?tab=add",
       "icons": [
         {
-          "src": "/icons/icon-192.png",
+          "src": "/icons/icon-192-v2.png",
           "sizes": "192x192"
         }
       ]
@@ -78,7 +90,7 @@
       "url": "/favorites",
       "icons": [
         {
-          "src": "/icons/icon-192.png",
+          "src": "/icons/icon-192-v2.png",
           "sizes": "192x192"
         }
       ]

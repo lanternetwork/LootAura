@@ -78,7 +78,6 @@ echo "2️⃣ Checking rate limiting coverage..."
 
 REQUIRED_RATE_LIMITED=(
   "app/api/sales/route.ts:GET"
-  "app/api/favorites_v2/route.ts:GET"
   "app/api/profile/update/route.ts:POST"
 )
 

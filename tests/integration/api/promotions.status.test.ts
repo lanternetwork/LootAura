@@ -255,13 +255,12 @@ describe('GET /api/promotions/status', () => {
   })
 
   it('respects MAX_SALE_IDS cap by limiting to 100 unique IDs', async () => {
-    // Generate 150 valid UUIDs using a format that Zod's UUID validator accepts
-    // Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (32 hex digits total)
+    // Generate 150 valid UUIDs by using a base UUID and incrementing the last segment
+    // This ensures all UUIDs are valid and unique
     const ids = Array.from({ length: 150 }, (_, i) => {
-      // Generate a unique 32-character hex string for each UUID
-      const hex = i.toString(16).padStart(32, '0')
-      // Split into UUID format: 8-4-4-4-12
-      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
+      const hex = i.toString(16).padStart(12, '0')
+      // Use a known valid UUID format: 550e8400-e29b-41d4-a716-{unique}
+      return `550e8400-e29b-41d4-a716-${hex}`
     }).join(',')
     const request = new NextRequest(
       `http://localhost/api/promotions/status?sale_ids=${encodeURIComponent(ids)}`,

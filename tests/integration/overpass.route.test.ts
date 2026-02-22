@@ -411,5 +411,79 @@ describe('Overpass Address Route Integration', () => {
     // Reset mock for next test
     mockFetch.mockClear()
   })
+
+  it('should handle query with + signs (URL encoded spaces)', async () => {
+    const mockElements = Array.from({ length: 5 }, (_, i) => ({
+      type: 'node' as const,
+      id: i + 1,
+      lat: 38.2512 + (i * 0.001),
+      lon: -85.7494 + (i * 0.001),
+      tags: {
+        'addr:housenumber': `5009`,
+        'addr:street': 'Preston Highway',
+        'addr:city': 'Louisville',
+        'addr:state': 'KY',
+        'addr:postcode': '40219',
+        'addr:country': 'US'
+      }
+    }))
+    
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        elements: mockElements
+      })
+    })
+
+    // Test with + signs (should be normalized to spaces)
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=5009+Preston+Highway&lat=38.25&lng=-85.75&limit=2')
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.code).toBeUndefined()
+    expect(Array.isArray(data.data)).toBe(true)
+    
+    mockFetch.mockClear()
+  })
+
+  it('should handle query with spaces', async () => {
+    const mockElements = Array.from({ length: 5 }, (_, i) => ({
+      type: 'node' as const,
+      id: i + 1,
+      lat: 38.2512 + (i * 0.001),
+      lon: -85.7494 + (i * 0.001),
+      tags: {
+        'addr:housenumber': `5009`,
+        'addr:street': 'Preston Highway',
+        'addr:city': 'Louisville',
+        'addr:state': 'KY',
+        'addr:postcode': '40219',
+        'addr:country': 'US'
+      }
+    }))
+    
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        elements: mockElements
+      })
+    })
+
+    // Test with URL-encoded spaces (%20)
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=5009%20Preston%20Highway&lat=38.25&lng=-85.75&limit=2')
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.code).toBeUndefined()
+    expect(Array.isArray(data.data)).toBe(true)
+    
+    mockFetch.mockClear()
+  })
 })
 

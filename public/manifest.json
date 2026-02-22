@@ -8,12 +8,6 @@
   "description": "Discover local yard sales, garage sales, and estate sales in your area. Never miss a great deal again!",
   "icons": [
     {
-      "src": "/icons/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
       "src": "/icons/icon-192-v2.png",
       "sizes": "192x192",
       "type": "image/png",

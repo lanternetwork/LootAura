@@ -607,5 +607,4 @@ See [Production Environment Variables](./PRODUCTION_ENV.md) for full configurati
 
 - [Resend Documentation](https://resend.com/docs)
 - [React Email Documentation](https://react.email/docs)
-- [Database RLS Audit](./db_rls_audit.md) - For user data access patterns
 

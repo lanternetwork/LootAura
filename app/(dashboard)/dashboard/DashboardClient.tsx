@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
@@ -41,23 +41,11 @@ export default function DashboardClient({
   const handleDraftPublish = (_draftKey: string, _saleId: string) => {
     // Remove draft from list on successful publish
     setDrafts((prev) => prev.filter((d) => d.draft_key !== _draftKey))
-    // Emit revalidation event
+    // Emit revalidation event to trigger page refresh
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'create', id: _saleId } }))
     }
-    // Refresh sales to show the new sale
-    fetch('/api/sales_v2?my_sales=true')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.sales && Array.isArray(data.sales)) {
-          setSales(data.sales as Sale[])
-        }
-      })
-      .catch((err) => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('[DASHBOARD_CLIENT] Error refreshing sales:', err)
-        }
-      })
+    // Sales will be refreshed via server-side revalidation on next navigation
   }
 
   const handleRetryDrafts = async () => {
@@ -84,31 +72,6 @@ export default function DashboardClient({
       setDraftsLoading(false)
     }
   }
-
-
-  // If no sales from server, fetch from API (fallback)
-  useEffect(() => {
-    if (initialSales && initialSales.length > 0) {
-      return // Server data is good
-    }
-
-    // Fallback: fetch from API
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[DASHBOARD_CLIENT] No sales from server - fetching from API...')
-    }
-    fetch('/api/sales_v2?my_sales=true')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.sales && Array.isArray(data.sales) && data.sales.length > 0) {
-          setSales(data.sales as Sale[])
-        }
-      })
-      .catch((err) => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('[DASHBOARD_CLIENT] API fetch error:', err)
-        }
-      })
-  }, [initialSales])
 
   const { data: profile } = useProfile()
 

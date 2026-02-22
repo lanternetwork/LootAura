@@ -2032,16 +2032,18 @@ export default function SellWizardClient({
       
       // CRITICAL: Save current draft payload (including wantsPromotion) before publishing
       // Use flushDraftBeforePublish to respect hash gate + single-flight
-      try {
-        await flushDraftBeforePublish(draftKeyToPublish)
-      } catch (error) {
-        // If save fails, log warning but continue with publish anyway
-        console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
-        // Continue with publish - might already exist on server
-      }
-      
-      // After save completes (or skipped if hash unchanged), publish the draft
-      publishDraftServer(draftKeyToPublish)
+      // Wrap in async IIFE since useEffect callback cannot be async
+      ;(async () => {
+        try {
+          await flushDraftBeforePublish(draftKeyToPublish)
+        } catch (error) {
+          // If save fails, log warning but continue with publish anyway
+          console.warn('[SELL_WIZARD] Failed to save draft to server before auto-publish:', error)
+          // Continue with publish - might already exist on server
+        }
+        
+        // After save completes (or skipped if hash unchanged), publish the draft
+        publishDraftServer(draftKeyToPublish)
         .then((result) => {
           if (result.ok && result.data && 'saleId' in result.data) {
             clearLocalDraft()
@@ -2063,8 +2065,9 @@ export default function SellWizardClient({
         .finally(() => {
           dispatch({ type: 'SET_LOADING', loading: false })
         })
+      })()
     }
-  }, [searchParams, user, formData, buildDraftPayload, dispatch, setToastMessage, setShowToast, setCreatedSaleId, setConfirmationModalOpen])
+  }, [searchParams, user, formData, buildDraftPayload, dispatch, setToastMessage, setShowToast, setCreatedSaleId, setConfirmationModalOpen, flushDraftBeforePublish])
 
   const handleSubmit = async () => {
     const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true'

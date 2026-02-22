@@ -255,11 +255,11 @@ describe('GET /api/promotions/status', () => {
   })
 
   it('respects MAX_SALE_IDS cap by limiting to 100 unique IDs', async () => {
-    // Generate 150 valid UUIDs in v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    // Generate 150 valid UUIDs (simple format, not v4, but still valid UUIDs)
     const ids = Array.from({ length: 150 }, (_, i) => {
       const hex = i.toString(16).padStart(12, '0')
-      // Format: 8-4-4-4-12 hex digits, with version 4 indicator
-      return `00000000-0000-4000-8000-${hex.padStart(12, '0')}`
+      // Format: 8-4-4-4-12 hex digits (valid UUID format)
+      return `00000000-0000-0000-0000-${hex}`
     }).join(',')
     const request = new NextRequest(
       `http://localhost/api/promotions/status?sale_ids=${encodeURIComponent(ids)}`,
@@ -295,5 +295,34 @@ describe('GET /api/promotions/status', () => {
     expect(Object.keys(status).sort()).toEqual(
       ['ends_at', 'is_active', 'sale_id', 'tier'].sort()
     )
+  })
+
+  it('returns 400 for invalid UUIDs', async () => {
+    const request = new NextRequest(
+      'http://localhost/api/promotions/status?sale_ids=invalid-uuid,not-a-uuid',
+      { method: 'GET' }
+    )
+
+    const res = await handler(request)
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.code).toBe('INVALID_REQUEST')
+    expect(json.message).toBe('Invalid sale_ids')
+  })
+
+  it('returns 400 when mixing valid and invalid UUIDs', async () => {
+    const validUuid = '00000000-0000-0000-0000-000000000001'
+    const request = new NextRequest(
+      `http://localhost/api/promotions/status?sale_ids=${validUuid},invalid-uuid`,
+      { method: 'GET' }
+    )
+
+    const res = await handler(request)
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.code).toBe('INVALID_REQUEST')
+    expect(json.message).toBe('Invalid sale_ids')
   })
 })

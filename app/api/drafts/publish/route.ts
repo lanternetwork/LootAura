@@ -119,6 +119,14 @@ export async function POST(request: NextRequest) {
       return fail(400, 'MISSING_START_TIME', 'Start time is required')
     }
 
+    // Validate date_start is not in the past (UTC-based)
+    const todayUtc = new Date()
+    todayUtc.setUTCHours(0, 0, 0, 0)
+    const startDateUtc = new Date(formData.date_start + 'T00:00:00Z')
+    if (startDateUtc < todayUtc) {
+      return fail(400, 'INVALID_START_DATE', 'Start date cannot be in the past')
+    }
+
     // Backward compatibility: default date_end to date_start if missing
     let finalDateEnd: string = (formData.date_end && formData.date_end.trim()) || ''
     let finalTimeEnd: string = (formData.time_end && formData.time_end.trim()) || ''

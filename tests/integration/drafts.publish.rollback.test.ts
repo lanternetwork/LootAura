@@ -348,4 +348,50 @@ describe('Draft publish rollback', () => {
       )
     })
   })
+
+  describe('Date validation', () => {
+    it('rejects publishing with past start date', async () => {
+      // Calculate yesterday's date in YYYY-MM-DD format
+      const yesterday = new Date()
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1)
+      const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+      // Create draft payload with yesterday's date
+      const pastDatePayload = {
+        ...createDraftPayload(),
+        formData: {
+          ...createDraftPayload().formData,
+          date_start: yesterdayStr,
+        },
+      }
+
+      // Mock successful draft lookup
+      mockDraftChain.maybeSingle.mockResolvedValue({
+        data: {
+          id: draftId,
+          draft_key: 'test-draft-key-past-date',
+          user_id: userId,
+          status: 'active',
+          payload: pastDatePayload,
+        },
+        error: null,
+      })
+
+      // Call the publish endpoint
+      const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
+        draftKey: 'test-draft-key-past-date',
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      // Publish should fail with INVALID_START_DATE
+      expect(response.status).toBe(400)
+      expect(data.ok).toBe(false)
+      expect(data.code).toBe('INVALID_START_DATE')
+
+      // Verify no rollback was called (validation happens before any DB writes)
+      expect(mockDeleteSaleAndItemsForRollback).not.toHaveBeenCalled()
+    })
+  })
 })

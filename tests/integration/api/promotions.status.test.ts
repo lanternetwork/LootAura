@@ -255,12 +255,12 @@ describe('GET /api/promotions/status', () => {
   })
 
   it('respects MAX_SALE_IDS cap by limiting to 100 unique IDs', async () => {
-    // Generate 150 valid UUIDs by using a base UUID and incrementing the last segment
-    // This ensures all UUIDs are valid and unique
-    const ids = Array.from({ length: 150 }, (_, i) => {
+    // Generate 105 valid UUIDs (enough to test the cap, but under MAX_SALE_IDS_PARAM_LENGTH)
+    // Each UUID is 36 chars, so 105 UUIDs = 105*36 + 104 commas = 3884 chars (under 4000 limit)
+    // Format: 00000000-0000-0000-0000-{12 hex digits}
+    const ids = Array.from({ length: 105 }, (_, i) => {
       const hex = i.toString(16).padStart(12, '0')
-      // Use a known valid UUID format: 550e8400-e29b-41d4-a716-{unique}
-      return `550e8400-e29b-41d4-a716-${hex}`
+      return `00000000-0000-0000-0000-${hex}`
     }).join(',')
     const request = new NextRequest(
       `http://localhost/api/promotions/status?sale_ids=${encodeURIComponent(ids)}`,

@@ -52,7 +52,12 @@ if (process.env.NODE_ENV === 'test') {
 async function overpassHandler(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const q = searchParams.get('q')?.trim() || ''
+    let q = searchParams.get('q') || ''
+    
+    // Normalize whitespace: replace + with space (defensive URL encoding handling),
+    // collapse multiple whitespace to single space, then trim
+    q = q.replace(/\+/g, ' ').replace(/\s+/g, ' ').trim()
+    
     const latParam = searchParams.get('lat')
     const lngParam = searchParams.get('lng')
     const limitParam = searchParams.get('limit')

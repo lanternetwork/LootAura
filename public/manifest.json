@@ -1,6 +1,7 @@
 {
   "name": "Loot Aura - Find Amazing Yard Sale Treasures",
   "short_name": "Loot Aura",
+  "id": "/?pwa=2",
   "display": "standalone",
   "start_url": "/",
   "background_color": "#ffffff",

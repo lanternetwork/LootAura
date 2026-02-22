@@ -255,11 +255,13 @@ describe('GET /api/promotions/status', () => {
   })
 
   it('respects MAX_SALE_IDS cap by limiting to 100 unique IDs', async () => {
-    // Generate 150 valid UUIDs (simple format, not v4, but still valid UUIDs)
+    // Generate 150 valid UUIDs using a format that Zod's UUID validator accepts
+    // Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (32 hex digits total)
     const ids = Array.from({ length: 150 }, (_, i) => {
-      const hex = i.toString(16).padStart(12, '0')
-      // Format: 8-4-4-4-12 hex digits (valid UUID format)
-      return `00000000-0000-0000-0000-${hex}`
+      // Generate a unique 32-character hex string for each UUID
+      const hex = i.toString(16).padStart(32, '0')
+      // Split into UUID format: 8-4-4-4-12
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
     }).join(',')
     const request = new NextRequest(
       `http://localhost/api/promotions/status?sale_ids=${encodeURIComponent(ids)}`,
@@ -308,7 +310,7 @@ describe('GET /api/promotions/status', () => {
 
     expect(res.status).toBe(400)
     expect(json.code).toBe('INVALID_REQUEST')
-    expect(json.message).toBe('Invalid sale_ids')
+    expect(json.error).toBe('Invalid sale_ids')
   })
 
   it('returns 400 when mixing valid and invalid UUIDs', async () => {
@@ -323,6 +325,6 @@ describe('GET /api/promotions/status', () => {
 
     expect(res.status).toBe(400)
     expect(json.code).toBe('INVALID_REQUEST')
-    expect(json.message).toBe('Invalid sale_ids')
+    expect(json.error).toBe('Invalid sale_ids')
   })
 })

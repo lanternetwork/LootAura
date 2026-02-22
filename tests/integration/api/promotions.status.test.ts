@@ -78,12 +78,13 @@ describe('GET /api/promotions/status', () => {
     mockSupabaseClient.schema.mockReturnValue(mockRlsDb)
 
     // Configure mockRlsDb.from to return a chainable query for promotions
+    const defaultSaleId = '00000000-0000-0000-0000-000000000001'
     mockRlsDb.from.mockImplementation((table: string) => {
       if (table === 'promotions') {
         const result = {
           data: [
             {
-              sale_id: 'sale-1',
+              sale_id: defaultSaleId,
               status: 'active',
               tier: 'featured_week',
               ends_at: '2030-01-01T00:00:00.000Z',
@@ -120,7 +121,7 @@ describe('GET /api/promotions/status', () => {
             Promise.resolve({
               data: [
                 {
-                  sale_id: 'sale-1',
+                  sale_id: defaultSaleId,
                   status: 'active',
                   tier: 'featured_week',
                   ends_at: '2030-01-01T00:00:00.000Z',
@@ -148,7 +149,7 @@ describe('GET /api/promotions/status', () => {
 
   it('requires authentication', async () => {
     currentUser = null
-    const request = new NextRequest('http://localhost/api/promotions/status?sale_ids=sale-1', {
+    const request = new NextRequest('http://localhost/api/promotions/status?sale_ids=00000000-0000-0000-0000-000000000001', {
       method: 'GET',
     })
 
@@ -165,6 +166,9 @@ describe('GET /api/promotions/status', () => {
     })
 
     // Configure promotions query to include both owned and non-owned promotions
+    const saleId1 = '00000000-0000-0000-0000-000000000001'
+    const saleId2 = '00000000-0000-0000-0000-000000000002'
+    
     mockRlsDb.from.mockImplementation((table: string) => {
       if (table === 'promotions') {
         const chain: any = {}
@@ -175,7 +179,7 @@ describe('GET /api/promotions/status', () => {
             const result = {
               data: [
                 {
-                  sale_id: 'sale-1',
+                  sale_id: saleId1,
                   status: 'active',
                   tier: 'featured_week',
                   ends_at: '2030-01-01T00:00:00.000Z',
@@ -213,7 +217,7 @@ describe('GET /api/promotions/status', () => {
             return Promise.resolve({
               data: [
                 {
-                  sale_id: 'sale-1',
+                  sale_id: saleId1,
                   status: 'active',
                   tier: 'featured_week',
                   ends_at: '2030-01-01T00:00:00.000Z',
@@ -237,7 +241,7 @@ describe('GET /api/promotions/status', () => {
     })
 
     const request = new NextRequest(
-      'http://localhost/api/promotions/status?sale_ids=sale-1,sale-2',
+      `http://localhost/api/promotions/status?sale_ids=${saleId1},${saleId2}`,
       { method: 'GET' }
     )
 
@@ -247,11 +251,17 @@ describe('GET /api/promotions/status', () => {
     expect(res.status).toBe(200)
     expect(Array.isArray(json.statuses)).toBe(true)
     expect(json.statuses).toHaveLength(1)
-    expect(json.statuses[0].sale_id).toBe('sale-1')
+    expect(json.statuses[0].sale_id).toBe(saleId1)
   })
 
   it('respects MAX_SALE_IDS cap by limiting to 100 unique IDs', async () => {
-    const ids = Array.from({ length: 150 }, (_, i) => `sale-${i + 1}`).join(',')
+    // Generate 105 valid UUIDs (enough to test the cap, but under MAX_SALE_IDS_PARAM_LENGTH)
+    // Each UUID is 36 chars, so 105 UUIDs = 105*36 + 104 commas = 3884 chars (under 4000 limit)
+    // Format: 00000000-0000-0000-0000-{12 hex digits}
+    const ids = Array.from({ length: 105 }, (_, i) => {
+      const hex = i.toString(16).padStart(12, '0')
+      return `00000000-0000-0000-0000-${hex}`
+    }).join(',')
     const request = new NextRequest(
       `http://localhost/api/promotions/status?sale_ids=${encodeURIComponent(ids)}`,
       { method: 'GET' }
@@ -271,8 +281,9 @@ describe('GET /api/promotions/status', () => {
   })
 
   it('returns minimal response shape', async () => {
+    const saleId1 = '00000000-0000-0000-0000-000000000001'
     const request = new NextRequest(
-      'http://localhost/api/promotions/status?sale_ids=sale-1',
+      `http://localhost/api/promotions/status?sale_ids=${saleId1}`,
       { method: 'GET' }
     )
 
@@ -285,5 +296,34 @@ describe('GET /api/promotions/status', () => {
     expect(Object.keys(status).sort()).toEqual(
       ['ends_at', 'is_active', 'sale_id', 'tier'].sort()
     )
+  })
+
+  it('returns 400 for invalid UUIDs', async () => {
+    const request = new NextRequest(
+      'http://localhost/api/promotions/status?sale_ids=invalid-uuid,not-a-uuid',
+      { method: 'GET' }
+    )
+
+    const res = await handler(request)
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.code).toBe('INVALID_REQUEST')
+    expect(json.error).toBe('Invalid sale_ids')
+  })
+
+  it('returns 400 when mixing valid and invalid UUIDs', async () => {
+    const validUuid = '00000000-0000-0000-0000-000000000001'
+    const request = new NextRequest(
+      `http://localhost/api/promotions/status?sale_ids=${validUuid},invalid-uuid`,
+      { method: 'GET' }
+    )
+
+    const res = await handler(request)
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.code).toBe('INVALID_REQUEST')
+    expect(json.error).toBe('Invalid sale_ids')
   })
 })

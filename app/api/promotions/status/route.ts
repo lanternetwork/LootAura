@@ -11,6 +11,7 @@
  */
 
 import { NextRequest } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
@@ -149,6 +150,22 @@ export async function GET(request: NextRequest) {
       return ok({ statuses: [] })
     }
 
+    // Validate all sale_ids are valid UUIDs before querying
+    // This prevents 500 errors from Postgres type casting failures
+    const uuidSchema = z.string().uuid()
+    const invalidIds = saleIds.filter(id => {
+      try {
+        uuidSchema.parse(id)
+        return false
+      } catch {
+        return true
+      }
+    })
+
+    if (invalidIds.length > 0) {
+      return fail(400, 'INVALID_REQUEST', 'Invalid sale_ids')
+    }
+
     // CRITICAL: Load session into the SAME client instance before using .schema()
     // This ensures the JWT is available for RLS policies when using schema-scoped client
     try {
@@ -199,12 +216,25 @@ export async function GET(request: NextRequest) {
     const { data: promotions, error } = await query
 
     if (error) {
+      // Improve error logging: extract structured fields from Supabase error object
+      // This prevents [object Object] serialization issues
+      const errorDetails = {
+        code: (error as any)?.code || 'UNKNOWN',
+        message: (error as any)?.message || String(error),
+        details: (error as any)?.details || null,
+        hint: (error as any)?.hint || null,
+      }
+      
       logger.error(
         'Failed to query promotions for status',
-        error instanceof Error ? error : new Error(String(error)),
+        error instanceof Error ? error : new Error(errorDetails.message),
         {
           component: 'promotions/status',
           operation: 'fetch_status',
+          errorCode: errorDetails.code,
+          errorMessage: errorDetails.message,
+          errorDetails: errorDetails.details,
+          errorHint: errorDetails.hint,
         }
       )
       return fail(500, 'DATABASE_ERROR', 'Failed to fetch promotion status')
@@ -215,12 +245,24 @@ export async function GET(request: NextRequest) {
 
     return ok({ statuses })
   } catch (error) {
+    // Improve error logging: extract structured fields from error object
+    const errorDetails = {
+      code: (error as any)?.code || 'UNKNOWN',
+      message: error instanceof Error ? error.message : String(error),
+      details: (error as any)?.details || null,
+      hint: (error as any)?.hint || null,
+    }
+    
     logger.error(
       'Unexpected error in promotions status handler',
-      error instanceof Error ? error : new Error(String(error)),
+      error instanceof Error ? error : new Error(errorDetails.message),
       {
         component: 'promotions/status',
         operation: 'GET',
+        errorCode: errorDetails.code,
+        errorMessage: errorDetails.message,
+        errorDetails: errorDetails.details,
+        errorHint: errorDetails.hint,
       }
     )
     return fail(500, 'INTERNAL_ERROR', 'Internal server error')

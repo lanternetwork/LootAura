@@ -2,6 +2,25 @@ import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/react-native';
+import Constants from 'expo-constants';
+
+// Initialize Sentry only in production builds
+// EXPO_PUBLIC_SENTRY_DSN is injected at build time via EAS env vars
+const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (!__DEV__ && sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    enableInExpoDevelopment: false,
+    environment: 'production',
+    // Privacy: Do not send PII
+    sendDefaultPii: false,
+    // Release tagging: com.lootaura.app@version+versionCode
+    release: `com.lootaura.app@${Constants.expoConfig?.version || 'unknown'}+${Constants.expoConfig?.android?.versionCode || 'unknown'}`,
+    // Performance monitoring
+    tracesSampleRate: 0.1,
+  });
+}
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();

@@ -156,6 +156,11 @@ function createRequestWithCsrf(url: string, body: any): NextRequest {
 
 // Helper to create a draft payload
 function createDraftPayload() {
+  // Use a future date to avoid past date validation
+  const futureDate = new Date()
+  futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+  const futureDateStr = futureDate.toISOString().split('T')[0]
+
   return {
     formData: {
       title: 'Test Sale',
@@ -166,9 +171,9 @@ function createDraftPayload() {
       zip_code: '12345',
       lat: 40.7128,
       lng: -74.0060,
-      date_start: '2025-12-01',
+      date_start: futureDateStr,
       time_start: '09:00',
-      date_end: '2025-12-01',
+      date_end: futureDateStr,
       time_end: '17:00',
       pricing_mode: 'negotiable' as const,
     },

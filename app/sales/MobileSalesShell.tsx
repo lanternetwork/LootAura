@@ -696,7 +696,14 @@ export default function MobileSalesShell({
               const cookies = document.cookie.split(';')
               const laLocCookie = cookies.find(c => c.trim().startsWith('la_loc='))
               if (laLocCookie) {
-                const value = laLocCookie.split('=')[1]
+                // Extract value robustly: find first '=' and take everything after it
+                // This handles cases where the cookie value itself contains '='
+                const equalIndex = laLocCookie.indexOf('=')
+                if (equalIndex === -1) {
+                  // No '=' found - invalid cookie format, treat as missing
+                  return null
+                }
+                const value = laLocCookie.substring(equalIndex + 1).trim()
                 let parsed: any = null
                 
                 // First attempt: try decoding (for encoded values from SalesClient)

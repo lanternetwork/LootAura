@@ -114,12 +114,17 @@ describe('POST /api/sales - RLS Error Handling', () => {
       error: { code: '42501', message: 'new row violates row-level security policy' },
     })
 
+    // Use a future date to avoid past date validation
+    const futureDate = new Date()
+    futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+
     const requestBody = {
       title: 'Test Sale',
       city: 'Test City',
       state: 'TS',
       address: '123 Test St',
-      date_start: '2024-01-01',
+      date_start: futureDateStr,
       time_start: '10:00',
       lat: 40.7128,
       lng: -74.0060,
@@ -153,12 +158,17 @@ describe('POST /api/sales - RLS Error Handling', () => {
       error: { code: 'PGRST301', message: 'permission denied' },
     })
 
+    // Use a future date to avoid past date validation
+    const futureDate = new Date()
+    futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+
     const requestBody = {
       title: 'Test Sale',
       city: 'Test City',
       state: 'TS',
       address: '123 Test St',
-      date_start: '2024-01-01',
+      date_start: futureDateStr,
       time_start: '10:00',
       lat: 40.7128,
       lng: -74.0060,
@@ -186,12 +196,17 @@ describe('POST /api/sales - RLS Error Handling', () => {
       error: { message: 'permission denied for table sales' },
     })
 
+    // Use a future date to avoid past date validation
+    const futureDate = new Date()
+    futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+
     const requestBody = {
       title: 'Test Sale',
       city: 'Test City',
       state: 'TS',
       address: '123 Test St',
-      date_start: '2024-01-01',
+      date_start: futureDateStr,
       time_start: '10:00',
       lat: 40.7128,
       lng: -74.0060,
@@ -219,12 +234,17 @@ describe('POST /api/sales - RLS Error Handling', () => {
       error: { code: 'PGRST204', message: 'Column does not exist' },
     })
 
+    // Use a future date to avoid past date validation
+    const futureDate = new Date()
+    futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+
     const requestBody = {
       title: 'Test Sale',
       city: 'Test City',
       state: 'TS',
       address: '123 Test St',
-      date_start: '2024-01-01',
+      date_start: futureDateStr,
       time_start: '10:00',
       lat: 40.7128,
       lng: -74.0060,

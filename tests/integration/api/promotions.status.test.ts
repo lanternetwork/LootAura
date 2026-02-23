@@ -297,4 +297,33 @@ describe('GET /api/promotions/status', () => {
       ['ends_at', 'is_active', 'sale_id', 'tier'].sort()
     )
   })
+
+  it('returns 400 for invalid UUIDs', async () => {
+    const request = new NextRequest(
+      'http://localhost/api/promotions/status?sale_ids=invalid-uuid,not-a-uuid',
+      { method: 'GET' }
+    )
+
+    const res = await handler(request)
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.code).toBe('INVALID_REQUEST')
+    expect(json.error).toBe('Invalid sale_ids')
+  })
+
+  it('returns 400 when mixing valid and invalid UUIDs', async () => {
+    const validUuid = '00000000-0000-0000-0000-000000000001'
+    const request = new NextRequest(
+      `http://localhost/api/promotions/status?sale_ids=${validUuid},invalid-uuid`,
+      { method: 'GET' }
+    )
+
+    const res = await handler(request)
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.code).toBe('INVALID_REQUEST')
+    expect(json.error).toBe('Invalid sale_ids')
+  })
 })

@@ -80,8 +80,6 @@ if (!sourcemapPath) {
       ignore: [
         '**/node_modules/**',
         '**/.git/**',
-        '**/.expo/**',
-        '**/dist/**',
         '**/build/**/test/**',
         '**/build/**/tests/**',
       ],

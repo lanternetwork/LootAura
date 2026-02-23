@@ -164,30 +164,6 @@ export default function SalesClient({
     }
   }, [])
   
-  // Write la_loc from initialCenter ONLY if:
-  // - Desktop (not mobile), OR
-  // - Mobile but NOT IP-derived (i.e., resolvedViewport.source !== 'geo')
-  // This prevents persisting IP-derived location on mobile cold start
-  useEffect(() => {
-    if (!initialCenter) return
-    
-    // On mobile, skip writing cookie from initialCenter if GPS is expected (IP-derived)
-    if (isMobile && resolvedViewport.source === 'geo') {
-      if (isDebugEnabled) {
-        console.log('[LOCATION_COOKIE] Skipping initialCenter write on mobile (GPS-first mode)')
-      }
-      return
-    }
-    
-    // Desktop or non-IP mobile: write cookie from initialCenter
-    writeLocationCookie(
-      initialCenter.lat,
-      initialCenter.lng,
-      'initial',
-      initialCenter.label
-    )
-  }, [initialCenter, isMobile, resolvedViewport.source, writeLocationCookie])
-  
   // Helper function to check if map is centered on a location
   const isCenteredOnLocation = useCallback((
     mapCenter: { lat: number; lng: number },
@@ -236,6 +212,30 @@ export default function SalesClient({
       userInteracted: userInteractedRef.current
     })
   }, [urlLat, urlLng, urlZoom, initialCenter, isMobile])
+
+  // Write la_loc from initialCenter ONLY if:
+  // - Desktop (not mobile), OR
+  // - Mobile but NOT IP-derived (i.e., resolvedViewport.source !== 'geo')
+  // This prevents persisting IP-derived location on mobile cold start
+  useEffect(() => {
+    if (!initialCenter) return
+    
+    // On mobile, skip writing cookie from initialCenter if GPS is expected (IP-derived)
+    if (isMobile && resolvedViewport.source === 'geo') {
+      if (isDebugEnabled) {
+        console.log('[LOCATION_COOKIE] Skipping initialCenter write on mobile (GPS-first mode)')
+      }
+      return
+    }
+    
+    // Desktop or non-IP mobile: write cookie from initialCenter
+    writeLocationCookie(
+      initialCenter.lat,
+      initialCenter.lng,
+      'initial',
+      initialCenter.label
+    )
+  }, [initialCenter, isMobile, resolvedViewport.source, writeLocationCookie, isDebugEnabled])
 
   // Use resolved viewport to determine effective center
   const effectiveCenter = resolvedViewport.center || initialCenter

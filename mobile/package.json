@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "eas:preview": "eas build --profile preview --platform all",
     "eas:prod": "eas build --profile production --platform all",
-    "eas:submit": "eas submit --profile production --platform all"
+    "eas:submit": "eas submit --profile production --platform all",
+    "eas-build-on-success": "node mobile/scripts/upload-sourcemaps.js"
   },
   "dependencies": {
     "@sentry/react-native": "^5.34.0",

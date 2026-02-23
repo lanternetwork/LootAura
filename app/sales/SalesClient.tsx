@@ -98,27 +98,95 @@ export default function SalesClient({
     }
   }, [])
 
-  // Set/refresh la_loc cookie client-side when we have a real center
-  // Moved from Server Component to avoid "Cookies can only be modified in a Server Action or Route Handler" error
+  // Centralized, validated, debounced la_loc cookie writer
+  // Only persists high-confidence sources (GPS, user actions) - NOT IP-derived initialCenter on mobile
+  const locationCookieWriteTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  const writeLocationCookie = useCallback((
+    lat: number,
+    lng: number,
+    source: 'gps' | 'user' | 'initial',
+    metadata?: { zip?: string; city?: string; state?: string }
+  ) => {
+    // Validate coordinates
+    if (typeof lat !== 'number' || typeof lng !== 'number' ||
+        isNaN(lat) || isNaN(lng) ||
+        lat < -90 || lat > 90 ||
+        lng < -180 || lng > 180) {
+      if (isDebugEnabled) {
+        console.warn('[LOCATION_COOKIE] Invalid coordinates, skipping write:', { lat, lng, source })
+      }
+      return
+    }
+    
+    // Clear existing timeout to debounce
+    if (locationCookieWriteTimeoutRef.current) {
+      clearTimeout(locationCookieWriteTimeoutRef.current)
+    }
+    
+    // Debounce: Write after 1 second of no changes
+    locationCookieWriteTimeoutRef.current = setTimeout(() => {
+      try {
+        const val = JSON.stringify({
+          lat,
+          lng,
+          source, // Include source for debugging (readers only check lat/lng, so this is safe)
+          zip: metadata?.zip,
+          city: metadata?.city,
+          state: metadata?.state,
+        })
+        
+        // Set cookie with same options: 1 day expiry, SameSite=Lax, Path=/, Secure if HTTPS
+        const expires = new Date()
+        expires.setTime(expires.getTime() + 60 * 60 * 24 * 1000) // 1 day in milliseconds
+        const secureFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? ';Secure' : ''
+        document.cookie = `la_loc=${encodeURIComponent(val)};expires=${expires.toUTCString()};path=/;SameSite=Lax${secureFlag}`
+        
+        if (isDebugEnabled) {
+          console.log('[LOCATION_COOKIE] Written:', { lat, lng, source })
+        }
+      } catch (error) {
+        if (isDebugEnabled) {
+          console.warn('[LOCATION_COOKIE] Write failed:', error)
+        }
+      }
+      
+      locationCookieWriteTimeoutRef.current = null
+    }, 1000) // 1 second debounce
+  }, [])
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (locationCookieWriteTimeoutRef.current) {
+        clearTimeout(locationCookieWriteTimeoutRef.current)
+      }
+    }
+  }, [])
+  
+  // Write la_loc from initialCenter ONLY if:
+  // - Desktop (not mobile), OR
+  // - Mobile but NOT IP-derived (i.e., resolvedViewport.source !== 'geo')
+  // This prevents persisting IP-derived location on mobile cold start
   useEffect(() => {
     if (!initialCenter) return
     
-    try {
-      const val = JSON.stringify({
-        lat: initialCenter.lat,
-        lng: initialCenter.lng,
-        zip: initialCenter.label?.zip,
-        city: initialCenter.label?.city,
-        state: initialCenter.label?.state,
-      })
-      // Set cookie with same options as server: maxAge 1 day, sameSite lax, path /
-      const expires = new Date()
-      expires.setTime(expires.getTime() + 60 * 60 * 24 * 1000) // 1 day in milliseconds
-      document.cookie = `la_loc=${encodeURIComponent(val)};expires=${expires.toUTCString()};path=/;SameSite=Lax`
-    } catch {
-      // Cookie setting failed - ignore silently
+    // On mobile, skip writing cookie from initialCenter if GPS is expected (IP-derived)
+    if (isMobile && resolvedViewport.source === 'geo') {
+      if (isDebugEnabled) {
+        console.log('[LOCATION_COOKIE] Skipping initialCenter write on mobile (GPS-first mode)')
+      }
+      return
     }
-  }, [initialCenter])
+    
+    // Desktop or non-IP mobile: write cookie from initialCenter
+    writeLocationCookie(
+      initialCenter.lat,
+      initialCenter.lng,
+      'initial',
+      initialCenter.label
+    )
+  }, [initialCenter, isMobile, resolvedViewport.source, writeLocationCookie])
   
   // Helper function to check if map is centered on a location
   const isCenteredOnLocation = useCallback((
@@ -1126,6 +1194,12 @@ export default function SalesClient({
         // Fallback to router.replace
         router.replace(newUrl, { scroll: false })
       }
+      
+      // Persist user-driven viewport change to cookie (high-confidence source)
+      // Only write if user has interacted (not programmatic change)
+      if (userInteractedRef.current || isUserAuthority()) {
+        writeLocationCookie(center.lat, center.lng, 'user')
+      }
     } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[FORCE_RECENTER] Skipping URL update during imperative recenter')
     }
@@ -1190,7 +1264,7 @@ export default function SalesClient({
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
     }, 200)
-  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance])
+  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance, writeLocationCookie])
 
   // Imperative function to force recenter map to a location
   // This bypasses all guards (isUserDragging, fitBounds, authority checks) and directly moves the map
@@ -1407,6 +1481,9 @@ export default function SalesClient({
         // Update permission state immediately (GPS success means permission was granted)
         setHasLocationPermission(true)
         
+        // Persist GPS location to cookie (high-confidence source)
+        writeLocationCookie(location.lat, location.lng, 'gps')
+        
         // Check if map is already centered on this location before attempting recenter
         const isAlreadyCentered = mapView?.center ? isCenteredOnLocation(mapView.center, location, 50) : false
         
@@ -1433,7 +1510,7 @@ export default function SalesClient({
         }
         // Error handling (denial tracking) is done in requestGeolocation
       })
-  }, [isMobile, resolvedViewport.source, recenterToUserLocation, mapVisible, markPerformance])
+  }, [isMobile, resolvedViewport.source, recenterToUserLocation, mapVisible, markPerformance, writeLocationCookie])
 
   // Handle ZIP search with near=1 API path (respects distance filter exactly)
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
@@ -2124,12 +2201,15 @@ export default function SalesClient({
       checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
     }
 
+    // Persist user-initiated location to cookie (high-confidence source)
+    writeLocationCookie(lat, lng, 'user')
+
     // Recenter map
     forceRecenterToLocation(map, lat, lng, 'user')
     
     // Force visibility recomputation even if map doesn't move
     setMapView(prev => prev ? { ...prev } : null)
-  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView])
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, writeLocationCookie])
 
   // Handle user-initiated GPS request from mobile (bypasses authority guard)
   // User-initiated: Recenter immediately with best available location, then fire GPS in background
@@ -2151,6 +2231,10 @@ export default function SalesClient({
         } else {
           checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
         }
+        
+        // Persist user-initiated location to cookie (high-confidence source)
+        writeLocationCookie(location.lat, location.lng, 'user')
+        
         flipToUserAuthority()
         recenterToUserLocation(location, 'user')
         setMapView(prev => prev ? { ...prev } : null)
@@ -2165,6 +2249,9 @@ export default function SalesClient({
         checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
       }
 
+      // Persist user-initiated location to cookie (high-confidence source)
+      writeLocationCookie(location.lat, location.lng, 'user')
+
       // Recenter map
       forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')
       
@@ -2177,7 +2264,7 @@ export default function SalesClient({
       }
       throw error // Re-throw to be caught by mobile component
     }
-  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, flipToUserAuthority, recenterToUserLocation])
+  }, [forceRecenterToLocation, lastUserLocation, setLastUserLocation, setHasLocationPermission, setMapView, flipToUserAuthority, recenterToUserLocation, writeLocationCookie])
 
   return (
     <>

@@ -30,6 +30,11 @@
         "EXPO_PUBLIC_API_URL": "https://lootaura.com",
         "EXPO_USE_NPM": "true",
         "EXPO_PUBLIC_SENTRY_DSN": ""
+      },
+      "hooks": {
+        "postBuild": {
+          "commands": ["node mobile/scripts/upload-sourcemaps.js"]
+        }
       }
     },
     "development": {

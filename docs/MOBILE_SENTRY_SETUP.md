@@ -28,7 +28,7 @@ The following environment variable must be set in EAS Dashboard:
 Sentry is initialized in `mobile/app/_layout.tsx` (root layout, earliest safe entrypoint):
 
 - Only enabled in production builds (`!__DEV__`)
-- DSN comes from `Constants.expoConfig.extra.sentryDsn` (populated from `EXPO_PUBLIC_SENTRY_DSN` env var)
+- DSN comes directly from `process.env.EXPO_PUBLIC_SENTRY_DSN` (set in EAS Secrets)
 - PII is disabled (`sendDefaultPii: false`)
 - Performance monitoring enabled at 10% sample rate
 
@@ -43,11 +43,11 @@ Releases are tagged with format: `com.lootaura.app@<version>+<versionCode>`
 
 ### EAS Build Configuration
 
-The `EXPO_PUBLIC_SENTRY_DSN` environment variable is configured in `mobile/eas.json`:
+The `EXPO_PUBLIC_SENTRY_DSN` environment variable must be set in EAS Dashboard → Secrets:
 
-- Production profile: `EXPO_PUBLIC_SENTRY_DSN` is available at build time
-- The value is empty in the config file (placeholder) - actual value comes from EAS Secrets
-- The env var is injected into `app.json` → `extra.sentryDsn` via Expo's build process
+- **Not defined in `mobile/eas.json`** - DSN must be set via EAS Secrets / build environment
+- Production builds will have access to `EXPO_PUBLIC_SENTRY_DSN` at runtime if set in EAS Secrets
+- The env var is available to the app via `process.env.EXPO_PUBLIC_SENTRY_DSN` in production builds
 
 ## Verifying Sentry is Working
 
@@ -94,7 +94,9 @@ To verify Sentry is capturing errors, you can temporarily trigger a native error
 
 2. **Check Build Logs:**
    - EAS build logs should not show Sentry initialization errors
-   - If DSN is missing, Sentry will silently fail (no errors in logs)
+   - To verify `EXPO_PUBLIC_SENTRY_DSN` is present (without printing the value), check that the build environment includes the variable name
+   - If DSN is missing or empty, Sentry will not initialize (silent failure, no errors in logs)
+   - You can verify the env var is set by checking EAS Dashboard → Builds → View build → Environment variables section (variable name should be listed)
 
 3. **Check Sentry Project:**
    - Verify the DSN matches your Sentry project

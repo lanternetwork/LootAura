@@ -29,7 +29,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "@sentry/cli": "^2.36.0",
     "@types/react": "~18.3.0",
+    "glob": "^10.3.10",
     "typescript": "~5.3.3"
   },
   "private": true

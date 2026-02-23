@@ -153,7 +153,7 @@ export default function SalesClient({
       
       locationCookieWriteTimeoutRef.current = null
     }, 1000) // 1 second debounce
-  }, [])
+  }, [isDebugEnabled])
   
   // Cleanup timeout on unmount
   useEffect(() => {

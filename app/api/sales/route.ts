@@ -1118,6 +1118,15 @@ async function postHandler(request: NextRequest) {
     if (!time_start || typeof time_start !== 'string') {
       return NextResponse.json({ error: 'Start time is required' }, { status: 400 })
     }
+
+    // Validate date_start is not in the past (UTC-based)
+    const todayUtc = new Date()
+    todayUtc.setUTCHours(0, 0, 0, 0)
+    const startDateUtc = new Date(date_start + 'T00:00:00Z')
+    if (startDateUtc < todayUtc) {
+      return fail(400, 'INVALID_START_DATE', 'Start date cannot be in the past')
+    }
+
     if (lat === undefined || lat === null || !Number.isFinite(Number(lat))) {
       return NextResponse.json({ error: 'Latitude is required and must be a valid number' }, { status: 400 })
     }

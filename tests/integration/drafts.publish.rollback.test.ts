@@ -156,6 +156,11 @@ function createRequestWithCsrf(url: string, body: any): NextRequest {
 
 // Helper to create a draft payload
 function createDraftPayload() {
+  // Use a future date to avoid past date validation
+  const futureDate = new Date()
+  futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+  const futureDateStr = futureDate.toISOString().split('T')[0]
+
   return {
     formData: {
       title: 'Test Sale',
@@ -166,9 +171,9 @@ function createDraftPayload() {
       zip_code: '12345',
       lat: 40.7128,
       lng: -74.0060,
-      date_start: '2025-12-01',
+      date_start: futureDateStr,
       time_start: '09:00',
-      date_end: '2025-12-01',
+      date_end: futureDateStr,
       time_end: '17:00',
       pricing_mode: 'negotiable' as const,
     },
@@ -346,6 +351,52 @@ describe('Draft publish rollback', () => {
         mockAdminDb,
         saleId
       )
+    })
+  })
+
+  describe('Date validation', () => {
+    it('rejects publishing with past start date', async () => {
+      // Calculate yesterday's date in YYYY-MM-DD format
+      const yesterday = new Date()
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1)
+      const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+      // Create draft payload with yesterday's date
+      const pastDatePayload = {
+        ...createDraftPayload(),
+        formData: {
+          ...createDraftPayload().formData,
+          date_start: yesterdayStr,
+        },
+      }
+
+      // Mock successful draft lookup
+      mockDraftChain.maybeSingle.mockResolvedValue({
+        data: {
+          id: draftId,
+          draft_key: 'test-draft-key-past-date',
+          user_id: userId,
+          status: 'active',
+          payload: pastDatePayload,
+        },
+        error: null,
+      })
+
+      // Call the publish endpoint
+      const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
+        draftKey: 'test-draft-key-past-date',
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      // Publish should fail with INVALID_START_DATE
+      expect(response.status).toBe(400)
+      expect(data.ok).toBe(false)
+      expect(data.code).toBe('INVALID_START_DATE')
+
+      // Verify no rollback was called (validation happens before any DB writes)
+      expect(mockDeleteSaleAndItemsForRollback).not.toHaveBeenCalled()
     })
   })
 })

@@ -183,6 +183,10 @@ describe('Sales API - Image Support', () => {
 
 	it('should accept and persist cover_image_url', async () => {
 	// No-op: insert/select/single chain in shared mock will reflect payload
+		// Use a future date to avoid past date validation
+		const futureDate = new Date()
+		futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+		const futureDateStr = futureDate.toISOString().split('T')[0]
 
 		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
 			title: 'Test Sale',
@@ -193,7 +197,7 @@ describe('Sales API - Image Support', () => {
 			zip_code: '12345',
 			lat: 38.2527,
 			lng: -85.7585,
-			date_start: '2024-01-01',
+			date_start: futureDateStr,
 			time_start: '09:00',
 			cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg'
 		})
@@ -211,6 +215,10 @@ describe('Sales API - Image Support', () => {
 
 	it('should accept and validate images array', async () => {
 	// No-op: shared mock returns inserted row id
+		// Use a future date to avoid past date validation
+		const futureDate = new Date()
+		futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+		const futureDateStr = futureDate.toISOString().split('T')[0]
 
 		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
 			title: 'Test Sale',
@@ -221,7 +229,7 @@ describe('Sales API - Image Support', () => {
 			zip_code: '12345',
 			lat: 38.2527,
 			lng: -85.7585,
-			date_start: '2024-01-01',
+			date_start: futureDateStr,
 			time_start: '09:00',
 			images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg']
 		})
@@ -238,6 +246,10 @@ describe('Sales API - Image Support', () => {
 	it('should reject invalid cover_image_url', async () => {
 		// Set mock to return false for invalid URLs in this test
 		mockIsAllowedImageUrl.mockReturnValue(false)
+		// Use a future date to avoid past date validation
+		const futureDate = new Date()
+		futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+		const futureDateStr = futureDate.toISOString().split('T')[0]
 		
 		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
 			title: 'Test Sale',
@@ -248,7 +260,7 @@ describe('Sales API - Image Support', () => {
 			zip_code: '12345',
 			lat: 38.2527,
 			lng: -85.7585,
-			date_start: '2024-01-01',
+			date_start: futureDateStr,
 			time_start: '09:00',
 			cover_image_url: 'https://malicious-site.com/image.jpg'
 		})
@@ -260,11 +272,42 @@ describe('Sales API - Image Support', () => {
 		expect(data.error).toBe('Invalid cover_image_url')
 	})
 
+	it('should reject past date_start', async () => {
+		// Calculate yesterday's date in YYYY-MM-DD format
+		const yesterday = new Date()
+		yesterday.setUTCDate(yesterday.getUTCDate() - 1)
+		const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: yesterdayStr,
+			time_start: '09:00',
+		})
+
+		const response = await POST(request)
+		const data = await response.json()
+
+		expect(response.status).toBe(400)
+		expect(data.ok).toBe(false)
+		expect(data.code).toBe('INVALID_START_DATE')
+	})
+
 	it('should reject invalid image URLs in images array', async () => {
 		// Set mock to return false for the malicious URL
 		mockIsAllowedImageUrl.mockImplementation((url: string) => {
 			return url.includes('res.cloudinary.com/test')
 		})
+		// Use a future date to avoid past date validation
+		const futureDate = new Date()
+		futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+		const futureDateStr = futureDate.toISOString().split('T')[0]
 		
 		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
 			title: 'Test Sale',
@@ -275,7 +318,7 @@ describe('Sales API - Image Support', () => {
 			zip_code: '12345',
 			lat: 38.2527,
 			lng: -85.7585,
-			date_start: '2024-01-01',
+			date_start: futureDateStr,
 			time_start: '09:00',
 			images: [
 				'https://res.cloudinary.com/test/image/upload/v123/img1.jpg',
@@ -292,6 +335,10 @@ describe('Sales API - Image Support', () => {
 
 	it('should handle empty images array', async () => {
 	// No-op: shared mock returns inserted row id
+		// Use a future date to avoid past date validation
+		const futureDate = new Date()
+		futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+		const futureDateStr = futureDate.toISOString().split('T')[0]
 
 		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
 			title: 'Test Sale',
@@ -302,7 +349,7 @@ describe('Sales API - Image Support', () => {
 			zip_code: '12345',
 			lat: 38.2527,
 			lng: -85.7585,
-			date_start: '2024-01-01',
+			date_start: futureDateStr,
 			time_start: '09:00',
 			images: []
 		})
@@ -319,6 +366,10 @@ describe('Sales API - Image Support', () => {
 
 	it('should default images to empty array when not provided', async () => {
 		// No-op: shared supabase mock will return inserted row with id
+		// Use a future date to avoid past date validation
+		const futureDate = new Date()
+		futureDate.setUTCDate(futureDate.getUTCDate() + 7)
+		const futureDateStr = futureDate.toISOString().split('T')[0]
 
 		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
 			title: 'Test Sale',
@@ -329,7 +380,7 @@ describe('Sales API - Image Support', () => {
 			zip_code: '12345',
 			lat: 38.2527,
 			lng: -85.7585,
-			date_start: '2024-01-01',
+			date_start: futureDateStr,
 			time_start: '09:00'
 		})
 

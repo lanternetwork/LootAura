@@ -242,18 +242,6 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       console.log(`[SALES_PAGE] Using neutral US center fallback`)
     }
     initialCenter = { lat: 39.8283, lng: -98.5795 }
-  } else {
-    // Set/refresh la_loc cookie for 24h when we have a real center
-    try {
-      const val = JSON.stringify({
-        lat: initialCenter.lat,
-        lng: initialCenter.lng,
-        zip: initialCenter.label?.zip,
-        city: initialCenter.label?.city,
-        state: initialCenter.label?.state,
-      })
-      cookieStore.set('la_loc', val, { httpOnly: false, maxAge: 60 * 60 * 24, sameSite: 'lax', path: '/' })
-    } catch {}
   }
 
   // Compute initial sales and buffered bounds server-side (matching client's first fetch)

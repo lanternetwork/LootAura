@@ -97,6 +97,28 @@ export default function SalesClient({
       })
     }
   }, [])
+
+  // Set/refresh la_loc cookie client-side when we have a real center
+  // Moved from Server Component to avoid "Cookies can only be modified in a Server Action or Route Handler" error
+  useEffect(() => {
+    if (!initialCenter) return
+    
+    try {
+      const val = JSON.stringify({
+        lat: initialCenter.lat,
+        lng: initialCenter.lng,
+        zip: initialCenter.label?.zip,
+        city: initialCenter.label?.city,
+        state: initialCenter.label?.state,
+      })
+      // Set cookie with same options as server: maxAge 1 day, sameSite lax, path /
+      const expires = new Date()
+      expires.setTime(expires.getTime() + 60 * 60 * 24 * 1000) // 1 day in milliseconds
+      document.cookie = `la_loc=${encodeURIComponent(val)};expires=${expires.toUTCString()};path=/;SameSite=Lax`
+    } catch {
+      // Cookie setting failed - ignore silently
+    }
+  }, [initialCenter])
   
   // Helper function to check if map is centered on a location
   const isCenteredOnLocation = useCallback((

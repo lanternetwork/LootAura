@@ -697,7 +697,24 @@ export default function MobileSalesShell({
               const laLocCookie = cookies.find(c => c.trim().startsWith('la_loc='))
               if (laLocCookie) {
                 const value = laLocCookie.split('=')[1]
-                const parsed = JSON.parse(decodeURIComponent(value))
+                let parsed: any = null
+                
+                // First attempt: try decoding (for encoded values from SalesClient)
+                try {
+                  parsed = JSON.parse(decodeURIComponent(value))
+                } catch {
+                  // Second attempt: try raw parse (for unencoded legacy values)
+                  try {
+                    parsed = JSON.parse(value)
+                  } catch {
+                    // Both attempts failed - invalid cookie, treat as missing
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.warn('[MOBILE_SHELL] Failed to parse la_loc cookie')
+                    }
+                    return null
+                  }
+                }
+                
                 return parsed?.zip || null
               }
             } catch {

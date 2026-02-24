@@ -454,6 +454,13 @@ export default function HomeScreen() {
     } catch {
       // Ignore URL parse errors
     }
+    
+    // Hide splash on earliest safe signal (onLoadEnd)
+    const hideSplashOnce = getHideSplashOnce();
+    if (hideSplashOnce) {
+      hideSplashOnce();
+    }
+    
     stopLoader('onLoadEnd', path);
     // Mark WebView as ready after first successful load
     setWebViewReady(true);
@@ -534,6 +541,13 @@ export default function HomeScreen() {
       } catch {
         // Ignore URL parse errors
       }
+      
+      // Hide splash on earliest safe signal (navState.loading=false)
+      const hideSplashOnce = getHideSplashOnce();
+      if (hideSplashOnce) {
+        hideSplashOnce();
+      }
+      
       stopLoader('navState.loading=false', path);
     }
     
@@ -879,7 +893,8 @@ export default function HomeScreen() {
             // Navigation is handled via source prop changes, which triggers onLoadStart/onLoadEnd
             style={[
               styles.webview,
-              routeState.isSaleDetail && styles.webviewWithFooter
+              routeState.isSaleDetail && styles.webviewWithFooter,
+              { backgroundColor: '#3A2268' } // Match container/splash color to prevent white flash
             ]}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}
@@ -1239,7 +1254,7 @@ export default function HomeScreen() {
               })();
               true; // Required for iOS
             `}
-            startInLoadingState={true}
+            startInLoadingState={false}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             sharedCookiesEnabled={true}

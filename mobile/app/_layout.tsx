@@ -25,9 +25,16 @@ if (!__DEV__ && sentryDsn) {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+// Global function to hide splash (called from index.tsx on APP_READY)
+let hideSplashOnce: (() => void) | null = null;
+
+export function getHideSplashOnce() {
+  return hideSplashOnce;
+}
+
 export default function RootLayout() {
   useEffect(() => {
-    let fallbackTimeout: NodeJS.Timeout | null = null;
+    let failsafeTimeout: NodeJS.Timeout | null = null;
     let isHidden = false;
 
     const hideSplash = async () => {
@@ -36,34 +43,40 @@ export default function RootLayout() {
       try {
         await SplashScreen.hideAsync();
         isHidden = true;
-        // Clear fallback timeout if hideAsync succeeds
-        if (fallbackTimeout) {
-          clearTimeout(fallbackTimeout);
-          fallbackTimeout = null;
+        // Clear failsafe timeout if hideAsync succeeds
+        if (failsafeTimeout) {
+          clearTimeout(failsafeTimeout);
+          failsafeTimeout = null;
         }
       } catch (error) {
         // Log error in development
         if (__DEV__) {
           console.error('[SPLASH] Failed to hide splash screen:', error);
         }
-        // Don't set isHidden = true on error, allow fallback to retry
+        // Don't set isHidden = true on error, allow failsafe to retry
       }
     };
 
-    // Attempt to hide splash immediately
-    hideSplash();
+    // Expose hideSplashOnce function for index.tsx to call on APP_READY
+    hideSplashOnce = () => {
+      hideSplash();
+    };
 
-    // Fallback timeout: force hide after 2 seconds if initial attempt fails or hangs
-    fallbackTimeout = setTimeout(() => {
+    // Failsafe timeout: force hide after 4 seconds if APP_READY never arrives
+    failsafeTimeout = setTimeout(() => {
       if (!isHidden) {
+        if (__DEV__) {
+          console.warn('[SPLASH] Failsafe timeout: hiding splash after 4s (APP_READY never received)');
+        }
         hideSplash();
       }
-    }, 2000);
+    }, 4000);
 
     return () => {
-      if (fallbackTimeout) {
-        clearTimeout(fallbackTimeout);
+      if (failsafeTimeout) {
+        clearTimeout(failsafeTimeout);
       }
+      hideSplashOnce = null;
     };
   }, []);
 

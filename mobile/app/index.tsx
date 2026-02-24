@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
+import { getHideSplashOnce } from './_layout';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
 
@@ -580,6 +581,12 @@ export default function HomeScreen() {
         
         // Extract retry attempt number if provided (for debug logging)
         const attempt = typeof message.attempt === 'number' ? message.attempt : 0;
+        
+        // Hide native splash screen when app is ready
+        const hideSplashOnce = getHideSplashOnce();
+        if (hideSplashOnce) {
+          hideSplashOnce();
+        }
         
         // Immediately hide overlay and mark ready
         stopLoader('APP_READY', pathOnly, attempt);
@@ -1243,12 +1250,6 @@ export default function HomeScreen() {
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
           />
-          {loading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#3A2268" />
-              <Text style={styles.loadingText}>Loading LootAura...</Text>
-            </View>
-          )}
           
           {/* Native Footer Overlay - Show when on sale detail page AND page has loaded */}
           {routeState.isSaleDetail && !loading && (
@@ -1304,22 +1305,6 @@ const styles = StyleSheet.create({
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#3A2268',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,

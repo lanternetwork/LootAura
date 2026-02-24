@@ -879,7 +879,8 @@ export default function HomeScreen() {
             // Navigation is handled via source prop changes, which triggers onLoadStart/onLoadEnd
             style={[
               styles.webview,
-              routeState.isSaleDetail && styles.webviewWithFooter
+              routeState.isSaleDetail && styles.webviewWithFooter,
+              { backgroundColor: '#3A2268' } // Match container/splash color to prevent white flash
             ]}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}

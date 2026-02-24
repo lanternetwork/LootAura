@@ -6,7 +6,7 @@
     "preview": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "20.18.0",
+      "node": "20",
       "android": {
         "buildType": "apk",
         "autoIncrement": true
@@ -18,7 +18,7 @@
     "production": {
       "developmentClient": false,
       "distribution": "store",
-      "node": "20.18.0",
+      "node": "20",
       "android": {
         "buildType": "app-bundle",
         "autoIncrement": true
@@ -34,7 +34,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "20.18.0",
+      "node": "20",
       "android": {
         "autoIncrement": true
       }

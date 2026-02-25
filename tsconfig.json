@@ -14,7 +14,8 @@
     "jsx": "react-jsx",
     "incremental": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["./*"] }
+    "paths": { "@/*": ["./*"] },
+    "typeRoots": ["./node_modules/@types", "./types"]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.d.ts"],
   "exclude": ["node_modules", "supabase/functions/**", "deprecated/**", "archive/deprecated/**", "mobile/**"]

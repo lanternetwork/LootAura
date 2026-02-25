@@ -578,7 +578,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         style={{ position: "absolute", inset: 0 }}
-        preserveDrawingBuffer={true}
+        preserveDrawingBuffer={false}
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMove={handleMove}

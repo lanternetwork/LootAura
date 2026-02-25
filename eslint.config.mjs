@@ -1,4 +1,3 @@
-import js from '@eslint/js'
 import typescript from '@typescript-eslint/eslint-plugin'
 import typescriptParser from '@typescript-eslint/parser'
 import react from 'eslint-plugin-react'
@@ -7,7 +6,6 @@ import testingLibrary from 'eslint-plugin-testing-library'
 import vitest from 'eslint-plugin-vitest'
 
 export default [
-  js.configs.recommended,
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {

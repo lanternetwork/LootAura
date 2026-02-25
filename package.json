@@ -46,7 +46,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "@supabase/ssr": "^0.5.0",
     "@tanstack/react-query": "^5.59.0",
-    "zod": "^3.23.8",
+    "zod": "^3.23.7",
     "clsx": "^2.1.1",
     "zipcodes": "^8",
     "react-virtuoso": "^4.7.0",
@@ -84,7 +84,7 @@
   "overrides": {
     "preact": "^10.28.2",
     "cookie": "^0.7.2",
-    "prismjs": "^1.29.0",
+    "prismjs": "^1.28.0",
     "nodemailer": "^7.0.11"
   },
   "devDependencies": {

@@ -35,6 +35,9 @@ export function createSupabaseServerClient() {
   const _schema = getSchema();
   const cookieStore = cookies()
 
+  // This client is intended for Server Components and must not write cookies.
+  // Mutations and session refresh belong in Route Handlers / API routes.
+  // Disable auto-refresh and session persistence to prevent cookie writes during SSR.
   return createServerClient(url, anon, {
     cookies: {
       get(name: string) {
@@ -46,6 +49,11 @@ export function createSupabaseServerClient() {
       remove(name: string, options: CookieOptions) {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
     },
     db: { schema: 'public' }, // Use public schema for reading views (sales_v2, items_v2)
   });

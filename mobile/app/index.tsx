@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, BackHandler, Linking, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
+import { getHideSplashOnce } from './_layout';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
 
@@ -39,6 +40,7 @@ export default function HomeScreen() {
   
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
+  const [initialWebUrl, setInitialWebUrl] = useState<string | null>(null);
   const [lastNavAction, setLastNavAction] = useState<string>('');
   const [lastNavigateMessage, setLastNavigateMessage] = useState<string>('');
   const [lastSanitizerDecision, setLastSanitizerDecision] = useState<string>('');
@@ -228,15 +230,42 @@ export default function HomeScreen() {
   // Handle Android back button
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (canGoBack && webViewRef.current) {
+      if (!webViewRef.current) {
+        return false; // Allow default back behavior (exit app) if WebView ref is null
+      }
+      
+      // Check if we can go back using navState.canGoBack OR by comparing URLs
+      const canNavigateBack = canGoBack || (() => {
+        // Fallback: check if current URL is different from initial URL (same-origin)
+        if (!currentWebViewUrl || !initialWebUrl) {
+          return false;
+        }
+        try {
+          const currentParsed = new URL(currentWebViewUrl);
+          const initialParsed = new URL(initialWebUrl);
+          const currentHostname = currentParsed.hostname.toLowerCase();
+          const initialHostname = initialParsed.hostname.toLowerCase();
+          
+          // Only allow back if both are same-origin and URLs differ
+          const isSameOrigin = (currentHostname === 'lootaura.com' || currentHostname.endsWith('.lootaura.com')) &&
+                               (initialHostname === 'lootaura.com' || initialHostname.endsWith('.lootaura.com'));
+          
+          return isSameOrigin && currentWebViewUrl !== initialWebUrl;
+        } catch {
+          return false;
+        }
+      })();
+      
+      if (canNavigateBack) {
         webViewRef.current.goBack();
         return true; // Prevent default back behavior
       }
+      
       return false; // Allow default back behavior (exit app)
     });
 
     return () => backHandler.remove();
-  }, [canGoBack]);
+  }, [canGoBack, currentWebViewUrl, initialWebUrl]);
 
   // Cleanup all timeouts on unmount
   useEffect(() => {
@@ -453,6 +482,13 @@ export default function HomeScreen() {
     } catch {
       // Ignore URL parse errors
     }
+    
+    // Hide splash on earliest safe signal (onLoadEnd)
+    const hideSplashOnce = getHideSplashOnce();
+    if (hideSplashOnce) {
+      hideSplashOnce();
+    }
+    
     stopLoader('onLoadEnd', path);
     // Mark WebView as ready after first successful load
     setWebViewReady(true);
@@ -523,6 +559,20 @@ export default function HomeScreen() {
     const url = navState.url || '';
     setCurrentWebViewUrl(url);
     
+    // Track initial same-origin URL for back button logic
+    if (url && !initialWebUrl) {
+      try {
+        const parsedUrl = new URL(url);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        // Only track same-origin URLs (lootaura.com or subdomains)
+        if (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com')) {
+          setInitialWebUrl(url);
+        }
+      } catch {
+        // Ignore URL parse errors
+      }
+    }
+    
     // CRITICAL: If navState.loading === false, force clear loading state
     // This is the most reliable way to detect when navigation is complete
     if (navState.loading === false) {
@@ -533,6 +583,13 @@ export default function HomeScreen() {
       } catch {
         // Ignore URL parse errors
       }
+      
+      // Hide splash on earliest safe signal (navState.loading=false)
+      const hideSplashOnce = getHideSplashOnce();
+      if (hideSplashOnce) {
+        hideSplashOnce();
+      }
+      
       stopLoader('navState.loading=false', path);
     }
     
@@ -580,6 +637,12 @@ export default function HomeScreen() {
         
         // Extract retry attempt number if provided (for debug logging)
         const attempt = typeof message.attempt === 'number' ? message.attempt : 0;
+        
+        // Hide native splash screen when app is ready
+        const hideSplashOnce = getHideSplashOnce();
+        if (hideSplashOnce) {
+          hideSplashOnce();
+        }
         
         // Immediately hide overlay and mark ready
         stopLoader('APP_READY', pathOnly, attempt);
@@ -872,7 +935,8 @@ export default function HomeScreen() {
             // Navigation is handled via source prop changes, which triggers onLoadStart/onLoadEnd
             style={[
               styles.webview,
-              routeState.isSaleDetail && styles.webviewWithFooter
+              routeState.isSaleDetail && styles.webviewWithFooter,
+              { backgroundColor: '#3A2268' } // Match container/splash color to prevent white flash
             ]}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}
@@ -1232,7 +1296,7 @@ export default function HomeScreen() {
               })();
               true; // Required for iOS
             `}
-            startInLoadingState={true}
+            startInLoadingState={false}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             sharedCookiesEnabled={true}
@@ -1243,12 +1307,6 @@ export default function HomeScreen() {
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
           />
-          {loading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#3A2268" />
-              <Text style={styles.loadingText}>Loading LootAura...</Text>
-            </View>
-          )}
           
           {/* Native Footer Overlay - Show when on sale detail page AND page has loaded */}
           {routeState.isSaleDetail && !loading && (
@@ -1304,22 +1362,6 @@ const styles = StyleSheet.create({
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#3A2268',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,

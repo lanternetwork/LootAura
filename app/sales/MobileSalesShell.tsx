@@ -8,14 +8,7 @@ import dynamic from 'next/dynamic'
 const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), {
   ssr: false,
   loading: () => (
-    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
-      <div className="text-center text-gray-500">
-        <div className="animate-pulse mb-2">
-          <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-600 rounded-full mx-auto"></div>
-        </div>
-        <p className="text-sm font-medium">Loading map...</p>
-      </div>
-    </div>
+    <div className="absolute inset-0 bg-gray-100" />
   )
 })
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
@@ -696,8 +689,32 @@ export default function MobileSalesShell({
               const cookies = document.cookie.split(';')
               const laLocCookie = cookies.find(c => c.trim().startsWith('la_loc='))
               if (laLocCookie) {
-                const value = laLocCookie.split('=')[1]
-                const parsed = JSON.parse(decodeURIComponent(value))
+                // Extract value robustly: find first '=' and take everything after it
+                // This handles cases where the cookie value itself contains '='
+                const equalIndex = laLocCookie.indexOf('=')
+                if (equalIndex === -1) {
+                  // No '=' found - invalid cookie format, treat as missing
+                  return null
+                }
+                const value = laLocCookie.substring(equalIndex + 1).trim()
+                let parsed: any = null
+                
+                // First attempt: try decoding (for encoded values from SalesClient)
+                try {
+                  parsed = JSON.parse(decodeURIComponent(value))
+                } catch {
+                  // Second attempt: try raw parse (for unencoded legacy values)
+                  try {
+                    parsed = JSON.parse(value)
+                  } catch {
+                    // Both attempts failed - invalid cookie, treat as missing
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.warn('[MOBILE_SHELL] Failed to parse la_loc cookie')
+                    }
+                    return null
+                  }
+                }
+                
                 return parsed?.zip || null
               }
             } catch {

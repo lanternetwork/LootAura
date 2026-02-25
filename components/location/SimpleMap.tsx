@@ -59,7 +59,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   onCenteringStart,
   onCenteringEnd,
   isTransitioning = false,
-  transitionMessage = "Loading...",
+  transitionMessage: _transitionMessage = "Loading...",
   interactive = true,
   attributionPosition = 'bottom-right',
   showOSMAttribution = true,

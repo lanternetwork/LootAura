@@ -723,24 +723,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
 
       {/* Loading overlay for smooth transitions */}
       {isTransitioning && (
-        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 transition-opacity duration-300">
-          <div className="bg-white rounded-lg shadow-lg p-4 flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent"></div>
-            <span className="text-gray-700 font-medium">{transitionMessage}</span>
-          </div>
-        </div>
+        <div className="absolute inset-0 bg-gray-100 z-50 transition-opacity duration-300" />
       )}
 
       {/* Pins loading skeleton */}
       {pinsLoading && !loaded && (hybridPins || pins) && (
-        <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
-          <div className="bg-white bg-opacity-80 rounded-lg shadow-md p-4">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent"></div>
-              <span className="text-sm text-gray-700 font-medium">Loading sales locations...</span>
-            </div>
-          </div>
-        </div>
+        <div className="absolute inset-0 bg-gray-100 z-40 pointer-events-none" />
       )}
       
       {/* Debug overlay */}

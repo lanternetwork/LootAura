@@ -40,6 +40,7 @@ export default function HomeScreen() {
   
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
+  const [initialWebUrl, setInitialWebUrl] = useState<string | null>(null);
   const [lastNavAction, setLastNavAction] = useState<string>('');
   const [lastNavigateMessage, setLastNavigateMessage] = useState<string>('');
   const [lastSanitizerDecision, setLastSanitizerDecision] = useState<string>('');
@@ -229,15 +230,42 @@ export default function HomeScreen() {
   // Handle Android back button
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (canGoBack && webViewRef.current) {
+      if (!webViewRef.current) {
+        return false; // Allow default back behavior (exit app) if WebView ref is null
+      }
+      
+      // Check if we can go back using navState.canGoBack OR by comparing URLs
+      const canNavigateBack = canGoBack || (() => {
+        // Fallback: check if current URL is different from initial URL (same-origin)
+        if (!currentWebViewUrl || !initialWebUrl) {
+          return false;
+        }
+        try {
+          const currentParsed = new URL(currentWebViewUrl);
+          const initialParsed = new URL(initialWebUrl);
+          const currentHostname = currentParsed.hostname.toLowerCase();
+          const initialHostname = initialParsed.hostname.toLowerCase();
+          
+          // Only allow back if both are same-origin and URLs differ
+          const isSameOrigin = (currentHostname === 'lootaura.com' || currentHostname.endsWith('.lootaura.com')) &&
+                               (initialHostname === 'lootaura.com' || initialHostname.endsWith('.lootaura.com'));
+          
+          return isSameOrigin && currentWebViewUrl !== initialWebUrl;
+        } catch {
+          return false;
+        }
+      })();
+      
+      if (canNavigateBack) {
         webViewRef.current.goBack();
         return true; // Prevent default back behavior
       }
+      
       return false; // Allow default back behavior (exit app)
     });
 
     return () => backHandler.remove();
-  }, [canGoBack]);
+  }, [canGoBack, currentWebViewUrl, initialWebUrl]);
 
   // Cleanup all timeouts on unmount
   useEffect(() => {
@@ -530,6 +558,20 @@ export default function HomeScreen() {
     setCanGoBack(navState.canGoBack);
     const url = navState.url || '';
     setCurrentWebViewUrl(url);
+    
+    // Track initial same-origin URL for back button logic
+    if (url && !initialWebUrl) {
+      try {
+        const parsedUrl = new URL(url);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        // Only track same-origin URLs (lootaura.com or subdomains)
+        if (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com')) {
+          setInitialWebUrl(url);
+        }
+      } catch {
+        // Ignore URL parse errors
+      }
+    }
     
     // CRITICAL: If navState.loading === false, force clear loading state
     // This is the most reliable way to detect when navigation is complete

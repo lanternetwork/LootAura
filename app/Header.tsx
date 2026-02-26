@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname, useSearchParams, useRouter } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
@@ -8,7 +8,6 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 export function Header() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [hasUser, setHasUser] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)

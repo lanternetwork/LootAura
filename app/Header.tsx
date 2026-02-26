@@ -119,34 +119,19 @@ export function Header() {
     <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">
       <div ref={containerRef} className="w-full px-3 sm:px-6 lg:px-8 h-full">
         <div className="flex justify-between items-center h-full gap-2">
-          {/* Mobile: Show back button on sale detail pages or when list is open, otherwise show logo */}
-          {(isSaleDetailPage || isSalesPageWithList) ? (
+          {/* Mobile: Show back button on sale detail pages only, otherwise show logo */}
+          {isSaleDetailPage ? (
             <>
-              {isSalesPageWithList ? (
-                <button
-                  onClick={(e) => {
-                    if (handleNativeNavigation('/sales', e)) return
-                    handleCloseList()
-                  }}
-                  className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
-                  aria-label="Return to map"
-                >
-                  <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-              ) : (
-                <Link
-                  href={backUrl}
-                  onClick={(e) => handleNativeNavigation(backUrl, e)}
-                  className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
-                  aria-label="Back to sales"
-                >
-                  <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </Link>
-              )}
+              <Link
+                href={backUrl}
+                onClick={(e) => handleNativeNavigation(backUrl, e)}
+                className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
+                aria-label="Back to sales"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
               {/* Desktop: Always show logo */}
               <Link ref={logoRef} href="/" onClick={(e) => handleNativeNavigation('/', e)} className="hidden sm:flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
                 <span className="inline-flex items-center justify-center">

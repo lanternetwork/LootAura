@@ -20,9 +20,6 @@ export function Header() {
   // Check if we're on a sale detail page
   const isSaleDetailPage = pathname?.startsWith('/sales/') && pathname !== '/sales'
   
-  // Check if we're on sales page with list view open
-  const isSalesPageWithList = pathname === '/sales' && searchParams?.get('view') === 'list'
-  
   // Build back URL with viewport params if they exist
   const backUrl = (() => {
     if (!isSaleDetailPage) return '/sales'
@@ -38,22 +35,6 @@ export function Header() {
     }
   })()
   
-  // Handle closing list view (returning to map)
-  const handleCloseList = useCallback(() => {
-    if (!isSalesPageWithList) return
-    
-    const params = new URLSearchParams()
-    // Copy all existing params except 'view'
-    if (searchParams) {
-      searchParams.forEach((value, key) => {
-        if (key !== 'view') {
-          params.set(key, value)
-        }
-      })
-    }
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
-    router.replace(newUrl, { scroll: false })
-  }, [isSalesPageWithList, searchParams, router])
   
   useEffect(() => {
     const sb = createSupabaseBrowserClient()

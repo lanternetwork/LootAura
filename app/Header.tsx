@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname, useSearchParams, useRouter } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
@@ -8,7 +8,6 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 export function Header() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [hasUser, setHasUser] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -19,9 +18,6 @@ export function Header() {
   
   // Check if we're on a sale detail page
   const isSaleDetailPage = pathname?.startsWith('/sales/') && pathname !== '/sales'
-  
-  // Check if we're on sales page with list view open
-  const isSalesPageWithList = pathname === '/sales' && searchParams?.get('view') === 'list'
   
   // Build back URL with viewport params if they exist
   const backUrl = (() => {
@@ -38,22 +34,6 @@ export function Header() {
     }
   })()
   
-  // Handle closing list view (returning to map)
-  const handleCloseList = useCallback(() => {
-    if (!isSalesPageWithList) return
-    
-    const params = new URLSearchParams()
-    // Copy all existing params except 'view'
-    if (searchParams) {
-      searchParams.forEach((value, key) => {
-        if (key !== 'view') {
-          params.set(key, value)
-        }
-      })
-    }
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
-    router.replace(newUrl, { scroll: false })
-  }, [isSalesPageWithList, searchParams, router])
   
   useEffect(() => {
     const sb = createSupabaseBrowserClient()
@@ -119,34 +99,19 @@ export function Header() {
     <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">
       <div ref={containerRef} className="w-full px-3 sm:px-6 lg:px-8 h-full">
         <div className="flex justify-between items-center h-full gap-2">
-          {/* Mobile: Show back button on sale detail pages or when list is open, otherwise show logo */}
-          {(isSaleDetailPage || isSalesPageWithList) ? (
+          {/* Mobile: Show back button on sale detail pages only, otherwise show logo */}
+          {isSaleDetailPage ? (
             <>
-              {isSalesPageWithList ? (
-                <button
-                  onClick={(e) => {
-                    if (handleNativeNavigation('/sales', e)) return
-                    handleCloseList()
-                  }}
-                  className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
-                  aria-label="Return to map"
-                >
-                  <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-              ) : (
-                <Link
-                  href={backUrl}
-                  onClick={(e) => handleNativeNavigation(backUrl, e)}
-                  className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
-                  aria-label="Back to sales"
-                >
-                  <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </Link>
-              )}
+              <Link
+                href={backUrl}
+                onClick={(e) => handleNativeNavigation(backUrl, e)}
+                className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
+                aria-label="Back to sales"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
               {/* Desktop: Always show logo */}
               <Link ref={logoRef} href="/" onClick={(e) => handleNativeNavigation('/', e)} className="hidden sm:flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
                 <span className="inline-flex items-center justify-center">

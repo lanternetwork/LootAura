@@ -576,7 +576,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           latitude: center.lat,
           zoom
         }}
-        mapStyle="mapbox://styles/mapbox/light-v11"
+        mapStyle="mapbox://styles/lanternetwork/cmm40a1ky00fp01s13a2i58k5"
         style={{ position: "absolute", inset: 0 }}
         preserveDrawingBuffer={false}
         onLoad={onLoad}

@@ -76,6 +76,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {adsenseEnabled && (
           <meta name="google-adsense-account" content="ca-pub-8685093412475036" />
         )}
+        {/* Mapbox preconnect hints for faster map loading */}
+        <link rel="preconnect" href="https://api.mapbox.com" />
+        <link rel="dns-prefetch" href="https://api.mapbox.com" />
+        <link rel="preconnect" href="https://events.mapbox.com" />
+        <link rel="dns-prefetch" href="https://events.mapbox.com" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-v2.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

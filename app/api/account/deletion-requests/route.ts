@@ -100,7 +100,8 @@ async function postHandler(request: NextRequest): Promise<NextResponse> {
       })
     }
 
-    const { reason, confirmed } = validationResult.data
+    const { reason } = validationResult.data
+    // confirmed is validated as true in schema, no need to use it after validation
 
     // Check for existing pending request
     const db = await getRlsDb(request)

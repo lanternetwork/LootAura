@@ -14,7 +14,7 @@ interface DeletionRequest {
   processed_at?: string | null
 }
 
-export default function AccountRemovalClient({ user }: AccountRemovalClientProps) {
+export default function AccountRemovalClient({ user: _user }: AccountRemovalClientProps) {
   const [isPending, startTransition] = useTransition()
   const [reason, setReason] = useState('')
   const [confirmed, setConfirmed] = useState(false)

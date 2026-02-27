@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSchema } from '@/lib/supabase/schema'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
 /**
  * GET /api/favorites - Get user favorites
@@ -54,7 +56,7 @@ export async function GET(_request: NextRequest) {
 /**
  * POST /api/favorites - Add a favorite
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(request)
@@ -127,7 +129,7 @@ export async function POST(request: NextRequest) {
 /**
  * DELETE /api/favorites - Remove a favorite
  */
-export async function DELETE(request: NextRequest) {
+async function deleteHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(request)
@@ -193,3 +195,6 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
+
+export const POST = withRateLimit(postHandler, [Policies.FAVORITES_MINUTE])
+export const DELETE = withRateLimit(deleteHandler, [Policies.FAVORITES_MINUTE])

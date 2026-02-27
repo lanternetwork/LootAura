@@ -272,6 +272,7 @@ export async function middleware(req: NextRequest) {
     pathname === '/favorites' ||
     pathname.startsWith('/favorites/') ||
     pathname.startsWith('/account') ||  // Remove trailing slash to match /account
+    pathname === '/accountremoval' ||
     pathname.startsWith('/admin/');
   
   // 7. Write APIs that require authentication

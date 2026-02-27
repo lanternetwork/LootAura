@@ -117,7 +117,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const wrappedHandler = async (request: NextRequest) => {
     return favoriteHandler(request, context)
   }
-  const rateLimitedHandler = withRateLimit(wrappedHandler, [Policies.MUTATE_MINUTE])
+  const rateLimitedHandler = withRateLimit(wrappedHandler, [Policies.FAVORITES_MINUTE])
   return rateLimitedHandler(req)
 }
 

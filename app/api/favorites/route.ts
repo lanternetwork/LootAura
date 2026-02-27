@@ -196,5 +196,5 @@ async function deleteHandler(request: NextRequest) {
   }
 }
 
-export const POST = withRateLimit(postHandler, [Policies.MUTATE_MINUTE])
-export const DELETE = withRateLimit(deleteHandler, [Policies.MUTATE_MINUTE])
+export const POST = withRateLimit(postHandler, [Policies.FAVORITES_MINUTE])
+export const DELETE = withRateLimit(deleteHandler, [Policies.FAVORITES_MINUTE])

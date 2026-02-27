@@ -3,8 +3,10 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkCsrfIfRequired } from '@/lib/api/csrfCheck'
 import { fail, ok } from '@/lib/http/json'
 import { logger } from '@/lib/log'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+async function favoriteHandler(req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   // CSRF protection check
   const csrfError = await checkCsrfIfRequired(req)
   if (csrfError) {
@@ -110,4 +112,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return ok({ favorited: true })
 }
 
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> | { id: string } }) {
+  // Create a wrapper that captures params for the rate-limited handler
+  const wrappedHandler = async (request: NextRequest) => {
+    return favoriteHandler(request, context)
+  }
+  const rateLimitedHandler = withRateLimit(wrappedHandler, [Policies.MUTATE_MINUTE])
+  return rateLimitedHandler(req)
+}
 

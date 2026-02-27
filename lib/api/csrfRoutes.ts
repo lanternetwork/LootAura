@@ -27,6 +27,7 @@ export const CSRF_PROTECTED_ROUTES = [
   '/api/v2/profiles', // POST
   '/api/preferences', // PUT
   '/api/analytics/track', // POST (user-initiated)
+  '/api/account/deletion-requests', // POST
 ] as const
 
 /**

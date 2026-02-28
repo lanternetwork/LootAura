@@ -44,5 +44,5 @@
 ## Step 2: Expo SDK 53 Compatible Versions
 
 Using Expo's recommended approach, the exact versions for Expo SDK 53 are:
-- react-native-screens: `4.7.0` (or latest 4.x compatible with RN 0.79)
-- react-native-safe-area-context: `4.15.0` (or latest 4.x compatible with SDK 53)
+- react-native-screens: `4.7.0` (exact version compatible with RN 0.79)
+- react-native-safe-area-context: `4.14.0` (exact version - 4.15.0 doesn't exist, using latest 4.14.x)

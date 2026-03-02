@@ -5,10 +5,15 @@ import { useEffect } from 'react';
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 
-// Initialize Sentry only in production builds
+// Initialize Sentry only in production builds when not disabled by env
 // EXPO_PUBLIC_SENTRY_DSN is injected at build time via EAS env vars
 const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-if (!__DEV__ && sentryDsn) {
+const sentryEnabledEnv = process.env.EXPO_PUBLIC_SENTRY_ENABLED;
+const isSentryDisabled =
+  sentryEnabledEnv !== undefined &&
+  sentryEnabledEnv !== '' &&
+  ['0', 'false', 'off'].includes(sentryEnabledEnv.toLowerCase());
+if (!__DEV__ && sentryDsn && !isSentryDisabled) {
   Sentry.init({
     dsn: sentryDsn,
     enableInExpoDevelopment: false,
@@ -20,6 +25,8 @@ if (!__DEV__ && sentryDsn) {
     // Performance monitoring
     tracesSampleRate: 0.1,
   });
+} else if (isSentryDisabled) {
+  console.info('[Sentry] Disabled via EXPO_PUBLIC_SENTRY_ENABLED');
 }
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

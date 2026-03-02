@@ -163,6 +163,13 @@ export default function SalesClient({
       }
     }
   }, [])
+
+  // Fire-and-forget prefetch of the map chunk so it is ready when the map container renders.
+  // SalesClient only mounts on /sales, so this runs only for that route; useEffect is client-only.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    import('@/components/location/SimpleMap').catch(() => {})
+  }, [])
   
   // Helper function to check if map is centered on a location
   const isCenteredOnLocation = useCallback((

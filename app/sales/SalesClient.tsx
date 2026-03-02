@@ -168,17 +168,7 @@ export default function SalesClient({
   // SalesClient only mounts on /sales, so this runs only for that route; useEffect is client-only.
   useEffect(() => {
     if (typeof window === 'undefined') return
-    performance.mark('map-chunk-prefetch-start')
-    import('@/components/location/SimpleMap')
-      .then(() => {
-        performance.mark('map-chunk-prefetch-end')
-        performance.measure(
-          'map-chunk-prefetch-duration',
-          'map-chunk-prefetch-start',
-          'map-chunk-prefetch-end'
-        )
-      })
-      .catch(() => {})
+    import('@/components/location/SimpleMap').catch(() => {})
   }, [])
   
   // Helper function to check if map is centered on a location

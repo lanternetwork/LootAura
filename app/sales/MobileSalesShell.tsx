@@ -118,7 +118,6 @@ export default function MobileSalesShell({
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
-  const mapContainerRenderMarkedRef = useRef(false)
   const [mapLoaded, setMapLoaded] = useState(false)
   
   // Capability detection: separate from layout breakpoint
@@ -248,21 +247,6 @@ export default function MobileSalesShell({
       map.off('zoom', updatePosition)
     }
   }, [selectedPinCoords])
-
-  // Lightweight perf mark when map container is about to render (confirms chunk availability timing).
-  useEffect(() => {
-    if (!mapView || mapContainerRenderMarkedRef.current) return
-    mapContainerRenderMarkedRef.current = true
-    performance.mark('map-container-render')
-    const startMark = performance.getEntriesByName('map-chunk-prefetch-start', 'mark')[0]
-    const endMark = performance.getEntriesByName('map-chunk-prefetch-end', 'mark')[0]
-    if (startMark) {
-      performance.measure('prefetch-start-to-map-render', 'map-chunk-prefetch-start', 'map-container-render')
-    }
-    if (endMark) {
-      performance.measure('prefetch-to-map-render', 'map-chunk-prefetch-end', 'map-container-render')
-    }
-  }, [mapView])
   
   // Handle mode toggle
   const handleToggleMode = useCallback(() => {

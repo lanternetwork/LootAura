@@ -48,6 +48,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Node.js 20
+        if: hashFiles('mobile/package-lock.json') == ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate mobile/package-lock.json if missing
+        if: hashFiles('mobile/package-lock.json') == ''
+        id: generate
+        run: |
+          cd mobile
+          npm install
+          echo "generated=true" >> "$GITHUB_OUTPUT"
+          echo "Generated mobile/package-lock.json"
+
+      - name: Upload generated lockfile
+        if: steps.generate.outputs.generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-lockfile-generated
+          path: mobile/package-lock.json
+
       - name: Verify mobile/package-lock.json exists
         run: |
           if [ ! -f mobile/package-lock.json ]; then
@@ -55,6 +77,12 @@ jobs:
             exit 1
           fi
           echo "mobile/package-lock.json present."
+
+      - name: Fail when lockfile was generated (commit the artifact)
+        if: steps.generate.outputs.generated == 'true'
+        run: |
+          echo "::error::mobile/package-lock.json was missing and was generated in this run. Download the artifact 'mobile-lockfile-generated', extract mobile/package-lock.json into your repo root, commit, and push."
+          exit 1
 
       - name: Enforce package.json implies lockfile changed (PRs)
         if: github.event_name == 'pull_request'

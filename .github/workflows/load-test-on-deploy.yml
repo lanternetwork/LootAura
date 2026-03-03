@@ -7,7 +7,6 @@ on:
 jobs:
   determine-url:
     runs-on: ubuntu-latest
-    if: github.event_name == 'deployment_status'
     continue-on-error: true
     outputs:
       url: ${{ steps.url.outputs.url }}
@@ -38,7 +37,7 @@ jobs:
 
   run-load-tests:
     uses: ./.github/workflows/load-test.yml
-    if: always() && needs.determine-url.result == 'success' && needs.determine-url.outputs.url != ''
+    if: needs.determine-url.result == 'success' && needs.determine-url.outputs.url != ''
     needs: determine-url
     continue-on-error: true
     with:

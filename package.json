@@ -1,7 +1,7 @@
 {
   "name": "yard-sale-finder",
   "private": true,
-  "version": "149",
+  "version": "150",
   "description": "Find yard sales near you - Force redeploy for OAuth fix",
   "engines": {
     "node": "^20"
@@ -86,7 +86,8 @@
     "cookie": "^0.7.2",
     "prismjs": "^1.27.0",
     "nodemailer": "^7.0.11",
-    "ini": "^1.3.8"
+    "ini": "^1.3.8",
+    "@testing-library/dom": "^10.4.0"
   },
   "devDependencies": {
     "eslint-config-next": "^14.2.35",

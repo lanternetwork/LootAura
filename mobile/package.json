@@ -36,6 +36,11 @@
     "glob": "^10.3.10",
     "typescript": "~5.8.3"
   },
+  "expo": {
+    "install": {
+      "exclude": ["@sentry/react-native"]
+    }
+  },
   "private": true
 }
 

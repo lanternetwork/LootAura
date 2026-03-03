@@ -57,13 +57,13 @@
           ]
         }
       ],
-      "permissions": [],
-      "statusBar": {
-        "barStyle": "dark-content",
-        "backgroundColor": "#ffffff",
-        "hidden": false,
-        "translucent": false
-      }
+      "permissions": []
+    },
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#ffffff",
+      "hidden": false,
+      "translucent": false
     },
     "ios": {
       "supportsTablet": true,

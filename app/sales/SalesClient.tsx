@@ -27,7 +27,7 @@ import {
 } from '@/lib/map/bounds'
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
-import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable, logLocationFallback } from '@/lib/map/geolocation'
+import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable } from '@/lib/map/geolocation'
 import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { haversineMeters } from '@/lib/geo/distance'

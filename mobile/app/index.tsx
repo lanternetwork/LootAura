@@ -941,6 +941,7 @@ export default function HomeScreen() {
           <WebView
             ref={webViewRef}
             source={{ uri: currentUrl }}
+            geolocationEnabled={true}
             // Removed key={currentUrl} to prevent full remount on navigation
             // Navigation is handled via source prop changes, which triggers onLoadStart/onLoadEnd
             style={[

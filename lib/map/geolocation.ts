@@ -7,6 +7,8 @@
  * - Respects user interaction to prevent surprise recentering
  */
 
+import * as Sentry from '@sentry/nextjs'
+
 const GEO_DENIED_KEY = 'geo:denied'
 const GEO_DENIED_TIMESTAMP_KEY = 'geo:denied:timestamp'
 // Don't reprompt for 30 days after denial
@@ -174,4 +176,30 @@ export function isMobileBreakpoint(): boolean {
     return false
   }
   return window.innerWidth < 768
+}
+
+/**
+ * Log when the location flow falls back from GPS to a weaker source.
+ * Only has effect when Sentry is active (production with DSN).
+ * Reason codes: denied | timeout | unavailable | error
+ */
+export function logLocationFallback(
+  reason: 'denied' | 'timeout' | 'unavailable' | 'error',
+  fallbackSource: string,
+  details?: Record<string, unknown>
+): void {
+  try {
+    Sentry.addBreadcrumb({
+      category: 'location',
+      message: `Location fallback: GPS failed (${reason}), using ${fallbackSource}`,
+      level: 'info',
+      data: { reason, fallbackSource, ...details }
+    })
+    Sentry.captureMessage('Location fallback from GPS to weaker source', {
+      level: 'info',
+      tags: { reason, fallbackSource }
+    })
+  } catch {
+    // Sentry not available - no-op
+  }
 }

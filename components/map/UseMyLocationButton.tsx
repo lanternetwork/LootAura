@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { requestGeolocation, isGeolocationAvailable, type GeolocationError } from '@/lib/map/geolocation'
+import { requestGeolocation, isGeolocationAvailable, logLocationFallback, type GeolocationError } from '@/lib/map/geolocation'
 
 interface UseMyLocationButtonProps {
   onLocationFound: (lat: number, lng: number, source: 'gps' | 'ip') => void
@@ -53,7 +53,8 @@ export default function UseMyLocationButton({
     // Permission not granted - wait for permission prompt resolution before recentering
     // Don't recenter with IP immediately - wait for user to respond to permission prompt
     if (!isGeolocationAvailable()) {
-      // GPS not available - fallback to IP
+      // GPS not available - fallback to IP (explicitly approximate)
+      logLocationFallback('unavailable', 'ip', { context: 'UseMyLocationButton' })
       try {
         const ipRes = await fetch('/api/geolocation/ip')
         if (ipRes.ok) {
@@ -85,10 +86,10 @@ export default function UseMyLocationButton({
       const geoError = err as GeolocationError
       onError?.(geoError)
       
-      // If permission denied or error, fallback to IP
+      // If permission denied or error, fallback to IP with telemetry (explicitly approximate)
       if (geoError.code === 1) {
         setError('Location access denied')
-        // Fallback to IP when permission denied
+        logLocationFallback('denied', 'ip', { context: 'UseMyLocationButton' })
         fetch('/api/geolocation/ip').then(ipRes => {
           if (ipRes.ok) {
             return ipRes.json()
@@ -104,7 +105,7 @@ export default function UseMyLocationButton({
         })
       } else if (geoError.code === 2) {
         setError('Location unavailable')
-        // Fallback to IP when unavailable
+        logLocationFallback('unavailable', 'ip', { context: 'UseMyLocationButton' })
         fetch('/api/geolocation/ip').then(ipRes => {
           if (ipRes.ok) {
             return ipRes.json()
@@ -120,7 +121,7 @@ export default function UseMyLocationButton({
         })
       } else if (geoError.code === 3) {
         setError('Location request timed out')
-        // Fallback to IP on timeout
+        logLocationFallback('timeout', 'ip', { context: 'UseMyLocationButton' })
         fetch('/api/geolocation/ip').then(ipRes => {
           if (ipRes.ok) {
             return ipRes.json()
@@ -136,6 +137,7 @@ export default function UseMyLocationButton({
         })
       } else {
         setError('Failed to get location')
+        logLocationFallback('error', 'ip', { context: 'UseMyLocationButton', code: geoError.code })
         setIsLoading(false)
       }
       setTimeout(() => setError(null), 3000)

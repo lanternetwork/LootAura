@@ -18,7 +18,7 @@ import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
-import { requestGeolocation, isGeolocationAvailable } from '@/lib/map/geolocation'
+import { requestGeolocation, isGeolocationAvailable, logLocationFallback } from '@/lib/map/geolocation'
 
 const HEADER_HEIGHT = 56 // px - mobile header height (h-14 = 56px)
 
@@ -265,7 +265,8 @@ export default function MobileSalesShell({
     // Fire GPS first to trigger permission prompt
     // Don't recenter with IP immediately - wait for user to respond to permission prompt
     if (!isGeolocationAvailable()) {
-      // GPS not available - fallback to IP immediately
+      // GPS not available - fallback to IP (explicitly approximate)
+      logLocationFallback('unavailable', 'ip', { context: 'MobileSalesShell' })
       try {
         const ipRes = await fetch('/api/geolocation/ip')
         if (ipRes.ok) {
@@ -312,8 +313,9 @@ export default function MobileSalesShell({
             setIsLocationLoading(false)
           })
         }).catch(() => {
-          // GPS failed - fallback to IP
+          // GPS failed (timeout after low-accuracy retry) - fallback to IP
           if (!resolvedLocation) {
+            logLocationFallback('timeout', 'ip', { context: 'MobileSalesShell' })
             fetch('/api/geolocation/ip').then(ipRes => {
               if (ipRes.ok) {
                 return ipRes.json()
@@ -338,8 +340,10 @@ export default function MobileSalesShell({
           }
         })
       } else {
-        // Permission denied or other error - fallback to IP
+        // Permission denied or other error - fallback to IP with telemetry
+        const reason = geoError.code === 1 ? 'denied' : geoError.code === 2 ? 'unavailable' : 'error'
         if (!resolvedLocation) {
+          logLocationFallback(reason, 'ip', { context: 'MobileSalesShell', code: geoError.code })
           fetch('/api/geolocation/ip').then(ipRes => {
             if (ipRes.ok) {
               return ipRes.json()

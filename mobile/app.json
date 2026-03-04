@@ -57,7 +57,7 @@
           ]
         }
       ],
-      "permissions": []
+      "permissions": ["android.permission.ACCESS_FINE_LOCATION"]
     },
     "androidStatusBar": {
       "barStyle": "light-content",

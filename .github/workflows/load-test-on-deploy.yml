@@ -7,22 +7,29 @@ on:
 jobs:
   determine-url:
     runs-on: ubuntu-latest
-    if: github.event.deployment_status.state == 'success'
     continue-on-error: true
     outputs:
       url: ${{ steps.url.outputs.url }}
     steps:
       - name: Determine target URL
         id: url
+        env:
+          DEPLOY_STATE: ${{ github.event.deployment_status.state || '' }}
+          ENV_URL: ${{ github.event.deployment_status.environment_url || '' }}
+          TARGET_URL: ${{ github.event.deployment_status.target_url || '' }}
         run: |
-          # Prefer environment_url; fallback to target_url
-          URL="${{ github.event.deployment_status.environment_url }}"
+          # Only set URL when deployment succeeded; otherwise output empty so run-load-tests is skipped
+          if [ "$DEPLOY_STATE" != "success" ]; then
+            echo "::notice::Deployment state is not success (got: $DEPLOY_STATE); skipping load tests"
+            echo "url=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          URL="$ENV_URL"
           if [ -z "$URL" ]; then
-            URL="${{ github.event.deployment_status.target_url }}"
+            URL="$TARGET_URL"
           fi
           if [ -z "$URL" ]; then
             echo "::notice::No deployment URL found; skipping load tests"
-            # Do not fail the workflow when there's no URL (e.g., previewless deployments)
             echo "url=" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -30,7 +37,7 @@ jobs:
 
   run-load-tests:
     uses: ./.github/workflows/load-test.yml
-    if: github.event.deployment_status.state == 'success' && needs.determine-url.outputs.url != ''
+    if: needs.determine-url.result == 'success' && needs.determine-url.outputs.url != ''
     needs: determine-url
     continue-on-error: true
     with:

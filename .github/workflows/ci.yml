@@ -39,6 +39,85 @@ jobs:
           fi
           echo "✅ All required environment variables present"
 
+  mobile-lockfile-check:
+    name: mobile-lockfile-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        if: hashFiles('mobile/package-lock.json') == ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate mobile/package-lock.json if missing
+        if: hashFiles('mobile/package-lock.json') == ''
+        id: generate
+        run: |
+          cd mobile
+          npm install
+          echo "generated=true" >> "$GITHUB_OUTPUT"
+          echo "Generated mobile/package-lock.json"
+
+      - name: Upload generated lockfile
+        if: steps.generate.outputs.generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-lockfile-generated
+          path: mobile/package-lock.json
+
+      - name: Verify mobile/package-lock.json exists
+        run: |
+          if [ ! -f mobile/package-lock.json ]; then
+            echo "::error::mobile/package-lock.json is missing. All mobile builds must use a lockfile. Generate it and commit it before merging."
+            exit 1
+          fi
+          echo "mobile/package-lock.json present."
+
+      - name: Fail when lockfile was generated (commit the artifact)
+        if: steps.generate.outputs.generated == 'true'
+        run: |
+          echo "::error::mobile/package-lock.json was missing and was generated in this run. Download the artifact 'mobile-lockfile-generated', extract mobile/package-lock.json into your repo root, commit, and push."
+          exit 1
+
+      - name: Enforce package.json implies lockfile changed (PRs)
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          PKG_CHANGED=$(git diff --name-only "$BASE" HEAD -- mobile/package.json)
+          LOCK_CHANGED=$(git diff --name-only "$BASE" HEAD -- mobile/package-lock.json)
+          if [ -n "$PKG_CHANGED" ] && [ -z "$LOCK_CHANGED" ]; then
+            echo "::error::mobile/package.json changed without updating mobile/package-lock.json. Run 'npm install' in mobile/ and commit the updated lockfile."
+            exit 1
+          fi
+          echo "mobile/package.json and lockfile in sync (or package.json unchanged)."
+
+  mobile-expo-doctor:
+    name: mobile-expo-doctor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install mobile dependencies from lockfile
+        run: |
+          cd mobile
+          npm ci
+
+      - name: Run expo doctor
+        run: |
+          cd mobile
+          npx expo-doctor
+
   lint:
     name: lint
     runs-on: ubuntu-latest

@@ -902,6 +902,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Solid strip behind system status bar so icons stay visible with edge-to-edge */}
+      {insets.top > 0 ? (
+        <View style={[styles.statusBarBackground, { height: insets.top }]} pointerEvents="none" />
+      ) : null}
       {/* Diagnostic HUD - Only visible when EXPO_PUBLIC_NATIVE_HUD=1 */}
       {isNativeHudEnabled && (
         <View style={styles.diagnosticHud} pointerEvents="none">
@@ -1356,6 +1360,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#3A2268',
+  },
+  statusBarBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#3A2268',
+    zIndex: 1,
+    elevation: 1,
   },
   webview: {
     flex: 1,

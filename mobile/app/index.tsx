@@ -10,8 +10,8 @@ import { getHideSplashOnce } from './_layout';
 const LOOTAURA_URL = 'https://lootaura.com/sales';
 
 export default function HomeScreen() {
-  // Gate diagnostic HUD behind environment variable
-  const isNativeHudEnabled = process.env.EXPO_PUBLIC_NATIVE_HUD === '1';
+  // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
+  const isDiagnosticsEnabled = process.env.EXPO_PUBLIC_NATIVE_HUD === '1';
   const [loading, setLoading] = useState(false); // Start hidden, show only when needed
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -140,7 +140,7 @@ export default function HomeScreen() {
 
   // Enterprise-ready loader management with idempotent state control
   const startLoader = (reason: string) => {
-    setLastNavAction(`startLoader: ${reason}`);
+    if (isDiagnosticsEnabled) setLastNavAction(`startLoader: ${reason}`);
     
     // Clear any existing timeouts
     if (loadTimeoutRef.current) {
@@ -201,7 +201,7 @@ export default function HomeScreen() {
       return;
     }
     
-    setLastNavAction(`stopLoader: ${signal}`);
+    if (isDiagnosticsEnabled) setLastNavAction(`stopLoader: ${signal}`);
     
     // Clear all timeouts
     if (loadTimeoutRef.current) {
@@ -469,7 +469,7 @@ export default function HomeScreen() {
     } else {
       // After ready, only show loader for real page loads (not SPA transitions)
       // We'll rely on navState.loading to determine if this is a real load
-      setLastNavAction(`onLoadStart (ready): ${url || 'unknown'}`);
+      if (isDiagnosticsEnabled) setLastNavAction(`onLoadStart (ready): ${url || 'unknown'}`);
     }
   };
 
@@ -593,8 +593,8 @@ export default function HomeScreen() {
       stopLoader('navState.loading=false', path);
     }
     
-    // Track navigation action when URL changes
-    if (url && url !== currentWebViewUrl) {
+    // Track navigation action when URL changes (diagnostics only)
+    if (isDiagnosticsEnabled && url && url !== currentWebViewUrl) {
       try {
         const parsedUrl = new URL(url);
         const pathname = parsedUrl.pathname;
@@ -616,8 +616,10 @@ export default function HomeScreen() {
   const handleMessage = (event: any) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
-      const messageStr = JSON.stringify(message);
-      setLastMessageReceived(messageStr.length > 100 ? messageStr.substring(0, 97) + '...' : messageStr);
+      if (isDiagnosticsEnabled) {
+        const messageStr = JSON.stringify(message);
+        setLastMessageReceived(messageStr.length > 100 ? messageStr.substring(0, 97) + '...' : messageStr);
+      }
       
       // Enterprise-ready APP_READY signal handling with strict validation
       if (message.type === 'APP_READY') {
@@ -676,41 +678,43 @@ export default function HomeScreen() {
         // Favorite state update from web
         setIsFavorited(message.isFavorited === true);
       } else if (message.type === 'LAYOUT_DIAG') {
-        // Layout diagnostics from web
-        setLayoutDiag({
-          bottomEl: message.bottomEl || null,
-          footerH: message.footerH !== undefined ? message.footerH : null,
-          footerTop: message.footerTop !== undefined ? message.footerTop : null,
-          footerBottom: message.footerBottom !== undefined ? message.footerBottom : null,
-          pb: message.pb || null,
-          pbSelectorUsed: message.pbSelectorUsed || null,
-          pbElDesc: message.pbElDesc || null,
-          pbMobileWrapper: message.pbMobileWrapper || null,
-          pbOther: message.pbOther || null,
-          vh: message.vh !== undefined ? message.vh : null,
-          y: message.y !== undefined ? message.y : null,
-          sh: message.sh !== undefined ? message.sh : null,
-          hasMobileContainer: message.hasMobileContainer !== undefined ? message.hasMobileContainer : null,
-          hasEndEl: message.hasEndEl !== undefined ? message.hasEndEl : null,
-          contentEnd: message.contentEnd !== undefined ? message.contentEnd : null,
-          gapAfterContentPx: message.gapAfterContentPx !== undefined ? message.gapAfterContentPx : null,
-          gapBelowViewportPx: message.gapBelowViewportPx !== undefined ? message.gapBelowViewportPx : null,
-        });
+        // Layout diagnostics from web (only when diagnostics enabled)
+        if (isDiagnosticsEnabled) {
+          setLayoutDiag({
+            bottomEl: message.bottomEl || null,
+            footerH: message.footerH !== undefined ? message.footerH : null,
+            footerTop: message.footerTop !== undefined ? message.footerTop : null,
+            footerBottom: message.footerBottom !== undefined ? message.footerBottom : null,
+            pb: message.pb || null,
+            pbSelectorUsed: message.pbSelectorUsed || null,
+            pbElDesc: message.pbElDesc || null,
+            pbMobileWrapper: message.pbMobileWrapper || null,
+            pbOther: message.pbOther || null,
+            vh: message.vh !== undefined ? message.vh : null,
+            y: message.y !== undefined ? message.y : null,
+            sh: message.sh !== undefined ? message.sh : null,
+            hasMobileContainer: message.hasMobileContainer !== undefined ? message.hasMobileContainer : null,
+            hasEndEl: message.hasEndEl !== undefined ? message.hasEndEl : null,
+            contentEnd: message.contentEnd !== undefined ? message.contentEnd : null,
+            gapAfterContentPx: message.gapAfterContentPx !== undefined ? message.gapAfterContentPx : null,
+            gapBelowViewportPx: message.gapBelowViewportPx !== undefined ? message.gapBelowViewportPx : null,
+          });
+        }
       } else if (message.type === 'NAVIGATE') {
         // Handle navigation request from header
         const path = message.path || message.url || '/';
-        setLastNavigateMessage(`NAVIGATE: ${path}`);
+        if (isDiagnosticsEnabled) setLastNavigateMessage(`NAVIGATE: ${path}`);
         
         console.log('[NATIVE] Navigating WebView to:', path);
         // Sanitize and validate URL before navigation
         const sanitizedUrl = sanitizeNavigationUrl(path);
         if (sanitizedUrl) {
-          setLastSanitizerDecision(`ALLOWED: ${sanitizedUrl}`);
+          if (isDiagnosticsEnabled) setLastSanitizerDecision(`ALLOWED: ${sanitizedUrl}`);
           setSanitizerRejectionBanner(''); // Clear any rejection banner
           executeNavigation(sanitizedUrl, 'WebView message');
         } else {
           const rejectionReason = `REJECTED: ${path}`;
-          setLastSanitizerDecision(rejectionReason);
+          if (isDiagnosticsEnabled) setLastSanitizerDecision(rejectionReason);
           setSanitizerRejectionBanner(rejectionReason);
           console.warn('[NATIVE] Rejected unsafe navigation URL:', path);
           // Clear banner after 5 seconds
@@ -771,25 +775,25 @@ export default function HomeScreen() {
       
       const lowerUrl = decodedUrl.toLowerCase();
       if (dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme))) {
-        setLastSanitizerDecision(`REJECTED: dangerous scheme`);
+        if (isDiagnosticsEnabled) setLastSanitizerDecision(`REJECTED: dangerous scheme`);
         return null;
       }
       
       // Reject absolute URLs with any protocol (http://, https://, etc.)
       if (decodedUrl.includes('://')) {
-        setLastSanitizerDecision(`REJECTED: absolute URL`);
+        if (isDiagnosticsEnabled) setLastSanitizerDecision(`REJECTED: absolute URL`);
         return null;
       }
       
       // Reject URLs with hostnames (security: prevent open redirects)
       if (decodedUrl.includes('@') || decodedUrl.match(/^[a-zA-Z0-9.-]+\.[a-zA-Z]/)) {
-        setLastSanitizerDecision(`REJECTED: hostname detected`);
+        if (isDiagnosticsEnabled) setLastSanitizerDecision(`REJECTED: hostname detected`);
         return null;
       }
       
       // Only allow relative paths starting with /
       if (!decodedUrl.startsWith('/')) {
-        setLastSanitizerDecision(`REJECTED: not relative path`);
+        if (isDiagnosticsEnabled) setLastSanitizerDecision(`REJECTED: not relative path`);
         return null;
       }
       
@@ -806,16 +810,16 @@ export default function HomeScreen() {
       });
       
       if (!isAllowed) {
-        setLastSanitizerDecision(`REJECTED: path not in allowlist (${pathMatch})`);
+        if (isDiagnosticsEnabled) setLastSanitizerDecision(`REJECTED: path not in allowlist (${pathMatch})`);
         return null;
       }
       
       // Return sanitized relative path
-      setLastSanitizerDecision(`ALLOWED: ${decodedUrl}`);
+      if (isDiagnosticsEnabled) setLastSanitizerDecision(`ALLOWED: ${decodedUrl}`);
       return decodedUrl;
     } catch (e) {
       // If URL parsing/decoding fails, reject it
-      setLastSanitizerDecision(`REJECTED: parse error`);
+      if (isDiagnosticsEnabled) setLastSanitizerDecision(`REJECTED: parse error`);
       return null;
     }
   };
@@ -830,9 +834,11 @@ export default function HomeScreen() {
     // Build full URL
     const fullUrl = `${LOOTAURA_URL}${relativePath}`;
     console.log('[NATIVE] Executing navigation to:', fullUrl);
-    setLastNavAction(`executeNavigation -> ${relativePath}`);
-    setLastNavRequest(relativePath);
-    setLastNavSource(source);
+    if (isDiagnosticsEnabled) {
+      setLastNavAction(`executeNavigation -> ${relativePath}`);
+      setLastNavRequest(relativePath);
+      setLastNavSource(source);
+    }
     
     // Use state-driven navigation - update currentUrl to trigger WebView reload
     // This properly triggers onLoadStart/onLoadEnd lifecycle events
@@ -858,7 +864,7 @@ export default function HomeScreen() {
       
       // Open external HTTP/HTTPS links in system browser
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
-        setLastNavAction(`blocked external link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
+        if (isDiagnosticsEnabled) setLastNavAction(`blocked external link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
         stopLoader('blockedExternalLink', parsedUrl.pathname);
         return false; // Prevent WebView from loading external URLs
@@ -867,7 +873,7 @@ export default function HomeScreen() {
       // If URL parsing fails, check for non-HTTP protocols
       // Allow other protocols (mailto:, tel:, etc.) to open in system apps
       if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
-        setLastNavAction(`blocked protocol link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
+        if (isDiagnosticsEnabled) setLastNavAction(`blocked protocol link: ${url.length > 40 ? url.substring(0, 37) + '...' : url}`);
         Linking.openURL(url);
         stopLoader('blockedProtocolLink', '/');
         return false;
@@ -906,8 +912,8 @@ export default function HomeScreen() {
       {insets.top > 0 ? (
         <View style={[styles.statusBarBackground, { height: insets.top }]} pointerEvents="none" />
       ) : null}
-      {/* Diagnostic HUD - Only visible when EXPO_PUBLIC_NATIVE_HUD=1 */}
-      {isNativeHudEnabled && (
+      {/* Diagnostic HUD - Only visible when diagnostics enabled */}
+      {isDiagnosticsEnabled && (
         <View style={styles.diagnosticHud} pointerEvents="none">
           <Text style={styles.diagnosticText} numberOfLines={20}>
             index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | pbSel={layoutDiag.pbSelectorUsed || 'none'} | pbMobile={layoutDiag.pbMobileWrapper ? (layoutDiag.pbMobileWrapper.length > 20 ? layoutDiag.pbMobileWrapper.substring(0, 17) + '...' : layoutDiag.pbMobileWrapper) : 'none'} | pbOther={layoutDiag.pbOther ? (layoutDiag.pbOther.length > 20 ? layoutDiag.pbOther.substring(0, 17) + '...' : layoutDiag.pbOther) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | hasMobile={layoutDiag.hasMobileContainer !== null ? (layoutDiag.hasMobileContainer ? 'T' : 'F') : '?'} | hasEndEl={layoutDiag.hasEndEl !== null ? (layoutDiag.hasEndEl ? 'T' : 'F') : '?'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | gapAfter={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | gapBelow={layoutDiag.gapBelowViewportPx !== null ? layoutDiag.gapBelowViewportPx.toFixed(0) : 'none'}
@@ -959,6 +965,7 @@ export default function HomeScreen() {
             injectedJavaScript={`
               (function() {
                 if (!window.ReactNativeWebView) return;
+                const DIAGNOSTICS_ENABLED = ${isDiagnosticsEnabled ? 'true' : 'false'};
                 
                 const reportLayoutDiagnostics = () => {
                   try {
@@ -1125,10 +1132,11 @@ export default function HomeScreen() {
                       hasRNBridge: hasRNBridge
                     }));
                     
-                    // Report layout diagnostics after route state with delay to allow DOM to settle
-                    setTimeout(reportLayoutDiagnostics, 50);
-                    // Also report after a longer delay to catch late-rendering content
-                    setTimeout(reportLayoutDiagnostics, 350);
+                    if (DIAGNOSTICS_ENABLED) {
+                      // Report layout diagnostics after route state with delay to allow DOM to settle
+                      setTimeout(reportLayoutDiagnostics, 50);
+                      setTimeout(reportLayoutDiagnostics, 350);
+                    }
                   } catch (e) {
                     // Silently fail if postMessage fails
                   }
@@ -1291,12 +1299,13 @@ export default function HomeScreen() {
                   setTimeout(reportRouteState, 0);
                 });
                 
-                // Also trigger diagnostics on scroll to catch bottom measurements
-                let scrollTimeout = null;
-                window.addEventListener('scroll', () => {
-                  if (scrollTimeout) clearTimeout(scrollTimeout);
-                  scrollTimeout = setTimeout(reportLayoutDiagnostics, 100);
-                }, { passive: true });
+                if (DIAGNOSTICS_ENABLED) {
+                  let scrollTimeout = null;
+                  window.addEventListener('scroll', () => {
+                    if (scrollTimeout) clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(reportLayoutDiagnostics, 100);
+                  }, { passive: true });
+                }
               })();
               true; // Required for iOS
             `}

@@ -27,7 +27,7 @@ import {
 } from '@/lib/map/bounds'
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
-import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable } from '@/lib/map/geolocation'
+import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable, logLocationFallback } from '@/lib/map/geolocation'
 import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { haversineMeters } from '@/lib/geo/distance'
@@ -105,7 +105,7 @@ export default function SalesClient({
   const writeLocationCookie = useCallback((
     lat: number,
     lng: number,
-    source: 'gps' | 'user' | 'initial',
+    source: 'gps' | 'user' | 'initial' | 'ip',
     metadata?: { zip?: string; city?: string; state?: string }
   ) => {
     // Validate coordinates
@@ -2200,9 +2200,8 @@ export default function SalesClient({
     } else {
       checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
     }
-
-    // Persist user-initiated location to cookie (high-confidence source)
-    writeLocationCookie(lat, lng, 'user')
+    // Persist to cookie with explicit source (IP must not be stored as gps or user)
+    writeLocationCookie(lat, lng, source === 'ip' ? 'ip' : 'user')
 
     // Recenter map
     forceRecenterToLocation(map, lat, lng, 'user')
@@ -2231,10 +2230,8 @@ export default function SalesClient({
         } else {
           checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
         }
-        
-        // Persist user-initiated location to cookie (high-confidence source)
-        writeLocationCookie(location.lat, location.lng, 'user')
-        
+        // Persist to cookie with explicit source (never label IP as gps/user)
+        writeLocationCookie(location.lat, location.lng, source === 'ip' ? 'ip' : 'user')
         flipToUserAuthority()
         recenterToUserLocation(location, 'user')
         setMapView(prev => prev ? { ...prev } : null)
@@ -2248,9 +2245,8 @@ export default function SalesClient({
       } else {
         checkGeolocationPermission().then(setHasLocationPermission).catch(() => setHasLocationPermission(false))
       }
-
-      // Persist user-initiated location to cookie (high-confidence source)
-      writeLocationCookie(location.lat, location.lng, 'user')
+      // Persist to cookie with explicit source (IP must not be stored as gps or user)
+      writeLocationCookie(location.lat, location.lng, source === 'ip' ? 'ip' : 'user')
 
       // Recenter map
       forceRecenterToLocation(mapInstance, location.lat, location.lng, 'user')

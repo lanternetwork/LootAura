@@ -4,7 +4,7 @@
     "slug": "LootAura",
     "scheme": "lootaura",
     "jsEngine": "jsc",
-    "version": "159",
+    "version": "160",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -19,7 +19,7 @@
     "android": {
       "jsEngine": "jsc",
       "package": "com.lootaura.app",
-      "versionCode": 159,
+      "versionCode": 160,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A2268",
@@ -60,8 +60,8 @@
       "permissions": []
     },
     "androidStatusBar": {
-      "barStyle": "dark-content",
-      "backgroundColor": "#ffffff",
+      "barStyle": "light-content",
+      "backgroundColor": "#3A2268",
       "hidden": false,
       "translucent": false
     },

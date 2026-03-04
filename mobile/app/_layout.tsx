@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import Constants from 'expo-constants';
@@ -87,15 +88,11 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <StatusBar style="light" backgroundColor="#3A2268" />
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { paddingBottom: 0 },
-          // Global status bar settings - purple background with light icons
-          statusBarStyle: 'light',
-          statusBarColor: '#3A2268',
-          statusBarTranslucent: false,
-          statusBarHidden: false,
         }}
       >
         <Stack.Screen name="index" />

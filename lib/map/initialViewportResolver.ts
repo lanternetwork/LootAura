@@ -15,6 +15,8 @@
 
 import { loadViewportState, type ViewportState } from './viewportPersistence'
 import { isColdStart, isUserAuthority } from './authority'
+import { isNativeApp } from '@/lib/runtime/isNativeApp'
+import * as Sentry from '@sentry/nextjs'
 
 export interface InitialViewportResult {
   viewport: ViewportState | null
@@ -40,10 +42,12 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
 
   const coldStart = isColdStart()
   const isUser = isUserAuthority()
+  const inApp = isNativeApp()
 
   // If user authority, ignore all automatic sources (GPS, IP, cookies)
   // But allow URL params and persisted viewport (user's own saved position)
-  if (isUser) {
+  // In-app mobile: always use system (geo-first) so persisted viewport does not block auto location
+  if (isUser && !(isMobile && inApp)) {
     // User authority: Only respect URL params if they exist (user-initiated navigation)
     // Ignore GPS, IP, cookies (automatic sources)
     if (urlLat && urlLng) {
@@ -123,19 +127,36 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
     }
   }
 
-  // 2) Mobile cold start: GPS-first (ignore persistence/cookies, but only if no user interaction)
-  // URL params already handled above, so we're past that point
-  if (isMobile && coldStart && !userInteracted) {
+  // 2) Mobile cold start or in-app mobile: GPS-first (only if no user interaction)
+  // In-app: treat as geo-first even when sessionStorage makes coldStart false, so persisted viewport does not block auto location
+  if (isMobile && (coldStart || inApp) && !userInteracted) {
+    const persistedForPlaceholder = loadViewportState()
+    const placeholder = persistedForPlaceholder?.viewport &&
+      !isNaN(persistedForPlaceholder.viewport.lat) && !isNaN(persistedForPlaceholder.viewport.lng) &&
+      persistedForPlaceholder.viewport.lat >= -90 && persistedForPlaceholder.viewport.lat <= 90 &&
+      persistedForPlaceholder.viewport.lng >= -180 && persistedForPlaceholder.viewport.lng <= 180 &&
+      (persistedForPlaceholder.viewport.zoom ?? 0) >= 0 && (persistedForPlaceholder.viewport.zoom ?? 0) <= 22
+      ? persistedForPlaceholder.viewport
+      : null
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[VIEWPORT_RESOLVER] Mobile cold start: GPS-first, ignoring persistence/cookies')
+      console.log('[VIEWPORT_RESOLVER] Mobile geo-first (coldStart:', coldStart, 'inApp:', inApp, ')', placeholder ? 'with persisted placeholder' : '')
     }
-    // Return geo signal to attempt GPS
-    // GPS will be attempted even if persisted viewport exists
+    try {
+      Sentry.addBreadcrumb({
+        category: 'location',
+        message: inApp ? 'Launch path: in-app mobile geo-first' : 'Launch path: mobile cold start geo-first',
+        level: 'info',
+        data: { inApp, coldStart, source: 'geo', persistedPlaceholder: !!placeholder }
+      })
+    } catch {
+      // Sentry not available - no-op
+    }
+    // Use placeholder only for center/zoom (first paint); keep viewport null so tests and callers that expect "geo = no persisted viewport" still hold
     return {
       viewport: null,
       source: 'geo',
-      center: null,
-      zoom: null
+      center: placeholder ? { lat: placeholder.lat, lng: placeholder.lng } : null,
+      zoom: placeholder?.zoom ?? null
     }
   }
 

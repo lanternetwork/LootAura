@@ -34,7 +34,7 @@ import { haversineMeters } from '@/lib/geo/distance'
 import { checkGeolocationPermission } from '@/lib/location/client'
 import { isDebugEnabled } from '@/lib/debug'
 import * as Sentry from '@sentry/nextjs'
-import { isNativeApp } from '@/lib/runtime/isNativeApp'
+import { isNativeApp, isNativeAppViaUserAgent } from '@/lib/runtime/isNativeApp'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -1430,21 +1430,23 @@ export default function SalesClient({
   //   Bypasses ALL guards - always recenters regardless of authority state
   useEffect(() => {
     const inApp = isNativeApp()
+    const inAppViaUa = isNativeAppViaUserAgent()
     const addLaunchBreadcrumb = (data: { skipped?: boolean; reason?: string; autoGeoRunning?: boolean }) => {
       try {
         Sentry.addBreadcrumb({
           category: 'location',
           message: data.autoGeoRunning ? 'Auto geo running (cold start)' : data.skipped ? 'Auto geo skipped' : 'Launch path',
           level: 'info',
-          data: { inApp, source: resolvedViewport.source, isMobile, ...data }
+          data: { inApp, inAppViaUa: inApp ? inAppViaUa : undefined, source: resolvedViewport.source, isMobile, ...data }
         })
       } catch {
         // Sentry not available - no-op
       }
     }
 
-    // Only attempt on mobile, if resolver indicated geolocation should be attempted
-    if (!isMobile || resolvedViewport.source !== 'geo') {
+    // Attempt on mobile when resolver said geo, or when in-app mobile (run once even if resolved source is persisted)
+    const allowAutoGeo = isMobile && (resolvedViewport.source === 'geo' || (inApp && resolvedViewport.source === 'persisted'))
+    if (!allowAutoGeo) {
       addLaunchBreadcrumb({ skipped: true, reason: !isMobile ? 'not_mobile' : 'not_geo_source' })
       return
     }

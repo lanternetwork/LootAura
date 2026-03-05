@@ -15,7 +15,7 @@
 
 import { loadViewportState, type ViewportState } from './viewportPersistence'
 import { isColdStart, isUserAuthority } from './authority'
-import { isNativeApp } from '@/lib/runtime/isNativeApp'
+import { isNativeApp, isNativeAppViaUserAgent } from '@/lib/runtime/isNativeApp'
 import * as Sentry from '@sentry/nextjs'
 
 export interface InitialViewportResult {
@@ -146,7 +146,7 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
         category: 'location',
         message: inApp ? 'Launch path: in-app mobile geo-first' : 'Launch path: mobile cold start geo-first',
         level: 'info',
-        data: { inApp, coldStart, source: 'geo', persistedPlaceholder: !!placeholder }
+        data: { inApp, inAppViaUa: inApp ? isNativeAppViaUserAgent() : undefined, coldStart, source: 'geo', persistedPlaceholder: !!placeholder }
       })
     } catch {
       // Sentry not available - no-op

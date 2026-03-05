@@ -27,12 +27,13 @@ import {
 } from '@/lib/map/bounds'
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
-import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable } from '@/lib/map/geolocation'
+import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable, logLocationFallback } from '@/lib/map/geolocation'
 import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { haversineMeters } from '@/lib/geo/distance'
 import { checkGeolocationPermission } from '@/lib/location/client'
 import { isDebugEnabled } from '@/lib/debug'
+import * as Sentry from '@sentry/nextjs'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -1475,40 +1476,59 @@ export default function SalesClient({
     })
       .then((location) => {
         markPerformance('sales_geolocation_request_complete')
-        
+        try {
+          Sentry.addBreadcrumb({
+            category: 'location',
+            message: 'Client cold-start location resolution: GPS success',
+            level: 'info',
+            data: { context: 'SalesClientColdStart', outcome: 'gps' }
+          })
+        } catch {
+          // Sentry not available - no-op
+        }
         // Store last known user location (triggers visibility recomputation)
         setLastUserLocation({ lat: location.lat, lng: location.lng, source: 'gps', timestamp: Date.now() })
         // Update permission state immediately (GPS success means permission was granted)
         setHasLocationPermission(true)
-        
         // Persist GPS location to cookie (high-confidence source)
         writeLocationCookie(location.lat, location.lng, 'gps')
-        
         // Check if map is already centered on this location before attempting recenter
         const isAlreadyCentered = mapView?.center ? isCenteredOnLocation(mapView.center, location, 50) : false
-        
         // Automatic GPS: Use reactive recenterToUserLocation with source: 'auto'
-        // This applies authority guard - will NOT recenter if user has taken control
-        // Do NOT use forceRecenterToLocation here - automatic GPS must respect guards
         const didRecenter = recenterToUserLocation(location, 'auto')
-        
-        // Ensure visibility recomputes after auto-geolocation success, even if map doesn't move
-        // This handles the case where auto-prompt grants permission and map is already at user location
         if (!didRecenter && isAlreadyCentered && mapView) {
-          // Map is already centered, force a state update to trigger visibility recomputation
-          // Use a timestamp-based update to ensure React sees it as a change
           setMapView(prev => prev ? { ...prev, zoom: prev.zoom } : null)
         } else if (didRecenter) {
-          // If we did recenter, mapView is already updated, but ensure visibility recomputes
-          // by triggering a small state update (React will dedupe if truly unchanged)
           setMapView(prev => prev ? { ...prev } : null)
         }
       })
-      .catch((error) => {
+      .catch((error: { code?: number }) => {
         if (isDebugEnabled) {
           console.log('[GEO] Geolocation error:', error)
         }
-        // Error handling (denial tracking) is done in requestGeolocation
+        const reason = error?.code === 1 ? 'denied' : error?.code === 2 ? 'unavailable' : error?.code === 3 ? 'timeout' : 'error'
+        logLocationFallback(reason, 'ip', { context: 'SalesClientColdStart', code: error?.code })
+        try {
+          Sentry.addBreadcrumb({
+            category: 'location',
+            message: 'Client cold-start location resolution: IP fallback',
+            level: 'info',
+            data: { context: 'SalesClientColdStart', outcome: 'ip_fallback', reason }
+          })
+        } catch {
+          // Sentry not available - no-op
+        }
+        if (isUserAuthority() || userInteractedRef.current) return
+        fetch('/api/geolocation/ip')
+          .then((ipRes) => (ipRes.ok ? ipRes.json() : null))
+          .then((g: { lat?: number; lng?: number } | null) => {
+            if (!g?.lat || !g?.lng || isUserAuthority() || userInteractedRef.current) return
+            setLastUserLocation({ lat: g.lat, lng: g.lng, source: 'ip', timestamp: Date.now() })
+            writeLocationCookie(g.lat, g.lng, 'ip')
+            recenterToUserLocation({ lat: g.lat, lng: g.lng }, 'auto')
+            setMapView(prev => prev ? { ...prev } : null)
+          })
+          .catch(() => {})
       })
   }, [isMobile, resolvedViewport.source, recenterToUserLocation, mapVisible, markPerformance, writeLocationCookie])
 

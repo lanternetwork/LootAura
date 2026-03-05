@@ -183,8 +183,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   }
 
   // 3) IP geolocation - try direct approach first, then API
-  // On mobile cold start, IP is fallback after GPS fails
-  // On desktop or non-cold-start, IP is normal fallback
+  // On mobile we skip server-side fetch to /api/geolocation/ip when Vercel headers are missing,
+  // so the initial center stays neutral and client cold-start resolution (GPS then client-side IP) runs instead.
   if (!initialCenter) {
     try {
       // Try Vercel headers directly first
@@ -206,8 +206,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log(`[SALES_PAGE] Using Vercel location:`, initialCenter)
         }
-      } else if (baseUrl) {
-        // Fallback to API
+      } else if (!isMobileRequest && baseUrl) {
+        // Desktop (or non-mobile): fallback to server-side API
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log(`[SALES_PAGE] Trying IP geolocation API: ${baseUrl}/api/geolocation/ip`)
         }
@@ -227,6 +227,20 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
           }
+        }
+      } else if (isMobileRequest) {
+        // Mobile with no Vercel geo headers: do not fetch /api/geolocation/ip (server-to-self would use server region).
+        // Use neutral fallback; client will run cold-start resolution (GPS then client-side IP).
+        try {
+          const Sentry = await import('@sentry/nextjs')
+          Sentry.addBreadcrumb({
+            category: 'location',
+            message: 'SSR mobile request missing Vercel geo headers, using neutral initial center',
+            level: 'info',
+            data: { context: 'SalesPage', isMobileRequest: true }
+          })
+        } catch {
+          // Sentry not available - no-op
         }
       }
     } catch (e) {

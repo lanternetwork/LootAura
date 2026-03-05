@@ -1444,22 +1444,47 @@ export default function SalesClient({
       }
     }
 
+    // Launch diagnostics: send to native shell for device-visible logging (no PII)
+    const sendLaunchLocationDiag = (payload: {
+      inApp: boolean
+      inAppViaUa: boolean
+      source: string
+      isMobile: boolean
+      mapVisible: boolean
+      autoGeoRan: boolean
+      skipReason?: string
+    }) => {
+      try {
+        const win = typeof window !== 'undefined' ? window as Window & { ReactNativeWebView?: { postMessage: (msg: string) => void } } : null
+        if (win?.ReactNativeWebView?.postMessage) {
+          win.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LAUNCH_LOCATION_DIAG', ...payload }))
+        }
+      } catch {
+        // Bridge absent or postMessage failed - no-op
+      }
+    }
+
     // Attempt on mobile when resolver said geo, or when in-app mobile (run once even if resolved source is persisted)
     const allowAutoGeo = isMobile && (resolvedViewport.source === 'geo' || (inApp && resolvedViewport.source === 'persisted'))
     if (!allowAutoGeo) {
-      addLaunchBreadcrumb({ skipped: true, reason: !isMobile ? 'not_mobile' : 'not_geo_source' })
+      const reason = !isMobile ? 'not_mobile' : 'not_geo_source'
+      addLaunchBreadcrumb({ skipped: true, reason })
+      sendLaunchLocationDiag({ inApp, inAppViaUa, source: resolvedViewport.source, isMobile, mapVisible, autoGeoRan: false, skipReason: reason })
       return
     }
 
     // DEFERRED: Wait for map to be visible before requesting geolocation
     if (!mapVisible && !userInteractedRef.current) {
       addLaunchBreadcrumb({ skipped: true, reason: 'map_not_visible' })
+      sendLaunchLocationDiag({ inApp, inAppViaUa, source: resolvedViewport.source, isMobile, mapVisible, autoGeoRan: false, skipReason: 'map_not_visible' })
       return
     }
 
     // Don't attempt if already attempted or user has interacted
     if (geolocationAttemptedRef.current || userInteractedRef.current) {
-      addLaunchBreadcrumb({ skipped: true, reason: geolocationAttemptedRef.current ? 'already_attempted' : 'user_interacted' })
+      const reason = geolocationAttemptedRef.current ? 'already_attempted' : 'user_interacted'
+      addLaunchBreadcrumb({ skipped: true, reason })
+      sendLaunchLocationDiag({ inApp, inAppViaUa, source: resolvedViewport.source, isMobile, mapVisible, autoGeoRan: false, skipReason: reason })
       return
     }
 
@@ -1469,6 +1494,7 @@ export default function SalesClient({
         console.log('[GEO] Skipping geolocation - previously denied')
       }
       addLaunchBreadcrumb({ skipped: true, reason: 'geolocation_denied' })
+      sendLaunchLocationDiag({ inApp, inAppViaUa, source: resolvedViewport.source, isMobile, mapVisible, autoGeoRan: false, skipReason: 'geolocation_denied' })
       return
     }
 
@@ -1478,10 +1504,12 @@ export default function SalesClient({
         console.log('[GEO] Skipping geolocation - API not available')
       }
       addLaunchBreadcrumb({ skipped: true, reason: 'geolocation_unavailable' })
+      sendLaunchLocationDiag({ inApp, inAppViaUa, source: resolvedViewport.source, isMobile, mapVisible, autoGeoRan: false, skipReason: 'geolocation_unavailable' })
       return
     }
 
     addLaunchBreadcrumb({ autoGeoRunning: true })
+    sendLaunchLocationDiag({ inApp, inAppViaUa, source: resolvedViewport.source, isMobile, mapVisible, autoGeoRan: true })
     geolocationAttemptedRef.current = true
 
     if (isDebugEnabled) {

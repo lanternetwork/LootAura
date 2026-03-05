@@ -9,6 +9,10 @@ import { getHideSplashOnce } from './_layout';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
 
+// Stable token in User-Agent so the web app can detect in-app on the first request/render
+// without relying on injectedJavaScriptBeforeContentLoaded (unreliable on Android).
+const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
+
 export default function HomeScreen() {
   // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
   const isDiagnosticsEnabled = process.env.EXPO_PUBLIC_NATIVE_HUD === '1';
@@ -941,6 +945,7 @@ export default function HomeScreen() {
           <WebView
             ref={webViewRef}
             source={{ uri: currentUrl }}
+            userAgent={`Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 ${IN_APP_UA_TOKEN}`}
             geolocationEnabled={true}
             // Removed key={currentUrl} to prevent full remount on navigation
             // Navigation is handled via source prop changes, which triggers onLoadStart/onLoadEnd

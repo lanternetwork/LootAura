@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 import { getHideSplashOnce } from './_layout';
-import { stripSalesViewportParams } from '../../lib/url/stripSalesViewportParams';
+import { stripSalesViewportParams } from './utils/stripSalesViewportParams';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
 

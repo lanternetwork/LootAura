@@ -32,13 +32,15 @@ export interface ResolverOptions {
   initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   isMobile: boolean
   userInteracted: boolean
+  /** When true (in-app mobile on /sales map), do not use URL viewport so geo-first can run */
+  ignoreUrlViewportForGeoFirst?: boolean
 }
 
 /**
  * Resolve initial viewport with authority-aware precedence
  */
 export function resolveInitialViewport(options: ResolverOptions): InitialViewportResult {
-  const { urlLat, urlLng, urlZoom, initialCenter, isMobile, userInteracted } = options
+  const { urlLat, urlLng, urlZoom, initialCenter, isMobile, userInteracted, ignoreUrlViewportForGeoFirst } = options
 
   const coldStart = isColdStart()
   const isUser = isUserAuthority()
@@ -108,8 +110,8 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
   // On mobile cold start: GPS-first (ignore persistence/cookies, but URL params are user-initiated so they win)
   // On desktop or non-cold-start: Normal precedence
 
-  // 1) URL viewport params - highest priority (even on mobile cold start, URL params are user-initiated navigation)
-  if (urlLat && urlLng) {
+  // 1) URL viewport params - highest priority (unless in-app mobile /sales where we want geo-first)
+  if (!ignoreUrlViewportForGeoFirst && urlLat && urlLng) {
     const lat = parseFloat(urlLat)
     const lng = parseFloat(urlLng)
     const zoom = urlZoom ? parseFloat(urlZoom) : null

@@ -6,6 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 import { getHideSplashOnce } from './_layout';
+import { stripSalesViewportParams } from '../../lib/url/stripSalesViewportParams';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
 
@@ -54,7 +55,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   
   // State-driven WebView navigation (replaces injectJavaScript)
-  const [currentUrl, setCurrentUrl] = useState<string>(LOOTAURA_URL);
+  // Sanitize so we never launch into /sales with viewport params (would block auto-geo)
+  const [currentUrl, setCurrentUrl] = useState<string>(() => stripSalesViewportParams(LOOTAURA_URL));
   
   // Diagnostic HUD state (always visible)
   const [currentWebViewUrl, setCurrentWebViewUrl] = useState<string>('');
@@ -351,7 +353,7 @@ export default function HomeScreen() {
         hasCodeParam: validation.hasCodeParam,
       });
 
-      setCurrentUrl(decodedUrl);
+      setCurrentUrl(stripSalesViewportParams(decodedUrl));
       startLoader('OAuth callback (cold start)');
       
       // Update dedupe refs
@@ -447,7 +449,7 @@ export default function HomeScreen() {
         hasCodeParam: validation.hasCodeParam,
       });
 
-      setCurrentUrl(finalUrl);
+      setCurrentUrl(stripSalesViewportParams(finalUrl));
       startLoader('OAuth callback (warm start)');
       
       // Update dedupe refs
@@ -857,8 +859,8 @@ export default function HomeScreen() {
     loaderStartTimeRef.current = null;
     overlayShownRef.current = false;
     
-    // Build full URL
-    const fullUrl = `${LOOTAURA_URL}${relativePath}`;
+    // Build full URL and strip viewport params for /sales so we never relaunch into persisted coords
+    const fullUrl = stripSalesViewportParams(`${LOOTAURA_URL}${relativePath}`);
     console.log('[NATIVE] Executing navigation to:', fullUrl);
     if (isDiagnosticsEnabled) {
       setLastNavAction(`executeNavigation -> ${relativePath}`);

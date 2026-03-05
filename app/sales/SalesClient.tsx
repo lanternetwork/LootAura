@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import SimpleMap from '@/components/location/SimpleMap'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
@@ -59,6 +59,7 @@ export default function SalesClient({
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname() ?? ''
   
   // Track user interaction to prevent surprise recentering
   const userInteractedRef = useRef(false)
@@ -211,9 +212,10 @@ export default function SalesClient({
       urlZoom,
       initialCenter,
       isMobile,
-      userInteracted: userInteractedRef.current
+      userInteracted: userInteractedRef.current,
+      ignoreUrlViewportForGeoFirst: isNativeApp() && isMobile && pathname === '/sales'
     })
-  }, [urlLat, urlLng, urlZoom, initialCenter, isMobile])
+  }, [urlLat, urlLng, urlZoom, initialCenter, isMobile, pathname])
 
   // Write la_loc from initialCenter ONLY if:
   // - Desktop (not mobile), OR

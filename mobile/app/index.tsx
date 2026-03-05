@@ -15,8 +15,12 @@ const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
 
 export default function HomeScreen() {
   // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
-  // Accept '1' or 'true' (case-insensitive) = enabled; '0' or 'false' = disabled; anything else = disabled
-  const nativeHudRaw = process.env.EXPO_PUBLIC_NATIVE_HUD;
+  // Accept '1' or 'true' (case-insensitive) = enabled; '0' or 'false' = disabled.
+  // Note: EXPO_PUBLIC_* is inlined at bundle time — set in .env or eas.json and restart Metro (expo start -c) or rebuild.
+  const nativeHudRaw =
+    typeof process.env.EXPO_PUBLIC_NATIVE_HUD === 'string'
+      ? process.env.EXPO_PUBLIC_NATIVE_HUD.trim()
+      : process.env.EXPO_PUBLIC_NATIVE_HUD;
   const isDiagnosticsEnabled = (() => {
     if (nativeHudRaw === '1') return true;
     if (typeof nativeHudRaw === 'string') {

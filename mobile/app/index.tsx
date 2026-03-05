@@ -15,7 +15,17 @@ const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
 
 export default function HomeScreen() {
   // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
-  const isDiagnosticsEnabled = process.env.EXPO_PUBLIC_NATIVE_HUD === '1';
+  // Accept '1' or 'true' (case-insensitive) = enabled; '0' or 'false' = disabled; anything else = disabled
+  const nativeHudRaw = process.env.EXPO_PUBLIC_NATIVE_HUD;
+  const isDiagnosticsEnabled = (() => {
+    if (nativeHudRaw === '1') return true;
+    if (typeof nativeHudRaw === 'string') {
+      const lower = nativeHudRaw.toLowerCase();
+      if (lower === 'true') return true;
+      if (lower === 'false' || lower === '0') return false;
+    }
+    return false;
+  })();
   const [loading, setLoading] = useState(false); // Start hidden, show only when needed
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);

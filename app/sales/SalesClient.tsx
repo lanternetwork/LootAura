@@ -34,6 +34,7 @@ import { haversineMeters } from '@/lib/geo/distance'
 import { checkGeolocationPermission } from '@/lib/location/client'
 import { isDebugEnabled } from '@/lib/debug'
 import * as Sentry from '@sentry/nextjs'
+import { isNativeApp } from '@/lib/runtime/isNativeApp'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -1428,19 +1429,35 @@ export default function SalesClient({
   // - User-Initiated GPS (handleUseMyLocation/handleUserLocationRequest): Uses imperative forceRecenterToLocation
   //   Bypasses ALL guards - always recenters regardless of authority state
   useEffect(() => {
+    const inApp = isNativeApp()
+    const addLaunchBreadcrumb = (data: { skipped?: boolean; reason?: string; autoGeoRunning?: boolean }) => {
+      try {
+        Sentry.addBreadcrumb({
+          category: 'location',
+          message: data.autoGeoRunning ? 'Auto geo running (cold start)' : data.skipped ? 'Auto geo skipped' : 'Launch path',
+          level: 'info',
+          data: { inApp, source: resolvedViewport.source, isMobile, ...data }
+        })
+      } catch {
+        // Sentry not available - no-op
+      }
+    }
+
     // Only attempt on mobile, if resolver indicated geolocation should be attempted
     if (!isMobile || resolvedViewport.source !== 'geo') {
+      addLaunchBreadcrumb({ skipped: true, reason: !isMobile ? 'not_mobile' : 'not_geo_source' })
       return
     }
 
     // DEFERRED: Wait for map to be visible before requesting geolocation
-    // This improves initial load time by not blocking on GPS permission prompt
     if (!mapVisible && !userInteractedRef.current) {
+      addLaunchBreadcrumb({ skipped: true, reason: 'map_not_visible' })
       return
     }
 
     // Don't attempt if already attempted or user has interacted
     if (geolocationAttemptedRef.current || userInteractedRef.current) {
+      addLaunchBreadcrumb({ skipped: true, reason: geolocationAttemptedRef.current ? 'already_attempted' : 'user_interacted' })
       return
     }
 
@@ -1449,6 +1466,7 @@ export default function SalesClient({
       if (isDebugEnabled) {
         console.log('[GEO] Skipping geolocation - previously denied')
       }
+      addLaunchBreadcrumb({ skipped: true, reason: 'geolocation_denied' })
       return
     }
 
@@ -1457,10 +1475,11 @@ export default function SalesClient({
       if (isDebugEnabled) {
         console.log('[GEO] Skipping geolocation - API not available')
       }
+      addLaunchBreadcrumb({ skipped: true, reason: 'geolocation_unavailable' })
       return
     }
 
-    // Mark as attempted to prevent duplicate requests
+    addLaunchBreadcrumb({ autoGeoRunning: true })
     geolocationAttemptedRef.current = true
 
     if (isDebugEnabled) {

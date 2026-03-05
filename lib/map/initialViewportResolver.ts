@@ -151,8 +151,9 @@ export function resolveInitialViewport(options: ResolverOptions): InitialViewpor
     } catch {
       // Sentry not available - no-op
     }
+    // Use placeholder only for center/zoom (first paint); keep viewport null so tests and callers that expect "geo = no persisted viewport" still hold
     return {
-      viewport: placeholder,
+      viewport: null,
       source: 'geo',
       center: placeholder ? { lat: placeholder.lat, lng: placeholder.lng } : null,
       zoom: placeholder?.zoom ?? null

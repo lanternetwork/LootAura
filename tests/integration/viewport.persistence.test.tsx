@@ -225,6 +225,35 @@ describe('InitialViewportResolver', () => {
       // Should fall back to IP or fallback, not geo
       expect(result.source).not.toBe('geo')
     })
+
+    describe('In-app mobile /sales guard (ignoreUrlViewportForGeoFirst)', () => {
+      it('when true, in-app mobile does not use URL viewport so geo-first runs', () => {
+        const result = resolveInitialViewport({
+          urlLat: '39.96',
+          urlLng: '-83',
+          urlZoom: '10',
+          initialCenter: null,
+          isMobile: true,
+          userInteracted: false,
+          ignoreUrlViewportForGeoFirst: true
+        })
+        expect(result.source).toBe('geo')
+        expect(result.viewport).toBeNull()
+      })
+
+      it('when false or omitted, URL viewport still wins (non-in-app behavior unchanged)', () => {
+        const result = resolveInitialViewport({
+          urlLat: '38.2527',
+          urlLng: '-85.7585',
+          urlZoom: '12',
+          initialCenter: { lat: 40.0, lng: -90.0 },
+          isMobile: false,
+          userInteracted: false
+        })
+        expect(result.source).toBe('url')
+        expect(result.center).toEqual({ lat: 38.2527, lng: -85.7585 })
+      })
+    })
   })
 
   describe('Invalid input handling', () => {

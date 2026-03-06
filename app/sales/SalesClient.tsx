@@ -1046,8 +1046,10 @@ export default function SalesClient({
   const initialLoadRef = useRef(true) // Track if this is the initial load
   // Guard: set when proactive initial fetch has been triggered so map onLoad does not duplicate first fetch
   const proactiveInitialFetchTriggeredRef = useRef(false)
-  // Normalized bbox key from proactive fetch; first onLoad viewport that normalizes to this key is treated as covered (drift tolerance)
+  // Normalized bbox key from proactive fetch; used only for first-onLoad drift tolerance
   const proactiveNormalizedBboxKeyRef = useRef<string | null>(null)
+  // Strictly one-time: set on first debounced run so drift tolerance can never apply again (prevents stale ref from suppressing later refetches)
+  const driftToleranceHandshakeAttemptedRef = useRef(false)
   // Track when we're programmatically centering to a pin to prevent clearing selection
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
 
@@ -1271,14 +1273,18 @@ export default function SalesClient({
       const normalizedViewportBounds = normalizeBounds(viewportBounds)
       const normalizedViewportKey = getNormalizedBboxKey(normalizedViewportBounds)
 
-      // First-onLoad drift tolerance: if Mapbox onLoad viewport normalizes to same key as proactive fetch, treat as covered
       const proactiveKey = proactiveNormalizedBboxKeyRef.current
-      if (proactiveKey !== null && normalizedViewportKey === proactiveKey) {
+      const isFirstHandshake = !driftToleranceHandshakeAttemptedRef.current
+      if (isFirstHandshake) {
+        driftToleranceHandshakeAttemptedRef.current = true
         proactiveNormalizedBboxKeyRef.current = null
+      }
+
+      const useDriftTolerance = isFirstHandshake && proactiveKey !== null && normalizedViewportKey === proactiveKey
+      if (useDriftTolerance) {
         if (isDebugEnabled) {
           console.log('[SALES] First onLoad drift tolerance - viewport normalizes to proactive key, no fetch')
         }
-        // Skip fetch and fall through to persistence; do not set needsFetch
       } else {
         const needsFetch = !bufferedBounds || !isViewportInsideBounds(normalizedViewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
 

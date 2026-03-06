@@ -406,10 +406,25 @@ export default function SalesClient({
   // Track API calls for debugging single fetch path
   const apiCallCounterRef = useRef(0)
 
+  // Lightweight request-key dedupe: same bounds+filters cannot be in-flight twice (remount/strict-mode)
+  const inFlightRequestKeyRef = useRef<string | null>(null)
+
   // Fetch sales based on buffered bounds (not tight viewport)
   // This function now receives bufferedBounds, which are larger than the viewport
   // For ZIP search, use near=1 mode by passing null for bufferedBbox and providing nearOptions
   const fetchMapSales = useCallback(async (bufferedBbox: Bounds | null, customFilters?: any, nearOptions?: { useNear: true; lat: number; lng: number }) => {
+    const activeFilters = customFilters || filters
+    const requestKey = nearOptions
+      ? `near:${nearOptions.lat},${nearOptions.lng}:${activeFilters.dateRange ?? ''}:${(activeFilters.categories ?? []).join(',')}:${activeFilters.distance ?? ''}`
+      : `bbox:${bufferedBbox?.north},${bufferedBbox?.south},${bufferedBbox?.east},${bufferedBbox?.west}:${activeFilters.dateRange ?? ''}:${(activeFilters.categories ?? []).join(',')}:${activeFilters.distance ?? ''}`
+    if (inFlightRequestKeyRef.current === requestKey) {
+      if (isDebugEnabled) {
+        console.log('[FETCH] Skipping duplicate in-flight request (same key):', requestKey.slice(0, 60) + '...')
+      }
+      return
+    }
+    inFlightRequestKeyRef.current = requestKey
+
     // Cancel any in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -450,7 +465,6 @@ export default function SalesClient({
 
     try {
       const params = new URLSearchParams()
-      const activeFilters = customFilters || filters
       
       if (nearOptions) {
         // Use near=1 API path for ZIP search (respects radiusKm exactly)
@@ -606,8 +620,11 @@ export default function SalesClient({
       // On error, only clear if no data exists, otherwise keep old data visible
       if (fetchedSales.length === 0) {
         setFetchedSales([])
+        // Clear bufferedBounds so viewport-driven path can retry (do not suppress retry indefinitely)
+        setBufferedBounds(null)
       }
     } finally {
+      inFlightRequestKeyRef.current = null
       setLoading(false)
       setIsFetching(false)
       // Mark that initial load has completed after first fetch attempt
@@ -618,7 +635,7 @@ export default function SalesClient({
         }
       }
     }
-  }, [filters.dateRange, filters.categories, deduplicateSales, filterDeletedSales, fetchedSales.length])
+  }, [filters.dateRange, filters.categories, filters.distance, deduplicateSales, filterDeletedSales, fetchedSales.length])
   
   // Listen for sales:mutated events to filter out deleted sales and refetch on create
   useEffect(() => {
@@ -786,6 +803,34 @@ export default function SalesClient({
       }
     }
   }, [initialSales.length, mapView?.bounds, bufferedBounds])
+
+  // Proactive initial fetch: when mapView is established and there is no SSR sales data,
+  // fetch immediately (no 200ms debounce) so the request runs in parallel with map load.
+  // Set bufferedBounds optimistically so when map onLoad later fires handleViewportChange,
+  // the debounced callback sees viewport inside buffer and does not duplicate the fetch.
+  // Ref guard ensures one-time run; on failure fetchMapSales clears bufferedBounds so viewport-driven retry can occur.
+  useEffect(() => {
+    if (
+      initialSales.length > 0 ||
+      !mapView?.bounds ||
+      proactiveInitialFetchTriggeredRef.current
+    ) {
+      return
+    }
+    proactiveInitialFetchTriggeredRef.current = true
+    const viewportBoundsForProactive: Bounds = {
+      west: mapView.bounds.west,
+      south: mapView.bounds.south,
+      east: mapView.bounds.east,
+      north: mapView.bounds.north
+    }
+    const newBufferedBounds = expandBounds(viewportBoundsForProactive, MAP_BUFFER_FACTOR)
+    setBufferedBounds(newBufferedBounds)
+    if (isDebugEnabled) {
+      console.log('[SALES] Proactive initial fetch (no debounce):', { viewportBoundsForProactive, newBufferedBounds })
+    }
+    fetchMapSales(newBufferedBounds)
+  }, [mapView?.bounds, initialSales.length, fetchMapSales])
 
   // Process pending create events when viewport becomes available
   useEffect(() => {
@@ -996,6 +1041,8 @@ export default function SalesClient({
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
   const initialLoadRef = useRef(true) // Track if this is the initial load
+  // Guard: set when proactive initial fetch has been triggered so map onLoad does not duplicate first fetch
+  const proactiveInitialFetchTriggeredRef = useRef(false)
   // Track when we're programmatically centering to a pin to prevent clearing selection
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
 

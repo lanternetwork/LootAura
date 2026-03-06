@@ -122,6 +122,17 @@ describe('MAP_PERF_DIAG payload', () => {
     }
   })
 
+  it('map_mounted can be earlier than map_style_loaded (map instance before style load)', () => {
+    const payload = buildValidPayload()
+    expect(payloadHasOnlyAllowedKeys(payload)).toBe(true)
+    expect(payloadHasNoForbiddenKeys(payload)).toBe(true)
+    const mapMounted = payload.mapMountedMs as number | undefined
+    const styleLoaded = payload.styleLoadedMs as number | undefined
+    if (mapMounted !== undefined && styleLoaded !== undefined) {
+      expect(mapMounted).toBeLessThanOrEqual(styleLoaded)
+    }
+  })
+
   it('rejects payload that includes forbidden keys', () => {
     const withForbidden = { ...buildValidPayload(), lat: 40, lng: -83 }
     expect(payloadHasNoForbiddenKeys(withForbidden)).toBe(false)

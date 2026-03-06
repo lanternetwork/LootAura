@@ -690,9 +690,11 @@ export default function HomeScreen() {
           setLastLaunchLocationDiag(JSON.stringify(message));
         }
       } else if (message.type === 'MAP_PERF_DIAG') {
-        console.log('[MAP_PERF_DIAG]', JSON.stringify(message));
+        const mapPerfJson = JSON.stringify(message);
+        console.log('[MAP_PERF_DIAG]', mapPerfJson);
+        console.log('[MAP_PERF_DIAG_JSON]' + mapPerfJson);
         if (isDiagnosticsEnabled) {
-          setLastMapPerfDiag(JSON.stringify(message));
+          setLastMapPerfDiag(mapPerfJson);
         }
       } else if (message.type === 'ROUTE_STATE') {
         // Route state update from web

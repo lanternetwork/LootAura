@@ -125,6 +125,29 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     isLoaded: () => loaded
   }), [loaded])
 
+  // Mark "map mounted" at earliest reliable moment when Mapbox map instance exists (before style load)
+  useEffect(() => {
+    if (mapPerfMarksFiredRef.current.mounted) return
+    const tryMark = () => {
+      const map = mapRef.current?.getMap?.()
+      if (map && typeof performance !== 'undefined' && performance.mark && !mapPerfMarksFiredRef.current.mounted) {
+        performance.mark('map_mounted')
+        mapPerfMarksFiredRef.current.mounted = true
+        return true
+      }
+      return false
+    }
+    if (tryMark()) return
+    const t0 = setTimeout(tryMark, 0)
+    const t1 = setTimeout(() => { if (!mapPerfMarksFiredRef.current.mounted) tryMark() }, 50)
+    const t2 = setTimeout(() => { if (!mapPerfMarksFiredRef.current.mounted) tryMark() }, 150)
+    return () => {
+      clearTimeout(t0)
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [])
+
   const onLoad = useCallback(() => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[MAP] onLoad - Map initialization completed')

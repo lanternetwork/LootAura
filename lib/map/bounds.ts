@@ -15,6 +15,32 @@ export interface Bounds {
 export const MAP_BUFFER_FACTOR = 1.8 // How much bigger than viewport the fetched box is
 export const MAP_BUFFER_SAFETY_FACTOR = 0.8 // When to consider viewport "too close" to the edge
 
+/** Precision (decimal places) for normalizing bounds to avoid drift-induced duplicate fetches */
+export const BOUNDS_PRECISION = 4
+
+/**
+ * Normalizes bounds by rounding west/south/east/north to a fixed precision.
+ * Used so proactive (center/zoom-derived) and Mapbox onLoad bounds match under small float drift.
+ */
+export function normalizeBounds(bounds: Bounds, precision: number = BOUNDS_PRECISION): Bounds {
+  const p = Math.pow(10, precision)
+  return {
+    west: Math.round(bounds.west * p) / p,
+    south: Math.round(bounds.south * p) / p,
+    east: Math.round(bounds.east * p) / p,
+    north: Math.round(bounds.north * p) / p
+  }
+}
+
+/**
+ * Returns a stable string key for a bbox for dedupe/comparison.
+ * Uses normalized (rounded) values so slight float differences produce the same key.
+ */
+export function getNormalizedBboxKey(bounds: Bounds, precision: number = BOUNDS_PRECISION): string {
+  const n = normalizeBounds(bounds, precision)
+  return `${n.north},${n.south},${n.east},${n.west}`
+}
+
 /**
  * Expands viewport bounds by a buffer factor to create a larger fetch area
  * 

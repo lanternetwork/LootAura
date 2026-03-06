@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { expandBounds, isViewportInsideBounds, MAP_BUFFER_FACTOR, MAP_BUFFER_SAFETY_FACTOR } from '@/lib/map/bounds'
+import { expandBounds, isViewportInsideBounds, normalizeBounds, getNormalizedBboxKey, MAP_BUFFER_FACTOR, MAP_BUFFER_SAFETY_FACTOR } from '@/lib/map/bounds'
 
 // Mock fetch function
 const mockFetch = vi.fn()
@@ -138,21 +138,64 @@ describe('Proactive initial fetch (Stage 1)', () => {
     const mapViewBounds = { west: -86, south: 39, east: -85, north: 40 }
     let bufferedBounds: typeof mapViewBounds | null = null
 
-    // Proactive path: set bufferedBounds and fetch
+    // Proactive path: normalize, set bufferedBounds and fetch (matches SalesClient)
     if (mapViewBounds && !proactiveTriggeredRef.current) {
       proactiveTriggeredRef.current = true
-      bufferedBounds = expandBounds(mapViewBounds, MAP_BUFFER_FACTOR)
+      const normalized = normalizeBounds(mapViewBounds)
+      bufferedBounds = expandBounds(normalized, MAP_BUFFER_FACTOR)
       fetchMapSales(bufferedBounds)
     }
     expect(fetchMapSales).toHaveBeenCalledTimes(1)
 
     // Simulate handleViewportChange debounced callback: viewport same as initial, bufferedBounds already set
-    const viewportBounds = { ...mapViewBounds }
+    const viewportBounds = normalizeBounds({ ...mapViewBounds })
     const needsFetch = !bufferedBounds || !isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
     if (needsFetch) {
       fetchMapSales(expandBounds(viewportBounds, MAP_BUFFER_FACTOR))
     }
     // Should not have triggered a second fetch (viewport inside buffer)
+    expect(fetchMapSales).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not trigger duplicate fetch when onLoad viewport has small float drift from proactive bounds', () => {
+    const fetchMapSales = vi.fn()
+    const proactiveTriggeredRef = { current: false }
+    const proactiveNormalizedBboxKeyRef = { current: null as string | null }
+    const mapViewBounds = { west: -86, south: 39, east: -85, north: 40 }
+    let bufferedBounds: typeof mapViewBounds | null = null
+
+    // Proactive path: normalize bounds, store key, set bufferedBounds, fetch
+    if (mapViewBounds && !proactiveTriggeredRef.current) {
+      proactiveTriggeredRef.current = true
+      const viewportBoundsForProactive = normalizeBounds(mapViewBounds)
+      proactiveNormalizedBboxKeyRef.current = getNormalizedBboxKey(viewportBoundsForProactive)
+      bufferedBounds = expandBounds(viewportBoundsForProactive, MAP_BUFFER_FACTOR)
+      fetchMapSales(bufferedBounds)
+    }
+    expect(fetchMapSales).toHaveBeenCalledTimes(1)
+
+    // Mapbox onLoad reports bounds with small float noise (different source/precision)
+    const onLoadBoundsWithDrift = {
+      west: -86.0000123,
+      south: 38.9999876,
+      east: -84.9999876,
+      north: 40.0000123
+    }
+    const normalizedViewportBounds = normalizeBounds(onLoadBoundsWithDrift)
+    const normalizedViewportKey = getNormalizedBboxKey(normalizedViewportBounds)
+    expect(normalizedViewportKey).toBe(proactiveNormalizedBboxKeyRef.current)
+
+    // First-onLoad drift tolerance: same normalized key → treat as covered, no fetch
+    const proactiveKey = proactiveNormalizedBboxKeyRef.current
+    const useDriftTolerance = proactiveKey !== null && normalizedViewportKey === proactiveKey
+    if (useDriftTolerance) {
+      proactiveNormalizedBboxKeyRef.current = null
+    } else {
+      const needsFetch = !bufferedBounds || !isViewportInsideBounds(normalizedViewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
+      if (needsFetch) {
+        fetchMapSales(expandBounds(normalizedViewportBounds, MAP_BUFFER_FACTOR))
+      }
+    }
     expect(fetchMapSales).toHaveBeenCalledTimes(1)
   })
 

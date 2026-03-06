@@ -21,6 +21,8 @@ import {
   expandBounds, 
   isViewportInsideBounds, 
   filterSalesForViewport,
+  normalizeBounds,
+  getNormalizedBboxKey,
   type Bounds,
   MAP_BUFFER_FACTOR,
   MAP_BUFFER_SAFETY_FACTOR
@@ -416,7 +418,7 @@ export default function SalesClient({
     const activeFilters = customFilters || filters
     const requestKey = nearOptions
       ? `near:${nearOptions.lat},${nearOptions.lng}:${activeFilters.dateRange ?? ''}:${(activeFilters.categories ?? []).join(',')}:${activeFilters.distance ?? ''}`
-      : `bbox:${bufferedBbox?.north},${bufferedBbox?.south},${bufferedBbox?.east},${bufferedBbox?.west}:${activeFilters.dateRange ?? ''}:${(activeFilters.categories ?? []).join(',')}:${activeFilters.distance ?? ''}`
+      : `bbox:${bufferedBbox ? getNormalizedBboxKey(bufferedBbox) : ''}:${activeFilters.dateRange ?? ''}:${(activeFilters.categories ?? []).join(',')}:${activeFilters.distance ?? ''}`
     if (inFlightRequestKeyRef.current === requestKey) {
       if (isDebugEnabled) {
         console.log('[FETCH] Skipping duplicate in-flight request (same key):', requestKey.slice(0, 60) + '...')
@@ -806,9 +808,8 @@ export default function SalesClient({
 
   // Proactive initial fetch: when mapView is established and there is no SSR sales data,
   // fetch immediately (no 200ms debounce) so the request runs in parallel with map load.
-  // Set bufferedBounds optimistically so when map onLoad later fires handleViewportChange,
-  // the debounced callback sees viewport inside buffer and does not duplicate the fetch.
-  // Ref guard ensures one-time run; on failure fetchMapSales clears bufferedBounds so viewport-driven retry can occur.
+  // Normalize bounds so request key and buffer match Mapbox onLoad under float drift.
+  // Set bufferedBounds optimistically; store normalized bbox key for first-onLoad drift tolerance.
   useEffect(() => {
     if (
       initialSales.length > 0 ||
@@ -818,12 +819,14 @@ export default function SalesClient({
       return
     }
     proactiveInitialFetchTriggeredRef.current = true
-    const viewportBoundsForProactive: Bounds = {
+    const rawViewportBounds: Bounds = {
       west: mapView.bounds.west,
       south: mapView.bounds.south,
       east: mapView.bounds.east,
       north: mapView.bounds.north
     }
+    const viewportBoundsForProactive = normalizeBounds(rawViewportBounds)
+    proactiveNormalizedBboxKeyRef.current = getNormalizedBboxKey(viewportBoundsForProactive)
     const newBufferedBounds = expandBounds(viewportBoundsForProactive, MAP_BUFFER_FACTOR)
     setBufferedBounds(newBufferedBounds)
     if (isDebugEnabled) {
@@ -1043,6 +1046,8 @@ export default function SalesClient({
   const initialLoadRef = useRef(true) // Track if this is the initial load
   // Guard: set when proactive initial fetch has been triggered so map onLoad does not duplicate first fetch
   const proactiveInitialFetchTriggeredRef = useRef(false)
+  // Normalized bbox key from proactive fetch; first onLoad viewport that normalizes to this key is treated as covered (drift tolerance)
+  const proactiveNormalizedBboxKeyRef = useRef<string | null>(null)
   // Track when we're programmatically centering to a pin to prevent clearing selection
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
 
@@ -1263,28 +1268,36 @@ export default function SalesClient({
     
     // Debounce buffer check by 200ms to balance responsiveness
     debounceTimerRef.current = setTimeout(() => {
-      // Check if we need to fetch based on buffer
-      const needsFetch = !bufferedBounds || !isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
-      
-      if (needsFetch) {
-        // Compute new buffered bounds around current viewport
-        const newBufferedBounds = expandBounds(viewportBounds, MAP_BUFFER_FACTOR)
-        
+      const normalizedViewportBounds = normalizeBounds(viewportBounds)
+      const normalizedViewportKey = getNormalizedBboxKey(normalizedViewportBounds)
+
+      // First-onLoad drift tolerance: if Mapbox onLoad viewport normalizes to same key as proactive fetch, treat as covered
+      const proactiveKey = proactiveNormalizedBboxKeyRef.current
+      if (proactiveKey !== null && normalizedViewportKey === proactiveKey) {
+        proactiveNormalizedBboxKeyRef.current = null
         if (isDebugEnabled) {
-          console.log('[SALES] Viewport outside buffer - fetching new buffered area:', {
-            viewportBounds,
-            oldBufferedBounds: bufferedBounds,
-            newBufferedBounds
-          })
+          console.log('[SALES] First onLoad drift tolerance - viewport normalizes to proactive key, no fetch')
         }
-        
-        // Fetch with buffered bounds (larger than viewport)
-        fetchMapSales(newBufferedBounds)
+        // Skip fetch and fall through to persistence; do not set needsFetch
       } else {
-        // Viewport is inside buffer - no fetch needed
-        // visibleSales will be automatically computed from fetchedSales via useMemo
-        if (isDebugEnabled) {
-          console.log('[SALES] Viewport inside buffer - using cached data, no fetch')
+        const needsFetch = !bufferedBounds || !isViewportInsideBounds(normalizedViewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
+
+        if (needsFetch) {
+          const newBufferedBounds = expandBounds(normalizedViewportBounds, MAP_BUFFER_FACTOR)
+
+          if (isDebugEnabled) {
+            console.log('[SALES] Viewport outside buffer - fetching new buffered area:', {
+              viewportBounds: normalizedViewportBounds,
+              oldBufferedBounds: bufferedBounds,
+              newBufferedBounds
+            })
+          }
+
+          fetchMapSales(newBufferedBounds)
+        } else {
+          if (isDebugEnabled) {
+            console.log('[SALES] Viewport inside buffer - using cached data, no fetch')
+          }
         }
       }
       

@@ -409,9 +409,9 @@ async function salesHandler(request: NextRequest) {
       })
     }
 
-    // Short-TTL server cache for public (non-user-scoped) requests only
+    // Short-TTL server cache for public (non-user-scoped) requests only; skip when search query is present so query runs (tests and freshness)
     let salesCacheKey: string | null = null
-    if (!favoritesOnly) {
+    if (!favoritesOnly && !q) {
       salesCacheKey = buildSalesCacheKey({
         actualBbox,
         nearLat: actualBbox ? undefined : latitude,

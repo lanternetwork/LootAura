@@ -161,10 +161,10 @@ describe('Proactive initial fetch (Stage 1)', () => {
     const fetchMapSales = vi.fn()
     const proactiveTriggeredRef = { current: false }
     const proactiveNormalizedBboxKeyRef = { current: null as string | null }
+    const driftToleranceHandshakeAttemptedRef = { current: false }
     const mapViewBounds = { west: -86, south: 39, east: -85, north: 40 }
     let bufferedBounds: typeof mapViewBounds | null = null
 
-    // Proactive path: normalize bounds, store key, set bufferedBounds, fetch
     if (mapViewBounds && !proactiveTriggeredRef.current) {
       proactiveTriggeredRef.current = true
       const viewportBoundsForProactive = normalizeBounds(mapViewBounds)
@@ -174,7 +174,6 @@ describe('Proactive initial fetch (Stage 1)', () => {
     }
     expect(fetchMapSales).toHaveBeenCalledTimes(1)
 
-    // Mapbox onLoad reports bounds with small float noise (different source/precision)
     const onLoadBoundsWithDrift = {
       west: -86.0000123,
       south: 38.9999876,
@@ -185,11 +184,15 @@ describe('Proactive initial fetch (Stage 1)', () => {
     const normalizedViewportKey = getNormalizedBboxKey(normalizedViewportBounds)
     expect(normalizedViewportKey).toBe(proactiveNormalizedBboxKeyRef.current)
 
-    // First-onLoad drift tolerance: same normalized key → treat as covered, no fetch
     const proactiveKey = proactiveNormalizedBboxKeyRef.current
-    const useDriftTolerance = proactiveKey !== null && normalizedViewportKey === proactiveKey
-    if (useDriftTolerance) {
+    const isFirstHandshake = !driftToleranceHandshakeAttemptedRef.current
+    if (isFirstHandshake) {
+      driftToleranceHandshakeAttemptedRef.current = true
       proactiveNormalizedBboxKeyRef.current = null
+    }
+    const useDriftTolerance = isFirstHandshake && proactiveKey !== null && normalizedViewportKey === proactiveKey
+    if (useDriftTolerance) {
+      // skip fetch
     } else {
       const needsFetch = !bufferedBounds || !isViewportInsideBounds(normalizedViewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
       if (needsFetch) {
@@ -197,6 +200,124 @@ describe('Proactive initial fetch (Stage 1)', () => {
       }
     }
     expect(fetchMapSales).toHaveBeenCalledTimes(1)
+  })
+
+  it('stale-ref regression: first viewport K′ ≠ proactive K clears ref; later viewport K does not use drift tolerance', () => {
+    const fetchMapSales = vi.fn()
+    const proactiveTriggeredRef = { current: false }
+    const proactiveNormalizedBboxKeyRef = { current: null as string | null }
+    const driftToleranceHandshakeAttemptedRef = { current: false }
+    const proactiveBounds = { west: -86, south: 39, east: -85, north: 40 }
+    let bufferedBounds: typeof proactiveBounds | null = null
+
+    if (proactiveBounds && !proactiveTriggeredRef.current) {
+      proactiveTriggeredRef.current = true
+      const viewportBoundsForProactive = normalizeBounds(proactiveBounds)
+      proactiveNormalizedBboxKeyRef.current = getNormalizedBboxKey(viewportBoundsForProactive)
+      bufferedBounds = expandBounds(viewportBoundsForProactive, MAP_BUFFER_FACTOR)
+      fetchMapSales(bufferedBounds)
+    }
+    const keyK = proactiveNormalizedBboxKeyRef.current
+    expect(keyK).toBeTruthy()
+    expect(fetchMapSales).toHaveBeenCalledTimes(1)
+
+    const boundsKPrime = { west: -85.5, south: 38.5, east: -84.5, north: 39.5 }
+    const normalizedKPrime = normalizeBounds(boundsKPrime)
+    const keyKPrime = getNormalizedBboxKey(normalizedKPrime)
+    expect(keyKPrime).not.toBe(keyK)
+
+    const isFirstHandshake1 = !driftToleranceHandshakeAttemptedRef.current
+    if (isFirstHandshake1) {
+      driftToleranceHandshakeAttemptedRef.current = true
+      proactiveNormalizedBboxKeyRef.current = null
+    }
+    const useDriftTolerance1 = isFirstHandshake1 && keyK !== null && keyKPrime === keyK
+    expect(useDriftTolerance1).toBe(false)
+    bufferedBounds = null
+
+    const normalizedK = normalizeBounds(proactiveBounds)
+    const keyKLater = getNormalizedBboxKey(normalizedK)
+    expect(keyKLater).toBe(keyK)
+    const isFirstHandshake2 = !driftToleranceHandshakeAttemptedRef.current
+    expect(isFirstHandshake2).toBe(false)
+    expect(proactiveNormalizedBboxKeyRef.current).toBe(null)
+    const useDriftTolerance2 = isFirstHandshake2 && proactiveNormalizedBboxKeyRef.current !== null && keyKLater === proactiveNormalizedBboxKeyRef.current
+    expect(useDriftTolerance2).toBe(false)
+    const needsFetch = !bufferedBounds || (bufferedBounds ? !isViewportInsideBounds(normalizedK, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR) : true)
+    expect(needsFetch).toBe(true)
+    if (needsFetch) {
+      fetchMapSales(expandBounds(normalizedK, MAP_BUFFER_FACTOR))
+    }
+    expect(fetchMapSales).toHaveBeenCalledTimes(2)
+  })
+
+  it('debounce coalescing: multiple viewport changes within 200ms result in one callback; handshake and ref clear on that run; drift tolerance only from final viewport', () => {
+    const DEBOUNCE_MS = 200
+    const fetchMapSales = vi.fn()
+    const proactiveNormalizedBboxKeyRef = { current: null as string | null }
+    const driftToleranceHandshakeAttemptedRef = { current: false }
+    const proactiveBounds = { west: -86, south: 39, east: -85, north: 40 }
+    let bufferedBounds: typeof proactiveBounds | null = null
+    let lastViewportBounds: typeof proactiveBounds | null = null
+    const debounceTimerRef = { current: null as ReturnType<typeof setTimeout> | null }
+
+    if (proactiveBounds && true) {
+      const viewportBoundsForProactive = normalizeBounds(proactiveBounds)
+      proactiveNormalizedBboxKeyRef.current = getNormalizedBboxKey(viewportBoundsForProactive)
+      bufferedBounds = expandBounds(viewportBoundsForProactive, MAP_BUFFER_FACTOR)
+      fetchMapSales(bufferedBounds)
+    }
+    const keyK = proactiveNormalizedBboxKeyRef.current
+    expect(keyK).toBeTruthy()
+    expect(fetchMapSales).toHaveBeenCalledTimes(1)
+
+    const runDebouncedCallback = () => {
+      const viewportBounds = lastViewportBounds!
+      const normalizedViewportBounds = normalizeBounds(viewportBounds)
+      const normalizedViewportKey = getNormalizedBboxKey(normalizedViewportBounds)
+      const proactiveKey = proactiveNormalizedBboxKeyRef.current
+      const isFirstHandshake = !driftToleranceHandshakeAttemptedRef.current
+      if (isFirstHandshake) {
+        driftToleranceHandshakeAttemptedRef.current = true
+        proactiveNormalizedBboxKeyRef.current = null
+      }
+      const useDriftTolerance = isFirstHandshake && proactiveKey !== null && normalizedViewportKey === proactiveKey
+      if (!useDriftTolerance) {
+        const needsFetch = !bufferedBounds || !isViewportInsideBounds(normalizedViewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
+        if (needsFetch) {
+          fetchMapSales(expandBounds(normalizedViewportBounds, MAP_BUFFER_FACTOR))
+        }
+      }
+    }
+
+    const scheduleDebounced = (bounds: typeof proactiveBounds) => {
+      lastViewportBounds = bounds
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      debounceTimerRef.current = setTimeout(runDebouncedCallback, DEBOUNCE_MS)
+    }
+
+    const onLoadBounds = { ...proactiveBounds }
+    const secondBounds = { west: -90, south: 35, east: -88, north: 37 }
+    expect(getNormalizedBboxKey(normalizeBounds(secondBounds))).not.toBe(keyK)
+
+    scheduleDebounced(onLoadBounds)
+    vi.advanceTimersByTime(100)
+    scheduleDebounced(secondBounds)
+    vi.advanceTimersByTime(DEBOUNCE_MS)
+
+    expect(driftToleranceHandshakeAttemptedRef.current).toBe(true)
+    expect(proactiveNormalizedBboxKeyRef.current).toBe(null)
+    expect(fetchMapSales).toHaveBeenCalledTimes(2)
+
+    const normalizedSecond = normalizeBounds(secondBounds)
+    const keyFinal = getNormalizedBboxKey(normalizedSecond)
+    expect(keyFinal).not.toBe(keyK)
+
+    lastViewportBounds = onLoadBounds
+    runDebouncedCallback()
+    expect(fetchMapSales).toHaveBeenCalledTimes(2)
   })
 
   it('should allow viewport-driven fetch after proactive fetch fails (retry not blocked)', async () => {

@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
+import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -406,6 +407,35 @@ async function salesHandler(request: NextRequest) {
         limit,
         offset
       })
+    }
+
+    // Short-TTL server cache for public (non-user-scoped) requests only; skip when search query is present so query runs (tests and freshness)
+    let salesCacheKey: string | null = null
+    if (!favoritesOnly && !q) {
+      salesCacheKey = buildSalesCacheKey({
+        actualBbox,
+        nearLat: actualBbox ? undefined : latitude,
+        nearLng: actualBbox ? undefined : longitude,
+        radiusKm: actualBbox ? undefined : (distanceKm ?? 25),
+        dateRange,
+        startDateParam,
+        endDateParam,
+        categories,
+        limit,
+        offset,
+        distanceKm: distanceKm ?? 40,
+        q,
+      })
+      const cached = await getSalesApiCache(salesCacheKey)
+      if (cached != null) {
+        const { addCacheHeaders } = await import('@/lib/http/cache')
+        return addCacheHeaders(NextResponse.json(cached), {
+          maxAge: 30,
+          sMaxAge: 120,
+          staleWhileRevalidate: 60,
+          public: true,
+        })
+      }
     }
     
     let results: PublicSale[] = []
@@ -983,6 +1013,11 @@ async function salesHandler(request: NextRequest) {
       degraded,
       durationMs: Date.now() - startedAt
     }))
+
+    // Populate short-TTL cache for public requests so identical requests hit cache
+    if (!favoritesOnly && salesCacheKey) {
+      await setSalesApiCache(salesCacheKey, response, 45)
+    }
     
     // Add optimized cache headers for public sales data
     const { addCacheHeaders } = await import('@/lib/http/cache')

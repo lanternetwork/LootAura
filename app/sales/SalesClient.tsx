@@ -70,6 +70,8 @@ export default function SalesClient({
   const isImperativeRecenterRef = useRef(false)
   // Track previous URL location params to prevent unnecessary viewport updates on filter changes
   const prevUrlLocationRef = useRef<{ lat: string | null; lng: string | null; zoom: string | null } | null>(null)
+  // Prefetch SimpleMap chunk on mobile /sales so Mapbox can start sooner when map mounts (idempotent)
+  const simpleMapPrefetchedRef = useRef(false)
   
   // Single source of truth for last known user location
   const [lastUserLocation, setLastUserLocation] = useState<{ lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null>(null)
@@ -206,6 +208,13 @@ export default function SalesClient({
   // Resolve initial viewport using deterministic precedence
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
   const isMobile = windowWidth < 768
+
+  // Mobile-only, route-scoped prefetch: warm SimpleMap chunk so Mapbox init can begin sooner when map mounts
+  useEffect(() => {
+    if (pathname !== '/sales' || !isMobile || simpleMapPrefetchedRef.current) return
+    simpleMapPrefetchedRef.current = true
+    import('@/components/location/SimpleMap').catch(() => { /* prefetch best-effort; ignore errors */ })
+  }, [pathname, isMobile])
   
   const resolvedViewport = useMemo(() => {
     return resolveInitialViewport({
@@ -358,6 +367,7 @@ export default function SalesClient({
   const deletedSaleIdsRef = useRef<Set<string>>(new Set())
   // Track pending create events that arrived before viewport was initialized
   const pendingCreateEventsRef = useRef<Array<{ id: string; lat?: number; lng?: number }>>([])
+  const mapPerfDiagSentRef = useRef(false)
   const [zipError, setZipError] = useState<string | null>(null)
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -919,6 +929,43 @@ export default function SalesClient({
     markPerformance('sales_page_first_render')
   }, [markPerformance])
 
+  // One-time map/sales perf diag: collect marks and send to native shell (timings + booleans only; no PII)
+  useEffect(() => {
+    if (!hasCompletedInitialLoad) return
+    const t = setTimeout(() => {
+      if (mapPerfDiagSentRef.current) return
+      try {
+        const marks = typeof performance !== 'undefined' && performance.getEntriesByType ? performance.getEntriesByType('mark') : []
+        const byName = new Map<string, number>()
+        marks.forEach((m: PerformanceEntry) => { byName.set(m.name, m.startTime) })
+        const payload = {
+          firstRenderMs: byName.get('sales_page_first_render') ?? undefined,
+          fetchStartMs: byName.get('sales_fetch_start') ?? undefined,
+          fetchCompleteMs: byName.get('sales_fetch_complete') ?? undefined,
+          initialLoadCompleteMs: byName.get('sales_initial_load_complete') ?? undefined,
+          mapMountedMs: byName.get('map_mounted') ?? undefined,
+          styleLoadedMs: byName.get('map_style_loaded') ?? undefined,
+          mapIdleMs: byName.get('map_idle') ?? undefined,
+          hasFirstRender: byName.has('sales_page_first_render'),
+          hasFetchStart: byName.has('sales_fetch_start'),
+          hasFetchComplete: byName.has('sales_fetch_complete'),
+          hasMapMounted: byName.has('map_mounted'),
+          hasStyleLoaded: byName.has('map_style_loaded'),
+          hasMapIdle: byName.has('map_idle'),
+          hasInitialLoadComplete: byName.has('sales_initial_load_complete'),
+        }
+        const win = typeof window !== 'undefined' ? window as Window & { ReactNativeWebView?: { postMessage: (msg: string) => void } } : null
+        if (win?.ReactNativeWebView?.postMessage) {
+          win.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_PERF_DIAG', ...payload }))
+          mapPerfDiagSentRef.current = true
+        }
+      } catch {
+        // Bridge absent or getEntriesByType not available - no-op
+      }
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [hasCompletedInitialLoad])
+
   // Hybrid system: Create location groups and apply clustering
   // DEFERRED: Run clustering after first paint to improve initial load time
   const [hybridResult, setHybridResult] = useState<ReturnType<typeof createHybridPins>>({
@@ -1046,8 +1093,10 @@ export default function SalesClient({
   const initialLoadRef = useRef(true) // Track if this is the initial load
   // Guard: set when proactive initial fetch has been triggered so map onLoad does not duplicate first fetch
   const proactiveInitialFetchTriggeredRef = useRef(false)
-  // Normalized bbox key from proactive fetch; first onLoad viewport that normalizes to this key is treated as covered (drift tolerance)
+  // Normalized bbox key from proactive fetch; used only for first-onLoad drift tolerance
   const proactiveNormalizedBboxKeyRef = useRef<string | null>(null)
+  // Strictly one-time: set on first debounced run so drift tolerance can never apply again (prevents stale ref from suppressing later refetches)
+  const driftToleranceHandshakeAttemptedRef = useRef(false)
   // Track when we're programmatically centering to a pin to prevent clearing selection
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
 
@@ -1271,14 +1320,18 @@ export default function SalesClient({
       const normalizedViewportBounds = normalizeBounds(viewportBounds)
       const normalizedViewportKey = getNormalizedBboxKey(normalizedViewportBounds)
 
-      // First-onLoad drift tolerance: if Mapbox onLoad viewport normalizes to same key as proactive fetch, treat as covered
       const proactiveKey = proactiveNormalizedBboxKeyRef.current
-      if (proactiveKey !== null && normalizedViewportKey === proactiveKey) {
+      const isFirstHandshake = !driftToleranceHandshakeAttemptedRef.current
+      if (isFirstHandshake) {
+        driftToleranceHandshakeAttemptedRef.current = true
         proactiveNormalizedBboxKeyRef.current = null
+      }
+
+      const useDriftTolerance = isFirstHandshake && proactiveKey !== null && normalizedViewportKey === proactiveKey
+      if (useDriftTolerance) {
         if (isDebugEnabled) {
           console.log('[SALES] First onLoad drift tolerance - viewport normalizes to proactive key, no fetch')
         }
-        // Skip fetch and fall through to persistence; do not set needsFetch
       } else {
         const needsFetch = !bufferedBounds || !isViewportInsideBounds(normalizedViewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
 

@@ -74,7 +74,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   const [mapError, setMapError] = useState<string | null>(null)
   const [pinsLoading, setPinsLoading] = useState(false)
   const lastBoundsKey = useRef<string>("")
-  
+  const mapPerfMarksFiredRef = useRef({ mounted: false, style: false, idle: false })
+
   const token = getMapboxToken()
   
   // Validate token before map loads
@@ -128,6 +129,23 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[MAP] onLoad - Map initialization completed')
     }
+    const map = mapRef.current?.getMap()
+    if (map && typeof performance !== 'undefined' && performance.mark) {
+      if (!mapPerfMarksFiredRef.current.mounted) {
+        performance.mark('map_mounted')
+        mapPerfMarksFiredRef.current.mounted = true
+      }
+      if (!mapPerfMarksFiredRef.current.style) {
+        performance.mark('map_style_loaded')
+        mapPerfMarksFiredRef.current.style = true
+      }
+      map.once('idle', () => {
+        if (!mapPerfMarksFiredRef.current.idle) {
+          performance.mark('map_idle')
+          mapPerfMarksFiredRef.current.idle = true
+        }
+      })
+    }
     setLoaded(true)
     setMapError(null) // Clear any previous errors on successful load
     setPinsLoading(true) // Start loading pins
@@ -135,11 +153,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     // Trigger initial viewport change to set proper bounds
     if (mapRef.current) {
-      const map = mapRef.current.getMap()
-      if (map) {
-        const center = map.getCenter()
-        const zoom = map.getZoom()
-        const bounds = map.getBounds()
+      const mapForViewport = mapRef.current.getMap()
+      if (mapForViewport) {
+        const center = mapForViewport.getCenter()
+        const zoom = mapForViewport.getZoom()
+        const bounds = mapForViewport.getBounds()
         
         const viewport = {
           center: { lat: center.lat, lng: center.lng },

@@ -1,8 +1,8 @@
 {
   "name": "yard-sale-finder",
   "private": true,
-  "version": "173",
-  "description": "Find yard sales near you - Force redeploy for OAuth fix",
+  "version": "174",
+  "description": "Find yard sales near you",
   "engines": {
     "node": "^20"
   },

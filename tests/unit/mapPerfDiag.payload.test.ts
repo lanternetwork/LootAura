@@ -18,6 +18,9 @@ const ALLOWED_KEYS = new Set([
   'mapMountedMs',
   'styleLoadedMs',
   'mapIdleMs',
+  'hasFirstRender',
+  'hasFetchStart',
+  'hasFetchComplete',
   'hasMapMounted',
   'hasStyleLoaded',
   'hasMapIdle',
@@ -49,6 +52,9 @@ function buildValidPayload(): Record<string, unknown> {
     mapMountedMs: 120,
     styleLoadedMs: 180,
     mapIdleMs: 400,
+    hasFirstRender: true,
+    hasFetchStart: true,
+    hasFetchComplete: true,
     hasMapMounted: true,
     hasStyleLoaded: true,
     hasMapIdle: true,
@@ -110,7 +116,7 @@ describe('MAP_PERF_DIAG payload', () => {
 
   it('allowed boolean fields are booleans', () => {
     const payload = buildValidPayload()
-    const boolKeys = ['hasMapMounted', 'hasStyleLoaded', 'hasMapIdle', 'hasInitialLoadComplete']
+    const boolKeys = ['hasFirstRender', 'hasFetchStart', 'hasFetchComplete', 'hasMapMounted', 'hasStyleLoaded', 'hasMapIdle', 'hasInitialLoadComplete']
     for (const key of boolKeys) {
       expect(typeof payload[key]).toBe('boolean')
     }

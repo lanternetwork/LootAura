@@ -70,6 +70,8 @@ export default function SalesClient({
   const isImperativeRecenterRef = useRef(false)
   // Track previous URL location params to prevent unnecessary viewport updates on filter changes
   const prevUrlLocationRef = useRef<{ lat: string | null; lng: string | null; zoom: string | null } | null>(null)
+  // Prefetch SimpleMap chunk on mobile /sales so Mapbox can start sooner when map mounts (idempotent)
+  const simpleMapPrefetchedRef = useRef(false)
   
   // Single source of truth for last known user location
   const [lastUserLocation, setLastUserLocation] = useState<{ lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null>(null)
@@ -206,6 +208,13 @@ export default function SalesClient({
   // Resolve initial viewport using deterministic precedence
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
   const isMobile = windowWidth < 768
+
+  // Mobile-only, route-scoped prefetch: warm SimpleMap chunk so Mapbox init can begin sooner when map mounts
+  useEffect(() => {
+    if (pathname !== '/sales' || !isMobile || simpleMapPrefetchedRef.current) return
+    simpleMapPrefetchedRef.current = true
+    import('@/components/location/SimpleMap').catch(() => { /* prefetch best-effort; ignore errors */ })
+  }, [pathname, isMobile])
   
   const resolvedViewport = useMemo(() => {
     return resolveInitialViewport({

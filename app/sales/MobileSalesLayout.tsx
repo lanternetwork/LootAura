@@ -1,14 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import dynamic from 'next/dynamic'
-// Lazy-load SimpleMap on mobile to defer Mapbox bundle loading
-const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="absolute inset-0 bg-gray-100" />
-  )
-})
+import SimpleMap from '@/components/location/SimpleMap'
 import MobileSalesBottomSheet, { BottomSheetState } from '@/components/sales/MobileSalesBottomSheet'
 import FiltersBar from '@/components/sales/FiltersBar'
 import { Sale } from '@/lib/types'

@@ -3,14 +3,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
-import dynamic from 'next/dynamic'
-// Lazy-load SimpleMap on mobile to defer Mapbox bundle loading
-const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="absolute inset-0 bg-gray-100" />
-  )
-})
+import SimpleMap from '@/components/location/SimpleMap'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'

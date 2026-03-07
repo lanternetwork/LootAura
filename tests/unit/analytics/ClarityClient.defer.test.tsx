@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
-import { MAP_IDLE_EVENT } from '@/components/analytics/ClarityClient'
+import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 
 const mockUsePathname = vi.fn(() => '/')
 const mockIsNativeApp = vi.fn(() => false)
@@ -48,12 +48,12 @@ describe('ClarityClient deferral', () => {
     const ClarityClient = (await import('@/components/analytics/ClarityClient')).default
     render(<ClarityClient />)
 
-    // Should have registered for map_idle, not injected yet
-    expect(addEventListenerSpy).toHaveBeenCalledWith(MAP_IDLE_EVENT, expect.any(Function))
+    // Should have registered for map first-idle event, not injected yet
+    expect(addEventListenerSpy).toHaveBeenCalledWith(MAP_IDLE_FIRST_EVENT, expect.any(Function))
     expect(document.querySelector('script[src*="clarity.ms"]')).toBeNull()
 
-    // Simulate map_idle
-    window.dispatchEvent(new CustomEvent(MAP_IDLE_EVENT))
+    // Simulate map first idle
+    window.dispatchEvent(new CustomEvent(MAP_IDLE_FIRST_EVENT))
 
     await waitFor(() => {
       expect(document.querySelector('script[src*="clarity.ms"]')).not.toBeNull()
@@ -70,7 +70,7 @@ describe('ClarityClient deferral', () => {
     await waitFor(() => {
       expect(document.querySelector('script[src*="clarity.ms"]')).not.toBeNull()
     })
-    expect(addEventListenerSpy).not.toHaveBeenCalledWith(MAP_IDLE_EVENT, expect.any(Function))
+    expect(addEventListenerSpy).not.toHaveBeenCalledWith(MAP_IDLE_FIRST_EVENT, expect.any(Function))
   })
 
   it('(b) on other route (e.g. /), injects immediately even when in-app', async () => {

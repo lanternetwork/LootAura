@@ -5,7 +5,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
-import { MAP_IDLE_EVENT } from '@/components/analytics/ClarityClient'
+import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 
 const observeSpy = vi.fn()
 const MockPerformanceObserver = vi.fn().mockImplementation(function (this: any, callback: () => void) {
@@ -70,7 +70,7 @@ describe('SalesClient contention observers', () => {
     // Before map_idle: observer should not have been started (effect returns early because !mapIdleObserved)
     expect(observeSpy).not.toHaveBeenCalled()
 
-    window.dispatchEvent(new CustomEvent(MAP_IDLE_EVENT))
+    window.dispatchEvent(new CustomEvent(MAP_IDLE_FIRST_EVENT))
 
     await waitFor(() => {
       expect(observeSpy).toHaveBeenCalled()

@@ -74,9 +74,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const _categories = searchParams.categories ? searchParams.categories.split(',') : undefined
   const _pageSize = searchParams.pageSize ? parseInt(searchParams.pageSize) : 50
 
-  // Resolve initial center server-side
+  // Resolve initial center server-side (headersList from top of function)
   const cookieStore = cookies()
-  const headersList = await headers()
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
   const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
   // Use fallback if host is empty (matching pattern from app/sell/new/page.tsx)

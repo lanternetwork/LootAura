@@ -15,7 +15,7 @@ import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
-import { MAP_IDLE_EVENT } from '@/components/analytics/ClarityClient'
+import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
 import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/lib/keyboard/shortcuts'
 import { 
@@ -977,8 +977,8 @@ export default function SalesClient({
   useEffect(() => {
     if (typeof window === 'undefined') return
     const onMapIdle = () => setMapIdleObserved(true)
-    window.addEventListener(MAP_IDLE_EVENT, onMapIdle)
-    return () => window.removeEventListener(MAP_IDLE_EVENT, onMapIdle)
+    window.addEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
+    return () => window.removeEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
   }, [])
 
   // Lightweight main-thread contention summary: Long Tasks API + RAF-delay probe; start only after map_idle to avoid contention during map init

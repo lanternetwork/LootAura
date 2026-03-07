@@ -368,6 +368,9 @@ export default function SalesClient({
   // Track pending create events that arrived before viewport was initialized
   const pendingCreateEventsRef = useRef<Array<{ id: string; lat?: number; lng?: number }>>([])
   const mapPerfDiagSentRef = useRef(false)
+  const salesClientMountedMarkFiredRef = useRef(false)
+  const pageReadinessMarksFiredRef = useRef({ domContentLoaded: false, load: false })
+  const contentionSummaryRef = useRef<{ longTaskCount?: number; longTaskMaxMs?: number; rafDelayMaxMs?: number }>({})
   const [zipError, setZipError] = useState<string | null>(null)
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -929,6 +932,82 @@ export default function SalesClient({
     markPerformance('sales_page_first_render')
   }, [markPerformance])
 
+  // One-time mark: SalesClient component mounted (client-side)
+  useEffect(() => {
+    if (salesClientMountedMarkFiredRef.current) return
+    if (typeof performance !== 'undefined' && performance.mark) {
+      performance.mark('sales_client_mounted')
+      salesClientMountedMarkFiredRef.current = true
+    }
+  }, [])
+
+  // Page readiness marks: DOMContentLoaded and window load (best-effort in App Router)
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof performance === 'undefined' || !performance.mark) return
+    const onDOMContentLoaded = () => {
+      if (pageReadinessMarksFiredRef.current.domContentLoaded) return
+      performance.mark('dom_content_loaded')
+      pageReadinessMarksFiredRef.current.domContentLoaded = true
+    }
+    const onLoad = () => {
+      if (pageReadinessMarksFiredRef.current.load) return
+      performance.mark('window_load')
+      pageReadinessMarksFiredRef.current.load = true
+    }
+    if (document.readyState === 'complete') {
+      onLoad()
+      if (!pageReadinessMarksFiredRef.current.domContentLoaded) performance.mark('dom_content_loaded')
+      pageReadinessMarksFiredRef.current.domContentLoaded = true
+    } else {
+      if (document.readyState === 'interactive') onDOMContentLoaded()
+      else document.addEventListener('DOMContentLoaded', onDOMContentLoaded)
+      window.addEventListener('load', onLoad)
+      return () => {
+        document.removeEventListener('DOMContentLoaded', onDOMContentLoaded)
+        window.removeEventListener('load', onLoad)
+      }
+    }
+  }, [])
+
+  // Lightweight main-thread contention summary: Long Tasks API (count + max duration) or RAF-delay probe (numeric only)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof performance === 'undefined') return
+    const summary = contentionSummaryRef.current
+    const observeEnd = 3000
+
+    try {
+      if (typeof PerformanceObserver !== 'undefined') {
+        const obs = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            const dur = entry.duration
+            summary.longTaskCount = (summary.longTaskCount ?? 0) + 1
+            summary.longTaskMaxMs = summary.longTaskMaxMs != null ? Math.max(summary.longTaskMaxMs, dur) : dur
+          }
+        })
+        // longtask is experimental (Chromium); not in TS DOM lib - use type assertion
+        obs.observe({ type: 'longtask', buffered: true } as PerformanceObserverInit)
+        setTimeout(() => obs.disconnect(), observeEnd)
+      }
+    } catch {
+      // longtask not supported
+    }
+
+    let rafCount = 0
+    const rafSamples = 5
+    let last = performance.now()
+    let maxDelay = 0
+    const run = () => {
+      const now = performance.now()
+      const delay = now - last
+      if (delay > maxDelay) maxDelay = delay
+      last = now
+      rafCount++
+      if (rafCount < rafSamples) requestAnimationFrame(run)
+      else if (maxDelay > 0) summary.rafDelayMaxMs = Math.round(maxDelay * 10) / 10
+    }
+    requestAnimationFrame(run)
+  }, [])
+
   // One-time map/sales perf diag: collect marks and send to native shell (timings + booleans only; no PII)
   useEffect(() => {
     if (!hasCompletedInitialLoad) return
@@ -938,6 +1017,7 @@ export default function SalesClient({
         const marks = typeof performance !== 'undefined' && performance.getEntriesByType ? performance.getEntriesByType('mark') : []
         const byName = new Map<string, number>()
         marks.forEach((m: PerformanceEntry) => { byName.set(m.name, m.startTime) })
+        const contention = contentionSummaryRef.current
         const payload = {
           firstRenderMs: byName.get('sales_page_first_render') ?? undefined,
           fetchStartMs: byName.get('sales_fetch_start') ?? undefined,
@@ -946,6 +1026,12 @@ export default function SalesClient({
           mapMountedMs: byName.get('map_mounted') ?? undefined,
           styleLoadedMs: byName.get('map_style_loaded') ?? undefined,
           mapIdleMs: byName.get('map_idle') ?? undefined,
+          domContentLoadedMs: byName.get('dom_content_loaded') ?? undefined,
+          windowLoadMs: byName.get('window_load') ?? undefined,
+          salesClientMountedMs: byName.get('sales_client_mounted') ?? undefined,
+          simplemapComponentMountedMs: byName.get('simplemap_component_mounted') ?? undefined,
+          simplemapChunkRequestedMs: byName.get('simplemap_chunk_requested') ?? undefined,
+          simplemapChunkResolvedMs: byName.get('simplemap_chunk_resolved') ?? undefined,
           hasFirstRender: byName.has('sales_page_first_render'),
           hasFetchStart: byName.has('sales_fetch_start'),
           hasFetchComplete: byName.has('sales_fetch_complete'),
@@ -953,6 +1039,15 @@ export default function SalesClient({
           hasStyleLoaded: byName.has('map_style_loaded'),
           hasMapIdle: byName.has('map_idle'),
           hasInitialLoadComplete: byName.has('sales_initial_load_complete'),
+          hasDomContentLoaded: byName.has('dom_content_loaded'),
+          hasWindowLoad: byName.has('window_load'),
+          hasSalesClientMounted: byName.has('sales_client_mounted'),
+          hasSimplemapComponentMounted: byName.has('simplemap_component_mounted'),
+          hasSimplemapChunkRequested: byName.has('simplemap_chunk_requested'),
+          hasSimplemapChunkResolved: byName.has('simplemap_chunk_resolved'),
+          longTaskCount: contention.longTaskCount,
+          longTaskMaxMs: contention.longTaskMaxMs,
+          rafDelayMaxMs: contention.rafDelayMaxMs,
         }
         const win = typeof window !== 'undefined' ? window as Window & { ReactNativeWebView?: { postMessage: (msg: string) => void } } : null
         if (win?.ReactNativeWebView?.postMessage) {

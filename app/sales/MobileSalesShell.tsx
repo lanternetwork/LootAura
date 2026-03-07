@@ -112,7 +112,18 @@ export default function MobileSalesShell({
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
-  
+  const simplemapChunkMarksFiredRef = useRef(false)
+
+  // One-time perf marks: SimpleMap chunk requested/resolved (with static import both in same tick when shell mounts)
+  useEffect(() => {
+    if (simplemapChunkMarksFiredRef.current) return
+    if (typeof performance !== 'undefined' && performance.mark) {
+      performance.mark('simplemap_chunk_requested')
+      performance.mark('simplemap_chunk_resolved')
+      simplemapChunkMarksFiredRef.current = true
+    }
+  }, [])
+
   // Capability detection: separate from layout breakpoint
   // Desktop browsers resized to mobile width do not have GPS capability
   const canUsePreciseGeolocation = useMemo(() => {

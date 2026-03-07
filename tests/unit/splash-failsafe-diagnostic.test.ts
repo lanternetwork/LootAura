@@ -44,11 +44,9 @@ describe('Splash failsafe diagnostic', () => {
 
   it('(c) APP_READY path still records APP_READY in diagnostics', () => {
     const index = fs.readFileSync(INDEX_PATH, 'utf-8')
-
-    const appReadyBlock = index.slice(
-      index.indexOf("message.type === 'APP_READY'"),
-      index.indexOf("message.type === 'APP_READY'") + 800
-    )
+    const appReadyIdx = index.indexOf("message.type === 'APP_READY'")
+    expect(appReadyIdx).toBeGreaterThan(-1)
+    const appReadyBlock = index.slice(appReadyIdx, appReadyIdx + 800)
     expect(appReadyBlock).toMatch(/pushDiagEvent\s*\(\s*['"]APP_READY['"]/)
   })
 })

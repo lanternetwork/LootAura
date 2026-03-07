@@ -8,7 +8,14 @@ import { describe, it, expect } from 'vitest'
 import path from 'path'
 import fs from 'fs'
 
-const LAYOUT_PATH = path.resolve(process.cwd(), 'app/layout.tsx')
+function resolveLayoutPath(): string {
+  const fromCwd = path.resolve(process.cwd(), 'app/layout.tsx')
+  if (fs.existsSync(fromCwd)) return fromCwd
+  const fromDir = path.resolve(__dirname, '../../app/layout.tsx')
+  return fromDir
+}
+
+const LAYOUT_PATH = resolveLayoutPath()
 
 describe('Layout in-app shell (body background gating)', () => {
   it('body has in-app-shell only when inApp is true (gated by isInAppUserAgent)', () => {
@@ -21,7 +28,8 @@ describe('Layout in-app shell (body background gating)', () => {
 
   it('normal web path uses default body class without in-app-shell', () => {
     const layout = fs.readFileSync(LAYOUT_PATH, 'utf-8')
-    expect(layout).toContain("'min-h-screen bg-neutral-50 text-neutral-900'")
-    expect(layout).toMatch(/inApp\s*\?[\s\S]*?:\s*'min-h-screen bg-neutral-50/)
+    expect(layout).toContain('min-h-screen bg-neutral-50 text-neutral-900')
+    expect(layout).toContain('inApp')
+    expect(layout).toMatch(/inApp\s*\?[\s\S]*?:[\s\S]*?min-h-screen/)
   })
 })

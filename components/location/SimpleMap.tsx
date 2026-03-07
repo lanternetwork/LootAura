@@ -8,6 +8,7 @@ import { PinsProps, HybridPinsProps } from "@/lib/pins/types"
 import PinsOverlay from "./PinsOverlay"
 import HybridPinsOverlay from "./HybridPinsOverlay"
 import AttributionOSM from "./AttributionOSM"
+import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
@@ -175,6 +176,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         if (!mapPerfMarksFiredRef.current.idle) {
           performance.mark('map_idle')
           mapPerfMarksFiredRef.current.idle = true
+          // Lightweight signal for deferred work (Clarity, contention observers) so they don't run during map init
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent(MAP_IDLE_FIRST_EVENT))
+          }
         }
       })
     }

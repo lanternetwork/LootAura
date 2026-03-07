@@ -3,9 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { isNativeApp } from '@/lib/runtime/isNativeApp'
-
-/** Name of the custom event fired when the map reaches first idle (used to defer non-essential work). */
-export const MAP_IDLE_EVENT = 'map_idle'
+import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 
 const CLARITY_DEFER_TIMEOUT_MS = 10000
 
@@ -18,9 +16,9 @@ function injectClarity(clarityId: string) {
   const r = 'script'
   const i = clarityId
   c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) }
-  const t = l.createElement(r)
-  t.async = 1
-  ;(t as HTMLScriptElement).src = 'https://www.clarity.ms/tag/' + i
+  const t = l.createElement(r) as HTMLScriptElement
+  t.async = true
+  t.src = 'https://www.clarity.ms/tag/' + i
   const y = l.getElementsByTagName(r)[0]
   y.parentNode!.insertBefore(t, y)
   const script = document.querySelector(`script[src*="clarity.ms/tag/${clarityId}"]`)
@@ -50,17 +48,17 @@ export default function ClarityClient() {
     let timeoutId: ReturnType<typeof setTimeout>
     const onMapIdle = () => {
       injectClarity(clarityId)
-      window.removeEventListener(MAP_IDLE_EVENT, onMapIdle)
+      window.removeEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
       clearTimeout(timeoutId)
     }
-    window.addEventListener(MAP_IDLE_EVENT, onMapIdle)
+    window.addEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
     timeoutId = setTimeout(() => {
-      window.removeEventListener(MAP_IDLE_EVENT, onMapIdle)
+      window.removeEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
       injectClarity(clarityId)
     }, CLARITY_DEFER_TIMEOUT_MS)
 
     return () => {
-      window.removeEventListener(MAP_IDLE_EVENT, onMapIdle)
+      window.removeEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
       clearTimeout(timeoutId)
     }
   }, [pathname])

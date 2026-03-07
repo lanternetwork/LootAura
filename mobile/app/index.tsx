@@ -22,6 +22,28 @@ function sanitizePayloadForDisplay(payload: string): string {
   return payload.replace(/(https?:\/\/[^"'\s?]+)\?[^"'\s]*/g, '$1');
 }
 
+/** Build a ROUTE_STATE payload for diagnostics console: no raw query string (search redacted). */
+function buildRouteStateDiagPayload(message: {
+  pathname?: string;
+  search?: string;
+  isSaleDetail?: boolean;
+  saleId?: string | null;
+  inAppFlag?: boolean | null;
+  hasRNBridge?: boolean | null;
+}): Record<string, unknown> {
+  const pathname = message.pathname || '/';
+  const search = message.search;
+  const hasSearch = typeof search === 'string' && search.trim() !== '';
+  return {
+    pathname,
+    isSaleDetail: message.isSaleDetail === true,
+    saleId: message.saleId ?? null,
+    inAppFlag: message.inAppFlag === true,
+    hasRNBridge: message.hasRNBridge === true,
+    ...(hasSearch ? { search: '[redacted]' as const } : {}),
+  };
+}
+
 export default function HomeScreen() {
   // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
   // Accept '1' or 'true' (case-insensitive) = enabled; '0' or 'false' = disabled.
@@ -694,7 +716,9 @@ export default function HomeScreen() {
         if (!webViewReady) {
           setWebViewReady(true);
         }
-        
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('APP_READY', JSON.stringify(message));
+        }
         return; // Handled, don't process further
       }
       
@@ -729,6 +753,9 @@ export default function HomeScreen() {
           inAppFlag: inAppFlag === true,
           hasRNBridge: hasRNBridge === true,
         });
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
+        }
         // Reset favorite state when leaving sale detail
         if (!isSaleDetail) {
           setIsFavorited(false);

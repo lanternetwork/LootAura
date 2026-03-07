@@ -20,7 +20,11 @@ function injectClarity(clarityId: string) {
   t.async = true
   t.src = 'https://www.clarity.ms/tag/' + i
   const y = l.getElementsByTagName(r)[0]
-  y.parentNode!.insertBefore(t, y)
+  if (y?.parentNode) {
+    y.parentNode.insertBefore(t, y)
+  } else {
+    ;(l.head || l.body).appendChild(t)
+  }
   const script = document.querySelector(`script[src*="clarity.ms/tag/${clarityId}"]`)
   if (script) script.setAttribute('data-clarity-id', clarityId)
 }

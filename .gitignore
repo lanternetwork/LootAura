@@ -44,11 +44,14 @@ pids
 *.seed
 *.pid.lock
 
-# IDE
+# IDE / editor
 .vscode/
 .idea/
 *.swp
 *.swo
+*.tmp
+*.orig
+*.bak
 
 # OS
 .DS_Store

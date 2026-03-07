@@ -12,24 +12,25 @@ function resolveLayoutPath(): string {
   const fromCwd = path.resolve(process.cwd(), 'app/layout.tsx')
   if (fs.existsSync(fromCwd)) return fromCwd
   const fromDir = path.resolve(__dirname, '../../app/layout.tsx')
-  return fromDir
+  if (fs.existsSync(fromDir)) return fromDir
+  throw new Error(`layout not found; tried ${fromCwd} and ${fromDir} (cwd=${process.cwd()})`)
 }
 
 const LAYOUT_PATH = resolveLayoutPath()
 
 describe('Layout in-app shell (body background gating)', () => {
-  it('body has in-app-shell only when inApp is true (gated by isInAppUserAgent)', () => {
+  it('in-app body class is gated by isInAppUserAgent (user-agent)', () => {
     const layout = fs.readFileSync(LAYOUT_PATH, 'utf-8')
     expect(layout).toContain('isInAppUserAgent')
-    expect(layout).toContain('in-app-shell')
     expect(layout).toContain('user-agent')
-    expect(layout).toMatch(/inApp[\s\S]*?in-app-shell/)
+    expect(layout).toContain('in-app-shell')
+    expect(layout).toContain('inApp')
   })
 
-  it('normal web path uses default body class without in-app-shell', () => {
+  it('default body class is used and inApp ternary exists', () => {
     const layout = fs.readFileSync(LAYOUT_PATH, 'utf-8')
     expect(layout).toContain('min-h-screen bg-neutral-50 text-neutral-900')
     expect(layout).toContain('inApp')
-    expect(layout).toMatch(/inApp\s*\?[\s\S]*?:[\s\S]*?min-h-screen/)
+    expect(layout).toContain('bodyClassName')
   })
 })

@@ -47,6 +47,15 @@ export function getInAppUaToken(): string {
 }
 
 /**
+ * Server-side (or headless) in-app detection from User-Agent string.
+ * Use when only headers are available (e.g. Next.js server component).
+ */
+export function isInAppUserAgent(userAgent: string | null): boolean {
+  if (!userAgent || typeof userAgent !== 'string') return false
+  return userAgent.includes(IN_APP_UA_TOKEN)
+}
+
+/**
  * Whether in-app was detected via User-Agent token (available on first request).
  * Use for Sentry breadcrumbs to distinguish UA-based vs bridge/flag detection.
  */

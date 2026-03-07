@@ -910,18 +910,20 @@ export default function SalesClient({
     return filterSalesForViewport(fetchedSales, viewportBounds)
   }, [fetchedSales, viewportBounds])
 
-  // Performance marker helper (debug-only)
+  // Performance marker: always record marks for MAP_PERF_DIAG; measure/debug log only when debug on
   const markPerformance = useCallback((name: string) => {
-    if (isDebugEnabled && typeof performance !== 'undefined' && performance.mark) {
+    if (typeof performance !== 'undefined' && performance.mark) {
       performance.mark(name)
-      const measureName = `${name}_measure`
-      if (performance.getEntriesByName(measureName).length === 0) {
-        try {
-          performance.measure(measureName, 'navigationStart', name)
-          const measure = performance.getEntriesByName(measureName)[0]
-          console.log(`[PERF] ${name}:`, `${Math.round(measure.duration)}ms`)
-        } catch (e) {
-          // Ignore measurement errors
+      if (isDebugEnabled) {
+        const measureName = `${name}_measure`
+        if (performance.getEntriesByName(measureName).length === 0) {
+          try {
+            performance.measure(measureName, 'navigationStart', name)
+            const measure = performance.getEntriesByName(measureName)[0]
+            console.log(`[PERF] ${name}:`, `${Math.round(measure.duration)}ms`)
+          } catch (e) {
+            // Ignore measurement errors
+          }
         }
       }
     }

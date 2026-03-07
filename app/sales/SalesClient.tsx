@@ -959,7 +959,7 @@ export default function SalesClient({
       if (!pageReadinessMarksFiredRef.current.domContentLoaded) performance.mark('dom_content_loaded')
       pageReadinessMarksFiredRef.current.domContentLoaded = true
     } else {
-      if (document.readyState === 'interactive' || document.readyState === 'complete') onDOMContentLoaded()
+      if (document.readyState === 'interactive') onDOMContentLoaded()
       else document.addEventListener('DOMContentLoaded', onDOMContentLoaded)
       window.addEventListener('load', onLoad)
       return () => {
@@ -984,7 +984,8 @@ export default function SalesClient({
             summary.longTaskMaxMs = summary.longTaskMaxMs != null ? Math.max(summary.longTaskMaxMs, dur) : dur
           }
         })
-        obs.observe({ type: 'longtask', buffered: true })
+        // longtask is experimental (Chromium); not in TS DOM lib - use type assertion
+        obs.observe({ type: 'longtask', buffered: true } as PerformanceObserverInit)
         setTimeout(() => obs.disconnect(), observeEnd)
       }
     } catch {

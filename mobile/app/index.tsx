@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share } from 'react-native';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -13,6 +13,36 @@ const LOOTAURA_URL = 'https://lootaura.com/sales';
 // Stable token in User-Agent so the web app can detect in-app on the first request/render
 // without relying on injectedJavaScriptBeforeContentLoaded (unreliable on Android).
 const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
+
+// Diagnostics console: in-memory ring buffer (only when HUD enabled)
+const DIAG_CONSOLE_RING_SIZE = 30;
+type DiagEvent = { timestamp: number; messageType: string; payload: string };
+
+function sanitizePayloadForDisplay(payload: string): string {
+  return payload.replace(/(https?:\/\/[^"'\s?]+)\?[^"'\s]*/g, '$1');
+}
+
+/** Build a ROUTE_STATE payload for diagnostics console: no raw query string (search redacted). */
+function buildRouteStateDiagPayload(message: {
+  pathname?: string;
+  search?: string;
+  isSaleDetail?: boolean;
+  saleId?: string | null;
+  inAppFlag?: boolean | null;
+  hasRNBridge?: boolean | null;
+}): Record<string, unknown> {
+  const pathname = message.pathname || '/';
+  const search = message.search;
+  const hasSearch = typeof search === 'string' && search.trim() !== '';
+  return {
+    pathname,
+    isSaleDetail: message.isSaleDetail === true,
+    saleId: message.saleId ?? null,
+    inAppFlag: message.inAppFlag === true,
+    hasRNBridge: message.hasRNBridge === true,
+    ...(hasSearch ? { search: '[redacted]' as const } : {}),
+  };
+}
 
 export default function HomeScreen() {
   // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
@@ -131,6 +161,17 @@ export default function HomeScreen() {
     gapAfterContentPx: null,
     gapBelowViewportPx: null,
   });
+
+  // Diagnostics console: ring buffer of events (only populated when HUD enabled)
+  const [diagConsoleEvents, setDiagConsoleEvents] = useState<DiagEvent[]>([]);
+  const [diagConsoleViewMode, setDiagConsoleViewMode] = useState<'latest' | 'all'>('latest');
+
+  const pushDiagEvent = useCallback((messageType: string, payload: string) => {
+    const sanitized = sanitizePayloadForDisplay(payload);
+    setDiagConsoleEvents((prev: DiagEvent[]) =>
+      [...prev, { timestamp: Date.now(), messageType, payload: sanitized }].slice(-DIAG_CONSOLE_RING_SIZE)
+    );
+  }, []);
 
   // Performance instrumentation helper (debug-only)
   const logLoaderPerformance = (signal: string, path: string, attempt?: number) => {
@@ -675,7 +716,9 @@ export default function HomeScreen() {
         if (!webViewReady) {
           setWebViewReady(true);
         }
-        
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('APP_READY', JSON.stringify(message));
+        }
         return; // Handled, don't process further
       }
       
@@ -688,14 +731,16 @@ export default function HomeScreen() {
         console.log('[LAUNCH_LOCATION_DIAG]', JSON.stringify(message));
         if (isDiagnosticsEnabled) {
           setLastLaunchLocationDiag(JSON.stringify(message));
+          pushDiagEvent('LAUNCH_LOCATION_DIAG', JSON.stringify(message));
         }
       } else if (message.type === 'MAP_PERF_DIAG') {
         const mapPerfJson = JSON.stringify(message);
-        // Full single-line payload for device logs (easy to copy); HUD shows abbreviated value below
+        // Full single-line payload for device logs (easy to copy); console shows full payload
         console.log('[MAP_PERF_DIAG]' + mapPerfJson);
         console.log('[MAP_PERF_DIAG_JSON]' + mapPerfJson);
         if (isDiagnosticsEnabled) {
           setLastMapPerfDiag(mapPerfJson);
+          pushDiagEvent('MAP_PERF_DIAG', mapPerfJson);
         }
       } else if (message.type === 'ROUTE_STATE') {
         // Route state update from web
@@ -708,6 +753,9 @@ export default function HomeScreen() {
           inAppFlag: inAppFlag === true,
           hasRNBridge: hasRNBridge === true,
         });
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
+        }
         // Reset favorite state when leaving sale detail
         if (!isSaleDetail) {
           setIsFavorited(false);
@@ -741,7 +789,10 @@ export default function HomeScreen() {
       } else if (message.type === 'NAVIGATE') {
         // Handle navigation request from header
         const path = message.path || message.url || '/';
-        if (isDiagnosticsEnabled) setLastNavigateMessage(`NAVIGATE: ${path}`);
+        if (isDiagnosticsEnabled) {
+          setLastNavigateMessage(`NAVIGATE: ${path}`);
+          pushDiagEvent('NAVIGATE', JSON.stringify(message));
+        }
         
         console.log('[NATIVE] Navigating WebView to:', path);
         // Sanitize and validate URL before navigation
@@ -950,12 +1001,62 @@ export default function HomeScreen() {
       {insets.top > 0 ? (
         <View style={[styles.statusBarBackground, { height: insets.top }]} pointerEvents="none" />
       ) : null}
-      {/* Diagnostic HUD - Only visible when diagnostics enabled */}
+      {/* Diagnostics Console - Only visible when diagnostics enabled; full JSON, no truncation */}
       {isDiagnosticsEnabled && (
-        <View style={styles.diagnosticHud} pointerEvents="none">
-          <Text style={styles.diagnosticText} numberOfLines={20}>
-            index | loading={loading ? 'T' : 'F'} | ready={webViewReady ? 'T' : 'F'} | pathname={routeState.pathname || 'none'} | isSaleDetail={routeState.isSaleDetail ? 'T' : 'F'} | saleId={routeState.saleId || 'none'} | footerVisible={routeState.isSaleDetail ? 'T' : 'F'} | isFavorited={isFavorited ? 'T' : 'F'} | bottomInset={insets.bottom} | parentBottomPadding={0} | footerBottomPadding={routeState.isSaleDetail ? insets.bottom : 0} | inAppFlag={routeState.inAppFlag === null ? '?' : (routeState.inAppFlag ? 'T' : 'F')} | hasRNBridge={routeState.hasRNBridge === null ? '?' : (routeState.hasRNBridge ? 'T' : 'F')} | currentUrl={currentUrl ? (currentUrl.length > 50 ? currentUrl.substring(0, 47) + '...' : currentUrl) : 'none'} | navStateUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastMsg={lastMessageReceived || 'none'} | launchDiag={lastLaunchLocationDiag ?? 'none'} | mapPerf(abbrev)={lastMapPerfDiag ? (lastMapPerfDiag.length > 80 ? lastMapPerfDiag.substring(0, 77) + '...' : lastMapPerfDiag) : 'none'} | bottomEl={layoutDiag.bottomEl ? (layoutDiag.bottomEl.length > 30 ? layoutDiag.bottomEl.substring(0, 27) + '...' : layoutDiag.bottomEl) : 'none'} | footerH={layoutDiag.footerH !== null ? layoutDiag.footerH.toFixed(0) : 'none'} | footerTop={layoutDiag.footerTop !== null ? layoutDiag.footerTop.toFixed(0) : 'none'} | pb={layoutDiag.pb ? (layoutDiag.pb.length > 20 ? layoutDiag.pb.substring(0, 17) + '...' : layoutDiag.pb) : 'none'} | pbSel={layoutDiag.pbSelectorUsed || 'none'} | pbMobile={layoutDiag.pbMobileWrapper ? (layoutDiag.pbMobileWrapper.length > 20 ? layoutDiag.pbMobileWrapper.substring(0, 17) + '...' : layoutDiag.pbMobileWrapper) : 'none'} | pbOther={layoutDiag.pbOther ? (layoutDiag.pbOther.length > 20 ? layoutDiag.pbOther.substring(0, 17) + '...' : layoutDiag.pbOther) : 'none'} | vh={layoutDiag.vh !== null ? layoutDiag.vh.toFixed(0) : 'none'} | y={layoutDiag.y !== null ? layoutDiag.y.toFixed(0) : 'none'} | sh={layoutDiag.sh !== null ? layoutDiag.sh.toFixed(0) : 'none'} | hasMobile={layoutDiag.hasMobileContainer !== null ? (layoutDiag.hasMobileContainer ? 'T' : 'F') : '?'} | hasEndEl={layoutDiag.hasEndEl !== null ? (layoutDiag.hasEndEl ? 'T' : 'F') : '?'} | contentEnd={layoutDiag.contentEnd !== null ? layoutDiag.contentEnd.toFixed(0) : 'none'} | gapAfter={layoutDiag.gapAfterContentPx !== null ? layoutDiag.gapAfterContentPx.toFixed(0) : 'none'} | gapBelow={layoutDiag.gapBelowViewportPx !== null ? layoutDiag.gapBelowViewportPx.toFixed(0) : 'none'}
-          </Text>
+        <View style={styles.diagnosticConsole} pointerEvents="box-none">
+          <View style={styles.diagnosticConsoleToolbar}>
+            <TouchableOpacity
+              style={[styles.diagnosticConsoleButton, diagConsoleViewMode === 'latest' && styles.diagnosticConsoleButtonActive]}
+              onPress={() => setDiagConsoleViewMode('latest')}
+            >
+              <Text style={styles.diagnosticConsoleButtonText}>Latest</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.diagnosticConsoleButton, diagConsoleViewMode === 'all' && styles.diagnosticConsoleButtonActive]}
+              onPress={() => setDiagConsoleViewMode('all')}
+            >
+              <Text style={styles.diagnosticConsoleButtonText}>All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.diagnosticConsoleButton}
+              onPress={() => {
+                const formatEvent = (ev: DiagEvent) =>
+                  `[${new Date(ev.timestamp).toISOString()}] ${ev.messageType}\n${ev.payload}`;
+                const text =
+                  diagConsoleViewMode === 'latest'
+                    ? diagConsoleEvents.length
+                      ? formatEvent(diagConsoleEvents[diagConsoleEvents.length - 1])
+                      : ''
+                    : diagConsoleEvents.map(formatEvent).join('\n\n');
+                if (text) Share.share({ message: text, title: 'Diagnostics' });
+              }}
+            >
+              <Text style={styles.diagnosticConsoleButtonText}>Copy</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            style={styles.diagnosticConsoleScroll}
+            contentContainerStyle={styles.diagnosticConsoleScrollContent}
+            nestedScrollEnabled
+          >
+            <Text style={styles.diagnosticConsoleText} selectable>
+              {diagConsoleViewMode === 'latest'
+                ? diagConsoleEvents.length
+                  ? (() => {
+                      const e = diagConsoleEvents[diagConsoleEvents.length - 1];
+                      return `[${new Date(e.timestamp).toISOString()}] ${e.messageType}\n${e.payload}`;
+                    })()
+                  : 'No events yet.'
+                : diagConsoleEvents.length
+                  ? diagConsoleEvents
+                      .map(
+                        (ev: DiagEvent) =>
+                          `[${new Date(ev.timestamp).toISOString()}] ${ev.messageType}\n${ev.payload}`
+                      )
+                      .join('\n\n')
+                  : 'No events yet.'}
+            </Text>
+          </ScrollView>
         </View>
       )}
       
@@ -1456,29 +1557,57 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // Diagnostic HUD - Always visible
-  diagnosticHud: {
+  // Diagnostics Console - scrollable panel when HUD enabled
+  diagnosticConsole: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
+    maxHeight: 280,
     zIndex: 9999,
-    elevation: 9999, // Android
+    elevation: 9999,
     backgroundColor: '#000000',
-    padding: 4,
     borderBottomWidth: 2,
     borderBottomColor: '#FF0000',
   },
-  diagnosticText: {
+  diagnosticConsoleToolbar: {
+    flexDirection: 'row',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    gap: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  diagnosticConsoleButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+  },
+  diagnosticConsoleButtonActive: {
+    backgroundColor: '#6366F1',
+  },
+  diagnosticConsoleButtonText: {
     color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  diagnosticConsoleScroll: {
+    maxHeight: 220,
+  },
+  diagnosticConsoleScrollContent: {
+    padding: 8,
+    paddingBottom: 16,
+  },
+  diagnosticConsoleText: {
+    color: '#E5E7EB',
     fontSize: 10,
-    fontWeight: 'bold',
     fontFamily: 'monospace',
   },
   // Sanitizer Rejection Banner
   rejectionBanner: {
     position: 'absolute',
-    top: 80, // Below diagnostic HUD
+    top: 282, // Below diagnostics console
     left: 0,
     right: 0,
     zIndex: 9998,

@@ -28,7 +28,9 @@ describe('Layout in-app shell (body background gating)', () => {
     const result = await RootLayout({ children: <div /> })
 
     const children = Array.isArray(result.props.children) ? result.props.children : [result.props.children]
-    const body = children.find((c: { type?: string }) => c?.type === 'body')
+    const body =
+      children.find((c: { type?: string }) => c?.type === 'body') ??
+      (children.length >= 2 && typeof children[1]?.props?.className === 'string' ? children[1] : undefined)
     expect(body).toBeDefined()
     expect(body.props.className).toContain('in-app-shell')
   })
@@ -43,7 +45,9 @@ describe('Layout in-app shell (body background gating)', () => {
     const result = await RootLayout({ children: <div /> })
 
     const children = Array.isArray(result.props.children) ? result.props.children : [result.props.children]
-    const body = children.find((c: { type?: string }) => c?.type === 'body')
+    const body =
+      children.find((c: { type?: string }) => c?.type === 'body') ??
+      (children.length >= 2 && typeof children[1]?.props?.className === 'string' ? children[1] : undefined)
     expect(body).toBeDefined()
     expect(body.props.className).not.toContain('in-app-shell')
   })

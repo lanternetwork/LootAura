@@ -6,6 +6,10 @@ import { createPageMetadata } from '@/lib/metadata'
 import { computeSSRInitialSales } from '@/lib/map/ssrInitialSales'
 import { type Bounds } from '@/lib/map/bounds'
 import { type Sale } from '@/lib/types'
+import { isInAppUserAgent } from '@/lib/runtime/isNativeApp'
+
+/** Neutral US center used when no server-derived location (e.g. in-app fast path). */
+const NEUTRAL_CENTER = { lat: 39.8283, lng: -98.5795 }
 
 interface SalesPageProps {
   searchParams: {
@@ -32,6 +36,26 @@ export const metadata: Metadata = createPageMetadata({
 })
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent') || ''
+  const isMobileRequest = /Mobile|Android|iPhone|iPad/i.test(userAgent)
+  const isInAppRequest = isInAppUserAgent(userAgent)
+
+  // In-app fast path: exact /sales, mobile + in-app UA → minimal shell, no expensive SSR
+  // Client mounts immediately and runs existing client-side fetch for pins; deep links unchanged
+  if (isInAppRequest && isMobileRequest) {
+    return (
+      <div className="bg-gray-50 overflow-hidden" style={{ height: '100vh', marginTop: '-56px', paddingTop: '56px' }}>
+        <SalesClient
+          initialSales={[]}
+          initialBufferedBounds={null}
+          initialCenter={NEUTRAL_CENTER}
+          user={null}
+        />
+      </div>
+    )
+  }
+
   const supabase = createSupabaseServerClient()
   let user: any = null
   try {
@@ -50,21 +74,15 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const _categories = searchParams.categories ? searchParams.categories.split(',') : undefined
   const _pageSize = searchParams.pageSize ? parseInt(searchParams.pageSize) : 50
 
-  // Resolve initial center server-side
+  // Resolve initial center server-side (headersList from top of function)
   const cookieStore = cookies()
-  const headersList = await headers()
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
   const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
   // Use fallback if host is empty (matching pattern from app/sell/new/page.tsx)
   const baseUrl: string = host ? `${protocol}${host}` : 
     (process.env.NEXT_PUBLIC_SITE_URL || 
      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'))
-  
-  // Check if this is a mobile request (best-effort detection via user agent)
-  // Note: Client-side will have accurate viewport width, but server-side we can only guess
-  // On mobile, we want GPS-first on cold start, so reduce server-side overrides
-  const userAgent = headersList.get('user-agent') || ''
-  const isMobileRequest = /Mobile|Android|iPhone|iPad/i.test(userAgent)
+  // userAgent / isMobileRequest already set at top of function
 
   let initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null = null
 
@@ -255,7 +273,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[SALES_PAGE] Using neutral US center fallback`)
     }
-    initialCenter = { lat: 39.8283, lng: -98.5795 }
+    initialCenter = NEUTRAL_CENTER
   }
 
   // Compute initial sales and buffered bounds server-side (matching client's first fetch)

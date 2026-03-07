@@ -35,10 +35,10 @@ describe('ClarityClient deferral', () => {
   })
 
   afterEach(() => {
-    addEventListenerSpy?.restore()
-    removeEventListenerSpy?.restore()
+    addEventListenerSpy?.mockRestore()
+    removeEventListenerSpy?.mockRestore()
     delete process.env.NEXT_PUBLIC_CLARITY_ID
-    process.env.NODE_ENV = originalEnv
+    ;(process.env as Record<string, string>).NODE_ENV = originalEnv
   })
 
   it('(a) on in-app /sales, does not inject immediately and waits for map_idle', async () => {

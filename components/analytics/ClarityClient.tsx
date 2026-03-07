@@ -45,14 +45,13 @@ export default function ClarityClient() {
       return
     }
 
-    let timeoutId: ReturnType<typeof setTimeout>
     const onMapIdle = () => {
       injectClarity(clarityId)
       window.removeEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
       clearTimeout(timeoutId)
     }
     window.addEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       window.removeEventListener(MAP_IDLE_FIRST_EVENT, onMapIdle)
       injectClarity(clarityId)
     }, CLARITY_DEFER_TIMEOUT_MS)

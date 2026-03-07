@@ -15,6 +15,7 @@ import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
+import { MAP_IDLE_EVENT } from '@/components/analytics/ClarityClient'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
 import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/lib/keyboard/shortcuts'
 import { 
@@ -377,6 +378,7 @@ export default function SalesClient({
   const [_isZipSearching, setIsZipSearching] = useState(false)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
   const [_isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+  const [mapIdleObserved, setMapIdleObserved] = useState(false)
   
   // Track window width for mobile detection (already declared above)
 
@@ -971,9 +973,17 @@ export default function SalesClient({
     }
   }, [])
 
-  // Lightweight main-thread contention summary: Long Tasks API (count + max duration) or RAF-delay probe (numeric only)
+  // Listen for map_idle so we can start contention observers after map init (reduces startup contention)
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof performance === 'undefined') return
+    if (typeof window === 'undefined') return
+    const onMapIdle = () => setMapIdleObserved(true)
+    window.addEventListener(MAP_IDLE_EVENT, onMapIdle)
+    return () => window.removeEventListener(MAP_IDLE_EVENT, onMapIdle)
+  }, [])
+
+  // Lightweight main-thread contention summary: Long Tasks API + RAF-delay probe; start only after map_idle to avoid contention during map init
+  useEffect(() => {
+    if (!mapIdleObserved || typeof window === 'undefined' || typeof performance === 'undefined') return
     const summary = contentionSummaryRef.current
     const observeEnd = 3000
 
@@ -986,7 +996,6 @@ export default function SalesClient({
             summary.longTaskMaxMs = summary.longTaskMaxMs != null ? Math.max(summary.longTaskMaxMs, dur) : dur
           }
         })
-        // longtask is experimental (Chromium); not in TS DOM lib - use type assertion
         obs.observe({ type: 'longtask', buffered: true } as PerformanceObserverInit)
         setTimeout(() => obs.disconnect(), observeEnd)
       }
@@ -1008,7 +1017,7 @@ export default function SalesClient({
       else if (maxDelay > 0) summary.rafDelayMaxMs = Math.round(maxDelay * 10) / 10
     }
     requestAnimationFrame(run)
-  }, [])
+  }, [mapIdleObserved])
 
   // One-time map/sales perf diag: collect marks and send to native shell (timings + booleans only; no PII)
   useEffect(() => {

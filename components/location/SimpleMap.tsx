@@ -175,6 +175,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         if (!mapPerfMarksFiredRef.current.idle) {
           performance.mark('map_idle')
           mapPerfMarksFiredRef.current.idle = true
+          // Lightweight signal for deferred work (Clarity, contention observers) so they don't run during map init
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('map_idle')) // event name must match MAP_IDLE_EVENT in ClarityClient
+          }
         }
       })
     }

@@ -34,8 +34,16 @@ SplashScreen.preventAutoHideAsync();
 // Global function to hide splash (called from index.tsx on APP_READY)
 let hideSplashOnce: (() => void) | null = null;
 
+/** Optional report callback for splash failsafe; set by index.tsx when diagnostics enabled. */
+let splashFailsafeReport: ((messageType: string, payload: string) => void) | null = null;
+
 export function getHideSplashOnce() {
   return hideSplashOnce;
+}
+
+/** Register callback to record SPLASH_FAILSAFE in diagnostics console when 4s failsafe fires. Gated by index (only set when EXPO_PUBLIC_NATIVE_HUD enabled). */
+export function setSplashFailsafeReport(callback: ((messageType: string, payload: string) => void) | null) {
+  splashFailsafeReport = callback;
 }
 
 export default function RootLayout() {
@@ -71,6 +79,15 @@ export default function RootLayout() {
     // Failsafe timeout: force hide after 4 seconds if APP_READY never arrives
     failsafeTimeout = setTimeout(() => {
       if (!isHidden) {
+        if (splashFailsafeReport) {
+          splashFailsafeReport(
+            'SPLASH_FAILSAFE',
+            JSON.stringify({
+              timestamp: Date.now(),
+              message: 'Splash hidden by 4s failsafe (APP_READY never received)',
+            })
+          );
+        }
         if (__DEV__) {
           console.warn('[SPLASH] Failsafe timeout: hiding splash after 4s (APP_READY never received)');
         }
@@ -83,6 +100,7 @@ export default function RootLayout() {
         clearTimeout(failsafeTimeout);
       }
       hideSplashOnce = null;
+      splashFailsafeReport = null;
     };
   }, []);
 

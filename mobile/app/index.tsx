@@ -5,7 +5,7 @@ import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
-import { getHideSplashOnce } from './_layout';
+import { getHideSplashOnce, setSplashFailsafeReport } from './_layout';
 import { stripSalesViewportParams } from './utils/stripSalesViewportParams';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
@@ -346,6 +346,14 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // When diagnostics enabled, register splash failsafe report so SPLASH_FAILSAFE appears in Diagnostics Console
+  useEffect(() => {
+    if (isDiagnosticsEnabled) {
+      setSplashFailsafeReport((messageType: string, payload: string) => pushDiagEvent(messageType, payload));
+      return () => setSplashFailsafeReport(null);
+    }
+  }, [isDiagnosticsEnabled, pushDiagEvent]);
+
   // Handle OAuth callback: Cold start handoff (via router params from auth/callback.tsx)
   useEffect(() => {
     const authCallbackUrl = searchParams.authCallbackUrl;
@@ -547,13 +555,7 @@ export default function HomeScreen() {
     } catch {
       // Ignore URL parse errors
     }
-    
-    // Hide splash on earliest safe signal (onLoadEnd)
-    const hideSplashOnce = getHideSplashOnce();
-    if (hideSplashOnce) {
-      hideSplashOnce();
-    }
-    
+    // Splash is hidden only on APP_READY (see handleMessage) to avoid flash before first paint
     stopLoader('onLoadEnd', path);
     // Mark WebView as ready after first successful load
     setWebViewReady(true);
@@ -648,13 +650,7 @@ export default function HomeScreen() {
       } catch {
         // Ignore URL parse errors
       }
-      
-      // Hide splash on earliest safe signal (navState.loading=false)
-      const hideSplashOnce = getHideSplashOnce();
-      if (hideSplashOnce) {
-        hideSplashOnce();
-      }
-      
+      // Splash is hidden only on APP_READY (see handleMessage) to avoid flash before first paint
       stopLoader('navState.loading=false', path);
     }
     

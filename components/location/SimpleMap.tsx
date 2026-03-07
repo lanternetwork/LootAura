@@ -74,7 +74,16 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   const [mapError, setMapError] = useState<string | null>(null)
   const [pinsLoading, setPinsLoading] = useState(false)
   const lastBoundsKey = useRef<string>("")
-  const mapPerfMarksFiredRef = useRef({ mounted: false, style: false, idle: false })
+  const mapPerfMarksFiredRef = useRef({ mounted: false, style: false, idle: false, componentMounted: false })
+
+  // One-time mark: React component mount time (distinct from map_mounted = map instance available)
+  useEffect(() => {
+    if (mapPerfMarksFiredRef.current.componentMounted) return
+    if (typeof performance !== 'undefined' && performance.mark) {
+      performance.mark('simplemap_component_mounted')
+      mapPerfMarksFiredRef.current.componentMounted = true
+    }
+  }, [])
 
   const token = getMapboxToken()
   

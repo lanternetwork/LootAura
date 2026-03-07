@@ -18,6 +18,12 @@ const ALLOWED_KEYS = new Set([
   'mapMountedMs',
   'styleLoadedMs',
   'mapIdleMs',
+  'domContentLoadedMs',
+  'windowLoadMs',
+  'salesClientMountedMs',
+  'simplemapComponentMountedMs',
+  'simplemapChunkRequestedMs',
+  'simplemapChunkResolvedMs',
   'hasFirstRender',
   'hasFetchStart',
   'hasFetchComplete',
@@ -25,6 +31,15 @@ const ALLOWED_KEYS = new Set([
   'hasStyleLoaded',
   'hasMapIdle',
   'hasInitialLoadComplete',
+  'hasDomContentLoaded',
+  'hasWindowLoad',
+  'hasSalesClientMounted',
+  'hasSimplemapComponentMounted',
+  'hasSimplemapChunkRequested',
+  'hasSimplemapChunkResolved',
+  'longTaskCount',
+  'longTaskMaxMs',
+  'rafDelayMaxMs',
 ])
 
 const FORBIDDEN_KEYS = new Set([
@@ -52,6 +67,12 @@ function buildValidPayload(): Record<string, unknown> {
     mapMountedMs: 120,
     styleLoadedMs: 180,
     mapIdleMs: 400,
+    domContentLoadedMs: 80,
+    windowLoadMs: 200,
+    salesClientMountedMs: 90,
+    simplemapComponentMountedMs: 115,
+    simplemapChunkRequestedMs: 85,
+    simplemapChunkResolvedMs: 86,
     hasFirstRender: true,
     hasFetchStart: true,
     hasFetchComplete: true,
@@ -59,6 +80,15 @@ function buildValidPayload(): Record<string, unknown> {
     hasStyleLoaded: true,
     hasMapIdle: true,
     hasInitialLoadComplete: true,
+    hasDomContentLoaded: true,
+    hasWindowLoad: true,
+    hasSalesClientMounted: true,
+    hasSimplemapComponentMounted: true,
+    hasSimplemapChunkRequested: true,
+    hasSimplemapChunkResolved: true,
+    longTaskCount: 2,
+    longTaskMaxMs: 120.5,
+    rafDelayMaxMs: 18.2,
   }
 }
 
@@ -107,6 +137,15 @@ describe('MAP_PERF_DIAG payload', () => {
       'mapMountedMs',
       'styleLoadedMs',
       'mapIdleMs',
+      'domContentLoadedMs',
+      'windowLoadMs',
+      'salesClientMountedMs',
+      'simplemapComponentMountedMs',
+      'simplemapChunkRequestedMs',
+      'simplemapChunkResolvedMs',
+      'longTaskCount',
+      'longTaskMaxMs',
+      'rafDelayMaxMs',
     ]
     for (const key of numericKeys) {
       const v = payload[key]
@@ -116,7 +155,21 @@ describe('MAP_PERF_DIAG payload', () => {
 
   it('allowed boolean fields are booleans', () => {
     const payload = buildValidPayload()
-    const boolKeys = ['hasFirstRender', 'hasFetchStart', 'hasFetchComplete', 'hasMapMounted', 'hasStyleLoaded', 'hasMapIdle', 'hasInitialLoadComplete']
+    const boolKeys = [
+      'hasFirstRender',
+      'hasFetchStart',
+      'hasFetchComplete',
+      'hasMapMounted',
+      'hasStyleLoaded',
+      'hasMapIdle',
+      'hasInitialLoadComplete',
+      'hasDomContentLoaded',
+      'hasWindowLoad',
+      'hasSalesClientMounted',
+      'hasSimplemapComponentMounted',
+      'hasSimplemapChunkRequested',
+      'hasSimplemapChunkResolved',
+    ]
     for (const key of boolKeys) {
       expect(typeof payload[key]).toBe('boolean')
     }

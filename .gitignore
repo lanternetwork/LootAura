@@ -53,3 +53,11 @@ pids
 # OS
 .DS_Store
 Thumbs.db
+
+# Local IDE / editor (keep on disk only)
+.cursor/
+
+# Machine-local CI / scratch artifacts
+ci-job-*.txt
+failed_logs.txt
+pr-body-*.txt

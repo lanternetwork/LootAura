@@ -9,8 +9,15 @@ import { describe, it, expect } from 'vitest'
 import path from 'path'
 import fs from 'fs'
 
-const LAYOUT_PATH = path.join(__dirname, '../../mobile/app/_layout.tsx')
-const INDEX_PATH = path.join(__dirname, '../../mobile/app/index.tsx')
+function resolveMobilePath(relative: string): string {
+  const fromDir = path.resolve(__dirname, '../../mobile', relative)
+  if (fs.existsSync(fromDir)) return fromDir
+  const fromCwd = path.resolve(process.cwd(), 'mobile', relative)
+  return fromCwd
+}
+
+const LAYOUT_PATH = resolveMobilePath('app/_layout.tsx')
+const INDEX_PATH = resolveMobilePath('app/index.tsx')
 
 describe('Splash failsafe diagnostic', () => {
   it('(a) failsafe triggers SPLASH_FAILSAFE diagnostic when report callback is set', () => {

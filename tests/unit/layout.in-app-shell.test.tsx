@@ -3,6 +3,7 @@
  * normal web must not get the splash-colored background.
  */
 
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getInAppUaToken } from '@/lib/runtime/isNativeApp'
 
@@ -18,6 +19,21 @@ describe('Layout in-app shell (body background gating)', () => {
     vi.clearAllMocks()
   })
 
+  function getBodyFromLayoutResult(result: React.ReactElement) {
+    const html =
+      result?.type === 'html'
+        ? result
+        : Array.isArray(result?.props?.children)
+          ? result?.props?.children[0]
+          : result?.props?.children
+    const children = html?.props?.children
+    const list = Array.isArray(children) ? children : children != null ? [children] : []
+    const byType = list.find((c: { type?: string }) => c?.type === 'body')
+    if (byType) return byType
+    const second = list.length >= 2 && typeof list[1]?.props?.className === 'string' ? list[1] : undefined
+    return second
+  }
+
   it('body has in-app-shell class when user-agent is in-app', async () => {
     const { headers } = await import('next/headers')
     vi.mocked(headers).mockResolvedValue({
@@ -27,12 +43,9 @@ describe('Layout in-app shell (body background gating)', () => {
     const RootLayout = (await import('@/app/layout')).default
     const result = await RootLayout({ children: <div /> })
 
-    const children = Array.isArray(result.props.children) ? result.props.children : [result.props.children]
-    const body =
-      children.find((c: { type?: string }) => c?.type === 'body') ??
-      (children.length >= 2 && typeof children[1]?.props?.className === 'string' ? children[1] : undefined)
+    const body = getBodyFromLayoutResult(result as React.ReactElement)
     expect(body).toBeDefined()
-    expect(body.props.className).toContain('in-app-shell')
+    expect(body!.props.className).toContain('in-app-shell')
   })
 
   it('body does not have in-app-shell class when user-agent is normal web', async () => {
@@ -44,11 +57,8 @@ describe('Layout in-app shell (body background gating)', () => {
     const RootLayout = (await import('@/app/layout')).default
     const result = await RootLayout({ children: <div /> })
 
-    const children = Array.isArray(result.props.children) ? result.props.children : [result.props.children]
-    const body =
-      children.find((c: { type?: string }) => c?.type === 'body') ??
-      (children.length >= 2 && typeof children[1]?.props?.className === 'string' ? children[1] : undefined)
+    const body = getBodyFromLayoutResult(result as React.ReactElement)
     expect(body).toBeDefined()
-    expect(body.props.className).not.toContain('in-app-shell')
+    expect(body!.props.className).not.toContain('in-app-shell')
   })
 })

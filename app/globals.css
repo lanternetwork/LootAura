@@ -107,6 +107,11 @@
 @import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }
 
+/* In-app WebView only: match native splash background to reduce flash (gated by isInAppUserAgent in layout) */
+body.in-app-shell {
+  background-color: #3A2268;
+}
+
 /* Hide scrollbar but allow scrolling */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE and Edge */

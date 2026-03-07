@@ -547,13 +547,7 @@ export default function HomeScreen() {
     } catch {
       // Ignore URL parse errors
     }
-    
-    // Hide splash on earliest safe signal (onLoadEnd)
-    const hideSplashOnce = getHideSplashOnce();
-    if (hideSplashOnce) {
-      hideSplashOnce();
-    }
-    
+    // Splash is hidden only on APP_READY (see handleMessage) to avoid flash before first paint
     stopLoader('onLoadEnd', path);
     // Mark WebView as ready after first successful load
     setWebViewReady(true);
@@ -648,13 +642,7 @@ export default function HomeScreen() {
       } catch {
         // Ignore URL parse errors
       }
-      
-      // Hide splash on earliest safe signal (navState.loading=false)
-      const hideSplashOnce = getHideSplashOnce();
-      if (hideSplashOnce) {
-        hideSplashOnce();
-      }
-      
+      // Splash is hidden only on APP_READY (see handleMessage) to avoid flash before first paint
       stopLoader('navState.loading=false', path);
     }
     

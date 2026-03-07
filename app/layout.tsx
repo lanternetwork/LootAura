@@ -1,5 +1,6 @@
 import "./globals.css"
 import { Metadata } from 'next'
+import { headers } from 'next/headers'
 import Script from 'next/script'
 import { Suspense } from 'react'
 import { Providers } from './providers'
@@ -19,6 +20,7 @@ import ClarityClient from '@/components/analytics/ClarityClient'
 import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
 import { ENV_PUBLIC } from '@/lib/env'
 import { AuthStateRefresher } from '@/components/auth/AuthStateRefresher'
+import { isInAppUserAgent } from '@/lib/runtime/isNativeApp'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -66,9 +68,16 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Gate AdSense script and meta tag based on feature flag
   const adsenseEnabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
+  // In-app WebView: match body background to native splash (#3A2268) to reduce flash on splash dismiss
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent') ?? ''
+  const inApp = isInAppUserAgent(userAgent)
+  const bodyClassName = inApp
+    ? 'min-h-screen bg-neutral-50 text-neutral-900 in-app-shell'
+    : 'min-h-screen bg-neutral-50 text-neutral-900'
 
   return (
     <html lang="en">
@@ -92,7 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <meta name="google-site-verification" content={ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION} />
         )}
       </head>
-      <body className="min-h-screen bg-neutral-50 text-neutral-900">
+      <body className={bodyClassName}>
         {adsenseEnabled && (
           <Script
             src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"

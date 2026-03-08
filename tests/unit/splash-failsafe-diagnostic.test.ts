@@ -28,7 +28,8 @@ describe('Splash failsafe diagnostic', () => {
     // Failsafe block must call the report with SPLASH_FAILSAFE before hideSplash
     expect(layout).toMatch(/SPLASH_FAILSAFE/)
     expect(layout).toMatch(/splashFailsafeReport\s*\(/)
-    expect(layout).toContain('Splash hidden by 4s failsafe (APP_READY never received)')
+    // Source uses template literal ${FAILSAFE_MS / 1000}s; match literal or pattern
+    expect(layout).toMatch(/Splash hidden by .*s failsafe/)
   })
 
   it('(b) report callback is only registered when diagnostics enabled (no overhead when off)', () => {
@@ -49,5 +50,11 @@ describe('Splash failsafe diagnostic', () => {
     // Slice must include the full APP_READY block (validation + hideSplash + stopLoader + pushDiagEvent)
     const appReadyBlock = index.slice(appReadyIdx, appReadyIdx + 2500)
     expect(appReadyBlock).toMatch(/pushDiagEvent\s*\(\s*['"]APP_READY['"]/)
+  })
+
+  it('(d) splash hide path is recorded in diagnostics (APP_READY or fallback or failsafe)', () => {
+    const index = fs.readFileSync(INDEX_PATH, 'utf-8')
+    expect(index).toContain('SPLASH_HIDDEN_APP_READY')
+    expect(index).toContain('SPLASH_HIDDEN_ROUTE_AND_LOAD')
   })
 })

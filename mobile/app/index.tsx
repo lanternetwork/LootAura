@@ -81,6 +81,11 @@ export default function HomeScreen() {
   const lastAuthCallbackUrlRef = useRef<string | null>(null);
   const lastAuthCallbackAtRef = useRef<number | null>(null);
   
+  // Splash fallback: hide when both navState.loading===false and ROUTE_STATE with hasRNBridge have been seen (one-shot)
+  const hasSeenLoadingFalseRef = useRef<boolean>(false);
+  const hasSeenRouteStateWithBridgeRef = useRef<boolean>(false);
+  const splashHiddenByRef = useRef<boolean>(false);
+  
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
   
@@ -650,8 +655,19 @@ export default function HomeScreen() {
       } catch {
         // Ignore URL parse errors
       }
-      // Splash is hidden only on APP_READY (see handleMessage) to avoid flash before first paint
       stopLoader('navState.loading=false', path);
+      // Fallback splash hide: when both loading=false and ROUTE_STATE with bridge have been seen
+      hasSeenLoadingFalseRef.current = true;
+      if (hasSeenRouteStateWithBridgeRef.current && !splashHiddenByRef.current) {
+        splashHiddenByRef.current = true;
+        const hideSplashOnce = getHideSplashOnce();
+        if (hideSplashOnce) {
+          hideSplashOnce();
+        }
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('SPLASH_HIDDEN_ROUTE_AND_LOAD', JSON.stringify({ pathname: path }));
+        }
+      }
     }
     
     // Track navigation action when URL changes (diagnostics only)
@@ -701,10 +717,16 @@ export default function HomeScreen() {
         // Extract retry attempt number if provided (for debug logging)
         const attempt = typeof message.attempt === 'number' ? message.attempt : 0;
         
-        // Hide native splash screen when app is ready
-        const hideSplashOnce = getHideSplashOnce();
-        if (hideSplashOnce) {
-          hideSplashOnce();
+        // Hide native splash screen when app is ready (one-shot; fallback path will not run if we hide here)
+        if (!splashHiddenByRef.current) {
+          splashHiddenByRef.current = true;
+          const hideSplashOnce = getHideSplashOnce();
+          if (hideSplashOnce) {
+            hideSplashOnce();
+          }
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent('SPLASH_HIDDEN_APP_READY', JSON.stringify(message));
+          }
         }
         
         // Immediately hide overlay and mark ready
@@ -751,6 +773,20 @@ export default function HomeScreen() {
         });
         if (isDiagnosticsEnabled) {
           pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
+        }
+        // Fallback splash hide: when both loading=false and ROUTE_STATE with bridge have been seen
+        if (hasRNBridge === true) {
+          hasSeenRouteStateWithBridgeRef.current = true;
+          if (hasSeenLoadingFalseRef.current && !splashHiddenByRef.current) {
+            splashHiddenByRef.current = true;
+            const hideSplashOnce = getHideSplashOnce();
+            if (hideSplashOnce) {
+              hideSplashOnce();
+            }
+            if (isDiagnosticsEnabled) {
+              pushDiagEvent('SPLASH_HIDDEN_ROUTE_AND_LOAD', JSON.stringify(buildRouteStateDiagPayload(message)));
+            }
+          }
         }
         // Reset favorite state when leaving sale detail
         if (!isSaleDetail) {

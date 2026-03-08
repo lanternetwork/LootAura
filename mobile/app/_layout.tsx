@@ -76,7 +76,8 @@ export default function RootLayout() {
       hideSplash();
     };
 
-    // Failsafe timeout: force hide after 4 seconds if APP_READY never arrives
+    // Failsafe timeout: last resort if neither APP_READY nor fallback (ROUTE_STATE + loading=false) hid splash
+    const FAILSAFE_MS = 8000;
     failsafeTimeout = setTimeout(() => {
       if (!isHidden) {
         if (splashFailsafeReport) {
@@ -84,16 +85,16 @@ export default function RootLayout() {
             'SPLASH_FAILSAFE',
             JSON.stringify({
               timestamp: Date.now(),
-              message: 'Splash hidden by 4s failsafe (APP_READY never received)',
+              message: `Splash hidden by ${FAILSAFE_MS / 1000}s failsafe (APP_READY and fallback never completed)`,
             })
           );
         }
         if (__DEV__) {
-          console.warn('[SPLASH] Failsafe timeout: hiding splash after 4s (APP_READY never received)');
+          console.warn(`[SPLASH] Failsafe timeout: hiding splash after ${FAILSAFE_MS / 1000}s (APP_READY and fallback never completed)`);
         }
         hideSplash();
       }
-    }, 4000);
+    }, FAILSAFE_MS);
 
     return () => {
       if (failsafeTimeout) {

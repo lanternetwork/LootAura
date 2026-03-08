@@ -48,10 +48,16 @@ export function setSplashFailsafeReport(callback: ((messageType: string, payload
 
 // Invariant: root Stack content background must match splash so the first native layer revealed after
 // splash dismissal is purple (splash → root content → SafeAreaView → launch overlay → WebView).
-// Do not remove contentStyle.backgroundColor or the handoff will flash window/default background.
+// Regression: ROOT_CONTENT_BACKGROUND must match app.json expo.splash.backgroundColor. Do not remove
+// contentStyle.backgroundColor or the handoff will flash window/default background.
 const ROOT_CONTENT_BACKGROUND = '#3A2268';
 
 export default function RootLayout() {
+  // Dev-only regression check: root content background must match app.json splash to avoid launch flash
+  if (__DEV__ && typeof Constants.expoConfig?.splash?.backgroundColor === 'string' && Constants.expoConfig.splash.backgroundColor !== ROOT_CONTENT_BACKGROUND) {
+    console.warn('[RootLayout] ROOT_CONTENT_BACKGROUND should match app.json expo.splash.backgroundColor to avoid launch flash');
+  }
+
   useEffect(() => {
     let failsafeTimeout: NodeJS.Timeout | null = null;
     let isHidden = false;

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -16,6 +16,9 @@ const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
 
 // Native-first splash dismissal: short delay after load complete to allow first paint (avoids flash)
 const SPLASH_POST_LOAD_DELAY_MS = 300;
+
+// Launch overlay: fade duration when hiding overlay after first paint (same triggers as splash hide)
+const LAUNCH_OVERLAY_FADE_MS = 200;
 
 // Diagnostics console: in-memory ring buffer (only when HUD enabled)
 const DIAG_CONSOLE_RING_SIZE = 30;
@@ -87,6 +90,14 @@ export default function HomeScreen() {
   // Splash: native-first hide after loading=false + delay; APP_READY can hide earlier and cancels pending delay
   const splashHiddenByRef = useRef<boolean>(false);
   const splashDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Launch-only overlay: bridges gap between native splash dismiss and WebView first paint; one-shot fade-out.
+  // Invariant: overlay is visible on first mount; it fades out only when APP_READY is received or
+  // navState.loading=false + SPLASH_POST_LOAD_DELAY_MS fires; it never reappears on SPA navigation.
+  const [showLaunchOverlay, setShowLaunchOverlay] = useState(true);
+  const launchOverlayFadedRef = useRef<boolean>(false);
+  const launchOverlayOpacity = useRef(new Animated.Value(1)).current;
+  const mountedRef = useRef<boolean>(true);
   
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
@@ -350,6 +361,30 @@ export default function HomeScreen() {
         clearTimeout(delayedOverlayTimeoutRef.current);
         delayedOverlayTimeoutRef.current = null;
       }
+    };
+  }, []);
+
+  // Launch overlay: one-shot fade-out at same moments as splash hide; idempotent, no reappearance on SPA nav
+  const startLaunchOverlayFadeOut = useCallback(() => {
+    if (launchOverlayFadedRef.current) return;
+    launchOverlayFadedRef.current = true;
+    if (__DEV__) {
+      console.log('[LAUNCH_OVERLAY] Fade-out started (invariant: only once per launch)');
+    }
+    Animated.timing(launchOverlayOpacity, {
+      toValue: 0,
+      duration: LAUNCH_OVERLAY_FADE_MS,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished && mountedRef.current) setShowLaunchOverlay(false);
+    });
+  }, [launchOverlayOpacity]);
+
+  // Mounted ref for safe setState after async animation (avoid setState on unmounted component)
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
     };
   }, []);
 
@@ -685,6 +720,8 @@ export default function HomeScreen() {
               pushDiagEvent('SPLASH_HIDDEN_NATIVE_LOAD_DELAY', JSON.stringify({ pathname: path }));
             }
           }
+          // Launch overlay: fade out at same moment as splash (native load + delay path); idempotent if APP_READY already ran
+          startLaunchOverlayFadeOut();
         }, SPLASH_POST_LOAD_DELAY_MS);
       }
     }
@@ -751,6 +788,8 @@ export default function HomeScreen() {
             pushDiagEvent('SPLASH_HIDDEN_APP_READY', JSON.stringify(message));
           }
         }
+        // Launch overlay: fade out at same moment as splash (APP_READY path)
+        startLaunchOverlayFadeOut();
         
         // Immediately hide overlay and mark ready
         stopLoader('APP_READY', pathOnly, attempt);
@@ -1502,7 +1541,13 @@ export default function HomeScreen() {
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
           />
-          
+          {/* Launch-only overlay: full-screen #3A2268 above WebView until first paint; fades out on APP_READY or native load+delay */}
+          {showLaunchOverlay && (
+            <Animated.View
+              style={[styles.launchOverlay, { opacity: launchOverlayOpacity }]}
+              pointerEvents="auto"
+            />
+          )}
           {/* Native Footer Overlay - Show when on sale detail page AND page has loaded */}
           {routeState.isSaleDetail && !loading && (
             <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
@@ -1563,6 +1608,16 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+  },
+  launchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#3A2268',
+    zIndex: 100,
+    elevation: 100,
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay

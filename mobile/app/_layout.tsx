@@ -76,7 +76,7 @@ export default function RootLayout() {
       hideSplash();
     };
 
-    // Failsafe timeout: last resort if neither APP_READY nor fallback (ROUTE_STATE + loading=false) hid splash
+    // Failsafe: catastrophic backstop only. Normal launches hide via APP_READY or native loading=false + delay in index.
     const FAILSAFE_MS = 8000;
     failsafeTimeout = setTimeout(() => {
       if (!isHidden) {

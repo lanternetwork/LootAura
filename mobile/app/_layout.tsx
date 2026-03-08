@@ -46,6 +46,11 @@ export function setSplashFailsafeReport(callback: ((messageType: string, payload
   splashFailsafeReport = callback;
 }
 
+// Invariant: root Stack content background must match splash so the first native layer revealed after
+// splash dismissal is purple (splash → root content → SafeAreaView → launch overlay → WebView).
+// Do not remove contentStyle.backgroundColor or the handoff will flash window/default background.
+const ROOT_CONTENT_BACKGROUND = '#3A2268';
+
 export default function RootLayout() {
   useEffect(() => {
     let failsafeTimeout: NodeJS.Timeout | null = null;
@@ -107,11 +112,11 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" backgroundColor="#3A2268" />
+      <StatusBar style="light" backgroundColor={ROOT_CONTENT_BACKGROUND} />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { paddingBottom: 0 },
+          contentStyle: { paddingBottom: 0, backgroundColor: ROOT_CONTENT_BACKGROUND },
         }}
       >
         <Stack.Screen name="index" />

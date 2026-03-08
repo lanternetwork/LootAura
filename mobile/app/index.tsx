@@ -6,6 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 import { getHideSplashOnce, setSplashFailsafeReport } from './_layout';
+import { isDiagnosticsEnabled as getDiagnosticsEnabled } from './utils/diagnosticsEnabled';
 import { stripSalesViewportParams } from './utils/stripSalesViewportParams';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
@@ -51,22 +52,8 @@ function buildRouteStateDiagPayload(message: {
 }
 
 export default function HomeScreen() {
-  // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
-  // Accept '1' or 'true' (case-insensitive) = enabled; '0' or 'false' = disabled.
-  // Note: EXPO_PUBLIC_* is inlined at bundle time — set in .env or eas.json and restart Metro (expo start -c) or rebuild.
-  const nativeHudRaw =
-    typeof process.env.EXPO_PUBLIC_NATIVE_HUD === 'string'
-      ? process.env.EXPO_PUBLIC_NATIVE_HUD.trim()
-      : process.env.EXPO_PUBLIC_NATIVE_HUD;
-  const isDiagnosticsEnabled = (() => {
-    if (nativeHudRaw === '1') return true;
-    if (typeof nativeHudRaw === 'string') {
-      const lower = nativeHudRaw.toLowerCase();
-      if (lower === 'true') return true;
-      if (lower === 'false' || lower === '0') return false;
-    }
-    return false;
-  })();
+  // Diagnostics gating: shared with sales/[id]; when false, skip HUD-only state and layout diag
+  const isDiagnosticsEnabled = getDiagnosticsEnabled();
   const [loading, setLoading] = useState(false); // Start hidden, show only when needed
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);

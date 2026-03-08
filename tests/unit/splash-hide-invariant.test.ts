@@ -22,9 +22,11 @@ describe('Splash hide invariant (native)', () => {
     expect(getHideSplashOnceCalls).not.toBeNull()
     expect(getHideSplashOnceCalls!.length).toBeGreaterThanOrEqual(2)
 
-    // First call must be in APP_READY block (after validation, before stopLoader)
-    const firstCallIndex = content.indexOf('getHideSplashOnce()')
-    expect(firstCallIndex).toBeGreaterThan(appReadyIndex)
+    // At least one call must be in APP_READY block (fallback blocks appear earlier in file in handleNavigationStateChange / ROUTE_STATE)
+    const appReadyBlockEnd = content.indexOf("return; // Handled, don't process further", appReadyIndex)
+    expect(appReadyBlockEnd).toBeGreaterThan(appReadyIndex)
+    const hasGetHideSplashInAppReadyBlock = content.slice(appReadyIndex, appReadyBlockEnd).includes('getHideSplashOnce()')
+    expect(hasGetHideSplashInAppReadyBlock).toBe(true)
 
     // Fallback path must require both refs (no hide on loading=false or ROUTE_STATE alone)
     expect(content).toContain('hasSeenLoadingFalseRef')

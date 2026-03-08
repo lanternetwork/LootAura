@@ -28,7 +28,8 @@ describe('Splash failsafe diagnostic', () => {
     // Failsafe block must call the report with SPLASH_FAILSAFE before hideSplash
     expect(layout).toMatch(/SPLASH_FAILSAFE/)
     expect(layout).toMatch(/splashFailsafeReport\s*\(/)
-    expect(layout).toMatch(/Splash hidden by \d+s failsafe/)
+    // Source uses template literal ${FAILSAFE_MS / 1000}s; match literal or pattern
+    expect(layout).toMatch(/Splash hidden by .*s failsafe/)
   })
 
   it('(b) report callback is only registered when diagnostics enabled (no overhead when off)', () => {

@@ -1,12 +1,13 @@
 {
   "name": "lootaura-mobile",
-  "version": "189",
+  "version": "190",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test": "jest --runWorkers=1",
     "eas:preview": "eas build --profile preview --platform all",
     "eas:prod": "eas build --profile production --platform all",
     "eas:submit": "eas submit --profile production --platform all",
@@ -35,9 +36,17 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@sentry/cli": "^2.36.0",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.0.10",
     "glob": "^10.3.10",
+    "jest": "^29.7.0",
+    "jest-expo": "~53.0.0",
     "typescript": "~5.8.3"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testMatch": ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
+    "modulePathIgnorePatterns": ["<rootDir>/node_modules/"]
   },
   "expo": {
     "install": {

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { isDiagnosticsEnabled } from '../utils/diagnosticsEnabled';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lootaura.com';
 const LOOTAURA_URL = 'https://lootaura.com';
@@ -359,15 +360,18 @@ export default function SaleDetailScreen() {
     );
   }
 
+  const showDiagnosticHud = isDiagnosticsEnabled();
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Diagnostic HUD - Always visible */}
-      <View style={styles.diagnosticHud} pointerEvents="none">
-        <Text style={styles.diagnosticText} numberOfLines={10}>
-          sales/[id] | saleId={saleId || 'none'} | loading={loading ? 'T' : 'F'} | lastNavReq={lastNavRequest || 'none'} | lastReq={lastRequestedUrl ? (lastRequestedUrl.length > 40 ? lastRequestedUrl.substring(0, 37) + '...' : lastRequestedUrl) : 'none'} | decision={lastDecision || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'} | lastMsg={lastMessageReceived || 'none'}
-        </Text>
-      </View>
-      
+      {/* Diagnostic HUD - only when EXPO_PUBLIC_NATIVE_HUD is '1' or 'true' (same as index) */}
+      {showDiagnosticHud && (
+        <View style={styles.diagnosticHud} pointerEvents="none">
+          <Text style={styles.diagnosticText} numberOfLines={10}>
+            sales/[id] | saleId={saleId || 'none'} | loading={loading ? 'T' : 'F'} | lastNavReq={lastNavRequest || 'none'} | lastReq={lastRequestedUrl ? (lastRequestedUrl.length > 40 ? lastRequestedUrl.substring(0, 37) + '...' : lastRequestedUrl) : 'none'} | decision={lastDecision || 'none'} | webViewUrl={currentWebViewUrl ? (currentWebViewUrl.length > 40 ? currentWebViewUrl.substring(0, 37) + '...' : currentWebViewUrl) : 'none'} | lastNavMsg={lastNavigateMessage || 'none'} | lastMsg={lastMessageReceived || 'none'}
+          </Text>
+        </View>
+      )}
       <View style={styles.mainContainer}>
         {/* WebView Content - Full height, web header is rendered inside WebView */}
         <View style={styles.webViewContainer}>

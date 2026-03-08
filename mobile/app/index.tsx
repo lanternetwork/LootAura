@@ -14,6 +14,9 @@ const LOOTAURA_URL = 'https://lootaura.com/sales';
 // without relying on injectedJavaScriptBeforeContentLoaded (unreliable on Android).
 const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
 
+// Native-first splash dismissal: short delay after load complete to allow first paint (avoids flash)
+const SPLASH_POST_LOAD_DELAY_MS = 300;
+
 // Diagnostics console: in-memory ring buffer (only when HUD enabled)
 const DIAG_CONSOLE_RING_SIZE = 30;
 type DiagEvent = { timestamp: number; messageType: string; payload: string };
@@ -81,10 +84,9 @@ export default function HomeScreen() {
   const lastAuthCallbackUrlRef = useRef<string | null>(null);
   const lastAuthCallbackAtRef = useRef<number | null>(null);
   
-  // Splash fallback: hide when both navState.loading===false and ROUTE_STATE with hasRNBridge have been seen (one-shot)
-  const hasSeenLoadingFalseRef = useRef<boolean>(false);
-  const hasSeenRouteStateWithBridgeRef = useRef<boolean>(false);
+  // Splash: native-first hide after loading=false + delay; APP_READY can hide earlier and cancels pending delay
   const splashHiddenByRef = useRef<boolean>(false);
+  const splashDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
@@ -358,6 +360,16 @@ export default function HomeScreen() {
       return () => setSplashFailsafeReport(null);
     }
   }, [isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Clear pending native splash-delay timer on unmount
+  useEffect(() => {
+    return () => {
+      if (splashDelayTimerRef.current) {
+        clearTimeout(splashDelayTimerRef.current);
+        splashDelayTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Handle OAuth callback: Cold start handoff (via router params from auth/callback.tsx)
   useEffect(() => {
@@ -646,7 +658,7 @@ export default function HomeScreen() {
     }
     
     // CRITICAL: If navState.loading === false, force clear loading state
-    // This is the most reliable way to detect when navigation is complete
+    // Native-first splash dismissal: after short delay to allow first paint, hide unless already hidden
     if (navState.loading === false) {
       let path = '/';
       try {
@@ -656,17 +668,24 @@ export default function HomeScreen() {
         // Ignore URL parse errors
       }
       stopLoader('navState.loading=false', path);
-      // Fallback splash hide: when both loading=false and ROUTE_STATE with bridge have been seen
-      hasSeenLoadingFalseRef.current = true;
-      if (hasSeenRouteStateWithBridgeRef.current && !splashHiddenByRef.current) {
-        splashHiddenByRef.current = true;
-        const hideSplashOnce = getHideSplashOnce();
-        if (hideSplashOnce) {
-          hideSplashOnce();
+      if (!splashHiddenByRef.current) {
+        if (splashDelayTimerRef.current) {
+          clearTimeout(splashDelayTimerRef.current);
+          splashDelayTimerRef.current = null;
         }
-        if (isDiagnosticsEnabled) {
-          pushDiagEvent('SPLASH_HIDDEN_ROUTE_AND_LOAD', JSON.stringify({ pathname: path }));
-        }
+        splashDelayTimerRef.current = setTimeout(() => {
+          splashDelayTimerRef.current = null;
+          if (!splashHiddenByRef.current) {
+            splashHiddenByRef.current = true;
+            const hideSplashOnce = getHideSplashOnce();
+            if (hideSplashOnce) {
+              hideSplashOnce();
+            }
+            if (isDiagnosticsEnabled) {
+              pushDiagEvent('SPLASH_HIDDEN_NATIVE_LOAD_DELAY', JSON.stringify({ pathname: path }));
+            }
+          }
+        }, SPLASH_POST_LOAD_DELAY_MS);
       }
     }
     
@@ -717,8 +736,12 @@ export default function HomeScreen() {
         // Extract retry attempt number if provided (for debug logging)
         const attempt = typeof message.attempt === 'number' ? message.attempt : 0;
         
-        // Hide native splash screen when app is ready (one-shot; fallback path will not run if we hide here)
+        // Optional optimization: hide immediately on APP_READY; cancel any pending native delayed hide
         if (!splashHiddenByRef.current) {
+          if (splashDelayTimerRef.current) {
+            clearTimeout(splashDelayTimerRef.current);
+            splashDelayTimerRef.current = null;
+          }
           splashHiddenByRef.current = true;
           const hideSplashOnce = getHideSplashOnce();
           if (hideSplashOnce) {
@@ -773,20 +796,6 @@ export default function HomeScreen() {
         });
         if (isDiagnosticsEnabled) {
           pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
-        }
-        // Fallback splash hide: when both loading=false and ROUTE_STATE with bridge have been seen
-        if (hasRNBridge === true) {
-          hasSeenRouteStateWithBridgeRef.current = true;
-          if (hasSeenLoadingFalseRef.current && !splashHiddenByRef.current) {
-            splashHiddenByRef.current = true;
-            const hideSplashOnce = getHideSplashOnce();
-            if (hideSplashOnce) {
-              hideSplashOnce();
-            }
-            if (isDiagnosticsEnabled) {
-              pushDiagEvent('SPLASH_HIDDEN_ROUTE_AND_LOAD', JSON.stringify(buildRouteStateDiagPayload(message)));
-            }
-          }
         }
         // Reset favorite state when leaving sale detail
         if (!isSaleDetail) {

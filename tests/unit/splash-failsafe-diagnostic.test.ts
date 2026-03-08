@@ -52,9 +52,9 @@ describe('Splash failsafe diagnostic', () => {
     expect(appReadyBlock).toMatch(/pushDiagEvent\s*\(\s*['"]APP_READY['"]/)
   })
 
-  it('(d) splash hide path is recorded in diagnostics (APP_READY or fallback or failsafe)', () => {
+  it('(d) splash hide path is recorded in diagnostics (APP_READY or native load+delay or failsafe)', () => {
     const index = fs.readFileSync(INDEX_PATH, 'utf-8')
     expect(index).toContain('SPLASH_HIDDEN_APP_READY')
-    expect(index).toContain('SPLASH_HIDDEN_ROUTE_AND_LOAD')
+    expect(index).toContain('SPLASH_HIDDEN_NATIVE_LOAD_DELAY')
   })
 })

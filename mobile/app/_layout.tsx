@@ -41,7 +41,7 @@ export function getHideSplashOnce() {
   return hideSplashOnce;
 }
 
-/** Register callback to record SPLASH_FAILSAFE in diagnostics console when 4s failsafe fires. Gated by index (only set when EXPO_PUBLIC_NATIVE_HUD enabled). */
+/** Register callback to record SPLASH_FAILSAFE in diagnostics console when the failsafe timeout fires. Gated by index (only set when EXPO_PUBLIC_NATIVE_HUD enabled). */
 export function setSplashFailsafeReport(callback: ((messageType: string, payload: string) => void) | null) {
   splashFailsafeReport = callback;
 }
@@ -76,7 +76,7 @@ export default function RootLayout() {
       hideSplash();
     };
 
-    // Failsafe timeout: last resort if neither APP_READY nor fallback (ROUTE_STATE + loading=false) hid splash
+    // Failsafe: catastrophic backstop only. Normal launches hide via APP_READY or native loading=false + delay in index.
     const FAILSAFE_MS = 8000;
     failsafeTimeout = setTimeout(() => {
       if (!isHidden) {
@@ -85,12 +85,12 @@ export default function RootLayout() {
             'SPLASH_FAILSAFE',
             JSON.stringify({
               timestamp: Date.now(),
-              message: `Splash hidden by ${FAILSAFE_MS / 1000}s failsafe (APP_READY and fallback never completed)`,
+              message: `Splash hidden by ${FAILSAFE_MS / 1000}s failsafe (APP_READY and native load path never completed)`,
             })
           );
         }
         if (__DEV__) {
-          console.warn(`[SPLASH] Failsafe timeout: hiding splash after ${FAILSAFE_MS / 1000}s (APP_READY and fallback never completed)`);
+          console.warn(`[SPLASH] Failsafe timeout: hiding splash after ${FAILSAFE_MS / 1000}s (APP_READY and native load path never completed)`);
         }
         hideSplash();
       }

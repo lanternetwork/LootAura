@@ -4,7 +4,7 @@
     "slug": "LootAura",
     "scheme": "lootaura",
     "jsEngine": "jsc",
-    "version": "192",
+    "version": "193",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -19,7 +19,7 @@
     "android": {
       "jsEngine": "jsc",
       "package": "com.lootaura.app",
-      "versionCode": 192,
+      "versionCode": 193,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A2268",
@@ -88,6 +88,13 @@
             "targetSdkVersion": 35,
             "kotlinVersion": "1.9.25"
           }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "backgroundColor": "#3A2268"
         }
       ],
       "./plugins/pin-jsc-android.js"

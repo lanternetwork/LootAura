@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -15,11 +15,14 @@ const LOOTAURA_URL = 'https://lootaura.com/sales';
 // without relying on injectedJavaScriptBeforeContentLoaded (unreliable on Android).
 const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
 
-// Native-first splash dismissal: short delay after load complete to allow first paint (avoids flash)
+// Native splash: hide only after RN boot screen is on screen (see boot screen onLayout).
 const SPLASH_POST_LOAD_DELAY_MS = 300;
 
-// Launch overlay: fade duration when hiding overlay after first paint (same triggers as splash hide)
-const LAUNCH_OVERLAY_FADE_MS = 200;
+// RN boot screen: fade duration when hiding after readiness (APP_READY or native load+delay).
+const BOOT_SCREEN_FADE_MS = 250;
+
+// Boot screen failsafe: force fade if still visible after this (ms).
+const BOOT_SCREEN_FAILSAFE_MS = 10000;
 
 // Diagnostics console: in-memory ring buffer (only when HUD enabled)
 const DIAG_CONSOLE_RING_SIZE = 30;
@@ -74,16 +77,14 @@ export default function HomeScreen() {
   const lastAuthCallbackUrlRef = useRef<string | null>(null);
   const lastAuthCallbackAtRef = useRef<number | null>(null);
   
-  // Splash: native-first hide after loading=false + delay; APP_READY can hide earlier and cancels pending delay
-  const splashHiddenByRef = useRef<boolean>(false);
+  // Native splash: hidden only after RN boot screen has painted (boot screen onLayout). Not tied to APP_READY/load.
   const splashDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Launch-only overlay: bridges gap between native splash dismiss and WebView first paint; one-shot fade-out.
-  // Invariant: overlay is visible on first mount; it fades out only when APP_READY is received or
-  // navState.loading=false + SPLASH_POST_LOAD_DELAY_MS fires; it never reappears on SPA navigation.
-  const [showLaunchOverlay, setShowLaunchOverlay] = useState(true);
-  const launchOverlayFadedRef = useRef<boolean>(false);
-  const launchOverlayOpacity = useRef(new Animated.Value(1)).current;
+  // RN boot screen: sole visual boot layer after native splash. Visible until readiness (APP_READY or load+delay).
+  const [showBootScreen, setShowBootScreen] = useState(true);
+  const bootScreenFadedRef = useRef<boolean>(false);
+  const bootScreenOpacity = useRef(new Animated.Value(1)).current;
+  const nativeSplashHiddenByBootScreenRef = useRef<boolean>(false);
   const mountedRef = useRef<boolean>(true);
   
   // Get safe area insets - footer will handle bottom inset
@@ -351,21 +352,39 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Launch overlay: one-shot fade-out at same moments as splash hide; idempotent, no reappearance on SPA nav
-  const startLaunchOverlayFadeOut = useCallback(() => {
-    if (launchOverlayFadedRef.current) return;
-    launchOverlayFadedRef.current = true;
-    if (__DEV__) {
-      console.log('[LAUNCH_OVERLAY] Fade-out started (invariant: only once per launch)');
+  // Hide native splash only after RN boot screen has painted (so user never sees gap between native splash and boot screen)
+  const handleBootScreenLayout = useCallback(() => {
+    if (nativeSplashHiddenByBootScreenRef.current) return;
+    nativeSplashHiddenByBootScreenRef.current = true;
+    const hideSplashOnce = getHideSplashOnce();
+    if (hideSplashOnce) hideSplashOnce();
+    if (isDiagnosticsEnabled) {
+      pushDiagEvent('BOOT_SCREEN_NATIVE_SPLASH_HIDDEN', JSON.stringify({ timestamp: Date.now() }));
     }
-    Animated.timing(launchOverlayOpacity, {
+  }, [isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Boot screen: one-shot fade-out when readiness reached (APP_READY, native load+delay, or error); idempotent, launch-scoped only
+  const startBootScreenFadeOut = useCallback((readinessPath: 'APP_READY' | 'NATIVE_LOAD_DELAY' | 'ERROR') => {
+    if (bootScreenFadedRef.current) return;
+    bootScreenFadedRef.current = true;
+    if (isDiagnosticsEnabled) {
+      const eventName = readinessPath === 'APP_READY' ? 'BOOT_SCREEN_READY_APP_READY' : readinessPath === 'NATIVE_LOAD_DELAY' ? 'BOOT_SCREEN_READY_NATIVE_LOAD_DELAY' : 'BOOT_SCREEN_READY_ERROR';
+      pushDiagEvent(eventName, JSON.stringify({ path: readinessPath, timestamp: Date.now() }));
+      pushDiagEvent('BOOT_SCREEN_FADE_START', JSON.stringify({ readinessPath, timestamp: Date.now() }));
+    }
+    Animated.timing(bootScreenOpacity, {
       toValue: 0,
-      duration: LAUNCH_OVERLAY_FADE_MS,
+      duration: BOOT_SCREEN_FADE_MS,
       useNativeDriver: true,
     }).start(({ finished }) => {
-      if (finished && mountedRef.current) setShowLaunchOverlay(false);
+      if (finished && mountedRef.current) {
+        setShowBootScreen(false);
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('BOOT_SCREEN_HIDDEN', JSON.stringify({ readinessPath, timestamp: Date.now() }));
+        }
+      }
     });
-  }, [launchOverlayOpacity]);
+  }, [bootScreenOpacity, isDiagnosticsEnabled, pushDiagEvent]);
 
   // Mounted ref for safe setState after async animation (avoid setState on unmounted component)
   useEffect(() => {
@@ -382,6 +401,39 @@ export default function HomeScreen() {
       return () => setSplashFailsafeReport(null);
     }
   }, [isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Boot screen visible on mount (diagnostics)
+  useEffect(() => {
+    if (showBootScreen && isDiagnosticsEnabled) {
+      pushDiagEvent('BOOT_SCREEN_VISIBLE', JSON.stringify({ timestamp: Date.now() }));
+    }
+  }, [showBootScreen, isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Boot screen failsafe: force fade if still visible after BOOT_SCREEN_FAILSAFE_MS
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!bootScreenFadedRef.current && mountedRef.current) {
+        bootScreenFadedRef.current = true;
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('BOOT_SCREEN_FAILSAFE', JSON.stringify({ message: 'Boot screen force-faded after failsafe timeout', timestamp: Date.now() }));
+          pushDiagEvent('BOOT_SCREEN_FADE_START', JSON.stringify({ readinessPath: 'FAILSAFE', timestamp: Date.now() }));
+        }
+        Animated.timing(bootScreenOpacity, {
+          toValue: 0,
+          duration: BOOT_SCREEN_FADE_MS,
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          if (finished && mountedRef.current) {
+            setShowBootScreen(false);
+            if (isDiagnosticsEnabled) {
+              pushDiagEvent('BOOT_SCREEN_HIDDEN', JSON.stringify({ readinessPath: 'FAILSAFE', timestamp: Date.now() }));
+            }
+          }
+        });
+      }
+    }, BOOT_SCREEN_FAILSAFE_MS);
+    return () => clearTimeout(t);
+  }, [bootScreenOpacity, isDiagnosticsEnabled, pushDiagEvent]);
 
   // Clear pending native splash-delay timer on unmount
   useEffect(() => {
@@ -632,6 +684,7 @@ export default function HomeScreen() {
     }
     stopLoader('error', path);
     setError('Failed to load LootAura. Please check your internet connection.');
+    startBootScreenFadeOut('ERROR');
   };
 
   const handleHttpError = (syntheticEvent: any) => {
@@ -657,6 +710,7 @@ export default function HomeScreen() {
       
       setError(`Unable to connect to LootAura (${nativeEvent.statusCode}). Please try again later.`);
       stopLoader('httpError', path);
+      startBootScreenFadeOut('ERROR');
     }
   };
 
@@ -690,27 +744,19 @@ export default function HomeScreen() {
         // Ignore URL parse errors
       }
       stopLoader('navState.loading=false', path);
-      if (!splashHiddenByRef.current) {
-        if (splashDelayTimerRef.current) {
-          clearTimeout(splashDelayTimerRef.current);
-          splashDelayTimerRef.current = null;
-        }
-        splashDelayTimerRef.current = setTimeout(() => {
-          splashDelayTimerRef.current = null;
-          if (!splashHiddenByRef.current) {
-            splashHiddenByRef.current = true;
-            const hideSplashOnce = getHideSplashOnce();
-            if (hideSplashOnce) {
-              hideSplashOnce();
-            }
-            if (isDiagnosticsEnabled) {
-              pushDiagEvent('SPLASH_HIDDEN_NATIVE_LOAD_DELAY', JSON.stringify({ pathname: path }));
-            }
-          }
-          // Launch overlay: fade out at same moment as splash (native load + delay path); idempotent if APP_READY already ran
-          startLaunchOverlayFadeOut();
-        }, SPLASH_POST_LOAD_DELAY_MS);
+      if (bootScreenFadedRef.current) return;
+      if (splashDelayTimerRef.current) {
+        clearTimeout(splashDelayTimerRef.current);
+        splashDelayTimerRef.current = null;
       }
+      splashDelayTimerRef.current = setTimeout(() => {
+        splashDelayTimerRef.current = null;
+        if (bootScreenFadedRef.current) return;
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('SPLASH_HIDDEN_NATIVE_LOAD_DELAY', JSON.stringify({ pathname: path }));
+        }
+        startBootScreenFadeOut('NATIVE_LOAD_DELAY');
+      }, SPLASH_POST_LOAD_DELAY_MS);
     }
     
     // Track navigation action when URL changes (diagnostics only)
@@ -760,23 +806,14 @@ export default function HomeScreen() {
         // Extract retry attempt number if provided (for debug logging)
         const attempt = typeof message.attempt === 'number' ? message.attempt : 0;
         
-        // Optional optimization: hide immediately on APP_READY; cancel any pending native delayed hide
-        if (!splashHiddenByRef.current) {
-          if (splashDelayTimerRef.current) {
-            clearTimeout(splashDelayTimerRef.current);
-            splashDelayTimerRef.current = null;
-          }
-          splashHiddenByRef.current = true;
-          const hideSplashOnce = getHideSplashOnce();
-          if (hideSplashOnce) {
-            hideSplashOnce();
-          }
-          if (isDiagnosticsEnabled) {
-            pushDiagEvent('SPLASH_HIDDEN_APP_READY', JSON.stringify(message));
-          }
+        if (splashDelayTimerRef.current) {
+          clearTimeout(splashDelayTimerRef.current);
+          splashDelayTimerRef.current = null;
         }
-        // Launch overlay: fade out at same moment as splash (APP_READY path)
-        startLaunchOverlayFadeOut();
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('SPLASH_HIDDEN_APP_READY', JSON.stringify(message));
+        }
+        startBootScreenFadeOut('APP_READY');
         
         // Immediately hide overlay and mark ready
         stopLoader('APP_READY', pathOnly, attempt);
@@ -1528,12 +1565,15 @@ export default function HomeScreen() {
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
           />
-          {/* Launch-only overlay: full-screen #3A2268 above WebView until first paint; fades out on APP_READY or native load+delay */}
-          {showLaunchOverlay && (
+          {/* RN boot screen: sole visual boot layer after native splash; fades out when readiness (APP_READY or native load+delay) */}
+          {showBootScreen && (
             <Animated.View
-              style={[styles.launchOverlay, { opacity: launchOverlayOpacity }]}
+              onLayout={handleBootScreenLayout}
+              style={[styles.bootScreen, { opacity: bootScreenOpacity }]}
               pointerEvents="auto"
-            />
+            >
+              <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
+            </Animated.View>
           )}
           {/* Native Footer Overlay - Show when on sale detail page AND page has loaded */}
           {routeState.isSaleDetail && !loading && (
@@ -1596,7 +1636,7 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
   },
-  launchOverlay: {
+  bootScreen: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -1605,6 +1645,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3A2268',
     zIndex: 100,
     elevation: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bootScreenImage: {
+    width: 200,
+    height: 200,
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay

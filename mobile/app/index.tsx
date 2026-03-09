@@ -1113,7 +1113,7 @@ export default function HomeScreen() {
           ]}
           pointerEvents="auto"
         >
-          {/* Clip RN image to a rounded square to match the native splash’s rounded-square treatment and avoid a visible shape jump at handoff. */}
+          {/* Rounded-square applied directly to the Image so Android actually clips it (parent overflow + borderRadius does not reliably clip Image children). Wrapper is for layout/centering only. */}
           <View style={styles.bootScreenImageWrapper}>
             <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
           </View>
@@ -1657,18 +1657,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Rounded-square clip to match native splash icon shape (avoids shape jump at handoff).
+  // Layout/centering only; clipping is applied on the Image itself (Android does not reliably clip Image from parent wrapper).
   bootScreenImageWrapper: {
+    width: 200,
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Rounded-square on Image so Android renders clipped corners; smallest fix before a mask library.
+  bootScreenImage: {
     width: 200,
     height: 200,
     borderRadius: 48,
     overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bootScreenImage: {
-    width: 200,
-    height: 200,
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay

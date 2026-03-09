@@ -1113,10 +1113,7 @@ export default function HomeScreen() {
           ]}
           pointerEvents="auto"
         >
-          {/* Rounded-square applied directly to the Image so Android actually clips it (parent overflow + borderRadius does not reliably clip Image children). Wrapper is for layout/centering only. */}
-          <View style={styles.bootScreenImageWrapper}>
-            <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
-          </View>
+          <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
         </Animated.View>
       )}
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -1657,19 +1654,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Layout/centering only; clipping is applied on the Image itself (Android does not reliably clip Image from parent wrapper).
-  bootScreenImageWrapper: {
-    width: 200,
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Rounded-square on Image so Android renders clipped corners; smallest fix before a mask library.
   bootScreenImage: {
     width: 200,
     height: 200,
-    borderRadius: 48,
-    overflow: 'hidden',
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated, Image, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -89,6 +89,7 @@ export default function HomeScreen() {
   
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   
   // State-driven WebView navigation (replaces injectJavaScript)
   // Sanitize so we never launch into /sales with viewport params (would block auto-geo)
@@ -1101,7 +1102,21 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
+      {/* RN boot screen: full-window bounds so the image is centered in the same coordinate system as the native splash, avoiding a visible icon shift during handoff. Rendered outside SafeAreaView so layout is not inset by the status bar. */}
+      {showBootScreen && (
+        <Animated.View
+          onLayout={handleBootScreenLayout}
+          style={[
+            styles.bootScreen,
+            { opacity: bootScreenOpacity, width: windowWidth, height: windowHeight },
+          ]}
+          pointerEvents="auto"
+        >
+          <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
+        </Animated.View>
+      )}
+      <SafeAreaView style={styles.container} edges={['top']}>
       {/* Solid strip behind system status bar so icons stay visible with edge-to-edge */}
       {insets.top > 0 ? (
         <View style={[styles.statusBarBackground, { height: insets.top }]} pointerEvents="none" />
@@ -1566,16 +1581,6 @@ export default function HomeScreen() {
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
           />
-          {/* RN boot screen: sole visual boot layer after native splash; fades out when readiness (APP_READY or native load+delay) */}
-          {showBootScreen && (
-            <Animated.View
-              onLayout={handleBootScreenLayout}
-              style={[styles.bootScreen, { opacity: bootScreenOpacity }]}
-              pointerEvents="auto"
-            >
-              <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
-            </Animated.View>
-          )}
           {/* Native Footer Overlay - Show when on sale detail page AND page has loaded */}
           {routeState.isSaleDetail && !loading && (
             <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
@@ -1616,7 +1621,8 @@ export default function HomeScreen() {
           )}
         </>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -1637,12 +1643,11 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
   },
+  // Full-window bounds (width/height set inline from useWindowDimensions) so image centers in same coordinate system as native splash and avoids visible shift at handoff.
   bootScreen: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: '#3A2268',
     zIndex: 100,
     elevation: 100,

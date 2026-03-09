@@ -1113,7 +1113,7 @@ export default function HomeScreen() {
           ]}
           pointerEvents="auto"
         >
-          {/* Android native splash uses a circular mask (SplashScreen API); clip RN image to a circle so the handoff has no visible shape jump. */}
+          {/* Clip RN image to a rounded square to match the native splash’s rounded-square treatment and avoid a visible shape jump at handoff. */}
           <View style={styles.bootScreenImageWrapper}>
             <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
           </View>
@@ -1657,11 +1657,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Circular clip to match Android native splash icon mask (avoids shape jump at handoff).
+  // Rounded-square clip to match native splash icon shape (avoids shape jump at handoff).
   bootScreenImageWrapper: {
     width: 200,
     height: 200,
-    borderRadius: 100,
+    borderRadius: 48,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',

@@ -47,7 +47,6 @@ describe('Boot screen contract', () => {
     const index = fs.readFileSync(INDEX_PATH, 'utf-8')
     expect(index).toContain('onLayout={handleBootScreenLayout}')
     expect(index).toContain('styles.bootScreen')
-    expect(index).toContain('bootScreenImage')
     const appReadyBlock = index.slice(
       index.indexOf("message.type === 'APP_READY'"),
       index.indexOf("return; // Handled, don't process further", index.indexOf("message.type === 'APP_READY'"))

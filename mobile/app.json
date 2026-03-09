@@ -94,7 +94,8 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "backgroundColor": "#3A2268"
+          "backgroundColor": "#3A2268",
+          "imageWidth": 200
         }
       ],
       "./plugins/pin-jsc-android.js"

@@ -1113,7 +1113,10 @@ export default function HomeScreen() {
           ]}
           pointerEvents="auto"
         >
-          <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
+          {/* Android native splash uses a circular mask (SplashScreen API); clip RN image to a circle so the handoff has no visible shape jump. */}
+          <View style={styles.bootScreenImageWrapper}>
+            <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
+          </View>
         </Animated.View>
       )}
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -1651,6 +1654,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#3A2268',
     zIndex: 100,
     elevation: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Circular clip to match Android native splash icon mask (avoids shape jump at handoff).
+  bootScreenImageWrapper: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },

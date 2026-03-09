@@ -24,6 +24,9 @@ const BOOT_SCREEN_FADE_MS = 250;
 // Boot screen failsafe: force fade if still visible after this (ms).
 const BOOT_SCREEN_FAILSAFE_MS = 10000;
 
+// Short opaque hold before starting boot screen fade on APP_READY (avoids flicker from unstable first frame).
+const BOOT_SCREEN_APP_READY_HOLD_MS = 100;
+
 // Diagnostics console: in-memory ring buffer (only when HUD enabled)
 const DIAG_CONSOLE_RING_SIZE = 30;
 type DiagEvent = { timestamp: number; messageType: string; payload: string };
@@ -79,6 +82,7 @@ export default function HomeScreen() {
   
   // Native splash: hidden only after RN boot screen has painted (boot screen onLayout).
   const splashDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appReadyHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // RN boot screen: sole visual boot layer after native splash. Visible until readiness (APP_READY or load+delay).
   const [showBootScreen, setShowBootScreen] = useState(true);
@@ -436,12 +440,16 @@ export default function HomeScreen() {
     return () => clearTimeout(t);
   }, [bootScreenOpacity, isDiagnosticsEnabled, pushDiagEvent]);
 
-  // Clear pending native splash-delay timer on unmount
+  // Clear pending timers on unmount (splash-delay, APP_READY hold)
   useEffect(() => {
     return () => {
       if (splashDelayTimerRef.current) {
         clearTimeout(splashDelayTimerRef.current);
         splashDelayTimerRef.current = null;
+      }
+      if (appReadyHoldTimerRef.current) {
+        clearTimeout(appReadyHoldTimerRef.current);
+        appReadyHoldTimerRef.current = null;
       }
     };
   }, []);
@@ -812,10 +820,17 @@ export default function HomeScreen() {
           clearTimeout(splashDelayTimerRef.current);
           splashDelayTimerRef.current = null;
         }
+        if (appReadyHoldTimerRef.current) {
+          clearTimeout(appReadyHoldTimerRef.current);
+          appReadyHoldTimerRef.current = null;
+        }
         if (isDiagnosticsEnabled) {
           pushDiagEvent('SPLASH_HIDDEN_APP_READY', JSON.stringify(message));
         }
-        startBootScreenFadeOut('APP_READY');
+        appReadyHoldTimerRef.current = setTimeout(() => {
+          appReadyHoldTimerRef.current = null;
+          if (!bootScreenFadedRef.current) startBootScreenFadeOut('APP_READY');
+        }, BOOT_SCREEN_APP_READY_HOLD_MS);
         
         // Immediately hide overlay and mark ready
         stopLoader('APP_READY', pathOnly, attempt);

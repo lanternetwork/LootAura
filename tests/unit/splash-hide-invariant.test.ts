@@ -30,6 +30,17 @@ describe('Splash hide invariant (native)', () => {
     expect(appReadyBlock).toContain('startBootScreenFadeOut(\'APP_READY\')')
   })
 
+  it('APP_READY path uses short hold before fade (not same-tick)', () => {
+    const content = fs.readFileSync(MOBILE_INDEX_PATH, 'utf-8')
+    expect(content).toContain('BOOT_SCREEN_APP_READY_HOLD_MS')
+    const appReadyIdx = content.indexOf("message.type === 'APP_READY'")
+    const appReadyBlockEnd = content.indexOf("return; // Handled, don't process further", appReadyIdx)
+    const appReadyBlock = content.slice(appReadyIdx, appReadyBlockEnd)
+    expect(appReadyBlock).toContain('setTimeout')
+    expect(appReadyBlock).toContain('BOOT_SCREEN_APP_READY_HOLD_MS')
+    expect(appReadyBlock).toContain("startBootScreenFadeOut('APP_READY')")
+  })
+
   it('loading=false path calls startBootScreenFadeOut(NATIVE_LOAD_DELAY), not getHideSplashOnce', () => {
     const content = fs.readFileSync(MOBILE_INDEX_PATH, 'utf-8')
     expect(content).toContain('SPLASH_POST_LOAD_DELAY_MS')

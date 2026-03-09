@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated, Image, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -1103,7 +1103,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* RN boot screen: full-window bounds so the image is centered in the same coordinate system as the native splash, avoiding a visible icon shift during handoff. Rendered outside SafeAreaView so layout is not inset by the status bar. */}
+      {/* RN boot screen: solid purple full-screen handoff layer. Rendered outside SafeAreaView so layout is full window. */}
       {showBootScreen && (
         <Animated.View
           onLayout={handleBootScreenLayout}
@@ -1112,9 +1112,7 @@ export default function HomeScreen() {
             { opacity: bootScreenOpacity, width: windowWidth, height: windowHeight },
           ]}
           pointerEvents="auto"
-        >
-          <Image source={require('../assets/splash.png')} style={styles.bootScreenImage} resizeMode="contain" />
-        </Animated.View>
+        />
       )}
       <SafeAreaView style={styles.container} edges={['top']}>
       {/* Solid strip behind system status bar so icons stay visible with edge-to-edge */}
@@ -1643,7 +1641,6 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
   },
-  // Full-window bounds (width/height set inline from useWindowDimensions) so image centers in same coordinate system as native splash and avoids visible shift at handoff.
   bootScreen: {
     position: 'absolute',
     top: 0,
@@ -1651,12 +1648,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#3A2268',
     zIndex: 100,
     elevation: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bootScreenImage: {
-    width: 200,
-    height: 200,
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay

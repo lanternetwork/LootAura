@@ -4,7 +4,7 @@
     "slug": "LootAura",
     "scheme": "lootaura",
     "jsEngine": "jsc",
-    "version": "201",
+    "version": "202",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -19,7 +19,7 @@
     "android": {
       "jsEngine": "jsc",
       "package": "com.lootaura.app",
-      "versionCode": 201,
+      "versionCode": 202,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A2268",

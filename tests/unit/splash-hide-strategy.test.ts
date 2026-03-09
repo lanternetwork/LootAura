@@ -1,9 +1,9 @@
 /**
- * Unit tests for splash hide strategy (RN boot screen):
- * (1) Native splash hides only from boot screen onLayout; APP_READY triggers boot screen fade (not splash hide).
- * (2) loading=false plus short delay triggers boot screen fade (startBootScreenFadeOut); delay timer still used.
+ * Unit tests for splash hide strategy (direct handoff):
+ * (1) Splash hides on APP_READY if it arrives first.
+ * (2) Otherwise splash hides after loading=false plus short delay.
  * (3) ROUTE_STATE is not required for splash hide.
- * (4) Failsafe only fires if neither APP_READY nor loading=false+delay path completes.
+ * (4) Failsafe only fires if neither path completes.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -20,32 +20,28 @@ const INDEX_PATH = resolveMobilePath('app/index.tsx')
 const LAYOUT_PATH = resolveMobilePath('app/_layout.tsx')
 
 describe('Splash hide strategy', () => {
-  it('(1) native splash hides only from boot screen onLayout; APP_READY triggers boot screen fade', () => {
+  it('(1) splash hides on APP_READY if it arrives first', () => {
     const index = fs.readFileSync(INDEX_PATH, 'utf-8')
     const appReadyIdx = index.indexOf("message.type === 'APP_READY'")
     expect(appReadyIdx).toBeGreaterThan(-1)
     const block = index.slice(appReadyIdx, appReadyIdx + 2800)
-    // APP_READY triggers boot screen fade, not native splash hide
-    expect(block).toMatch(/startBootScreenFadeOut\s*\(\s*['"]APP_READY['"]\s*\)/)
-    // APP_READY cancels pending native delay timer
+    expect(block).toMatch(/splashHiddenByRef\.current\s*=\s*true/)
+    expect(block).toMatch(/getHideSplashOnce\(\)/)
+    expect(block).toMatch(/!splashHiddenByRef\.current/)
     expect(index).toMatch(/splashDelayTimerRef\.current[\s\S]*?clearTimeout/)
-    // Native splash is hidden only in handleBootScreenLayout (not in APP_READY block)
-    const appReadyBlockEnd = index.indexOf("return; // Handled, don't process further", appReadyIdx)
-    expect(index.slice(appReadyIdx, appReadyBlockEnd)).not.toMatch(/getHideSplashOnce\s*\(\)/)
   })
 
-  it('(2) loading=false plus short delay triggers boot screen fade', () => {
+  it('(2) otherwise splash hides after loading=false plus short delay', () => {
     const index = fs.readFileSync(INDEX_PATH, 'utf-8')
     expect(index).toContain('navState.loading === false')
     expect(index).toContain('SPLASH_POST_LOAD_DELAY_MS')
     expect(index).toContain('splashDelayTimerRef')
     expect(index).toContain('SPLASH_HIDDEN_NATIVE_LOAD_DELAY')
-    expect(index).toContain("startBootScreenFadeOut('NATIVE_LOAD_DELAY')")
+    expect(index).toMatch(/setTimeout\s*\([\s\S]*?!splashHiddenByRef\.current/m)
   })
 
   it('(3) ROUTE_STATE is not required for splash hide', () => {
     const index = fs.readFileSync(INDEX_PATH, 'utf-8')
-    // ROUTE_STATE handler must not call getHideSplashOnce (no splash hide in that branch)
     const routeStateIdx = index.indexOf("message.type === 'ROUTE_STATE'")
     expect(routeStateIdx).toBeGreaterThan(-1)
     const nextBranch = index.indexOf("} else if (message.type ===", routeStateIdx + 1)
@@ -59,5 +55,13 @@ describe('Splash hide strategy', () => {
     expect(layout).toContain('!isHidden')
     expect(layout).toContain('hideSplash()')
     expect(layout).toMatch(/8000|10000|FAILSAFE_MS/)
+  })
+
+  it('(5) no RN boot screen is rendered', () => {
+    const index = fs.readFileSync(INDEX_PATH, 'utf-8')
+    expect(index).not.toContain('showBootScreen')
+    expect(index).not.toContain('handleBootScreenLayout')
+    expect(index).not.toContain('startBootScreenFadeOut')
+    expect(index).not.toContain('styles.bootScreen')
   })
 })

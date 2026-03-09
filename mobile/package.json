@@ -1,6 +1,6 @@
 {
   "name": "lootaura-mobile",
-  "version": "194",
+  "version": "195",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

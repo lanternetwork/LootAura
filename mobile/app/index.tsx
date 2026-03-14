@@ -1116,8 +1116,46 @@ export default function HomeScreen() {
     }
   };
 
+  // Route-aware shell background policy:
+  // - Light shell for standard content pages (e.g., Favorites, Dashboard)
+  // - Dark shell for map-heavy / immersive routes and during launch/boot
+  const lightShellRoutes = ['/favorites', '/dashboard'] as const;
+  const useLightShellBackground = lightShellRoutes.includes(
+    routeState.pathname as (typeof lightShellRoutes)[number]
+  );
+
+  if (__DEV__) {
+    // Dev-only invariant: make the route → shell policy explicit for key routes
+    const isSaleRoute = routeState.pathname === '/' || routeState.pathname.startsWith('/sales');
+    const shellKind = useLightShellBackground ? 'light' : 'dark';
+    const routeLabel = routeState.pathname || '/';
+    // Favorites and Dashboard must resolve to the light shell path
+    if ((routeLabel === '/favorites' || routeLabel === '/dashboard') && !useLightShellBackground) {
+      console.warn('[SHELL_BG] Expected light shell for route but got dark shell', { route: routeLabel });
+    }
+    // Sale detail and primary sales/map routes should remain on the darker shell
+    if ((routeState.isSaleDetail || isSaleRoute) && useLightShellBackground) {
+      console.warn('[SHELL_BG] Unexpected light shell for map-heavy route', {
+        route: routeLabel,
+        isSaleDetail: routeState.isSaleDetail,
+      });
+    }
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SHELL_BG] Route shell policy', {
+        route: routeLabel,
+        isSaleDetail: routeState.isSaleDetail,
+        shell: shellKind,
+      });
+    }
+  }
+
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        useLightShellBackground ? styles.lightShellBackground : styles.darkShellBackground,
+      ]}
+    >
       {/* RN boot screen: solid purple full-screen handoff layer. Rendered outside SafeAreaView so layout is full window. */}
       {showBootScreen && (
         <Animated.View
@@ -1129,7 +1167,13 @@ export default function HomeScreen() {
           pointerEvents="auto"
         />
       )}
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView
+        style={[
+          styles.container,
+          useLightShellBackground ? styles.lightShellBackground : styles.darkShellBackground,
+        ]}
+        edges={['top']}
+      >
       {/* Solid strip behind system status bar so icons stay visible with edge-to-edge */}
       {insets.top > 0 ? (
         <View style={[styles.statusBarBackground, { height: insets.top }]} pointerEvents="none" />
@@ -1220,7 +1264,9 @@ export default function HomeScreen() {
             style={[
               styles.webview,
               routeState.isSaleDetail && styles.webviewWithFooter,
-              { backgroundColor: '#3A2268' } // Match container/splash color to prevent white flash
+              useLightShellBackground
+                ? { backgroundColor: '#FFFFFF' }
+                : { backgroundColor: '#3A2268' } // Match container/splash color to prevent white flash on immersive routes
             ]}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}
@@ -1642,7 +1688,12 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  darkShellBackground: {
     backgroundColor: '#3A2268',
+  },
+  lightShellBackground: {
+    backgroundColor: '#FFFFFF',
   },
   statusBarBackground: {
     position: 'absolute',

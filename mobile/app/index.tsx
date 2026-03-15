@@ -1181,6 +1181,10 @@ export default function HomeScreen() {
       {/* Diagnostics Console - Only visible when diagnostics enabled; full JSON, no truncation */}
       {isDiagnosticsEnabled && (
         <View style={styles.diagnosticConsole} pointerEvents="box-none">
+          {/* Temporary: current footer state for native footer visibility diagnosis */}
+          <Text style={styles.diagnosticConsoleText} numberOfLines={2} selectable>
+            pathname={routeState.pathname || '(none)'} isSaleDetail={String(routeState.isSaleDetail)} saleId={routeState.saleId ?? '(null)'} loading={String(loading)} footerShow={String(routeState.isSaleDetail && !loading)}
+          </Text>
           <View style={styles.diagnosticConsoleToolbar}>
             <TouchableOpacity
               style={[styles.diagnosticConsoleButton, diagConsoleViewMode === 'latest' && styles.diagnosticConsoleButtonActive]}

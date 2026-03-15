@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { getCsrfHeaders } from '@/lib/csrf-client'
-import { deterministicSpread, normalizeZipForValidation, batchStatuses, buildBatchReport, type BatchReport } from '@/lib/admin/testSalesSpread'
+import { deterministicScatter, scatterSeed, normalizeZipForValidation, batchStatuses, buildBatchReport, buildCreatedSaleFromCreateResponse, type BatchReport, type CreatedSale } from '@/lib/admin/testSalesSpread'
 
 const MAX_SALES = 50
 const MIN_SALES = 1
@@ -20,13 +20,6 @@ const TITLES = [
   'Antique & Collectibles Sale',
   'Holiday Clearance Sale',
 ]
-
-interface CreatedSale {
-  id: string
-  title: string
-  status: string
-  date_start: string
-}
 
 interface ZipResolution {
   zip: string
@@ -85,10 +78,11 @@ export default function TestSalesGenerator() {
     const saleDate = new Date(today)
     saleDate.setDate(today.getDate() + daysOffset)
     const dateStr = saleDate.toISOString().split('T')[0]
-    const title = TITLES[index % TITLES.length]
+    const baseTitle = TITLES[index % TITLES.length]
+    const title = `${baseTitle} - ${status}`
 
     const saleData = {
-      title: `${title} - ${status}`,
+      title,
       description: `Test sale for ${status}. Created for demo.`,
       address: `${100 + (index % 900)} Main St`,
       city: geo.city,
@@ -120,7 +114,9 @@ export default function TestSalesGenerator() {
       const msg = data.details ? `${data.error}: ${data.details}` : data.error || 'Failed to create sale'
       throw new Error(msg)
     }
-    return data.sale as CreatedSale
+
+    // API returns only { ok: true, saleId } — build CreatedSale locally so the list never has undefined
+    return buildCreatedSaleFromCreateResponse(data, title, status, dateStr)
   }
 
   async function createTestSales() {
@@ -146,7 +142,8 @@ export default function TestSalesGenerator() {
         return
       }
 
-      const points = deterministicSpread(geo.lat, geo.lng, numberOfSales, spreadRadiusDegrees)
+      const seed = scatterSeed(zip, numberOfSales, spreadRadiusDegrees)
+      const points = deterministicScatter(geo.lat, geo.lng, numberOfSales, spreadRadiusDegrees, seed)
       const statuses = batchStatuses(numberOfSales, publishedOnly)
 
       const created: CreatedSale[] = []
@@ -156,8 +153,13 @@ export default function TestSalesGenerator() {
         setProgress(`Creating ${i + 1}/${numberOfSales}...`)
         const status = statuses[i] ?? 'published'
         const daysOffset = status === 'published' ? i : status === 'draft' ? 7 : -7
+        const point = points[i]
+        if (!point) {
+          failureMessage = failureMessage ? `${failureMessage}; Missing point for index ${i}` : `Missing point for index ${i}`
+          continue
+        }
         try {
-          const sale = await createOneSale(status, daysOffset, points[i]!, geo, i)
+          const sale = await createOneSale(status, daysOffset, point, geo, i)
           created.push(sale)
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : 'Unknown error'

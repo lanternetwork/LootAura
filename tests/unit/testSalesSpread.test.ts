@@ -3,7 +3,10 @@ import {
   normalizeZipForValidation,
   batchStatuses,
   deterministicSpread,
+  deterministicScatter,
+  scatterSeed,
   buildBatchReport,
+  buildCreatedSaleFromCreateResponse,
 } from '@/lib/admin/testSalesSpread'
 
 describe('normalizeZipForValidation (ZIP validation)', () => {
@@ -69,7 +72,130 @@ describe('batchStatuses (count and published-only shape)', () => {
   })
 })
 
-describe('deterministicSpread (deterministic coordinate generation)', () => {
+describe('buildCreatedSaleFromCreateResponse (no crash when API returns only saleId)', () => {
+  it('builds CreatedSale from saleId and request fields', () => {
+    const sale = buildCreatedSaleFromCreateResponse(
+      { saleId: 'abc-123' },
+      'Garage Sale - published',
+      'published',
+      '2025-06-15'
+    )
+    expect(sale.id).toBe('abc-123')
+    expect(sale.title).toBe('Garage Sale - published')
+    expect(sale.status).toBe('published')
+    expect(sale.date_start).toBe('2025-06-15')
+  })
+
+  it('accepts id when saleId is missing', () => {
+    const sale = buildCreatedSaleFromCreateResponse(
+      { id: 'fallback-id' },
+      'Title',
+      'draft',
+      '2025-01-01'
+    )
+    expect(sale.id).toBe('fallback-id')
+  })
+
+  it('throws when no sale id returned', () => {
+    expect(() =>
+      buildCreatedSaleFromCreateResponse({}, 'Title', 'published', '2025-01-01')
+    ).toThrow('no sale id returned')
+  })
+
+  it('created-sales list items are always defined (no undefined)', () => {
+    const items = [
+      buildCreatedSaleFromCreateResponse({ saleId: '1' }, 'A', 'published', '2025-01-01'),
+      buildCreatedSaleFromCreateResponse({ saleId: '2' }, 'B', 'published', '2025-01-02'),
+    ]
+    items.forEach((item) => {
+      expect(item).toBeDefined()
+      expect(item.id).toBeDefined()
+      expect(item.title).toBeDefined()
+      expect(item.status).toBeDefined()
+      expect(item.date_start).toBeDefined()
+    })
+  })
+})
+
+describe('deterministicScatter (deterministic scatter, no grid)', () => {
+  const centerLat = 38.25
+  const centerLng = -85.76
+  const radius = 0.015
+  const seed = scatterSeed('40202', 8, radius)
+
+  it('same inputs produce same outputs', () => {
+    const a = deterministicScatter(centerLat, centerLng, 8, radius, seed)
+    const b = deterministicScatter(centerLat, centerLng, 8, radius, seed)
+    expect(a).toHaveLength(8)
+    expect(b).toHaveLength(8)
+    expect(a).toEqual(b)
+  })
+
+  it('scatterSeed is stable for same zip + count + radius', () => {
+    expect(scatterSeed('40202', 8, 0.015)).toBe(scatterSeed('40202', 8, 0.015))
+    expect(scatterSeed('90210', 5, 0.01)).not.toBe(scatterSeed('40202', 8, 0.015))
+  })
+
+  it('count 0 or negative returns empty array', () => {
+    expect(deterministicScatter(centerLat, centerLng, 0, radius, seed)).toEqual([])
+    expect(deterministicScatter(centerLat, centerLng, -1, radius, seed)).toEqual([])
+  })
+
+  it('count 1 returns center point', () => {
+    const one = deterministicScatter(centerLat, centerLng, 1, radius, seed)
+    expect(one).toEqual([{ lat: centerLat, lng: centerLng }])
+  })
+
+  it('radius 0 returns empty for count > 1', () => {
+    expect(deterministicScatter(centerLat, centerLng, 5, 0, seed)).toEqual([])
+  })
+
+  it('output length equals requested count', () => {
+    expect(deterministicScatter(centerLat, centerLng, 6, radius, seed)).toHaveLength(6)
+    expect(deterministicScatter(centerLat, centerLng, 50, radius, seed)).toHaveLength(50)
+  })
+
+  it('points are within radius of center', () => {
+    const points = deterministicScatter(centerLat, centerLng, 12, radius, seed)
+    const latRad = (centerLat * Math.PI) / 180
+    const lngScale = 1 / Math.cos(latRad)
+    points.forEach((p) => {
+      const dLat = p.lat - centerLat
+      const dLng = (p.lng - centerLng) * lngScale
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng)
+      expect(dist).toBeLessThanOrEqual(radius * 1.01)
+    })
+  })
+
+  it('no obvious grid: points are not in perfect rows/columns', () => {
+    const points = deterministicScatter(centerLat, centerLng, 9, radius, seed)
+    const lats = points.map((p) => p.lat)
+    const lngs = points.map((p) => p.lng)
+    const uniqueLats = [...new Set(lats.map((x) => Math.round(x * 10000)))]
+    const uniqueLngs = [...new Set(lngs.map((x) => Math.round(x * 10000)))]
+    expect(uniqueLats.length).toBeGreaterThan(2)
+    expect(uniqueLngs.length).toBeGreaterThan(2)
+  })
+
+  it('minimum spacing: no two points stacked (all pairs have meaningful separation)', () => {
+    const points = deterministicScatter(centerLat, centerLng, 10, radius, seed)
+    const minAllowed = radius * 0.01
+    const latRad = (centerLat * Math.PI) / 180
+    const lngScale = 1 / Math.cos(latRad)
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const a = points[i]!
+        const b = points[j]!
+        const dLat = a.lat - b.lat
+        const dLng = (a.lng - b.lng) * lngScale
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng)
+        expect(dist).toBeGreaterThan(minAllowed)
+      }
+    }
+  })
+})
+
+describe('deterministicSpread (legacy wrapper)', () => {
   const centerLat = 38.25
   const centerLng = -85.76
   const radius = 0.01
@@ -78,35 +204,17 @@ describe('deterministicSpread (deterministic coordinate generation)', () => {
     const a = deterministicSpread(centerLat, centerLng, 8, radius)
     const b = deterministicSpread(centerLat, centerLng, 8, radius)
     expect(a).toHaveLength(8)
-    expect(b).toHaveLength(8)
-    expect(a).toEqual(b)
-  })
-
-  it('count 0 or negative returns empty array', () => {
-    expect(deterministicSpread(centerLat, centerLng, 0, radius)).toEqual([])
-    expect(deterministicSpread(centerLat, centerLng, -1, radius)).toEqual([])
+    expect(b).toEqual(a)
   })
 
   it('count 1 returns center point', () => {
-    const one = deterministicSpread(centerLat, centerLng, 1, radius)
-    expect(one).toEqual([{ lat: centerLat, lng: centerLng }])
-  })
-
-  it('radius 0 returns empty (except count 1 handled above)', () => {
-    expect(deterministicSpread(centerLat, centerLng, 5, 0)).toEqual([])
-  })
-
-  it('larger radius produces wider spread', () => {
-    const small = deterministicSpread(centerLat, centerLng, 4, 0.005)
-    const large = deterministicSpread(centerLat, centerLng, 4, 0.02)
-    const latSpan = (pts: { lat: number }[]) =>
-      Math.max(...pts.map((p) => p.lat)) - Math.min(...pts.map((p) => p.lat))
-    expect(latSpan(large)).toBeGreaterThan(latSpan(small))
+    expect(deterministicSpread(centerLat, centerLng, 1, radius)).toEqual([
+      { lat: centerLat, lng: centerLng },
+    ])
   })
 
   it('output length equals requested count', () => {
     expect(deterministicSpread(centerLat, centerLng, 6, radius)).toHaveLength(6)
-    expect(deterministicSpread(centerLat, centerLng, 50, radius)).toHaveLength(50)
   })
 })
 

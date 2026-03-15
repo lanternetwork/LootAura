@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION lootaura_v2.is_current_user_admin()
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = auth, lootaura_v2, public, pg_catalog
+SET search_path = auth, pg_catalog
 AS $$
 DECLARE
   v_email text;
@@ -39,7 +39,9 @@ BEGIN
 END;
 $$;
 
--- Ensure authenticated can execute the helper but not see auth.users directly
+-- Lock down function execution: no implicit PUBLIC or broad EXECUTE
+REVOKE ALL ON FUNCTION lootaura_v2.is_current_user_admin() FROM PUBLIC;
+REVOKE ALL ON FUNCTION lootaura_v2.is_current_user_admin() FROM authenticated;
 GRANT EXECUTE ON FUNCTION lootaura_v2.is_current_user_admin() TO authenticated;
 
 -- Replace promotions_admin_select to use the helper

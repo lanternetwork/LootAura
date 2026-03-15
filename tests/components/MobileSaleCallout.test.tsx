@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import { makeSale } from '../_helpers/factories'
 
@@ -43,5 +43,24 @@ describe('MobileSaleCallout', () => {
     )
 
     expect(container.firstChild).toBeNull()
+  })
+
+  it('clicking favorite control does not dismiss the callout (pinPosition branch)', () => {
+    const onDismiss = vi.fn()
+    const sale = makeSale({ id: 'callout-sale-1', title: 'Map callout sale' })
+
+    render(
+      <MobileSaleCallout
+        sale={sale}
+        onDismiss={onDismiss}
+        viewport={{ center: { lat: 38, lng: -85 }, zoom: 10 }}
+        pinPosition={{ x: 100, y: 200 }}
+      />
+    )
+
+    const favoriteControl = screen.getByTestId('callout-favorite')
+    fireEvent.click(favoriteControl)
+
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 })

@@ -252,8 +252,8 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               )}
             </div>
 
-            {/* Action buttons - side by side */}
-            <div className="flex gap-2 pointer-events-auto">
+            {/* Action buttons - side by side; stopPropagation so map wrapper does not dismiss callout */}
+            <div className="flex gap-2 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
               {/* Navigation button */}
               <a
                 href={getNavigationUrl()}

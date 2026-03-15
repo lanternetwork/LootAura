@@ -75,7 +75,7 @@ describe('batchStatuses (count and published-only shape)', () => {
 describe('buildCreatedSaleFromCreateResponse (no crash when API returns only saleId)', () => {
   it('builds CreatedSale from saleId and request fields', () => {
     const sale = buildCreatedSaleFromCreateResponse(
-      { ok: true, saleId: 'abc-123' },
+      { saleId: 'abc-123' },
       'Garage Sale - published',
       'published',
       '2025-06-15'
@@ -88,7 +88,7 @@ describe('buildCreatedSaleFromCreateResponse (no crash when API returns only sal
 
   it('accepts id when saleId is missing', () => {
     const sale = buildCreatedSaleFromCreateResponse(
-      { ok: true, id: 'fallback-id' },
+      { id: 'fallback-id' },
       'Title',
       'draft',
       '2025-01-01'
@@ -98,7 +98,7 @@ describe('buildCreatedSaleFromCreateResponse (no crash when API returns only sal
 
   it('throws when no sale id returned', () => {
     expect(() =>
-      buildCreatedSaleFromCreateResponse({ ok: true }, 'Title', 'published', '2025-01-01')
+      buildCreatedSaleFromCreateResponse({}, 'Title', 'published', '2025-01-01')
     ).toThrow('no sale id returned')
   })
 

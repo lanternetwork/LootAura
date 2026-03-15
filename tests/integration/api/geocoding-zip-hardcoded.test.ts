@@ -31,6 +31,7 @@ function requestWithZip(zip: string) {
 describe('GET /api/geocoding/zip hardcoded LA ZIPs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: behave as if local zipcodes table has no row for the ZIP
     mockFromBase.mockReturnValue({
       select: () => ({
         eq: () => ({
@@ -64,6 +65,30 @@ describe('GET /api/geocoding/zip hardcoded LA ZIPs', () => {
     expect(data.ok).toBe(true)
     expect(data.zip).toBe('90210')
     expect(data.city).toBe('Beverly Hills')
+    expect(data.state).toBe('CA')
+    expect(data.source).toBe('hardcoded')
+  })
+
+  it('hardcoded 90069 wins even if local DB has stale partial data', async () => {
+    // Simulate a stale local row with missing city/state; hardcoded should still win
+    mockFromBase.mockReturnValueOnce({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            Promise.resolve({
+              data: { zip: '90069', lat: 0, lng: 0, city: null, state: null },
+              error: null,
+            }),
+        }),
+      }),
+    })
+
+    const res = await GET(requestWithZip('90069'))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.ok).toBe(true)
+    expect(data.zip).toBe('90069')
+    expect(data.city).toBe('West Hollywood')
     expect(data.state).toBe('CA')
     expect(data.source).toBe('hardcoded')
   })

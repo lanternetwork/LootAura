@@ -21,6 +21,31 @@ const TITLES = [
   'Holiday Clearance Sale',
 ]
 
+// Fixed, approved Cloudinary demo image pool for Test Sales Generator.
+// Must match isAllowedImageUrl rules: https://res.cloudinary.com/<cloud>/image/upload/**
+const DEMO_IMAGE_URLS: string[] = [
+  'https://res.cloudinary.com/deg2szdqf/image/upload/v1769083249/lootaura/sales/lxxnw1cdpya7ynocmve3.png',
+  'https://res.cloudinary.com/deg2szdqf/image/upload/v1773522297/lootaura/sales/hqywpapadsobmgwrdury.jpg',
+  'https://res.cloudinary.com/deg2szdqf/image/upload/v1773579888/ChatGPT_Image_Mar_15_2026_09_04_38_AM_rn6pll.png',
+  'https://res.cloudinary.com/deg2szdqf/image/upload/v1773579970/ChatGPT_Image_Mar_15_2026_09_05_53_AM_lmwgpg.png',
+  'https://res.cloudinary.com/deg2szdqf/image/upload/v1773580212/ChatGPT_Image_Mar_15_2026_09_10_05_AM_blr9op.png',
+]
+
+function getDemoMediaForIndex(index: number): { cover_image_url: string; images: string[] } {
+  const pool = DEMO_IMAGE_URLS
+  const len = pool.length
+  // Safety: fall back to empty strings if pool is misconfigured, but keep behavior deterministic.
+  if (len === 0) {
+    return { cover_image_url: '', images: [] }
+  }
+  const cover = pool[index % len]
+  const images: string[] = [cover]
+  if (len > 1) {
+    images.push(pool[(index + 1) % len])
+  }
+  return { cover_image_url: cover, images }
+}
+
 interface ZipResolution {
   zip: string
   lat: number
@@ -80,6 +105,7 @@ export default function TestSalesGenerator() {
     const dateStr = saleDate.toISOString().split('T')[0]
     const baseTitle = TITLES[index % TITLES.length]
     const title = `${baseTitle} - ${status}`
+    const media = getDemoMediaForIndex(index)
 
     const saleData = {
       title,
@@ -96,6 +122,8 @@ export default function TestSalesGenerator() {
       time_end: '17:00:00',
       status,
       pricing_mode: 'negotiable',
+      cover_image_url: media.cover_image_url,
+      images: media.images,
     }
 
     const response = await fetch('/api/sales', {

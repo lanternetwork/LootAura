@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { getCsrfHeaders } from '@/lib/csrf-client'
-import { deterministicScatter, scatterSeed, normalizeZipForValidation, batchStatuses, buildBatchReport, buildCreatedSaleFromCreateResponse, type BatchReport, type CreatedSale } from '@/lib/admin/testSalesSpread'
+import { deterministicScatter, scatterSeed, normalizeZipForValidation, batchStatuses, buildBatchReport, buildCreatedSaleFromCreateResponse, isCompleteZipResolution, type BatchReport, type CreatedSale } from '@/lib/admin/testSalesSpread'
 
 const MAX_SALES = 50
 const MIN_SALES = 1
@@ -139,6 +139,16 @@ export default function TestSalesGenerator() {
       if (!geo) {
         setError('ZIP code not found. Try another ZIP or check the geocoding service.')
         setProgress(null)
+        return
+      }
+
+      if (!isCompleteZipResolution(geo)) {
+        setError('ZIP resolved to incomplete location data (missing or invalid city/state). Use a ZIP that returns full location, or try another ZIP.')
+        setReport(
+          buildBatchReport(0, 0, geo.zip, geo.city ?? '', geo.state ?? '', null)
+        )
+        setProgress(null)
+        setLoading(false)
         return
       }
 

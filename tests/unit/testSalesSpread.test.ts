@@ -7,6 +7,7 @@ import {
   scatterSeed,
   buildBatchReport,
   buildCreatedSaleFromCreateResponse,
+  isCompleteZipResolution,
 } from '@/lib/admin/testSalesSpread'
 
 describe('normalizeZipForValidation (ZIP validation)', () => {
@@ -69,6 +70,37 @@ describe('batchStatuses (count and published-only shape)', () => {
     expect(s5.filter((x) => x === 'published')).toHaveLength(3)
     expect(s5.filter((x) => x === 'draft')).toHaveLength(1)
     expect(s5.filter((x) => x === 'archived')).toHaveLength(1)
+  })
+})
+
+describe('isCompleteZipResolution (generator fail-fast guard)', () => {
+  it('returns true when city and state are present and valid', () => {
+    expect(isCompleteZipResolution({ city: 'West Hollywood', state: 'CA' })).toBe(true)
+    expect(isCompleteZipResolution({ city: 'Louisville', state: 'KY' })).toBe(true)
+    expect(isCompleteZipResolution({ city: 'Beverly Hills', state: 'CA' })).toBe(true)
+  })
+
+  it('returns false when city is missing, blank, or Unknown', () => {
+    expect(isCompleteZipResolution({ city: '', state: 'CA' })).toBe(false)
+    expect(isCompleteZipResolution({ city: 'Unknown', state: 'CA' })).toBe(false)
+    expect(isCompleteZipResolution({ city: '   ', state: 'CA' })).toBe(false)
+    expect(isCompleteZipResolution({ state: 'CA' })).toBe(false)
+    expect(isCompleteZipResolution({ city: null, state: 'CA' })).toBe(false)
+  })
+
+  it('returns false when state is missing, blank, or too short', () => {
+    expect(isCompleteZipResolution({ city: 'West Hollywood', state: '' })).toBe(false)
+    expect(isCompleteZipResolution({ city: 'West Hollywood', state: '   ' })).toBe(false)
+    expect(isCompleteZipResolution({ city: 'West Hollywood', state: 'C' })).toBe(false)
+    expect(isCompleteZipResolution({ city: 'West Hollywood' })).toBe(false)
+    expect(isCompleteZipResolution({ city: 'West Hollywood', state: null })).toBe(false)
+  })
+
+  it('zero create attempts: report shape when guard blocks (requested 0, succeeded 0)', () => {
+    const report = buildBatchReport(0, 0, '90069', 'Unknown', '', null)
+    expect(report.requested).toBe(0)
+    expect(report.succeeded).toBe(0)
+    expect(report.failureMessage).toBeNull()
   })
 })
 

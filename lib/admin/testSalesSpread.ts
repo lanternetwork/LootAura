@@ -18,6 +18,24 @@ export interface CreatedSale {
 }
 
 /**
+ * Whether resolved ZIP metadata is complete enough for sale creation (admin Test Sales Generator).
+ * Matches /api/sales requirement: state must be present and length >= 2; city must be present and not generic.
+ */
+export function isCompleteZipResolution(geo: {
+  city?: string | null
+  state?: string | null
+}): boolean {
+  const cityOk =
+    geo.city != null &&
+    typeof geo.city === 'string' &&
+    geo.city.trim() !== '' &&
+    geo.city.trim() !== 'Unknown'
+  const stateOk =
+    typeof geo.state === 'string' && geo.state.trim().length >= 2
+  return cityOk && stateOk
+}
+
+/**
  * Build CreatedSale from create response so the admin generator never has undefined in the list.
  * API returns only { ok, saleId } (or saleId as id). Throws if no id.
  */

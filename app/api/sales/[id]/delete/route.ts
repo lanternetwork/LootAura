@@ -35,7 +35,38 @@ async function deleteHandler(req: NextRequest, { params }: { params: { id: strin
     .eq('owner_id', user.user.id)
   
   if (error) {
-    console.error('[SALES/DELETE] Error deleting sale:', error)
+    // Log structured error details for diagnostics (no change to external behavior)
+    try {
+      const { logger } = await import('@/lib/log')
+      const errorCode = (error as any)?.code || 'UNKNOWN'
+      const errorMessage = (error as any)?.message || String(error)
+      const errorDetails = (error as any)?.details || null
+      const errorHint = (error as any)?.hint || null
+
+      logger.error(
+        'Error deleting sale',
+        error instanceof Error ? error : new Error(errorMessage),
+        {
+          component: 'sales/delete',
+          operation: 'DELETE',
+          saleId,
+          userId: user.user.id,
+          errorCode,
+          errorMessage,
+          errorDetails,
+          errorHint,
+        }
+      )
+    } catch (logErr) {
+      // Fallback to console logging if structured logger import fails
+      // eslint-disable-next-line no-console
+      console.error('[SALES/DELETE] Error deleting sale (logging fallback):', {
+        saleId,
+        userId: user.user.id,
+        error,
+        logErr,
+      })
+    }
     return NextResponse.json({ ok: false, code: 'DELETE_FAILED', error: 'Failed to delete sale' }, { status: 500 })
   }
   

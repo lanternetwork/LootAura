@@ -285,7 +285,13 @@ async function zipHandler(request: NextRequest) {
       '78723': { lat: 30.2672, lng: -97.7431, city: 'Austin', state: 'TX' },
       '97211': { lat: 45.5152, lng: -122.6784, city: 'Portland', state: 'OR' },
       '10001': { lat: 40.7505, lng: -73.9934, city: 'New York', state: 'NY' },
+      // Los Angeles area (demo / Test Sales Generator)
+      '90069': { lat: 34.0900, lng: -118.3856, city: 'West Hollywood', state: 'CA' },
+      '90028': { lat: 34.0996, lng: -118.3262, city: 'Los Angeles', state: 'CA' },
+      '90046': { lat: 34.0983, lng: -118.3608, city: 'West Hollywood', state: 'CA' },
+      '90048': { lat: 34.0736, lng: -118.3712, city: 'West Hollywood', state: 'CA' },
       '90210': { lat: 34.0901, lng: -118.4065, city: 'Beverly Hills', state: 'CA' },
+      '90211': { lat: 34.0670, lng: -118.3842, city: 'Beverly Hills', state: 'CA' },
       '60601': { lat: 41.8781, lng: -87.6298, city: 'Chicago', state: 'IL' },
       '33101': { lat: 25.7617, lng: -80.1918, city: 'Miami', state: 'FL' },
       '30301': { lat: 33.7490, lng: -84.3880, city: 'Atlanta', state: 'GA' },

@@ -130,93 +130,8 @@ async function zipHandler(request: NextRequest) {
       }, { status: 400 })
     }
     
-    // Check cache first
-    const cachedResult = getCachedZip(normalizedZip)
-    if (cachedResult) {
-      console.log('[ZIP] source=cache status=ok', {
-        input: escapeForLogging(rawZip),
-        normalized: escapeForLogging(normalizedZip)
-      })
-      return NextResponse.json({
-        ...cachedResult,
-        source: 'cache'
-      }, {
-        headers: {
-          'Cache-Control': 'public, max-age=60'
-        }
-      })
-    }
-    
-    // 1. Try local lookup first (exact TEXT match)
-    console.log('[ZIP] source=local', {
-      input: escapeForLogging(rawZip),
-      normalized: escapeForLogging(normalizedZip)
-    })
-    // Read from base table via schema-scoped client
-    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-    const db = await getRlsDb()
-    const { data: localData, error: localError } = await fromBase(db, 'zipcodes')
-      .select('zip, lat, lng, city, state')
-      .eq('zip', normalizedZip) // TEXT comparison, no parseInt
-      .single()
-    
-    // Log database lookup results for debugging
-    console.log('[ZIP] database lookup result:', {
-      input: escapeForLogging(rawZip),
-      normalized: escapeForLogging(normalizedZip),
-      hasData: !!localData,
-      hasError: !!localError,
-      error: localError?.message
-    })
-    
-    if (!localError && localData) {
-      console.log('[ZIP] source=local status=ok', {
-        input: escapeForLogging(rawZip),
-        normalized: escapeForLogging(normalizedZip)
-      })
-      const result = {
-        ok: true,
-        zip: localData.zip,
-        lat: localData.lat,
-        lng: localData.lng,
-        city: localData.city,
-        state: localData.state,
-        source: 'local'
-      }
-      
-      // Cache the result
-      setCachedZip(normalizedZip, result)
-      
-      // Track ZIP usage for authenticated users (non-blocking)
-      // This helps determine primary ZIP for featured email selection
-      try {
-        const supabase = createSupabaseServerClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          // Increment ZIP usage (fire and forget - don't block response)
-          const { incrementZipUsage } = await import('@/lib/data/zipUsage')
-          incrementZipUsage(user.id, normalizedZip).catch((err) => {
-            // Silently fail - ZIP tracking is non-critical
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.warn('[ZIP] Failed to track ZIP usage:', err)
-            }
-          })
-        }
-      } catch (trackingError) {
-        // Silently fail - ZIP tracking is non-critical
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.warn('[ZIP] Failed to track ZIP usage:', trackingError)
-        }
-      }
-      
-      return NextResponse.json(result, {
-        headers: {
-          'Cache-Control': 'public, max-age=86400'
-        }
-      })
-    }
-    
-    // 2. Hardcoded fallback for common ZIP codes
+    // 1. Hardcoded fallback for common/demo ZIP codes
+    // NOTE: Hardcoded ZIPs (including LA demo ZIPs) take precedence over stale local/cache data.
     const hardcodedZips: Record<string, { lat: number; lng: number; city: string; state: string }> = {
       // Louisville, KY
       '40204': { lat: 38.2380249, lng: -85.7246945, city: 'Louisville', state: 'KY' },
@@ -324,8 +239,94 @@ async function zipHandler(request: NextRequest) {
         }
       })
     }
-
-    // 3. Fallback to Nominatim
+    
+    // 2. Check cache (local DB results only)
+    const cachedResult = getCachedZip(normalizedZip)
+    if (cachedResult) {
+      console.log('[ZIP] source=cache status=ok', {
+        input: escapeForLogging(rawZip),
+        normalized: escapeForLogging(normalizedZip)
+      })
+      return NextResponse.json({
+        ...cachedResult,
+        source: 'cache'
+      }, {
+        headers: {
+          'Cache-Control': 'public, max-age=60'
+        }
+      })
+    }
+    
+    // 3. Try local lookup (public.zipcodes_v2) next
+    console.log('[ZIP] source=local', {
+      input: escapeForLogging(rawZip),
+      normalized: escapeForLogging(normalizedZip)
+    })
+    // Read from base table via schema-scoped client
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const db = await getRlsDb()
+    const { data: localData, error: localError } = await fromBase(db, 'zipcodes')
+      .select('zip, lat, lng, city, state')
+      .eq('zip', normalizedZip) // TEXT comparison, no parseInt
+      .single()
+    
+    // Log database lookup results for debugging
+    console.log('[ZIP] database lookup result:', {
+      input: escapeForLogging(rawZip),
+      normalized: escapeForLogging(normalizedZip),
+      hasData: !!localData,
+      hasError: !!localError,
+      error: localError?.message
+    })
+    
+    if (!localError && localData) {
+      console.log('[ZIP] source=local status=ok', {
+        input: escapeForLogging(rawZip),
+        normalized: escapeForLogging(normalizedZip)
+      })
+      const result = {
+        ok: true,
+        zip: localData.zip,
+        lat: localData.lat,
+        lng: localData.lng,
+        city: localData.city,
+        state: localData.state,
+        source: 'local'
+      }
+      
+      // Cache the result
+      setCachedZip(normalizedZip, result)
+      
+      // Track ZIP usage for authenticated users (non-blocking)
+      // This helps determine primary ZIP for featured email selection
+      try {
+        const supabase = createSupabaseServerClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Increment ZIP usage (fire and forget - don't block response)
+          const { incrementZipUsage } = await import('@/lib/data/zipUsage')
+          incrementZipUsage(user.id, normalizedZip).catch((err) => {
+            // Silently fail - ZIP tracking is non-critical
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.warn('[ZIP] Failed to track ZIP usage:', err)
+            }
+          })
+        }
+      } catch (trackingError) {
+        // Silently fail - ZIP tracking is non-critical
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[ZIP] Failed to track ZIP usage:', trackingError)
+        }
+      }
+      
+      return NextResponse.json(result, {
+        headers: {
+          'Cache-Control': 'public, max-age=86400'
+        }
+      })
+    }
+    
+    // 4. Fallback to Nominatim
     console.log('[ZIP] source=nominatim', {
       input: escapeForLogging(rawZip),
       normalized: escapeForLogging(normalizedZip)

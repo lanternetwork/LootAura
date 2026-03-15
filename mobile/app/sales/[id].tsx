@@ -568,10 +568,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Fixed Footer Styles (matches web sticky action bar exactly)
+  // minHeight + zIndex/elevation ensure footer stays visible and tappable above WebView
   footer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',  // bg-white/95
+    minHeight: 72,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',  // border-gray-200
+    zIndex: 10,
+    elevation: 10,
   },
   footerContent: {
     flexDirection: 'row',

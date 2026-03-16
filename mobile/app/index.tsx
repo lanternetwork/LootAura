@@ -1454,7 +1454,7 @@ export default function HomeScreen() {
                           isSaleDetail = true;
                           saleId = String(saleIdAttr);
                           // Normalize pathname so native shell sees a concrete detail path
-                          pathname = `/sales/${saleId}`;
+                          pathname = '/sales/' + saleId;
                         }
                       } catch (e) {
                         // Fallback detection failed - remain on URL-only route state

@@ -1436,11 +1436,30 @@ export default function HomeScreen() {
                 
                 const reportRouteState = () => {
                   try {
-                    const pathname = window.location.pathname;
+                    let pathname = window.location.pathname;
                     const search = window.location.search;
-                    const saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
-                    const isSaleDetail = !!saleDetailMatch;
-                    const saleId = isSaleDetail ? saleDetailMatch[1] : null;
+                    
+                    // Primary detection: URL-based sale detail (/sales/:id)
+                    let saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
+                    let isSaleDetail = !!saleDetailMatch;
+                    let saleId = isSaleDetail ? saleDetailMatch[1] : null;
+                    
+                    // Fallback detection: DOM-based when URL does not change (mobile detail overlay)
+                    if (!isSaleDetail) {
+                      try {
+                        const mobileDetailEl = document.querySelector('[data-mobile-sale-detail=\"true\"]');
+                        const saleIdAttr = mobileDetailEl && mobileDetailEl.getAttribute('data-sale-id');
+                        
+                        if (mobileDetailEl && saleIdAttr) {
+                          isSaleDetail = true;
+                          saleId = String(saleIdAttr);
+                          // Normalize pathname so native shell sees a concrete detail path
+                          pathname = `/sales/${saleId}`;
+                        }
+                      } catch (e) {
+                        // Fallback detection failed - remain on URL-only route state
+                      }
+                    }
                     
                     // Diagnostic: Check if in-app flag is set
                     const inAppFlag = window.__LOOTAURA_IN_APP === true;

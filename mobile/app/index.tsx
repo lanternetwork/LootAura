@@ -1744,9 +1744,11 @@ export default function HomeScreen() {
                   ]}
                   onPress={handleFavoriteToggle}
                 >
-                  <Text style={styles.saveButtonText}>
-                    {isFavorited ? 'Saved' : 'Save'}
-                  </Text>
+                  <MaterialCommunityIcons 
+                    name={isFavorited ? "heart" : "heart-outline"} 
+                    size={20} 
+                    color={isFavorited ? '#B91C1C' : '#374151'}
+                  />
                 </TouchableOpacity>
 
                 {/* Share Button (Secondary) */}
@@ -1754,7 +1756,7 @@ export default function HomeScreen() {
                   style={styles.shareButton}
                   onPress={handleShare}
                 >
-                  <Text style={styles.shareButtonText}>Share</Text>
+                  <Feather name="share-2" size={20} color="#3A2268" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1970,11 +1972,6 @@ const styles = StyleSheet.create({
   saveButtonInactive: {
     backgroundColor: '#F3F4F6',
   },
-  saveButtonText: {
-    color: '#374151',
-    fontSize: 12,
-    fontWeight: '500',
-  },
   shareButton: {
     width: 48,
     height: 48,
@@ -1983,11 +1980,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(147, 51, 234, 0.15)',
     borderRadius: 8,
-  },
-  shareButtonText: {
-    color: '#3A2268',
-    fontSize: 12,
-    fontWeight: '500',
   },
 });
 

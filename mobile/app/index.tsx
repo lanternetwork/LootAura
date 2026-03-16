@@ -126,6 +126,7 @@ export default function HomeScreen() {
     hasRNBridge: null,
   });
   const [explicitSaleDetailActive, setExplicitSaleDetailActive] = useState(false);
+  const [footerIconsReady, setFooterIconsReady] = useState(false);
   
   // Footer state
   const [isFavorited, setIsFavorited] = useState(false);
@@ -183,6 +184,30 @@ export default function HomeScreen() {
     setDiagConsoleEvents((prev: DiagEvent[]) =>
       [...prev, { timestamp: Date.now(), messageType, payload: sanitized }].slice(-DIAG_CONSOLE_RING_SIZE)
     );
+  }, []);
+
+  // Footer-local safeguard: ensure vector icon fonts are loaded before rendering footer icons
+  useEffect(() => {
+    let cancelled = false;
+    const loadFooterIconFonts = async () => {
+      try {
+        await Promise.all([
+          (Feather as any).loadFont?.(),
+          (MaterialCommunityIcons as any).loadFont?.(),
+        ]);
+        if (!cancelled) {
+          setFooterIconsReady(true);
+        }
+      } catch (e) {
+        if (__DEV__) {
+          console.warn('[FOOTER_ICONS] Failed to load vector icon fonts for footer', e);
+        }
+      }
+    };
+    loadFooterIconFonts();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Performance instrumentation helper (debug-only)
@@ -1732,7 +1757,9 @@ export default function HomeScreen() {
                   style={styles.navigateButton}
                   onPress={handleNavigate}
                 >
-                  <Feather name="map-pin" size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
+                  {footerIconsReady && (
+                    <Feather name="map-pin" size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
+                  )}
                   <Text style={styles.navigateButtonText}>Navigate</Text>
                 </TouchableOpacity>
 
@@ -1744,11 +1771,13 @@ export default function HomeScreen() {
                   ]}
                   onPress={handleFavoriteToggle}
                 >
-                  <MaterialCommunityIcons 
-                    name={isFavorited ? "heart" : "heart-outline"} 
-                    size={20} 
-                    color={isFavorited ? '#B91C1C' : '#374151'}
-                  />
+                  {footerIconsReady && (
+                    <MaterialCommunityIcons 
+                      name={isFavorited ? "heart" : "heart-outline"} 
+                      size={20} 
+                      color={isFavorited ? '#B91C1C' : '#374151'}
+                    />
+                  )}
                 </TouchableOpacity>
 
                 {/* Share Button (Secondary) */}
@@ -1756,7 +1785,9 @@ export default function HomeScreen() {
                   style={styles.shareButton}
                   onPress={handleShare}
                 >
-                  <Feather name="share-2" size={20} color="#3A2268" />
+                  {footerIconsReady && (
+                    <Feather name="share-2" size={20} color="#3A2268" />
+                  )}
                 </TouchableOpacity>
               </View>
             </View>

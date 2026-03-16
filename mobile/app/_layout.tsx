@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import Constants from 'expo-constants';
-import { useFonts } from 'expo-font';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Guarded Sentry init: production only, when EXPO_PUBLIC_SENTRY_DSN is set.
@@ -118,15 +117,24 @@ export default function RootLayout() {
     };
   }, []);
 
-  const [fontsLoaded] = useFonts({
-    ...Feather.font,
-    ...MaterialCommunityIcons.font,
-  });
+  // Non-blocking icon font loading: fire-and-forget so startup is never gated on fonts
+  useEffect(() => {
+    const loadFonts = async () => {
+      try {
+        await Promise.all([
+          // loadFont is provided by @expo/vector-icons; calls through to Font.loadAsync under the hood
+          (Feather as any).loadFont?.(),
+          (MaterialCommunityIcons as any).loadFont?.(),
+        ]);
+      } catch (e) {
+        if (__DEV__) {
+          console.warn('[Icons] Failed to load vector icon fonts', e);
+        }
+      }
+    };
 
-  // Optionally keep splash visible until fonts are ready; RootLayout only renders content when fonts are loaded
-  if (!fontsLoaded) {
-    return null;
-  }
+    loadFonts();
+  }, []);
 
   return (
     <SafeAreaProvider>

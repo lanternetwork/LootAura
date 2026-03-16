@@ -1444,18 +1444,15 @@ export default function HomeScreen() {
                     let isSaleDetail = !!saleDetailMatch;
                     let saleId = isSaleDetail ? saleDetailMatch[1] : null;
                     
-                    // Fallback detection: DOM + Next data when URL does not change (mobile detail overlay)
+                    // Fallback detection: DOM-based when URL does not change (mobile detail overlay)
                     if (!isSaleDetail) {
                       try {
                         const mobileDetailEl = document.querySelector('[data-mobile-sale-detail=\"true\"]');
-                        const nextData = (window as any).__NEXT_DATA__ as any | undefined;
-                        const pageProps = nextData && nextData.props && (nextData.props.pageProps || nextData.props?.__N_SSP && nextData.props?.pageProps);
-                        const saleFromProps = pageProps && (pageProps.sale || pageProps.saleDetail || pageProps.salePageProps?.sale);
-                        const saleIdFromProps = saleFromProps && saleFromProps.id;
+                        const saleIdAttr = mobileDetailEl && mobileDetailEl.getAttribute('data-sale-id');
                         
-                        if (mobileDetailEl && saleIdFromProps) {
+                        if (mobileDetailEl && saleIdAttr) {
                           isSaleDetail = true;
-                          saleId = String(saleIdFromProps);
+                          saleId = String(saleIdAttr);
                           // Normalize pathname so native shell sees a concrete detail path
                           pathname = `/sales/${saleId}`;
                         }

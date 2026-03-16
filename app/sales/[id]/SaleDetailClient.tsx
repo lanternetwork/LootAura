@@ -667,6 +667,7 @@ export default function SaleDetailClient({
       {/* Mobile Layout */}
       <div 
         data-mobile-sale-detail="true"
+        data-sale-id={sale.id}
         className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : isNativeFooter ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}
       >
         {/* Back to map button - Mobile only */}

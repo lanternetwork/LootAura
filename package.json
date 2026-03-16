@@ -1,7 +1,7 @@
 {
   "name": "yard-sale-finder",
   "private": true,
-  "version": "209",
+  "version": "210",
   "description": "Find yard sales near you",
   "engines": {
     "node": "^20"

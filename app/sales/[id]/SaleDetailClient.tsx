@@ -280,6 +280,43 @@ export default function SaleDetailClient({
     }
   }, [sale.id])
   
+  // Explicit bridge: notify native shell when sale detail becomes visible/hidden
+  useEffect(() => {
+    if (typeof window === 'undefined' || !(window as any).ReactNativeWebView) {
+      return
+    }
+    
+    const message = {
+      type: 'SALE_DETAIL_STATE',
+      isSaleDetail: true,
+      saleId: sale.id,
+      pathname: `/sales/${sale.id}`
+    }
+    
+    try {
+      ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
+    } catch {
+      // Ignore bridge failures
+    }
+    
+    return () => {
+      if (typeof window === 'undefined' || !(window as any).ReactNativeWebView) {
+        return
+      }
+      const resetMessage = {
+        type: 'SALE_DETAIL_STATE',
+        isSaleDetail: false,
+        saleId: null,
+        pathname: '/sales'
+      }
+      try {
+        ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(resetMessage))
+      } catch {
+        // Ignore bridge failures
+      }
+    }
+  }, [sale.id])
+  
   // Send initial favoriteState to native when component mounts or favorite state changes
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {

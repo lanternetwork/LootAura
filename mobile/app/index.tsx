@@ -125,6 +125,7 @@ export default function HomeScreen() {
     inAppFlag: null,
     hasRNBridge: null,
   });
+  const [explicitSaleDetailActive, setExplicitSaleDetailActive] = useState(false);
   
   // Footer state
   const [isFavorited, setIsFavorited] = useState(false);
@@ -863,22 +864,63 @@ export default function HomeScreen() {
           setLastMapPerfDiag(mapPerfJson);
           pushDiagEvent('MAP_PERF_DIAG', mapPerfJson);
         }
+      } else if (message.type === 'SALE_DETAIL_STATE') {
+        const { isSaleDetail, saleId, pathname } = message;
+        const active = isSaleDetail === true;
+        setExplicitSaleDetailActive(active);
+        setRouteState((prev) => {
+          const next = {
+            pathname: pathname || prev.pathname || '/',
+            search: prev.search,
+            isSaleDetail: active,
+            saleId: active ? (saleId ?? prev.saleId ?? null) : null,
+            inAppFlag: prev.inAppFlag,
+            hasRNBridge: prev.hasRNBridge,
+          };
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent(
+              'SALE_DETAIL_STATE',
+              JSON.stringify(
+                buildRouteStateDiagPayload({
+                  pathname: next.pathname,
+                  search: next.search,
+                  isSaleDetail: next.isSaleDetail,
+                  saleId: next.saleId,
+                  inAppFlag: next.inAppFlag,
+                  hasRNBridge: next.hasRNBridge,
+                })
+              )
+            );
+          }
+          return next;
+        });
       } else if (message.type === 'ROUTE_STATE') {
         // Route state update from web
         const { pathname, search, isSaleDetail, saleId, inAppFlag, hasRNBridge } = message;
-        setRouteState({
-          pathname: pathname || '/',
-          search: search || '',
-          isSaleDetail: isSaleDetail === true,
-          saleId: saleId || null,
-          inAppFlag: inAppFlag === true,
-          hasRNBridge: hasRNBridge === true,
+        setRouteState((prev) => {
+          const explicitActive = explicitSaleDetailActive;
+          const effectiveIsSaleDetail = isSaleDetail === true || explicitActive;
+          const effectiveSaleId =
+            isSaleDetail === true
+              ? saleId || prev.saleId || null
+              : explicitActive
+                ? prev.saleId || null
+                : saleId || null;
+          const next = {
+            pathname: pathname || prev.pathname || '/',
+            search: search || prev.search || '',
+            isSaleDetail: effectiveIsSaleDetail,
+            saleId: effectiveSaleId,
+            inAppFlag: inAppFlag === true,
+            hasRNBridge: hasRNBridge === true,
+          };
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
+          }
+          return next;
         });
-        if (isDiagnosticsEnabled) {
-          pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
-        }
         // Reset favorite state when leaving sale detail
-        if (!isSaleDetail) {
+        if (!(isSaleDetail === true || explicitSaleDetailActive)) {
           setIsFavorited(false);
         }
       } else if (message.type === 'favoriteState') {

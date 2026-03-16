@@ -1434,6 +1434,17 @@ export default function HomeScreen() {
                   }
                 };
                 
+                // ROUTE_STATE retry: bounded re-check for DOM sale-detail marker when URL does not change
+                let routeStateRetryCount = 0;
+                const MAX_ROUTE_STATE_RETRIES = 3;
+                const scheduleRouteStateRetry = () => {
+                  if (routeStateRetryCount >= MAX_ROUTE_STATE_RETRIES) {
+                    return;
+                  }
+                  routeStateRetryCount += 1;
+                  setTimeout(reportRouteState, 150 * routeStateRetryCount);
+                };
+                
                 const reportRouteState = () => {
                   try {
                     let pathname = window.location.pathname;
@@ -1458,6 +1469,11 @@ export default function HomeScreen() {
                         }
                       } catch (e) {
                         // Fallback detection failed - remain on URL-only route state
+                      }
+                      
+                      // If still not a sale detail and marker not yet present, schedule a short-lived retry
+                      if (!isSaleDetail) {
+                        scheduleRouteStateRetry();
                       }
                     }
                     

@@ -1181,10 +1181,12 @@ export default function HomeScreen() {
       {/* Diagnostics Console - Only visible when diagnostics enabled; full JSON, no truncation */}
       {isDiagnosticsEnabled && (
         <View style={styles.diagnosticConsole} pointerEvents="box-none">
-          {/* Temporary: current footer state for native footer visibility diagnosis */}
-          <Text style={styles.diagnosticConsoleText} numberOfLines={2} selectable>
-            pathname={routeState.pathname || '(none)'} isSaleDetail={String(routeState.isSaleDetail)} saleId={routeState.saleId ?? '(null)'} loading={String(loading)} footerShow={String(routeState.isSaleDetail && !loading)}
-          </Text>
+          {/* Temporary: current footer state for native footer visibility diagnosis; wrapper reserves space so it is not clipped */}
+          <View style={styles.diagnosticConsoleFooterState}>
+            <Text style={styles.diagnosticConsoleText} numberOfLines={2} selectable>
+              pathname={routeState.pathname || '(none)'} isSaleDetail={String(routeState.isSaleDetail)} saleId={routeState.saleId ?? '(null)'} loading={String(loading)} footerShow={String(routeState.isSaleDetail && !loading)}
+            </Text>
+          </View>
           <View style={styles.diagnosticConsoleToolbar}>
             <TouchableOpacity
               style={[styles.diagnosticConsoleButton, diagConsoleViewMode === 'latest' && styles.diagnosticConsoleButtonActive]}
@@ -1766,7 +1768,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#FF0000',
   },
+  diagnosticConsoleFooterState: {
+    flexShrink: 0,
+    minHeight: 28,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
   diagnosticConsoleToolbar: {
+    flexShrink: 0,
     flexDirection: 'row',
     paddingHorizontal: 4,
     paddingVertical: 4,
@@ -1789,6 +1799,7 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   diagnosticConsoleScroll: {
+    flex: 1,
     maxHeight: 220,
   },
   diagnosticConsoleScrollContent: {

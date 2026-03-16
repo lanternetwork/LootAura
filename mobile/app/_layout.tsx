@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import Constants from 'expo-constants';
+import { useFonts } from 'expo-font';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Guarded Sentry init: production only, when EXPO_PUBLIC_SENTRY_DSN is set.
 {
@@ -115,6 +117,16 @@ export default function RootLayout() {
       splashFailsafeReport = null;
     };
   }, []);
+
+  const [fontsLoaded] = useFonts({
+    ...Feather.font,
+    ...MaterialCommunityIcons.font,
+  });
+
+  // Optionally keep splash visible until fonts are ready; RootLayout only renders content when fonts are loaded
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <SafeAreaProvider>

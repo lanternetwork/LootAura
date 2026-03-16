@@ -1181,12 +1181,6 @@ export default function HomeScreen() {
       {/* Diagnostics Console - Only visible when diagnostics enabled; full JSON, no truncation */}
       {isDiagnosticsEnabled && (
         <View style={styles.diagnosticConsole} pointerEvents="box-none">
-          {/* Temporary: current footer state for native footer visibility diagnosis; wrapper reserves space so it is not clipped */}
-          <View style={styles.diagnosticConsoleFooterState}>
-            <Text style={styles.diagnosticConsoleText} numberOfLines={2} selectable>
-              pathname={routeState.pathname || '(none)'} isSaleDetail={String(routeState.isSaleDetail)} saleId={routeState.saleId ?? '(null)'} loading={String(loading)} footerShow={String(routeState.isSaleDetail && !loading)}
-            </Text>
-          </View>
           <View style={styles.diagnosticConsoleToolbar}>
             <TouchableOpacity
               style={[styles.diagnosticConsoleButton, diagConsoleViewMode === 'latest' && styles.diagnosticConsoleButtonActive]}
@@ -1216,6 +1210,12 @@ export default function HomeScreen() {
             >
               <Text style={styles.diagnosticConsoleButtonText}>Copy</Text>
             </TouchableOpacity>
+          </View>
+          {/* Temporary: highly visible current footer state for native footer visibility diagnosis */}
+          <View style={styles.diagnosticConsoleFooterState}>
+            <Text style={styles.diagnosticConsoleFooterStateText} numberOfLines={2} selectable>
+              FOOTER STATE — pathname={routeState.pathname || '(none)'} isSaleDetail={String(routeState.isSaleDetail)} saleId={routeState.saleId ?? '(null)'} loading={String(loading)} footerShow={String(routeState.isSaleDetail && !loading)}
+            </Text>
           </View>
           <ScrollView
             style={styles.diagnosticConsoleScroll}
@@ -1770,10 +1770,12 @@ const styles = StyleSheet.create({
   },
   diagnosticConsoleFooterState: {
     flexShrink: 0,
-    minHeight: 28,
+    minHeight: 32,
     paddingHorizontal: 8,
-    paddingTop: 4,
-    paddingBottom: 2,
+    paddingVertical: 6,
+    backgroundColor: '#111827',
+    borderTopWidth: 1,
+    borderTopColor: '#4B5563',
   },
   diagnosticConsoleToolbar: {
     flexShrink: 0,
@@ -1810,6 +1812,12 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontSize: 10,
     fontFamily: 'monospace',
+  },
+  diagnosticConsoleFooterStateText: {
+    color: '#FBBF24',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
   // Sanitizer Rejection Banner
   rejectionBanner: {

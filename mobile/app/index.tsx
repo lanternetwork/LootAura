@@ -3,7 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  FooterNavigateIcon,
+  FooterSaveInactiveIcon,
+  FooterSaveActiveIcon,
+  FooterShareIcon,
+} from '../icons/FooterIcons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 import { getHideSplashOnce, setSplashFailsafeReport } from './_layout';
 import { isDiagnosticsEnabled as getDiagnosticsEnabled } from './utils/diagnosticsEnabled';
@@ -126,7 +131,6 @@ export default function HomeScreen() {
     hasRNBridge: null,
   });
   const [explicitSaleDetailActive, setExplicitSaleDetailActive] = useState(false);
-  const [footerIconsReady, setFooterIconsReady] = useState(false);
   
   // Footer state
   const [isFavorited, setIsFavorited] = useState(false);
@@ -184,30 +188,6 @@ export default function HomeScreen() {
     setDiagConsoleEvents((prev: DiagEvent[]) =>
       [...prev, { timestamp: Date.now(), messageType, payload: sanitized }].slice(-DIAG_CONSOLE_RING_SIZE)
     );
-  }, []);
-
-  // Footer-local safeguard: ensure vector icon fonts are loaded before rendering footer icons
-  useEffect(() => {
-    let cancelled = false;
-    const loadFooterIconFonts = async () => {
-      try {
-        await Promise.all([
-          (Feather as any).loadFont?.(),
-          (MaterialCommunityIcons as any).loadFont?.(),
-        ]);
-        if (!cancelled) {
-          setFooterIconsReady(true);
-        }
-      } catch (e) {
-        if (__DEV__) {
-          console.warn('[FOOTER_ICONS] Failed to load vector icon fonts for footer', e);
-        }
-      }
-    };
-    loadFooterIconFonts();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   // Performance instrumentation helper (debug-only)
@@ -1757,9 +1737,7 @@ export default function HomeScreen() {
                   style={styles.navigateButton}
                   onPress={handleNavigate}
                 >
-                  {footerIconsReady && (
-                    <Feather name="map-pin" size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
-                  )}
+                  <FooterNavigateIcon size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
                   <Text style={styles.navigateButtonText}>Navigate</Text>
                 </TouchableOpacity>
 
@@ -1771,12 +1749,10 @@ export default function HomeScreen() {
                   ]}
                   onPress={handleFavoriteToggle}
                 >
-                  {footerIconsReady && (
-                    <MaterialCommunityIcons 
-                      name={isFavorited ? "heart" : "heart-outline"} 
-                      size={20} 
-                      color={isFavorited ? '#B91C1C' : '#374151'}
-                    />
+                  {isFavorited ? (
+                    <FooterSaveActiveIcon size={20} color="#B91C1C" />
+                  ) : (
+                    <FooterSaveInactiveIcon size={20} color="#374151" />
                   )}
                 </TouchableOpacity>
 
@@ -1785,9 +1761,7 @@ export default function HomeScreen() {
                   style={styles.shareButton}
                   onPress={handleShare}
                 >
-                  {footerIconsReady && (
-                    <Feather name="share-2" size={20} color="#3A2268" />
-                  )}
+                  <FooterShareIcon size={20} color="#3A2268" />
                 </TouchableOpacity>
               </View>
             </View>

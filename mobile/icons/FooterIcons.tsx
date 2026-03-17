@@ -45,7 +45,7 @@ export const FooterSaveActiveIcon: React.FC<IconProps> = ({ size = 20, color = '
 export const FooterShareIcon: React.FC<IconProps> = ({ size = 20, color = '#3A2268', style }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
     <Path
-      d="M12 5m-2.5 0a2.5 2.5 0 1 1 5 0a2.5 2.5 0 1 1-5 0zM8 19m-2.5 0a2.5 2.5 0 1 1 5 0a2.5 2.5 0 1 1-5 0zM16 19m-2.5 0a2.5 2.5 0 1 1 5 0a2.5 2.5 0 1 1-5 0zM12 7.5L9 17M12 7.5L15 17"
+      d="M6 12m-2.5 0a2.5 2.5 0 1 1 5 0a2.5 2.5 0 1 1-5 0zM18 6m-2.5 0a2.5 2.5 0 1 1 5 0a2.5 2.5 0 1 1-5 0zM18 18m-2.5 0a2.5 2.5 0 1 1 5 0a2.5 2.5 0 1 1-5 0zM6 12L18 6M6 12L18 18"
       fill="none"
       stroke={color}
       strokeWidth={2.5}

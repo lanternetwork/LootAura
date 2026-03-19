@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
 import { isDebugEnabled } from '@/lib/debug'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
@@ -27,6 +26,7 @@ import ReportSaleModal from '@/components/moderation/ReportSaleModal'
 import { BadgeCheck } from 'lucide-react'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 import { isNativeApp } from '@/lib/runtime/isNativeApp'
+import { queryClient } from '@/lib/queryClient'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -248,7 +248,6 @@ export default function SaleDetailClient({
   const { data: currentUser } = useAuth()
   const { data: favoriteSales = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
-  const queryClient = useQueryClient()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)

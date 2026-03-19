@@ -203,6 +203,22 @@ export function useToggleFavorite() {
   const queryClient = useQueryClient()
   const { data: user } = useAuth()
 
+  const tryFindSaleInCache = (saleId: string): Sale | null => {
+    // Best-effort: attempt to reuse existing cached sale objects so the favorites list can update immediately.
+    // This is intentionally conservative: if we can't find a full `Sale`, we fall back to invalidation/refetch.
+    const exactSale = queryClient.getQueryData(['sale', saleId] as any) as Sale | undefined
+    if (exactSale && exactSale.id === saleId) return exactSale
+
+    const salesLists = queryClient.getQueriesData({ queryKey: ['sales'], exact: false } as any) as Array<[any, any]>
+    for (const [, data] of salesLists) {
+      if (!Array.isArray(data)) continue
+      const found = data.find((s: any) => s && s.id === saleId)
+      if (found) return found as Sale
+    }
+
+    return null
+  }
+
   return useMutation({
     mutationFn: async ({ saleId, isFavorited: _isFavorited }: { saleId: string; isFavorited: boolean }) => {
       if (!user) throw new Error('Please sign in to save favorites')
@@ -225,10 +241,34 @@ export function useToggleFavorite() {
       const result = await response.json()
       return result
     },
-    onSuccess: () => {
-      // Invalidate with user ID to match useFavorites query key
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: ['favorites', user.id] })
+    onSuccess: (result: any, variables: { saleId: string; isFavorited: boolean }) => {
+      const userId = user?.id
+      const saleId = variables.saleId
+      const favoritedFromServer = typeof result?.favorited === 'boolean' ? result.favorited : variables.isFavorited
+
+      // Immediate cache sync: ensures Favorites tab can reflect the toggle without waiting for refetch.
+      if (userId) {
+        const saleFromCache = favoritedFromServer ? tryFindSaleInCache(saleId) : null
+
+        queryClient.setQueryData(['favorites', userId], (old: Sale[] | undefined) => {
+          const prev = Array.isArray(old) ? old : []
+          const exists = prev.some(s => s?.id === saleId)
+
+          if (favoritedFromServer) {
+            if (exists) return prev
+            if (!saleFromCache) return prev // can't construct a correct Sale object -> rely on refetch
+            return [saleFromCache, ...prev]
+          }
+
+          // Unfavorite
+          if (!exists) return prev
+          return prev.filter(s => s?.id !== saleId)
+        })
+      }
+
+      // Safety net: invalidate with user ID to match useFavorites query key
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ['favorites', userId] })
       }
       // Also invalidate general favorites queries
       queryClient.invalidateQueries({ queryKey: ['favorites'] })

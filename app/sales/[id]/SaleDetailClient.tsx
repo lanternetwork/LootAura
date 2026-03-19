@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { isDebugEnabled } from '@/lib/debug'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
@@ -247,6 +248,7 @@ export default function SaleDetailClient({
   const { data: currentUser } = useAuth()
   const { data: favoriteSales = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
+  const queryClient = useQueryClient()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)
@@ -581,6 +583,26 @@ export default function SaleDetailClient({
       // Update with actual result (in case of any discrepancy)
       const newFavorited = result.favorited ?? !wasFavorited
       setIsFavorited(newFavorited)
+      
+      // Keep shared favorites cache in sync so the Favorites tab can reflect the toggle immediately.
+      // SaleDetailClient already has the full `sale` object via props, which is needed to construct `Sale[]`.
+      const userId = currentUser?.id
+      if (userId) {
+        const saleForFavorites = sale as unknown as Sale
+        queryClient.setQueryData(['favorites', userId], (old: Sale[] | undefined) => {
+          const prev = Array.isArray(old) ? old : []
+          const exists = prev.some(s => s?.id === saleForFavorites.id)
+
+          if (newFavorited) {
+            if (exists) return prev
+            return [saleForFavorites, ...prev]
+          }
+
+          // Unfavorite
+          if (!exists) return prev
+          return prev.filter(s => s?.id !== saleForFavorites.id)
+        })
+      }
       
       // Track save event if favoriting (not unfavoriting)
       if (newFavorited && !wasFavorited) {

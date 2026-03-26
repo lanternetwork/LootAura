@@ -107,9 +107,11 @@
 @import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }
 
-/* In-app WebView only: match native splash background to reduce flash (gated by isInAppUserAgent in layout) */
+/* In-app WebView body background:
+   - Default to the same light neutral background as the main web app
+   - Map/sales and other routes are responsible for any darker route-specific theming */
 body.in-app-shell {
-  background-color: #3A2268;
+  background-color: var(--bg-neutral);
 }
 
 /* Hide scrollbar but allow scrolling */

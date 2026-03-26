@@ -1,6 +1,6 @@
 /**
- * Regression: splash must be hidden only from the APP_READY message handler,
- * not from onLoadEnd or navState.loading === false, to avoid flash before first paint.
+ * Regression: native splash is hidden only from RN boot screen onLayout (handleBootScreenLayout).
+ * APP_READY and loading=false+delay trigger boot screen fade (startBootScreenFadeOut), not splash hide.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -10,22 +10,47 @@ import fs from 'fs'
 const MOBILE_INDEX_PATH = path.join(__dirname, '../../mobile/app/index.tsx')
 
 describe('Splash hide invariant (native)', () => {
-  it('getHideSplashOnce() is only called in the APP_READY message handler', () => {
+  it('getHideSplashOnce() is called only from handleBootScreenLayout (boot screen onLayout)', () => {
     const content = fs.readFileSync(MOBILE_INDEX_PATH, 'utf-8')
 
-    // Must contain exactly one call to getHideSplashOnce() (the one in APP_READY path)
-    const getHideSplashOnceCalls = content.match(/getHideSplashOnce\(\)/g)
-    expect(getHideSplashOnceCalls).not.toBeNull()
-    expect(getHideSplashOnceCalls!.length).toBe(1)
+    expect(content).toContain('getHideSplashOnce()')
+    expect(content).toContain('handleBootScreenLayout')
+    const layoutHandler = content.slice(
+      content.indexOf('handleBootScreenLayout'),
+      content.indexOf('startBootScreenFadeOut')
+    )
+    expect(layoutHandler).toContain('getHideSplashOnce()')
+    expect(layoutHandler).toContain('nativeSplashHiddenByBootScreenRef')
 
-    // The single call must appear after the APP_READY handler check
-    const appReadyIndex = content.indexOf("message.type === 'APP_READY'")
-    expect(appReadyIndex).toBeGreaterThan(-1)
-    const getHideSplashOnceIndex = content.indexOf('getHideSplashOnce()')
-    expect(getHideSplashOnceIndex).toBeGreaterThan(appReadyIndex)
+    const appReadyIdx = content.indexOf("message.type === 'APP_READY'")
+    expect(appReadyIdx).toBeGreaterThan(-1)
+    const appReadyBlockEnd = content.indexOf("return; // Handled, don't process further", appReadyIdx)
+    const appReadyBlock = content.slice(appReadyIdx, appReadyBlockEnd)
+    expect(appReadyBlock).not.toContain('getHideSplashOnce()')
+    expect(appReadyBlock).toContain('startBootScreenFadeOut(\'APP_READY\')')
+  })
 
-    // Must NOT hide splash in handleLoadEnd (comment or call removed)
-    expect(content).not.toMatch(/Hide splash on earliest safe signal \(onLoadEnd\)/)
-    expect(content).not.toMatch(/Hide splash on earliest safe signal \(navState\.loading=false\)/)
+  it('APP_READY path uses short hold before fade (not same-tick)', () => {
+    const content = fs.readFileSync(MOBILE_INDEX_PATH, 'utf-8')
+    expect(content).toContain('BOOT_SCREEN_APP_READY_HOLD_MS')
+    const appReadyIdx = content.indexOf("message.type === 'APP_READY'")
+    const appReadyBlockEnd = content.indexOf("return; // Handled, don't process further", appReadyIdx)
+    const appReadyBlock = content.slice(appReadyIdx, appReadyBlockEnd)
+    expect(appReadyBlock).toContain('setTimeout')
+    expect(appReadyBlock).toContain('BOOT_SCREEN_APP_READY_HOLD_MS')
+    expect(appReadyBlock).toContain("startBootScreenFadeOut('APP_READY')")
+  })
+
+  it('loading=false path calls startBootScreenFadeOut(NATIVE_LOAD_DELAY), not getHideSplashOnce', () => {
+    const content = fs.readFileSync(MOBILE_INDEX_PATH, 'utf-8')
+    expect(content).toContain('SPLASH_POST_LOAD_DELAY_MS')
+    expect(content).toContain('splashDelayTimerRef')
+    expect(content).toContain('SPLASH_HIDDEN_NATIVE_LOAD_DELAY')
+    expect(content).toContain("startBootScreenFadeOut('NATIVE_LOAD_DELAY')")
+    const loadingFalseBlock = content.slice(
+      content.indexOf('navState.loading === false'),
+      content.indexOf('navState.loading === false') + 2200
+    )
+    expect(loadingFalseBlock).not.toMatch(/getHideSplashOnce\s*\(\)/)
   })
 })

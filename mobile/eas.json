@@ -7,9 +7,6 @@
       "developmentClient": true,
       "distribution": "internal",
       "node": "20.18.1",
-      "env": {
-        "EXPO_PUBLIC_NATIVE_HUD": "true"
-      },
       "android": {
         "buildType": "apk",
         "autoIncrement": true
@@ -31,7 +28,6 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://lootaura.com",
-        "EXPO_PUBLIC_NATIVE_HUD": "true",
         "EXPO_USE_NPM": "true"
       }
     },
@@ -39,9 +35,6 @@
       "developmentClient": true,
       "distribution": "internal",
       "node": "20.18.1",
-      "env": {
-        "EXPO_PUBLIC_NATIVE_HUD": "true"
-      },
       "android": {
         "autoIncrement": true
       }

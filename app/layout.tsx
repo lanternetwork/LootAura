@@ -71,7 +71,6 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Gate AdSense script and meta tag based on feature flag
   const adsenseEnabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
-  // In-app WebView: match body background to native splash (#3A2268) to reduce flash on splash dismiss
   const headersList = await headers()
   const userAgent = headersList.get('user-agent') ?? ''
   const inApp = isInAppUserAgent(userAgent)

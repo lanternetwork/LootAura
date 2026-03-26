@@ -7,6 +7,7 @@ import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import AddressLink from '@/components/common/AddressLink'
+import FavoriteButton from '@/components/FavoriteButton'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
@@ -251,8 +252,8 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               )}
             </div>
 
-            {/* Action buttons - side by side */}
-            <div className="flex gap-2 pointer-events-auto">
+            {/* Action buttons - side by side; stopPropagation so map wrapper does not dismiss callout */}
+            <div className="flex gap-2 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
               {/* Navigation button */}
               <a
                 href={getNavigationUrl()}
@@ -272,7 +273,9 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </a>
-              
+              <span className="flex-shrink-0 flex items-center justify-center min-w-[48px]">
+                <FavoriteButton saleId={sale.id} />
+              </span>
               {/* View Sale button - reduced width */}
               <button
                 onClick={handleViewSale}
@@ -416,7 +419,9 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </a>
-              
+              <span className="flex-shrink-0 flex items-center justify-center min-w-[48px]">
+                <FavoriteButton saleId={sale.id} />
+              </span>
               {/* View Sale button - reduced width */}
               <button
                 onClick={handleViewSale}

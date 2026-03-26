@@ -280,6 +280,43 @@ export default function SaleDetailClient({
     }
   }, [sale.id])
   
+  // Explicit bridge: notify native shell when sale detail becomes visible/hidden
+  useEffect(() => {
+    if (typeof window === 'undefined' || !(window as any).ReactNativeWebView) {
+      return
+    }
+    
+    const message = {
+      type: 'SALE_DETAIL_STATE',
+      isSaleDetail: true,
+      saleId: sale.id,
+      pathname: `/sales/${sale.id}`
+    }
+    
+    try {
+      ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
+    } catch {
+      // Ignore bridge failures
+    }
+    
+    return () => {
+      if (typeof window === 'undefined' || !(window as any).ReactNativeWebView) {
+        return
+      }
+      const resetMessage = {
+        type: 'SALE_DETAIL_STATE',
+        isSaleDetail: false,
+        saleId: null,
+        pathname: '/sales'
+      }
+      try {
+        ;(window as any).ReactNativeWebView.postMessage(JSON.stringify(resetMessage))
+      } catch {
+        // Ignore bridge failures
+      }
+    }
+  }, [sale.id])
+  
   // Send initial favoriteState to native when component mounts or favorite state changes
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
@@ -667,6 +704,7 @@ export default function SaleDetailClient({
       {/* Mobile Layout */}
       <div 
         data-mobile-sale-detail="true"
+        data-sale-id={sale.id}
         className={`md:hidden max-w-screen-sm mx-auto px-4 pt-4 space-y-4 ${isEmbed ? 'pb-[88px]' : isNativeFooter ? 'pb-[calc(68px+env(safe-area-inset-bottom,0px))]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+80px)]'}`}
       >
         {/* Back to map button - Mobile only */}

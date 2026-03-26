@@ -1,11 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, ScrollView, Animated, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  FooterNavigateIcon,
+  FooterSaveInactiveIcon,
+  FooterSaveActiveIcon,
+  FooterShareIcon,
+} from '../icons/FooterIcons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 import { getHideSplashOnce, setSplashFailsafeReport } from './_layout';
+import { isDiagnosticsEnabled as getDiagnosticsEnabled } from './utils/diagnosticsEnabled';
 import { stripSalesViewportParams } from './utils/stripSalesViewportParams';
 
 const LOOTAURA_URL = 'https://lootaura.com/sales';
@@ -13,6 +19,18 @@ const LOOTAURA_URL = 'https://lootaura.com/sales';
 // Stable token in User-Agent so the web app can detect in-app on the first request/render
 // without relying on injectedJavaScriptBeforeContentLoaded (unreliable on Android).
 const IN_APP_UA_TOKEN = 'LootAuraInApp/1.0';
+
+// Native splash: hide only after RN boot screen has painted (boot screen onLayout). Failsafe in _layout.
+const SPLASH_POST_LOAD_DELAY_MS = 300;
+
+// RN boot screen: fade duration when hiding after readiness (APP_READY or native load+delay).
+const BOOT_SCREEN_FADE_MS = 250;
+
+// Boot screen failsafe: force fade if still visible after this (ms).
+const BOOT_SCREEN_FAILSAFE_MS = 10000;
+
+// Short opaque hold before starting boot screen fade on APP_READY (avoids flicker from unstable first frame).
+const BOOT_SCREEN_APP_READY_HOLD_MS = 100;
 
 // Diagnostics console: in-memory ring buffer (only when HUD enabled)
 const DIAG_CONSOLE_RING_SIZE = 30;
@@ -45,22 +63,8 @@ function buildRouteStateDiagPayload(message: {
 }
 
 export default function HomeScreen() {
-  // Single source of truth for diagnostics: when false, skip HUD-only state and layout diag
-  // Accept '1' or 'true' (case-insensitive) = enabled; '0' or 'false' = disabled.
-  // Note: EXPO_PUBLIC_* is inlined at bundle time — set in .env or eas.json and restart Metro (expo start -c) or rebuild.
-  const nativeHudRaw =
-    typeof process.env.EXPO_PUBLIC_NATIVE_HUD === 'string'
-      ? process.env.EXPO_PUBLIC_NATIVE_HUD.trim()
-      : process.env.EXPO_PUBLIC_NATIVE_HUD;
-  const isDiagnosticsEnabled = (() => {
-    if (nativeHudRaw === '1') return true;
-    if (typeof nativeHudRaw === 'string') {
-      const lower = nativeHudRaw.toLowerCase();
-      if (lower === 'true') return true;
-      if (lower === 'false' || lower === '0') return false;
-    }
-    return false;
-  })();
+  // Diagnostics gating: shared with sales/[id]; when false, skip HUD-only state and layout diag
+  const isDiagnosticsEnabled = getDiagnosticsEnabled();
   const [loading, setLoading] = useState(false); // Start hidden, show only when needed
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -81,8 +85,20 @@ export default function HomeScreen() {
   const lastAuthCallbackUrlRef = useRef<string | null>(null);
   const lastAuthCallbackAtRef = useRef<number | null>(null);
   
+  // Native splash: hidden only after RN boot screen has painted (boot screen onLayout).
+  const splashDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appReadyHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // RN boot screen: sole visual boot layer after native splash. Visible until readiness (APP_READY or load+delay).
+  const [showBootScreen, setShowBootScreen] = useState(true);
+  const bootScreenFadedRef = useRef<boolean>(false);
+  const bootScreenOpacity = useRef(new Animated.Value(1)).current;
+  const nativeSplashHiddenByBootScreenRef = useRef<boolean>(false);
+  const mountedRef = useRef<boolean>(true);
+  
   // Get safe area insets - footer will handle bottom inset
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   
   // State-driven WebView navigation (replaces injectJavaScript)
   // Sanitize so we never launch into /sales with viewport params (would block auto-geo)
@@ -114,6 +130,7 @@ export default function HomeScreen() {
     inAppFlag: null,
     hasRNBridge: null,
   });
+  const [explicitSaleDetailActive, setExplicitSaleDetailActive] = useState(false);
   
   // Footer state
   const [isFavorited, setIsFavorited] = useState(false);
@@ -354,6 +371,95 @@ export default function HomeScreen() {
     }
   }, [isDiagnosticsEnabled, pushDiagEvent]);
 
+  // Hide native splash only after RN boot screen has painted (so user never sees gap between native splash and boot screen)
+  const handleBootScreenLayout = useCallback(() => {
+    if (nativeSplashHiddenByBootScreenRef.current) return;
+    nativeSplashHiddenByBootScreenRef.current = true;
+    const hideSplashOnce = getHideSplashOnce();
+    if (hideSplashOnce) hideSplashOnce();
+    if (isDiagnosticsEnabled) {
+      pushDiagEvent('BOOT_SCREEN_NATIVE_SPLASH_HIDDEN', JSON.stringify({ timestamp: Date.now() }));
+    }
+  }, [isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Boot screen: one-shot fade-out when readiness reached (APP_READY, native load+delay, or error); idempotent, launch-scoped only
+  const startBootScreenFadeOut = useCallback((readinessPath: 'APP_READY' | 'NATIVE_LOAD_DELAY' | 'ERROR') => {
+    if (bootScreenFadedRef.current) return;
+    bootScreenFadedRef.current = true;
+    if (isDiagnosticsEnabled) {
+      const eventName = readinessPath === 'APP_READY' ? 'BOOT_SCREEN_READY_APP_READY' : readinessPath === 'NATIVE_LOAD_DELAY' ? 'BOOT_SCREEN_READY_NATIVE_LOAD_DELAY' : 'BOOT_SCREEN_READY_ERROR';
+      pushDiagEvent(eventName, JSON.stringify({ path: readinessPath, timestamp: Date.now() }));
+      pushDiagEvent('BOOT_SCREEN_FADE_START', JSON.stringify({ readinessPath, timestamp: Date.now() }));
+    }
+    Animated.timing(bootScreenOpacity, {
+      toValue: 0,
+      duration: BOOT_SCREEN_FADE_MS,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished && mountedRef.current) {
+        setShowBootScreen(false);
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('BOOT_SCREEN_HIDDEN', JSON.stringify({ readinessPath, timestamp: Date.now() }));
+        }
+      }
+    });
+  }, [bootScreenOpacity, isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Mounted ref for safe setState after async animation (avoid setState on unmounted component)
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Boot screen visible on mount (diagnostics)
+  useEffect(() => {
+    if (showBootScreen && isDiagnosticsEnabled) {
+      pushDiagEvent('BOOT_SCREEN_VISIBLE', JSON.stringify({ timestamp: Date.now() }));
+    }
+  }, [showBootScreen, isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Boot screen failsafe: force fade if still visible after BOOT_SCREEN_FAILSAFE_MS
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!bootScreenFadedRef.current && mountedRef.current) {
+        bootScreenFadedRef.current = true;
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('BOOT_SCREEN_FAILSAFE', JSON.stringify({ message: 'Boot screen force-faded after failsafe timeout', timestamp: Date.now() }));
+          pushDiagEvent('BOOT_SCREEN_FADE_START', JSON.stringify({ readinessPath: 'FAILSAFE', timestamp: Date.now() }));
+        }
+        Animated.timing(bootScreenOpacity, {
+          toValue: 0,
+          duration: BOOT_SCREEN_FADE_MS,
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          if (finished && mountedRef.current) {
+            setShowBootScreen(false);
+            if (isDiagnosticsEnabled) {
+              pushDiagEvent('BOOT_SCREEN_HIDDEN', JSON.stringify({ readinessPath: 'FAILSAFE', timestamp: Date.now() }));
+            }
+          }
+        });
+      }
+    }, BOOT_SCREEN_FAILSAFE_MS);
+    return () => clearTimeout(t);
+  }, [bootScreenOpacity, isDiagnosticsEnabled, pushDiagEvent]);
+
+  // Clear pending timers on unmount (splash-delay, APP_READY hold)
+  useEffect(() => {
+    return () => {
+      if (splashDelayTimerRef.current) {
+        clearTimeout(splashDelayTimerRef.current);
+        splashDelayTimerRef.current = null;
+      }
+      if (appReadyHoldTimerRef.current) {
+        clearTimeout(appReadyHoldTimerRef.current);
+        appReadyHoldTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // Handle OAuth callback: Cold start handoff (via router params from auth/callback.tsx)
   useEffect(() => {
     const authCallbackUrl = searchParams.authCallbackUrl;
@@ -593,6 +699,7 @@ export default function HomeScreen() {
     }
     stopLoader('error', path);
     setError('Failed to load LootAura. Please check your internet connection.');
+    startBootScreenFadeOut('ERROR');
   };
 
   const handleHttpError = (syntheticEvent: any) => {
@@ -618,6 +725,7 @@ export default function HomeScreen() {
       
       setError(`Unable to connect to LootAura (${nativeEvent.statusCode}). Please try again later.`);
       stopLoader('httpError', path);
+      startBootScreenFadeOut('ERROR');
     }
   };
 
@@ -641,7 +749,7 @@ export default function HomeScreen() {
     }
     
     // CRITICAL: If navState.loading === false, force clear loading state
-    // This is the most reliable way to detect when navigation is complete
+    // Native splash hidden from boot screen onLayout; here we just trigger boot screen fade after delay
     if (navState.loading === false) {
       let path = '/';
       try {
@@ -650,8 +758,21 @@ export default function HomeScreen() {
       } catch {
         // Ignore URL parse errors
       }
-      // Splash is hidden only on APP_READY (see handleMessage) to avoid flash before first paint
       stopLoader('navState.loading=false', path);
+      if (!bootScreenFadedRef.current) {
+        if (splashDelayTimerRef.current) {
+          clearTimeout(splashDelayTimerRef.current);
+          splashDelayTimerRef.current = null;
+        }
+        splashDelayTimerRef.current = setTimeout(() => {
+          splashDelayTimerRef.current = null;
+          if (bootScreenFadedRef.current) return;
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent('SPLASH_HIDDEN_NATIVE_LOAD_DELAY', JSON.stringify({ pathname: path }));
+          }
+          startBootScreenFadeOut('NATIVE_LOAD_DELAY');
+        }, SPLASH_POST_LOAD_DELAY_MS);
+      }
     }
     
     // Track navigation action when URL changes (diagnostics only)
@@ -701,11 +822,21 @@ export default function HomeScreen() {
         // Extract retry attempt number if provided (for debug logging)
         const attempt = typeof message.attempt === 'number' ? message.attempt : 0;
         
-        // Hide native splash screen when app is ready
-        const hideSplashOnce = getHideSplashOnce();
-        if (hideSplashOnce) {
-          hideSplashOnce();
+        if (splashDelayTimerRef.current) {
+          clearTimeout(splashDelayTimerRef.current);
+          splashDelayTimerRef.current = null;
         }
+        if (appReadyHoldTimerRef.current) {
+          clearTimeout(appReadyHoldTimerRef.current);
+          appReadyHoldTimerRef.current = null;
+        }
+        if (isDiagnosticsEnabled) {
+          pushDiagEvent('SPLASH_HIDDEN_APP_READY', JSON.stringify(message));
+        }
+        appReadyHoldTimerRef.current = setTimeout(() => {
+          appReadyHoldTimerRef.current = null;
+          if (!bootScreenFadedRef.current) startBootScreenFadeOut('APP_READY');
+        }, BOOT_SCREEN_APP_READY_HOLD_MS);
         
         // Immediately hide overlay and mark ready
         stopLoader('APP_READY', pathOnly, attempt);
@@ -738,22 +869,63 @@ export default function HomeScreen() {
           setLastMapPerfDiag(mapPerfJson);
           pushDiagEvent('MAP_PERF_DIAG', mapPerfJson);
         }
+      } else if (message.type === 'SALE_DETAIL_STATE') {
+        const { isSaleDetail, saleId, pathname } = message;
+        const active = isSaleDetail === true;
+        setExplicitSaleDetailActive(active);
+        setRouteState((prev) => {
+          const next = {
+            pathname: pathname || prev.pathname || '/',
+            search: prev.search,
+            isSaleDetail: active,
+            saleId: active ? (saleId ?? prev.saleId ?? null) : null,
+            inAppFlag: prev.inAppFlag,
+            hasRNBridge: prev.hasRNBridge,
+          };
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent(
+              'SALE_DETAIL_STATE',
+              JSON.stringify(
+                buildRouteStateDiagPayload({
+                  pathname: next.pathname,
+                  search: next.search,
+                  isSaleDetail: next.isSaleDetail,
+                  saleId: next.saleId,
+                  inAppFlag: next.inAppFlag,
+                  hasRNBridge: next.hasRNBridge,
+                })
+              )
+            );
+          }
+          return next;
+        });
       } else if (message.type === 'ROUTE_STATE') {
         // Route state update from web
         const { pathname, search, isSaleDetail, saleId, inAppFlag, hasRNBridge } = message;
-        setRouteState({
-          pathname: pathname || '/',
-          search: search || '',
-          isSaleDetail: isSaleDetail === true,
-          saleId: saleId || null,
-          inAppFlag: inAppFlag === true,
-          hasRNBridge: hasRNBridge === true,
+        setRouteState((prev) => {
+          const explicitActive = explicitSaleDetailActive;
+          const effectiveIsSaleDetail = isSaleDetail === true || explicitActive;
+          const effectiveSaleId =
+            isSaleDetail === true
+              ? saleId || prev.saleId || null
+              : explicitActive
+                ? prev.saleId || null
+                : saleId || null;
+          const next = {
+            pathname: pathname || prev.pathname || '/',
+            search: search || prev.search || '',
+            isSaleDetail: effectiveIsSaleDetail,
+            saleId: effectiveSaleId,
+            inAppFlag: inAppFlag === true,
+            hasRNBridge: hasRNBridge === true,
+          };
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
+          }
+          return next;
         });
-        if (isDiagnosticsEnabled) {
-          pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
-        }
         // Reset favorite state when leaving sale detail
-        if (!isSaleDetail) {
+        if (!(isSaleDetail === true || explicitSaleDetailActive)) {
           setIsFavorited(false);
         }
       } else if (message.type === 'favoriteState') {
@@ -991,8 +1163,64 @@ export default function HomeScreen() {
     }
   };
 
+  // Route-aware shell background policy:
+  // - Light shell for standard content pages (e.g., Favorites, Dashboard)
+  // - Dark shell for map-heavy / immersive routes and during launch/boot
+  const lightShellRoutes = ['/favorites', '/dashboard'] as const;
+  const useLightShellBackground = lightShellRoutes.includes(
+    routeState.pathname as (typeof lightShellRoutes)[number]
+  );
+
+  if (__DEV__) {
+    // Dev-only invariant: make the route → shell policy explicit for key routes
+    const isSaleRoute = routeState.pathname === '/' || routeState.pathname.startsWith('/sales');
+    const shellKind = useLightShellBackground ? 'light' : 'dark';
+    const routeLabel = routeState.pathname || '/';
+    // Favorites and Dashboard must resolve to the light shell path
+    if ((routeLabel === '/favorites' || routeLabel === '/dashboard') && !useLightShellBackground) {
+      console.warn('[SHELL_BG] Expected light shell for route but got dark shell', { route: routeLabel });
+    }
+    // Sale detail and primary sales/map routes should remain on the darker shell
+    if ((routeState.isSaleDetail || isSaleRoute) && useLightShellBackground) {
+      console.warn('[SHELL_BG] Unexpected light shell for map-heavy route', {
+        route: routeLabel,
+        isSaleDetail: routeState.isSaleDetail,
+      });
+    }
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SHELL_BG] Route shell policy', {
+        route: routeLabel,
+        isSaleDetail: routeState.isSaleDetail,
+        shell: shellKind,
+      });
+    }
+  }
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View
+      style={[
+        styles.container,
+        useLightShellBackground ? styles.lightShellBackground : styles.darkShellBackground,
+      ]}
+    >
+      {/* RN boot screen: solid purple full-screen handoff layer. Rendered outside SafeAreaView so layout is full window. */}
+      {showBootScreen && (
+        <Animated.View
+          onLayout={handleBootScreenLayout}
+          style={[
+            styles.bootScreen,
+            { opacity: bootScreenOpacity, width: windowWidth, height: windowHeight },
+          ]}
+          pointerEvents="auto"
+        />
+      )}
+      <SafeAreaView
+        style={[
+          styles.container,
+          useLightShellBackground ? styles.lightShellBackground : styles.darkShellBackground,
+        ]}
+        edges={['top']}
+      >
       {/* Solid strip behind system status bar so icons stay visible with edge-to-edge */}
       {insets.top > 0 ? (
         <View style={[styles.statusBarBackground, { height: insets.top }]} pointerEvents="none" />
@@ -1029,6 +1257,12 @@ export default function HomeScreen() {
             >
               <Text style={styles.diagnosticConsoleButtonText}>Copy</Text>
             </TouchableOpacity>
+          </View>
+          {/* Temporary: highly visible current footer state for native footer visibility diagnosis */}
+          <View style={styles.diagnosticConsoleFooterState}>
+            <Text style={styles.diagnosticConsoleFooterStateText} numberOfLines={2} selectable>
+              FOOTER STATE — pathname={routeState.pathname || '(none)'} isSaleDetail={String(routeState.isSaleDetail)} saleId={routeState.saleId ?? '(null)'} loading={String(loading)} footerShow={String(routeState.isSaleDetail && !loading)}
+            </Text>
           </View>
           <ScrollView
             style={styles.diagnosticConsoleScroll}
@@ -1083,7 +1317,9 @@ export default function HomeScreen() {
             style={[
               styles.webview,
               routeState.isSaleDetail && styles.webviewWithFooter,
-              { backgroundColor: '#3A2268' } // Match container/splash color to prevent white flash
+              useLightShellBackground
+                ? { backgroundColor: '#FFFFFF' }
+                : { backgroundColor: '#3A2268' } // Match container/splash color to prevent white flash on immersive routes
             ]}
             onLoadStart={handleLoadStart}
             onLoadEnd={handleLoadEnd}
@@ -1245,13 +1481,48 @@ export default function HomeScreen() {
                   }
                 };
                 
+                // ROUTE_STATE retry: bounded re-check for DOM sale-detail marker when URL does not change
+                let routeStateRetryCount = 0;
+                const MAX_ROUTE_STATE_RETRIES = 3;
+                const scheduleRouteStateRetry = () => {
+                  if (routeStateRetryCount >= MAX_ROUTE_STATE_RETRIES) {
+                    return;
+                  }
+                  routeStateRetryCount += 1;
+                  setTimeout(reportRouteState, 150 * routeStateRetryCount);
+                };
+                
                 const reportRouteState = () => {
                   try {
-                    const pathname = window.location.pathname;
+                    let pathname = window.location.pathname;
                     const search = window.location.search;
-                    const saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
-                    const isSaleDetail = !!saleDetailMatch;
-                    const saleId = isSaleDetail ? saleDetailMatch[1] : null;
+                    
+                    // Primary detection: URL-based sale detail (/sales/:id)
+                    let saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
+                    let isSaleDetail = !!saleDetailMatch;
+                    let saleId = isSaleDetail ? saleDetailMatch[1] : null;
+                    
+                    // Fallback detection: DOM-based when URL does not change (mobile detail overlay)
+                    if (!isSaleDetail) {
+                      try {
+                        const mobileDetailEl = document.querySelector('[data-mobile-sale-detail=\"true\"]');
+                        const saleIdAttr = mobileDetailEl && mobileDetailEl.getAttribute('data-sale-id');
+                        
+                        if (mobileDetailEl && saleIdAttr) {
+                          isSaleDetail = true;
+                          saleId = String(saleIdAttr);
+                          // Normalize pathname so native shell sees a concrete detail path
+                          pathname = '/sales/' + saleId;
+                        }
+                      } catch (e) {
+                        // Fallback detection failed - remain on URL-only route state
+                      }
+                      
+                      // If still not a sale detail and marker not yet present, schedule a short-lived retry
+                      if (!isSaleDetail) {
+                        scheduleRouteStateRetry();
+                      }
+                    }
                     
                     // Diagnostic: Check if in-app flag is set
                     const inAppFlag = window.__LOOTAURA_IN_APP === true;
@@ -1457,7 +1728,6 @@ export default function HomeScreen() {
             // Enable mixed content for development (if needed)
             mixedContentMode="always"
           />
-          
           {/* Native Footer Overlay - Show when on sale detail page AND page has loaded */}
           {routeState.isSaleDetail && !loading && (
             <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
@@ -1467,7 +1737,7 @@ export default function HomeScreen() {
                   style={styles.navigateButton}
                   onPress={handleNavigate}
                 >
-                  <Feather name="map-pin" size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
+                  <FooterNavigateIcon size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
                   <Text style={styles.navigateButtonText}>Navigate</Text>
                 </TouchableOpacity>
 
@@ -1479,11 +1749,11 @@ export default function HomeScreen() {
                   ]}
                   onPress={handleFavoriteToggle}
                 >
-                  <MaterialCommunityIcons 
-                    name={isFavorited ? "heart" : "heart-outline"} 
-                    size={20} 
-                    color={isFavorited ? '#B91C1C' : '#374151'}
-                  />
+                  {isFavorited ? (
+                    <FooterSaveActiveIcon size={20} color="#B91C1C" />
+                  ) : (
+                    <FooterSaveInactiveIcon size={20} color="#374151" />
+                  )}
                 </TouchableOpacity>
 
                 {/* Share Button (Secondary) */}
@@ -1491,21 +1761,27 @@ export default function HomeScreen() {
                   style={styles.shareButton}
                   onPress={handleShare}
                 >
-                  <Feather name="share-2" size={20} color="#3A2268" />
+                  <FooterShareIcon size={20} color="#3A2268" />
                 </TouchableOpacity>
               </View>
             </View>
           )}
         </>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  darkShellBackground: {
     backgroundColor: '#3A2268',
+  },
+  lightShellBackground: {
+    backgroundColor: '#FFFFFF',
   },
   statusBarBackground: {
     position: 'absolute',
@@ -1518,6 +1794,14 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+  },
+  bootScreen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: '#3A2268',
+    zIndex: 100,
+    elevation: 100,
   },
   webviewWithFooter: {
     paddingBottom: 80, // Space for native footer overlay
@@ -1566,7 +1850,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#FF0000',
   },
+  diagnosticConsoleFooterState: {
+    flexShrink: 0,
+    minHeight: 32,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#111827',
+    borderTopWidth: 1,
+    borderTopColor: '#4B5563',
+  },
   diagnosticConsoleToolbar: {
+    flexShrink: 0,
     flexDirection: 'row',
     paddingHorizontal: 4,
     paddingVertical: 4,
@@ -1589,6 +1883,7 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   diagnosticConsoleScroll: {
+    flex: 1,
     maxHeight: 220,
   },
   diagnosticConsoleScrollContent: {
@@ -1599,6 +1894,12 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontSize: 10,
     fontFamily: 'monospace',
+  },
+  diagnosticConsoleFooterStateText: {
+    color: '#FBBF24',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
   // Sanitizer Rejection Banner
   rejectionBanner: {

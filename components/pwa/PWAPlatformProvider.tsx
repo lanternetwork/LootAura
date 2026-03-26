@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { isNativeApp } from '@/lib/runtime/isNativeApp'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -81,6 +82,7 @@ function detectPlatform() {
 export function PWAPlatformProvider({ children }: { children: React.ReactNode }) {
   const [isStandalone, setIsStandalone] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [isNativeShell, setIsNativeShell] = useState<boolean>(() => isNativeApp())
   const [dismissUntil, setDismissUntil] = useState<number | null>(null)
   const [hasUpdateAvailable, setHasUpdateAvailable] = useState(false)
   const [hasDeferredPrompt, setHasDeferredPrompt] = useState(false)
@@ -99,6 +101,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
     if (!PWA_ENABLED) return
 
     setPlatform(detectPlatform())
+    setIsNativeShell(isNativeApp())
 
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
@@ -145,7 +148,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
   }, [])
 
   useEffect(() => {
-    if (!PWA_ENABLED || !INSTALL_CTA_ENABLED) return
+    if (!PWA_ENABLED || !INSTALL_CTA_ENABLED || isNativeShell) return
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
@@ -170,7 +173,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
-  }, [])
+  }, [isNativeShell])
 
   const canPromptInstall = hasDeferredPrompt && !!deferredPromptRef.current && !isInstalled && !isStandalone
   const isDismissed = dismissUntil !== null
@@ -178,6 +181,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
   const showAndroidInstallCta =
     PWA_ENABLED &&
     INSTALL_CTA_ENABLED &&
+    !isNativeShell &&
     platform.isAndroid &&
     platform.isChromium &&
     canPromptInstall &&
@@ -187,6 +191,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
     PWA_ENABLED &&
     INSTALL_CTA_ENABLED &&
     IOS_HELPER_ENABLED &&
+    !isNativeShell &&
     platform.isIOSSafari &&
     !isInstalled &&
     !isStandalone &&

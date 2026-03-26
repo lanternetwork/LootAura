@@ -6,21 +6,13 @@ import { Header } from '@/app/Header'
 
 const mockUseAuth = vi.fn()
 const mockUseProfile = vi.fn()
+const mockUseSignOut = vi.fn()
 
 vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
   useProfile: () => mockUseProfile(),
+  useSignOut: () => mockUseSignOut(),
 }))
-
-// Avoid dealing with Supabase in UserProfile sign-out logic
-vi.mock('@/lib/hooks/useAuth', async (orig) => {
-  const original = await (orig() as any)
-  return {
-    ...original,
-    useAuth: () => mockUseAuth(),
-    useProfile: () => mockUseProfile(),
-  }
-})
 
 describe('Header auth behavior', () => {
   beforeEach(() => {
@@ -44,6 +36,10 @@ describe('Header auth behavior', () => {
       data: null,
       isLoading: true,
     })
+    mockUseSignOut.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
 
     const { rerender } = render(<Header />)
 
@@ -65,6 +61,10 @@ describe('Header auth behavior', () => {
     mockUseProfile.mockReturnValue({
       data: { display_name: 'Test User' },
       isLoading: false,
+    })
+    mockUseSignOut.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
     })
 
     rerender(<Header />)

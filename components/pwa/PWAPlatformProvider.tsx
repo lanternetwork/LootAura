@@ -40,7 +40,6 @@ const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000
 const PWA_ENABLED = process.env.NEXT_PUBLIC_PWA_ENABLED !== 'false'
 const INSTALL_CTA_ENABLED = process.env.NEXT_PUBLIC_PWA_INSTALL_CTA_ENABLED !== 'false'
 const IOS_HELPER_ENABLED = process.env.NEXT_PUBLIC_PWA_IOS_INSTALL_HELPER_ENABLED !== 'false'
-const DESKTOP_INSTALL_ENABLED = process.env.NEXT_PUBLIC_PWA_DESKTOP_INSTALL_ENABLED === 'true'
 const SW_ENABLED = process.env.NEXT_PUBLIC_PWA_SW_ENABLED !== 'false'
 
 const PWAPlatformContext = createContext<PWAPlatformContextValue | null>(null)
@@ -179,8 +178,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
     platform.isAndroid &&
     platform.isChromium &&
     canPromptInstall &&
-    !isDismissed &&
-    (DESKTOP_INSTALL_ENABLED || !platform.isIOS)
+    !isDismissed
 
   const showIosInstallHelper =
     PWA_ENABLED &&

@@ -6,6 +6,14 @@ const PUBLIC_DIR = path.resolve(process.cwd(), 'public')
 const MANIFEST_PATH = path.resolve(PUBLIC_DIR, 'manifest.json')
 
 describe('PWA manifest asset references', () => {
+  it('includes required PNG install icons', () => {
+    const raw = fs.readFileSync(MANIFEST_PATH, 'utf-8')
+    const manifest = JSON.parse(raw) as { icons?: Array<{ src: string; sizes: string; type: string }> }
+    const icons = manifest.icons || []
+    expect(icons.some((icon) => icon.src === '/icons/icon-192.png' && icon.sizes === '192x192' && icon.type === 'image/png')).toBe(true)
+    expect(icons.some((icon) => icon.src === '/icons/icon-512.png' && icon.sizes === '512x512' && icon.type === 'image/png')).toBe(true)
+  })
+
   it('manifest and linked assets resolve in public/', () => {
     const raw = fs.readFileSync(MANIFEST_PATH, 'utf-8')
     const manifest = JSON.parse(raw) as {
@@ -34,5 +42,6 @@ describe('PWA manifest asset references', () => {
     const layout = fs.readFileSync(path.resolve(process.cwd(), 'app/layout.tsx'), 'utf-8')
     expect(manifest.theme_color).toBe('#0b3d2e')
     expect(layout).toContain('<meta name="theme-color" content="#0b3d2e" />')
+    expect(layout).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />')
   })
 })

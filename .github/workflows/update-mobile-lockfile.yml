@@ -1,0 +1,38 @@
+name: Update mobile package-lock
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-lockfile:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: fix/favorites-state-sync
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install mobile dependencies and update lockfile
+        working-directory: mobile
+        run: npm install
+
+      - name: Commit updated mobile/package-lock.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git status --porcelain | grep \"mobile/package-lock.json\"; then
+            git add mobile/package-lock.json
+            git commit -m \"chore: update mobile/package-lock.json via workflow\"
+            git push origin HEAD:fix/favorites-state-sync
+          else
+            echo \"No changes to mobile/package-lock.json\"
+          fi
+

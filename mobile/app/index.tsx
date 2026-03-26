@@ -3,7 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Linking, Share, 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  FooterNavigateIcon,
+  FooterSaveInactiveIcon,
+  FooterSaveActiveIcon,
+  FooterShareIcon,
+} from '../icons/FooterIcons';
 import { validateAuthCallbackUrl } from './utils/authCallbackValidator';
 import { getHideSplashOnce, setSplashFailsafeReport } from './_layout';
 import { isDiagnosticsEnabled as getDiagnosticsEnabled } from './utils/diagnosticsEnabled';
@@ -125,6 +130,7 @@ export default function HomeScreen() {
     inAppFlag: null,
     hasRNBridge: null,
   });
+  const [explicitSaleDetailActive, setExplicitSaleDetailActive] = useState(false);
   
   // Footer state
   const [isFavorited, setIsFavorited] = useState(false);
@@ -863,22 +869,63 @@ export default function HomeScreen() {
           setLastMapPerfDiag(mapPerfJson);
           pushDiagEvent('MAP_PERF_DIAG', mapPerfJson);
         }
+      } else if (message.type === 'SALE_DETAIL_STATE') {
+        const { isSaleDetail, saleId, pathname } = message;
+        const active = isSaleDetail === true;
+        setExplicitSaleDetailActive(active);
+        setRouteState((prev) => {
+          const next = {
+            pathname: pathname || prev.pathname || '/',
+            search: prev.search,
+            isSaleDetail: active,
+            saleId: active ? (saleId ?? prev.saleId ?? null) : null,
+            inAppFlag: prev.inAppFlag,
+            hasRNBridge: prev.hasRNBridge,
+          };
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent(
+              'SALE_DETAIL_STATE',
+              JSON.stringify(
+                buildRouteStateDiagPayload({
+                  pathname: next.pathname,
+                  search: next.search,
+                  isSaleDetail: next.isSaleDetail,
+                  saleId: next.saleId,
+                  inAppFlag: next.inAppFlag,
+                  hasRNBridge: next.hasRNBridge,
+                })
+              )
+            );
+          }
+          return next;
+        });
       } else if (message.type === 'ROUTE_STATE') {
         // Route state update from web
         const { pathname, search, isSaleDetail, saleId, inAppFlag, hasRNBridge } = message;
-        setRouteState({
-          pathname: pathname || '/',
-          search: search || '',
-          isSaleDetail: isSaleDetail === true,
-          saleId: saleId || null,
-          inAppFlag: inAppFlag === true,
-          hasRNBridge: hasRNBridge === true,
+        setRouteState((prev) => {
+          const explicitActive = explicitSaleDetailActive;
+          const effectiveIsSaleDetail = isSaleDetail === true || explicitActive;
+          const effectiveSaleId =
+            isSaleDetail === true
+              ? saleId || prev.saleId || null
+              : explicitActive
+                ? prev.saleId || null
+                : saleId || null;
+          const next = {
+            pathname: pathname || prev.pathname || '/',
+            search: search || prev.search || '',
+            isSaleDetail: effectiveIsSaleDetail,
+            saleId: effectiveSaleId,
+            inAppFlag: inAppFlag === true,
+            hasRNBridge: hasRNBridge === true,
+          };
+          if (isDiagnosticsEnabled) {
+            pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
+          }
+          return next;
         });
-        if (isDiagnosticsEnabled) {
-          pushDiagEvent('ROUTE_STATE', JSON.stringify(buildRouteStateDiagPayload(message)));
-        }
         // Reset favorite state when leaving sale detail
-        if (!isSaleDetail) {
+        if (!(isSaleDetail === true || explicitSaleDetailActive)) {
           setIsFavorited(false);
         }
       } else if (message.type === 'favoriteState') {
@@ -1211,6 +1258,12 @@ export default function HomeScreen() {
               <Text style={styles.diagnosticConsoleButtonText}>Copy</Text>
             </TouchableOpacity>
           </View>
+          {/* Temporary: highly visible current footer state for native footer visibility diagnosis */}
+          <View style={styles.diagnosticConsoleFooterState}>
+            <Text style={styles.diagnosticConsoleFooterStateText} numberOfLines={2} selectable>
+              FOOTER STATE — pathname={routeState.pathname || '(none)'} isSaleDetail={String(routeState.isSaleDetail)} saleId={routeState.saleId ?? '(null)'} loading={String(loading)} footerShow={String(routeState.isSaleDetail && !loading)}
+            </Text>
+          </View>
           <ScrollView
             style={styles.diagnosticConsoleScroll}
             contentContainerStyle={styles.diagnosticConsoleScrollContent}
@@ -1428,13 +1481,48 @@ export default function HomeScreen() {
                   }
                 };
                 
+                // ROUTE_STATE retry: bounded re-check for DOM sale-detail marker when URL does not change
+                let routeStateRetryCount = 0;
+                const MAX_ROUTE_STATE_RETRIES = 3;
+                const scheduleRouteStateRetry = () => {
+                  if (routeStateRetryCount >= MAX_ROUTE_STATE_RETRIES) {
+                    return;
+                  }
+                  routeStateRetryCount += 1;
+                  setTimeout(reportRouteState, 150 * routeStateRetryCount);
+                };
+                
                 const reportRouteState = () => {
                   try {
-                    const pathname = window.location.pathname;
+                    let pathname = window.location.pathname;
                     const search = window.location.search;
-                    const saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
-                    const isSaleDetail = !!saleDetailMatch;
-                    const saleId = isSaleDetail ? saleDetailMatch[1] : null;
+                    
+                    // Primary detection: URL-based sale detail (/sales/:id)
+                    let saleDetailMatch = pathname.match(/^\\/sales\\/([^\\/\\?]+)/);
+                    let isSaleDetail = !!saleDetailMatch;
+                    let saleId = isSaleDetail ? saleDetailMatch[1] : null;
+                    
+                    // Fallback detection: DOM-based when URL does not change (mobile detail overlay)
+                    if (!isSaleDetail) {
+                      try {
+                        const mobileDetailEl = document.querySelector('[data-mobile-sale-detail=\"true\"]');
+                        const saleIdAttr = mobileDetailEl && mobileDetailEl.getAttribute('data-sale-id');
+                        
+                        if (mobileDetailEl && saleIdAttr) {
+                          isSaleDetail = true;
+                          saleId = String(saleIdAttr);
+                          // Normalize pathname so native shell sees a concrete detail path
+                          pathname = '/sales/' + saleId;
+                        }
+                      } catch (e) {
+                        // Fallback detection failed - remain on URL-only route state
+                      }
+                      
+                      // If still not a sale detail and marker not yet present, schedule a short-lived retry
+                      if (!isSaleDetail) {
+                        scheduleRouteStateRetry();
+                      }
+                    }
                     
                     // Diagnostic: Check if in-app flag is set
                     const inAppFlag = window.__LOOTAURA_IN_APP === true;
@@ -1649,7 +1737,7 @@ export default function HomeScreen() {
                   style={styles.navigateButton}
                   onPress={handleNavigate}
                 >
-                  <Feather name="map-pin" size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
+                  <FooterNavigateIcon size={20} color="#FFFFFF" style={styles.navigateButtonIcon} />
                   <Text style={styles.navigateButtonText}>Navigate</Text>
                 </TouchableOpacity>
 
@@ -1661,11 +1749,11 @@ export default function HomeScreen() {
                   ]}
                   onPress={handleFavoriteToggle}
                 >
-                  <MaterialCommunityIcons 
-                    name={isFavorited ? "heart" : "heart-outline"} 
-                    size={20} 
-                    color={isFavorited ? '#B91C1C' : '#374151'}
-                  />
+                  {isFavorited ? (
+                    <FooterSaveActiveIcon size={20} color="#B91C1C" />
+                  ) : (
+                    <FooterSaveInactiveIcon size={20} color="#374151" />
+                  )}
                 </TouchableOpacity>
 
                 {/* Share Button (Secondary) */}
@@ -1673,7 +1761,7 @@ export default function HomeScreen() {
                   style={styles.shareButton}
                   onPress={handleShare}
                 >
-                  <Feather name="share-2" size={20} color="#3A2268" />
+                  <FooterShareIcon size={20} color="#3A2268" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1762,7 +1850,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#FF0000',
   },
+  diagnosticConsoleFooterState: {
+    flexShrink: 0,
+    minHeight: 32,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#111827',
+    borderTopWidth: 1,
+    borderTopColor: '#4B5563',
+  },
   diagnosticConsoleToolbar: {
+    flexShrink: 0,
     flexDirection: 'row',
     paddingHorizontal: 4,
     paddingVertical: 4,
@@ -1785,6 +1883,7 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   diagnosticConsoleScroll: {
+    flex: 1,
     maxHeight: 220,
   },
   diagnosticConsoleScrollContent: {
@@ -1795,6 +1894,12 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontSize: 10,
     fontFamily: 'monospace',
+  },
+  diagnosticConsoleFooterStateText: {
+    color: '#FBBF24',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
   // Sanitizer Rejection Banner
   rejectionBanner: {

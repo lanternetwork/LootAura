@@ -83,6 +83,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
   const [isInstalled, setIsInstalled] = useState(false)
   const [dismissUntil, setDismissUntil] = useState<number | null>(null)
   const [hasUpdateAvailable, setHasUpdateAvailable] = useState(false)
+  const [hasDeferredPrompt, setHasDeferredPrompt] = useState(false)
   const [platform, setPlatform] = useState({
     isIOS: false,
     isAndroid: false,
@@ -149,12 +150,14 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       deferredPromptRef.current = e as BeforeInstallPromptEvent
+      setHasDeferredPrompt(true)
     }
 
     const handleAppInstalled = () => {
       setIsInstalled(true)
       setIsStandalone(true)
       deferredPromptRef.current = null
+      setHasDeferredPrompt(false)
       localStorage.removeItem(DISMISSED_KEY)
       setDismissUntil(null)
       emitMetric('app_installed')
@@ -169,7 +172,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
     }
   }, [])
 
-  const canPromptInstall = !!deferredPromptRef.current && !isInstalled && !isStandalone
+  const canPromptInstall = hasDeferredPrompt && !!deferredPromptRef.current && !isInstalled && !isStandalone
   const isDismissed = dismissUntil !== null
 
   const showAndroidInstallCta =
@@ -226,6 +229,7 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
       }
     } finally {
       deferredPromptRef.current = null
+      setHasDeferredPrompt(false)
     }
   }
 

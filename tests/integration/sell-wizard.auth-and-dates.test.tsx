@@ -52,7 +52,9 @@ describe('Sell Wizard auth messaging and date fields', () => {
   })
 
   it('hides anonymous sign-in messaging when authenticated', async () => {
-    mockGetUser.mockResolvedValueOnce({
+    // React StrictMode can invoke effects twice in test runs, so return the
+    // authenticated user consistently (not just once).
+    mockGetUser.mockResolvedValue({
       data: { user: { id: 'user-123', email: 'test@example.com' } },
     })
 

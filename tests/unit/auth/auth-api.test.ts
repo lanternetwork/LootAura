@@ -188,6 +188,52 @@ describe('Auth API Routes', () => {
       expect(data.user).toBeDefined()
       expect(data.message).toBe('Account created successfully')
     })
+
+    it('should accept email with surrounding whitespace', async () => {
+      const mockSupabase = {
+        auth: {
+          signUp: vi.fn().mockResolvedValue({
+            data: {
+              session: {
+                access_token: 'test-access-token',
+                refresh_token: 'test-refresh-token',
+                expires_at: Math.floor(Date.now() / 1000) + 3600,
+                user: { id: 'test-user-id', email: 'test@example.com' },
+              },
+              user: { id: 'test-user-id', email: 'test@example.com' },
+            },
+            error: null,
+          }),
+        },
+      }
+
+      const { createServerSupabaseClient, isValidSession } = await import('@/lib/auth/server-session')
+      vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+      vi.mocked(isValidSession).mockReturnValue(true)
+
+      const request = new NextRequest('http://localhost:3000/api/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: '  test@example.com  ',
+          password: 'Password123',
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const response = await signupPOST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.user).toBeDefined()
+      expect(data.message).toBe('Account created successfully')
+      expect(mockSupabase.auth.signUp).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'Password123',
+        options: expect.any(Object),
+      })
+    })
   })
 
   describe('POST /api/auth/logout', () => {

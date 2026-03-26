@@ -2514,7 +2514,11 @@ export default function SellWizardClient({
               )}
             </div>
             <p className="text-gray-600">Create a listing to reach more buyers in your area</p>
-            <p className="text-sm text-gray-500 mt-2">You can fill this out without an account. We'll ask you to sign in when you submit.</p>
+            {!user && (
+              <p className="text-sm text-gray-500 mt-2">
+                You can fill this out without an account. We'll ask you to sign in when you submit.
+              </p>
+            )}
             {hasLocalDraft() && (
               <button
                 onClick={() => {
@@ -2747,7 +2751,6 @@ function DetailsStep({ formData, onChange, onPlaceSelected, errors, userLat, use
             type="date"
             value={formData.date_start || ''}
             onChange={(e) => onChange('date_start', e.target.value)}
-            onClick={(e) => e.currentTarget.showPicker?.()}
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] cursor-pointer ${
               errors?.date_start ? 'border-red-500' : 'border-gray-300'
             }`}
@@ -2784,7 +2787,6 @@ function DetailsStep({ formData, onChange, onPlaceSelected, errors, userLat, use
             type="date"
             value={formData.date_end || formData.date_start || ''}
             onChange={(e) => onChange('date_end', e.target.value)}
-            onClick={(e) => e.currentTarget.showPicker?.()}
             min={formData.date_start || undefined}
             max={formData.date_start ? (() => {
               const startDate = new Date(formData.date_start)

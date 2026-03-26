@@ -30,7 +30,7 @@ export function useAuth() {
     staleTime: 5 * 60 * 1000, // Consider auth data fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (formerly cacheTime)
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
-    refetchOnMount: false, // Don't refetch on component mount if data exists
+    refetchOnMount: true, // Always refetch on mount to avoid stale auth in long-lived sessions
     refetchOnReconnect: true, // Only refetch on network reconnect
     retry: 1, // Only retry once on failure
     retryDelay: 1000, // Wait 1 second before retry
@@ -106,7 +106,16 @@ export function useSignIn() {
       })
 
       if (error) {
-        throw new Error(error.message)
+        const rawMessage = error.message || ''
+        const normalizedMessage = rawMessage.toLowerCase()
+
+        // Map common Supabase credential errors to a stable, user-friendly message
+        if (normalizedMessage.includes('invalid login') || normalizedMessage.includes('invalid credentials')) {
+          throw new Error('Invalid email or password')
+        }
+
+        // Fallback to the original message or a generic error if empty
+        throw new Error(rawMessage || 'Sign in failed. Please try again.')
       }
 
       return data

@@ -75,5 +75,5 @@ describe('Sell Wizard auth messaging and date fields', () => {
 
     expect(mockPush).not.toHaveBeenCalled()
   })
-}
+})
 

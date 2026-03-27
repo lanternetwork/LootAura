@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Call the cleanup function
     const { data, error } = await supabase.rpc('cleanup_sale_drafts')

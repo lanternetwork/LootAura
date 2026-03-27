@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { password, access_token, refresh_token } = updatePasswordSchema.parse(body)
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // If tokens are provided, set the session first

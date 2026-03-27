@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(req)
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: user } = await supabase.auth.getUser()
   if (!user?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   try {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     throw error
   }
   
-  const saleId = params.id
+  const { id: saleId } = await params
   const body = await req.json().catch(() => ({}))
   const requestedStatus = body.status || 'archived'
   

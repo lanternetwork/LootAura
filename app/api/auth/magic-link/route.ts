@@ -37,7 +37,7 @@ async function magicLinkHandler(request: NextRequest) {
       throw error
     }
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Configure email redirect URL

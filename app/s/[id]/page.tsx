@@ -8,20 +8,18 @@ import { serializeState } from '@/lib/url/state'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 interface PageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export default async function ShortlinkPage({ params }: PageProps) {
-  const { id } = params
+  const { id } = await params
 
   if (!id || typeof id !== 'string') {
     notFound()
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
 
     if (!supabase) {
       console.error('Failed to create Supabase client')

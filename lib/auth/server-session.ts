@@ -23,6 +23,8 @@ export interface SupabaseSession {
   }
 }
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>
+
 // Type guard to check if session has required properties
 export function isValidSession(session: any): session is SupabaseSession {
   return (
@@ -43,7 +45,7 @@ export function isValidSession(session: any): session is SupabaseSession {
  * RLS policies are enforced. Use getAdminDb() from lib/supabase/clients.ts
  * only for admin-only operations where RLS bypass is explicitly required.
  */
-export function createServerSupabaseClient(cookieStore: ReturnType<typeof cookies>) {
+export function createServerSupabaseClient(cookieStore: CookieStore) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   
@@ -159,7 +161,7 @@ export function clearSessionCookies(response: NextResponse): void {
  * Validate session from cookies
  * Returns session data if valid, null if invalid/expired
  */
-export async function validateSession(cookieStore: ReturnType<typeof cookies>) {
+export async function validateSession(cookieStore: CookieStore) {
   try {
     // Use the same Supabase client creation method as the route handlers
     // This ensures we read cookies the same way (handles Google OAuth correctly)
@@ -240,7 +242,7 @@ export async function validateSession(cookieStore: ReturnType<typeof cookies>) {
  * Check if user is authenticated based on session cookies
  * Lightweight check for middleware
  */
-export function hasValidSession(cookieStore: ReturnType<typeof cookies>): boolean {
+export function hasValidSession(cookieStore: CookieStore): boolean {
   try {
     const accessToken = cookieStore.get('sb-access-token')
     const refreshToken = cookieStore.get('sb-refresh-token')

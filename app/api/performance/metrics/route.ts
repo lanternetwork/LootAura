@@ -41,7 +41,7 @@ async function metricsHandler(_request: NextRequest) {
     const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
     
     if (!isDebugMode) {
-      const cookieStore = cookies()
+      const cookieStore = await cookies()
       const supabase = createServerSupabaseClient(cookieStore)
       
       const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -129,7 +129,7 @@ export const GET = withRateLimit(metricsHandler, [
 
 async function getDatabaseMetrics() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Get query performance stats

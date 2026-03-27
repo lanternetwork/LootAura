@@ -8,7 +8,7 @@ import { ReportSaleSchema } from '@/lib/validators/reportSale'
 import { fail, ok } from '@/lib/http/json'
 import { logger } from '@/lib/log'
 
-async function reportHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function reportHandler(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(req)
@@ -16,14 +16,14 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
     return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   }
 
-  const saleId = params.id
+  const { id: saleId } = await context.params
 
   // Parse and validate request body
   let body: any
@@ -179,13 +179,13 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
   return ok({ reported: true })
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServerClient()
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 
   return withRateLimit(
-    (request) => reportHandler(request, { params }),
+    (request) => reportHandler(request, context),
     [Policies.REPORT_SALE],
     { userId }
   )(req)

@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 // GET: Get latest draft for authenticated user
 export async function GET(_request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -523,7 +523,7 @@ async function deleteDraftHandler(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -589,7 +589,7 @@ async function deleteDraftHandler(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   // Get user ID for rate limiting
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 

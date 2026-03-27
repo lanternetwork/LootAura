@@ -12,11 +12,13 @@ export const revalidate = 0
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  let saleIdForLog: string | undefined
   try {
-    const supabase = createSupabaseServerClient()
-    const saleId = params.id
+    const supabase = await createSupabaseServerClient()
+    const { id: saleId } = await params
+    saleIdForLog = saleId
 
     if (!saleId) {
       return NextResponse.json(
@@ -83,7 +85,7 @@ export async function GET(
     logger.error('Error fetching sale', error instanceof Error ? error : new Error(String(error)), {
       component: 'api/sales/[id]',
       operation: 'GET',
-      saleId: params.id,
+      saleId: saleIdForLog,
     })
     return NextResponse.json(
       { error: 'Internal server error' },

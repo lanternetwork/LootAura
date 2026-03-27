@@ -18,7 +18,7 @@ async function countHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
     // Parse location

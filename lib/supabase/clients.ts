@@ -18,7 +18,7 @@ export async function getRlsDb(_request?: NextRequest) {
   // In API routes, always use cookies() from next/headers for consistency
   // This ensures the RLS client sees the same session as createSupabaseServerClient()
   // The request parameter is kept for backward compatibility but not used for cookie reading
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   
   // Use getAll/setAll pattern (recommended for Next.js App Router)
   // This ensures all cookies are read/written correctly, especially for OAuth flows
@@ -79,7 +79,7 @@ export async function getRlsBaseClient(_request?: NextRequest) {
     throw new Error('Supabase credentials missing')
   }
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   
   const sb = createServerClient(url, anon, {
     cookies: {

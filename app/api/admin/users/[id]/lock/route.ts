@@ -15,7 +15,10 @@ const LockUserSchema = z.object({
   reason: z.string().max(500).optional().nullable(),
 })
 
-async function lockUserHandler(request: NextRequest, { params }: { params: { id: string } }) {
+async function lockUserHandler(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   let user: { id: string; email?: string }
   try {
     // Require admin access
@@ -32,7 +35,7 @@ async function lockUserHandler(request: NextRequest, { params }: { params: { id:
   }
 
   try {
-    const userId = params.id
+    const { id: userId } = await context.params
 
     // Parse and validate request body
     let body: any
@@ -113,9 +116,9 @@ async function lockUserHandler(request: NextRequest, { params }: { params: { id:
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   return withRateLimit(
-    (req) => lockUserHandler(req, { params }),
+    (req) => lockUserHandler(req, context),
     [Policies.ADMIN_TOOLS, Policies.ADMIN_HOURLY],
     {}
   )(request)

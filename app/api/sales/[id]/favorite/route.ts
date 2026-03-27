@@ -6,14 +6,14 @@ import { logger } from '@/lib/log'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 
-async function favoriteHandler(req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+async function favoriteHandler(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   // CSRF protection check
   const csrfError = await checkCsrfIfRequired(req)
   if (csrfError) {
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
 
   // Auth check
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -32,9 +32,7 @@ async function favoriteHandler(req: NextRequest, { params }: { params: Promise<{
     throw error
   }
 
-  // Handle params as Promise (Next.js 15+) or object (Next.js 13/14)
-  const resolvedParams = await Promise.resolve(params)
-  const saleId = resolvedParams.id
+  const { id: saleId } = await context.params
 
   if (!saleId) {
     return NextResponse.json({ error: 'Sale ID is required' }, { status: 400 })
@@ -112,7 +110,7 @@ async function favoriteHandler(req: NextRequest, { params }: { params: Promise<{
   return ok({ favorited: true })
 }
 
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   // Create a wrapper that captures params for the rate-limited handler
   const wrappedHandler = async (request: NextRequest) => {
     return favoriteHandler(request, context)

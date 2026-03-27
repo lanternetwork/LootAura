@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { email } = resendSchema.parse(body)
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Resend confirmation email

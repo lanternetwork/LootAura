@@ -15,10 +15,11 @@ import { ENV_PUBLIC } from '@/lib/env'
  * The file should contain just the verification code as plain text.
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { googleVerification: string[] } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ googleVerification: string[] }> }
 ) {
-  const path = params.googleVerification.join('/')
+  const resolvedParams = await params
+  const path = resolvedParams.googleVerification.join('/')
   const verificationFile = ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION_FILE
   
   // Only handle Google verification files (must start with "google" and end with ".html")

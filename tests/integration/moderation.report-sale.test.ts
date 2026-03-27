@@ -371,7 +371,7 @@ describe('POST /api/sales/[id]/report', () => {
         { reason: 'spam', details: 'Test report' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(200)
@@ -408,7 +408,7 @@ describe('POST /api/sales/[id]/report', () => {
         { reason: 'spam' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(200)
@@ -433,7 +433,7 @@ describe('POST /api/sales/[id]/report', () => {
         { reason: 'spam', details: 'Duplicate' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(200)
@@ -515,7 +515,7 @@ describe('POST /api/sales/[id]/report', () => {
         { reason: 'spam' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(200)
@@ -589,7 +589,7 @@ describe('POST /api/sales/[id]/report', () => {
         { reason: 'spam' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(200)
@@ -608,7 +608,7 @@ describe('POST /api/sales/[id]/report', () => {
         { csrfToken: null }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(403)
@@ -652,7 +652,7 @@ describe('POST /api/sales/[id]/report', () => {
         { reason: 'spam' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(429)
@@ -679,7 +679,7 @@ describe('POST /api/sales/[id]/report', () => {
         { reason: 'spam' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(404)
@@ -693,7 +693,7 @@ describe('POST /api/sales/[id]/report', () => {
         { invalid: 'data' }
       )
 
-      const response = await POST(request, { params: { id: saleId } })
+      const response = await POST(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(400)

@@ -13,7 +13,7 @@ async function avatarHandler(request: NextRequest) {
     return csrfError
   }
 
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   try {
@@ -98,7 +98,7 @@ async function avatarHandler(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   // Get user ID for rate limiting
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user } } = await sb.auth.getUser()
   const userId = user?.id
 

@@ -17,11 +17,11 @@ import { fail, ok } from '@/lib/http/json'
 
 export const dynamic = 'force-dynamic'
 
-async function metricsHandler(request: NextRequest, { params }: { params: { id: string } }) {
-  const saleId = params.id
+async function metricsHandler(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id: saleId } = await context.params
 
   // Auth required
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return fail(401, 'AUTH_REQUIRED', 'Authentication required')
@@ -101,9 +101,9 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
   })
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   return withRateLimit(
-    (req) => metricsHandler(req, { params }),
+    (req) => metricsHandler(req, context),
     [Policies.SALES_VIEW_30S]
   )(request)
 }

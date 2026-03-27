@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const days = parseInt(searchParams.get('days') || '7', 10)
     const includeTest = searchParams.get('includeTest') === 'true'
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const db = await getRlsDb()
 
     // Check if table exists and is readable

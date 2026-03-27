@@ -12,7 +12,7 @@ import { redirect, notFound } from 'next/navigation'
  * Throws NextResponse with 403 if not admin
  */
 export async function assertAdminOrThrow(_req: Request): Promise<{ user: { id: string; email?: string } }> {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
@@ -48,7 +48,7 @@ export async function assertAdminOrThrow(_req: Request): Promise<{ user: { id: s
  * Returns 404 if authenticated but not an admin
  */
 export async function requireAdminToolsAccess(): Promise<{ user: { id: string; email: string } }> {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   // If no user, redirect to sign-in

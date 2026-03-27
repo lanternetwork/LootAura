@@ -4,7 +4,7 @@ import { ProfileUpdateSchema } from '@/lib/validators/profile'
 import { isAllowedAvatarUrl } from '@/lib/cloudinary'
 
 export async function GET(_req: NextRequest) {
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   // Note: GET requests are read-only and should NOT be blocked by account locks
@@ -216,7 +216,7 @@ export async function PUT(req: NextRequest) {
     console.log('[PROFILE] CSRF check passed, proceeding with profile update')
   }
 
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   // Account lock enforcement (fail-closed)
@@ -460,7 +460,7 @@ export async function POST(_request: NextRequest) {
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   try {

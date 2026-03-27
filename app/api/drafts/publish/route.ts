@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   let user: any = null
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !authUser) {

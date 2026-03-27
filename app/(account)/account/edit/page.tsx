@@ -6,7 +6,7 @@ import EditProfileClient from './EditProfileClient'
 export const dynamic = 'force-dynamic'
 
 export default async function EditProfilePage() {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const {
     data: { user },
     error: authError,

@@ -42,7 +42,7 @@ async function salesHandler(request: NextRequest) {
   const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
   
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
     // Check for near=1 parameter (location-scoped landing page queries)
@@ -1056,7 +1056,7 @@ async function postHandler(request: NextRequest) {
 
   let user: { id: string } | null = null
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
 
     // Check authentication (allow test environment bypass to keep integration tests hermetic)
     const authResponse = await supabase.auth.getUser()

@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { state } = ShareRequestSchema.parse(body)
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const shortId = nanoid(8) // 8-character short ID
 
     // Store in database
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
 
     // Retrieve from database
     const { data, error } = await supabase

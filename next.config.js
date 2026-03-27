@@ -61,8 +61,11 @@ const nextConfig = {
   },
   // Compress responses
   compress: true,
-  // Enable SWC minification
-  swcMinify: true,
+  // Lint already runs in dedicated CI jobs.
+  // Avoid duplicate lint invocation during `next build` on Next 15.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Security headers
   async headers() {
     return [

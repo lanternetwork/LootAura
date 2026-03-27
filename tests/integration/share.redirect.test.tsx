@@ -58,7 +58,7 @@ describe('Share Redirect Integration', () => {
     const { serializeState } = await import('@/lib/url/state')
     vi.mocked(serializeState).mockReturnValue('lat=40.7128&lng=-74.006&zoom=12')
 
-    await ShortlinkPage({ params: { id: 'test12345' } })
+    await ShortlinkPage({ params: Promise.resolve({ id: 'test12345' }) })
 
     expect(mockSupabase.from).toHaveBeenCalledWith('shared_states')
     expect(serializeState).toHaveBeenCalledWith(mockState)
@@ -66,7 +66,7 @@ describe('Share Redirect Integration', () => {
   })
 
   it('should call notFound for invalid short ID', async () => {
-    await ShortlinkPage({ params: { id: '' } })
+    await ShortlinkPage({ params: Promise.resolve({ id: '' }) })
 
     expect(notFound).toHaveBeenCalled()
   })
@@ -82,7 +82,7 @@ describe('Share Redirect Integration', () => {
     })
     mockSupabase.from.mockReturnValue({ select: mockSelect })
 
-    await ShortlinkPage({ params: { id: 'nonexistent' } })
+    await ShortlinkPage({ params: Promise.resolve({ id: 'nonexistent' }) })
 
     expect(notFound).toHaveBeenCalled()
   })
@@ -98,7 +98,7 @@ describe('Share Redirect Integration', () => {
     // Mock console.error to avoid noise in tests
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    await ShortlinkPage({ params: { id: 'test12345' } })
+    await ShortlinkPage({ params: Promise.resolve({ id: 'test12345' }) })
 
     expect(consoleSpy).toHaveBeenCalled()
     expect(notFound).toHaveBeenCalled()

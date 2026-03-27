@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fallbacks: la_loc cookie → neutral US center
-    const store = cookies()
+    const store = await cookies()
     const saved = store.get('la_loc')?.value
     if (saved) {
       try {

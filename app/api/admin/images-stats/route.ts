@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 
 export async function GET(_request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Get last 10 sales with cover_image_url and images fields
     const { data: recentSales, error: salesError } = await supabase

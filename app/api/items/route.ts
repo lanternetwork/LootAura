@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
     const saleId = searchParams.get('sale_id')
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -154,7 +154,7 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -235,7 +235,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()

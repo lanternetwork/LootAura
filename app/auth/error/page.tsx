@@ -1,9 +1,10 @@
 interface AuthErrorPageProps {
-  searchParams: { error?: string }
+  searchParams: Promise<{ error?: string }>
 }
 
-export default function AuthErrorPage({ searchParams }: AuthErrorPageProps) {
-  const error = searchParams.error || 'unknown_error'
+export default async function AuthErrorPage({ searchParams }: AuthErrorPageProps) {
+  const { error: errorParam } = await searchParams
+  const error = errorParam || 'unknown_error'
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">

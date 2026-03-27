@@ -32,7 +32,7 @@ export async function POST(_request: NextRequest) {
     if (vapidError) {
       return NextResponse.json({ ok: false, error: vapidError }, { status: 500 })
     }
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {

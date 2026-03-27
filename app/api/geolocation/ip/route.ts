@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const headersList = await headers()
     
@@ -27,9 +27,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Fallback to external IP geolocation APIs (try multiple for better accuracy)
-    const clientIP = headersList.get('x-forwarded-for') || 
-                     headersList.get('x-real-ip') || 
-                     request.ip ||
+    const forwardedFor = headersList.get('x-forwarded-for') || ''
+    const clientIP = forwardedFor.split(',')[0]?.trim() ||
+                     headersList.get('x-real-ip') ||
                      '127.0.0.1'
 
     console.log('[IP_GEOLOCATION] Client IP:', clientIP)

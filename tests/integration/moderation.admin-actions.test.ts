@@ -332,7 +332,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
       body: JSON.stringify({ status: 'resolved' }),
     })
 
-    const response = await PATCH(request, { params: { id: reportId } })
+    const response = await PATCH(request, { params: Promise.resolve({ id: reportId }) })
     const data = await response.json()
 
     expect(response.status).toBe(403)
@@ -372,7 +372,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
       body: JSON.stringify({ status: 'resolved', admin_notes: 'Resolved by admin' }),
     })
 
-    const response = await PATCH(request, { params: { id: reportId } })
+    const response = await PATCH(request, { params: Promise.resolve({ id: reportId }) })
     const data = await response.json()
 
     expect(response.status).toBe(200)
@@ -427,7 +427,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
       body: JSON.stringify({ status: 'resolved', hide_sale: true }),
     })
 
-    const response = await PATCH(request, { params: { id: reportId } })
+    const response = await PATCH(request, { params: Promise.resolve({ id: reportId }) })
     const data = await response.json()
 
     expect(response.status).toBe(200)
@@ -499,7 +499,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
       body: JSON.stringify({ status: 'resolved', lock_account: true }),
     })
 
-    const response = await PATCH(request, { params: { id: reportId } })
+    const response = await PATCH(request, { params: Promise.resolve({ id: reportId }) })
     const data = await response.json()
 
     expect(response.status).toBe(200)
@@ -538,7 +538,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
       body: JSON.stringify({ status: 'resolved' }),
     })
 
-    const response = await PATCH(request, { params: { id: reportId } })
+    const response = await PATCH(request, { params: Promise.resolve({ id: reportId }) })
     const data = await response.json()
 
     expect(response.status).toBe(404)
@@ -551,7 +551,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
       body: JSON.stringify({ status: 'invalid_status' }),
     })
 
-    const response = await PATCH(request, { params: { id: reportId } })
+    const response = await PATCH(request, { params: Promise.resolve({ id: reportId }) })
     const data = await response.json()
 
     expect(response.status).toBe(400)

@@ -300,7 +300,7 @@ async function zipHandler(request: NextRequest) {
       // Track ZIP usage for authenticated users (non-blocking)
       // This helps determine primary ZIP for featured email selection
       try {
-        const supabase = createSupabaseServerClient()
+        const supabase = await createSupabaseServerClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           // Increment ZIP usage (fire and forget - don't block response)

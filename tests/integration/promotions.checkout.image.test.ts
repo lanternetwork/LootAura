@@ -47,7 +47,7 @@ describe('Promotion Checkout Image Selection', () => {
       })
 
       const request = new NextRequest(`http://localhost/api/sales/${saleId}/summary`)
-      const response = await GET(request, { params: { id: saleId } })
+      const response = await GET(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(200)
@@ -76,7 +76,7 @@ describe('Promotion Checkout Image Selection', () => {
       })
 
       const request = new NextRequest(`http://localhost/api/sales/${saleId}/summary`)
-      const response = await GET(request, { params: { id: saleId } })
+      const response = await GET(request, { params: Promise.resolve({ id: saleId }) })
       const data = await response.json()
 
       expect(response.status).toBe(200)

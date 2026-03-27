@@ -12,7 +12,7 @@ import { isInAppUserAgent } from '@/lib/runtime/isNativeApp'
 const NEUTRAL_CENTER = { lat: 39.8283, lng: -98.5795 }
 
 interface SalesPageProps {
-  searchParams: {
+  searchParams: Promise<{
     lat?: string
     lng?: string
     zoom?: string
@@ -24,7 +24,7 @@ interface SalesPageProps {
     dateTo?: string
     page?: string
     pageSize?: string
-  }
+  }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -56,7 +56,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     )
   }
 
-  const supabase = createSupabaseServerClient()
+  const sp = await searchParams
+
+  const supabase = await createSupabaseServerClient()
   let user: any = null
   try {
     const res = await supabase.auth.getUser()
@@ -66,16 +68,16 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   }
 
   // Parse search parameters (for future use)
-  const _lat = searchParams.lat ? parseFloat(searchParams.lat) : undefined
-  const _lng = searchParams.lng ? parseFloat(searchParams.lng) : undefined
-  const _zip = searchParams.zip
-  const _distanceKm = searchParams.distanceKm ? parseFloat(searchParams.distanceKm) : 25
-  const _city = searchParams.city
-  const _categories = searchParams.categories ? searchParams.categories.split(',') : undefined
-  const _pageSize = searchParams.pageSize ? parseInt(searchParams.pageSize) : 50
+  const _lat = sp.lat ? parseFloat(sp.lat) : undefined
+  const _lng = sp.lng ? parseFloat(sp.lng) : undefined
+  const _zip = sp.zip
+  const _distanceKm = sp.distanceKm ? parseFloat(sp.distanceKm) : 25
+  const _city = sp.city
+  const _categories = sp.categories ? sp.categories.split(',') : undefined
+  const _pageSize = sp.pageSize ? parseInt(sp.pageSize) : 50
 
   // Resolve initial center server-side (headersList from top of function)
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
   const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
   // Use fallback if host is empty (matching pattern from app/sell/new/page.tsx)
@@ -278,8 +280,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   // Compute initial sales and buffered bounds server-side (matching client's first fetch)
   // Only seed if we have a valid center (skip if ZIP needs client-side resolution)
-  const urlZoom = searchParams.zoom
-  const urlZip = searchParams.zip
+  const urlZoom = sp.zoom
+  const urlZip = sp.zip
   const zipNeedsResolution = urlZip && !_lat && !_lng && 
     (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
   
@@ -290,7 +292,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   if (initialCenter && !zipNeedsResolution) {
     try {
       // Parse filters from URL (matching client's useFilters initialization)
-      const dateRange = searchParams.dateFrom || searchParams.dateTo ? 'range' : 'any'
+      const dateRange = sp.dateFrom || sp.dateTo ? 'range' : 'any'
       const categories = _categories || []
       const distance = _distanceKm ? _distanceKm / 1.60934 : 10 // Convert km to miles, default 10
       

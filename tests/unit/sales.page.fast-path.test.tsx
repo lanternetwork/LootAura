@@ -67,7 +67,7 @@ describe('Sales page fast path', () => {
     } as Headers)
 
     const SalesPage = (await import('@/app/sales/page')).default
-    await SalesPage({ searchParams: {} })
+    await SalesPage({ searchParams: Promise.resolve({}) })
 
     expect(mockCreateSupabaseServerClient).not.toHaveBeenCalled()
     expect(mockComputeSSRInitialSales).not.toHaveBeenCalled()
@@ -81,7 +81,7 @@ describe('Sales page fast path', () => {
     } as Headers)
 
     const SalesPage = (await import('@/app/sales/page')).default
-    await SalesPage({ searchParams: {} })
+    await SalesPage({ searchParams: Promise.resolve({}) })
 
     expect(mockCreateSupabaseServerClient).toHaveBeenCalled()
     // With Vercel IP headers we get initialCenter, so computeSSRInitialSales is called

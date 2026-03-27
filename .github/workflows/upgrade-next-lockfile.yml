@@ -1,0 +1,42 @@
+name: Upgrade Next lockfile helper
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install upgraded deps (attempt without React bump)
+        id: install_base
+        continue-on-error: true
+        run: npm install next@15.5.14 eslint-config-next@15.5.14
+
+      - name: Install upgraded deps (with React alignment if required)
+        if: steps.install_base.outcome == 'failure'
+        run: npm install next@15.5.14 eslint-config-next@15.5.14 react@19.1.1 react-dom@19.1.1
+
+      - name: Commit updated lockfile/deps
+        run: |
+          if git diff --quiet; then
+            echo "No dependency changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: bump next to 15.5.14 and refresh lockfile"
+          git push

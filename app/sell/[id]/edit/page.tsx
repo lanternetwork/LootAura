@@ -4,13 +4,12 @@ import SellWizardClient from '../../new/SellWizardClient'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 
 interface SellEditPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export default async function SellEditPage({ params }: SellEditPageProps) {
-  const sale = await getSaleById(params.id)
+  const { id } = await params
+  const sale = await getSaleById(id)
 
   if (!sale) {
     notFound()
@@ -30,7 +29,7 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
       const admin = getAdminDb()
       const { data: saleData } = await fromBase(admin, 'sales')
         .select('tags')
-        .eq('id', params.id)
+        .eq('id', id)
         .maybeSingle()
       
       if (saleData && saleData.tags) {
@@ -44,7 +43,7 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
         }
       } else {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[EDIT_PAGE] No tags found in base table for sale:', params.id)
+          console.log('[EDIT_PAGE] No tags found in base table for sale:', id)
         }
       }
     } catch (error) {

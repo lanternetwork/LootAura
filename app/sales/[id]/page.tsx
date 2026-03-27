@@ -8,19 +8,18 @@ import SaleDetailClient from './SaleDetailClient'
 import { createSaleMetadata, createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 
 interface SaleDetailPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
+  const { id } = await params
   const supabase = createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
   const isDebugAdmin = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
   const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase())) || isDebugAdmin
-  const result = await getSaleWithItems(supabase, params.id)
+  const result = await getSaleWithItems(supabase, id)
 
   if (!result) {
     notFound()
@@ -38,7 +37,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     const { logger } = await import('@/lib/log')
     logger.debug('Sale detail page rendering', {
       component: 'sales/[id]/page',
-      saleId: params.id,
+      saleId: id,
       itemsCount: items.length,
       saleStatus: sale.status,
       items: items.map(i => ({ 
@@ -65,7 +64,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
   // Fetch nearby sales (non-blocking - if it fails, we just don't show the card)
-  const nearbySales = await getNearestSalesForSale(supabase, params.id, 2).catch(() => [])
+  const nearbySales = await getNearestSalesForSale(supabase, id, 2).catch(() => [])
 
   // Fetch current user's rating for this seller (if authenticated)
   let currentUserRating: number | null = null
@@ -115,12 +114,13 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 }
 
 export async function generateMetadata({ params }: SaleDetailPageProps): Promise<Metadata> {
+  const { id } = await params
   const supabase = createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
   const isDebugAdmin = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
   const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase())) || isDebugAdmin
-  const result = await getSaleWithItems(supabase, params.id)
+  const result = await getSaleWithItems(supabase, id)
   
   if (!result || ((result.sale as any).moderation_status === 'hidden_by_admin' && !isAdmin)) {
     return {

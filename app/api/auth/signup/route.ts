@@ -23,7 +23,7 @@ async function signupHandler(request: NextRequest) {
     }
     const { email, password } = signupSchema.parse(sanitizedBody)
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Configure email redirect URL

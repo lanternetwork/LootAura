@@ -48,7 +48,7 @@ async function callbackHandler(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/error?error=missing_code', url.origin))
     }
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Exchange code for session

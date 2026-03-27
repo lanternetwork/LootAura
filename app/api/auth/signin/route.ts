@@ -17,7 +17,7 @@ async function signinHandler(request: NextRequest) {
     const body = await request.json()
     const { email, password } = signinSchema.parse(body)
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Attempt to sign in with Supabase

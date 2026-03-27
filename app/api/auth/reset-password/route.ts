@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { email } = resetPasswordSchema.parse(body)
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Configure email redirect URL

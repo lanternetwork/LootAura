@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(_request: NextRequest) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Revoke the current session

@@ -22,7 +22,9 @@ export function generateCsrfToken(): string {
 }
 
 export function setCsrfToken(token: string): void {
-  const cookieStore = cookies()
+  const cookieStore = cookies() as unknown as {
+    set: (name: string, value: string, options: Record<string, unknown>) => void
+  }
   // CSRF token must be readable by client-side JavaScript to send in x-csrf-token header
   // Security is maintained by validating that header token matches cookie token
   cookieStore.set(CSRF_TOKEN_COOKIE, token, {
@@ -35,7 +37,9 @@ export function setCsrfToken(token: string): void {
 }
 
 export function getCsrfToken(): string | null {
-  const cookieStore = cookies()
+  const cookieStore = cookies() as unknown as {
+    get: (name: string) => { value?: string } | undefined
+  }
   return cookieStore.get(CSRF_TOKEN_COOKIE)?.value || null
 }
 

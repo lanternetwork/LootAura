@@ -14,12 +14,13 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 
 type PublicProfilePageProps = {
-  params: { username: string }
-  searchParams: { page?: string }
+  params: Promise<{ username: string }>
+  searchParams: Promise<{ page?: string }>
 }
 
-export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
-  const slug = decodeURIComponent(params.username)
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const resolvedParams = await params
+  const slug = decodeURIComponent(resolvedParams.username)
   const supabase = createSupabaseServerClient()
   
   // Detect if slug is UUID
@@ -188,8 +189,10 @@ function ProfileSkeleton() {
 }
 
 export default async function PublicProfilePage({ params, searchParams }: PublicProfilePageProps) {
-  const slug = decodeURIComponent(params.username)
-  const page = Number(searchParams.page || '1')
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
+  const slug = decodeURIComponent(resolvedParams.username)
+  const page = Number(resolvedSearchParams.page || '1')
   
   const data = await fetchProfileData(slug)
   if (!data) return notFound()

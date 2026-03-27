@@ -101,7 +101,7 @@ export async function middleware(req: NextRequest) {
   
   // Initialize CSRF token early for ALL requests (before any early returns)
   // This ensures the cookie is available for client-side JavaScript on all pages
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   let csrfToken: string | null = null
   try {
     const { generateCsrfToken, getCsrfToken } = await import('@/lib/csrf')

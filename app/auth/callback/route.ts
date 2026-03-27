@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     requestId: correlationId
   })
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   // Detect if request is over HTTPS (for Vercel preview deployments)
   const protocol = url.protocol

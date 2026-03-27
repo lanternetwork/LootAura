@@ -33,7 +33,10 @@ export function createSupabaseServerClient() {
   logSchemaOnce();
 
   const _schema = getSchema();
-  const cookieStore = cookies()
+  const cookieStore = cookies() as unknown as {
+    get: (name: string) => { value?: string } | undefined
+    set: (cookie: { name: string; value: string; maxAge?: number } & Record<string, unknown>) => void
+  }
 
   // This client is intended for Server Components and must not write cookies.
   // Mutations and session refresh belong in Route Handlers / API routes.
@@ -72,7 +75,10 @@ export function createSupabaseWriteClient() {
     throw new Error('Supabase credentials missing');
   }
 
-  const cookieStore = cookies()
+  const cookieStore = cookies() as unknown as {
+    get: (name: string) => { value?: string } | undefined
+    set: (cookie: { name: string; value: string; maxAge?: number } & Record<string, unknown>) => void
+  }
 
   return createServerClient(url, anon, {
     cookies: {

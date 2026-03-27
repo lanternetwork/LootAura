@@ -25,16 +25,17 @@ async function searchHandler(request: NextRequest) {
       supabase = createSupabaseServerClient()
     } else {
       try {
+        const cookieStore = await cookies()
         supabase = createServerClient(url, anon, {
           cookies: {
             get(name: string) {
-              return cookies().get(name)?.value
+              return cookieStore.get(name)?.value
             },
             set(name: string, value: string, options: any) {
-              cookies().set({ name, value, ...options })
+              cookieStore.set({ name, value, ...options })
             },
             remove(name: string, options: any) {
-              cookies().set({ name, value: '', ...options, maxAge: 0 })
+              cookieStore.set({ name, value: '', ...options, maxAge: 0 })
             },
           },
           // Use default public schema

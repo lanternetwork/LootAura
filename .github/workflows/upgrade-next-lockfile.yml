@@ -1,6 +1,9 @@
 name: Upgrade Next lockfile helper
 
 on:
+  push:
+    branches:
+      - chore/next-15-5-14-upgrade
   workflow_dispatch:
 
 permissions:

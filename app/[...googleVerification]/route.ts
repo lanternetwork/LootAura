@@ -16,7 +16,7 @@ import { ENV_PUBLIC } from '@/lib/env'
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ googleVerification: string[] }> | { googleVerification: string[] } }
+  { params }: { params: Promise<{ googleVerification: string[] }> }
 ) {
   const resolvedParams = await params
   const path = resolvedParams.googleVerification.join('/')

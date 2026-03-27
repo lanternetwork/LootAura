@@ -58,7 +58,7 @@ async function markersHandler(request: NextRequest) {
       })
     }
 
-    const sb = createSupabaseServerClient()
+    const sb = await createSupabaseServerClient()
     
     // Validate and parse date range parameters early (before query)
     const dateValidation = dateBounds.validateDateRange(startDate, endDate)

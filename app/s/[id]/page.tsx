@@ -19,7 +19,7 @@ export default async function ShortlinkPage({ params }: PageProps) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
 
     if (!supabase) {
       console.error('Failed to create Supabase client')

@@ -16,7 +16,7 @@ export async function GET(
 ) {
   let saleIdForLog: string | undefined
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { id: saleId } = await params
     saleIdForLog = saleId
 

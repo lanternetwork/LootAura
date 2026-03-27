@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export async function deriveCategories(userId: string, monthsLookback = 12): Promise<string[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const since = new Date()
   since.setMonth(since.getMonth() - monthsLookback)
   // Use SQL aggregation to avoid transferring all rows

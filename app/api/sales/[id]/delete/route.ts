@@ -13,7 +13,7 @@ async function deleteHandler(req: NextRequest, context: { params: Promise<{ id: 
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: user } = await supabase.auth.getUser()
   if (!user?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   try {
@@ -75,7 +75,7 @@ async function deleteHandler(req: NextRequest, context: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   // Get user ID for rate limiting
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 

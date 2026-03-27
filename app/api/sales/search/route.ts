@@ -22,7 +22,7 @@ async function searchHandler(request: NextRequest) {
     // In test environments, always use the mocked client
     if (process.env.NODE_ENV === 'test' || !url || !anon) {
       const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-      supabase = createSupabaseServerClient()
+      supabase = await createSupabaseServerClient()
     } else {
       try {
         const cookieStore = await cookies()
@@ -44,7 +44,7 @@ async function searchHandler(request: NextRequest) {
         // If cookies() is not available, fall back to mocked client
         if (cookieError?.message?.includes('cookies') || cookieError?.message?.includes('request scope')) {
           const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-          supabase = createSupabaseServerClient()
+          supabase = await createSupabaseServerClient()
         } else {
           throw cookieError
         }

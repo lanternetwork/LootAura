@@ -21,7 +21,7 @@ const DeletionRequestSchema = z.object({
 // GET: Fetch user's current deletion request
 async function getHandler(request: NextRequest): Promise<NextResponse> {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -68,7 +68,7 @@ async function postHandler(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()

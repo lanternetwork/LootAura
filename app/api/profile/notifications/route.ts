@@ -16,7 +16,7 @@ const NotificationPreferencesSchema = z.object({
 })
 
 export async function GET() {
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   // Note: GET requests are read-only and should NOT be blocked by account locks
@@ -63,7 +63,7 @@ export async function PUT(request: NextRequest) {
     return csrfError
   }
 
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   try {

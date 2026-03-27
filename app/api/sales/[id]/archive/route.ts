@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: user } = await supabase.auth.getUser()
   if (!user?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   try {

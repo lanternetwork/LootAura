@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { T } from '@/lib/supabase/tables'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   
   // Get all published sales for dynamic URLs
   const { data: sales } = await supabase

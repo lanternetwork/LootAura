@@ -17,7 +17,7 @@ async function updateSocialLinksHandler(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Guard against undefined/null supabase client
     if (!supabase || !supabase.auth) {
@@ -126,7 +126,7 @@ async function updateSocialLinksHandler(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   // Get user ID for rate limiting
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 

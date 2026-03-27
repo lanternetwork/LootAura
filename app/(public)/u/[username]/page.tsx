@@ -21,7 +21,7 @@ type PublicProfilePageProps = {
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const resolvedParams = await params
   const slug = decodeURIComponent(resolvedParams.username)
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   
   // Detect if slug is UUID
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
@@ -64,7 +64,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
 }
 
 async function fetchProfileData(slug: string) {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[PROFILE] public page fetch start', { slug })
@@ -128,7 +128,7 @@ async function fetchProfileData(slug: string) {
 }
 
 async function fetchListings(userId: string, page: number) {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const limit = 12
   const from = (page - 1) * limit
   const to = from + limit - 1

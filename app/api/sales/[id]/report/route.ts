@@ -16,7 +16,7 @@ async function reportHandler(req: NextRequest, context: { params: Promise<{ id: 
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
@@ -180,7 +180,7 @@ async function reportHandler(req: NextRequest, context: { params: Promise<{ id: 
 }
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 

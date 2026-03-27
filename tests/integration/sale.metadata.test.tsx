@@ -57,7 +57,7 @@ async function testGenerateMetadata(saleId: string): Promise<Metadata> {
   const { getSaleWithItems } = await import('@/lib/data/salesAccess')
   const { createSaleMetadata } = await import('@/lib/metadata')
   
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const result = await getSaleWithItems(supabase, saleId)
   
   if (!result) {

@@ -21,7 +21,7 @@ async function metricsHandler(request: NextRequest, context: { params: Promise<{
   const { id: saleId } = await context.params
 
   // Auth required
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return fail(401, 'AUTH_REQUIRED', 'Authentication required')

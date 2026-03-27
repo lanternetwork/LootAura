@@ -67,7 +67,7 @@ describe('Public Read Shape Validation', () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase
       .from('sales_v2')
       .select('id, title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, status, is_featured, created_at, updated_at')
@@ -126,7 +126,7 @@ describe('Public Read Shape Validation', () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase
       .from('sales_v2')
       .select('id, title, lat, lng')
@@ -178,7 +178,7 @@ describe('Public Read Shape Validation', () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase
       .from('profiles_v2')
       .select('id, username, full_name, avatar_url')
@@ -229,7 +229,7 @@ describe('Public Read Shape Validation', () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase
       .from('items_v2')
       .select('id, sale_id, name, description, price, category, condition, images, is_sold, created_at, updated_at')
@@ -268,7 +268,7 @@ describe('Public Read Shape Validation', () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase
       .from('sales_v2')
       .select('id, title') // Only select safe fields

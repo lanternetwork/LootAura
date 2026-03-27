@@ -374,7 +374,7 @@ async function finalizeDraftPromotion(
               try {
                 const { getUserProfile } = await import('@/lib/data/profileAccess')
                 const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-                const supabase = createSupabaseServerClient()
+                const supabase = await createSupabaseServerClient()
                 const profile = await getUserProfile(supabase, userId)
                 displayName = profile?.display_name ?? undefined
               } catch {

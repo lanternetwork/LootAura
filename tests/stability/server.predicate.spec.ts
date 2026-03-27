@@ -29,7 +29,7 @@ describe('server.predicate', () => {
     const normalized = normalizeCategories(categories)
     
     // Simulate server query
-    const sb = createSupabaseServerClient()
+    const sb = await createSupabaseServerClient()
     const { data: salesWithCategories } = await sb
       .from('items_v2')
       .select('sale_id')
@@ -59,7 +59,7 @@ describe('server.predicate', () => {
     expect(normalized).toEqual(['furniture', 'tools'])
     
     // Simulate server query with normalized values
-    const sb = createSupabaseServerClient()
+    const sb = await createSupabaseServerClient()
     const { data: salesWithCategories } = await sb
       .from('items_v2')
       .select('sale_id')

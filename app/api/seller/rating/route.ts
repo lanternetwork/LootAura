@@ -13,7 +13,7 @@ async function postHandler(req: NextRequest) {
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
 
   // Auth check
   const { data: { user }, error: authError } = await supabase.auth.getUser()

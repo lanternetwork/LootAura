@@ -5,7 +5,7 @@ import { PreferencesSchema } from '@/lib/validators/preferences'
 const DEFAULTS = { theme: 'system', email_opt_in: false, units: 'imperial', discovery_radius_km: 10 }
 
 export async function GET() {
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   // Note: GET requests are read-only and should NOT be blocked by account locks
@@ -46,7 +46,7 @@ async function putPreferencesHandler(req: Request) {
     return csrfError
   }
 
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
@@ -116,7 +116,7 @@ async function putPreferencesHandler(req: Request) {
 
 export async function PUT(req: Request) {
   // Get user ID for rate limiting
-  const sb = createSupabaseServerClient()
+  const sb = await createSupabaseServerClient()
   const { data: { user } } = await sb.auth.getUser()
   const userId = user?.id
 

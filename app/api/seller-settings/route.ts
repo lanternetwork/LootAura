@@ -7,7 +7,7 @@ type SettingsPayload = {
 }
 
 export async function GET() {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const {
     data: { user },
     error: authError,
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     return csrfError
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const {
     data: { user },
     error: authError,

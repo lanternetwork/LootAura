@@ -13,7 +13,7 @@ interface SaleDetailPageProps {
 
 export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const { id } = await params
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
@@ -115,7 +115,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
 export async function generateMetadata({ params }: SaleDetailPageProps): Promise<Metadata> {
   const { id } = await params
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
   const isDebugAdmin = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'

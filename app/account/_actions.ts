@@ -24,7 +24,7 @@ export type ActionResult<T = any> = {
 
 // Helper function to get authenticated user
 async function getAuthenticatedUser() {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   
   if (error || !user) {

@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   const page = Number(url.searchParams.get('page') || '1')
   const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit') || '12')))
   if (!userParam) return NextResponse.json({ error: 'user required' }, { status: 400 })
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   // Resolve userParam to user id via profiles_v2 if needed
   const prof = await supabase.from('profiles_v2').select('id, username').or(`id.eq.${userParam},username.eq.${userParam}`).maybeSingle()
   if (!prof.data?.id) return NextResponse.json({ error: 'user not found' }, { status: 404 })

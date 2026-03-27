@@ -28,7 +28,7 @@ const ItemV2InputSchema = ItemV2InputBaseSchema.refine((data) => data.title || d
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
     // Get query parameters
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     let body: any
     try {
       body = await request.json()
@@ -257,7 +257,7 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { pathname } = new URL(request.url)
     const itemId = pathname.split('/').pop()
     
@@ -392,7 +392,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { pathname } = new URL(request.url)
     const itemId = pathname.split('/').pop()
     

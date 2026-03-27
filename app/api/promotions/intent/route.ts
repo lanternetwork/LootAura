@@ -50,7 +50,7 @@ async function intentHandler(request: NextRequest) {
     }
 
     // Auth required
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')

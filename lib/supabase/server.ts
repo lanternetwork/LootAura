@@ -12,7 +12,7 @@ function logSchemaOnce() {
   }
 }
 
-export function createSupabaseServerClient() {
+export async function createSupabaseServerClient() {
   // Validate required environment variables
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -33,7 +33,7 @@ export function createSupabaseServerClient() {
   logSchemaOnce();
 
   const _schema = getSchema();
-  const cookieStore = cookies() as unknown as {
+  const cookieStore = (await cookies()) as unknown as {
     get: (name: string) => { value?: string } | undefined
     set: (cookie: { name: string; value: string; maxAge?: number } & Record<string, unknown>) => void
   }
@@ -67,7 +67,7 @@ export function createSupabaseServerClient() {
  * Note: PostgREST only supports 'public' and 'graphql_public' schemas in client config
  * Tables in lootaura_v2 schema must be accessed through views in public schema
  */
-export function createSupabaseWriteClient() {
+export async function createSupabaseWriteClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -75,7 +75,7 @@ export function createSupabaseWriteClient() {
     throw new Error('Supabase credentials missing');
   }
 
-  const cookieStore = cookies() as unknown as {
+  const cookieStore = (await cookies()) as unknown as {
     get: (name: string) => { value?: string } | undefined
     set: (cookie: { name: string; value: string; maxAge?: number } & Record<string, unknown>) => void
   }

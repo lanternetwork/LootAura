@@ -219,7 +219,7 @@ export class ConnectionPool {
   async getConnection() {
     // Supabase handles connection pooling internally
     // This is a placeholder for future optimization
-    return createSupabaseServerClient()
+    return await createSupabaseServerClient()
   }
 
   releaseConnection(_connection: any) {

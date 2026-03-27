@@ -58,7 +58,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   const sp = await searchParams
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   let user: any = null
   try {
     const res = await supabase.auth.getUser()

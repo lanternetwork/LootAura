@@ -40,7 +40,7 @@ describe('Cloud Preset RLS Policies', () => {
 
     // Simulate RLS policy check
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     await supabase.from('user_presets').select('*').eq('user_id', userId).order('created_at', { ascending: false })
 
@@ -62,7 +62,7 @@ describe('Cloud Preset RLS Policies', () => {
 
     // Simulate RLS policy check - should only return user's own presets
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     await supabase.from('user_presets').select('*').eq('user_id', otherUserId).order('created_at', { ascending: false })
 
@@ -82,7 +82,7 @@ describe('Cloud Preset RLS Policies', () => {
     mockSupabase.from.mockReturnValue(mockQuery)
 
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     const result = await supabase.from('user_presets').insert({
       name: 'Test Preset',
@@ -108,7 +108,7 @@ describe('Cloud Preset RLS Policies', () => {
     mockSupabase.from.mockReturnValue(mockQuery)
 
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     await supabase.from('user_presets').update({ name: 'Updated Preset' }).eq('id', presetId).select()
 
@@ -129,7 +129,7 @@ describe('Cloud Preset RLS Policies', () => {
     mockSupabase.from.mockReturnValue(mockQuery)
 
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     await supabase.from('user_presets').delete().eq('id', presetId)
 

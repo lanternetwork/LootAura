@@ -325,7 +325,7 @@ export async function getUserPreferences(
       // If view doesn't exist, try write client
       try {
         const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-        const writeClient = createSupabaseWriteClient()
+        const writeClient = await createSupabaseWriteClient()
         const { data: writeSettings } = await writeClient
           .from('seller_settings')
           .select('default_radius_km, email_opt_in')

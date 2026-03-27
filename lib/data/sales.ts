@@ -139,7 +139,7 @@ function getDateRange(dateRange?: 'today' | 'weekend' | 'next_weekend' | 'any') 
 export async function getSales(params: GetSalesParams = { distanceKm: 25, limit: 50, offset: 0 }) {
   try {
     const validatedParams = GetSalesParamsSchema.parse(params)
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Get date range constraints
     const dateConstraints = getDateRange(validatedParams.dateRange)
@@ -291,7 +291,7 @@ export interface SaleWithOwnerInfo extends Sale {
 
 export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null> {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     const { data: sale, error: saleError } = await supabase
       .from('sales_v2')
@@ -396,7 +396,7 @@ export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null>
 export async function createSale(input: SaleInput): Promise<Sale> {
   try {
     const validatedInput = SaleInputSchema.parse(input)
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -429,7 +429,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
 export async function updateSale(id: string, input: Partial<SaleInput>): Promise<Sale> {
   try {
     const validatedInput = SaleInputSchema.partial().parse(input)
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -462,7 +462,7 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
 
 export async function deleteSale(id: string): Promise<void> {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -488,7 +488,7 @@ export async function deleteSale(id: string): Promise<void> {
 
 export async function listItems(saleId: string): Promise<Item[]> {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     const { data, error } = await supabase
       .from('items')
@@ -511,7 +511,7 @@ export async function listItems(saleId: string): Promise<Item[]> {
 export async function createItem(saleId: string, input: ItemInput): Promise<Item> {
   try {
     const validatedInput = ItemInputSchema.parse(input)
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -548,7 +548,7 @@ export async function createItem(saleId: string, input: ItemInput): Promise<Item
 
 export async function toggleFavorite(saleId: string): Promise<{ is_favorited: boolean }> {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

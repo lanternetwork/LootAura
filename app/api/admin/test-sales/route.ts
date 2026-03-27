@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
 
     // Get ZIP code coordinates (simplified - you might want to use a real geocoding service)
     const zipCoordinates: { [key: string]: { lat: number; lng: number; city: string; state: string } } = {

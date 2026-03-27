@@ -104,8 +104,8 @@ export async function middleware(req: NextRequest) {
   const cookieStore = await cookies()
   let csrfToken: string | null = null
   try {
-    const { generateCsrfToken, getCsrfToken } = await import('@/lib/csrf')
-    const existingToken = getCsrfToken()
+    const { generateCsrfToken, CSRF_TOKEN_COOKIE } = await import('@/lib/csrf')
+    const existingToken = cookieStore.get(CSRF_TOKEN_COOKIE)?.value ?? null
     if (!existingToken) {
       csrfToken = generateCsrfToken()
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

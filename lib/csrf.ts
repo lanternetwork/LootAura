@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 
-const CSRF_TOKEN_COOKIE = 'csrf-token'
+export const CSRF_TOKEN_COOKIE = 'csrf-token'
 const CSRF_HEADER = 'x-csrf-token'
 
 /**
@@ -21,8 +21,8 @@ export function generateCsrfToken(): string {
     .join('')
 }
 
-export function setCsrfToken(token: string): void {
-  const cookieStore = cookies() as unknown as {
+export async function setCsrfToken(token: string): Promise<void> {
+  const cookieStore = (await cookies()) as unknown as {
     set: (name: string, value: string, options: Record<string, unknown>) => void
   }
   // CSRF token must be readable by client-side JavaScript to send in x-csrf-token header
@@ -36,8 +36,8 @@ export function setCsrfToken(token: string): void {
   })
 }
 
-export function getCsrfToken(): string | null {
-  const cookieStore = cookies() as unknown as {
+export async function getCsrfToken(): Promise<string | null> {
+  const cookieStore = (await cookies()) as unknown as {
     get: (name: string) => { value?: string } | undefined
   }
   return cookieStore.get(CSRF_TOKEN_COOKIE)?.value || null
@@ -64,15 +64,6 @@ export function validateCsrfToken(request: Request): boolean {
     }
   }
   
-  // Fallback: try cookies() if available (for server components)
-  if (!tokenFromCookie) {
-    try {
-      tokenFromCookie = getCsrfToken()
-    } catch {
-      // cookies() not available in this context, that's okay
-    }
-  }
-
   // Only log validation details in debug mode (skip in test environment)
   const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined
   const isDebug = process.env.NEXT_PUBLIC_DEBUG === 'true'

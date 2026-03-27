@@ -5,7 +5,7 @@ import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 
-async function deleteHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function deleteHandler(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(req)
@@ -24,7 +24,7 @@ async function deleteHandler(req: NextRequest, { params }: { params: { id: strin
     throw error
   }
   
-  const saleId = params.id
+  const { id: saleId } = await context.params
   
   // Use RLS-aware client - sales has RLS DELETE policy that allows owners to delete their own sales
   const rls = await getRlsDb()
@@ -73,14 +73,14 @@ async function deleteHandler(req: NextRequest, { params }: { params: { id: strin
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   // Get user ID for rate limiting
   const supabase = createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 
   return withRateLimit(
-    (request) => deleteHandler(request, { params }),
+    (request) => deleteHandler(request, context),
     [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
     { userId }
   )(req)

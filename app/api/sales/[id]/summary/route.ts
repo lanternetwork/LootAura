@@ -13,11 +13,11 @@ export const revalidate = 0 // Never cache - ensure fresh data after draft edits
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient()
-    const saleId = params.id
+    const { id: saleId } = await params
 
     if (!saleId) {
       return NextResponse.json(

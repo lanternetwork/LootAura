@@ -18,7 +18,10 @@ const UpdateReportSchema = z.object({
   lock_account: z.boolean().optional(),
 })
 
-async function updateReportHandler(request: NextRequest, { params }: { params: { id: string } }) {
+async function updateReportHandler(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   let user: { id: string; email?: string }
   try {
     // Require admin access
@@ -35,7 +38,7 @@ async function updateReportHandler(request: NextRequest, { params }: { params: {
   }
 
   try {
-    const reportId = params.id
+    const { id: reportId } = await context.params
 
     // Parse and validate request body
     let body: any
@@ -175,9 +178,9 @@ async function updateReportHandler(request: NextRequest, { params }: { params: {
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   return withRateLimit(
-    (req) => updateReportHandler(req, { params }),
+    (req) => updateReportHandler(req, context),
     [Policies.ADMIN_TOOLS, Policies.ADMIN_HOURLY],
     {}
   )(request)

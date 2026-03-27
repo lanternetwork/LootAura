@@ -294,7 +294,7 @@ describe('Account lock enforcement', () => {
         {}
       )
 
-      const response = await POST(request, { params: { id: 'sale-1' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'sale-1' }) })
       const data = await response.json()
 
       expect(response.status).toBe(403)

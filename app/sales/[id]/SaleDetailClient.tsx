@@ -26,6 +26,7 @@ import ReportSaleModal from '@/components/moderation/ReportSaleModal'
 import { BadgeCheck } from 'lucide-react'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 import { isNativeApp } from '@/lib/runtime/isNativeApp'
+import { queryClient } from '@/lib/queryClient'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -618,6 +619,26 @@ export default function SaleDetailClient({
       // Update with actual result (in case of any discrepancy)
       const newFavorited = result.favorited ?? !wasFavorited
       setIsFavorited(newFavorited)
+      
+      // Keep shared favorites cache in sync so the Favorites tab can reflect the toggle immediately.
+      // SaleDetailClient already has the full `sale` object via props, which is needed to construct `Sale[]`.
+      const userId = currentUser?.id
+      if (userId) {
+        const saleForFavorites = sale as unknown as Sale
+        queryClient.setQueryData(['favorites', userId], (old: Sale[] | undefined) => {
+          const prev = Array.isArray(old) ? old : []
+          const exists = prev.some(s => s?.id === saleForFavorites.id)
+
+          if (newFavorited) {
+            if (exists) return prev
+            return [saleForFavorites, ...prev]
+          }
+
+          // Unfavorite
+          if (!exists) return prev
+          return prev.filter(s => s?.id !== saleForFavorites.id)
+        })
+      }
       
       // Track save event if favoriting (not unfavoriting)
       if (newFavorited && !wasFavorited) {

@@ -99,8 +99,8 @@ describe('Sign In Page Integration', () => {
       })
     })
 
-    it('should display error message on sign in failure', async () => {
-      mockSignIn.mockRejectedValueOnce(new Error('Invalid credentials'))
+    it('should display error message on sign in failure and preserve input', async () => {
+      mockSignIn.mockRejectedValueOnce(new Error('Invalid email or password'))
 
       render(<SignIn />)
 
@@ -117,9 +117,13 @@ describe('Sign In Page Integration', () => {
       fireEvent.click(signInButtons[0])
 
       await waitFor(() => {
-        const errorMessages = screen.getAllByText('Invalid credentials')
+        const errorMessages = screen.getAllByText('Invalid email or password')
         expect(errorMessages.length).toBeGreaterThan(0)
       })
+
+      // Ensure the entered email and password are still present after failure
+      expect((emailInputs[0] as HTMLInputElement).value).toBe('test@example.com')
+      expect((passwordInputs[0] as HTMLInputElement).value).toBe('wrongpassword')
     })
   })
 

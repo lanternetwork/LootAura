@@ -1,6 +1,6 @@
 'use client'
 import { useFavorites, useToggleFavorite, useAuth } from '@/lib/hooks/useAuth'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AiFillHeart, AiOutlineHeart } from 'react-icons/ai'
 import { useRouter } from 'next/navigation'
 import { trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
@@ -21,6 +21,14 @@ export default function FavoriteButton({
   const isFavorited = favorites.some((fav: any) => fav.id === saleId)
   const displayFavorited = optimistic ?? isFavorited
 
+  // Prevent "blink": keep displaying optimistic state until the shared favorites cache reflects it.
+  useEffect(() => {
+    if (optimistic === null) return
+    if (optimistic === isFavorited) {
+      setOptimistic(null)
+    }
+  }, [optimistic, isFavorited])
+
   const handleToggle = () => {
     // If user is not authenticated, redirect to login
     if (!user) {
@@ -28,14 +36,17 @@ export default function FavoriteButton({
       return
     }
     // Optimistic UI
-    setOptimistic(!isFavorited)
+    const wasFavorited = isFavorited
+    const nextFavorited = !wasFavorited
+    setOptimistic(nextFavorited)
     toggleFavorite
-      .mutateAsync({ saleId, isFavorited })
-      .then(() => {
+      .mutateAsync({ saleId, isFavorited: wasFavorited })
+      .then((res) => {
+        const serverFavorited = typeof res?.favorited === 'boolean' ? res.favorited : nextFavorited
         // Track Clarity event for favorite toggle
-        trackFavoriteToggled(saleId, !isFavorited)
-        // fall back to cache after success
-        setOptimistic(null)
+        trackFavoriteToggled(saleId, serverFavorited)
+        // Hold until cache sync (handled by effect above)
+        setOptimistic(serverFavorited)
       })
       .catch(() => {
         // rollback on error

@@ -28,11 +28,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git status --porcelain | grep \"mobile/package-lock.json\"; then
+          if git status --porcelain | grep "mobile/package-lock.json"; then
             git add mobile/package-lock.json
-            git commit -m \"chore: update mobile/package-lock.json via workflow\"
+            git commit -m "chore: update mobile/package-lock.json via workflow"
             git push origin HEAD:fix/favorites-state-sync
           else
-            echo \"No changes to mobile/package-lock.json\"
+            echo "No changes to mobile/package-lock.json"
           fi
 

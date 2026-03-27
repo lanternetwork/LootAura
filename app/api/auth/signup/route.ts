@@ -17,7 +17,11 @@ const signupSchema = z.object({
 async function signupHandler(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password } = signupSchema.parse(body)
+    const sanitizedBody = {
+      ...body,
+      email: typeof body?.email === 'string' ? body.email.trim() : body?.email,
+    }
+    const { email, password } = signupSchema.parse(sanitizedBody)
 
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)

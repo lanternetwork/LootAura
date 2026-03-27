@@ -31,6 +31,8 @@ export default function SignUp() {
     setError(null)
     setSuccessMsg(null)
 
+    const normalizedEmail = email.trim()
+
     if (password !== confirm) {
       setError('Passwords do not match')
       return
@@ -38,8 +40,11 @@ export default function SignUp() {
 
     setLoading(true)
     try {
+      // Normalize email before submission to avoid false "invalid email" rejections
+      setEmail(normalizedEmail)
+
       const { data, error } = await sb.auth.signUp({
-        email,
+        email: normalizedEmail,
         password
       })
 

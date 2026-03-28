@@ -61,22 +61,13 @@ test.describe('Smoke Tests - Critical Flows', () => {
     
     // Navigate to sign in - use correct route
     await page.goto('/auth/signin', { waitUntil: 'domcontentloaded' })
-    
-    // Verify sign in page loads (check for any heading or form element)
-    const heading = page.getByRole('heading').first()
-    const emailInput = page.getByPlaceholder(/email|@/i).first()
-    
-    // At least one should be visible
-    const headingVisible = await heading.isVisible({ timeout: 5000 }).catch(() => false)
-    const inputVisible = await emailInput.isVisible({ timeout: 5000 }).catch(() => false)
-    
-    // Verify page loaded successfully (might be 404 or redirect, but body should load)
+
+    await expect(page).toHaveURL(/\/auth\/signin/)
     await expect(page.locator('body')).toBeVisible({ timeout: 5000 })
-    
-    // If we got a valid page (not 404), check for signin elements
-    if (page.url().includes('/auth/signin')) {
-      expect(headingVisible || inputVisible).toBe(true)
-    }
+
+    // Sign-in duplicates markup: mobile block first (md:hidden), desktop second (hidden md:grid).
+    // Smoke uses Desktop Chrome — .first() targets hidden mobile nodes and fails visibility checks.
+    await expect(page.getByPlaceholder('your@email.com').last()).toBeVisible({ timeout: 10000 })
   })
 
   test('@smoke: create sale happy path', async ({ page }) => {

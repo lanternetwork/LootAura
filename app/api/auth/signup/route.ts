@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
+import { setSessionCookies, isValidSession } from '@/lib/auth/server-session'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
-import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,13 +23,25 @@ async function signupHandler(request: NextRequest) {
     }
     const { email, password } = signupSchema.parse(sanitizedBody)
 
-    const cookieStore = await cookies()
-    const supabase = createServerSupabaseClient(cookieStore)
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !anon) {
+      return NextResponse.json(
+        { ok: false, code: 'CONFIG_ERROR', error: 'Sign up is temporarily unavailable.' },
+        { status: 503 }
+      )
+    }
 
-    // Configure email redirect URL
-    const emailRedirectTo = process.env.NEXT_PUBLIC_SITE_URL
-      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
-      : undefined
+    const supabase = createClient(url, anon, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    })
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
+    const emailRedirectTo = siteUrl ? `${siteUrl}/auth/callback` : undefined
 
     if (!emailRedirectTo && process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using Supabase default email redirect')
@@ -39,57 +51,62 @@ async function signupHandler(request: NextRequest) {
       console.log('[AUTH] Sign-up redirect configured:', { event: 'signup', redirectToSet: !!emailRedirectTo })
     }
 
-    // Attempt to sign up with Supabase
+    const signUpOptions = emailRedirectTo ? { emailRedirectTo } : undefined
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo }
+      ...(signUpOptions ? { options: signUpOptions } : {}),
     })
 
     if (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[AUTH] Sign-up failed:', { event: 'signup', status: 'fail', code: error.message })
       }
-      
+
       return NextResponse.json(
-        { ok: false, code: 'SIGNUP_FAILED', error: 'Failed to create account. Please try again.' },
+        {
+          ok: false,
+          code: 'SIGNUP_FAILED',
+          error: 'Failed to create account. Please try again.',
+          details: error.message,
+        },
         { status: 400 }
       )
     }
 
-    // Check if email confirmation is required
     if (data.user && !data.session) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[AUTH] Sign-up requires email confirmation:', { event: 'signup', status: 'confirmation-required' })
       }
-      
+
       return NextResponse.json(
-        { 
-          message: 'Please check your email to confirm your account',
-          requiresConfirmation: true
+        {
+          ok: true,
+          data: {
+            requiresConfirmation: true,
+            message: 'Please check your email to confirm your account',
+          },
         },
         { status: 201 }
       )
     }
 
-    // If session is available and valid, set cookies
     if (data.session && isValidSession(data.session) && data.user) {
-      // Ensure profile exists for the user (idempotent)
       try {
         const profileResponse = await fetch(new URL('/api/profile', request.url), {
           method: 'POST',
           headers: {
-            'Cookie': request.headers.get('cookie') || '',
+            Cookie: request.headers.get('cookie') || '',
           },
         })
-        
+
         if (profileResponse.ok) {
           const profileData = await profileResponse.json()
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[AUTH] Profile ensured during signup:', { 
-              event: 'signup', 
+            console.log('[AUTH] Profile ensured during signup:', {
+              event: 'signup',
               created: profileData.created,
-              userId: data.user.id 
+              userId: data.user.id,
             })
           }
         }
@@ -97,16 +114,18 @@ async function signupHandler(request: NextRequest) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[AUTH] Profile creation error during signup, but continuing:', profileError)
         }
-        // Don't fail the auth flow if profile creation fails
       }
 
       const response = NextResponse.json(
-        { 
-          user: {
-            id: data.user.id,
-            email: data.user.email,
+        {
+          ok: true,
+          data: {
+            user: {
+              id: data.user.id,
+              email: data.user.email,
+            },
+            message: 'Account created successfully',
           },
-          message: 'Account created successfully'
         },
         { status: 201 }
       )
@@ -120,16 +139,22 @@ async function signupHandler(request: NextRequest) {
       return response
     }
 
-    // Fallback response
     return NextResponse.json(
-      { message: 'Account created successfully' },
+      {
+        ok: true,
+        data: { message: 'Account created successfully' },
+      },
       { status: 201 }
     )
-
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input data', details: error.errors },
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          error: 'Invalid input data',
+          details: JSON.stringify(error.errors),
+        },
         { status: 400 }
       )
     }
@@ -139,7 +164,7 @@ async function signupHandler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { ok: false, code: 'INTERNAL_ERROR', error: 'Internal server error' },
       { status: 500 }
     )
   }
@@ -147,5 +172,5 @@ async function signupHandler(request: NextRequest) {
 
 export const POST = withRateLimit(signupHandler, [
   Policies.AUTH_DEFAULT,
-  Policies.AUTH_HOURLY
+  Policies.AUTH_HOURLY,
 ])

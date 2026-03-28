@@ -27,6 +27,7 @@ build/
 .vercel/
 
 # Testing
+*.tsbuildinfo
 coverage/
 .nyc_output/
 test-results/

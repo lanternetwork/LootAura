@@ -43,15 +43,6 @@ export default function SignUp() {
       // Normalize email before submission to avoid false "invalid email" rejections
       setEmail(normalizedEmail)
 
-      console.log("EMAIL_DEBUG", {
-        raw: email,
-        normalized: normalizedEmail,
-        rawLength: email.length,
-        normalizedLength: normalizedEmail.length,
-        rawChars: Array.from(email).map((c) => c.charCodeAt(0)),
-        normalizedChars: Array.from(normalizedEmail).map((c) => c.charCodeAt(0)),
-      })
-
       const { data, error } = await sb.auth.signUp({
         email: normalizedEmail,
         password,

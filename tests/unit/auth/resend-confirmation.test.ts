@@ -1,5 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import type { NextResponse } from 'next/server'
+import { Policies } from '@/lib/rateLimit/policies'
+
+const { rateLimitWrapArgs } = vi.hoisted(() => ({
+  rateLimitWrapArgs: { policies: null as unknown[] | null },
+}))
+
+vi.mock('@/lib/rateLimit/withRateLimit', () => ({
+  withRateLimit: (
+    handler: (req: NextRequest) => Promise<NextResponse>,
+    policies: unknown[]
+  ) => {
+    rateLimitWrapArgs.policies = policies
+    return handler
+  },
+}))
+
 import { POST as resendPOST } from '@/app/api/auth/resend/route'
 
 // Mock the server session module
@@ -20,6 +37,13 @@ describe('Resend Confirmation Email', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXT_PUBLIC_DEBUG = 'false'
+  })
+
+  it('wraps POST with AUTH_DEFAULT and AUTH_HOURLY (parity with signup / magic-link)', () => {
+    expect(rateLimitWrapArgs.policies).toEqual([
+      Policies.AUTH_DEFAULT,
+      Policies.AUTH_HOURLY,
+    ])
   })
 
   it('should resend confirmation email successfully', async () => {

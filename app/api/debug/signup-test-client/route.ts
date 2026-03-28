@@ -1,13 +1,14 @@
 /**
- * TEMPORARY DEBUG: server-side Supabase signUp isolation (BUG-002).
- * Remove this route after testing. Do not rely on in production.
+ * TEMPORARY DEBUG: @supabase/supabase-js createClient with same public env as browser client.
+ * Mirrors lib/supabase/client.ts options (db schema + auth flags) on the server.
+ * Remove after BUG-002 isolation.
  */
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const DEBUG_EMAIL = 'directtest@gmail.com'
+const DEBUG_EMAIL = 'directtest3@gmail.com'
 const DEBUG_PASSWORD = 'Test123456!'
 
 export async function GET() {
@@ -18,20 +19,21 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
+        client: '@supabase/supabase-js createClient (browser-compatible options)',
+        keyType: 'anon',
         data: null,
         error: { message: 'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY' },
-        errorMessage: 'Missing env',
-        errorStatus: null,
       },
       { status: 500 }
     )
   }
 
   const supabase = createClient(url, anon, {
+    db: { schema: 'public' },
     auth: {
+      detectSessionInUrl: false,
       persistSession: false,
       autoRefreshToken: false,
-      detectSessionInUrl: false,
     },
   })
 
@@ -43,14 +45,10 @@ export async function GET() {
   const errObj = error as (Error & { status?: number; code?: string }) | null
 
   return NextResponse.json({
-    implementation: {
-      file: 'app/api/debug/signup-test/route.ts',
-      client: '@supabase/supabase-js createClient',
-      envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'],
-      keyType: 'anon',
-      api: 'supabase.auth.signUp (not Admin API)',
-    },
     ok: !error,
+    client:
+      '@supabase/supabase-js createClient(url, anon, { db: { schema: "public" }, auth: { detectSessionInUrl: false, persistSession: false, autoRefreshToken: false } })',
+    keyType: 'anon',
     data,
     error: error
       ? {
@@ -60,7 +58,5 @@ export async function GET() {
           code: errObj?.code ?? null,
         }
       : null,
-    errorMessage: error?.message ?? null,
-    errorStatus: errObj?.status ?? null,
   })
 }

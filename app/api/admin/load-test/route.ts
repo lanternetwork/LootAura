@@ -1,80 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn, ChildProcess } from 'child_process'
 import { join } from 'path'
+import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
 export const dynamic = 'force-dynamic'
 
-interface LoadTestRequest {
-  scenario: string
-  baseURL?: string
-  ip?: string
-  userToken?: string
-}
+/** Only these scenario ids may be passed to the CLI (no user-controlled spawn args beyond this allowlist). */
+const VALID_SCENARIOS = [
+  'sales-baseline',
+  'sales-burst',
+  'sales-sustained',
+  'geo-cache-warmup',
+  'geo-abuse',
+  'auth-signin',
+  'auth-magic-link',
+  'mutation-sales',
+  'multi-ip-sales',
+] as const
+
+type ValidScenario = (typeof VALID_SCENARIOS)[number]
+
+const LOAD_TEST_CLI = join(process.cwd(), 'scripts/load/cli.ts')
+/** Fixed target; request body must not influence spawn arguments beyond scenario id. */
+const FIXED_BASE_URL = 'http://localhost:3000'
 
 export async function POST(request: NextRequest) {
   try {
-    // Disable load testing only in actual production (not staging/preview)
-    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production') {
-      return NextResponse.json(
-        { error: 'Load testing is disabled in production environment' },
-        { status: 403 }
-      )
+    await assertAdminOrThrow(request)
+
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse('Not found', { status: 404 })
     }
 
-    // Disallow running the load runner on Vercel (both preview and prod) to avoid 500s
     if (process.env.VERCEL === '1') {
       return NextResponse.json(
         {
           error: 'Load testing is unavailable in Vercel environments',
-          message: 'Run load tests locally or in a non-Vercel environment.'
+          message: 'Run load tests locally or use GitHub Actions dispatch from admin tools.',
         },
         { status: 501 }
       )
     }
 
-    const body: LoadTestRequest = await request.json()
-    const { scenario, baseURL = 'http://localhost:3000', ip, userToken } = body
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
 
-    // Validate scenario
-    const validScenarios = [
-      'sales-baseline',
-      'sales-burst', 
-      'sales-sustained',
-      'geo-cache-warmup',
-      'geo-abuse',
-      'auth-signin',
-      'auth-magic-link',
-      'mutation-sales',
-      'multi-ip-sales'
-    ]
+    const scenario =
+      body !== null && typeof body === 'object' && !Array.isArray(body)
+        ? (body as { scenario?: unknown }).scenario
+        : undefined
 
-    if (!validScenarios.includes(scenario)) {
+    if (typeof scenario !== 'string' || !VALID_SCENARIOS.includes(scenario as ValidScenario)) {
       return NextResponse.json(
-        { error: 'Invalid scenario', validScenarios },
+        { error: 'Invalid scenario', validScenarios: [...VALID_SCENARIOS] },
         { status: 400 }
       )
     }
 
-    // Build command arguments
-    const args = [
-      join(process.cwd(), 'scripts/load/cli.ts'),
-      '--scenario', scenario,
-      '--baseURL', baseURL
-    ]
+    const args = [LOAD_TEST_CLI, '--scenario', scenario, '--baseURL', FIXED_BASE_URL]
 
-    if (ip) {
-      args.push('--ip', ip)
-    }
-
-    if (userToken) {
-      args.push('--userToken', userToken)
-    }
-
-    // Set production-like environment for local testing
     const env = {
       ...process.env,
       NODE_ENV: 'production' as const,
-      RATE_LIMITING_ENABLED: 'true'
+      RATE_LIMITING_ENABLED: 'true',
     }
 
     return new Promise<NextResponse>((resolve) => {
@@ -84,16 +76,14 @@ export async function POST(request: NextRequest) {
       const child = spawn('tsx', args, {
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: process.cwd()
+        cwd: process.cwd(),
       }) as ChildProcess
 
-      // Capture stdout
       child.stdout?.on('data', (data: Buffer) => {
         const lines = data.toString().split('\n').filter((line: string) => line.trim())
         output.push(...lines)
       })
 
-      // Capture stderr
       child.stderr?.on('data', (data: Buffer) => {
         const lines = data.toString().split('\n').filter((line: string) => line.trim())
         output.push(...lines)
@@ -101,78 +91,97 @@ export async function POST(request: NextRequest) {
 
       child.on('close', (code: number | null) => {
         if (code === 0) {
-          // Parse metrics from output
-          const summaryLine = output.find(line => line.includes('Load Test Summary'))
+          const summaryLine = output.find((line) => line.includes('Load Test Summary'))
           if (summaryLine) {
             const summaryIndex = output.indexOf(summaryLine)
             const summaryLines = output.slice(summaryIndex, summaryIndex + 10)
-            
+
             metrics = {
               totalRequests: extractMetric(summaryLines, 'Total Requests'),
               successRate: extractMetric(summaryLines, 'Success Rate'),
               error429Count: extractMetric(summaryLines, '429 Errors'),
               medianLatency: extractMetric(summaryLines, 'Median Latency'),
-              timeToFirst429: extractMetric(summaryLines, 'Time to First 429')
+              timeToFirst429: extractMetric(summaryLines, 'Time to First 429'),
             }
           }
 
-          resolve(NextResponse.json({
-            success: true,
-            scenario,
-            output,
-            metrics,
-            exitCode: code
-          }))
+          resolve(
+            NextResponse.json({
+              success: true,
+              scenario,
+              output,
+              metrics,
+              exitCode: code,
+            })
+          )
         } else {
-          resolve(NextResponse.json({
-            success: false,
-            scenario,
-            output,
-            error: `Process exited with code ${code}`,
-            exitCode: code
-          }, { status: 500 }))
+          resolve(
+            NextResponse.json(
+              {
+                success: false,
+                scenario,
+                output,
+                error: `Process exited with code ${code}`,
+                exitCode: code,
+              },
+              { status: 500 }
+            )
+          )
         }
       })
 
       child.on('error', (error: Error) => {
-        resolve(NextResponse.json({
-          success: false,
-          scenario,
-          output,
-          error: error.message
-        }, { status: 500 }))
+        resolve(
+          NextResponse.json(
+            {
+              success: false,
+              scenario,
+              output,
+              error: error.message,
+            },
+            { status: 500 }
+          )
+        )
       })
 
-      // Set a timeout to prevent hanging
       setTimeout(() => {
         child.kill()
-        resolve(NextResponse.json({
-          success: false,
-          scenario,
-          output,
-          error: 'Test timed out after 5 minutes'
-        }, { status: 408 }))
-      }, 5 * 60 * 1000) // 5 minute timeout
+        resolve(
+          NextResponse.json(
+            {
+              success: false,
+              scenario,
+              output,
+              error: 'Test timed out after 5 minutes',
+            },
+            { status: 408 }
+          )
+        )
+      }, 5 * 60 * 1000)
     })
-
   } catch (error) {
+    if (error instanceof NextResponse) {
+      return error
+    }
     console.error('Load test API error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 }
     )
   }
 }
 
 function extractMetric(lines: string[], label: string): number | undefined {
-  const line = lines.find(l => l.includes(label))
+  const line = lines.find((l) => l.includes(label))
   if (!line) return undefined
-  
-  // Extract number from line like "Total Requests: 1,247"
+
   const match = line.match(/(\d+(?:,\d+)*(?:\.\d+)?)/)
   if (match) {
     return parseFloat(match[1].replace(/,/g, ''))
   }
-  
+
   return undefined
 }

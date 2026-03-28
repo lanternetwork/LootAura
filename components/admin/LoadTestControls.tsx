@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { dispatchLoadTestFromAdminPanel } from '@/lib/actions/loadTestDispatch'
 
 interface LoadTestResult {
   scenario: string
@@ -46,22 +47,16 @@ export default function LoadTestControls() {
 
     try {
       const startTime = Date.now()
-      
-      // Dispatch CI workflow to run load test in GitHub Actions
-      const response = await fetch('/api/admin/load-test/dispatch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          scenario: scenarioId,
-          baseURL: baseURL
-        })
+
+      const data = await dispatchLoadTestFromAdminPanel({
+        scenario: scenarioId,
+        baseURL,
       })
 
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${data?.error || 'dispatch failed'}${data?.details ? ` — ${data.details}` : ''}`)
+      if (!data.ok) {
+        throw new Error(
+          `HTTP ${data.status}: ${data.error || 'dispatch failed'}${data.details ? ` — ${data.details}` : ''}`
+        )
       }
       const duration = Date.now() - startTime
 

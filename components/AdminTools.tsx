@@ -2,12 +2,10 @@
 import { useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
-interface ReviewKeyInfo {
+interface SaleLookupInfo {
   sale_id: string
   address_key: string
-  review_key: string
   review_count: number
-  seller_id: string
   title: string
   address: string
   city: string
@@ -16,7 +14,7 @@ interface ReviewKeyInfo {
 
 export default function AdminTools() {
   const [saleId, setSaleId] = useState('')
-  const [reviewInfo, setReviewInfo] = useState<ReviewKeyInfo | null>(null)
+  const [reviewInfo, setReviewInfo] = useState<SaleLookupInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const _supabase = createSupabaseBrowserClient()
@@ -36,20 +34,10 @@ export default function AdminTools() {
         throw new Error(data.error)
       }
 
-      const addressKey = data.sale.address_key as string | undefined
-      const reviewKey = data.review_key as string | undefined
-      const prefix = addressKey != null ? `${addressKey}|` : ''
-      const sellerIdFromKey =
-        reviewKey && prefix && reviewKey.startsWith(prefix)
-          ? reviewKey.slice(prefix.length)
-          : ''
-
       setReviewInfo({
         sale_id: data.sale.id,
         address_key: data.sale.address_key,
-        review_key: data.review_key,
         review_count: data.review_count,
-        seller_id: sellerIdFromKey,
         title: data.sale.title,
         address: data.sale.address,
         city: data.sale.city,
@@ -65,7 +53,7 @@ export default function AdminTools() {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h3 className="text-lg font-semibold mb-4">Review Key Debugging</h3>
+      <h3 className="text-lg font-semibold mb-4">Sale lookup (reviews)</h3>
       
       <div className="space-y-4">
         <div>
@@ -99,7 +87,10 @@ export default function AdminTools() {
 
         {reviewInfo && (
           <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-            <h4 className="font-medium text-gray-900 mb-3">Review Key Information</h4>
+            <h4 className="font-medium text-gray-900 mb-3">Sale lookup</h4>
+            <p className="text-xs text-gray-500 mb-3">
+              Review key and seller id are not returned by the public API.
+            </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
@@ -117,19 +108,9 @@ export default function AdminTools() {
                 <p className="text-gray-900">{reviewInfo.address}, {reviewInfo.city}, {reviewInfo.state}</p>
               </div>
               
-              <div>
-                <span className="font-medium text-gray-700">Seller ID:</span>
-                <p className="text-gray-900 font-mono">{reviewInfo.seller_id}</p>
-              </div>
-              
               <div className="md:col-span-2">
                 <span className="font-medium text-gray-700">Address Key:</span>
                 <p className="text-gray-900 font-mono text-xs break-all">{reviewInfo.address_key}</p>
-              </div>
-              
-              <div className="md:col-span-2">
-                <span className="font-medium text-gray-700">Review Key:</span>
-                <p className="text-gray-900 font-mono text-xs break-all">{reviewInfo.review_key}</p>
               </div>
               
               <div>

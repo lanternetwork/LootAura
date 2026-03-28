@@ -54,7 +54,10 @@ export default function SignUp() {
 
       const { data, error } = await sb.auth.signUp({
         email: normalizedEmail,
-        password
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       })
 
       if (error) {

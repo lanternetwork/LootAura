@@ -8,10 +8,10 @@ import { createServerSupabaseClient } from '@/lib/auth/server-session'
 
 export const dynamic = 'force-dynamic'
 
-const DEBUG_EMAIL = 'directtest5@gmail.com'
 const DEBUG_PASSWORD = 'Test123456!'
 
 export async function GET() {
+  const email = `debug5+${Date.now()}@gmail.com`
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -36,7 +36,7 @@ export async function GET() {
     : undefined
 
   const { data, error } = await supabase.auth.signUp({
-    email: DEBUG_EMAIL,
+    email,
     password: DEBUG_PASSWORD,
     ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
   })

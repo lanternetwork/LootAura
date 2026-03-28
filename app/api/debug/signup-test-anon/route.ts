@@ -6,10 +6,10 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const DEBUG_EMAIL = 'directtest2@gmail.com'
 const DEBUG_PASSWORD = 'Test123456!'
 
 export async function GET() {
+  const email = `debug2+${Date.now()}@gmail.com`
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '')
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -37,7 +37,7 @@ export async function GET() {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      email: DEBUG_EMAIL,
+      email,
       password: DEBUG_PASSWORD,
     }),
   })

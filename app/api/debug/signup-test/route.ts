@@ -7,10 +7,10 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const DEBUG_EMAIL = 'directtest@gmail.com'
 const DEBUG_PASSWORD = 'Test123456!'
 
 export async function GET() {
+  const email = `debug1+${Date.now()}@gmail.com`
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -36,7 +36,7 @@ export async function GET() {
   })
 
   const { data, error } = await supabase.auth.signUp({
-    email: DEBUG_EMAIL,
+    email,
     password: DEBUG_PASSWORD,
   })
 

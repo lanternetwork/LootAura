@@ -7,7 +7,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
-const DEBUG_EMAIL = 'directtest4@gmail.com'
 const DEBUG_PASSWORD = 'Test123456!'
 
 export default function DebugSignupFetchPage() {
@@ -24,6 +23,7 @@ export default function DebugSignupFetchPage() {
         setResult(JSON.stringify({ error: 'Missing NEXT_PUBLIC_SUPABASE_URL or ANON_KEY' }, null, 2))
         return
       }
+      const email = `debug4+${Date.now()}@gmail.com`
       const signupUrl = `${baseUrl}/auth/v1/signup`
       const res = await fetch(signupUrl, {
         method: 'POST',
@@ -33,7 +33,7 @@ export default function DebugSignupFetchPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: DEBUG_EMAIL,
+          email,
           password: DEBUG_PASSWORD,
         }),
       })
@@ -48,6 +48,7 @@ export default function DebugSignupFetchPage() {
         JSON.stringify(
           {
             keyType: 'anon',
+            email,
             requestUrl: signupUrl,
             httpStatus: res.status,
             ok: res.ok,
@@ -75,8 +76,8 @@ export default function DebugSignupFetchPage() {
       <div className="max-w-3xl mx-auto space-y-4">
         <h1 className="text-xl font-bold">DEBUG: Raw browser → /auth/v1/signup</h1>
         <p className="text-sm text-neutral-600">
-          Bypasses supabase-js. Uses NEXT_PUBLIC_SUPABASE_URL + anon key. Email:{' '}
-          {DEBUG_EMAIL}
+          Bypasses supabase-js. Fresh email per run:{' '}
+          <code className="text-xs">debug4+&lt;timestamp&gt;@gmail.com</code>
         </p>
         <button
           type="button"

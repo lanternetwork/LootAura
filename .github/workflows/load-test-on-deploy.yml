@@ -1,5 +1,8 @@
 name: Load Tests on Deployment
 
+permissions:
+  contents: read
+
 on:
   deployment_status:
     types: [created, success]

@@ -104,13 +104,13 @@ async function generateHardcodedList(limit: number = 500, outputFile?: string) {
     
     for (const cityState of sortedGroups) {
       const zips = grouped[cityState]
-      
-      // Add comment for city group
-      code += `\n  // ${cityState}\n`
-      
-      // Add each ZIP code
+
+      // Add comment for city group (single line; strip newlines / control chars)
+      code += `\n  // ${sanitizeCommentLine(cityState)}\n`
+
+      // Add each ZIP code — JSON.stringify for safe TS string literals
       zips.forEach(zip => {
-        code += `  '${zip.zip}': { lat: ${zip.lat}, lng: ${zip.lng}, city: '${escapeString(zip.city)}', state: '${zip.state}' },\n`
+        code += `  ${JSON.stringify(zip.zip)}: { lat: ${zip.lat}, lng: ${zip.lng}, city: ${JSON.stringify(zip.city)}, state: ${JSON.stringify(zip.state)} },\n`
       })
     }
     
@@ -138,8 +138,9 @@ async function generateHardcodedList(limit: number = 500, outputFile?: string) {
   }
 }
 
-function escapeString(str: string): string {
-  return str.replace(/'/g, "\\'")
+/** Keep // comments on one line and free of control characters */
+function sanitizeCommentLine(s: string): string {
+  return s.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 // Parse command line arguments

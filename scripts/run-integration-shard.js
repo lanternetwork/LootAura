@@ -9,8 +9,7 @@
  * Enforces hard cap: max 3 files per shard to prevent OOM.
  */
 
-const { spawn } = require('child_process')
-const { execSync } = require('child_process')
+const { spawn, execFileSync } = require('child_process')
 const path = require('path')
 
 const shardIndex = parseInt(process.env.SHARD_INDEX || '0', 10)
@@ -23,7 +22,7 @@ if (isNaN(shardIndex) || isNaN(shardCount) || shardIndex < 0 || shardCount < 1) 
 
 // Get list of test files
 const listScript = path.resolve(__dirname, 'list-integration-tests.js')
-const fileListOutput = execSync(`node ${listScript}`, { encoding: 'utf-8' })
+const fileListOutput = execFileSync(process.execPath, [listScript], { encoding: 'utf-8' })
 const allFiles = fileListOutput
   .split('\n')
   .map(line => line.trim())
@@ -58,10 +57,7 @@ const vitestArgs = ['run', ...assignedFiles]
 
 const vitestProcess = spawn('npx', ['vitest', ...vitestArgs], {
   stdio: 'inherit',
-  shell: true,
-  env: {
-    ...process.env,
-  },
+  env: process.env,
 })
 
 vitestProcess.on('exit', (code) => {

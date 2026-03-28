@@ -12,7 +12,7 @@
 
 const fs = require('fs')
 const path = require('path')
-const { execSync } = require('child_process')
+const { execFileSync } = require('child_process')
 
 const batchSize = parseInt(process.argv[2] || '2', 10)
 const batchIndex = parseInt(process.env.BATCH_INDEX || '0', 10)
@@ -72,11 +72,9 @@ for (const file of batchFiles) {
   console.log(`\n[Batch ${batchIndex}/${totalBatches}] Running: ${file}`)
   
   try {
-    execSync(`node ${runScript} ${file}`, {
+    execFileSync(process.execPath, [runScript, file], {
       stdio: 'inherit',
-      env: {
-        ...process.env,
-      },
+      env: process.env,
     })
   } catch (error) {
     console.error(`\n[Batch ${batchIndex}/${totalBatches}] Failed: ${file}`)

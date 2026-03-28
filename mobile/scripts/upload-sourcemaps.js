@@ -10,7 +10,7 @@
  * - SENTRY_PROJECT: Sentry project slug
  */
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { globSync } = require('glob');
@@ -153,8 +153,7 @@ try {
   // sentry-cli releases files <release> upload-sourcemaps <path> --dist <dist>
   const dist = process.env.EAS_BUILD_PLATFORM === 'android' ? 'android' : 'ios';
   
-  const uploadCommand = [
-    'npx',
+  const args = [
     '@sentry/cli',
     'releases',
     'files',
@@ -169,10 +168,10 @@ try {
     process.env.SENTRY_PROJECT,
     '--auth-token',
     process.env.SENTRY_AUTH_TOKEN,
-  ].join(' ');
+  ];
 
   console.log('[Sentry] Running sourcemap upload...');
-  execSync(uploadCommand, { stdio: 'inherit' });
+  execFileSync('npx', args, { stdio: 'inherit', env: process.env });
   console.log(`[Sentry] Successfully uploaded sourcemaps for release: ${release}`);
 } catch (error) {
   console.error(`[Sentry] SOURCEMAP_UPLOAD_FAILED: Upload command failed: ${error.message}`);

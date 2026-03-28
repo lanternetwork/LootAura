@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NextRequest } from 'next/server'
-import type { NextResponse } from 'next/server'
+import { NextRequest, type NextResponse } from 'next/server'
 import { Policies } from '@/lib/rateLimit/policies'
 
 const { rateLimitWrapArgs } = vi.hoisted(() => ({

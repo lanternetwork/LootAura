@@ -16,7 +16,7 @@ describe('Email Redirect Configuration', () => {
     vi.clearAllMocks()
     process.env.NEXT_PUBLIC_DEBUG = 'false'
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
   })
 
   it('should set emailRedirectTo when NEXT_PUBLIC_SITE_URL is configured', async () => {

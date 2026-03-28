@@ -178,7 +178,7 @@ describe('Auth API Routes', () => {
       vi.mocked(isValidSession).mockReturnValue(true)
 
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 
       const request = new NextRequest('http://localhost:3000/api/auth/signup', {
         method: 'POST',
@@ -224,7 +224,7 @@ describe('Auth API Routes', () => {
       vi.mocked(isValidSession).mockReturnValue(true)
 
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
       process.env.NEXT_PUBLIC_SITE_URL = 'https://myapp.com'
 
       const request = new NextRequest('http://localhost:3000/api/auth/signup', {

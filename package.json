@@ -1,7 +1,7 @@
 {
   "name": "yard-sale-finder",
   "private": true,
-  "version": "233",
+  "version": "234",
   "description": "Find yard sales near you",
   "engines": {
     "node": "^20"
@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "NODE_OPTIONS='--max-old-space-size=8192 --expose-gc' vitest run",
+    "test": "node --max-old-space-size=8192 --expose-gc ./node_modules/vitest/vitest.mjs run",
     "test:ui": "vitest",
     "test:e2e": "playwright test",
     "format": "prettier -w .",
@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@react-email/components": "^0.0.19",
-    "@sentry/nextjs": "^8.15.0",
+    "@sentry/nextjs": "^10.46.0",
     "@stripe/react-stripe-js": "^2.4.0",
     "@stripe/stripe-js": "^2.4.0",
     "@supabase/ssr": "^0.5.0",
@@ -101,7 +101,7 @@
     "@types/web-push": "^3.6.4",
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.14",
@@ -113,12 +113,13 @@
     "jsdom": "^25.0.0",
     "lint-staged": "^15.2.10",
     "msw": "^2.3.1",
-    "patch-package": "^7.0.0",
+    "patch-package": "^8.0.1",
     "postcss": "^8.4.38",
     "prettier": "^3.3.3",
     "tailwindcss": "^3.4.9",
-    "tsx": "^4.7.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.4.5",
-    "vitest": "^2.0.5"
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
   }
 }

@@ -1,5 +1,9 @@
 name: Load Tests
 
+permissions:
+  contents: read
+  actions: write
+
 on:
   workflow_dispatch:
     inputs:

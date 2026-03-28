@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
 import { cookies } from 'next/headers'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,7 +11,7 @@ const resendSchema = z.object({
   email: z.string().email('Invalid email address'),
 })
 
-export async function POST(request: NextRequest) {
+async function resendHandler(request: NextRequest) {
   try {
     const body = await request.json()
     const { email } = resendSchema.parse(body)
@@ -61,3 +63,9 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+/** Same burst + hourly caps as signup and magic-link (IP-scoped). */
+export const POST = withRateLimit(resendHandler, [
+  Policies.AUTH_DEFAULT,
+  Policies.AUTH_HOURLY,
+])

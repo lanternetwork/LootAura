@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_request: NextRequest) {
+async function ipGeolocationHandler(_request: NextRequest) {
   try {
     const headersList = await headers()
     
@@ -122,3 +124,9 @@ export async function GET(_request: NextRequest) {
     })
   }
 }
+
+/** Same IP-scoped limits as `app/api/geocoding/zip/route.ts` (GEO_ZIP_SHORT + GEO_ZIP_HOURLY). */
+export const GET = withRateLimit(ipGeolocationHandler, [
+  Policies.GEO_ZIP_SHORT,
+  Policies.GEO_ZIP_HOURLY,
+])

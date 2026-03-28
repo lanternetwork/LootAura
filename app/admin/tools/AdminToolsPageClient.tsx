@@ -305,15 +305,28 @@ export default function AdminToolsPageClient() {
                 <h4 className="font-medium text-gray-900">Mapbox Health</h4>
                 <p className="text-sm text-gray-600">Check Mapbox integration</p>
               </a>
-              <a
-                href="/api/health/supabase"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                <h4 className="font-medium text-gray-900">Supabase Health</h4>
-                <p className="text-sm text-gray-600">Check Supabase connectivity</p>
-              </a>
+              {process.env.NODE_ENV === 'production' ? (
+                <div
+                  className="block p-4 border border-gray-200 rounded-lg bg-gray-50"
+                  aria-disabled="true"
+                >
+                  <h4 className="font-medium text-gray-500">Supabase Health</h4>
+                  <p className="text-sm text-gray-500">Check Supabase connectivity</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Available in non-production only.
+                  </p>
+                </div>
+              ) : (
+                <a
+                  href="/api/health/supabase"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  <h4 className="font-medium text-gray-900">Supabase Health</h4>
+                  <p className="text-sm text-gray-600">Check Supabase connectivity</p>
+                </a>
+              )}
             </div>
           </div>
         </div>

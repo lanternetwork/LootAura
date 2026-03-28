@@ -40,10 +40,8 @@ async function magicLinkHandler(request: NextRequest) {
     const cookieStore = await cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
-    // Configure email redirect URL
-    const emailRedirectTo = process.env.NEXT_PUBLIC_SITE_URL
-      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
-      : undefined
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
+    const emailRedirectTo = siteUrl ? `${siteUrl}/auth/callback` : undefined
 
     if (!emailRedirectTo && process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using Supabase default email redirect')

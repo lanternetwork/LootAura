@@ -4,6 +4,10 @@ import { POST as signinPOST } from '@/app/api/auth/signin/route'
 import { POST as signupPOST } from '@/app/api/auth/signup/route'
 import { POST as logoutPOST } from '@/app/api/auth/logout/route'
 
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(),
+}))
+
 // Mock the server session module
 vi.mock('@/lib/auth/server-session', () => ({
   createServerSupabaseClient: vi.fn(),
@@ -126,6 +130,7 @@ describe('Auth API Routes', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Invalid input data')
     })
 
@@ -145,6 +150,7 @@ describe('Auth API Routes', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Invalid input data')
     })
 
@@ -166,9 +172,13 @@ describe('Auth API Routes', () => {
         },
       }
 
-      const { createServerSupabaseClient, isValidSession } = await import('@/lib/auth/server-session')
-      vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+      const { createClient } = await import('@supabase/supabase-js')
+      vi.mocked(createClient).mockReturnValue(mockSupabase as any)
+      const { isValidSession } = await import('@/lib/auth/server-session')
       vi.mocked(isValidSession).mockReturnValue(true)
+
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 
       const request = new NextRequest('http://localhost:3000/api/auth/signup', {
         method: 'POST',
@@ -185,8 +195,9 @@ describe('Auth API Routes', () => {
       const data = await response.json()
 
       expect(response.status).toBe(201)
-      expect(data.user).toBeDefined()
-      expect(data.message).toBe('Account created successfully')
+      expect(data.ok).toBe(true)
+      expect(data.data?.user).toBeDefined()
+      expect(data.data?.message).toBe('Account created successfully')
     })
 
     it('should accept email with surrounding whitespace', async () => {
@@ -207,9 +218,14 @@ describe('Auth API Routes', () => {
         },
       }
 
-      const { createServerSupabaseClient, isValidSession } = await import('@/lib/auth/server-session')
-      vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+      const { createClient } = await import('@supabase/supabase-js')
+      vi.mocked(createClient).mockReturnValue(mockSupabase as any)
+      const { isValidSession } = await import('@/lib/auth/server-session')
       vi.mocked(isValidSession).mockReturnValue(true)
+
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+      process.env.NEXT_PUBLIC_SITE_URL = 'https://myapp.com'
 
       const request = new NextRequest('http://localhost:3000/api/auth/signup', {
         method: 'POST',
@@ -226,12 +242,13 @@ describe('Auth API Routes', () => {
       const data = await response.json()
 
       expect(response.status).toBe(201)
-      expect(data.user).toBeDefined()
-      expect(data.message).toBe('Account created successfully')
+      expect(data.ok).toBe(true)
+      expect(data.data?.user).toBeDefined()
+      expect(data.data?.message).toBe('Account created successfully')
       expect(mockSupabase.auth.signUp).toHaveBeenCalledWith({
         email: 'test@example.com',
         password: 'Password123',
-        options: expect.any(Object),
+        options: { emailRedirectTo: 'https://myapp.com/auth/callback' },
       })
     })
   })

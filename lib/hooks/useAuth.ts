@@ -127,24 +127,41 @@ export function useSignIn() {
   })
 }
 
+/** Delegates to POST /api/auth/signup (server anon client); avoids browser sb.auth.signUp. */
 export function useSignUp() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const { data, error } = await sb.auth.signUp({
-        email,
-        password
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (error) {
-        throw new Error(error.message)
+      const payload = (await response.json()) as {
+        ok?: boolean
+        data?: { requiresConfirmation?: boolean; message?: string; user?: { id: string; email?: string | null } }
+        error?: string
+        message?: string
+        details?: string
       }
 
-      return data
+      if (!response.ok || payload.ok === false) {
+        const msg =
+          (typeof payload.message === 'string' && payload.message.trim() && payload.message) ||
+          (typeof payload.details === 'string' && payload.details.trim() && payload.details) ||
+          payload.error ||
+          'An unexpected error occurred'
+        throw new Error(msg)
+      }
+
+      return payload.data ?? {}
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth'] })
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
   })
 }

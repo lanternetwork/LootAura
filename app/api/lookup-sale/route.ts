@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
       console.log('Error counting reviews:', countError.message)
     }
     
+    // review_key is computed server-side only for counting; do not return it (embeds owner_id).
     return NextResponse.json({
       ok: true,
       sale: {
@@ -73,9 +74,7 @@ export async function GET(request: NextRequest) {
         city: sale.city,
         state: sale.state,
         address_key: sale.address_key,
-        owner_id: sale.owner_id
       },
-      review_key: reviewKey,
       review_count: reviewCount || 0,
       found_in_table: foundTable
     })

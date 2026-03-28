@@ -4,13 +4,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 export default function SignUp() {
   const router = useRouter()
   const params = useSearchParams()
   const { data: currentUser, isLoading: authLoading } = useAuth()
-  const sb = createSupabaseBrowserClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -19,7 +17,6 @@ export default function SignUp() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // If already authenticated, redirect to /sales
   useEffect(() => {
     if (!authLoading && currentUser) {
       router.replace('/sales')
@@ -40,24 +37,41 @@ export default function SignUp() {
 
     setLoading(true)
     try {
-      // Normalize email before submission to avoid false "invalid email" rejections
       setEmail(normalizedEmail)
 
-      const { data, error } = await sb.auth.signUp({
-        email: normalizedEmail,
-        password
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password }),
       })
 
-      if (error) {
-        throw new Error(error.message)
+      const payload = (await response.json()) as {
+        ok?: boolean
+        data?: { requiresConfirmation?: boolean; message?: string; user?: { id: string; email?: string | null } }
+        error?: string
+        message?: string
+        details?: string
+        code?: string
       }
 
-      // If email confirmation is required, session will be null
-      if (!data.session) {
-        setSuccessMsg('Account created. Check your email to verify your address.')
+      if (!response.ok || payload.ok === false) {
+        const msg =
+          (typeof payload.message === 'string' && payload.message.trim() && payload.message) ||
+          (typeof payload.details === 'string' && payload.details.trim() && payload.details) ||
+          payload.error ||
+          'An unexpected error occurred'
+        throw new Error(msg)
+      }
+
+      if (payload.data?.requiresConfirmation) {
+        setSuccessMsg(
+          payload.data.message || 'Account created. Check your email to verify your address.'
+        )
         return
       }
 
+      await router.refresh()
       const redirectTo = params.get('redirectTo') || '/sales'
       router.replace(redirectTo)
     } catch (err) {
@@ -91,11 +105,11 @@ export default function SignUp() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
-            <input 
+            <input
               type="email"
-              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
+              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
             />
@@ -103,11 +117,11 @@ export default function SignUp() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Password</label>
-            <input 
-              type="password" 
-              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
+            <input
+              type="password"
+              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
               minLength={8}
@@ -116,11 +130,11 @@ export default function SignUp() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Confirm Password</label>
-            <input 
-              type="password" 
-              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
-              value={confirm} 
-              onChange={e => setConfirm(e.target.value)} 
+            <input
+              type="password"
+              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
               placeholder="••••••••"
               required
               minLength={8}
@@ -129,16 +143,16 @@ export default function SignUp() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Display Name (optional)</label>
-            <input 
+            <input
               type="text"
-              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
-              value={displayName} 
-              onChange={e => setDisplayName(e.target.value)} 
+              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
               placeholder="e.g., Alex S."
             />
           </div>
 
-          <button 
+          <button
             type="submit"
             disabled={loading}
             className="w-full rounded bg-amber-500 px-4 py-2 text-white font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -157,5 +171,3 @@ export default function SignUp() {
     </div>
   )
 }
-
-

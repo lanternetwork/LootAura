@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
+import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
@@ -35,23 +36,9 @@ interface PerformanceMetrics {
   timestamp: string
 }
 
-async function metricsHandler(_request: NextRequest) {
+async function metricsHandler(request: NextRequest) {
   try {
-    // Only allow in debug mode or for authenticated admin users
-    const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
-    
-    if (!isDebugMode) {
-      const cookieStore = await cookies()
-      const supabase = createServerSupabaseClient(cookieStore)
-      
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      
-      // Check if user is admin (you would implement this check)
-      // For now, we'll allow all authenticated users in non-debug mode
-    }
+    await assertAdminOrThrow(request)
 
     const startTime = Date.now()
 
@@ -111,6 +98,9 @@ async function metricsHandler(_request: NextRequest) {
     })
 
   } catch (error) {
+    if (error instanceof NextResponse) {
+      return error
+    }
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       authDebug.logAuthError('performance-metrics', error)
     }

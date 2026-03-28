@@ -36,12 +36,20 @@ export default function AdminTools() {
         throw new Error(data.error)
       }
 
+      const addressKey = data.sale.address_key as string | undefined
+      const reviewKey = data.review_key as string | undefined
+      const prefix = addressKey != null ? `${addressKey}|` : ''
+      const sellerIdFromKey =
+        reviewKey && prefix && reviewKey.startsWith(prefix)
+          ? reviewKey.slice(prefix.length)
+          : ''
+
       setReviewInfo({
         sale_id: data.sale.id,
         address_key: data.sale.address_key,
         review_key: data.review_key,
         review_count: data.review_count,
-        seller_id: data.sale.owner_id,
+        seller_id: sellerIdFromKey,
         title: data.sale.title,
         address: data.sale.address,
         city: data.sale.city,

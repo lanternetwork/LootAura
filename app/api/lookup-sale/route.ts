@@ -73,7 +73,6 @@ export async function GET(request: NextRequest) {
         city: sale.city,
         state: sale.state,
         address_key: sale.address_key,
-        owner_id: sale.owner_id
       },
       review_key: reviewKey,
       review_count: reviewCount || 0,

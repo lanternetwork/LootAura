@@ -199,18 +199,14 @@ module.exports = withSentryConfig(
     silent: true, // Suppress source map uploading logs
     org: process.env.SENTRY_ORG,
     project: process.env.SENTRY_PROJECT,
-    // Hide source maps from public access
-    hideSourceMaps: true,
-    // Disable Sentry logger
-    disableLogger: true,
     // Do not widen client/server bundle
     widenClientFileUpload: false,
-    // Transpile client SDK
-    transpileClientSDK: true,
     // Tunnel requests to Sentry (optional, for ad blockers)
     tunnelRoute: '/monitoring',
-    // Automatically tree-shake Sentry logger statements
-    automaticVercelMonitors: true,
+    webpack: {
+      treeshake: { removeDebugLogging: true },
+      automaticVercelMonitors: true,
+    },
   },
   {
     // Sentry build-time options

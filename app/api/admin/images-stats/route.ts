@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { assertAdminOrThrow } from '@/lib/auth/adminGate'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(_request: NextRequest) {
+async function getImagesStatsHandler(request: NextRequest): Promise<NextResponse> {
   try {
+    await assertAdminOrThrow(request)
+
     const supabase = await createSupabaseServerClient()
-    
+
     // Get last 10 sales with cover_image_url and images fields
     const { data: recentSales, error: salesError } = await supabase
       .from('sales_v2')
@@ -15,25 +20,27 @@ export async function GET(_request: NextRequest) {
       .eq('status', 'published')
       .order('created_at', { ascending: false })
       .limit(10)
-    
+
     if (salesError) {
       console.error('Error fetching recent sales:', salesError)
-      return NextResponse.json({ 
-        error: 'Failed to fetch sales data' 
-      }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: 'Failed to fetch sales data',
+        },
+        { status: 500 }
+      )
     }
-    
+
     // Calculate stats
     const totalSales = recentSales?.length || 0
-    const salesWithCoverImage = recentSales?.filter(sale => sale.cover_image_url).length || 0
-    const salesWithImages = recentSales?.filter(sale => sale.images && Array.isArray(sale.images) && sale.images.length > 0).length || 0
+    const salesWithCoverImage = recentSales?.filter((sale) => sale.cover_image_url).length || 0
+    const salesWithImages =
+      recentSales?.filter((sale) => sale.images && Array.isArray(sale.images) && sale.images.length > 0).length || 0
     const salesUsingPlaceholder = totalSales - salesWithCoverImage
-    
+
     // Calculate placeholder percentage
-    const placeholderPercentage = totalSales > 0 
-      ? Math.round((salesUsingPlaceholder / totalSales) * 100) 
-      : 0
-    
+    const placeholderPercentage = totalSales > 0 ? Math.round((salesUsingPlaceholder / totalSales) * 100) : 0
+
     return NextResponse.json({
       ok: true,
       stats: {
@@ -41,16 +48,23 @@ export async function GET(_request: NextRequest) {
         withCoverImage: salesWithCoverImage,
         withImages: salesWithImages,
         usingPlaceholder: salesUsingPlaceholder,
-        placeholderPercentage
+        placeholderPercentage,
       },
-      sales: recentSales || []
+      sales: recentSales || [],
     })
   } catch (error: any) {
+    if (error instanceof NextResponse) {
+      return error
+    }
     console.error('Images stats error:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      message: error?.message 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        message: error?.message,
+      },
+      { status: 500 }
+    )
   }
 }
 
+export const GET = withRateLimit(getImagesStatsHandler, [Policies.ADMIN_TOOLS, Policies.ADMIN_HOURLY])

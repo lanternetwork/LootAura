@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
   let createdItemIds: string[] = []
   let draft: any = null
   let user: any = null
+  /** Non-blocking user-visible hint if sale-created confirmation email did not send. */
+  let saleCreatedEmailNotice: string | undefined
 
   try {
     const supabase = await createSupabaseServerClient()
@@ -574,42 +576,83 @@ export async function POST(request: NextRequest) {
           // Use user's timezone or default to America/New_York
           const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
 
-          // Send email using the new comprehensive function (non-blocking)
-          const { sendSaleCreatedEmail } = await import('@/lib/email/sales')
-          const emailResult = await sendSaleCreatedEmail({
-            sale: saleData as any, // Type assertion needed due to Supabase query result type
-            owner: {
-              email: user.email,
-              displayName,
-            },
-            timezone,
+          const { canSendEmail, recordEmailSend } = await import('@/lib/email/emailLog')
+          const saleCreatedDedupeKey = `sale_created:${createdSaleId}`
+          const dedupeGate = await canSendEmail({
+            profileId: user.id,
+            emailType: 'sale_created_confirmation',
+            dedupeKey: saleCreatedDedupeKey,
+            lookbackWindow: '7 days',
           })
-          
-          // Log email result for debugging (non-blocking, doesn't affect response)
-          if (!emailResult.ok) {
-            const { logger } = await import('@/lib/log')
-            logger.warn('Sale created email send failed (non-critical)', {
-              component: 'drafts/publish',
-              operation: 'send_email',
-              draftId: draft.id,
-              saleId: createdSaleId ?? undefined,
-              userId: user.id,
-              ownerEmail: user.email,
-              error: emailResult.error || 'Unknown error',
-              // Include email config status for debugging
-              emailsEnabled: process.env.LOOTAURA_ENABLE_EMAILS === 'true',
-              hasResendApiKey: !!process.env.RESEND_API_KEY,
-              hasResendFromEmail: !!process.env.RESEND_FROM_EMAIL,
+
+          if (!dedupeGate.allowed) {
+            if (dedupeGate.reason === 'duplicate') {
+              saleCreatedEmailNotice =
+                'Sale confirmation email was not sent (already sent recently for this sale).'
+            } else {
+              saleCreatedEmailNotice =
+                'Sale confirmation email was not sent (verification unavailable). Your sale is still published.'
+            }
+          } else {
+            const { sendSaleCreatedEmail } = await import('@/lib/email/sales')
+            const emailResult = await sendSaleCreatedEmail({
+              sale: saleData as any, // Type assertion needed due to Supabase query result type
+              owner: {
+                email: user.email,
+                displayName,
+              },
+              timezone,
+              dedupeKey: saleCreatedDedupeKey,
             })
-          } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[DRAFTS/PUBLISH] Sale created email sent successfully:', {
-              saleId: createdSaleId,
-              ownerEmail: user.email,
-            })
+
+            const saleCreatedSubject = `Your yard sale is live on LootAura 🚀`
+            if (emailResult.ok) {
+              await recordEmailSend({
+                profileId: user.id,
+                emailType: 'sale_created_confirmation',
+                toEmail: user.email,
+                subject: saleCreatedSubject,
+                dedupeKey: saleCreatedDedupeKey,
+                deliveryStatus: 'sent',
+                meta: { saleId: createdSaleId, source: 'draft_publish' },
+              })
+            } else {
+              const { logger } = await import('@/lib/log')
+              logger.warn('Sale created email send failed (non-critical)', {
+                component: 'drafts/publish',
+                operation: 'send_email',
+                draftId: draft.id,
+                saleId: createdSaleId ?? undefined,
+                userId: user.id,
+                ownerEmail: user.email,
+                error: emailResult.error || 'Unknown error',
+                emailsEnabled: process.env.LOOTAURA_ENABLE_EMAILS === 'true',
+                hasResendApiKey: !!process.env.RESEND_API_KEY,
+                hasResendFromEmail: !!process.env.RESEND_FROM_EMAIL,
+              })
+              await recordEmailSend({
+                profileId: user.id,
+                emailType: 'sale_created_confirmation',
+                toEmail: user.email,
+                subject: saleCreatedSubject,
+                dedupeKey: saleCreatedDedupeKey,
+                deliveryStatus: 'failed',
+                errorMessage: 'Email send failed',
+                meta: { saleId: createdSaleId, source: 'draft_publish' },
+              })
+              saleCreatedEmailNotice =
+                'Sale confirmation email could not be sent. Your sale is still published; check email settings or spam folder.'
+            }
+
+            if (emailResult.ok && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[DRAFTS/PUBLISH] Sale created email sent successfully:', {
+                saleId: createdSaleId,
+                ownerEmail: user.email,
+              })
+            }
           }
         }
       } catch (emailError) {
-        // Log but don't fail - email is non-critical
         const { logger } = await import('@/lib/log')
         logger.warn('Failed to trigger sale created confirmation email (non-critical)', {
           component: 'drafts/publish',
@@ -618,10 +661,17 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           error: emailError instanceof Error ? emailError.message : String(emailError),
         })
+        saleCreatedEmailNotice =
+          'Sale confirmation email could not be sent. Your sale is still published; try again later or check spam.'
       }
     }
-    
-    return ok({ data: { saleId: createdSaleId ?? undefined } })
+
+    return ok({
+      data: {
+        saleId: createdSaleId ?? undefined,
+        ...(saleCreatedEmailNotice && { saleCreatedEmailNotice }),
+      },
+    })
   } catch (e: any) {
     const { logger } = await import('@/lib/log')
     const { isProduction } = await import('@/lib/env')

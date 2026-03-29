@@ -286,7 +286,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     // Default: email can be sent (not already sent)
     // Reset to default state - each test should explicitly set its own expectations
     mockCanSendEmail.mockReset()
-    mockCanSendEmail.mockResolvedValue(true)
+    mockCanSendEmail.mockResolvedValue({ allowed: true })
     mockSendSaleCreatedEmail.mockReset()
     mockSendSaleCreatedEmail.mockResolvedValue({ ok: true })
     mockRecordEmailSend.mockReset()
@@ -370,7 +370,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
 
   it('should not send duplicate email on repeated webhook invocation with same payment intent', async () => {
     // First invocation - email can be sent
-    mockCanSendEmail.mockResolvedValueOnce(true)
+    mockCanSendEmail.mockResolvedValueOnce({ allowed: true })
     
     const request1 = createStripeWebhookRequest()
     const response1 = await POST(request1)
@@ -384,7 +384,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     vi.clearAllMocks()
     
     // Mock that email was already sent (idempotency check returns false)
-    mockCanSendEmail.mockResolvedValueOnce(false)
+    mockCanSendEmail.mockResolvedValueOnce({ allowed: false, reason: 'duplicate' })
 
     // Setup mocks for second invocation (idempotent path)
     // Draft is already deleted, so return null
@@ -574,7 +574,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     // Gate condition 6: canSendEmail() returns true (email not already sent)
     // Explicitly mock and track calls
     mockCanSendEmail.mockClear()
-    mockCanSendEmail.mockResolvedValueOnce(true)
+    mockCanSendEmail.mockResolvedValueOnce({ allowed: true })
 
     // Gate condition 7: sendSaleCreatedEmail() fails
     // Explicitly mock and track calls
@@ -682,7 +682,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
     // This ensures test isolation - no prior test state affects this test
     // We need canSendEmail to return true so the email block is reached
     mockCanSendEmail.mockReset()
-    mockCanSendEmail.mockResolvedValueOnce(true)
+    mockCanSendEmail.mockResolvedValueOnce({ allowed: true })
 
     // Ensure sendSaleCreatedEmail is set to fail (already set above, but be explicit)
     mockSendSaleCreatedEmail.mockReset()
@@ -719,7 +719,7 @@ describe('Stripe webhook - finalizeDraftPromotion email sending', () => {
         })
       )
       const canSendResult = await mockCanSendEmail.mock.results[0].value
-      expect(canSendResult).toBe(true)
+      expect(canSendResult).toEqual({ allowed: true })
     }
 
     // Assert: sendSaleCreatedEmail was called once (proves we attempted to send)

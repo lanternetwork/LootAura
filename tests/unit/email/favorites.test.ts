@@ -14,7 +14,7 @@ vi.mock('@/lib/email/sendEmail', () => ({
 }))
 
 vi.mock('@/lib/email/emailLog', () => ({
-  canSendEmail: vi.fn().mockResolvedValue(true),
+  canSendEmail: vi.fn().mockResolvedValue({ allowed: true }),
   recordEmailSend: vi.fn().mockResolvedValue(undefined),
   generateFavoritesDigestDedupeKey: vi.fn((profileId: string) => `dedupe-${profileId}`),
 }))

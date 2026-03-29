@@ -6,7 +6,7 @@
 import React from 'react'
 import { sendEmail } from './sendEmail'
 import { ModerationDailyDigestEmail, buildModerationDigestSubject, type ReportDigestItem } from './templates/ModerationDailyDigestEmail'
-import { recordEmailSend } from './emailLog'
+import { canSendEmail, recordEmailSend } from './emailLog'
 import { getWeekKey } from '@/lib/featured-email/selection'
 
 export interface SendModerationDailyDigestEmailParams {
@@ -22,7 +22,7 @@ export interface SendModerationDailyDigestEmailParams {
  */
 export async function sendModerationDailyDigestEmail(
   params: SendModerationDailyDigestEmailParams
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; skipped?: boolean }> {
   const { reports, dateWindow, baseUrl = 'https://lootaura.com' } = params
 
   // Require MODERATION_DIGEST_EMAIL to be set (fail closed if missing)
@@ -39,6 +39,32 @@ export async function sendModerationDailyDigestEmail(
       ok: false,
       error: 'MODERATION_DIGEST_EMAIL not configured',
     }
+  }
+
+  const weekDedupeKey = `moderation_digest_${getWeekKey(new Date())}`
+  const dedupeGate = await canSendEmail({
+    profileId: null,
+    emailType: 'moderation_daily_digest',
+    dedupeKey: weekDedupeKey,
+    lookbackWindow: '14 days',
+  })
+
+  if (!dedupeGate.allowed) {
+    const { logger } = await import('@/lib/log')
+    if (dedupeGate.reason === 'duplicate') {
+      logger.info('Moderation digest skipped — already sent this week', {
+        component: 'email',
+        operation: 'moderation_digest',
+        dedupeKey: weekDedupeKey,
+      })
+      return { ok: true, skipped: true }
+    }
+    logger.warn('Moderation digest skipped — dedupe check failed (fail closed)', {
+      component: 'email',
+      operation: 'moderation_digest',
+      dedupeKey: weekDedupeKey,
+    })
+    return { ok: false, error: 'Dedupe check failed; moderation digest not sent' }
   }
 
   const subject = buildModerationDigestSubject(reports.length)
@@ -66,7 +92,7 @@ export async function sendModerationDailyDigestEmail(
       emailType: 'moderation_daily_digest',
       toEmail,
       subject,
-      dedupeKey: `moderation_digest_${getWeekKey(new Date())}`, // One per week
+      dedupeKey: weekDedupeKey,
       deliveryStatus: result.ok ? 'sent' : 'failed',
       errorMessage: result.error,
       meta: {
@@ -85,7 +111,7 @@ export async function sendModerationDailyDigestEmail(
       emailType: 'moderation_daily_digest',
       toEmail,
       subject,
-      dedupeKey: `moderation_digest_${getWeekKey(new Date())}`,
+      dedupeKey: weekDedupeKey,
       deliveryStatus: 'failed',
       errorMessage,
       meta: {

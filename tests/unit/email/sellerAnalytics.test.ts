@@ -9,7 +9,7 @@ vi.mock('@/lib/email/sendEmail', () => ({
 }))
 
 vi.mock('@/lib/email/emailLog', () => ({
-  canSendEmail: vi.fn().mockResolvedValue(true),
+  canSendEmail: vi.fn().mockResolvedValue({ allowed: true }),
   recordEmailSend: vi.fn().mockResolvedValue(undefined),
   generateSellerWeeklyDedupeKey: vi.fn((_profileId: string, _weekStart: Date) => 'dedupe-week'),
 }))

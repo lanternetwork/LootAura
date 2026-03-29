@@ -110,14 +110,20 @@ export async function sendFeaturedSalesEmail(
       lookbackWindow: '7 days',
     })
     
-    if (!canSend) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (!canSend.allowed) {
+      if (canSend.reason === 'duplicate' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[EMAIL_FEATURED_SALES] Skipping duplicate email (already sent for this week):', {
           profileId,
           dedupeKey,
         })
       }
-      return { ok: false, error: 'Email already sent for this week' }
+      return {
+        ok: false,
+        error:
+          canSend.reason === 'duplicate'
+            ? 'Email already sent for this week'
+            : 'Email not sent (dedupe check unavailable)',
+      }
     }
 
     // Generate unsubscribe token and URL

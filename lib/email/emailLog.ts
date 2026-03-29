@@ -17,11 +17,17 @@ export interface RecordEmailSendOptions {
 }
 
 export interface CanSendEmailOptions {
-  profileId: string
+  /** Owner profile UUID, or `null` for system emails (e.g. moderation digest) where `email_log.profile_id` is null. */
+  profileId: string | null
   emailType: string
   dedupeKey: string
   lookbackWindow?: string // PostgreSQL interval, e.g. '1 day' or '7 days'
 }
+
+/** `duplicate` = row exists in window. `dedupe_error` = query failed (send must not proceed). */
+export type CanSendEmailResult =
+  | { allowed: true }
+  | { allowed: false; reason: 'duplicate' | 'dedupe_error' }
 
 /**
  * Record an email send in the email_log table
@@ -91,14 +97,10 @@ export async function recordEmailSend(options: RecordEmailSendOptions): Promise<
 }
 
 /**
- * Check if an email with the given dedupe key was already sent recently
- * 
- * This can be used to prevent duplicate emails within a time window.
- * 
- * @param options - Deduplication check parameters
- * @returns Promise<boolean> - true if email was already sent, false if it's safe to send
+ * Check if an email with the given dedupe key was already sent recently.
+ * On query failure, returns `{ allowed: false, reason: 'dedupe_error' }` (fail closed).
  */
-export async function canSendEmail(options: CanSendEmailOptions): Promise<boolean> {
+export async function canSendEmail(options: CanSendEmailOptions): Promise<CanSendEmailResult> {
   const {
     profileId,
     emailType,
@@ -106,52 +108,63 @@ export async function canSendEmail(options: CanSendEmailOptions): Promise<boolea
     lookbackWindow = '1 day',
   } = options
 
+  const profileLabel =
+    profileId === null ? 'system(null)' : `${profileId.substring(0, 8)}...`
+
   try {
     const admin = getAdminDb()
 
-    // Query for recent emails with matching dedupe key
-    const { data, error } = await fromBase(admin, 'email_log')
+    let query = fromBase(admin, 'email_log')
       .select('id')
-      .eq('profile_id', profileId)
       .eq('email_type', emailType)
       .eq('dedupe_key', dedupeKey)
       .gte('sent_at', `now() - interval '${lookbackWindow}'`)
       .limit(1)
 
+    if (profileId === null) {
+      query = query.is('profile_id', null)
+    } else {
+      query = query.eq('profile_id', profileId)
+    }
+
+    const { data, error } = await query
+
     if (error) {
-      // On error, allow sending (fail open) but log the error
-      console.warn('[EMAIL_LOG] Error checking dedupe, allowing send:', {
-        profileId: profileId.substring(0, 8) + '...',
+      console.error('[EMAIL_LOG] Dedupe check failed — blocking send (fail closed):', {
+        profileId: profileLabel,
         emailType,
         dedupeKey,
         error: error.message,
+        errorCode: (error as { code?: string }).code,
       })
-      return true // Fail open - allow sending if we can't check
+      return { allowed: false, reason: 'dedupe_error' }
     }
 
-    // If we found a matching email, it was already sent
     const alreadySent = data && data.length > 0
 
     if (alreadySent && process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[EMAIL_LOG] Duplicate email detected, skipping send:', {
-        profileId: profileId.substring(0, 8) + '...',
+        profileId: profileLabel,
         emailType,
         dedupeKey,
         lookbackWindow,
       })
     }
 
-    return !alreadySent // Return true if NOT already sent (safe to send)
+    if (alreadySent) {
+      return { allowed: false, reason: 'duplicate' }
+    }
+
+    return { allowed: true }
   } catch (error) {
-    // On unexpected error, fail open (allow sending)
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.warn('[EMAIL_LOG] Unexpected error checking dedupe, allowing send:', {
-      profileId: profileId.substring(0, 8) + '...',
+    console.error('[EMAIL_LOG] Unexpected error checking dedupe — blocking send (fail closed):', {
+      profileId: profileLabel,
       emailType,
       dedupeKey,
       error: errorMessage,
     })
-    return true // Fail open - allow sending if we can't check
+    return { allowed: false, reason: 'dedupe_error' }
   }
 }
 

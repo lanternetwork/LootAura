@@ -361,7 +361,7 @@ async function finalizeDraftPromotion(
             lookbackWindow: '7 days', // Prevent duplicates for a week
           })
 
-          if (canSend) {
+          if (canSend.allowed) {
             // Fetch full sale data for email
             const { data: saleData } = await fromBase(admin, 'sales')
               .select('*')
@@ -443,12 +443,18 @@ async function finalizeDraftPromotion(
               }
             }
           } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            logger.info('Sale created email skipped - already sent (idempotent)', {
-              component: 'webhooks/stripe',
-              operation: 'send_email',
-              saleId: createdSaleId,
-              paymentIntentId,
-            })
+            logger.info(
+              canSend.reason === 'duplicate'
+                ? 'Sale created email skipped - already sent (idempotent)'
+                : 'Sale created email skipped - dedupe check failed (fail closed)',
+              {
+                component: 'webhooks/stripe',
+                operation: 'send_email',
+                saleId: createdSaleId,
+                paymentIntentId,
+                dedupeReason: canSend.reason,
+              }
+            )
           }
         }
       }

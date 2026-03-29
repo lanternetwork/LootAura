@@ -237,14 +237,20 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
         lookbackWindow: '1 day',
       })
       
-      if (!canSend) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (!canSend.allowed) {
+        if (canSend.reason === 'duplicate' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[EMAIL_FAVORITES] Skipping duplicate email (already sent in last 24h):', {
             profileId,
             dedupeKey,
           })
         }
-        return { ok: false, error: 'Email already sent recently' }
+        return {
+          ok: false,
+          error:
+            canSend.reason === 'duplicate'
+              ? 'Email already sent recently'
+              : 'Email not sent (dedupe check unavailable)',
+        }
       }
     }
 

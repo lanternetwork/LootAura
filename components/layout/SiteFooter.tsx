@@ -7,7 +7,7 @@ import { BADGES } from '@/app/featured/badges.manifest'
 export function SiteFooter() {
   const pathname = usePathname()
   const currentYear = new Date().getFullYear()
-  const footerBadges = BADGES.slice(0, 6)
+  const footerBadges = BADGES
   
   // Hide footer on /sales page and auth pages
   if (pathname === '/sales' || pathname?.startsWith('/auth/')) {

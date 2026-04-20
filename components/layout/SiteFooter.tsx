@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { BADGES } from '@/app/featured/badges.manifest'
 
 export function SiteFooter() {
   const pathname = usePathname()
   const currentYear = new Date().getFullYear()
+  const footerBadges = BADGES.slice(0, 6)
   
   // Hide footer on /sales page and auth pages
   if (pathname === '/sales' || pathname?.startsWith('/auth/')) {
@@ -45,6 +47,28 @@ export function SiteFooter() {
               Terms of Use
             </Link>
           </nav>
+        </div>
+
+        {/* Footer verification badges */}
+        <div className="mt-6 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+            {footerBadges.map((badge) => (
+              <a
+                key={`${badge.href}|${badge.img}`}
+                href={badge.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={badge.name}
+              >
+                <img
+                  src={badge.img}
+                  alt={badge.name}
+                  className="h-5 w-auto grayscale opacity-60 transition-opacity duration-150 hover:opacity-80"
+                  loading="eager"
+                />
+              </a>
+            ))}
+          </div>
         </div>
 
         {/* Copyright */}

@@ -49,27 +49,29 @@ export function SiteFooter() {
           </nav>
         </div>
 
-        {/* Footer verification badges */}
-        <div className="mt-6 border-t border-slate-100 pt-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
-            {footerBadges.map((badge) => (
-              <a
-                key={`${badge.href}|${badge.img}`}
-                href={badge.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={badge.name}
-              >
-                <img
-                  src={badge.img}
-                  alt={badge.name}
-                  className="h-5 w-auto grayscale opacity-60 transition-opacity duration-150 hover:opacity-80"
-                  loading="eager"
-                />
-              </a>
-            ))}
+        {pathname === '/' && (
+          <div className="mt-6 border-t border-slate-100 pt-4">
+            {/* Footer verification badges (homepage only) */}
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+              {footerBadges.map((badge) => (
+                <a
+                  key={`${badge.href}|${badge.img}`}
+                  href={badge.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={badge.name}
+                >
+                  <img
+                    src={badge.img}
+                    alt={badge.name}
+                    className="h-5 w-auto grayscale opacity-60 transition-opacity duration-150 hover:opacity-80"
+                    loading="eager"
+                  />
+                </a>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Copyright */}
         <div className="mt-6 pt-6 border-t border-slate-100">

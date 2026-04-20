@@ -107,4 +107,25 @@ export const BADGES: Badge[] = [
     addedAt: "2026-04-20",
     requirement: "badge",
   },
+  {
+    name: "Startup Benchmarks",
+    href: "https://startupbenchmarks.com",
+    img: "https://startupbenchmarks.com/assets/images/badge.png",
+    addedAt: "2026-04-20",
+    requirement: "badge",
+  },
+  {
+    name: "Loot Aura badge",
+    href: "https://www.proofstories.io/directory/products/loot-aura/",
+    img: "https://www.proofstories.io/directory/badges/l/loot-aura.svg",
+    addedAt: "2026-04-20",
+    requirement: "badge",
+  },
+  {
+    name: "Featured on FoundrList",
+    href: "https://www.foundrlist.com/product/lootaura-2?utm_source=badge&utm_medium=embed",
+    img: "https://www.foundrlist.com/api/badge/lootaura-2",
+    addedAt: "2026-04-20",
+    requirement: "badge",
+  },
 ]

@@ -4,18 +4,9 @@ export type Badge = {
   img: string
   addedAt: string
   requirement: "badge"
-  notes?: string
 }
 
 export const BADGES: Badge[] = [
-  {
-    name: "Example Directory",
-    href: "https://example.com/lootaura",
-    img: "/badges/example.svg",
-    addedAt: "2026-04-20",
-    requirement: "badge",
-    notes: "initial test entry",
-  },
   {
     name: "Million Dot Homepage",
     href: "https://milliondothomepage.com/product/loot-aura",

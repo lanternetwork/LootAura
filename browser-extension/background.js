@@ -1,4 +1,5 @@
-const LOOTAURA_ORIGIN = "https://lootaura.com";
+const LOOTAURA_ORIGIN =
+  "https://loot-aura-i64uon2h3-lanternetworks-projects.vercel.app";
 const MAX_PREFLIGHT_ATTEMPTS = 3;
 const PREFLIGHT_BACKOFF_MS = [1000, 2000, 5000];
 
@@ -9,7 +10,7 @@ function delay(ms) {
 function queryLootAuraTabs() {
   return new Promise((resolve) => {
     chrome.tabs.query(
-      { url: [`${LOOTAURA_ORIGIN}/*`, "https://www.lootaura.com/*"] },
+      { url: [`${LOOTAURA_ORIGIN}/*`] },
       (tabs) => resolve(Array.isArray(tabs) ? tabs : [])
     );
   });

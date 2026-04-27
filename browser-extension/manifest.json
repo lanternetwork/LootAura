@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "LootAura Queue Starter",
+  "version": "1.0.0",
+  "description": "Phase 1: Queue extraction and sequential listing navigation.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://yardsaletreasuremap.com/*",
+    "https://www.yardsaletreasuremap.com/*",
+    "https://lootaura.com/*",
+    "https://www.lootaura.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://yardsaletreasuremap.com/*",
+        "https://www.yardsaletreasuremap.com/*"
+      ],
+      "js": ["content-script.js"]
+    },
+    {
+      "matches": [
+        "https://lootaura.com/*",
+        "https://www.lootaura.com/*"
+      ],
+      "js": ["lootaura-content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
+

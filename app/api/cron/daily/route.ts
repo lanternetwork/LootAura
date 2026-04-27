@@ -26,6 +26,8 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
 import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
+import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
+import { publishReadyIngestedSales } from '@/lib/ingestion/publishWorker'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
@@ -156,6 +158,21 @@ async function handleRequest(request: NextRequest) {
       }
     }
 
+    // Task 5: Ingestion orchestration (ingestion -> geocode -> publish)
+    try {
+      const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId)
+      results.tasks.ingestionOrchestration = ingestionOrchestrationResult
+    } catch (error) {
+      logger.error('Ingestion orchestration task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+      }))
+      results.tasks.ingestionOrchestration = {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+
 
     // Determine overall success (at least one task must succeed)
     const hasSuccess = Object.values(results.tasks).some((task: any) => task.ok === true)
@@ -196,6 +213,134 @@ async function handleRequest(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+async function runIngestionOrchestration(
+  withOpId: (context?: any) => any
+): Promise<any> {
+  logger.info('Starting ingestion orchestration task', withOpId({
+    component: 'api/cron/daily',
+    task: 'ingestion-orchestration',
+  }))
+
+  const taskResult: any = {
+    ok: true,
+    steps: {},
+  }
+
+  // Step 1: Source ingestion placeholder (manual upload path is admin-triggered).
+  try {
+    logger.info('Ingestion step started', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'ingestion',
+    }))
+
+    const adminDb = getAdminDb()
+    const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
+      .select('city, state, source_platform')
+      .eq('enabled', true)
+
+    if (cityError) {
+      throw new Error(cityError.message || 'Failed to load ingestion city configs')
+    }
+
+    taskResult.steps.ingestion = {
+      ok: true,
+      skipped: true,
+      reason: 'no_external_adapter_implemented',
+      enabledCities: (enabledCities || []).length,
+    }
+
+    logger.info('Ingestion step completed', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'ingestion',
+      enabledCities: (enabledCities || []).length,
+      skipped: true,
+    }))
+  } catch (error) {
+    taskResult.ok = false
+    taskResult.steps.ingestion = {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+    logger.error('Ingestion step failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'ingestion',
+    }))
+  }
+
+  // Step 2: Geocode pending sales.
+  try {
+    logger.info('Geocode step started', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'geocode',
+    }))
+    const geocodeSummary = await geocodePendingSales()
+    taskResult.steps.geocode = {
+      ok: true,
+      ...geocodeSummary,
+    }
+    logger.info('Geocode step completed', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'geocode',
+      ...geocodeSummary,
+    }))
+  } catch (error) {
+    taskResult.ok = false
+    taskResult.steps.geocode = {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+    logger.error('Geocode step failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'geocode',
+    }))
+  }
+
+  // Step 3: Publish ready ingested sales.
+  try {
+    logger.info('Publish step started', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'publish',
+    }))
+    const publishSummary = await publishReadyIngestedSales()
+    taskResult.steps.publish = {
+      ok: true,
+      ...publishSummary,
+    }
+    logger.info('Publish step completed', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'publish',
+      ...publishSummary,
+    }))
+  } catch (error) {
+    taskResult.ok = false
+    taskResult.steps.publish = {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+    logger.error('Publish step failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'publish',
+    }))
+  }
+
+  logger.info('Ingestion orchestration task completed', withOpId({
+    component: 'api/cron/daily',
+    task: 'ingestion-orchestration',
+    result: taskResult,
+  }))
+
+  return taskResult
 }
 
 async function archiveEndedSales(

@@ -1,7 +1,6 @@
 import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureReason } from '@/lib/ingestion/types'
 
 const VAGUE_TIME_KEYWORDS = ['morning', 'afternoon', 'all day', 'allday', 'all-day']
-const GENERIC_TITLES = new Set(['sale', 'garage sale', 'yard sale', 'estate sale'])
 
 function cleanText(value: string | null): string | null {
   if (value == null) return null
@@ -33,7 +32,7 @@ function parseDateFromText(text: string): Date | null {
 function toDateInTimezone(raw: string | number | null, timezone: string): string | null {
   if (raw == null) return null
   const date = typeof raw === 'number' ? new Date(raw) : parseDateFromText(raw)
-  if (Number.isNaN(date.getTime())) return null
+  if (date == null || Number.isNaN(date.getTime())) return null
   // en-CA yields YYYY-MM-DD shape in all runtime targets.
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -112,12 +111,6 @@ function snapToThirtyMinutes(time: string): string {
   return `${String(nextHour).padStart(2, '0')}:${String(finalMin).padStart(2, '0')}:00`
 }
 
-function weakTitle(title: string | null): boolean {
-  if (!title) return true
-  const normalized = title.trim().toLowerCase()
-  return normalized.length < 5 || GENERIC_TITLES.has(normalized)
-}
-
 export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: CityIngestionConfig): Promise<ProcessedIngestedSale> {
   const failureReasons: FailureReason[] = []
   const addressRaw = cleanText(rawSale.addressRaw)
@@ -142,10 +135,6 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
 
   const timeStart = snapToThirtyMinutes(time.start)
   const timeEnd = snapToThirtyMinutes(time.end)
-
-  const title = weakTitle(cleanText(rawSale.title))
-    ? `${cityConfig.city} Yard Sale`
-    : (cleanText(rawSale.title) as string)
 
   const hasAddressError = failureReasons.includes('missing_address') || failureReasons.includes('invalid_address_format')
   const hasDateError = failureReasons.includes('missing_date') || failureReasons.includes('invalid_date')

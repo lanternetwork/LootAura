@@ -42,17 +42,38 @@ interface DateCandidate {
   index: number
 }
 
+const MONTH_MAP: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+}
+
+function monthNumber(token: string): number | null {
+  const value = MONTH_MAP[token.toLowerCase()]
+  return Number.isFinite(value) ? value : null
+}
+
 /**
  * STEP 2–4: one ordered `dates[]` — ISO, M/D/YYYY, then M/D excluding spans already covered
  * by the longer forms (so `5/1/2026` does not also yield `5/1`).
  */
 function extractDateCandidates(text: string): DateCandidate[] {
+  const normalizedForDates = text.replace(/\b(\d{1,2})(st|nd|rd|th)\b/gi, '$1')
   const protectedSpans: { start: number; end: number }[] = []
   const out: DateCandidate[] = []
   let m: RegExpExecArray | null
 
-  const isoRe = /\b(\d{4})-(\d{2})-(\d{2})\b/g
-  while ((m = isoRe.exec(text)) !== null) {
+  const isoRe = /(\d{4})-(\d{2})-(\d{2})/g
+  while ((m = isoRe.exec(normalizedForDates)) !== null) {
     const year = Number.parseInt(m[1], 10)
     const month = Number.parseInt(m[2], 10)
     const day = Number.parseInt(m[3], 10)
@@ -60,8 +81,8 @@ function extractDateCandidates(text: string): DateCandidate[] {
     out.push({ month, day, year, index: m.index })
   }
 
-  const mdyyyyRe = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g
-  while ((m = mdyyyyRe.exec(text)) !== null) {
+  const mdyyyyRe = /(\d{1,2})\/(\d{1,2})\/(\d{4})/g
+  while ((m = mdyyyyRe.exec(normalizedForDates)) !== null) {
     protectedSpans.push({ start: m.index, end: m.index + m[0].length })
     const month = Number.parseInt(m[1], 10)
     const day = Number.parseInt(m[2], 10)
@@ -69,8 +90,8 @@ function extractDateCandidates(text: string): DateCandidate[] {
     out.push({ month, day, year, index: m.index })
   }
 
-  const mdRe = /\b(\d{1,2})\/(\d{1,2})\b/g
-  while ((m = mdRe.exec(text)) !== null) {
+  const mdRe = /(\d{1,2})\/(\d{1,2})/g
+  while ((m = mdRe.exec(normalizedForDates)) !== null) {
     const start = m.index
     const end = start + m[0].length
     if (protectedSpans.some((s) => start >= s.start && end <= s.end)) {
@@ -83,8 +104,64 @@ function extractDateCandidates(text: string): DateCandidate[] {
     })
   }
 
+  const monthNames = Object.keys(MONTH_MAP).join('|')
+  const weekdayOpt = '(?:(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?),?\\s+)?'
+
+  // Full month-name range: "May 2 - May 4", "May 2 to May 4", "May 2 through May 4"
+  const monthRangeRe = new RegExp(
+    `\\b${weekdayOpt}(${monthNames})\\s+(\\d{1,2})\\s*(?:-|to|through)\\s*(${monthNames})\\s+(\\d{1,2})\\b`,
+    'gi'
+  )
+  while ((m = monthRangeRe.exec(normalizedForDates)) !== null) {
+    const startMonth = monthNumber(m[1] || '')
+    const endMonth = monthNumber(m[3] || '')
+    const startDay = Number.parseInt(m[2] || '', 10)
+    const endDay = Number.parseInt(m[4] || '', 10)
+    if (!startMonth || !endMonth || !Number.isFinite(startDay) || !Number.isFinite(endDay)) continue
+
+    out.push({ month: startMonth, day: startDay, index: m.index })
+
+    const secondToken = `${m[3]} ${m[4]}`
+    const secondTokenIndexInMatch = m[0].toLowerCase().indexOf(secondToken.toLowerCase())
+    const secondIndex = secondTokenIndexInMatch >= 0 ? m.index + secondTokenIndexInMatch : m.index
+    out.push({ month: endMonth, day: endDay, index: secondIndex })
+  }
+
+  // Compact range: "May 2-4"
+  const monthCompactRangeRe = new RegExp(`\\b${weekdayOpt}(${monthNames})\\s+(\\d{1,2})-(\\d{1,2})\\b`, 'gi')
+  while ((m = monthCompactRangeRe.exec(normalizedForDates)) !== null) {
+    const month = monthNumber(m[1] || '')
+    const startDay = Number.parseInt(m[2] || '', 10)
+    const endDay = Number.parseInt(m[3] || '', 10)
+    if (!month || !Number.isFinite(startDay) || !Number.isFinite(endDay)) continue
+
+    out.push({ month, day: startDay, index: m.index })
+    const dashPos = m[0].indexOf('-')
+    const endIndex = dashPos >= 0 ? m.index + dashPos + 1 : m.index
+    out.push({ month, day: endDay, index: endIndex })
+  }
+
+  // Single month-name date: "May 2", "Monday, May 4", "Tue May 5"
+  const monthSingleRe = new RegExp(`\\b${weekdayOpt}(${monthNames})\\s+(\\d{1,2})\\b`, 'gi')
+  while ((m = monthSingleRe.exec(normalizedForDates)) !== null) {
+    const month = monthNumber(m[1] || '')
+    const day = Number.parseInt(m[2] || '', 10)
+    if (!month || !Number.isFinite(day)) continue
+    out.push({ month, day, index: m.index })
+  }
+
   out.sort((a, b) => a.index - b.index)
-  return out
+
+  // Deduplicate by month/day/year while preserving index order.
+  const seen = new Set<string>()
+  const deduped: DateCandidate[] = []
+  for (const candidate of out) {
+    const key = `${candidate.month}|${candidate.day}|${candidate.year ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(candidate)
+  }
+  return deduped
 }
 
 interface ClockPart {

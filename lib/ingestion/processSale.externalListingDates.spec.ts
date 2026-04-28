@@ -167,4 +167,102 @@ describe('processIngestedSale — external listing date/time (weekday M/D, start
     expect(processed.dateStart).toBeNull()
     expect(processed.status).toBe('needs_check')
   })
+
+  it('parses single month-name date', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'May 2' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+  })
+
+  it('parses month-name with ordinal suffix', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'May 2nd' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+  })
+
+  it('parses month-name with weekday prefix', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'Monday, May 4' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-04')
+  })
+
+  it('parses full month-name range with hyphen', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'May 2 - May 4' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.dateEnd).toBe('2026-05-04')
+  })
+
+  it('parses compact month-name range', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'May 2-4' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.dateEnd).toBe('2026-05-04')
+  })
+
+  it('parses month-name range with to keyword', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'May 2 to May 4' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.dateEnd).toBe('2026-05-04')
+  })
+
+  it('parses month-name with explicit time range', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({ description: 'May 2\n8:00 am - 3:00 pm' }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.timeStart).toBe('08:00:00')
+    expect(processed.timeEnd).toBe('15:00:00')
+  })
+
+  it('keeps index ordering across numeric and month-name candidates', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: '5/1 - 5/2 May 3' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-01')
+    expect(processed.dateEnd).toBe('2026-05-03')
+  })
+
+  it('parses month-name range with unicode dash', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'May 2 – May 4' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.dateEnd).toBe('2026-05-04')
+  })
+
+  it('parses weekday-prefixed numeric date', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'Tue 4/28' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-04-28')
+  })
+
+  it('parses numeric date inline with surrounding text', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({ description: 'Tuesday night sale Tue 4/28' }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-04-28')
+  })
+
+  it('parses numeric date after newlines', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'Some text\n\n4/28' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-04-28')
+  })
+
+  it('parses punctuation-adjacent numeric date', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: 'Sale date: 4/28.' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-04-28')
+  })
+
+  it('parses numeric date with nearby time token', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: '4:00 pm Tue 4/28' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-04-28')
+    expect(processed.timeStart).toBe('16:00:00')
+  })
 })

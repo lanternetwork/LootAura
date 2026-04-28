@@ -14,6 +14,7 @@ on:
         options:
           - load-tests
           - seed-city-configs
+          - verify-city-configs
         default: load-tests
       csv_path:
         description: "CSV/txt path for city config seeding (repo-relative)"
@@ -63,7 +64,7 @@ on:
 jobs:
   run-load-tests:
     name: Run Load Tests
-    if: ${{ inputs.operation != 'seed-city-configs' }}
+    if: ${{ inputs.operation == 'load-tests' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -166,5 +167,30 @@ jobs:
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE || secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npx --yes tsx scripts/seedCityConfigs.ts "${{ inputs.csv_path }}"
+
+  verify-city-configs:
+    name: Verify City Configs
+    if: ${{ inputs.operation == 'verify-city-configs' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify ingestion_city_configs coverage
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx --yes tsx scripts/verifyCityConfigs.ts "${{ inputs.csv_path }}"
 
 

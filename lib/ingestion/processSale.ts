@@ -11,16 +11,31 @@ function hasStreetNumberAndName(address: string | null): boolean {
   return /^\s*\d+\s+.+/.test(address)
 }
 
-/** STEP 1: description + dateRaw, newlines → spaces, collapse whitespace. */
-function normalizeIngestionDateTimeText(dateRaw: string | number | null, description: string | null): string {
-  const parts = [description, dateRaw]
-    .filter((x) => x != null && String(x).trim() !== '')
-    .map(String)
-  return parts.join(' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+function sanitizeText(input: string): string {
+  if (!input) return ''
+
+  let text = input
+
+  // 1. Normalize unicode (critical)
+  text = text.normalize('NFKC')
+
+  // 2. Replace non-breaking spaces
+  text = text.replace(/\u00A0/g, ' ')
+
+  // 3. Normalize all dash types → standard hyphen
+  text = text.replace(/[‐-‒–—−]/g, '-')
+
+  // 4. Normalize all whitespace
+  text = text.replace(/\s+/g, ' ')
+
+  // 5. Trim
+  text = text.trim()
+
+  return text
 }
 
 /** Single chronological token: M/D, optional explicit calendar year from ISO or M/D/YYYY. */
-interface ExtractedDatePart {
+interface DateCandidate {
   month: number
   day: number
   year?: number
@@ -31,9 +46,9 @@ interface ExtractedDatePart {
  * STEP 2–4: one ordered `dates[]` — ISO, M/D/YYYY, then M/D excluding spans already covered
  * by the longer forms (so `5/1/2026` does not also yield `5/1`).
  */
-function extractAllDates(text: string): ExtractedDatePart[] {
+function extractDateCandidates(text: string): DateCandidate[] {
   const protectedSpans: { start: number; end: number }[] = []
-  const out: ExtractedDatePart[] = []
+  const out: DateCandidate[] = []
   let m: RegExpExecArray | null
 
   const isoRe = /\b(\d{4})-(\d{2})-(\d{2})\b/g
@@ -78,7 +93,7 @@ interface ClockPart {
 }
 
 /** STEP 3: all 12h clock tokens (word-bounded). */
-function extractAllTimes(text: string): ClockPart[] {
+function extractTimeCandidates(text: string): ClockPart[] {
   const re = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi
   const out: ClockPart[] = []
   let m: RegExpExecArray | null
@@ -95,25 +110,16 @@ function extractAllTimes(text: string): ClockPart[] {
   return out
 }
 
-function isValidCalendarMd(month: number, day: number, year: number): boolean {
-  if (month < 1 || month > 12 || day < 1 || day > 31) return false
-  const d = new Date(year, month - 1, day)
-  return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day
+function isValidMonthDay(month: number, day: number): boolean {
+  return month >= 1 && month <= 12 && day >= 1 && day <= 31
 }
 
-/** STEP 6: calendar M/D in listing timezone → YYYY-MM-DD (noon UTC anchor). */
-function formatMdInTimezone(month: number, day: number, year: number, timezone: string): string | null {
-  if (!isValidCalendarMd(month, day, year)) return null
+/** STEP 6: deterministic YYYY-MM-DD (no Date/Intl/timezone dependence). */
+function formatYyyyMmDd(year: number, month: number, day: number): string {
+  const yyyy = String(year)
   const mm = String(month).padStart(2, '0')
   const dd = String(day).padStart(2, '0')
-  const d = new Date(`${year}-${mm}-${dd}T12:00:00Z`)
-  if (Number.isNaN(d.getTime())) return null
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d)
+  return `${yyyy}-${mm}-${dd}`
 }
 
 function formatClock(p: ClockPart): string {
@@ -132,6 +138,72 @@ function snapToThirtyMinutes(time: string): string {
   return `${String(nextHour).padStart(2, '0')}:${String(finalMin).padStart(2, '0')}:00`
 }
 
+function resolveDates(
+  candidates: DateCandidate[],
+  baseYear: number
+): { dateStart: string | null; dateEnd: string | null; invalidDate: boolean } {
+  if (candidates.length === 0) {
+    return { dateStart: null, dateEnd: null, invalidDate: true }
+  }
+
+  const first = candidates[0]
+  const last = candidates[candidates.length - 1]
+  if (!first || !last) {
+    throw new Error('DATE_RESOLVER_INVARIANT_VIOLATION')
+  }
+  if (
+    !Number.isFinite(first.month) ||
+    !Number.isFinite(first.day) ||
+    !Number.isFinite(last.month) ||
+    !Number.isFinite(last.day)
+  ) {
+    throw new Error('DATE_RESOLVER_INVARIANT_VIOLATION')
+  }
+  if (!isValidMonthDay(first.month, first.day)) {
+    return { dateStart: null, dateEnd: null, invalidDate: true }
+  }
+
+  const startYear = first.year ?? baseYear
+  const dateStart = formatYyyyMmDd(startYear, first.month, first.day)
+  let dateEnd: string | null = null
+
+  if (candidates.length >= 2) {
+    if (!isValidMonthDay(last.month, last.day)) {
+      return { dateStart: null, dateEnd: null, invalidDate: true }
+    }
+    let endYear = last.year ?? startYear
+    const endEarlier = last.month < first.month || (last.month === first.month && last.day < first.day)
+    if (endEarlier) {
+      endYear += 1
+    }
+    dateEnd = formatYyyyMmDd(endYear, last.month, last.day)
+  }
+
+  return { dateStart, dateEnd, invalidDate: false }
+}
+
+function resolveTimes(candidates: ClockPart[]): { timeStart: string; timeEnd: string; timeSource: 'explicit' | 'default' } {
+  let timeStartStr = '09:00:00'
+  let timeEndStr = '14:00:00'
+  let timeSource: 'explicit' | 'default' = 'default'
+
+  if (candidates.length >= 2) {
+    timeStartStr = formatClock(candidates[0])
+    timeEndStr = formatClock(candidates[1])
+    timeSource = 'explicit'
+  } else if (candidates.length === 1) {
+    timeStartStr = formatClock(candidates[0])
+    timeEndStr = '14:00:00'
+    timeSource = 'explicit'
+  }
+
+  return {
+    timeStart: snapToThirtyMinutes(timeStartStr),
+    timeEnd: snapToThirtyMinutes(timeEndStr),
+    timeSource,
+  }
+}
+
 export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: CityIngestionConfig): Promise<ProcessedIngestedSale> {
   const failureReasons: FailureReason[] = []
   const addressRaw = cleanText(rawSale.addressRaw)
@@ -144,62 +216,27 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     failureReasons.push(addressRaw ? 'invalid_address_format' : 'missing_address')
   }
 
-  const normalized = normalizeIngestionDateTimeText(rawSale.dateRaw, description)
+  const combinedRaw = `${rawSale.description || ''}\n${rawSale.dateRaw || ''}`
+  const combinedText = sanitizeText(combinedRaw)
   const baseYear = new Date().getFullYear()
-  const tz = cityConfig.timezone
 
-  const dates = extractAllDates(normalized)
+  const dateCandidates = extractDateCandidates(combinedText)
   let dateStart: string | null = null
   let dateEnd: string | null = null
 
-  if (!normalized) {
+  if (!combinedText) {
     failureReasons.push('missing_date')
-  } else if (dates.length === 0) {
-    failureReasons.push('invalid_date')
   } else {
-    const first = dates[0]
-    const last = dates[dates.length - 1]
-    const startYear = first.year ?? baseYear
-    const startFmt = formatMdInTimezone(first.month, first.day, startYear, tz)
-    if (!startFmt) {
+    const resolvedDates = resolveDates(dateCandidates, baseYear)
+    dateStart = resolvedDates.dateStart
+    dateEnd = resolvedDates.dateEnd
+    if (resolvedDates.invalidDate) {
       failureReasons.push('invalid_date')
-    } else {
-      dateStart = startFmt
-      if (dates.length >= 2) {
-        let endYear = last.year ?? baseYear
-        const startTs = new Date(startYear, first.month - 1, first.day).getTime()
-        const endTs = new Date(endYear, last.month - 1, last.day).getTime()
-        if (endTs < startTs) {
-          endYear += 1
-        }
-        const endFmt = formatMdInTimezone(last.month, last.day, endYear, tz)
-        if (!endFmt) {
-          failureReasons.push('invalid_date')
-          dateStart = null
-        } else {
-          dateEnd = endFmt
-        }
-      }
     }
   }
 
-  const times = extractAllTimes(normalized)
-  let timeStartStr = '09:00:00'
-  let timeEndStr = '14:00:00'
-  let timeSource: 'explicit' | 'default' = 'default'
-
-  if (times.length >= 2) {
-    timeStartStr = formatClock(times[0])
-    timeEndStr = formatClock(times[1])
-    timeSource = 'explicit'
-  } else if (times.length === 1) {
-    timeStartStr = formatClock(times[0])
-    timeEndStr = '14:00:00'
-    timeSource = 'explicit'
-  }
-
-  const timeStart = snapToThirtyMinutes(timeStartStr)
-  const timeEnd = snapToThirtyMinutes(timeEndStr)
+  const timeCandidates = extractTimeCandidates(combinedText)
+  const resolvedTimes = resolveTimes(timeCandidates)
 
   const hasAddressError = failureReasons.includes('missing_address') || failureReasons.includes('invalid_address_format')
   const hasDateError = failureReasons.includes('missing_date') || failureReasons.includes('invalid_date')
@@ -215,10 +252,10 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     lng: null,
     dateStart,
     dateEnd,
-    timeStart,
-    timeEnd,
-    timeSource,
-    dateSource: normalized ? 'source_date_raw' : null,
+    timeStart: resolvedTimes.timeStart,
+    timeEnd: resolvedTimes.timeEnd,
+    timeSource: resolvedTimes.timeSource,
+    dateSource: combinedText ? 'source_date_raw' : null,
     status,
     failureReasons,
     parseConfidence,

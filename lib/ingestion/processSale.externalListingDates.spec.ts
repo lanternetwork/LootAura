@@ -125,4 +125,46 @@ describe('processIngestedSale — external listing date/time (weekday M/D, start
     expect(processed.dateStart).toBe('2026-05-01')
     expect(processed.dateEnd).toBeNull()
   })
+
+  it('normalizes unicode dashes + NBSP to parse identically', async () => {
+    const nbsp = '\u00A0'
+    const a = await processIngestedSale(
+      baseRaw({ description: `5/2 -${nbsp}5/3 9:00 am - 5:00 pm` }),
+      homewoodConfig
+    )
+    const b = await processIngestedSale(
+      baseRaw({ description: '5/2 – 5/3 9:00 am — 5:00 pm' }),
+      homewoodConfig
+    )
+
+    expect(a.failureReasons).not.toContain('invalid_date')
+    expect(b.failureReasons).not.toContain('invalid_date')
+    expect(a.dateStart).toBe('2026-05-02')
+    expect(a.dateEnd).toBe('2026-05-03')
+    expect(b.dateStart).toEqual(a.dateStart)
+    expect(b.dateEnd).toEqual(a.dateEnd)
+    expect(b.timeStart).toEqual(a.timeStart)
+    expect(b.timeEnd).toEqual(a.timeEnd)
+  })
+
+  it('supports single explicit 5pm time with default end', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({ description: '5/2 sale starts 5pm' }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.timeStart).toBe('17:00:00')
+    expect(processed.timeEnd).toBe('14:00:00')
+  })
+
+  it('treats invalid date tokens as invalid_date without throwing', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({ description: 'Open 99/99 8:00 am - 3:00 pm' }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).toContain('invalid_date')
+    expect(processed.dateStart).toBeNull()
+    expect(processed.status).toBe('needs_check')
+  })
 })

@@ -277,4 +277,14 @@ describe('processIngestedSale — external listing date/time (weekday M/D, start
     expect(processed.timeStart).toBe('08:30:00')
     expect(processed.timeEnd).toBe('17:00:00')
   })
+
+  it('parses visually identical date range when slash glyphs are non-ascii', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({ description: '8:30 am - 5:00 pm 5⁄2 - 5⁄3' }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.dateEnd).toBe('2026-05-03')
+  })
 })

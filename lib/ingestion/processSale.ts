@@ -25,6 +25,10 @@ function sanitizeText(input: string): string {
   // 3. Normalize all dash types → standard hyphen
   text = text.replace(/[‐-‒–—−]/g, '-')
 
+  // 3b. Normalize slash variants used by some renderers/copies.
+  // This keeps visually-identical dates (e.g. 5⁄2, 5∕2, 5／2) parseable.
+  text = text.replace(/[⁄∕／]/g, '/')
+
   // 4. Normalize all whitespace
   text = text.replace(/\s+/g, ' ')
 

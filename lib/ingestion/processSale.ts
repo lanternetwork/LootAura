@@ -207,7 +207,6 @@ function resolveTimes(candidates: ClockPart[]): { timeStart: string; timeEnd: st
 export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: CityIngestionConfig): Promise<ProcessedIngestedSale> {
   const failureReasons: FailureReason[] = []
   const addressRaw = cleanText(rawSale.addressRaw)
-  const description = cleanText(rawSale.description)
   const city = cleanText(rawSale.cityHint) || cleanText(cityConfig.city)
   const state = cleanText(rawSale.stateHint) || cleanText(cityConfig.state)
 

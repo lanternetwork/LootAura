@@ -151,12 +151,14 @@ function extractDateCandidates(text: string): DateCandidate[] {
   }
 
   out.sort((a, b) => a.index - b.index)
+  return out
+}
 
-  // Deduplicate by month/day/year while preserving index order.
+function dedupeDateCandidates(rawCandidates: DateCandidate[]): DateCandidate[] {
   const seen = new Set<string>()
   const deduped: DateCandidate[] = []
-  for (const candidate of out) {
-    const key = `${candidate.month}|${candidate.day}|${candidate.year ?? ''}`
+  for (const candidate of rawCandidates) {
+    const key = `${candidate.month}-${candidate.day}-${candidate.year ?? 'base'}`
     if (seen.has(key)) continue
     seen.add(key)
     deduped.push(candidate)
@@ -296,19 +298,48 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
   const combinedText = sanitizeText(combinedRaw)
   const baseYear = new Date().getFullYear()
 
-  const dateCandidates = extractDateCandidates(combinedText)
+  const rawDateCandidates = extractDateCandidates(combinedText)
+  const dedupedDateCandidates = dedupeDateCandidates(rawDateCandidates)
+  const dateCandidates =
+    rawDateCandidates.length >= 2 && dedupedDateCandidates.length < 2
+      ? (() => {
+          // eslint-disable-next-line no-console
+          console.error('date_candidate_dedupe_collapse', {
+            rawCount: rawDateCandidates.length,
+            dedupedCount: dedupedDateCandidates.length,
+            raw: rawDateCandidates,
+            deduped: dedupedDateCandidates,
+          })
+          return rawDateCandidates
+        })()
+      : dedupedDateCandidates
+
   let dateStart: string | null = null
   let dateEnd: string | null = null
 
+  let invalidDate = false
   if (!combinedText) {
     failureReasons.push('missing_date')
   } else {
     const resolvedDates = resolveDates(dateCandidates, baseYear)
     dateStart = resolvedDates.dateStart
     dateEnd = resolvedDates.dateEnd
-    if (resolvedDates.invalidDate) {
-      failureReasons.push('invalid_date')
-    }
+    invalidDate = resolvedDates.invalidDate
+    if (invalidDate) failureReasons.push('invalid_date')
+  }
+
+  // Invariant: if extraction found tokens, resolution must either produce dateStart
+  // or explicitly mark invalid_date. Never silently collapse.
+  if (rawDateCandidates.length >= 1 && !dateStart && !invalidDate) {
+    // eslint-disable-next-line no-console
+    console.error('date_resolution_invariant_failed', {
+      rawCount: rawDateCandidates.length,
+      dedupedCount: dedupedDateCandidates.length,
+      usedCount: dateCandidates.length,
+      raw: rawDateCandidates,
+      deduped: dedupedDateCandidates,
+    })
+    failureReasons.push('invalid_date')
   }
 
   const timeCandidates = extractTimeCandidates(combinedText)

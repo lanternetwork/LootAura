@@ -303,9 +303,17 @@ function extractTitle() {
 
 function extractDescription() {
   const contentEls = Array.from(document.querySelectorAll(".content"));
-  const description = contentEls
-    .map((el) => (el instanceof HTMLElement ? el.innerText : ""))
-    .join(" ")
+  const target = contentEls.find((el) => {
+    if (!(el instanceof HTMLElement)) return false;
+    const text = el.innerText || "";
+    return /(\d{1,2}\/\d{1,2})/.test(text);
+  });
+
+  const description = (target && target instanceof HTMLElement
+    ? target.innerText
+    : contentEls
+        .map((el) => (el instanceof HTMLElement ? el.innerText : ""))
+        .join(" "))
     .replace(/\s+/g, " ")
     .trim();
   console.log("EXTRACTED DESCRIPTION:", description);

@@ -1,4 +1,11 @@
-const SESSION_KEY = "lootaura_queue_session";
+(function () {
+  const LOOTAURA_EXTERNAL_PAGE_QUEUE_INIT = "__lootauraExternalPageQueue_v2";
+  if (globalThis[LOOTAURA_EXTERNAL_PAGE_QUEUE_INIT]) {
+    return;
+  }
+  globalThis[LOOTAURA_EXTERNAL_PAGE_QUEUE_INIT] = true;
+
+  const SESSION_KEY = "lootaura_queue_session";
 const TRACKING_PARAMS = ["utm_source", "utm_medium", "utm_campaign"];
 const OVERLAY_ID = "lootaura-phase2-overlay";
 
@@ -18,38 +25,30 @@ function canonicalizeUrl(url) {
   }
 }
 
-function isListingUrl(href) {
-  if (!href || href === "#") return false;
-
-  let url;
-  try {
-    url = new URL(href, window.location.origin);
-  } catch {
-    return false;
-  }
-
-  if (url.origin !== window.location.origin) return false;
-
-  const path = url.pathname.toLowerCase();
-  if (!path.endsWith("/listing.html")) return false;
-
-  return true;
-}
-
 function buildQueueUrls() {
-  const anchors = Array.from(document.querySelectorAll("a"));
-  console.log("[LootAura] Total anchors found:", anchors.length);
+  const anchors = Array.from(document.querySelectorAll("a[href]"));
+  const urls = anchors
+    .map((a) => {
+      try {
+        return new URL(a.getAttribute("href"), window.location.origin).href;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 
-  const rawHrefs = anchors
-    .map((a) => a.getAttribute("href"))
-    .filter((href) => typeof href === "string");
+  const listingUrls = urls.filter((url) => {
+    const u = url.toLowerCase();
+    return u.includes("/listing.html") || u.includes("/userlisting.html");
+  });
 
-  const filtered = rawHrefs.filter((href) => isListingUrl(href));
-  console.log("Listing URLs found:", filtered.length);
+  const unique = Array.from(new Set(listingUrls));
 
-  const deduped = Array.from(new Set(filtered.map((url) => canonicalizeUrl(url))));
-  console.log("[LootAura] Deduped URLs count:", deduped.length);
-  return deduped;
+  console.log("Total anchors:", anchors.length);
+  console.log("Listing URLs found:", unique.length);
+  console.log("Sample URLs:", unique.slice(0, 5));
+
+  return unique;
 }
 
 function deriveCityStateFromPage() {
@@ -72,11 +71,21 @@ function deriveCityStateFromPage() {
   }
 
   if (!city) {
+    try {
+      window.focus();
+    } catch {
+      /* ignore */
+    }
     const cityPrompt = prompt("Enter city for this session (required):", "");
     city = (cityPrompt || "").trim();
   }
 
   if (!state) {
+    try {
+      window.focus();
+    } catch {
+      /* ignore */
+    }
     const statePrompt = prompt("Enter state code (required, e.g. IL):", "");
     state = (statePrompt || "").trim().toUpperCase();
   }
@@ -88,7 +97,7 @@ function deriveCityStateFromPage() {
 function createSession(urls, locationInfo) {
   return {
     id: Date.now().toString(),
-    source: "ystm",
+    source: "external_page_source",
     urls,
     city: locationInfo.city,
     state: locationInfo.state,
@@ -112,14 +121,30 @@ function getSession() {
   });
 }
 
+const RUNTIME_MESSAGE_TIMEOUT_MS = 120000;
+
 function sendRuntimeMessage(message) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(
+        new Error(
+          "Timed out waiting for the extension background (preflight). Reload this tab, ensure the LootAura extension is enabled, open your LootAura preview tab while logged in as admin, then try again."
+        )
+      );
+    }, RUNTIME_MESSAGE_TIMEOUT_MS);
+
     chrome.runtime.sendMessage(message, (response) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
         return;
       }
-      resolve(response || null);
+      resolve(response ?? null);
     });
   });
 }
@@ -143,11 +168,15 @@ async function runPreflight() {
 async function startSession() {
   const urls = buildQueueUrls();
   if (urls.length === 0) {
-    alert("No listings found on this page");
+    alert("No listings found on this page (no listing or userlisting URLs in links).");
     return;
   }
   if (urls.length < 3) {
-    alert("Low number of listings detected — selectors may be off");
+    console.warn(
+      "[LootAura] Few listing URLs on this page:",
+      urls.length,
+      "(expected more on a typical city results page)"
+    );
   }
 
   const locationInfo = deriveCityStateFromPage();
@@ -166,7 +195,14 @@ async function startSession() {
     } else if (status === 429) {
       alert("Preflight rate-limited after retries. Try again shortly.");
     } else {
-      alert("Preflight failed. Session not started.");
+      const detail =
+        (preflight && typeof preflight.error === "string" && preflight.error) ||
+        (status ? `HTTP ${status}` : "");
+      alert(
+        detail
+          ? `Preflight failed. Session not started.\n\n${detail}`
+          : "Preflight failed. Session not started."
+      );
     }
     console.warn("[LootAura] Preflight failed:", preflight);
     return;
@@ -266,14 +302,46 @@ function extractTitle() {
 }
 
 function extractDescription() {
-  const p = document.querySelector("p");
-  return p?.textContent?.trim() || "";
+  const contentEls = Array.from(document.querySelectorAll(".content"));
+  const description = contentEls
+    .map((el) => (el instanceof HTMLElement ? el.innerText : ""))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  console.log("EXTRACTED DESCRIPTION:", description);
+  return description;
 }
 
+/** US-style street + city + state on one line; no heuristic fallback. */
 function extractAddress() {
-  const text = document.body.innerText || "";
-  const line = text.split("\n").find((entry) => /\d+\s+\w+/.test(entry));
-  return line ? line.trim().slice(0, 500) : "";
+  const lines = (document.body.innerText || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const pattern =
+    /\d{3,6}\s+[A-Za-z0-9.\-\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?/i;
+  const line = lines.find((l) => pattern.test(l)) ?? null;
+
+  const addressRaw = line ? line.slice(0, 500) : null;
+  console.log("Address extracted:", addressRaw);
+  return addressRaw;
+}
+
+/** City + 2-letter state at end of line: `City, ST`, `City, ST ZIP`, or `City, ST ZIP, USA`. */
+function extractCityState(address) {
+  if (!address) return { city: null, state: null };
+
+  const match = address.match(
+    /,\s*([^,]+?),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?(?:,\s*USA)?$/i
+  );
+
+  if (!match) return { city: null, state: null };
+
+  return {
+    city: match[1].trim(),
+    state: match[2].toUpperCase(),
+  };
 }
 
 function extractDate() {
@@ -296,19 +364,23 @@ function extractImage() {
 }
 
 function buildSubmissionPayload(session, currentUrl, selectedTags) {
+  const addressRaw = extractAddress();
+  const { city, state } = extractCityState(addressRaw);
+  console.log("City/state extracted:", { city, state });
+
   return {
     records: [
       {
-        sourcePlatform: "ystm",
+        sourcePlatform: "external_page_source",
         sourceUrl: currentUrl,
         externalId: null,
         title: extractTitle(),
         description: extractDescription(),
-        addressRaw: extractAddress(),
+        addressRaw,
         dateRaw: extractDate(),
         imageSourceUrl: extractImage(),
-        cityHint: session.city,
-        stateHint: session.state,
+        cityHint: city || session.city,
+        stateHint: state || session.state,
         rawPayload: {
           tags: selectedTags,
           collectedAt: Date.now(),
@@ -463,11 +535,25 @@ function renderOverlay(session, currentUrl) {
   console.log("[LootAura] Overlay rendered for listing:", currentUrl);
 }
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "START_SESSION") {
-    startSession();
+    // Popup uses chrome.tabs.sendMessage; must ack or the port closes with an error.
+    try {
+      sendResponse({ ok: true });
+    } catch {
+      /* ignore */
+    }
+    void startSession().catch((err) => {
+      console.error("[LootAura] startSession failed:", err);
+      window.alert(
+        err instanceof Error ? `LootAura: ${err.message}` : `LootAura: ${String(err)}`
+      );
+    });
+    return false;
   }
+  return false;
 });
 
 resumeSessionIfActive();
+})();
 

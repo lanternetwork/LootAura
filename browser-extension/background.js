@@ -2,6 +2,9 @@ const LOOTAURA_ORIGIN =
   "https://loot-aura-i64uon2h3-lanternetworks-projects.vercel.app";
 const MAX_PREFLIGHT_ATTEMPTS = 3;
 const PREFLIGHT_BACKOFF_MS = [1000, 2000, 5000];
+/** Brief retries after programmatic inject (frame paint / SW timing). */
+const SEND_MESSAGE_RETRIES = 12;
+const SEND_MESSAGE_RETRY_MS = 150;
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,11 +21,13 @@ function queryLootAuraTabs() {
 
 function createLootAuraTab() {
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: LOOTAURA_ORIGIN }, (tab) => resolve(tab || null));
+    chrome.tabs.create({ url: LOOTAURA_ORIGIN, active: true }, (tab) =>
+      resolve(tab || null)
+    );
   });
 }
 
-function waitForTabComplete(tabId, timeoutMs = 15000) {
+function waitForTabComplete(tabId, timeoutMs = 45000) {
   return new Promise((resolve, reject) => {
     let done = false;
     const timer = setTimeout(() => {
@@ -32,14 +37,28 @@ function waitForTabComplete(tabId, timeoutMs = 15000) {
       reject(new Error("Timed out waiting for LootAura tab to load"));
     }, timeoutMs);
 
-    function listener(updatedTabId, changeInfo) {
-      if (updatedTabId !== tabId) return;
-      if (changeInfo.status !== "complete") return;
+    function maybeFinish(url) {
+      if (!url || !url.startsWith(LOOTAURA_ORIGIN)) return;
+      if (url.startsWith("chrome-error://")) return;
       if (done) return;
       done = true;
       clearTimeout(timer);
       chrome.tabs.onUpdated.removeListener(listener);
       resolve();
+    }
+
+    function listener(updatedTabId, changeInfo, tab) {
+      if (updatedTabId !== tabId) return;
+      if (changeInfo.status !== "complete") return;
+      const direct = tab?.url;
+      if (direct) {
+        maybeFinish(direct);
+        return;
+      }
+      chrome.tabs.get(tabId, (t) => {
+        if (chrome.runtime.lastError) return;
+        maybeFinish(t?.url || "");
+      });
     }
 
     chrome.tabs.onUpdated.addListener(listener);
@@ -60,16 +79,51 @@ async function ensureLootAuraTab() {
   return created;
 }
 
-function sendToLootAuraTab(tabId, message) {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      resolve(response || null);
+/**
+ * Manifest content_scripts are unreliable on Next.js (race / navigations).
+ * Inject the bridge immediately before messaging.
+ */
+async function injectLootAuraBridge(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["lootaura-content.js"],
     });
-  });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    throw new Error(`Failed to inject LootAura bridge: ${detail}`);
+  }
+}
+
+async function sendToLootAuraTab(tabId, message) {
+  await injectLootAuraBridge(tabId);
+
+  let lastErr = "Unknown error";
+  for (let attempt = 1; attempt <= SEND_MESSAGE_RETRIES; attempt += 1) {
+    try {
+      const response = await new Promise((resolve, reject) => {
+        chrome.tabs.sendMessage(tabId, message, (r) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(r ?? null);
+        });
+      });
+      return response;
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      const retryable =
+        lastErr.includes("Could not establish connection") ||
+        lastErr.includes("Receiving end does not exist");
+      if (!retryable || attempt >= SEND_MESSAGE_RETRIES) {
+        throw new Error(lastErr);
+      }
+      await delay(SEND_MESSAGE_RETRY_MS);
+    }
+  }
+
+  throw new Error(lastErr);
 }
 
 async function runPreflightWithRetry(tabId, payload) {
@@ -98,9 +152,11 @@ async function runPreflightWithRetry(tabId, payload) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  (async () => {
-    if (!msg || (msg.type !== "PREFLIGHT_UPLOAD" && msg.type !== "SUBMIT_SALE")) return;
+  if (!msg || (msg.type !== "PREFLIGHT_UPLOAD" && msg.type !== "SUBMIT_SALE")) {
+    return false;
+  }
 
+  (async () => {
     try {
       const lootauraTab = await ensureLootAuraTab();
       if (typeof lootauraTab.id !== "number") {

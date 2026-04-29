@@ -21,7 +21,7 @@ let _adminSupabase: ReturnType<typeof createClient> | null = null
 function getAdminSupabase(): ReturnType<typeof createClient> {
   if (!_adminSupabase) {
     // Check process.env first to avoid triggering ENV_SERVER validation during build
-    const serviceRoleFromEnv = process.env.SUPABASE_SERVICE_ROLE
+    const serviceRoleFromEnv = process.env.SUPABASE_SERVICE_ROLE_KEY
     
     if (serviceRoleFromEnv) {
       // Use service role from process.env directly (available at runtime)
@@ -40,9 +40,9 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
       // During build time or if not in process.env, try ENV_SERVER
       // This may fail during build, so create a placeholder for type checking
       try {
-        const envServiceRole = ENV_SERVER.SUPABASE_SERVICE_ROLE
+        const envServiceRole = ENV_SERVER.SUPABASE_SERVICE_ROLE_KEY
         if (!envServiceRole) {
-          throw new Error('Missing SUPABASE_SERVICE_ROLE for admin client')
+          throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY for admin client')
         }
         
         _adminSupabase = createClient(

@@ -3,6 +3,7 @@ import { z } from 'zod'
 const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(10, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters'),
+  NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: z.string().min(10, 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN must be at least 10 characters'),
   NEXT_PUBLIC_SITE_URL: z.preprocess(
     (val) => {
       // Handle empty strings, whitespace, or invalid values during build
@@ -70,7 +71,7 @@ const publicSchema = z.object({
 })
 
 const serverSchema = z.object({
-  SUPABASE_SERVICE_ROLE: z.string().min(10, 'SUPABASE_SERVICE_ROLE must be at least 10 characters'),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(10, 'SUPABASE_SERVICE_ROLE_KEY must be at least 10 characters'),
   VAPID_PRIVATE_KEY: z.string().min(10).optional(),
   UPSTASH_REDIS_REST_URL: z.preprocess(
     (val) => (val === '' ? undefined : val),
@@ -103,6 +104,7 @@ const serverSchema = z.object({
 export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -126,7 +128,7 @@ function getEnvServer() {
   // In test environment, always re-parse to pick up env changes
   if (process.env.NODE_ENV === 'test' || !_ENV_SERVER) {
     _ENV_SERVER = serverSchema.parse({
-      SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
       VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
       UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
       UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,

@@ -140,7 +140,7 @@ CREATE TABLE lootaura_v2.zipcodes (
 ## Environment Variables Required
 
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL
-- `SUPABASE_SERVICE_ROLE`: Service role key (for admin operations)
+- `SUPABASE_SERVICE_ROLE_KEY`: Service role key (for admin operations)
 
 Make sure these are set in your `.env.local` file.
 
@@ -156,9 +156,9 @@ Make sure these are set in your `.env.local` file.
 
 ## Troubleshooting
 
-### "Missing SUPABASE_SERVICE_ROLE"
+### "Missing SUPABASE_SERVICE_ROLE_KEY"
 - Check your `.env.local` file
-- Ensure `SUPABASE_SERVICE_ROLE` is set
+- Ensure `SUPABASE_SERVICE_ROLE_KEY` is set
 
 ### "CSV file not found"
 - Use absolute path or relative path from project root

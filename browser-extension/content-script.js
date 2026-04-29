@@ -303,11 +303,19 @@ function extractTitle() {
 
 function extractDescription() {
   const contentEls = Array.from(document.querySelectorAll(".content"));
-  const target = contentEls.find((el) => {
-    if (!(el instanceof HTMLElement)) return false;
-    const text = el.innerText || "";
-    return /(\d{1,2}\/\d{1,2})/.test(text);
-  });
+  const target = contentEls
+    .filter((el) => el instanceof HTMLElement)
+    .map((el) => {
+      const text = el.innerText || "";
+      const hasDate = /(\d{1,2}\/\d{1,2})/.test(text);
+      const hasTime = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.test(text);
+      const normalizedLength = text.replace(/\s+/g, " ").trim().length;
+
+      // Prefer blocks with date/time signals; use text length as tie-breaker.
+      const signalScore = (hasDate ? 100 : 0) + (hasTime ? 60 : 0) + normalizedLength;
+      return { el, text, signalScore };
+    })
+    .sort((a, b) => b.signalScore - a.signalScore)[0]?.el;
 
   const description = (target && target instanceof HTMLElement
     ? target.innerText

@@ -51,14 +51,34 @@ jobs:
             exit 1
           fi
           echo "✅ FEATURED_EMAIL_DRYRUN_SECRET is configured"
+
+      - name: Assert required app secrets present
+        run: |
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
+            echo "❌ NEXT_PUBLIC_SUPABASE_URL is required but not configured in GitHub Actions secrets"
+            exit 1
+          fi
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
+            echo "❌ NEXT_PUBLIC_SUPABASE_ANON_KEY is required but not configured in GitHub Actions secrets"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "❌ SUPABASE_SERVICE_ROLE_KEY is required but not configured in GitHub Actions secrets"
+            exit 1
+          fi
+          if [ -z "${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}" ]; then
+            echo "❌ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN is required but not configured in GitHub Actions secrets"
+            exit 1
+          fi
+          echo "✅ Required app secrets are configured"
         
       - name: Build application
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
-          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || 'placeholder-token' }}
-          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE || 'placeholder-service-role' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
           NEXT_PUBLIC_DEBUG: 'false'
           ENABLE_DEBUG_ENDPOINTS: 'true'
@@ -72,10 +92,10 @@ jobs:
         env:
           PORT: 3000
           NODE_ENV: production
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
-          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || 'placeholder-token' }}
-          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE || 'placeholder-service-role' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
           NEXT_PUBLIC_DEBUG: 'false'
           ENABLE_DEBUG_ENDPOINTS: 'true'
@@ -127,44 +147,30 @@ jobs:
             exit 1
           fi
           
-          # Check if we have real database credentials (not placeholders)
-          if [[ "$NEXT_PUBLIC_SUPABASE_URL" == *"placeholder"* ]] || [[ "$SUPABASE_SERVICE_ROLE" == *"placeholder"* ]]; then
-            echo "⚠️ Using placeholder database credentials - checking API endpoint accessibility"
-            # Check if the API returns a proper error (not a 500)
-            SHARE_ERROR=$(echo $SHARE_RESPONSE | jq -r '.error' 2>/dev/null)
-            if [ "$SHARE_ERROR" != "null" ] && [ -n "$SHARE_ERROR" ]; then
-              echo "✅ Share API endpoint is accessible (returns expected error: $SHARE_ERROR)"
-            else
-              echo "❌ Share API endpoint not responding correctly"
-              echo "Response: $SHARE_RESPONSE"
-              exit 1
-            fi
-          else
-            SHARE_ID=$(echo $SHARE_RESPONSE | jq -r '.shortId' 2>/dev/null)
-            if [ "$SHARE_ID" = "null" ] || [ -z "$SHARE_ID" ]; then
-              echo "❌ Share creation failed"
-              echo "Response: $SHARE_RESPONSE"
-              exit 1
-            fi
-            echo "✅ Share created: $SHARE_ID"
-            
-            # Test 3: Resolve shortlink (anon) → fetches state
-            echo "Testing shortlink resolution..."
-            SHORTLINK_RESPONSE=$(curl -s "http://localhost:3000/api/share?id=$SHARE_ID")
-            
-            if [ $? -ne 0 ]; then
-              echo "❌ Shortlink API request failed"
-              exit 1
-            fi
-            
-            SHORTLINK_STATE=$(echo $SHORTLINK_RESPONSE | jq -r '.state' 2>/dev/null)
-            if [ "$SHORTLINK_STATE" = "null" ] || [ -z "$SHORTLINK_STATE" ]; then
-              echo "❌ Shortlink resolution failed"
-              echo "Response: $SHORTLINK_RESPONSE"
-              exit 1
-            fi
-            echo "✅ Shortlink resolved successfully"
+          SHARE_ID=$(echo $SHARE_RESPONSE | jq -r '.shortId' 2>/dev/null)
+          if [ "$SHARE_ID" = "null" ] || [ -z "$SHARE_ID" ]; then
+            echo "❌ Share creation failed"
+            echo "Response: $SHARE_RESPONSE"
+            exit 1
           fi
+          echo "✅ Share created: $SHARE_ID"
+          
+          # Test 3: Resolve shortlink (anon) → fetches state
+          echo "Testing shortlink resolution..."
+          SHORTLINK_RESPONSE=$(curl -s "http://localhost:3000/api/share?id=$SHARE_ID")
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Shortlink API request failed"
+            exit 1
+          fi
+          
+          SHORTLINK_STATE=$(echo $SHORTLINK_RESPONSE | jq -r '.state' 2>/dev/null)
+          if [ "$SHORTLINK_STATE" = "null" ] || [ -z "$SHORTLINK_STATE" ]; then
+            echo "❌ Shortlink resolution failed"
+            echo "Response: $SHORTLINK_RESPONSE"
+            exit 1
+          fi
+          echo "✅ Shortlink resolved successfully"
           
           # Test 4: Toggle favorite (ensuring RLS works)
           echo "Testing RLS with favorites..."
@@ -229,9 +235,9 @@ jobs:
           
           echo "✅ Featured email dry-run passed (count: $DRYRUN_COUNT)"
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
-          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE || 'placeholder-service-role' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           
       - name: Cleanup
         if: always()

@@ -51,6 +51,76 @@ function buildQueueUrls() {
   return unique;
 }
 
+const STATE_NAME_TO_CODE = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  "district of columbia": "DC",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+};
+
+function toTitleCase(input) {
+  return input
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function normalizeStateFromName(stateName) {
+  const normalized = String(stateName || "")
+    .replace(/-/g, " ")
+    .toLowerCase()
+    .trim();
+  return STATE_NAME_TO_CODE[normalized] || "";
+}
+
 function deriveCityStateFromPage() {
   const parts = window.location.pathname
     .split("/")
@@ -60,14 +130,13 @@ function deriveCityStateFromPage() {
 
   let state = "";
   let city = "";
-  for (let i = 0; i < parts.length; i += 1) {
-    if (/^[A-Za-z]{2}$/.test(parts[i])) {
-      state = parts[i].toUpperCase();
-      if (parts[i + 1]) {
-        city = parts[i + 1].replace(/-/g, " ").trim();
-      }
-      break;
-    }
+
+  // YSTM pattern: /US/{StateName}/{CitySlug}/...
+  // Example: /US/Illinois/Tinley-Park/...
+  const usIndex = parts.findIndex((p) => p.toUpperCase() === "US");
+  if (usIndex >= 0 && parts[usIndex + 1] && parts[usIndex + 2]) {
+    state = normalizeStateFromName(parts[usIndex + 1]);
+    city = toTitleCase(parts[usIndex + 2].replace(/-/g, " ").trim());
   }
 
   if (!city) {

@@ -35,7 +35,7 @@ export default async function ShortlinkPage({ params }: PageProps) {
         const key = await deriveKey(req, policy.scope)
         const result = await check(policy, key)
         if (!result.allowed) {
-          notFound()
+          return notFound()
         }
       }
     }

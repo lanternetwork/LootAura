@@ -118,14 +118,31 @@ function toCityConfig(row: CityConfigRow): CityIngestionConfig {
   }
 }
 
-async function getCityConfig(rawSale: RawExternalSale): Promise<{ config: CityIngestionConfig | null; closestCandidates: string[] }> {
+function extractUrlCityFromSourceUrl(sourceUrl: string): string | null {
+  try {
+    const pathname = new URL(sourceUrl).pathname
+    const segments = pathname.split('/').filter(Boolean)
+    if (segments.length >= 4 && segments[0] === 'US') {
+      return decodeURIComponent(segments[2]).replace(/-/g, ' ')
+    }
+  } catch {
+    // Ignore parse errors for diagnostics-only helper.
+  }
+  return null
+}
+
+async function getCityConfig(
+  sourcePlatform: string,
+  lookupCity: string,
+  lookupState: string
+): Promise<{ config: CityIngestionConfig | null; closestCandidates: string[] }> {
   const admin = getAdminDb()
-  const normalizedIncomingState = normalizeStateToCode(rawSale.stateHint)
-  const normalizedIncomingCity = normalizeCityForMatch(rawSale.cityHint)
+  const normalizedIncomingState = normalizeStateToCode(lookupState)
+  const normalizedIncomingCity = normalizeCityForMatch(lookupCity)
 
   const { data } = await fromBase(admin, 'ingestion_city_configs')
     .select('city, state, timezone, enabled, source_platform, source_pages')
-    .eq('source_platform', rawSale.sourcePlatform)
+    .eq('source_platform', sourcePlatform)
     .eq('enabled', true)
 
   const rows = (Array.isArray(data) ? data : []) as CityConfigRow[]
@@ -241,9 +258,22 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
 
   for (const rawSale of records) {
     try {
-      const lookup = await getCityConfig(rawSale)
-      const cityConfig = lookup.config ?? fallbackCityConfig(rawSale)
+      const defaultConfig = fallbackCityConfig(rawSale)
+      let processed = await processIngestedSale(rawSale, defaultConfig)
+      const parsedCity = processed.city || rawSale.cityHint
+      const parsedState = processed.state || rawSale.stateHint
+      const lookupCity = cleanText(parsedCity) || ''
+      const lookupState = cleanText(parsedState) || ''
+      const urlCity = extractUrlCityFromSourceUrl(rawSale.sourceUrl)
+
+      const lookup = await getCityConfig(rawSale.sourcePlatform, lookupCity, lookupState)
+      const cityConfig = lookup.config ?? defaultConfig
       const hasMissingCityConfig = cityConfig.enabled === false
+
+      if (lookup.config && (!rawSale.cityHint || !rawSale.stateHint)) {
+        processed = await processIngestedSale(rawSale, cityConfig)
+      }
+
       if (hasMissingCityConfig) {
         logger.warn('City ingestion config not found', {
           component: 'ingestion/upload',
@@ -251,15 +281,15 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           requestId: opId,
           ingestionRunId,
           sourcePlatform: rawSale.sourcePlatform,
-          incomingCity: rawSale.cityHint,
-          incomingState: rawSale.stateHint,
-          normalizedCity: normalizeCityForMatch(rawSale.cityHint),
-          normalizedState: normalizeStateToCode(rawSale.stateHint),
+          lookup_city: lookupCity,
+          lookup_state: lookupState,
+          parsed_city: parsedCity,
+          url_city: urlCity,
+          normalizedCity: normalizeCityForMatch(lookupCity),
+          normalizedState: normalizeStateToCode(lookupState),
           closestCandidates: lookup.closestCandidates,
         })
       }
-
-      const processed = await processIngestedSale(rawSale, cityConfig)
       const match = await findIngestedSaleMatch(rawSale.sourceUrl, processed)
       const isDuplicate = match?.matchType === 'soft_address_date'
       const failureReasons = dedupeFailureReasons([

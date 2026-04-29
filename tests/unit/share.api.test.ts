@@ -6,9 +6,26 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST, GET } from '@/app/api/share/route'
 import { getAdminDb } from '@/lib/supabase/clients'
+import { shouldBypassRateLimit } from '@/lib/rateLimit/config'
+import { deriveKey } from '@/lib/rateLimit/keys'
+import { check } from '@/lib/rateLimit/limiter'
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: vi.fn()
+}))
+vi.mock('@/lib/rateLimit/config', () => ({
+  shouldBypassRateLimit: vi.fn(() => true)
+}))
+vi.mock('@/lib/rateLimit/keys', () => ({
+  deriveKey: vi.fn(async () => 'test-key')
+}))
+vi.mock('@/lib/rateLimit/limiter', () => ({
+  check: vi.fn(async () => ({
+    allowed: true,
+    softLimited: false,
+    remaining: 100,
+    resetAt: Math.floor(Date.now() / 1000) + 60,
+  }))
 }))
 
 // Mock nanoid
@@ -24,6 +41,7 @@ describe('Share API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getAdminDb).mockReturnValue(mockAdminDb as any)
+    vi.mocked(shouldBypassRateLimit).mockReturnValue(true)
   })
 
   afterEach(() => {
@@ -101,6 +119,55 @@ describe('Share API', () => {
 
       expect(response.status).toBe(500)
       expect(data.error).toBe('Failed to create shareable link')
+    })
+
+    it('should return rate limited for POST when policy blocks request', async () => {
+      vi.mocked(shouldBypassRateLimit).mockReturnValue(false)
+      vi.mocked(check).mockResolvedValue({
+        allowed: false,
+        softLimited: false,
+        remaining: 0,
+        resetAt: Math.floor(Date.now() / 1000) + 60,
+      })
+
+      const request = new NextRequest('http://localhost:3000/api/share', {
+        method: 'POST',
+        body: JSON.stringify({
+          state: {
+            view: { lat: 1, lng: 2, zoom: 3 },
+            filters: { dateRange: 'any', categories: [], radius: 25 },
+          },
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(429)
+      expect(data).toEqual({ code: 'RATE_LIMITED', message: 'Too many requests' })
+      expect(deriveKey).toHaveBeenCalled()
+      expect(check).toHaveBeenCalled()
+    })
+
+    it('should reject oversized POST payload', async () => {
+      const huge = 'a'.repeat(33 * 1024)
+      const request = new NextRequest('http://localhost:3000/api/share', {
+        method: 'POST',
+        body: JSON.stringify({
+          state: {
+            view: { lat: 1, lng: 2, zoom: 3 },
+            filters: { dateRange: huge, categories: [], radius: 25 },
+          },
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(413)
+      expect(data).toEqual({ code: 'PAYLOAD_TOO_LARGE', message: 'Request too large' })
     })
   })
 
@@ -181,6 +248,23 @@ describe('Share API', () => {
 
       expect(response.status).toBe(500)
       expect(data.error).toBe('Failed to retrieve shareable link')
+    })
+
+    it('should return rate limited for GET when policy blocks request', async () => {
+      vi.mocked(shouldBypassRateLimit).mockReturnValue(false)
+      vi.mocked(check).mockResolvedValue({
+        allowed: false,
+        softLimited: false,
+        remaining: 0,
+        resetAt: Math.floor(Date.now() / 1000) + 60,
+      })
+
+      const request = new NextRequest('http://localhost:3000/api/share?id=test12345')
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(429)
+      expect(data).toEqual({ code: 'RATE_LIMITED', message: 'Too many requests' })
     })
   })
 })

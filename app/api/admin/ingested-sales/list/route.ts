@@ -68,9 +68,36 @@ async function listIngestedSalesHandler(request: NextRequest) {
       return jsonError(500, 'INGESTED_SALES_LIST_FAILED', 'Failed to list ingested sales')
     }
 
+    const rows = data || []
+    const statusCounts: Record<string, number> = {
+      needs_check: 0,
+      needs_geocode: 0,
+      ready: 0,
+      published: 0,
+      publish_failed: 0,
+    }
+    const failureCounts: Record<string, number> = {}
+
+    for (const row of rows) {
+      const statusKey = typeof row.status === 'string' ? row.status : 'unknown'
+      statusCounts[statusKey] = (statusCounts[statusKey] || 0) + 1
+
+      const failures = Array.isArray(row.failure_reasons) ? row.failure_reasons : []
+      for (const reason of failures) {
+        if (typeof reason !== 'string' || reason.length === 0) continue
+        failureCounts[reason] = (failureCounts[reason] || 0) + 1
+      }
+    }
+
+    logger.info('Ingestion summary', {
+      total: rows.length,
+      statusCounts,
+      failureCounts,
+    })
+
     return NextResponse.json({
       ok: true,
-      data: data || [],
+      data: rows,
     })
   } catch (error) {
     logger.error(

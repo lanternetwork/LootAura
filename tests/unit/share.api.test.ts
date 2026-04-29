@@ -6,10 +6,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST, GET } from '@/app/api/share/route'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getAdminPublicDb } from '@/lib/supabase/clients'
 
 // Mock Supabase server client
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn()
+}))
+
+vi.mock('@/lib/supabase/clients', () => ({
+  getAdminPublicDb: vi.fn()
 }))
 
 // Mock nanoid
@@ -21,10 +26,14 @@ describe('Share API', () => {
   const mockSupabase = {
     from: vi.fn()
   }
+  const mockPublicAdmin = {
+    from: vi.fn()
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
+    vi.mocked(getAdminPublicDb).mockReturnValue(mockPublicAdmin as any)
   })
 
   afterEach(() => {
@@ -34,7 +43,7 @@ describe('Share API', () => {
   describe('POST /api/share', () => {
     it('should create a shareable link', async () => {
       const mockInsert = vi.fn().mockResolvedValue({ error: null })
-      mockSupabase.from.mockReturnValue({ insert: mockInsert })
+      mockPublicAdmin.from.mockReturnValue({ insert: mockInsert })
 
       const requestBody = {
         state: {
@@ -54,7 +63,7 @@ describe('Share API', () => {
 
       expect(response.status).toBe(200)
       expect(data).toEqual({ shortId: 'test12345' })
-      expect(mockSupabase.from).toHaveBeenCalledWith('shared_states')
+      expect(mockPublicAdmin.from).toHaveBeenCalledWith('shared_states')
       expect(mockInsert).toHaveBeenCalledWith({
         id: 'test12345',
         state_json: requestBody.state,
@@ -82,7 +91,7 @@ describe('Share API', () => {
 
     it('should handle database errors', async () => {
       const mockInsert = vi.fn().mockResolvedValue({ error: { message: 'Database error' } })
-      mockSupabase.from.mockReturnValue({ insert: mockInsert })
+      mockPublicAdmin.from.mockReturnValue({ insert: mockInsert })
 
       const requestBody = {
         state: {

@@ -132,18 +132,6 @@ export function getAdminDb() {
   return admin.schema('lootaura_v2')
 }
 
-/** Service-role client for `public` schema tables (e.g. shared_states). Server-only. */
-export function getAdminPublicDb() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase service role credentials missing')
-  }
-
-  return createClient(url, key, { auth: { persistSession: false } }).schema('public')
-}
-
 // Guard wrapper: block qualified names
 export function fromBase(
   db: Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>,

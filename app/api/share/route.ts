@@ -3,8 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAdminPublicDb } from '@/lib/supabase/clients'
+import { getAdminDb } from '@/lib/supabase/clients'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 
@@ -55,9 +54,8 @@ export async function POST(request: NextRequest) {
 
     const shortId = nanoid(8) // 8-character short ID
 
-    // Insert via service role on public.shared_states (anon often lacks INSERT grant;
-    // table is not in lootaura_v2, so use public-schema admin client, not getAdminDb()).
-    const { error } = await getAdminPublicDb()
+    // Server-only: lootaura_v2.shared_states (see migration 156). Same API as before.
+    const { error } = await getAdminDb()
       .from('shared_states')
       .insert({
         id: shortId,
@@ -108,10 +106,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = await createSupabaseServerClient()
-
-    // Retrieve from database
-    const { data, error } = await supabase
+    const { data, error } = await getAdminDb()
       .from('shared_states')
       .select('state_json')
       .eq('id', shortId)

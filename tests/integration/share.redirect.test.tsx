@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { notFound, redirect } from 'next/navigation'
 import ShortlinkPage from '@/app/s/[id]/page'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getAdminDb } from '@/lib/supabase/clients'
 
 // Mock Next.js navigation
 vi.mock('next/navigation', () => ({
@@ -14,9 +14,8 @@ vi.mock('next/navigation', () => ({
   redirect: vi.fn()
 }))
 
-// Mock Supabase server client
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn()
+vi.mock('@/lib/supabase/clients', () => ({
+  getAdminDb: vi.fn()
 }))
 
 // Mock URL state serialization
@@ -25,14 +24,13 @@ vi.mock('@/lib/url/state', () => ({
 }))
 
 describe('Share Redirect Integration', () => {
-  const mockSupabase = {
+  const mockAdminDb = {
     from: vi.fn()
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Set up the mock properly
-    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
+    vi.mocked(getAdminDb).mockReturnValue(mockAdminDb as any)
   })
 
   afterEach(() => {
@@ -53,14 +51,14 @@ describe('Share Redirect Integration', () => {
         })
       })
     })
-    mockSupabase.from.mockReturnValue({ select: mockSelect })
+    mockAdminDb.from.mockReturnValue({ select: mockSelect })
 
     const { serializeState } = await import('@/lib/url/state')
     vi.mocked(serializeState).mockReturnValue('lat=40.7128&lng=-74.006&zoom=12')
 
     await ShortlinkPage({ params: Promise.resolve({ id: 'test12345' }) })
 
-    expect(mockSupabase.from).toHaveBeenCalledWith('shared_states')
+    expect(mockAdminDb.from).toHaveBeenCalledWith('shared_states')
     expect(serializeState).toHaveBeenCalledWith(mockState)
     expect(redirect).toHaveBeenCalledWith('/explore?lat=40.7128&lng=-74.006&zoom=12')
   })
@@ -80,7 +78,7 @@ describe('Share Redirect Integration', () => {
         })
       })
     })
-    mockSupabase.from.mockReturnValue({ select: mockSelect })
+    mockAdminDb.from.mockReturnValue({ select: mockSelect })
 
     await ShortlinkPage({ params: Promise.resolve({ id: 'nonexistent' }) })
 
@@ -93,7 +91,7 @@ describe('Share Redirect Integration', () => {
         single: vi.fn().mockRejectedValue(new Error('Database error'))
       })
     })
-    mockSupabase.from.mockReturnValue({ select: mockSelect })
+    mockAdminDb.from.mockReturnValue({ select: mockSelect })
 
     // Mock console.error to avoid noise in tests
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

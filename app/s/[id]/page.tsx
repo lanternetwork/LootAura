@@ -5,7 +5,7 @@
 
 import { notFound, redirect } from 'next/navigation'
 import { serializeState } from '@/lib/url/state'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getAdminDb } from '@/lib/supabase/clients'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -19,15 +19,7 @@ export default async function ShortlinkPage({ params }: PageProps) {
   }
 
   try {
-    const supabase = await createSupabaseServerClient()
-
-    if (!supabase) {
-      console.error('Failed to create Supabase client')
-      notFound()
-    }
-
-    // Retrieve shared state from database
-    const { data, error } = await supabase
+    const { data, error } = await getAdminDb()
       .from('shared_states')
       .select('state_json')
       .eq('id', id)

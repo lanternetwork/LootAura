@@ -57,8 +57,8 @@ else
       # Allow geocoding/zip since it only uses admin for optional writeback (ENABLE_ZIP_WRITEBACK)
       # Allow sales/[id]/report since it needs admin to check reports from other users (no SELECT policy) and update moderation status
       # Allow drafts/publish since it needs admin for transactional consistency (create sale + items + delete draft) and rollback operations
-      if echo "$file" | grep -qE "(webhook|/admin/|/cron/|/jobs/|health/supabase|promotions/intent|/debug/|analytics/track|geocoding/zip|sales/.*/report|drafts/publish)"; then
-        echo "   ✅ $file - Allowed: webhook/admin/cron/job/health/promotions-intent/debug/analytics/geocoding/sale-reports/drafts-publish context"
+      if echo "$file" | grep -qE "(webhook|/admin/|/cron/|/jobs/|health/supabase|promotions/intent|/debug/|analytics/track|geocoding/zip|sales/.*/report|drafts/publish|api/share)"; then
+        echo "   ✅ $file - Allowed: webhook/admin/cron/job/health/promotions-intent/debug/analytics/geocoding/sale-reports/drafts-publish/share context"
       elif echo "$file" | grep -qE "(middleware|server-session)"; then
         echo "   ❌ $file - BLOCKER: Service role in middleware/auth session"
         ERRORS=$((ERRORS + 1))

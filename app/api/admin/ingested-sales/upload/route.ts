@@ -17,25 +17,140 @@ interface UploadBody {
   publishReady?: boolean
 }
 
-async function getCityConfig(rawSale: RawExternalSale): Promise<CityIngestionConfig | null> {
+type CityConfigRow = {
+  city: string
+  state: string
+  timezone: string
+  enabled: boolean
+  source_platform: string
+  source_pages: unknown
+}
+
+const STATE_NAME_TO_CODE: Record<string, string> = {
+  alabama: 'AL',
+  alaska: 'AK',
+  arizona: 'AZ',
+  arkansas: 'AR',
+  california: 'CA',
+  colorado: 'CO',
+  connecticut: 'CT',
+  delaware: 'DE',
+  'district of columbia': 'DC',
+  florida: 'FL',
+  georgia: 'GA',
+  hawaii: 'HI',
+  idaho: 'ID',
+  illinois: 'IL',
+  indiana: 'IN',
+  iowa: 'IA',
+  kansas: 'KS',
+  kentucky: 'KY',
+  louisiana: 'LA',
+  maine: 'ME',
+  maryland: 'MD',
+  massachusetts: 'MA',
+  michigan: 'MI',
+  minnesota: 'MN',
+  mississippi: 'MS',
+  missouri: 'MO',
+  montana: 'MT',
+  nebraska: 'NE',
+  nevada: 'NV',
+  'new hampshire': 'NH',
+  'new jersey': 'NJ',
+  'new mexico': 'NM',
+  'new york': 'NY',
+  'north carolina': 'NC',
+  'north dakota': 'ND',
+  ohio: 'OH',
+  oklahoma: 'OK',
+  oregon: 'OR',
+  pennsylvania: 'PA',
+  'rhode island': 'RI',
+  'south carolina': 'SC',
+  'south dakota': 'SD',
+  tennessee: 'TN',
+  texas: 'TX',
+  utah: 'UT',
+  vermont: 'VT',
+  virginia: 'VA',
+  washington: 'WA',
+  'west virginia': 'WV',
+  wisconsin: 'WI',
+  wyoming: 'WY',
+}
+
+function normalizeCityForMatch(city: string): string {
+  return city
+    .toLowerCase()
+    .normalize('NFKC')
+    .replace(/\bsaint\b/g, 'saint')
+    .replace(/\bst[.]?(?=\s|$)/g, 'saint')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function normalizeStateToCode(state: string): string {
+  const normalized = state
+    .toLowerCase()
+    .normalize('NFKC')
+    .replace(/[^a-z\s]/g, ' ')
+    .replace(/\b(usa|us|united states|united states of america)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (normalized.length === 2) {
+    return normalized.toUpperCase()
+  }
+
+  return STATE_NAME_TO_CODE[normalized] || normalized.toUpperCase()
+}
+
+function toCityConfig(row: CityConfigRow): CityIngestionConfig {
+  return {
+    city: row.city,
+    state: row.state,
+    timezone: row.timezone,
+    enabled: row.enabled,
+    sourcePlatform: row.source_platform,
+    sourcePages: Array.isArray(row.source_pages) ? row.source_pages.map(String) : [],
+  }
+}
+
+async function getCityConfig(rawSale: RawExternalSale): Promise<{ config: CityIngestionConfig | null; closestCandidates: string[] }> {
   const admin = getAdminDb()
+  const normalizedIncomingState = normalizeStateToCode(rawSale.stateHint)
+  const normalizedIncomingCity = normalizeCityForMatch(rawSale.cityHint)
+
   const { data } = await fromBase(admin, 'ingestion_city_configs')
     .select('city, state, timezone, enabled, source_platform, source_pages')
-    .eq('city', rawSale.cityHint)
-    .eq('state', rawSale.stateHint)
     .eq('source_platform', rawSale.sourcePlatform)
     .eq('enabled', true)
-    .maybeSingle()
 
-  if (!data) return null
-  return {
-    city: data.city,
-    state: data.state,
-    timezone: data.timezone,
-    enabled: data.enabled,
-    sourcePlatform: data.source_platform,
-    sourcePages: Array.isArray(data.source_pages) ? data.source_pages.map(String) : [],
+  const rows = (Array.isArray(data) ? data : []) as CityConfigRow[]
+  const matched = rows.find((row) => (
+    normalizeStateToCode(row.state) === normalizedIncomingState &&
+    normalizeCityForMatch(row.city) === normalizedIncomingCity
+  ))
+
+  if (matched) {
+    return { config: toCityConfig(matched), closestCandidates: [] }
   }
+
+  const closestCandidates = rows
+    .filter((row) => {
+      if (normalizeStateToCode(row.state) !== normalizedIncomingState) return false
+      const normalizedCandidateCity = normalizeCityForMatch(row.city)
+      return (
+        normalizedCandidateCity.includes(normalizedIncomingCity) ||
+        normalizedIncomingCity.includes(normalizedCandidateCity)
+      )
+    })
+    .slice(0, 5)
+    .map((row) => `${row.city}, ${row.state}`)
+
+  return { config: null, closestCandidates }
 }
 
 function dedupeFailureReasons(reasons: string[]): string[] {
@@ -126,7 +241,8 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
 
   for (const rawSale of records) {
     try {
-      const cityConfig = (await getCityConfig(rawSale)) ?? fallbackCityConfig(rawSale)
+      const lookup = await getCityConfig(rawSale)
+      const cityConfig = lookup.config ?? fallbackCityConfig(rawSale)
       const hasMissingCityConfig = cityConfig.enabled === false
       if (hasMissingCityConfig) {
         logger.warn('City ingestion config not found', {
@@ -135,6 +251,11 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           requestId: opId,
           ingestionRunId,
           sourcePlatform: rawSale.sourcePlatform,
+          incomingCity: rawSale.cityHint,
+          incomingState: rawSale.stateHint,
+          normalizedCity: normalizeCityForMatch(rawSale.cityHint),
+          normalizedState: normalizeStateToCode(rawSale.stateHint),
+          closestCandidates: lookup.closestCandidates,
         })
       }
 

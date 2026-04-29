@@ -66,10 +66,8 @@ jobs:
             echo "❌ SUPABASE_SERVICE_ROLE_KEY is required but not configured in GitHub Actions secrets"
             exit 1
           fi
-          if [ -z "${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}" ]; then
-            echo "❌ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN is required but not configured in GitHub Actions secrets"
-            exit 1
-          fi
+          # Mapbox: not asserted here — build/start use secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+          # or a CI-only placeholder so Next can compile; synthetic tests do not hit Mapbox APIs.
           echo "✅ Required app secrets are configured"
         
       - name: Build application
@@ -77,7 +75,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN != '' && secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || 'pk.ci_synthetic_build_placeholder_token_01' }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
           NEXT_PUBLIC_DEBUG: 'false'
@@ -94,7 +92,7 @@ jobs:
           NODE_ENV: production
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN != '' && secrets.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || 'pk.ci_synthetic_build_placeholder_token_01' }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
           NEXT_PUBLIC_DEBUG: 'false'

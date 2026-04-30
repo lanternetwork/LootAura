@@ -116,7 +116,19 @@ export async function POST(request: NextRequest) {
       )
     }
     const body = JSON.parse(rawBody)
-    const { state } = ShareRequestSchema.parse(body)
+    const parsed = ShareRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Invalid request format'
+          }
+        },
+        { status: 400 }
+      )
+    }
+    const { state } = parsed.data
 
     const shortId = nanoid(8) // 8-character short ID
 

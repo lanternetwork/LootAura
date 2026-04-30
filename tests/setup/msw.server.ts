@@ -2,6 +2,10 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 
+const mswSetupGlobal = globalThis as typeof globalThis & {
+  __LOOTAURA_MSW_SETUP_ONCE__?: boolean
+}
+
 // Expose a flag to optionally disable local fetch stubs in other setups
 process.env.TEST_USE_MSW = 'true'
 
@@ -218,16 +222,20 @@ const handlers = [
 // Server
 export const server = setupServer(...handlers)
 
-beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' })
-})
+if (!mswSetupGlobal.__LOOTAURA_MSW_SETUP_ONCE__) {
+  mswSetupGlobal.__LOOTAURA_MSW_SETUP_ONCE__ = true
 
-afterEach(() => {
-  // Reset handlers after each test to prevent state accumulation
-  server.resetHandlers()
-})
+  beforeAll(() => {
+    server.listen({ onUnhandledRequest: 'error' })
+  })
 
-afterAll(() => {
-  // Ensure server is properly closed after all tests in a file
-  server.close()
-})
+  afterEach(() => {
+    // Reset handlers after each test to prevent state accumulation
+    server.resetHandlers()
+  })
+
+  afterAll(() => {
+    // Ensure server is properly closed after all tests in a file
+    server.close()
+  })
+}

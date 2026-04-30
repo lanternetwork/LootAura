@@ -4,6 +4,10 @@ import React from 'react'
 import { vi, afterEach as vitestAfterEach } from 'vitest'
 import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
+const testSetupGlobal = globalThis as typeof globalThis & {
+  __LOOTAURA_TEST_SETUP_ONCE__?: boolean
+}
+
 // never re-create this per test, keep it stable
 const stableSupabase = makeStableSupabaseClient()
 
@@ -156,43 +160,46 @@ vi.mock('@/lib/supabase/server', () => {
 
 // Do not globally stub fetch; MSW server (tests/setup/msw.server.ts) will intercept network calls
 
-// Mock window.matchMedia for JSDOM test environment (guard Node environment)
-const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
-  matches: false,
-  media: query,
-  onchange: null,
-  addListener: vi.fn(), // deprecated
-  removeListener: vi.fn(), // deprecated
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  dispatchEvent: vi.fn(),
-}))
+if (!testSetupGlobal.__LOOTAURA_TEST_SETUP_ONCE__) {
+  testSetupGlobal.__LOOTAURA_TEST_SETUP_ONCE__ = true
 
-if (typeof window !== 'undefined' && (window as any)) {
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: mockMatchMedia,
-  })
-}
+  // Mock window.matchMedia for JSDOM test environment (guard Node environment)
+  const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }))
 
-if (typeof globalThis !== 'undefined') {
-  Object.defineProperty(globalThis as any, 'matchMedia', {
-    writable: true,
-    value: mockMatchMedia,
-  })
-}
+  if (typeof window !== 'undefined' && (window as any)) {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: mockMatchMedia,
+    })
+  }
 
-try {
-  (global as any).matchMedia = mockMatchMedia
-} catch {}
+  if (typeof globalThis !== 'undefined') {
+    Object.defineProperty(globalThis as any, 'matchMedia', {
+      writable: true,
+      value: mockMatchMedia,
+    })
+  }
 
-// Console noise guardrail - fail tests on unexpected console output
-const originalConsoleError = console.error
-const originalConsoleWarn = console.warn
+  try {
+    (global as any).matchMedia = mockMatchMedia
+  } catch {}
 
-// Allowlist for known intentional console messages
-// Each entry includes: pattern, owning test file, and reason for allowance
-const ALLOWED_PATTERNS = [
+  // Console noise guardrail - fail tests on unexpected console output
+  const originalConsoleError = console.error
+  const originalConsoleWarn = console.warn
+
+  // Allowlist for known intentional console messages
+  // Each entry includes: pattern, owning test file, and reason for allowance
+  const ALLOWED_PATTERNS = [
   // Debug logging (tests/setup.ts, lib/map/viewportFetchManager.ts)
   /^\[MAP:DEBOUNCE\]/, // Debug logging from debounce manager - tests/integration/map.debounce-cancel.test.ts
   /^\[MAP:PERSISTENCE\]/, // Viewport persistence error logging - tests/integration/viewport.persistence.test.tsx
@@ -293,64 +300,65 @@ const ALLOWED_PATTERNS = [
   /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
   /^\[SELL_WIZARD\] promotionsEnabled prop is undefined/, // Prop passing diagnostic warning - app/sell/new/SellWizardClient.tsx
   /^\[REVIEW_STEP\] promotionsEnabled prop is undefined/, // Prop passing diagnostic warning - app/sell/new/SellWizardClient.tsx ReviewStep
-]
+  ]
 
-const isAllowedMessage = (message: string): boolean => {
-  return ALLOWED_PATTERNS.some(pattern => pattern.test(message))
-}
-
-console.error = (...args: any[]) => {
-  const message = args.join(' ')
-  if (!isAllowedMessage(message)) {
-    throw new Error(`Unexpected console.error: ${message}`)
+  const isAllowedMessage = (message: string): boolean => {
+    return ALLOWED_PATTERNS.some(pattern => pattern.test(message))
   }
-  originalConsoleError(...args)
-}
 
-console.warn = (...args: any[]) => {
-  const message = args.join(' ')
-  // Allow GoTrueClient warning about multiple instances (common in tests)
-  if (message.includes('Multiple GoTrueClient instances')) {
-    return // Suppress this warning
-  }
-  if (!isAllowedMessage(message)) {
-    throw new Error(`Unexpected console.warn: ${message}`)
-  }
-  originalConsoleWarn(...args)
-}
-
-// Clear geocode caches after each test to ensure determinism for TTL-based tests
-vitestAfterEach(async () => {
-  try {
-    const mod = await import('@/lib/geocode')
-    if (typeof (mod as any).clearGeocodeCache === 'function') {
-      (mod as any).clearGeocodeCache()
+  console.error = (...args: any[]) => {
+    const message = args.join(' ')
+    if (!isAllowedMessage(message)) {
+      throw new Error(`Unexpected console.error: ${message}`)
     }
-  } catch {}
-  try {
-    const clear = (globalThis as any).__clearSuggestCache
-    if (typeof clear === 'function') clear()
-  } catch {}
-  try {
-    const clear = (globalThis as any).__clearOverpassCache
-    if (typeof clear === 'function') clear()
-  } catch {}
-})
-
-// Global unhandled rejection handler to catch ZodErrors from env validation during tests
-// These errors are expected in env.test.ts when testing error conditions
-process.on('unhandledRejection', (reason: unknown) => {
-  // Ignore ZodErrors from env validation during tests
-  // These are expected when testing error conditions in env.test.ts
-  if (reason && typeof reason === 'object' && 'issues' in reason) {
-    // Check if this is from env.test.ts by checking the stack trace
-    // Safely access stack property - ZodError may have a stack property
-    const stack = (reason instanceof Error ? reason.stack : (reason as any).stack) || ''
-    if (stack.includes('env.test.ts') || stack.includes('lib/env.ts')) {
-      // This is an expected error from env validation tests - ignore it
-      return
-    }
+    originalConsoleError(...args)
   }
-  // For other unhandled rejections, let them propagate (Vitest will handle them)
-})
+
+  console.warn = (...args: any[]) => {
+    const message = args.join(' ')
+    // Allow GoTrueClient warning about multiple instances (common in tests)
+    if (message.includes('Multiple GoTrueClient instances')) {
+      return // Suppress this warning
+    }
+    if (!isAllowedMessage(message)) {
+      throw new Error(`Unexpected console.warn: ${message}`)
+    }
+    originalConsoleWarn(...args)
+  }
+
+  // Clear geocode caches after each test to ensure determinism for TTL-based tests
+  vitestAfterEach(async () => {
+    try {
+      const mod = await import('@/lib/geocode')
+      if (typeof (mod as any).clearGeocodeCache === 'function') {
+        (mod as any).clearGeocodeCache()
+      }
+    } catch {}
+    try {
+      const clear = (globalThis as any).__clearSuggestCache
+      if (typeof clear === 'function') clear()
+    } catch {}
+    try {
+      const clear = (globalThis as any).__clearOverpassCache
+      if (typeof clear === 'function') clear()
+    } catch {}
+  })
+
+  // Global unhandled rejection handler to catch ZodErrors from env validation during tests
+  // These errors are expected in env.test.ts when testing error conditions
+  process.on('unhandledRejection', (reason: unknown) => {
+    // Ignore ZodErrors from env validation during tests
+    // These are expected when testing error conditions in env.test.ts
+    if (reason && typeof reason === 'object' && 'issues' in reason) {
+      // Check if this is from env.test.ts by checking the stack trace
+      // Safely access stack property - ZodError may have a stack property
+      const stack = (reason instanceof Error ? reason.stack : (reason as any).stack) || ''
+      if (stack.includes('env.test.ts') || stack.includes('lib/env.ts')) {
+        // This is an expected error from env validation tests - ignore it
+        return
+      }
+    }
+    // For other unhandled rejections, let them propagate (Vitest will handle them)
+  })
+}
 

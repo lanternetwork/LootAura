@@ -25,15 +25,22 @@ export async function getRlsDb(_request?: NextRequest) {
   const sb = createServerClient(url, anon, {
     cookies: {
       getAll() {
-        return cookieStore.getAll()
+        if (
+          typeof cookieStore !== 'undefined' &&
+          typeof cookieStore.getAll === 'function'
+        ) {
+          return cookieStore.getAll()
+        }
+        return []
       },
       setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set({ name, value, ...options })
-          })
-        } catch (error) {
-          // Cookie setting can fail in some contexts, that's ok
+        if (
+          typeof cookieStore !== 'undefined' &&
+          typeof cookieStore.set === 'function'
+        ) {
+          for (const c of cookiesToSet) {
+            cookieStore.set(c.name, c.value, c.options)
+          }
         }
       },
     },
@@ -84,15 +91,22 @@ export async function getRlsBaseClient(_request?: NextRequest) {
   const sb = createServerClient(url, anon, {
     cookies: {
       getAll() {
-        return cookieStore.getAll()
+        if (
+          typeof cookieStore !== 'undefined' &&
+          typeof cookieStore.getAll === 'function'
+        ) {
+          return cookieStore.getAll()
+        }
+        return []
       },
       setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set({ name, value, ...options })
-          })
-        } catch (error) {
-          // Cookie setting can fail in some contexts, that's ok
+        if (
+          typeof cookieStore !== 'undefined' &&
+          typeof cookieStore.set === 'function'
+        ) {
+          for (const c of cookiesToSet) {
+            cookieStore.set(c.name, c.value, c.options)
+          }
         }
       },
     },

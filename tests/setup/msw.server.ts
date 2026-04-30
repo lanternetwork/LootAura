@@ -2,6 +2,8 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
 const mswSetupGlobal = globalThis as typeof globalThis & {
   __LOOTAURA_MSW_SETUP_ONCE__?: boolean
 }
@@ -94,7 +96,10 @@ const handlers = [
     }
     // Check for timeout simulation
     if (body.includes('simulate_timeout')) {
-      return new Promise(() => {}) // Never resolves
+      // Simulate a slow upstream that exceeds client-side timeout budgets
+      // without leaving unresolved promises that accumulate across tests.
+      await delay(15000)
+      return HttpResponse.json({ error: 'upstream timeout' }, { status: 504 })
     }
     
     // Extract prefix from query (look for ["addr:housenumber"~"^X"])

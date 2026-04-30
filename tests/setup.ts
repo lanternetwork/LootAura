@@ -371,12 +371,21 @@ if (!testSetupGlobal.__LOOTAURA_TEST_SETUP_ONCE__) {
     // For other unhandled rejections, let them propagate (Vitest will handle them)
   }
 
+  const isNode =
+    typeof process !== 'undefined' &&
+    !!process.release &&
+    process.release.name === 'node'
+
   vitestBeforeAll(() => {
-    process.on('unhandledRejection', rejectionHandler)
+    if (isNode) {
+      process.on('unhandledRejection', rejectionHandler)
+    }
   })
 
   vitestAfterAll(() => {
-    process.off('unhandledRejection', rejectionHandler)
+    if (isNode) {
+      process.off('unhandledRejection', rejectionHandler)
+    }
   })
 }
 

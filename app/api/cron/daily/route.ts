@@ -119,7 +119,7 @@ function toAbsoluteUrl(value: string, baseUrl: string): string | null {
 
 function stripTags(input: string): string {
   return input
-    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, ' ')
+    .replace(/<script[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
     .replace(/<style\b[\s\S]*?<\/style\s*>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
 }

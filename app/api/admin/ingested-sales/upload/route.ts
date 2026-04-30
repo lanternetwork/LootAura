@@ -90,7 +90,6 @@ function normalizeCityForMatch(city: string): string {
   return city
     .toLowerCase()
     .normalize('NFKC')
-    .replace(/\bsaint\b/g, 'saint')
     .replace(/\bst[.]?(?=\s|$)/g, 'saint')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')

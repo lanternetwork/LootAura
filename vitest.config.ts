@@ -26,6 +26,12 @@ export default defineConfig({
     // Use forks instead of threads for better memory isolation
     // Each fork gets its own heap and inherits NODE_OPTIONS properly
     pool: 'forks',
+    poolOptions: {
+      forks: {
+        // Ensure forked workers keep the same heap cap as the parent test process in CI.
+        execArgv: ['--max-old-space-size=8192'],
+      },
+    },
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs (reduced to 1 for CI stability)

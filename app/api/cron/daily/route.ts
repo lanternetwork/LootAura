@@ -27,6 +27,7 @@ import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
 import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
+import { runGeocodeQueueWorker, sweepNeedsGeocodeToQueue } from '@/lib/ingestion/geocodeQueue'
 import { publishReadyIngestedSales } from '@/lib/ingestion/publishWorker'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
@@ -279,9 +280,14 @@ async function runIngestionOrchestration(
       task: 'ingestion-orchestration',
       step: 'geocode',
     }))
+    const queueSummary = await runGeocodeQueueWorker()
+    const sweepSummary = await sweepNeedsGeocodeToQueue(200)
     const geocodeSummary = await geocodePendingSales()
     taskResult.steps.geocode = {
       ok: true,
+      queue: queueSummary,
+      sweep: sweepSummary,
+      fallback: geocodeSummary,
       ...geocodeSummary,
     }
     logger.info('Geocode step completed', withOpId({

@@ -6,6 +6,12 @@ import { Policies } from '@/lib/rateLimit/policies'
 import { ManualUploadSchema } from '@/lib/ingestion/schemas'
 import { processIngestedSale } from '@/lib/ingestion/processSale'
 import { findIngestedSaleMatch } from '@/lib/ingestion/dedupe'
+import {
+  enqueueGeocodeJob,
+  isGeocodeQueueAvailable,
+  runGeocodeQueueWorkerSingleBatch,
+} from '@/lib/ingestion/geocodeQueue'
+import { geocodeIngestedSaleById } from '@/lib/ingestion/geocodeWorker'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger, generateOperationId } from '@/lib/log'
 import type { RawExternalSale, IngestionRunSummary, CityIngestionConfig, FailureReason } from '@/lib/ingestion/types'
@@ -191,6 +197,77 @@ function cleanText(value: string | null): string | null {
   return cleaned.length > 0 ? cleaned : null
 }
 
+function geocodePriorityForSource(sourcePlatform: string): 'HIGH' | 'NORMAL' {
+  return sourcePlatform === 'external_page_source' ? 'HIGH' : 'NORMAL'
+}
+
+async function enqueueGeocodeIfNeeded(
+  saleId: string,
+  sourcePlatform: string,
+  status: string,
+  requestId: string,
+  ingestionRunId: string
+): Promise<void> {
+  if (status !== 'needs_geocode') return
+  const priority = geocodePriorityForSource(sourcePlatform)
+  try {
+    await enqueueGeocodeJob({
+      sale_id: saleId,
+      priority,
+    })
+    if (priority === 'HIGH') {
+      setTimeout(() => {
+        Promise.race([
+          runGeocodeQueueWorkerSingleBatch(),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ])
+          .then(() => {
+            logger.info('inline worker kick triggered', {
+              component: 'ingestion/upload',
+              operation: 'inline_worker_kick',
+              requestId,
+              ingestionRunId,
+              saleId,
+            })
+          })
+          .catch((error) => {
+            logger.warn('Inline worker kick failed', {
+              component: 'ingestion/upload',
+              operation: 'inline_worker_kick',
+              requestId,
+              ingestionRunId,
+              saleId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          })
+      }, 0)
+    }
+  } catch (error) {
+    logger.warn('Failed to enqueue geocode job', {
+      component: 'ingestion/upload',
+      operation: 'enqueue_geocode_job',
+      requestId,
+      ingestionRunId,
+      saleId,
+      sourcePlatform,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+async function geocodeFallbackWhenNoQueue(
+  saleId: string,
+  status: string,
+  lat: number | null,
+  lng: number | null
+): Promise<void> {
+  if (status !== 'needs_geocode') return
+  if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) return
+  if (isGeocodeQueueAvailable()) return
+  logger.info('geocode_fallback_triggered_no_queue', { saleId })
+  await geocodeIngestedSaleById(saleId)
+}
+
 async function uploadHandler(request: NextRequest): Promise<NextResponse> {
   const opId = generateOperationId()
   const startedAt = Date.now()
@@ -349,11 +426,16 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           continue
         }
         summary.updated += 1
+        await enqueueGeocodeIfNeeded(match.id, rawSale.sourcePlatform, status, opId, ingestionRunId)
+        await geocodeFallbackWhenNoQueue(match.id, status, processed.lat, processed.lng)
       } else {
-        const { error: insertError } = await fromBase(admin, 'ingested_sales').insert(basePayload)
-        if (insertError) {
+        const insertResult = await fromBase(admin, 'ingested_sales')
+          .insert(basePayload)
+          .select('id')
+          .single()
+        if (insertResult.error || !insertResult.data?.id) {
           summary.failed += 1
-          logger.error('Failed to insert ingested sale', new Error(insertError.message), {
+          logger.error('Failed to insert ingested sale', new Error(insertResult.error?.message || 'unknown'), {
             component: 'ingestion/upload',
             operation: 'insert_ingested_sale',
             requestId: opId,
@@ -362,6 +444,19 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           continue
         }
         summary.created += 1
+        await enqueueGeocodeIfNeeded(
+          insertResult.data.id as string,
+          rawSale.sourcePlatform,
+          status,
+          opId,
+          ingestionRunId
+        )
+        await geocodeFallbackWhenNoQueue(
+          insertResult.data.id as string,
+          status,
+          processed.lat,
+          processed.lng
+        )
       }
 
       if (isDuplicate) summary.duplicates += 1

@@ -152,8 +152,10 @@ export function PWAPlatformProvider({ children }: { children: React.ReactNode })
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
+      // Ignore duplicate browser events while a prompt is already deferred.
+      if (deferredPromptRef.current) return
       deferredPromptRef.current = e as BeforeInstallPromptEvent
-      setHasDeferredPrompt(true)
+      setHasDeferredPrompt((current) => (current ? current : true))
     }
 
     const handleAppInstalled = () => {

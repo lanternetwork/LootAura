@@ -226,6 +226,7 @@ const handlers = [
 
 // Server
 export const server = setupServer(...handlers)
+;(globalThis as any).server = server
 
 if (!mswSetupGlobal.__LOOTAURA_MSW_SETUP_ONCE__) {
   mswSetupGlobal.__LOOTAURA_MSW_SETUP_ONCE__ = true

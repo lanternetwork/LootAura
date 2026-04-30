@@ -11,7 +11,7 @@
  * between test files to prevent memory accumulation.
  */
 
-import { afterAll } from 'vitest'
+import { afterAll, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
 /**
@@ -101,7 +101,24 @@ function forceGC() {
  * Per-file teardown hook.
  * Runs after all tests in a file complete.
  */
-afterAll(() => {
+afterAll(async () => {
+  // 1. Close MSW server
+  if ((globalThis as any).server) {
+    await (globalThis as any).server.close?.()
+  }
+
+  // 2. Clear all timers
+  vi.useRealTimers()
+  vi.clearAllTimers()
+
+  // 3. Reset mocks
+  vi.resetAllMocks()
+
+  // 4. Remove any global event listeners if present
+  if (typeof process !== 'undefined') {
+    process.removeAllListeners?.('unhandledRejection')
+  }
+
   // Reset DOM state
   resetDOM()
   

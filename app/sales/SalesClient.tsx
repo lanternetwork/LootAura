@@ -543,6 +543,9 @@ export default function SalesClient({
       const response = await fetch(`/api/sales?${params.toString()}`, {
         signal: abortControllerRef.current.signal
       })
+      if (!response || typeof (response as Response).ok !== 'boolean') {
+        throw new Error('Invalid fetch response object for map sales')
+      }
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }

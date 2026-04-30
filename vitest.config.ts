@@ -25,8 +25,8 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Lower memory pressure in CI by avoiding a fresh isolate per test file.
-    isolate: false,
+    // Prevent cross-file global/mock leakage in CI while keeping local runs faster.
+    isolate: isCI ? true : false,
     // Use forks instead of threads for better memory isolation
     // Each fork gets its own heap and inherits NODE_OPTIONS properly
     pool: 'forks',

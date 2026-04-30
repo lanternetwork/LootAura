@@ -274,8 +274,14 @@ describe('Sale Details Items Display', () => {
           }),
         })
       }
-      // For other endpoints, return undefined to prevent calls
-      return Promise.resolve(undefined)
+      // For other endpoints, return a Response-like object to avoid
+      // undefined `.ok` reads in components that issue background fetches.
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({ ok: false, error: 'unmocked endpoint in test' }),
+      })
     })
     ;(global as any).fetch = mockFetch
 

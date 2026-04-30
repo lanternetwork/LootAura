@@ -106,7 +106,7 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key-min-10-chars'
 process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || 'test-mapbox-token-min-10-chars'
 process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role-min-10-chars'
-process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
+process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
 process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@example.com'
 
 // Supabase client mock - module-level constant object literal
@@ -371,21 +371,14 @@ if (!testSetupGlobal.__LOOTAURA_TEST_SETUP_ONCE__) {
     // For other unhandled rejections, let them propagate (Vitest will handle them)
   }
 
-  const isNode =
-    typeof process !== 'undefined' &&
-    !!process.release &&
-    process.release.name === 'node'
-
-  vitestBeforeAll(() => {
-    if (isNode) {
+  if (typeof process !== 'undefined' && process?.release?.name === 'node') {
+    vitestBeforeAll(() => {
       process.on('unhandledRejection', rejectionHandler)
-    }
-  })
+    })
 
-  vitestAfterAll(() => {
-    if (isNode) {
+    vitestAfterAll(() => {
       process.off('unhandledRejection', rejectionHandler)
-    }
-  })
+    })
+  }
 }
 

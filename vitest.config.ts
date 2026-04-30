@@ -45,8 +45,8 @@ export default defineConfig({
     },
     // Reduce memory usage
     maxConcurrency: 1,
-    // Use moderate parallelism locally, force deterministic low memory in CI.
-    maxWorkers: isCI ? 1 : 2,
+    // Use two workers in CI to avoid single-worker memory accumulation.
+    maxWorkers: isCI ? 2 : 2,
     minWorkers: 1,
     // Avoid spawning extra file workers that can still crash under CI memory pressure.
     fileParallelism: false,

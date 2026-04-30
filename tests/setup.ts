@@ -7,6 +7,7 @@ import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 const testSetupGlobal = globalThis as typeof globalThis & {
   __LOOTAURA_TEST_SETUP_ONCE__?: boolean
 }
+const nativeFloat32Array = globalThis.Float32Array
 
 // never re-create this per test, keep it stable
 const stableSupabase = makeStableSupabaseClient()
@@ -328,6 +329,15 @@ if (!testSetupGlobal.__LOOTAURA_TEST_SETUP_ONCE__) {
 
   // Clear geocode caches after each test to ensure determinism for TTL-based tests
   vitestAfterEach(async () => {
+    // Some tests replace globals with jsdom realm constructors.
+    // Keep typed arrays pinned to the native Node realm for supercluster/kdbush.
+    if (globalThis.Float32Array !== nativeFloat32Array) {
+      Object.defineProperty(globalThis, 'Float32Array', {
+        value: nativeFloat32Array,
+        writable: true,
+        configurable: true,
+      })
+    }
     try {
       const mod = await import('@/lib/geocode')
       if (typeof (mod as any).clearGeocodeCache === 'function') {

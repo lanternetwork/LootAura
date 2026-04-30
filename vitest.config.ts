@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const isCI = process.env.CI === 'true'
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -36,8 +38,8 @@ export default defineConfig({
     },
     // Reduce memory usage
     maxConcurrency: 1,
-    // Constrain worker count to prevent OOMs (reduced to 1 for CI stability)
-    maxWorkers: 1,
+    // Use moderate parallelism locally, force deterministic low memory in CI.
+    maxWorkers: isCI ? 1 : 2,
     minWorkers: 1,
     // Avoid spawning extra file workers that can still crash under CI memory pressure.
     fileParallelism: false,

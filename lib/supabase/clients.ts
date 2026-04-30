@@ -3,7 +3,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
 
-const isTest = process.env.NODE_ENV === 'test'
+function isTestEnv() {
+  return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true'
+}
 
 function createTestRlsClient() {
   const chain: any = {
@@ -52,7 +54,7 @@ export async function getRlsDb(_request?: NextRequest) {
     throw new Error('Supabase credentials missing')
   }
 
-  if (isTest) {
+  if (isTestEnv()) {
     return createTestRlsClient()
   }
 
@@ -127,7 +129,7 @@ export async function getRlsBaseClient(_request?: NextRequest) {
     throw new Error('Supabase credentials missing')
   }
 
-  if (isTest) {
+  if (isTestEnv()) {
     return createTestRlsClient()
   }
 

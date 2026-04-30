@@ -27,11 +27,412 @@ import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
 import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
-import { runGeocodeQueueWorker, sweepNeedsGeocodeToQueue } from '@/lib/ingestion/geocodeQueue'
+import { enqueueGeocodeJob, runGeocodeQueueWorker, sweepNeedsGeocodeToQueue } from '@/lib/ingestion/geocodeQueue'
 import { publishReadyIngestedSales } from '@/lib/ingestion/publishWorker'
+import { processIngestedSale } from '@/lib/ingestion/processSale'
+import { findIngestedSaleMatch } from '@/lib/ingestion/dedupe'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
+import type { CityIngestionConfig, FailureReason, RawExternalSale } from '@/lib/ingestion/types'
 
 export const dynamic = 'force-dynamic'
+
+type CityConfigRow = {
+  city: string
+  state: string
+  timezone: string
+  enabled: boolean
+  source_platform: string
+  source_pages: unknown
+}
+
+type CronIngestionSummary = {
+  fetched: number
+  inserted: number
+  updated: number
+  duplicates: number
+  needsCheck: number
+  failed: number
+  enqueued: number
+  deferred: number
+}
+
+function parseBatchSize(): number {
+  const raw = process.env.CRON_INGEST_BATCH_SIZE
+  const parsed = raw ? Number.parseInt(raw, 10) : 50
+  if (!Number.isFinite(parsed) || parsed <= 0) return 50
+  return Math.min(parsed, 200)
+}
+
+function parseGeocodeEnqueueCap(): number {
+  const raw = process.env.CRON_INGEST_GEOCODE_ENQUEUE_CAP
+  const parsed = raw ? Number.parseInt(raw, 10) : 500
+  if (!Number.isFinite(parsed) || parsed < 0) return 500
+  return parsed
+}
+
+function parseSourceUrlCap(): number {
+  const raw = process.env.CRON_INGEST_SOURCE_URL_CAP
+  const parsed = raw ? Number.parseInt(raw, 10) : 2000
+  if (!Number.isFinite(parsed) || parsed <= 0) return 2000
+  return Math.min(parsed, 10000)
+}
+
+function cleanText(value: string | null): string | null {
+  if (value == null) return null
+  const cleaned = value.replace(/\s+/g, ' ').trim()
+  return cleaned.length > 0 ? cleaned : null
+}
+
+function dedupeFailureReasons(reasons: string[]): string[] {
+  return [...new Set(reasons)]
+}
+
+function toCityConfig(row: CityConfigRow): CityIngestionConfig {
+  return {
+    city: row.city,
+    state: row.state,
+    timezone: row.timezone,
+    enabled: row.enabled,
+    sourcePlatform: row.source_platform,
+    sourcePages: Array.isArray(row.source_pages) ? row.source_pages.map(String) : [],
+  }
+}
+
+function fallbackCityConfig(rawSale: RawExternalSale): CityIngestionConfig {
+  return {
+    city: rawSale.cityHint,
+    state: rawSale.stateHint,
+    timezone: 'UTC',
+    enabled: false,
+    sourcePlatform: rawSale.sourcePlatform,
+    sourcePages: [],
+  }
+}
+
+function toAbsoluteUrl(value: string, baseUrl: string): string | null {
+  try {
+    return new URL(value, baseUrl).toString()
+  } catch {
+    return null
+  }
+}
+
+function stripTags(input: string): string {
+  return input.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')
+}
+
+function decodeHtmlEntities(input: string): string {
+  return input
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+}
+
+function extractListingUrls(pageHtml: string, baseUrl: string): string[] {
+  const hrefRegex = /href\s*=\s*["']([^"']+)["']/gi
+  const urls: string[] = []
+  let match: RegExpExecArray | null = null
+  while ((match = hrefRegex.exec(pageHtml)) != null) {
+    const rawHref = match[1] || ''
+    const absolute = toAbsoluteUrl(rawHref, baseUrl)
+    if (!absolute) continue
+    const lower = absolute.toLowerCase()
+    if (!lower.includes('/listing.html') && !lower.includes('/userlisting.html')) continue
+    urls.push(absolute)
+  }
+  return [...new Set(urls)]
+}
+
+function extractTitle(html: string): string | null {
+  const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || null
+  if (h1) return cleanText(decodeHtmlEntities(stripTags(h1)))
+  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || null
+  return cleanText(decodeHtmlEntities(stripTags(title || '')))
+}
+
+function extractDescription(html: string): string | null {
+  const meta = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["'][^>]*>/i)?.[1] || null
+  if (meta) return cleanText(decodeHtmlEntities(meta))
+  const text = cleanText(decodeHtmlEntities(stripTags(html)))
+  return text ? text.slice(0, 2000) : null
+}
+
+function extractAddressRaw(text: string): string | null {
+  const match = text.match(/\d{2,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-'\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?/)
+  return cleanText(match ? match[0] : null)
+}
+
+function extractDateRaw(text: string): string | null {
+  const line = text
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .find((entry) => /\b(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(entry))
+  return cleanText(line || null)
+}
+
+function extractImageSourceUrl(html: string, pageUrl: string): string | null {
+  const src = html.match(/<img[^>]*src=["']([^"']+)["'][^>]*>/i)?.[1] || null
+  if (!src) return null
+  return toAbsoluteUrl(src, pageUrl)
+}
+
+function parseExternalIdFromUrl(sourceUrl: string): string | null {
+  try {
+    const u = new URL(sourceUrl)
+    const id = u.searchParams.get('id') || u.searchParams.get('listingId')
+    return cleanText(id)
+  } catch {
+    return null
+  }
+}
+
+async function fetchHtml(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'user-agent': 'LootAuraIngestionBot/1.0 (+https://lootaura.com)',
+      },
+      cache: 'no-store',
+    })
+    if (!response.ok) return null
+    return await response.text()
+  } catch {
+    return null
+  }
+}
+
+async function fetchExternalPageSourceRecords(
+  cityConfigs: CityIngestionConfig[],
+  sourceUrlCap: number
+): Promise<RawExternalSale[]> {
+  const results: RawExternalSale[] = []
+  const listingUrlSet = new Set<string>()
+
+  for (const cfg of cityConfigs) {
+    for (const pageUrl of cfg.sourcePages) {
+      if (listingUrlSet.size >= sourceUrlCap) break
+      const pageHtml = await fetchHtml(pageUrl)
+      if (!pageHtml) continue
+      const urls = extractListingUrls(pageHtml, pageUrl)
+      for (const url of urls) {
+        if (listingUrlSet.size >= sourceUrlCap) break
+        listingUrlSet.add(url)
+      }
+    }
+  }
+
+  for (const listingUrl of listingUrlSet) {
+    const cfg = cityConfigs.find((cityCfg) =>
+      cityCfg.sourcePages.some((sourcePage) => {
+        try {
+          const sourceHost = new URL(sourcePage).hostname
+          const listingHost = new URL(listingUrl).hostname
+          return sourceHost === listingHost
+        } catch {
+          return false
+        }
+      })
+    )
+    if (!cfg) continue
+
+    const html = await fetchHtml(listingUrl)
+    if (!html) continue
+    const plainText = decodeHtmlEntities(stripTags(html))
+    results.push({
+      sourcePlatform: 'external_page_source',
+      sourceUrl: listingUrl,
+      externalId: parseExternalIdFromUrl(listingUrl),
+      title: extractTitle(html),
+      description: extractDescription(html),
+      addressRaw: extractAddressRaw(plainText),
+      dateRaw: extractDateRaw(plainText),
+      imageSourceUrl: extractImageSourceUrl(html, listingUrl),
+      rawPayload: {
+        fetchedAt: new Date().toISOString(),
+        sourceType: 'cron_external_page_source',
+      },
+      cityHint: cfg.city,
+      stateHint: cfg.state,
+    })
+  }
+
+  return results
+}
+
+async function processCronIngestionBatch(
+  adminDb: ReturnType<typeof getAdminDb>,
+  records: RawExternalSale[],
+  geocodeEnqueueCap: number,
+  enqueueState: { enqueued: number; deferred: number }
+): Promise<Omit<CronIngestionSummary, 'fetched'>> {
+  const summary: Omit<CronIngestionSummary, 'fetched'> = {
+    inserted: 0,
+    updated: 0,
+    duplicates: 0,
+    needsCheck: 0,
+    failed: 0,
+    enqueued: 0,
+    deferred: 0,
+  }
+
+  for (const rawSale of records) {
+    try {
+      const defaultConfig = fallbackCityConfig(rawSale)
+      const processed = await processIngestedSale(rawSale, defaultConfig)
+      const match = await findIngestedSaleMatch(rawSale.sourceUrl, processed)
+      const isDuplicate = match?.matchType === 'soft_address_date'
+      const failureReasons = dedupeFailureReasons([
+        ...processed.failureReasons,
+        ...(isDuplicate ? ['duplicate_detected'] : []),
+      ]) as FailureReason[]
+      const status = processed.status
+
+      const basePayload = {
+        source_platform: rawSale.sourcePlatform,
+        source_url: rawSale.sourceUrl,
+        external_id: rawSale.externalId,
+        raw_text: cleanText(rawSale.description),
+        raw_payload: rawSale.rawPayload,
+        title: cleanText(rawSale.title) || `${rawSale.cityHint} Yard Sale`,
+        description: cleanText(rawSale.description),
+        address_raw: rawSale.addressRaw,
+        normalized_address: processed.normalizedAddress,
+        city: processed.city,
+        state: processed.state,
+        lat: processed.lat,
+        lng: processed.lng,
+        date_start: processed.dateStart,
+        date_end: processed.dateEnd,
+        time_start: processed.timeStart,
+        time_end: processed.timeEnd,
+        date_source: processed.dateSource,
+        time_source: processed.timeSource,
+        image_source_url: rawSale.imageSourceUrl,
+        status,
+        failure_reasons: failureReasons,
+        parser_version: 'cron_external_page_v1',
+        parse_confidence: processed.parseConfidence,
+        is_duplicate: isDuplicate,
+        duplicate_of: isDuplicate ? match?.id : null,
+        normalized_date: processed.dateStart,
+      }
+
+      let rowId: string | null = null
+      if (match) {
+        const { error: updateError } = await fromBase(adminDb, 'ingested_sales')
+          .update(basePayload)
+          .eq('id', match.id)
+        if (updateError) {
+          summary.failed += 1
+          continue
+        }
+        rowId = String(match.id)
+        summary.updated += 1
+      } else {
+        const insertResult = await fromBase(adminDb, 'ingested_sales')
+          .insert(basePayload)
+          .select('id')
+          .single()
+        if (insertResult.error || !insertResult.data?.id) {
+          summary.failed += 1
+          continue
+        }
+        rowId = String(insertResult.data.id)
+        summary.inserted += 1
+      }
+
+      if (isDuplicate) summary.duplicates += 1
+      if (status === 'needs_check') summary.needsCheck += 1
+
+      if (status === 'needs_geocode' && rowId) {
+        if (enqueueState.enqueued >= geocodeEnqueueCap) {
+          enqueueState.deferred += 1
+          summary.deferred += 1
+        } else {
+          await enqueueGeocodeJob({ sale_id: rowId, priority: 'NORMAL' })
+          enqueueState.enqueued += 1
+          summary.enqueued += 1
+        }
+      }
+    } catch {
+      summary.failed += 1
+    }
+  }
+
+  return summary
+}
+
+async function runCronSourceIngestion(withOpId: (context?: any) => any): Promise<any> {
+  const adminDb = getAdminDb()
+  const batchSize = parseBatchSize()
+  const geocodeEnqueueCap = parseGeocodeEnqueueCap()
+  const sourceUrlCap = parseSourceUrlCap()
+
+  const { data: rows, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
+    .select('city, state, timezone, enabled, source_platform, source_pages')
+    .eq('enabled', true)
+    .eq('source_platform', 'external_page_source')
+
+  if (cityError) {
+    throw new Error(cityError.message || 'Failed to load ingestion city configs')
+  }
+
+  const cityConfigs = ((Array.isArray(rows) ? rows : []) as CityConfigRow[]).map(toCityConfig)
+  const records = await fetchExternalPageSourceRecords(cityConfigs, sourceUrlCap)
+
+  const totals: CronIngestionSummary = {
+    fetched: records.length,
+    inserted: 0,
+    updated: 0,
+    duplicates: 0,
+    needsCheck: 0,
+    failed: 0,
+    enqueued: 0,
+    deferred: 0,
+  }
+  const enqueueState = { enqueued: 0, deferred: 0 }
+
+  for (let offset = 0; offset < records.length; offset += batchSize) {
+    const batch = records.slice(offset, offset + batchSize)
+    const batchSummary = await processCronIngestionBatch(adminDb, batch, geocodeEnqueueCap, enqueueState)
+    totals.inserted += batchSummary.inserted
+    totals.updated += batchSummary.updated
+    totals.duplicates += batchSummary.duplicates
+    totals.needsCheck += batchSummary.needsCheck
+    totals.failed += batchSummary.failed
+    totals.enqueued += batchSummary.enqueued
+    totals.deferred += batchSummary.deferred
+  }
+
+  logger.info('Cron ingestion source completed', withOpId({
+    component: 'api/cron/daily',
+    task: 'ingestion-orchestration',
+    step: 'ingestion',
+    fetched: totals.fetched,
+    inserted: totals.inserted,
+    updated: totals.updated,
+    duplicates: totals.duplicates,
+    needsCheck: totals.needsCheck,
+    failed: totals.failed,
+    enqueued: totals.enqueued,
+    deferred: totals.deferred,
+    batchSize,
+    geocodeEnqueueCap,
+    sourceUrlCap,
+  }))
+
+  return {
+    ok: true,
+    ...totals,
+    batchSize,
+    geocodeEnqueueCap,
+    sourceUrlCap,
+  }
+}
 
 export async function GET(request: NextRequest) {
   return handleRequest(request)
@@ -229,37 +630,15 @@ async function runIngestionOrchestration(
     steps: {},
   }
 
-  // Step 1: Source ingestion placeholder (manual upload path is admin-triggered).
+  // Step 1: Source ingestion (adapter-based external page source).
   try {
     logger.info('Ingestion step started', withOpId({
       component: 'api/cron/daily',
       task: 'ingestion-orchestration',
       step: 'ingestion',
     }))
-
-    const adminDb = getAdminDb()
-    const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
-      .select('city, state, source_platform')
-      .eq('enabled', true)
-
-    if (cityError) {
-      throw new Error(cityError.message || 'Failed to load ingestion city configs')
-    }
-
-    taskResult.steps.ingestion = {
-      ok: true,
-      skipped: true,
-      reason: 'no_external_adapter_implemented',
-      enabledCities: (enabledCities || []).length,
-    }
-
-    logger.info('Ingestion step completed', withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-      enabledCities: (enabledCities || []).length,
-      skipped: true,
-    }))
+    const ingestionSummary = await runCronSourceIngestion(withOpId)
+    taskResult.steps.ingestion = ingestionSummary
   } catch (error) {
     taskResult.ok = false
     taskResult.steps.ingestion = {

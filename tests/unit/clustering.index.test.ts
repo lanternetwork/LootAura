@@ -1,6 +1,9 @@
 /**
  * Unit tests for clustering index functionality
  */
+/**
+ * @vitest-environment node
+ */
 
 import { buildClusterIndex, getClustersForViewport, expandZoomForCluster } from '@/lib/pins/clustering'
 import { PinPoint } from '@/lib/pins/types'

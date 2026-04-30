@@ -31,6 +31,8 @@ export default defineConfig({
     // Constrain worker count to prevent OOMs (reduced to 1 for CI stability)
     maxWorkers: 1,
     minWorkers: 1,
+    // Avoid spawning extra file workers that can still crash under CI memory pressure.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

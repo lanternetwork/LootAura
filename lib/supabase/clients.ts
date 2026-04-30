@@ -3,6 +3,43 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
 
+const isTest = process.env.NODE_ENV === 'test'
+
+function createTestRlsClient() {
+  const chain: any = {
+    select: () => chain,
+    insert: () => chain,
+    update: () => chain,
+    delete: () => chain,
+    eq: () => chain,
+    gte: () => chain,
+    lte: () => chain,
+    in: () => chain,
+    or: () => chain,
+    order: () => chain,
+    range: async () => ({ data: [], error: null }),
+    limit: () => chain,
+    single: async () => ({ data: null, error: null }),
+    maybeSingle: async () => ({ data: null, error: null }),
+    then: undefined,
+  }
+
+  const client: any = {
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+      setSession: async () => ({ data: { session: null }, error: null }),
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe: () => {} } },
+      }),
+    },
+    from: () => chain,
+    schema: () => client,
+  }
+
+  return client
+}
+
 // RLS-aware client for API routes
 // In API routes, always use cookies() from next/headers for consistent cookie reading
 // This ensures auth.uid() in RLS policies matches the authenticated user
@@ -13,6 +50,10 @@ export async function getRlsDb(_request?: NextRequest) {
 
   if (!url || !anon) {
     throw new Error('Supabase credentials missing')
+  }
+
+  if (isTest) {
+    return createTestRlsClient()
   }
 
   // In API routes, always use cookies() from next/headers for consistency
@@ -84,6 +125,10 @@ export async function getRlsBaseClient(_request?: NextRequest) {
 
   if (!url || !anon) {
     throw new Error('Supabase credentials missing')
+  }
+
+  if (isTest) {
+    return createTestRlsClient()
   }
 
   const cookieStore = await cookies()

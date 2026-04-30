@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi, afterEach as vitestAfterEach } from 'vitest'
+import { vi, afterEach as vitestAfterEach, beforeAll as vitestBeforeAll, afterAll as vitestAfterAll } from 'vitest'
 import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
 const testSetupGlobal = globalThis as typeof globalThis & {
@@ -344,9 +344,9 @@ if (!testSetupGlobal.__LOOTAURA_TEST_SETUP_ONCE__) {
     } catch {}
   })
 
-  // Global unhandled rejection handler to catch ZodErrors from env validation during tests
-  // These errors are expected in env.test.ts when testing error conditions
-  process.on('unhandledRejection', (reason: unknown) => {
+  // Global unhandled rejection handler to catch ZodErrors from env validation during tests.
+  // Register and tear down via lifecycle hooks to avoid retaining listeners across long runs.
+  const rejectionHandler = (reason: unknown) => {
     // Ignore ZodErrors from env validation during tests
     // These are expected when testing error conditions in env.test.ts
     if (reason && typeof reason === 'object' && 'issues' in reason) {
@@ -359,6 +359,14 @@ if (!testSetupGlobal.__LOOTAURA_TEST_SETUP_ONCE__) {
       }
     }
     // For other unhandled rejections, let them propagate (Vitest will handle them)
+  }
+
+  vitestBeforeAll(() => {
+    process.on('unhandledRejection', rejectionHandler)
+  })
+
+  vitestAfterAll(() => {
+    process.off('unhandledRejection', rejectionHandler)
   })
 }
 

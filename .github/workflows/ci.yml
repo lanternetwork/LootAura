@@ -245,8 +245,9 @@ jobs:
           exit 1
 
       - name: Run unit tests
-        run: NODE_OPTIONS="--max-old-space-size=4096" npm run test -- tests/unit/
+        run: npm run test -- tests/unit/
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
@@ -318,6 +319,7 @@ jobs:
       - name: Run integration tests
         run: node scripts/run-integration-batch.js
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           BATCH_INDEX: ${{ matrix.batch }}
           TOTAL_BATCHES: 43
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

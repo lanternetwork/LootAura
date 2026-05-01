@@ -250,12 +250,14 @@ export async function POST(request: NextRequest) {
 
       let message = 'Error'
       try {
-        const data = await responseError.json()
-        message =
-          data?.error?.message ||
-          data?.message ||
-          data?.error ||
-          message
+        const data = await responseError.json?.()
+        if (data) {
+          message =
+            data?.error?.message ||
+            data?.message ||
+            data?.error ||
+            message
+        }
       } catch {
         try {
           const text = await responseError.text?.()

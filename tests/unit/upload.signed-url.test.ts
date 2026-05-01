@@ -59,7 +59,8 @@ describe('Upload Signed URL API', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toContain('File size exceeds maximum allowed')
+    expect(data.error?.message).toContain('File size exceeds maximum allowed')
+    expect(data.ok).toBe(false)
   })
 
   it('should reject unauthenticated requests', async () => {

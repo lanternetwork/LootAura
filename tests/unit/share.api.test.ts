@@ -146,7 +146,9 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(429)
-      expect(data).toEqual({ code: 'RATE_LIMITED', message: 'Too many requests' })
+      expect(data.code).toBe('RATE_LIMITED')
+      expect(data.error?.message).toBe('Too many requests')
+      expect(data.ok).toBe(false)
       expect(deriveKey).toHaveBeenCalled()
       expect(check).toHaveBeenCalled()
     })
@@ -168,7 +170,9 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(413)
-      expect(data).toEqual({ code: 'PAYLOAD_TOO_LARGE', message: 'Request too large' })
+      expect(data.code).toBe('PAYLOAD_TOO_LARGE')
+      expect(data.error?.message).toBe('Request too large')
+      expect(data.ok).toBe(false)
     })
   })
 
@@ -265,7 +269,9 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(429)
-      expect(data).toEqual({ code: 'RATE_LIMITED', message: 'Too many requests' })
+      expect(data.code).toBe('RATE_LIMITED')
+      expect(data.error?.message).toBe('Too many requests')
+      expect(data.ok).toBe(false)
     })
   })
 })

@@ -40,8 +40,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Require admin access in all environments
-    await assertAdminOrThrow(request)
+    // Require admin access in all environments. Some tests mock this as Error,
+    // so normalize any admin-check failure to a consistent forbidden response.
+    try {
+      await assertAdminOrThrow(request)
+    } catch {
+      throw Response.json(
+        {
+          ok: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Forbidden: Admin access required',
+          },
+        },
+        { status: 403 }
+      )
+    }
 
     // Require ENABLE_ADMIN_TOOLS flag (allow in debug mode for development/preview)
     // Note: Production is already handled by early return above

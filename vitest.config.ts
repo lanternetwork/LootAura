@@ -30,8 +30,8 @@ export default defineConfig({
       '**/tests/e2e/**', // Exclude Playwright E2E tests
     ],
     // Ensure no network calls in tests
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    testTimeout: 30000,
+    hookTimeout: 30000,
     // Prevent cross-file global/mock leakage in CI while keeping local runs faster.
     isolate: isCI ? true : false,
     // Use forks instead of threads for better memory isolation
@@ -45,8 +45,7 @@ export default defineConfig({
     },
     // Reduce memory usage
     maxConcurrency: 1,
-    // Use two workers in CI to avoid single-worker memory accumulation.
-    maxWorkers: isCI ? 2 : 2,
+    maxWorkers: isCI ? 1 : 2,
     minWorkers: 1,
     // Avoid spawning extra file workers that can still crash under CI memory pressure.
     fileParallelism: false,

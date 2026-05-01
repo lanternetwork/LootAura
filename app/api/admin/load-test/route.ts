@@ -56,14 +56,16 @@ export async function POST(request: NextRequest) {
     await assertAdminOrThrow(request)
 
     if (process.env.NODE_ENV === 'production') {
-      return errorResponse('INVALID_REQUEST', 'Not found', 404)
+      return new Response('Not found', { status: 404 })
     }
 
     if (process.env.VERCEL === '1') {
-      return errorResponse(
-        'INVALID_REQUEST',
-        'Load testing is unavailable in Vercel environments. Run load tests locally or use GitHub Actions dispatch from admin tools.',
-        501
+      return NextResponse.json(
+        {
+          error: 'Load testing is unavailable in Vercel environments',
+          message: 'Run load tests locally or use GitHub Actions dispatch from admin tools.',
+        },
+        { status: 501 }
       )
     }
 
@@ -188,8 +190,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof NextResponse) {
       const status = error.status
-      const code =
-        status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : 'INVALID_REQUEST'
+      if (status !== 400 && status !== 401 && status !== 403) {
+        return error
+      }
+      const code = status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : 'INVALID_REQUEST'
 
       let message = 'Request failed'
       try {

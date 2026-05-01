@@ -127,8 +127,17 @@ export async function selectFeaturedSales(
   }
 
   // Step 2: Filter out recipient's own sales
-  const filteredCandidates = candidates.filter(
-    (sale) => sale.owner_id !== recipientProfileId
+  type CandidateSale = {
+    id: string
+    owner_id: string
+    lat: number | null
+    lng: number | null
+    date_start: string
+    date_end: string | null
+  }
+  const typedCandidates = candidates as CandidateSale[]
+  const filteredCandidates = typedCandidates.filter(
+    (sale: CandidateSale) => sale.owner_id !== recipientProfileId
   )
 
   if (filteredCandidates.length === 0) {
@@ -142,7 +151,7 @@ export async function selectFeaturedSales(
   // Step 3: Query active promotions for candidate sales
   // Active promotion = status='active' AND now ∈ [starts_at, ends_at]
   const nowStr = now.toISOString()
-  const candidateSaleIds = filteredCandidates.map((s) => s.id)
+  const candidateSaleIds = filteredCandidates.map((s: CandidateSale) => s.id)
   
   let activePromotionSaleIds = new Set<string>()
   if (candidateSaleIds.length > 0) {
@@ -154,16 +163,16 @@ export async function selectFeaturedSales(
       .in('sale_id', candidateSaleIds)
 
     if (activePromotions) {
-      activePromotionSaleIds = new Set(activePromotions.map((p) => p.sale_id))
+      activePromotionSaleIds = new Set(activePromotions.map((p: { sale_id: string }) => p.sale_id))
     }
   }
 
   // Step 4: Separate promoted and organic sales
   // Promoted = has active promotion, Organic = no active promotion
-  const promotedCandidates = filteredCandidates.filter((sale) => 
+  const promotedCandidates = filteredCandidates.filter((sale: CandidateSale) =>
     activePromotionSaleIds.has(sale.id)
   )
-  const organicCandidates = filteredCandidates.filter((sale) => 
+  const organicCandidates = filteredCandidates.filter((sale: CandidateSale) =>
     !activePromotionSaleIds.has(sale.id)
   )
 
@@ -180,19 +189,19 @@ export async function selectFeaturedSales(
       .eq('week_key', weekKey)
       .in(
         'sale_id',
-        promotedCandidates.map((s) => s.id)
+        promotedCandidates.map((s: CandidateSale) => s.id)
       )
 
     // Create map of inclusion counts
     const inclusionMap = new Map<string, number>()
     if (inclusions) {
-      inclusions.forEach((inc) => {
+      inclusions.forEach((inc: { sale_id: string; times_shown: number | null }) => {
         inclusionMap.set(inc.sale_id, inc.times_shown || 0)
       })
     }
 
     // Sort promoted by least-shown first, then apply seeded shuffle within same count
-    fairnessAdjustedPromoted = promotedCandidates.sort((a, b) => {
+    fairnessAdjustedPromoted = promotedCandidates.sort((a: CandidateSale, b: CandidateSale) => {
       const aCount = inclusionMap.get(a.id) || 0
       const bCount = inclusionMap.get(b.id) || 0
       if (aCount !== bCount) {
@@ -211,7 +220,7 @@ export async function selectFeaturedSales(
   thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30)
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString()
 
-  const organicSaleIds = organicCandidates.map((s) => s.id)
+  const organicSaleIds = organicCandidates.map((s: CandidateSale) => s.id)
   const viewCountsMap = new Map<string, number>()
 
   if (organicSaleIds.length > 0) {
@@ -227,7 +236,7 @@ export async function selectFeaturedSales(
         .eq('is_test', false)
 
       if (views) {
-        views.forEach((view) => {
+        views.forEach((view: { sale_id: string }) => {
           const current = viewCountsMap.get(view.sale_id) || 0
           viewCountsMap.set(view.sale_id, current + 1)
         })
@@ -236,7 +245,7 @@ export async function selectFeaturedSales(
   }
 
   // Sort organic by view count (descending), then apply seeded shuffle
-  const sortedOrganic = organicCandidates.sort((a, b) => {
+  const sortedOrganic = organicCandidates.sort((a: CandidateSale, b: CandidateSale) => {
     const aViews = viewCountsMap.get(a.id) || 0
     const bViews = viewCountsMap.get(b.id) || 0
     if (aViews !== bViews) {
@@ -252,16 +261,16 @@ export async function selectFeaturedSales(
 
   // If >=12 promoted, take all 12 from promoted
   if (fairnessAdjustedPromoted.length >= 12) {
-    selected.push(...fairnessAdjustedPromoted.slice(0, 12).map((s) => s.id))
+    selected.push(...fairnessAdjustedPromoted.slice(0, 12).map((s: CandidateSale) => s.id))
     totalPromoted = 12
   } else {
     // Take all promoted, fill remainder with high-view organic
-    selected.push(...fairnessAdjustedPromoted.map((s) => s.id))
+    selected.push(...fairnessAdjustedPromoted.map((s: CandidateSale) => s.id))
     totalPromoted = fairnessAdjustedPromoted.length
 
     const remaining = 12 - selected.length
     if (remaining > 0 && shuffledOrganic.length > 0) {
-      selected.push(...shuffledOrganic.slice(0, remaining).map((s) => s.id))
+      selected.push(...shuffledOrganic.slice(0, remaining).map((s: CandidateSale) => s.id))
     }
   }
 

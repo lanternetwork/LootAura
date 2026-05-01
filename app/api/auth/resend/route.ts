@@ -31,7 +31,11 @@ async function resendHandler(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { ok: false, code: 'RESEND_FAILED', error: 'Failed to resend verification email. Please try again.' },
+        {
+          ok: false,
+          code: 'RESEND_FAILED',
+          error: { message: 'Failed to resend verification email. Please try again.' },
+        },
         { status: 400 }
       )
     }
@@ -48,7 +52,11 @@ async function resendHandler(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input data', details: error.errors },
+        {
+          ok: false,
+          error: { message: 'Invalid input data' },
+          details: error.errors,
+        },
         { status: 400 }
       )
     }
@@ -58,7 +66,10 @@ async function resendHandler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        ok: false,
+        error: { message: 'Internal server error' },
+      },
       { status: 500 }
     )
   }

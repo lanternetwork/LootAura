@@ -82,7 +82,11 @@ async function enforceRateLimit(request: NextRequest, policies: Policy[]): Promi
 
   if (!mostRestrictive.allowed) {
     const response = NextResponse.json(
-      { code: 'RATE_LIMITED', message: 'Too many requests' },
+      {
+        ok: false,
+        code: 'RATE_LIMITED',
+        error: { message: 'Too many requests' },
+      },
       { status: 429 }
     )
     return applyRateHeaders(
@@ -111,7 +115,11 @@ export async function POST(request: NextRequest) {
     const bodySizeBytes = new TextEncoder().encode(rawBody).length
     if (bodySizeBytes > MAX_SHARE_PAYLOAD_BYTES) {
       return NextResponse.json(
-        { code: 'PAYLOAD_TOO_LARGE', message: 'Request too large' },
+        {
+          ok: false,
+          code: 'PAYLOAD_TOO_LARGE',
+          error: { message: 'Request too large' },
+        },
         { status: 413 }
       )
     }
@@ -120,6 +128,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         {
+          ok: false,
           error: {
             code: 'INVALID_REQUEST',
             message: 'Invalid request format'
@@ -144,7 +153,10 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Failed to store shared state:', error)
       return NextResponse.json(
-        { error: 'Failed to create shareable link' },
+        {
+          ok: false,
+          error: { message: 'Failed to create shareable link' },
+        },
         { status: 500 }
       )
     }
@@ -157,13 +169,20 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request format', details: error.errors },
+        {
+          ok: false,
+          error: { message: 'Invalid request format' },
+          details: error.errors,
+        },
         { status: 400 }
       )
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        ok: false,
+        error: { message: 'Internal server error' },
+      },
       { status: 500 }
     )
   }
@@ -184,7 +203,10 @@ export async function GET(request: NextRequest) {
 
     if (!shortId) {
       return NextResponse.json(
-        { error: 'Missing short ID' },
+        {
+          ok: false,
+          error: { message: 'Missing short ID' },
+        },
         { status: 400 }
       )
     }
@@ -198,14 +220,20 @@ export async function GET(request: NextRequest) {
     if (error) {
       if (error.code === 'PGRST116') {
         return NextResponse.json(
-          { error: 'Share link not found' },
+          {
+            ok: false,
+            error: { message: 'Share link not found' },
+          },
           { status: 404 }
         )
       }
       
       console.error('Failed to retrieve shared state:', error)
       return NextResponse.json(
-        { error: 'Failed to retrieve shareable link' },
+        {
+          ok: false,
+          error: { message: 'Failed to retrieve shareable link' },
+        },
         { status: 500 }
       )
     }
@@ -218,13 +246,20 @@ export async function GET(request: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid response format', details: error.errors },
+        {
+          ok: false,
+          error: { message: 'Invalid response format' },
+          details: error.errors,
+        },
         { status: 500 }
       )
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        ok: false,
+        error: { message: 'Internal server error' },
+      },
       { status: 500 }
     )
   }

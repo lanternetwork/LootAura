@@ -45,7 +45,15 @@ export async function POST(request: NextRequest) {
     const { ENV_SERVER } = await import('@/lib/env')
     const maxSizeBytes = ENV_SERVER.MAX_UPLOAD_SIZE_BYTES || 5242880 // 5MB default
     if (sizeBytes > maxSizeBytes) {
-      return errorResponse(400, 'INVALID_REQUEST', `File size exceeds maximum allowed (${Math.round(maxSizeBytes / 1024 / 1024)}MB)`)
+      return Response.json(
+        {
+          ok: false,
+          error: {
+            message: `File size exceeds maximum allowed (${Math.round(maxSizeBytes / 1024 / 1024)}MB)`,
+          },
+        },
+        { status: 400 }
+      )
     }
 
     // Check authentication

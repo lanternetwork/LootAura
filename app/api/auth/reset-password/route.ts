@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
     
     if (!allowed) {
       return NextResponse.json(
-        { error: rateLimitError },
+        {
+          ok: false,
+          error: { message: rateLimitError || '' },
+        },
         { status: 429 }
       )
     }
@@ -51,7 +54,11 @@ export async function POST(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { ok: false, code: 'RESET_FAILED', error: 'Failed to send password reset email. Please try again.' },
+        {
+          ok: false,
+          code: 'RESET_FAILED',
+          error: { message: 'Failed to send password reset email. Please try again.' },
+        },
         { status: 400 }
       )
     }
@@ -71,7 +78,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input data', details: error.errors },
+        {
+          ok: false,
+          error: { message: 'Invalid input data' },
+          details: error.errors,
+        },
         { status: 400 }
       )
     }
@@ -81,7 +92,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        ok: false,
+        error: { message: 'Internal server error' },
+      },
       { status: 500 }
     )
   }

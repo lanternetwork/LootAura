@@ -32,7 +32,13 @@ async function signinHandler(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { code: error?.message || 'Invalid session', message: 'Auth failed' },
+        {
+          ok: false,
+          code: error?.message || 'Invalid session',
+          error: {
+            message: 'Auth failed',
+          },
+        },
         { status: 401 }
       )
     }
@@ -86,7 +92,11 @@ async function signinHandler(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input data', details: error.errors },
+        {
+          ok: false,
+          error: { message: 'Invalid input data' },
+          details: error.errors,
+        },
         { status: 400 }
       )
     }
@@ -96,7 +106,10 @@ async function signinHandler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        ok: false,
+        error: { message: 'Internal server error' },
+      },
       { status: 500 }
     )
   }

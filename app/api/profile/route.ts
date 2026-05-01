@@ -6,7 +6,9 @@ import { isAllowedAvatarUrl } from '@/lib/cloudinary'
 export async function GET(_req: NextRequest) {
   const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
-  if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, error: { message: 'Unauthorized' } }, { status: 401 })
+  }
   // Note: GET requests are read-only and should NOT be blocked by account locks
   // Only write operations (POST, PUT, DELETE) should enforce account locks
 
@@ -96,7 +98,10 @@ export async function GET(_req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.error('[PROFILE] GET table fetch error:', error)
     }
-    return NextResponse.json({ ok: false, code: 'FETCH_ERROR', error: 'Failed to fetch profile' }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, code: 'FETCH_ERROR', error: { message: 'Failed to fetch profile' } },
+      { status: 500 }
+    )
   }
 
   if (!data) {
@@ -155,14 +160,14 @@ export async function GET(_req: NextRequest) {
               console.error('[PROFILE] GET direct query also failed:', directError?.message)
             }
             // Profile doesn't exist and couldn't create it - return 404
-            return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+            return NextResponse.json({ ok: false, error: { message: 'Profile not found' } }, { status: 404 })
           }
         } catch (directE: any) {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.error('[PROFILE] GET direct query exception:', directE?.message || directE)
           }
           // Profile doesn't exist and couldn't create it - return 404
-          return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+          return NextResponse.json({ ok: false, error: { message: 'Profile not found' } }, { status: 404 })
         }
       }
     } catch (e: any) {
@@ -170,7 +175,7 @@ export async function GET(_req: NextRequest) {
         console.error('[PROFILE] GET update_profile RPC exception:', e?.message || e, e?.stack)
       }
       // Profile doesn't exist and couldn't create it - return 404
-      return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+      return NextResponse.json({ ok: false, error: { message: 'Profile not found' } }, { status: 404 })
     }
   }
 
@@ -218,7 +223,9 @@ export async function PUT(req: NextRequest) {
 
   const sb = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
-  if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, error: { message: 'Unauthorized' } }, { status: 401 })
+  }
   // Account lock enforcement (fail-closed)
   if (process.env.NODE_ENV === 'test' && user.id === 'locked-user-id') {
     return NextResponse.json(
@@ -256,11 +263,14 @@ export async function PUT(req: NextRequest) {
   const json = await req.json()
   const parsed = ProfileUpdateSchema.safeParse(json)
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: 'Invalid profile data', details: parsed.error.issues }, { status: 400 })
+    return NextResponse.json(
+      { ok: false, error: { message: 'Invalid profile data' }, details: parsed.error.issues },
+      { status: 400 }
+    )
   }
   const payload = parsed.data
   if (payload.avatar_url && !isAllowedAvatarUrl(payload.avatar_url)) {
-    return NextResponse.json({ ok: false, error: 'Avatar host not allowed' }, { status: 400 })
+    return NextResponse.json({ ok: false, error: { message: 'Avatar host not allowed' } }, { status: 400 })
   }
 
   // Build update object with only provided fields (skip undefined)
@@ -279,7 +289,7 @@ export async function PUT(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.warn('[PROFILE] PUT received empty update data')
     }
-    return NextResponse.json({ ok: false, error: 'No fields to update' }, { status: 400 })
+    return NextResponse.json({ ok: false, error: { message: 'No fields to update' } }, { status: 400 })
   }
 
   // Try RPC function first, but fallback to direct update if RPC fails
@@ -457,7 +467,10 @@ export async function PUT(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.error('[PROFILE] PUT update failed:', updateErr?.message || 'No data returned')
     }
-    return NextResponse.json({ ok: false, error: updateErr?.message || 'Update failed' }, { status: updateErr ? 500 : 400 })
+    return NextResponse.json(
+      { ok: false, error: { message: updateErr?.message || 'Update failed' } },
+      { status: updateErr ? 500 : 400 }
+    )
   }
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -480,7 +493,9 @@ export async function POST(_request: NextRequest) {
 
   const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, error: { message: 'Unauthorized' } }, { status: 401 })
+  }
   try {
     const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
     await assertAccountNotLocked(user.id)
@@ -500,7 +515,12 @@ export async function POST(_request: NextRequest) {
     .select('id')
     .eq('id', user.id)
     .maybeSingle()
-  if (checkError) return NextResponse.json({ ok: false, error: 'Failed to check existing profile', details: checkError.message }, { status: 500 })
+  if (checkError) {
+    return NextResponse.json(
+      { ok: false, error: { message: 'Failed to check existing profile' }, details: checkError.message },
+      { status: 500 }
+    )
+  }
   if (existing) {
     // Profile exists, fetch full profile from view
     const { data: fullProfile, error: fetchError } = await supabase
@@ -553,7 +573,10 @@ export async function POST(_request: NextRequest) {
         return NextResponse.json({ ok: true, data: fullProfile, created: false, message: 'Profile already exists' })
       }
     }
-    return NextResponse.json({ ok: false, error: 'Failed to create profile', details: createError.message }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, error: { message: 'Failed to create profile' }, details: createError.message },
+      { status: 500 }
+    )
   }
   
   // Now update the profile with the actual values we want
@@ -640,7 +663,10 @@ export async function POST(_request: NextRequest) {
       }
       return NextResponse.json({ ok: true, data: basicProfile, created: true, message: 'Profile created successfully' })
     }
-    return NextResponse.json({ ok: false, error: 'Profile created but failed to fetch', details: fetchError?.message }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, error: { message: 'Profile created but failed to fetch' }, details: fetchError?.message },
+      { status: 500 }
+    )
   }
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

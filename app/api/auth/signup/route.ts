@@ -27,7 +27,11 @@ async function signupHandler(request: NextRequest) {
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     if (!url || !anon) {
       return NextResponse.json(
-        { ok: false, code: 'CONFIG_ERROR', error: 'Sign up is temporarily unavailable.' },
+        {
+          ok: false,
+          code: 'CONFIG_ERROR',
+          error: { message: 'Sign up is temporarily unavailable.' },
+        },
         { status: 503 }
       )
     }
@@ -67,7 +71,7 @@ async function signupHandler(request: NextRequest) {
         {
           ok: false,
           code: 'SIGNUP_FAILED',
-          error: 'Failed to create account. Please try again.',
+          error: { message: 'Failed to create account. Please try again.' },
           details: error.message,
         },
         { status: 400 }
@@ -152,7 +156,7 @@ async function signupHandler(request: NextRequest) {
         {
           ok: false,
           code: 'VALIDATION_ERROR',
-          error: 'Invalid input data',
+          error: { message: 'Invalid input data' },
           details: JSON.stringify(error.errors),
         },
         { status: 400 }
@@ -164,7 +168,11 @@ async function signupHandler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: false, code: 'INTERNAL_ERROR', error: 'Internal server error' },
+      {
+        ok: false,
+        code: 'INTERNAL_ERROR',
+        error: { message: 'Internal server error' },
+      },
       { status: 500 }
     )
   }

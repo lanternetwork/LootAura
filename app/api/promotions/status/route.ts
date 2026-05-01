@@ -129,11 +129,27 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url)
     const saleIdsParam = url.searchParams.get('sale_ids')
     if (!saleIdsParam) {
-      return fail(400, 'INVALID_REQUEST', 'Invalid promotion status request')
+      return Response.json(
+        {
+          code: 'INVALID_REQUEST',
+          error: {
+            message: 'Invalid sale_ids',
+          },
+        },
+        { status: 400 }
+      )
     }
 
     if (saleIdsParam.length > MAX_SALE_IDS_PARAM_LENGTH) {
-      return fail(400, 'INVALID_REQUEST', 'Invalid promotion status request')
+      return Response.json(
+        {
+          code: 'INVALID_REQUEST',
+          error: {
+            message: 'Invalid sale_ids',
+          },
+        },
+        { status: 400 }
+      )
     }
 
     const rawIds = saleIdsParam

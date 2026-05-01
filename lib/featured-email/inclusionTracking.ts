@@ -16,6 +16,10 @@ export interface InclusionRecord {
   timesShown: number
 }
 
+interface RecipientRow {
+  recipient_profile_id: string | null
+}
+
 /**
  * Record featured inclusions for a batch of sales/recipients
  * Updates both recipient-level and rollup tables
@@ -77,8 +81,11 @@ export async function recordInclusions(
         .eq('sale_id', saleId)
 
       // Get unique recipient count
+      const recipientRows = (uniqueRecipients ?? []) as RecipientRow[]
       const uniqueRecipientSet = new Set(
-        uniqueRecipients?.map((r) => r.recipient_profile_id) || []
+        recipientRows
+          .map((r: RecipientRow) => r.recipient_profile_id)
+          .filter(Boolean)
       )
       const uniqueCount = uniqueRecipientSet.size
 
@@ -87,7 +94,11 @@ export async function recordInclusions(
         .select('times_shown')
         .eq('sale_id', saleId)
 
-      const totalCount = totalInclusions?.reduce((sum, inc) => sum + (inc.times_shown || 0), 0) || 0
+      const totalCount =
+        totalInclusions?.reduce(
+          (sum: number, inc: { times_shown: number | null }) => sum + (inc.times_shown || 0),
+          0
+        ) || 0
 
       // Upsert rollup
       const { data: existingRollup } = await fromBase(admin, 'featured_inclusion_rollups')

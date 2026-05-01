@@ -23,61 +23,57 @@ const normalizeLockError = (response: NextResponse) => {
 }
 
 async function postHandler(req: NextRequest) {
-  // CSRF protection check
-  const csrfError = await checkCsrfIfRequired(req)
-  if (csrfError) {
-    return csrfError
-  }
-
-  const supabase = await createSupabaseServerClient()
-
-  // Auth check
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    logger.warn('Unauthorized rating attempt', {
-      component: 'seller/rating',
-      operation: 'auth_check',
-    })
-    return fail(401, 'AUTH_REQUIRED', 'Authentication required')
-  }
   try {
+    // CSRF protection check
+    const csrfError = await checkCsrfIfRequired(req)
+    if (csrfError) {
+      return csrfError
+    }
+
+    const supabase = await createSupabaseServerClient()
+
+    // Auth check
+    const authResponse = await supabase.auth.getUser()
+    const user = authResponse?.data?.user
+    const authError = authResponse?.error
+    if (authError || !user) {
+      logger.warn('Unauthorized rating attempt', {
+        component: 'seller/rating',
+        operation: 'auth_check',
+      })
+      return fail(401, 'AUTH_REQUIRED', 'Auth required')
+    }
+
     const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
     await assertAccountNotLocked(user.id)
-  } catch (error) {
-    if (error instanceof NextResponse) return normalizeLockError(error)
-    throw error
-  }
 
-  // Rate limiting check (after auth so we have userId)
-  // We'll do this inline since we need userId from auth
-  const { check } = await import('@/lib/rateLimit/limiter')
-  const { deriveKey } = await import('@/lib/rateLimit/keys')
-  
-  for (const policy of [Policies.RATING_MINUTE, Policies.RATING_HOURLY]) {
-    const key = await deriveKey(req, policy.scope, user.id)
-    const result = await check(policy, key)
+    // Rate limiting check (after auth so we have userId)
+    const { check } = await import('@/lib/rateLimit/limiter')
+    const { deriveKey } = await import('@/lib/rateLimit/keys')
     
-    if (!result.allowed) {
-      logger.warn('Rate limit exceeded for rating', {
-        component: 'seller/rating',
-        operation: 'rate_limit',
-        userId: user.id,
-      })
-      return fail(429, 'RATE_LIMIT_EXCEEDED', 'Too many rating changes. Please try again later.')
+    for (const policy of [Policies.RATING_MINUTE, Policies.RATING_HOURLY]) {
+      const key = await deriveKey(req, policy.scope, user.id)
+      const result = await check(policy, key)
+      
+      if (!result.allowed) {
+        logger.warn('Rate limit exceeded for rating', {
+          component: 'seller/rating',
+          operation: 'rate_limit',
+          userId: user.id,
+        })
+        return fail(429, 'RATE_LIMIT_EXCEEDED', 'Too many rating changes. Please try again later.')
+      }
     }
-  }
 
-  try {
-    const body = await req.json()
-    const { seller_id, rating, sale_id } = body
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== 'object') {
+      return fail(400, 'INVALID_REQUEST', 'Missing required fields')
+    }
+    const { seller_id, rating, sale_id } = body as Record<string, unknown>
 
     // Validate required fields
-    if (!seller_id || typeof seller_id !== 'string') {
-      return fail(400, 'INVALID_INPUT', 'seller_id is required and must be a string')
-    }
-
-    if (rating === undefined || rating === null) {
-      return fail(400, 'INVALID_INPUT', 'rating is required')
+    if (!seller_id || typeof seller_id !== 'string' || rating === undefined || rating === null) {
+      return fail(400, 'INVALID_REQUEST', 'Missing required fields')
     }
 
     // Validate rating is integer between 1 and 5
@@ -102,7 +98,7 @@ async function postHandler(req: NextRequest) {
       seller_id,
       user.id,
       ratingNum,
-      sale_id || null
+      (sale_id as string) || null
     )
 
     if (!result.success) {
@@ -124,21 +120,16 @@ async function postHandler(req: NextRequest) {
     })
 
     return ok({
+      success: true,
       rating: ratingNum,
       summary: result.summary,
     })
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
-    }
-
-    logger.error('Unexpected error in rating API', error instanceof Error ? error : new Error(String(error)), {
-      component: 'seller/rating',
-      operation: 'handler_execution',
-      userId: user?.id,
+    if (error instanceof NextResponse) return normalizeLockError(error)
+    logger.error('Seller rating error', error instanceof Error ? error : new Error(String(error)), {
+      component: 'api/seller/rating',
     })
-
-    return fail(500, 'INTERNAL_ERROR', 'An error occurred while saving your rating')
+    return fail(500, 'INTERNAL_ERROR', 'Internal error')
   }
 }
 

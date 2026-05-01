@@ -133,38 +133,16 @@ jobs:
           node-version: '20'
           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
+      - name: Clean build artifacts
+        run: |
+          rm -rf .next
+          rm -rf node_modules/.cache
+          rm -rf .turbo
+
       - name: Install dependencies
         run: |
-          # Retry logic for network issues and file system race conditions
-          set +e
-          for attempt in 1 2 3; do
-            echo "Install attempt $attempt/3..."
-            # Clean node_modules before retry to avoid ETXTBSY errors
-            if [ $attempt -gt 1 ]; then
-              echo "Cleaning node_modules before retry..."
-              rm -rf node_modules
-            fi
-            exitcode=0
-            if [ -f package-lock.json ]; then
-              npm ci || exitcode=$?
-            else
-              npm install || exitcode=$?
-              if [ $exitcode -eq 0 ]; then
-                npm install --package-lock-only || exitcode=$?
-              fi
-            fi
-            if [ $exitcode -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
-              exit 0
-            fi
-            echo "❌ Install attempt $attempt failed"
-            if [ $attempt -lt 3 ]; then
-              echo "Retrying in 10 seconds..."
-              sleep 10
-            fi
-          done
-          echo "All install attempts failed"
-          exit 1
+          rm -rf node_modules
+          npm ci
 
       - name: Run ESLint
         run: npm run lint
@@ -421,41 +399,20 @@ jobs:
           node-version: '20'
           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
+      - name: Clean build artifacts
+        run: |
+          rm -rf .next
+          rm -rf node_modules/.cache
+          rm -rf .turbo
+
       - name: Install dependencies
         run: |
-          # Retry logic for network issues and file system race conditions
-          set +e
-          for attempt in 1 2 3; do
-            echo "Install attempt $attempt/3..."
-            # Clean node_modules before retry to avoid ETXTBSY errors
-            if [ $attempt -gt 1 ]; then
-              echo "Cleaning node_modules before retry..."
-              rm -rf node_modules
-            fi
-            exitcode=0
-            if [ -f package-lock.json ]; then
-              npm ci || exitcode=$?
-            else
-              npm install || exitcode=$?
-              if [ $exitcode -eq 0 ]; then
-                npm install --package-lock-only || exitcode=$?
-              fi
-            fi
-            if [ $exitcode -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
-              exit 0
-            fi
-            echo "❌ Install attempt $attempt failed"
-            if [ $attempt -lt 3 ]; then
-              echo "Retrying in 10 seconds..."
-              sleep 10
-            fi
-          done
-          echo "All install attempts failed"
-          exit 1
+          rm -rf node_modules
+          npm ci
 
-      - name: Build application
-        run: npm run build
+      - name: Build
+        run: |
+          NEXT_DISABLE_CACHE=1 npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -502,41 +459,20 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Clean build artifacts
+        run: |
+          rm -rf .next
+          rm -rf node_modules/.cache
+          rm -rf .turbo
+
       - name: Install dependencies
         run: |
-          # Retry logic for network issues and file system race conditions
-          set +e
-          for attempt in 1 2 3; do
-            echo "Install attempt $attempt/3..."
-            # Clean node_modules before retry to avoid ETXTBSY errors
-            if [ $attempt -gt 1 ]; then
-              echo "Cleaning node_modules before retry..."
-              rm -rf node_modules
-            fi
-            exitcode=0
-            if [ -f package-lock.json ]; then
-              npm ci || exitcode=$?
-            else
-              npm install || exitcode=$?
-              if [ $exitcode -eq 0 ]; then
-                npm install --package-lock-only || exitcode=$?
-              fi
-            fi
-            if [ $exitcode -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
-              exit 0
-            fi
-            echo "❌ Install attempt $attempt failed"
-            if [ $attempt -lt 3 ]; then
-              echo "Retrying in 10 seconds..."
-              sleep 10
-            fi
-          done
-          echo "All install attempts failed"
-          exit 1
+          rm -rf node_modules
+          npm ci
 
-      - name: Build (fallback if artifacts not used)
-        run: npm run build
+      - name: Build
+        run: |
+          NEXT_DISABLE_CACHE=1 npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

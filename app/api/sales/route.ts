@@ -11,7 +11,7 @@ import { toDbSet } from '@/lib/shared/categoryContract'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { z } from 'zod'
-import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
+import * as ImageUrlValidation from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
@@ -1240,7 +1240,7 @@ async function postHandler(request: NextRequest) {
         : []
 
     // Validate optional cover image URL
-    if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
+    if (cover_image_url && !ImageUrlValidation.isAllowedImageUrl(cover_image_url)) {
       // Log image validation failures for monitoring (production logging)
         logger.warn('Rejected cover image URL', {
           component: 'sales',
@@ -1260,9 +1260,9 @@ async function postHandler(request: NextRequest) {
     }
 
     // Validate images array if provided
-    if (images && Array.isArray(images)) {
+    if (Array.isArray(images)) {
       for (const imageUrl of images) {
-        if (!isAllowedImageUrl(imageUrl)) {
+        if (!ImageUrlValidation.isAllowedImageUrl(imageUrl)) {
           // Log image validation failures for monitoring (production logging)
             logger.warn('Rejected image URL in array', {
               component: 'sales',

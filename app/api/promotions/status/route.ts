@@ -163,7 +163,15 @@ export async function GET(request: NextRequest) {
     })
 
     if (invalidIds.length > 0) {
-      return fail(400, 'INVALID_REQUEST', 'Invalid sale_ids')
+      return Response.json(
+        {
+          code: 'INVALID_REQUEST',
+          error: {
+            message: 'Invalid sale_ids',
+          },
+        },
+        { status: 400 }
+      )
     }
 
     // CRITICAL: Load session into the SAME client instance before using .schema()

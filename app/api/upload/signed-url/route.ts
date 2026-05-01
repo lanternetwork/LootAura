@@ -46,12 +46,7 @@ export async function POST(request: NextRequest) {
     const maxSizeBytes = ENV_SERVER.MAX_UPLOAD_SIZE_BYTES || 5242880 // 5MB default
     if (sizeBytes > maxSizeBytes) {
       return Response.json(
-        {
-          ok: false,
-          error: {
-            message: `File size exceeds maximum allowed (${Math.round(maxSizeBytes / 1024 / 1024)}MB)`,
-          },
-        },
+        { error: 'File size exceeds maximum allowed' },
         { status: 400 }
       )
     }

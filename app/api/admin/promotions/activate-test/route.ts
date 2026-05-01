@@ -24,6 +24,10 @@ const ActivateTestPromotionSchema = z.object({
   tier: z.enum(['featured_week']).optional().default('featured_week'),
 })
 
+interface PromotionIdRow {
+  id: string
+}
+
 async function activateTestPromotionHandler(request: NextRequest) {
   let user: { id: string; email?: string }
   try {
@@ -178,7 +182,8 @@ async function activateTestPromotionHandler(request: NextRequest) {
     // Expire all existing live promotions (idempotent: if none exist, this is a no-op)
     if (existingPromotions && existingPromotions.length > 0) {
       const now = new Date().toISOString()
-      const promotionIds = existingPromotions.map((p) => p.id)
+      const promotionRows = existingPromotions as PromotionIdRow[]
+      const promotionIds = promotionRows.map((p: PromotionIdRow) => p.id)
 
       const { error: expireError } = await fromBase(adminDb, 'promotions')
         .update({

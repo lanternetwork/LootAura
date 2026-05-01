@@ -20,6 +20,10 @@ const DeactivateTestPromotionSchema = z.object({
   sale_id: z.string().uuid('sale_id must be a valid UUID'),
 })
 
+interface PromotionIdRow {
+  id: string
+}
+
 async function deactivateTestPromotionHandler(request: NextRequest) {
   let user: { id: string; email?: string }
   try {
@@ -122,7 +126,8 @@ async function deactivateTestPromotionHandler(request: NextRequest) {
 
     // Expire all active promotions
     const now = new Date().toISOString()
-    const promotionIds = activePromotions.map(p => p.id)
+    const promotionRows = activePromotions as PromotionIdRow[]
+    const promotionIds = promotionRows.map((p: PromotionIdRow) => p.id)
 
     const { data: updatedPromotions, error: updateError } = await fromBase(adminDb, 'promotions')
       .update({

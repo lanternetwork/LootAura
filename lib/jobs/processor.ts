@@ -6,6 +6,12 @@ import { BaseJob, JOB_TYPES, ImagePostprocessJobPayload, CleanupOrphanedDataJobP
 import { retryJob, completeJob } from './queue'
 import { logger } from '@/lib/log'
 import * as Sentry from '@sentry/nextjs'
+import type { Sale } from '@/lib/types'
+
+type AdminListUser = {
+  id: string
+  email?: string | null
+}
 
 /**
  * Process a single job
@@ -187,7 +193,8 @@ export async function processWeeklyFeaturedSalesJob(
     }
 
     // Filter to users with emails
-    const usersWithEmails = usersList?.users?.filter(u => u.email) || []
+    const usersWithEmails: AdminListUser[] =
+      usersList?.users?.filter((u: AdminListUser) => Boolean(u.email)) || []
 
     if (usersWithEmails.length === 0) {
       logger.info('No users found with email addresses', {
@@ -198,7 +205,7 @@ export async function processWeeklyFeaturedSalesJob(
 
     // Fetch user profiles to check preferences
     // Only include users who have email_featured_weekly_enabled = true (default true)
-    const userIds = usersWithEmails.map(u => u.id)
+    const userIds = usersWithEmails.map((u: AdminListUser) => u.id)
     const { data: profiles, error: profilesError } = await fromBase(admin, 'profiles')
       .select('id, email_featured_weekly_enabled, email_favorites_digest_enabled, email_seller_weekly_enabled')
       .in('id', userIds)
@@ -215,7 +222,11 @@ export async function processWeeklyFeaturedSalesJob(
     // Eligible = has email_featured_weekly_enabled = true AND not fully unsubscribed
     // (not unsubscribed = at least one of email_favorites_digest_enabled or email_seller_weekly_enabled is true)
     const eligibleProfileIds = new Set<string>()
-    profiles?.forEach(profile => {
+    profiles?.forEach((profile: {
+      id: string
+      email_favorites_digest_enabled: boolean | null
+      email_seller_weekly_enabled: boolean | null
+    }) => {
       // Not unsubscribed if at least one email preference is enabled
       const notUnsubscribed = profile.email_favorites_digest_enabled === true || profile.email_seller_weekly_enabled === true
       if (notUnsubscribed) {
@@ -224,13 +235,13 @@ export async function processWeeklyFeaturedSalesJob(
     })
 
     // Filter users to eligible ones
-    const eligibleUsers = usersWithEmails.filter(u => eligibleProfileIds.has(u.id))
+    const eligibleUsers = usersWithEmails.filter((u: AdminListUser) => eligibleProfileIds.has(u.id))
 
     // Apply allowlist filter if in allowlist-send or compute-only mode
     let recipientsToProcess = eligibleUsers
     if (sendMode === 'allowlist-send' || sendMode === 'compute-only') {
-      const allowlistSet = new Set(allowlist.map(a => a.toLowerCase().trim()))
-      recipientsToProcess = eligibleUsers.filter(u => {
+      const allowlistSet = new Set(allowlist.map((a: string) => a.toLowerCase().trim()))
+      recipientsToProcess = eligibleUsers.filter((u: AdminListUser) => {
         const emailMatch = u.email && allowlistSet.has(u.email.toLowerCase())
         const idMatch = allowlistSet.has(u.id.toLowerCase())
         return emailMatch || idMatch
@@ -355,7 +366,7 @@ export async function processWeeklyFeaturedSalesJob(
         // Record inclusions if email was sent (or if in compute-only with allowlist)
         if (emailSent || (sendMode === 'compute-only' && allowlist.length > 0)) {
           // Record inclusion for each selected sale
-          selectionResult.selectedSales.forEach(saleId => {
+          selectionResult.selectedSales.forEach((saleId: string) => {
             inclusionsToRecord.push({
               saleId,
               recipientProfileId: user.id,
@@ -711,7 +722,7 @@ export async function processFavoriteSalesStartingSoonJob(
     }
 
     // Get unique sale IDs
-    const saleIds = [...new Set(favorites.map(f => f.sale_id))]
+    const saleIds = [...new Set(favorites.map((f: { sale_id: string }) => f.sale_id))]
     
     // Query sales that are published
     const { data: sales, error: salesError } = await fromBase(admin, 'sales')
@@ -732,7 +743,7 @@ export async function processFavoriteSalesStartingSoonJob(
 
     // Filter sales that are starting within the configured window
     // Allow sales that started up to 1 hour ago to account for timing differences
-    const salesStartingSoon = sales.filter(sale => {
+    const salesStartingSoon = (sales as Sale[]).filter((sale: Sale) => {
       try {
         const startDateTime = new Date(`${sale.date_start}T${sale.time_start || '00:00'}Z`) // Explicitly UTC
         return startDateTime >= oneHourAgo && startDateTime <= hoursFromNow
@@ -749,10 +760,10 @@ export async function processFavoriteSalesStartingSoonJob(
         return { success: true }
       }
 
-    const saleIdsStartingSoon = new Set(salesStartingSoon.map(s => s.id))
+    const saleIdsStartingSoon = new Set(salesStartingSoon.map((s: Sale) => s.id))
 
     // Filter favorites to only those for sales starting soon
-    const eligibleFavorites = favorites.filter(f => saleIdsStartingSoon.has(f.sale_id))
+    const eligibleFavorites = favorites.filter((f: { sale_id: string }) => saleIdsStartingSoon.has(f.sale_id))
 
     if (eligibleFavorites.length === 0) {
       logger.info('No eligible favorites found', {
@@ -762,7 +773,7 @@ export async function processFavoriteSalesStartingSoonJob(
     }
 
     // Get unique user IDs
-    const userIds = [...new Set(eligibleFavorites.map(f => f.user_id))]
+    const userIds = [...new Set(eligibleFavorites.map((f: { user_id: string }) => f.user_id))]
 
     // Query auth.users for email addresses using admin client
     // Note: We use the admin client's auth.admin.listUsers() method
@@ -785,7 +796,8 @@ export async function processFavoriteSalesStartingSoonJob(
     }
 
     // Filter to only users we need
-    const users = usersList?.users?.filter(u => userIds.includes(u.id)) || []
+    const users: AdminListUser[] =
+      usersList?.users?.filter((u: AdminListUser) => userIds.includes(u.id)) || []
 
     if (!users || users.length === 0) {
       logger.warn('No users found with email addresses', {
@@ -811,7 +823,7 @@ export async function processFavoriteSalesStartingSoonJob(
     // Create set of user IDs with preferences enabled (if profiles query succeeded)
     const enabledUserIds = profilesError 
       ? new Set(userIds) // If query failed, include all users (fail open)
-      : new Set(profiles?.map(p => p.id) || [])
+      : new Set(profiles?.map((p: { id: string }) => p.id) || [])
 
     // Create a map of user_id -> email (only for users with preferences enabled)
     const userEmailMap = new Map<string, string>()
@@ -822,7 +834,7 @@ export async function processFavoriteSalesStartingSoonJob(
     }
 
     // Create a map of sale_id -> sale
-    const saleMap = new Map(salesStartingSoon.map(s => [s.id, s]))
+    const saleMap = new Map<string, Sale>(salesStartingSoon.map((s: Sale) => [s.id, s]))
 
     // Group eligible favorites by user_id
     const favoritesByUser = new Map<string, Array<{ user_id: string; sale_id: string }>>()
@@ -873,9 +885,9 @@ export async function processFavoriteSalesStartingSoonJob(
         }
 
         // Collect all sales for this user
-        const userSales = userFavorites
-          .map(fav => saleMap.get(fav.sale_id))
-          .filter((sale): sale is typeof sale & { id: string } => sale !== undefined)
+        const userSales: Sale[] = userFavorites
+          .map((fav: { sale_id: string }) => saleMap.get(fav.sale_id))
+          .filter((sale): sale is Sale => sale !== undefined)
 
         if (userSales.length === 0) {
           continue
@@ -1080,7 +1092,8 @@ export async function processSellerWeeklyAnalyticsJob(
     }
 
     // Filter to only owners we need
-    const users = usersList?.users?.filter(u => ownerIds.has(u.id) && u.email) || []
+    const users: AdminListUser[] =
+      usersList?.users?.filter((u: AdminListUser) => ownerIds.has(u.id) && Boolean(u.email)) || []
 
     if (users.length === 0) {
       logger.warn('No users found with email addresses', {
@@ -1107,7 +1120,7 @@ export async function processSellerWeeklyAnalyticsJob(
     // Create set of user IDs with preferences enabled (if profiles query succeeded)
     const enabledOwnerIds = profilesError
       ? new Set(ownerIds) // If query failed, include all users (fail open)
-      : new Set(profiles?.map(p => p.id) || [])
+      : new Set(profiles?.map((p: { id: string }) => p.id) || [])
 
     // Process each owner (only those with preferences enabled)
     let emailsSent = 0

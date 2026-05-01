@@ -45,6 +45,10 @@ type CityConfigRow = {
   source_pages: unknown
 }
 
+type PromotionIdRow = {
+  id: string
+}
+
 type CronIngestionSummary = {
   fetched: number
   inserted: number
@@ -926,7 +930,8 @@ async function expireEndedPromotions(
   }
 
   // Update all expired promotions to 'expired' status
-  const promotionIds = expiredPromotions.map((p) => p.id)
+  const promotionRows = expiredPromotions as PromotionIdRow[]
+  const promotionIds = promotionRows.map((p: PromotionIdRow) => p.id)
   const { error: updateError } = await fromBase(db, 'promotions')
     .update({
       status: 'expired',
@@ -952,7 +957,7 @@ async function expireEndedPromotions(
     component: 'api/cron/daily',
     task: 'expire-promotions',
     expiredCount: expiredPromotions.length,
-    promotionIds: expiredPromotions.map((p) => p.id),
+    promotionIds: promotionRows.map((p: PromotionIdRow) => p.id),
   }))
 
   return {

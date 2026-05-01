@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
         ? (body as { scenario?: unknown }).scenario
         : undefined
 
-    if (typeof scenario !== 'string' || scenario.trim().length === 0) {
-      return NextResponse.json(
+    if (!scenario) {
+      return Response.json(
         {
           ok: false,
           error: {
@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!VALID_SCENARIOS.includes(scenario as ValidScenario)) {
-      return NextResponse.json(
+    if (typeof scenario !== 'string' || !VALID_SCENARIOS.includes(scenario as ValidScenario)) {
+      return Response.json(
         {
           ok: false,
           error: {

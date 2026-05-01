@@ -1,13 +1,20 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi, afterEach as vitestAfterEach } from 'vitest'
+import { vi, beforeAll as vitestBeforeAll, afterEach as vitestAfterEach, expect as vitestExpect } from 'vitest'
 import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
 const testSetupGlobal = globalThis as typeof globalThis & {
   __LOOTAURA_TEST_SETUP_ONCE__?: boolean
 }
 const nativeFloat32Array = globalThis.Float32Array
+
+vitestBeforeAll(() => {
+  const state = vitestExpect.getState()
+  if (state?.testPath) {
+    console.log('[RUNNING FILE]', state.testPath)
+  }
+})
 
 // never re-create this per test, keep it stable
 const stableSupabase = makeStableSupabaseClient()

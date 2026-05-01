@@ -8,6 +8,14 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
+    reporters: [
+      'default',
+      {
+        onFinished(files: Array<{ filepath: string }>) {
+          console.log('[TEST FILES COMPLETED]', files.map((f) => f.filepath))
+        },
+      } as any,
+    ],
     setupFiles: isCI
       ? [
           path.resolve(__dirname, 'tests/setup/msw.server.ts'),

@@ -17,6 +17,15 @@ import { fail, ok } from '@/lib/http/json'
 
 export const dynamic = 'force-dynamic'
 
+interface PromotionRow {
+  id: string
+  status: string
+  tier: string
+  starts_at: string
+  ends_at: string
+  created_at: string
+}
+
 async function metricsHandler(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id: saleId } = await context.params
 
@@ -69,6 +78,15 @@ async function metricsHandler(request: NextRequest, context: { params: Promise<{
 
   // Get inclusion rollup (aggregate metrics)
   const inclusionRollup = await getInclusionRollup(saleId)
+  const promotionRows = (allPromotions ?? []) as PromotionRow[]
+  const promotionHistory = promotionRows.map((p: PromotionRow) => ({
+    id: p.id,
+    status: p.status,
+    tier: p.tier,
+    startsAt: p.starts_at,
+    endsAt: p.ends_at,
+    createdAt: p.created_at,
+  }))
 
   return ok({
     saleId,
@@ -81,14 +99,7 @@ async function metricsHandler(request: NextRequest, context: { params: Promise<{
       amountCents: activePromotion.amount_cents,
       currency: activePromotion.currency,
     } : null,
-    promotionHistory: allPromotions?.map((p) => ({
-      id: p.id,
-      status: p.status,
-      tier: p.tier,
-      startsAt: p.starts_at,
-      endsAt: p.ends_at,
-      createdAt: p.created_at,
-    })) || [],
+    promotionHistory,
     featuredMetrics: inclusionRollup ? {
       uniqueRecipientsTotal: inclusionRollup.uniqueRecipientsTotal,
       totalInclusionsTotal: inclusionRollup.totalInclusionsTotal,

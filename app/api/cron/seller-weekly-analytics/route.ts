@@ -94,14 +94,13 @@ async function handleRequest(request: NextRequest) {
         error: result.error,
       })
 
-      return NextResponse.json(
+      return Response.json(
         {
           ok: false,
           job: 'seller-weekly-analytics',
-          runAt,
-          env,
-          dateParam: dateParam || undefined,
-          error: result.error,
+          error: {
+            message: 'Job execution failed',
+          },
         },
         { status: 500 }
       )
@@ -125,7 +124,15 @@ async function handleRequest(request: NextRequest) {
   } catch (error) {
     // Handle auth errors (thrown by assertCronAuthorized)
     if (error instanceof NextResponse) {
-      return error
+      return Response.json(
+        {
+          ok: false,
+          error: {
+            message: 'Unauthorized',
+          },
+        },
+        { status: 401 }
+      )
     }
 
     // Handle unexpected errors
@@ -136,13 +143,13 @@ async function handleRequest(request: NextRequest) {
       env,
     })
 
-    return NextResponse.json(
+    return Response.json(
       {
         ok: false,
         job: 'seller-weekly-analytics',
-        runAt,
-        env,
-        error: 'Internal server error',
+        error: {
+          message: 'Internal server error',
+        },
       },
       { status: 500 }
     )

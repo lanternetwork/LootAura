@@ -8,6 +8,10 @@ import { ReportSaleSchema } from '@/lib/validators/reportSale'
 import { fail, ok } from '@/lib/http/json'
 import { logger } from '@/lib/log'
 
+interface ReportRow {
+  reporter_profile_id: string | null
+}
+
 async function reportHandler(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
@@ -145,7 +149,12 @@ async function reportHandler(req: NextRequest, context: { params: Promise<{ id: 
 
   if (!countError && recentReports) {
     // Count unique reporters
-    const uniqueReporters = new Set(recentReports.map(r => r.reporter_profile_id).filter(Boolean))
+    const reportRows = (recentReports ?? []) as ReportRow[]
+    const uniqueReporters = new Set(
+      reportRows
+        .map((r: ReportRow) => r.reporter_profile_id)
+        .filter(Boolean)
+    )
     
     if (uniqueReporters.size >= 5) {
       // Auto-hide the sale (only if not already hidden)

@@ -6,12 +6,11 @@
  * Processes email delivery events (delivered, bounced, complained, etc.).
  */
 
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { getResendWebhookSecret, verifyResendWebhookSignature } from '@/lib/email/webhook'
 import { logger } from '@/lib/log'
 import { ok } from '@/lib/http/json'
-import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 

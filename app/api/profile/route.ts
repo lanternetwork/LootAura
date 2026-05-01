@@ -221,7 +221,6 @@ export async function PUT(req: NextRequest) {
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   // Account lock enforcement (fail-closed)
   if (process.env.NODE_ENV === 'test' && user.id === 'locked-user-id') {
-    const { fail } = await import('@/lib/http/json')
     return NextResponse.json(
       {
         ok: false,
@@ -239,7 +238,6 @@ export async function PUT(req: NextRequest) {
   const { isAccountLocked } = await import('@/lib/auth/accountLock')
   const locked = await isAccountLocked(user.id)
   if (locked) {
-    const { fail } = await import('@/lib/http/json')
     return NextResponse.json(
       {
         ok: false,

@@ -54,9 +54,30 @@ export async function POST(request: NextRequest) {
         ? (body as { scenario?: unknown }).scenario
         : undefined
 
-    if (typeof scenario !== 'string' || !VALID_SCENARIOS.includes(scenario as ValidScenario)) {
+    if (typeof scenario !== 'string' || scenario.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Invalid scenario', validScenarios: [...VALID_SCENARIOS] },
+        {
+          ok: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Invalid scenario',
+          },
+          validScenarios: [...VALID_SCENARIOS],
+        },
+        { status: 400 }
+      )
+    }
+
+    if (!VALID_SCENARIOS.includes(scenario as ValidScenario)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Invalid scenario',
+          },
+          validScenarios: [...VALID_SCENARIOS],
+        },
         { status: 400 }
       )
     }

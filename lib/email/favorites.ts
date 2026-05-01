@@ -161,18 +161,28 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
 
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
-    console.error('[EMAIL_FAVORITES] Cannot send digest email - invalid recipient email:', {
-      recipientEmail: redactEmailForLogging(to),
-      salesCount: sales.length,
-    })
+    logger.error(
+      'EMAIL_FAVORITES: Cannot send digest email - invalid recipient email',
+      new Error('Invalid recipient email'),
+      {
+        component: 'email/favorites',
+        recipientEmail: redactEmailForLogging(to),
+        salesCount: sales.length,
+      }
+    )
     return { ok: false, error: 'Invalid recipient email' }
   }
 
   // Guard: Must have at least one sale
   if (!sales || sales.length === 0) {
-    console.error('[EMAIL_FAVORITES] Cannot send digest email - no sales provided:', {
-      recipientEmail: redactEmailForLogging(to),
-    })
+    logger.error(
+      'EMAIL_FAVORITES: Cannot send digest email - no sales provided',
+      new Error('No sales provided'),
+      {
+        component: 'email/favorites',
+        recipientEmail: redactEmailForLogging(to),
+      }
+    )
     return { ok: false, error: 'No sales provided' }
   }
 
@@ -273,10 +283,15 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
           ? (error as any).code 
           : undefined
         
-        console.error('[EMAIL_FAVORITES] Failed to generate unsubscribe token, aborting email send:', {
-          profileId: profileId.substring(0, 8) + '...',
-          error: errorMessage,
-        })
+        logger.error(
+          'EMAIL_FAVORITES: Failed to generate unsubscribe token, aborting email send',
+          error instanceof Error ? error : new Error(errorMessage),
+          {
+            component: 'email/favorites',
+            profileId: profileId.substring(0, 8) + '...',
+            error: errorMessage,
+          }
+        )
         
         // Record failed attempt in email_log with fixed, non-sensitive error message
         await recordEmailSend({
@@ -344,11 +359,16 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   } catch (error) {
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('[EMAIL_FAVORITES] Failed to send favorite sales starting soon digest email:', {
-      recipientEmail: redactEmailForLogging(to),
-      salesCount: sales.length,
-      error: errorMessage,
-    })
+    logger.error(
+      'EMAIL_FAVORITES: Failed to send favorite sales starting soon digest email',
+      error instanceof Error ? error : new Error(errorMessage),
+      {
+        component: 'email/favorites',
+        recipientEmail: redactEmailForLogging(to),
+        salesCount: sales.length,
+        error: errorMessage,
+      }
+    )
 
     return { ok: false, error: errorMessage }
   }

@@ -7,6 +7,7 @@ import { ReactElement } from 'react'
 import { getResendClient } from './client'
 import { redactEmailForLogging, redactMetadataForLogging } from './logging'
 import type { EmailSendOptions } from './types'
+import { logger } from '@/lib/log'
 
 export interface SendEmailParams extends EmailSendOptions {
   react: ReactElement
@@ -50,7 +51,8 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
   const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM
   if (!fromEmail) {
     const error = new Error('RESEND_FROM_EMAIL (or EMAIL_FROM) is not set')
-    console.error('[EMAIL] Configuration error:', {
+    logger.error('EMAIL_SEND: Configuration error', error, {
+      component: 'email/send-email',
       type,
       to: redactEmailForLogging(to),
       error: error.message,
@@ -106,13 +108,18 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
   } catch (error) {
     // Log structured error but don't throw - emails are non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('[EMAIL] Failed to send email:', {
-      type,
-      to: redactEmailForLogging(to),
-      subject,
-      error: errorMessage,
-      metadata: redactMetadataForLogging(metadata),
-    })
+    logger.error(
+      'EMAIL_SEND: Failed to send email',
+      error instanceof Error ? error : new Error(errorMessage),
+      {
+        component: 'email/send-email',
+        type,
+        to: redactEmailForLogging(to),
+        subject,
+        error: errorMessage,
+        metadata: redactMetadataForLogging(metadata),
+      }
+    )
 
     // Optionally log to Sentry if available
     try {

@@ -91,16 +91,22 @@ export async function sendSellerWeeklyAnalyticsEmail(
 
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
-    console.error('[EMAIL_SELLER_ANALYTICS] Cannot send email - invalid recipient email:', {
-      recipientEmail: redactEmailForLogging(to),
-    })
+    logger.error(
+      'EMAIL_SELLER_ANALYTICS: Cannot send email - invalid recipient email',
+      new Error('Invalid recipient email'),
+      {
+        component: 'email/seller-analytics',
+        recipientEmail: redactEmailForLogging(to),
+      }
+    )
     return { ok: false, error: 'Invalid recipient email' }
   }
 
   // Guard: Only send if there are metrics
   if (metrics.totalViews === 0 && metrics.totalSaves === 0 && metrics.totalClicks === 0) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[EMAIL_SELLER_ANALYTICS] Skipping email - no metrics:', {
+      logger.info('EMAIL_SELLER_ANALYTICS: Skipping email - no metrics', {
+        component: 'email/seller-analytics',
         recipientEmail: redactEmailForLogging(to),
       })
     }
@@ -132,7 +138,8 @@ export async function sendSellerWeeklyAnalyticsEmail(
       
       if (!canSend.allowed) {
         if (canSend.reason === 'duplicate' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[EMAIL_SELLER_ANALYTICS] Skipping duplicate email (already sent for this week):', {
+          logger.info('EMAIL_SELLER_ANALYTICS: Skipping duplicate email (already sent for this week)', {
+            component: 'email/seller-analytics',
             profileId,
             dedupeKey,
           })
@@ -166,10 +173,15 @@ export async function sendSellerWeeklyAnalyticsEmail(
           ? (error as any).code 
           : undefined
         
-        console.error('[EMAIL_SELLER_ANALYTICS] Failed to generate unsubscribe token, aborting email send:', {
-          profileId: profileId.substring(0, 8) + '...',
-          error: errorMessage,
-        })
+        logger.error(
+          'EMAIL_SELLER_ANALYTICS: Failed to generate unsubscribe token, aborting email send',
+          error instanceof Error ? error : new Error(errorMessage),
+          {
+            component: 'email/seller-analytics',
+            profileId: profileId.substring(0, 8) + '...',
+            error: errorMessage,
+          }
+        )
         
         // Record failed attempt in email_log with fixed, non-sensitive error message
         await recordEmailSend({
@@ -196,7 +208,9 @@ export async function sendSellerWeeklyAnalyticsEmail(
       }
     } else {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[EMAIL_SELLER_ANALYTICS] No profileId provided, skipping unsubscribe token generation')
+        logger.info('EMAIL_SELLER_ANALYTICS: No profileId provided, skipping unsubscribe token generation', {
+          component: 'email/seller-analytics',
+        })
       }
     }
 
@@ -259,10 +273,15 @@ export async function sendSellerWeeklyAnalyticsEmail(
   } catch (error) {
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('[EMAIL_SELLER_ANALYTICS] Failed to send seller weekly analytics email:', {
-      recipientEmail: redactEmailForLogging(to),
-      error: errorMessage,
-    })
+    logger.error(
+      'EMAIL_SELLER_ANALYTICS: Failed to send seller weekly analytics email',
+      error instanceof Error ? error : new Error(errorMessage),
+      {
+        component: 'email/seller-analytics',
+        recipientEmail: redactEmailForLogging(to),
+        error: errorMessage,
+      }
+    )
 
     return { ok: false, error: errorMessage }
   }

@@ -7,6 +7,7 @@ import React from 'react'
 import { sendEmail } from './sendEmail'
 import { redactEmailForLogging } from './logging'
 import { SaleCreatedConfirmationEmail, buildSaleCreatedSubject } from './templates/SaleCreatedConfirmationEmail'
+import { logger } from '@/lib/log'
 import type { Sale } from '@/lib/types'
 
 /**
@@ -167,7 +168,8 @@ export async function sendSaleCreatedEmail(
   // Guard: Only send for published sales
   if (sale.status !== 'published') {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[EMAIL_SALES] Skipping email - sale not published:', {
+      logger.info('EMAIL_SALES: Skipping email - sale not published', {
+        component: 'email/sales',
         saleId: sale.id,
         status: sale.status,
       })
@@ -177,10 +179,15 @@ export async function sendSaleCreatedEmail(
 
   // Guard: Validate owner email
   if (!owner.email || typeof owner.email !== 'string' || owner.email.trim() === '') {
-    console.error('[EMAIL_SALES] Cannot send email - invalid owner email:', {
-      saleId: sale.id,
-      ownerEmail: redactEmailForLogging(owner.email),
-    })
+    logger.error(
+      'EMAIL_SALES: Cannot send email - invalid owner email',
+      new Error('Invalid owner email'),
+      {
+        component: 'email/sales',
+        saleId: sale.id,
+        ownerEmail: redactEmailForLogging(owner.email),
+      }
+    )
     return { ok: false, error: 'Invalid owner email' }
   }
 
@@ -225,11 +232,16 @@ export async function sendSaleCreatedEmail(
   } catch (error) {
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('[EMAIL_SALES] Failed to send sale created email:', {
-      saleId: sale.id,
-      ownerEmail: redactEmailForLogging(owner.email),
-      error: errorMessage,
-    })
+    logger.error(
+      'EMAIL_SALES: Failed to send sale created email',
+      error instanceof Error ? error : new Error(errorMessage),
+      {
+        component: 'email/sales',
+        saleId: sale.id,
+        ownerEmail: redactEmailForLogging(owner.email),
+        error: errorMessage,
+      }
+    )
 
     return { ok: false, error: errorMessage }
   }

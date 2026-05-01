@@ -352,17 +352,17 @@ export async function processGeocodeQueueBatch(): Promise<GeocodeQueueBatchSumma
     if (usedHigh && jobToProcess) {
       const throttled = await shouldThrottleHighPriority()
       if (throttled) {
-        // Restore the popped HIGH-priority job back to the same queue and exit safely.
-        // This avoids partial consumption when the batch cannot make forward progress.
-        await redisCommand('rpush', [HIGH_QUEUE_KEY, JSON.stringify(jobToProcess)])
-        logger.warn('priority throttled; batch exiting with queue preserved', {
+        // Requeue throttled HIGH jobs to NORMAL to preserve work and avoid starvation.
+        // processedInBatch is intentionally unchanged because no geocode work occurred.
+        jobToProcess = { ...jobToProcess, priority: 'NORMAL' }
+        await enqueueGeocodeJob(jobToProcess)
+        logger.warn('priority throttled to NORMAL', {
           component: 'ingestion/geocodeQueue',
           operation: 'priority_throttle',
           saleId: job.sale_id,
-          queuePreserved: true,
         })
         idleLoops += 1
-        break
+        continue
       }
     }
 

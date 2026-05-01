@@ -190,7 +190,8 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
   const publishedSales = sales.filter(sale => {
     if (sale.status !== 'published') {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[EMAIL_FAVORITES] Skipping sale in digest - not published:', {
+        logger.info('EMAIL_FAVORITES: Skipping sale in digest - not published', {
+          component: 'email/favorites',
           saleId: sale.id,
           status: sale.status,
         })
@@ -202,7 +203,8 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
 
   if (publishedSales.length === 0) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[EMAIL_FAVORITES] Skipping digest email - no published sales:', {
+      logger.warn('EMAIL_FAVORITES: Skipping digest email - no published sales', {
+        component: 'email/favorites',
         recipientEmail: redactEmailForLogging(to),
         totalSales: sales.length,
       })
@@ -249,7 +251,8 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
       
       if (!canSend.allowed) {
         if (canSend.reason === 'duplicate' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[EMAIL_FAVORITES] Skipping duplicate email (already sent in last 24h):', {
+          logger.info('EMAIL_FAVORITES: Skipping duplicate email (already sent in last 24h)', {
+            component: 'email/favorites',
             profileId,
             dedupeKey,
           })
@@ -314,7 +317,9 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
       }
     } else {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[EMAIL_FAVORITES] No profileId provided, skipping unsubscribe token generation')
+        logger.info('EMAIL_FAVORITES: No profileId provided, skipping unsubscribe token generation', {
+          component: 'email/favorites',
+        })
       }
     }
 

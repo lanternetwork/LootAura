@@ -243,6 +243,23 @@ async function recordWorkerRunStats(summary: GeocodeQueueBatchSummary, durationM
   await redisCommand('set', [STATS_KEY, JSON.stringify(payload)])
 }
 
+async function safeReadQueueDepthSnapshot(): Promise<{ high: number; normal: number; delayed: number } | null> {
+  try {
+    const [high, normal, delayed] = await Promise.all([
+      redisCommand('llen', [HIGH_QUEUE_KEY]),
+      redisCommand('llen', [NORMAL_QUEUE_KEY]),
+      redisCommand('zcard', [DELAYED_QUEUE_KEY]),
+    ])
+    return {
+      high: Number(high || 0),
+      normal: Number(normal || 0),
+      delayed: Number(delayed || 0),
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function getGeocodeQueueMetrics(): Promise<GeocodeQueueMetrics> {
   if (!queueAvailable()) {
     return {
@@ -315,12 +332,15 @@ export async function processGeocodeQueueBatch(): Promise<GeocodeQueueBatchSumma
 
   while (processedInBatch < batchSize) {
     if (idleLoops >= maxIdleLoops) {
+      const queueDepths = await safeReadQueueDepthSnapshot()
       logger.warn('geocode queue batch stopped after idle loop guard', {
         component: 'ingestion/geocodeQueue',
         operation: 'idle_loop_guard',
         idleLoops,
         maxIdleLoops,
         processedInBatch,
+        queueDepths,
+        jobsMayRemainQueued: true,
       })
       break
     }

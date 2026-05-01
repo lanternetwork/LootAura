@@ -197,7 +197,7 @@ describe('Profile Management', () => {
 
       expect(response.status).toBe(401)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error?.message).toBe('Unauthorized')
     })
 
     it('should handle profile creation errors gracefully', async () => {
@@ -257,7 +257,7 @@ describe('Profile Management', () => {
 
       expect(response.status).toBe(500)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Failed to create profile')
+      expect(data.error?.message).toBe('Failed to create profile')
       
       consoleSpy.mockRestore()
     })
@@ -458,7 +458,7 @@ describe('Profile Management', () => {
 
       expect(response.status).toBe(404)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Profile not found')
+      expect(data.error?.message).toBe('Profile not found')
     })
   })
 })

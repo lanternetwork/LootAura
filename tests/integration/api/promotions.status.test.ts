@@ -309,7 +309,7 @@ describe('GET /api/promotions/status', () => {
 
     expect(res.status).toBe(400)
     expect(json.code).toBe('INVALID_REQUEST')
-    expect(json.error).toBe('Invalid sale_ids')
+    expect(json.error?.message).toBe('Invalid sale_ids')
   })
 
   it('returns 400 when mixing valid and invalid UUIDs', async () => {
@@ -324,6 +324,6 @@ describe('GET /api/promotions/status', () => {
 
     expect(res.status).toBe(400)
     expect(json.code).toBe('INVALID_REQUEST')
-    expect(json.error).toBe('Invalid sale_ids')
+    expect(json.error?.message).toBe('Invalid sale_ids')
   })
 })

@@ -86,7 +86,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
 
       expect(response.status).toBe(401)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error?.message).toBe('Unauthorized')
       
       // Verify email was not sent
       expect(mockSendModerationDailyDigestEmail).not.toHaveBeenCalled()
@@ -523,7 +523,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
 
       expect(response.status).toBe(500)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Failed to fetch reports')
+      expect(data.error?.message).toBe('Failed to fetch reports')
       
       // Verify email was not sent
       expect(mockSendModerationDailyDigestEmail).not.toHaveBeenCalled()
@@ -580,7 +580,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
 
       expect(response.status).toBe(500)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Failed to send email')
+      expect(data.error?.message).toBe('Failed to send email')
     })
   })
 })

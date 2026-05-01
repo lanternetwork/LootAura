@@ -38,7 +38,7 @@ describe('Upload Signed URL API', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toBe('Invalid upload request')
+    expect(data.error?.message).toBe('Invalid upload request')
     expect(data.details).toBeDefined()
   })
 
@@ -91,7 +91,7 @@ describe('Upload Signed URL API', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data.error).toBe('Authentication required')
+    expect(data.error?.message).toBe('Authentication required')
   })
 
   it('should create signed URL for valid request', async () => {
@@ -177,6 +177,6 @@ describe('Upload Signed URL API', () => {
     const data = await response.json()
 
     expect(response.status).toBe(500)
-    expect(data.error).toBe('Failed to create upload URL')
+    expect(data.error?.message).toBe('Failed to create upload URL')
   })
 })

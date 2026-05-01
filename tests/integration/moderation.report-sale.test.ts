@@ -656,7 +656,7 @@ describe('POST /api/sales/[id]/report', () => {
       const data = await response.json()
 
       expect(response.status).toBe(429)
-      expect(data.error).toBe('rate_limited')
+      expect(data.error?.message).toBe('rate_limited')
       expect(data.message).toContain('Too many requests')
       
       // Verify the rate limit check was called

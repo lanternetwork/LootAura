@@ -152,7 +152,7 @@ describe('POST /api/webhooks/resend', () => {
     expect(response.status).toBe(500)
     expect(data.ok).toBe(false)
     expect(data.code).toBe('CONFIG_ERROR')
-    expect(data.error).toBe('Webhook secret not configured')
+    expect(data.error?.message).toBe('Webhook secret not configured')
   })
 
   it('should reject missing signature with 401', async () => {

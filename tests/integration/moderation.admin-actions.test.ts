@@ -118,7 +118,7 @@ describe('GET /api/admin/reports', () => {
     const data = await response.json()
 
     expect(response.status).toBe(403)
-    expect(data.error).toBe('Forbidden: Admin access required')
+    expect(data.error?.message).toBe('Forbidden: Admin access required')
   })
 
   it('allows admin to list reports', async () => {
@@ -336,7 +336,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
     const data = await response.json()
 
     expect(response.status).toBe(403)
-    expect(data.error).toBe('Forbidden: Admin access required')
+    expect(data.error?.message).toBe('Forbidden: Admin access required')
   })
 
   it('updates report status', async () => {
@@ -542,7 +542,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
     const data = await response.json()
 
     expect(response.status).toBe(404)
-    expect(data.error).toBe('Report not found')
+    expect(data.error?.message).toBe('Report not found')
   })
 
   it('returns 400 for invalid request body', async () => {
@@ -555,7 +555,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toBe('Invalid request body')
+    expect(data.error?.message).toBe('Invalid request body')
   })
 })
 

@@ -119,7 +119,7 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(500)
-      expect(data.error).toBe('Failed to create shareable link')
+      expect(data.error?.message).toBe('Failed to create shareable link')
     })
 
     it('should return rate limited for POST when policy blocks request', async () => {
@@ -208,7 +208,7 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Missing short ID')
+      expect(data.error?.message).toBe('Missing short ID')
     })
 
     it('should handle share link not found', async () => {
@@ -228,7 +228,7 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data.error).toBe('Share link not found')
+      expect(data.error?.message).toBe('Share link not found')
     })
 
     it('should handle database errors', async () => {
@@ -248,7 +248,7 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(500)
-      expect(data.error).toBe('Failed to retrieve shareable link')
+      expect(data.error?.message).toBe('Failed to retrieve shareable link')
     })
 
     it('should return rate limited for GET when policy blocks request', async () => {

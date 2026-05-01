@@ -107,7 +107,7 @@ describe('Resend Confirmation Email', () => {
 
     expect(response.status).toBe(400)
     expect(data.code).toBe('RESEND_FAILED')
-    expect(data.error).toBe('Failed to resend verification email. Please try again.')
+    expect(data.error?.message).toBe('Failed to resend verification email. Please try again.')
   })
 
   it('should reject invalid email', async () => {
@@ -125,7 +125,7 @@ describe('Resend Confirmation Email', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toBe('Invalid input data')
+    expect(data.error?.message).toBe('Invalid input data')
     expect(data.details).toBeDefined()
   })
 })

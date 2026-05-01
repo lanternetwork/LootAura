@@ -90,7 +90,7 @@ describe('GET /api/admin/users', () => {
     const data = await response.json()
 
     expect(response.status).toBe(403)
-    expect(data.error).toBe('Forbidden: Admin access required')
+    expect(data.error?.message).toBe('Forbidden: Admin access required')
   })
 
   it('allows admin to list users', async () => {

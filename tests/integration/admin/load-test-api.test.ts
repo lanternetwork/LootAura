@@ -154,7 +154,7 @@ describe('Admin Load Test API', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toBe('Invalid scenario')
+    expect(data.error?.message).toBe('Invalid scenario')
     expect(data.validScenarios).toBeDefined()
   })
 
@@ -173,6 +173,6 @@ describe('Admin Load Test API', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toBe('Invalid scenario')
+    expect(data.error?.message).toBe('Invalid scenario')
   })
 })

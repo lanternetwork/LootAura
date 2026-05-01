@@ -136,7 +136,7 @@ describe('Public Profile Endpoint - Anon Base Table Access', () => {
 
       // Should return 404
       expect(response.status).toBe(404)
-      expect(data.error).toBe('not found')
+      expect(data.error?.message).toBe('not found')
     })
 
     it('should try username first, then id, but never base table', async () => {
@@ -174,7 +174,7 @@ describe('Public Profile Endpoint - Anon Base Table Access', () => {
 
       // Should return 404
       expect(response.status).toBe(404)
-      expect(data.error).toBe('not found')
+      expect(data.error?.message).toBe('not found')
     })
   })
 })

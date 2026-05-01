@@ -86,7 +86,7 @@ describe('Upload Rate Limiting', () => {
     const data = await response.json()
 
     expect(response.status).toBe(429)
-    expect(data.error).toBe('Too many requests. Please try again later.')
+    expect(data.error?.message).toBe('Too many requests. Please try again later.')
   })
 
   it('should log rate limit events when debug is enabled', async () => {

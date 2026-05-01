@@ -269,7 +269,7 @@ describe('Sales API - Image Support', () => {
 		const data = await response.json()
 
 		expect(response.status).toBe(400)
-		expect(data.error).toBe('Invalid cover_image_url')
+		expect(data.error?.message).toBe('Invalid cover_image_url')
 	})
 
 	it('should reject past date_start', async () => {
@@ -330,7 +330,7 @@ describe('Sales API - Image Support', () => {
 		const data = await response.json()
 
 		expect(response.status).toBe(400)
-		expect(data.error).toBe('Invalid image URL in images array')
+		expect(data.error?.message).toBe('Invalid image URL in images array')
 	})
 
 	it('should handle empty images array', async () => {

@@ -74,7 +74,7 @@ describe('Password Reset Authentication', () => {
 
       expect(response.status).toBe(400)
       expect(data.code).toBe('RESET_FAILED')
-      expect(data.error).toBe('Failed to send password reset email. Please try again.')
+      expect(data.error?.message).toBe('Failed to send password reset email. Please try again.')
     })
 
     it('should validate email format', async () => {
@@ -88,7 +88,7 @@ describe('Password Reset Authentication', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid input data')
+      expect(data.error?.message).toBe('Invalid input data')
       expect(data.details).toBeDefined()
     })
 
@@ -103,7 +103,7 @@ describe('Password Reset Authentication', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid input data')
+      expect(data.error?.message).toBe('Invalid input data')
     })
 
     it('should configure redirect URL when NEXT_PUBLIC_SITE_URL is set', async () => {

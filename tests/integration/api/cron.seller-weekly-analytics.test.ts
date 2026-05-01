@@ -65,7 +65,7 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
 
     expect(response.status).toBe(401)
     expect(data.ok).toBe(false)
-    expect(data.error).toBe('Unauthorized')
+    expect(data.error?.message).toBe('Unauthorized')
     expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
   })
 
@@ -128,7 +128,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
 
     expect(response.status).toBe(401)
     expect(data.ok).toBe(false)
-    expect(data.error).toBe('Unauthorized')
+    expect(data.error?.message).toBe('Unauthorized')
     expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
   })
 
@@ -255,7 +255,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     expect(response.status).toBe(500)
     expect(data.ok).toBe(false)
     expect(data.job).toBe('seller-weekly-analytics')
-    expect(data.error).toBe('Job execution failed')
+    expect(data.error?.message).toBe('Job execution failed')
     expect(processSellerWeeklyAnalyticsJob).toHaveBeenCalledTimes(1)
   })
 
@@ -278,7 +278,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     expect(response.status).toBe(500)
     expect(data.ok).toBe(false)
     expect(data.job).toBe('seller-weekly-analytics')
-    expect(data.error).toBe('Internal server error')
+    expect(data.error?.message).toBe('Internal server error')
   })
 })
 

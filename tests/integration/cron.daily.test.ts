@@ -107,7 +107,7 @@ describe('GET /api/cron/daily', () => {
 
       expect(response.status).toBe(401)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error?.message).toBe('Unauthorized')
       
       // Verify no jobs were executed
       expect(mockProcessFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()

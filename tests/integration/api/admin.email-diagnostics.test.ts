@@ -56,7 +56,7 @@ describe('GET /api/admin/email/diagnostics', () => {
 
     expect(response.status).toBe(403)
     expect(data.ok).toBe(false)
-    expect(data.error).toBe('Unauthorized')
+    expect(data.error?.message).toBe('Unauthorized')
   })
 
   it('should return diagnostics when authenticated as admin', async () => {

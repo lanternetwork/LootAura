@@ -48,7 +48,7 @@ describe('Auth API Routes', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid input data')
+      expect(data.error?.message).toBe('Invalid input data')
       expect(data.details).toBeDefined()
     })
 
@@ -68,7 +68,7 @@ describe('Auth API Routes', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid input data')
+      expect(data.error?.message).toBe('Invalid input data')
     })
 
     it('should handle successful signin', async () => {
@@ -131,7 +131,7 @@ describe('Auth API Routes', () => {
 
       expect(response.status).toBe(400)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Invalid input data')
+      expect(data.error?.message).toBe('Invalid input data')
     })
 
     it('should reject password without required complexity', async () => {
@@ -151,7 +151,7 @@ describe('Auth API Routes', () => {
 
       expect(response.status).toBe(400)
       expect(data.ok).toBe(false)
-      expect(data.error).toBe('Invalid input data')
+      expect(data.error?.message).toBe('Invalid input data')
     })
 
     it('should handle successful signup', async () => {

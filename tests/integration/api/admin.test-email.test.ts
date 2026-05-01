@@ -37,7 +37,7 @@ describe('POST /api/admin/test-email', () => {
     const data = await response.json()
 
     expect(response.status).toBe(403)
-    expect(data.error).toBe('Forbidden: Admin access required')
+    expect(data.error?.message).toBe('Forbidden: Admin access required')
   })
 
   it('allows admin users to send test email', async () => {

@@ -3,9 +3,21 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { deriveCategories } from '@/lib/profile/deriveCategories'
 
 export async function GET(req: Request) {
+  const errorResponse = (status: number, code: string, message: string) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+      },
+      { status }
+    )
+
   const url = new URL(req.url)
   const username = url.searchParams.get('username') || ''
-  if (!username) return NextResponse.json({ error: 'username required' }, { status: 400 })
+  if (!username) return errorResponse(400, 'INVALID_REQUEST', 'username required')
   const supabase = await createSupabaseServerClient()
   let profile = null as any
   // Try by username column; fallback to id
@@ -17,7 +29,7 @@ export async function GET(req: Request) {
   }
   // No fallback to base table - profiles_v2 view is the only source for public profile data
   // This ensures anon users cannot access sensitive fields (lock fields, email prefs) from base table
-  if (!profile) return NextResponse.json({ error: 'not found' }, { status: 404 })
+  if (!profile) return errorResponse(404, 'NOT_FOUND', 'not found')
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') console.log('[PROFILE] get public profile', { username })
   const preferred = await deriveCategories(profile.id).catch(() => [])
   

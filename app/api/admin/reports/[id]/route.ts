@@ -22,6 +22,19 @@ async function updateReportHandler(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const errorResponse = (status: number, code: string, message: string, details?: unknown) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+        ...(details !== undefined ? { details } : {}),
+      },
+      { status }
+    )
+
   let user: { id: string; email?: string }
   try {
     // Require admin access
@@ -31,10 +44,7 @@ async function updateReportHandler(
     if (error instanceof NextResponse) {
       return error
     }
-    return NextResponse.json(
-      { error: 'Forbidden: Admin access required' },
-      { status: 403 }
-    )
+    return errorResponse(403, 'FORBIDDEN', 'Forbidden: Admin access required')
   }
 
   try {
@@ -45,18 +55,12 @@ async function updateReportHandler(
     try {
       body = await request.json()
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
-        { status: 400 }
-      )
+      return errorResponse(400, 'INVALID_REQUEST', 'Invalid JSON in request body')
     }
 
     const validationResult = UpdateReportSchema.safeParse(body)
     if (!validationResult.success) {
-      return NextResponse.json(
-        { error: 'Invalid request body', details: validationResult.error.issues },
-        { status: 400 }
-      )
+      return errorResponse(400, 'INVALID_REQUEST', 'Invalid request body', validationResult.error.issues)
     }
 
     const { status, action_taken, admin_notes, hide_sale, lock_account } = validationResult.data
@@ -70,10 +74,7 @@ async function updateReportHandler(
       .maybeSingle()
 
     if (reportError || !report) {
-      return NextResponse.json(
-        { error: 'Report not found' },
-        { status: 404 }
-      )
+      return errorResponse(404, 'NOT_FOUND', 'Report not found')
     }
 
     // Update report record
@@ -93,10 +94,7 @@ async function updateReportHandler(
         operation: 'update_report',
         reportId,
       })
-      return NextResponse.json(
-        { error: 'Failed to update report' },
-        { status: 500 }
-      )
+      return errorResponse(500, 'INTERNAL_ERROR', 'Failed to update report')
     }
 
     // Handle hide_sale action
@@ -171,10 +169,7 @@ async function updateReportHandler(
       component: 'moderation',
       operation: 'update_report',
     })
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }
 

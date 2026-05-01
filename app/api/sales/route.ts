@@ -1099,7 +1099,16 @@ async function postHandler(request: NextRequest) {
           errorMessage: authError?.message,
           errorStatus: authError?.status
         })
-        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          },
+        },
+        { status: 401 }
+      )
       }
     }
 
@@ -1128,11 +1137,16 @@ async function postHandler(request: NextRequest) {
         component: 'sales',
         operation: 'json_parse'
       })
-      return NextResponse.json({ 
-        ok: false,
-        code: 'INVALID_JSON',
-        error: 'Invalid request format'
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'INVALID_JSON',
+            message: 'Invalid request format',
+          },
+        },
+        { status: 400 }
+      )
     }
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
@@ -1215,7 +1229,16 @@ async function postHandler(request: NextRequest) {
           operation: 'image_validation',
           reason: 'invalid_url_format'
         })
-      return NextResponse.json({ error: 'Invalid cover_image_url' }, { status: 400 })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Invalid cover_image_url',
+          },
+        },
+        { status: 400 }
+      )
     }
 
     // Validate images array if provided
@@ -1228,7 +1251,16 @@ async function postHandler(request: NextRequest) {
               operation: 'image_validation',
               reason: 'invalid_url_format'
             })
-          return NextResponse.json({ error: 'Invalid image URL in images array' }, { status: 400 })
+          return NextResponse.json(
+            {
+              ok: false,
+              error: {
+                code: 'INVALID_REQUEST',
+                message: 'Invalid image URL in images array',
+              },
+            },
+            { status: 400 }
+          )
         }
       }
     }

@@ -36,6 +36,18 @@ interface EmailDiagnostics {
  * Only accessible to admins
  */
 export async function GET(request: NextRequest) {
+  const errorResponse = (status: number, code: string, message: string) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+      },
+      { status }
+    )
+
   try {
     // Require admin access
     await assertAdminOrThrow(request)
@@ -91,16 +103,10 @@ export async function GET(request: NextRequest) {
     
     // If it's an auth error, return 403
     if (errorMessage.includes('Unauthorized') || errorMessage.includes('Forbidden')) {
-      return NextResponse.json(
-        { ok: false, error: 'Unauthorized', message: errorMessage },
-        { status: 403 }
-      )
+      return errorResponse(403, 'UNAUTHORIZED', 'Unauthorized')
     }
 
-    return NextResponse.json(
-      { ok: false, error: 'Internal server error', message: errorMessage },
-      { status: 500 }
-    )
+    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }
 

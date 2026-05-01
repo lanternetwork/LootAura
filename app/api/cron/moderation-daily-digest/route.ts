@@ -39,6 +39,18 @@ async function handleRequest(request: NextRequest) {
   const env = process.env.NODE_ENV || 'development'
   const opId = generateOperationId()
   const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+  const errorResponse = (status: number, code: string, message: string) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+        requestId: opId,
+      },
+      { status }
+    )
 
   try {
     // Validate cron authentication
@@ -47,7 +59,7 @@ async function handleRequest(request: NextRequest) {
     } catch (error) {
       // assertCronAuthorized throws NextResponse if unauthorized or misconfigured
       if (error instanceof NextResponse) {
-        return error
+        return errorResponse(error.status, 'UNAUTHORIZED', 'Unauthorized')
       }
       // If it's not a NextResponse, rethrow
       throw error
@@ -91,11 +103,7 @@ async function handleRequest(request: NextRequest) {
         component: 'api/cron/moderation-daily-digest',
         operation: 'fetch_reports',
       }))
-      return NextResponse.json({
-        ok: false,
-        error: 'Failed to fetch reports',
-        requestId: opId,
-      }, { status: 500 })
+      return errorResponse(500, 'INTERNAL_ERROR', 'Failed to fetch reports')
     }
 
     // Transform reports for email template
@@ -138,11 +146,7 @@ async function handleRequest(request: NextRequest) {
         operation: 'send_email',
         reportCount: reportItems.length,
       }))
-      return NextResponse.json({
-        ok: false,
-        error: 'Failed to send email',
-        requestId: opId,
-      }, { status: 500 })
+      return errorResponse(500, 'INTERNAL_ERROR', 'Failed to send email')
     }
 
     logger.info('Moderation weekly digest sent successfully', withOpId({
@@ -165,11 +169,7 @@ async function handleRequest(request: NextRequest) {
       operation: 'unexpected_error',
     }))
 
-    return NextResponse.json({
-      ok: false,
-      error: errorMessage,
-      requestId: opId,
-    }, { status: 500 })
+    return errorResponse(500, 'INTERNAL_ERROR', errorMessage || 'Internal error')
   }
 }
 

@@ -11,6 +11,19 @@ import { logger } from '@/lib/log'
 export const dynamic = 'force-dynamic'
 
 async function getUsersHandler(request: NextRequest) {
+  const errorResponse = (status: number, code: string, message: string, details?: unknown) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+        ...(details !== undefined ? { details } : {}),
+      },
+      { status }
+    )
+
   try {
     // Require admin access
     await assertAdminOrThrow(request)
@@ -18,10 +31,7 @@ async function getUsersHandler(request: NextRequest) {
     if (error instanceof NextResponse) {
       return error
     }
-    return NextResponse.json(
-      { error: 'Forbidden: Admin access required' },
-      { status: 403 }
-    )
+    return errorResponse(403, 'FORBIDDEN', 'Forbidden: Admin access required')
   }
 
   try {
@@ -68,9 +78,11 @@ async function getUsersHandler(request: NextRequest) {
         errorCode: (error as any)?.code,
         errorMessage: (error as any)?.message,
       })
-      return NextResponse.json(
-        { error: 'Failed to fetch users', details: process.env.NEXT_PUBLIC_DEBUG === 'true' ? String(error) : undefined },
-        { status: 500 }
+      return errorResponse(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to fetch users',
+        process.env.NEXT_PUBLIC_DEBUG === 'true' ? String(error) : undefined
       )
     }
 
@@ -105,10 +117,7 @@ async function getUsersHandler(request: NextRequest) {
       component: 'moderation',
       operation: 'get_users',
     })
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }
 

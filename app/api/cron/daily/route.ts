@@ -451,6 +451,17 @@ async function handleRequest(request: NextRequest) {
   const env = process.env.NODE_ENV || 'development'
   const opId = generateOperationId()
   const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+  const errorResponse = (status: number, code: string, message: string) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+      },
+      { status }
+    )
 
   try {
     // Validate cron authentication
@@ -459,7 +470,7 @@ async function handleRequest(request: NextRequest) {
     } catch (error) {
       // assertCronAuthorized throws NextResponse if unauthorized or misconfigured
       if (error instanceof NextResponse) {
-        return error
+        return errorResponse(error.status, 'UNAUTHORIZED', 'Unauthorized')
       }
       // If it's not a NextResponse, rethrow
       throw error
@@ -597,7 +608,7 @@ async function handleRequest(request: NextRequest) {
   } catch (error) {
     // Handle auth errors (thrown by assertCronAuthorized)
     if (error instanceof NextResponse) {
-      return error
+      return errorResponse(error.status, 'UNAUTHORIZED', 'Unauthorized')
     }
 
     // Handle unexpected errors
@@ -608,16 +619,7 @@ async function handleRequest(request: NextRequest) {
       env,
     }))
 
-    return NextResponse.json(
-      {
-        ok: false,
-        job: 'daily',
-        runAt,
-        env,
-        error: 'Internal server error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }
 

@@ -10,6 +10,18 @@ import { logger } from '@/lib/log'
 export const dynamic = 'force-dynamic'
 
 async function getReportsHandler(request: NextRequest) {
+  const errorResponse = (status: number, code: string, message: string) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+      },
+      { status }
+    )
+
   try {
     // Require admin access
     await assertAdminOrThrow(request)
@@ -17,10 +29,7 @@ async function getReportsHandler(request: NextRequest) {
     if (error instanceof NextResponse) {
       return error
     }
-    return NextResponse.json(
-      { error: 'Forbidden: Admin access required' },
-      { status: 403 }
-    )
+    return errorResponse(403, 'FORBIDDEN', 'Forbidden: Admin access required')
   }
 
   try {
@@ -78,10 +87,7 @@ async function getReportsHandler(request: NextRequest) {
         component: 'moderation',
         operation: 'get_reports',
       })
-      return NextResponse.json(
-        { error: 'Failed to fetch reports' },
-        { status: 500 }
-      )
+      return errorResponse(500, 'INTERNAL_ERROR', 'Failed to fetch reports')
     }
 
     // Enrich reports with owner lock status
@@ -139,10 +145,7 @@ async function getReportsHandler(request: NextRequest) {
       component: 'moderation',
       operation: 'get_reports',
     })
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }
 

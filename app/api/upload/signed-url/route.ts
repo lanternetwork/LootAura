@@ -15,16 +15,26 @@ const uploadRequestSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  const errorResponse = (status: number, code: string, message: string, details?: unknown) =>
+    NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code,
+          message,
+        },
+        ...(details !== undefined ? { details } : {}),
+      },
+      { status }
+    )
+
   try {
     // Rate limiting
     const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMITS.UPLOAD_SIGNER)
     const { allowed, error: rateLimitError } = rateLimitMiddleware(request)
     
     if (!allowed) {
-      return NextResponse.json(
-        { error: rateLimitError },
-        { status: 429 }
-      )
+      return errorResponse(429, 'RATE_LIMIT_EXCEEDED', rateLimitError || 'Too many requests. Please try again later.')
     }
 
     // Validate input
@@ -35,10 +45,7 @@ export async function POST(request: NextRequest) {
     const { ENV_SERVER } = await import('@/lib/env')
     const maxSizeBytes = ENV_SERVER.MAX_UPLOAD_SIZE_BYTES || 5242880 // 5MB default
     if (sizeBytes > maxSizeBytes) {
-      return NextResponse.json(
-        { error: `File size exceeds maximum allowed (${Math.round(maxSizeBytes / 1024 / 1024)}MB)` },
-        { status: 400 }
-      )
+      return errorResponse(400, 'INVALID_REQUEST', `File size exceeds maximum allowed (${Math.round(maxSizeBytes / 1024 / 1024)}MB)`)
     }
 
     // Check authentication
@@ -50,7 +57,7 @@ export async function POST(request: NextRequest) {
       if (isDebugMode()) {
         console.log('[UPLOAD] Auth failed', { event: 'upload-signer', status: 'fail', code: authError?.message })
       }
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return errorResponse(401, 'UNAUTHORIZED', 'Authentication required')
     }
 
     // Generate unique object key (no user ID exposure)
@@ -71,10 +78,7 @@ export async function POST(request: NextRequest) {
       if (isDebugMode()) {
         console.log('[UPLOAD] Signed URL creation failed', { event: 'upload-signer', status: 'fail', code: signedUrlError.message })
       }
-      return NextResponse.json(
-        { error: 'Failed to create upload URL' },
-        { status: 500 }
-      )
+      return errorResponse(500, 'INTERNAL_ERROR', 'Failed to create upload URL')
     }
 
     // Generate public URL for the uploaded file
@@ -108,10 +112,7 @@ export async function POST(request: NextRequest) {
       if (isDebugMode()) {
         console.log('[UPLOAD] Validation failed', { event: 'upload-signer', status: 'fail', errors: error.errors.length })
       }
-      return NextResponse.json(
-        { error: 'Invalid upload request', details: error.errors },
-        { status: 400 }
-      )
+      return errorResponse(400, 'INVALID_REQUEST', 'Invalid upload request', error.errors)
     }
 
     const { isDebugMode } = await import('@/lib/env')
@@ -119,9 +120,6 @@ export async function POST(request: NextRequest) {
       console.log('[UPLOAD] Unexpected error', { event: 'upload-signer', status: 'fail' })
     }
     console.error('[UPLOAD] Unexpected error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }

@@ -32,8 +32,6 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 30000,
     hookTimeout: 30000,
-    // Prevent cross-file global/mock leakage and force cleanup between files.
-    isolate: true,
     // Use forks instead of threads for better memory isolation
     // Each fork gets its own heap and inherits NODE_OPTIONS properly
     pool: 'forks',
@@ -41,7 +39,6 @@ export default defineConfig({
       forks: {
         // Ensure forked workers keep the same heap cap as the parent test process in CI.
         execArgv: ['--max-old-space-size=8192'],
-        singleFork: true,
       },
     },
     sequence: {

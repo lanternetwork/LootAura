@@ -8,15 +8,12 @@ import { checkCsrfIfRequired } from '@/lib/api/csrfCheck'
 
 const normalizeLockError = (response: NextResponse) => {
   if (response.status === 403) {
-    return NextResponse.json(
+    return Response.json(
       {
         ok: false,
+        code: 'ACCOUNT_LOCKED',
         error: {
-          code: 'ACCOUNT_LOCKED',
-          message: 'account_locked',
-        },
-        details: {
-          message: 'This account has been locked. Please contact support if you believe this is an error.',
+          message: 'account_locked'
         },
       },
       { status: 403 }

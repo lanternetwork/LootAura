@@ -82,7 +82,11 @@ async function enforceRateLimit(request: NextRequest, policies: Policy[]): Promi
 
   if (!mostRestrictive.allowed) {
     const response = NextResponse.json(
-      { code: 'RATE_LIMITED', message: 'Too many requests' },
+      {
+        ok: false,
+        code: 'RATE_LIMITED',
+        error: { message: 'Too many requests' },
+      },
       { status: 429 }
     )
     return applyRateHeaders(
@@ -111,7 +115,11 @@ export async function POST(request: NextRequest) {
     const bodySizeBytes = new TextEncoder().encode(rawBody).length
     if (bodySizeBytes > MAX_SHARE_PAYLOAD_BYTES) {
       return NextResponse.json(
-        { code: 'PAYLOAD_TOO_LARGE', message: 'Request too large' },
+        {
+          ok: false,
+          code: 'PAYLOAD_TOO_LARGE',
+          error: { message: 'Request too large' },
+        },
         { status: 413 }
       )
     }

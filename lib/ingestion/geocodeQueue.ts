@@ -47,6 +47,7 @@ const DEFAULT_MAX_BATCHES = 3
 const DEFAULT_RETRY_BASE_MS = 2000
 const DEFAULT_MAX_RETRY_DELAY_MS = 60000
 const DEFAULT_MAX_HIGH_PER_MINUTE = 60
+const DEFAULT_MAX_IDLE_LOOPS_FACTOR = 4
 
 function getRedisConfig() {
   const redisUrl = ENV_SERVER.UPSTASH_REDIS_REST_URL
@@ -98,6 +99,11 @@ function parseMaxBatchesPerRun(): number {
 function parseMaxHighPerMinute(): number {
   const value = parseIntEnv('MAX_HIGH_PER_MINUTE', DEFAULT_MAX_HIGH_PER_MINUTE)
   return Math.min(value, 1000)
+}
+
+function parseMaxIdleLoopsFactor(): number {
+  const value = parseIntEnv('GEOCODE_QUEUE_MAX_IDLE_LOOPS_FACTOR', DEFAULT_MAX_IDLE_LOOPS_FACTOR)
+  return Math.min(value, 20)
 }
 
 function nextRetryDelayMs(attempts: number): number {
@@ -304,8 +310,21 @@ export async function processGeocodeQueueBatch(): Promise<GeocodeQueueBatchSumma
   let processedInBatch = 0
   let nextAllowedAt = 0
   let rowsBecameReady = 0
+  let idleLoops = 0
+  const maxIdleLoops = Math.max(batchSize, batchSize * parseMaxIdleLoopsFactor())
 
   while (processedInBatch < batchSize) {
+    if (idleLoops >= maxIdleLoops) {
+      logger.warn('geocode queue batch stopped after idle loop guard', {
+        component: 'ingestion/geocodeQueue',
+        operation: 'idle_loop_guard',
+        idleLoops,
+        maxIdleLoops,
+        processedInBatch,
+      })
+      break
+    }
+
     const { job, usedHigh } = await dequeueOne(highBudgetRemaining)
     if (!job) break
 
@@ -320,6 +339,7 @@ export async function processGeocodeQueueBatch(): Promise<GeocodeQueueBatchSumma
           operation: 'priority_throttle',
           saleId: job.sale_id,
         })
+        idleLoops += 1
         continue
       }
     }
@@ -340,6 +360,7 @@ export async function processGeocodeQueueBatch(): Promise<GeocodeQueueBatchSumma
     const result = await geocodeIngestedSaleById(jobToProcess.sale_id, { skipPublishAfterSuccess: true })
     nextAllowedAt = Date.now() + minSpacingMs
     processedInBatch += 1
+    idleLoops = 0
     summary.processed += 1
 
     if (!result) {

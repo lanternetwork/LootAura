@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockGeocodeById = vi.fn()
 
@@ -19,6 +19,12 @@ describe('geocode queue hardening', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     mockGeocodeById.mockReset()
+  })
+
+  afterEach(() => {
+    vi.clearAllTimers()
+    vi.unstubAllGlobals()
+    vi.resetModules()
   })
 
   it('returns queue metrics with last run stats', async () => {

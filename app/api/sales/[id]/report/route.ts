@@ -193,10 +193,25 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 
-  return withRateLimit(
+  const response = await withRateLimit(
     (request) => reportHandler(request, context),
     [Policies.REPORT_SALE],
     { userId }
   )(req)
+
+  if (response.status === 429) {
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          message: 'rate_limited'
+        },
+        message: 'Too many requests'
+      },
+      { status: 429 }
+    )
+  }
+
+  return response
 }
 

@@ -10,7 +10,8 @@ import { NextRequest } from 'next/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { getResendWebhookSecret, verifyResendWebhookSignature } from '@/lib/email/webhook'
 import { logger } from '@/lib/log'
-import { fail, ok } from '@/lib/http/json'
+import { ok } from '@/lib/http/json'
+import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,9 +36,22 @@ function mapEventTypeToDeliveryStatus(eventType: string): string {
 }
 
 async function webhookHandler(request: NextRequest) {
+  const errorResponse = (status: number, code: string, message: string) =>
+    NextResponse.json(
+      {
+        ok: false,
+        code,
+        error: {
+          code,
+          message,
+        },
+      },
+      { status }
+    )
+
   // Only accept POST
   if (request.method !== 'POST') {
-    return fail(405, 'METHOD_NOT_ALLOWED', 'Only POST requests are allowed')
+    return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Only POST requests are allowed')
   }
 
   // Get raw body for signature verification
@@ -53,7 +67,7 @@ async function webhookHandler(request: NextRequest) {
       component: 'webhooks/resend',
       operation: 'verify_signature',
     })
-    return fail(401, 'MISSING_SIGNATURE', 'Missing webhook signature header')
+    return errorResponse(401, 'MISSING_SIGNATURE', 'Missing webhook signature header')
   }
 
   // Get webhook secret (required - throws if missing)
@@ -65,7 +79,7 @@ async function webhookHandler(request: NextRequest) {
       component: 'webhooks/resend',
       operation: 'verify_signature',
     })
-    return fail(500, 'CONFIG_ERROR', 'Webhook secret not configured')
+    return errorResponse(500, 'CONFIG_ERROR', 'Webhook secret not configured')
   }
 
   // Verify webhook signature
@@ -84,7 +98,7 @@ async function webhookHandler(request: NextRequest) {
       component: 'webhooks/resend',
       operation: 'verify_signature',
     })
-    return fail(401, 'INVALID_SIGNATURE', 'Invalid webhook signature')
+    return errorResponse(401, 'INVALID_SIGNATURE', 'Invalid webhook signature')
   }
 
   // Parse verified payload
@@ -104,7 +118,7 @@ async function webhookHandler(request: NextRequest) {
       component: 'webhooks/resend',
       operation: 'parse_payload',
     })
-    return fail(400, 'INVALID_PAYLOAD', 'Invalid JSON payload')
+    return errorResponse(400, 'INVALID_PAYLOAD', 'Invalid JSON payload')
   }
 
   // Extract event details

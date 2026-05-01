@@ -222,17 +222,37 @@ export async function PUT(req: NextRequest) {
   // Account lock enforcement (fail-closed)
   if (process.env.NODE_ENV === 'test' && user.id === 'locked-user-id') {
     const { fail } = await import('@/lib/http/json')
-    return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
-      message: 'This account has been locked. Please contact support if you believe this is an error.'
-    })
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: 'ACCOUNT_LOCKED',
+          message: 'account_locked',
+        },
+        details: {
+          message: 'This account has been locked. Please contact support if you believe this is an error.',
+        },
+      },
+      { status: 403 }
+    )
   }
   const { isAccountLocked } = await import('@/lib/auth/accountLock')
   const locked = await isAccountLocked(user.id)
   if (locked) {
     const { fail } = await import('@/lib/http/json')
-    return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
-      message: 'This account has been locked. Please contact support if you believe this is an error.'
-    })
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: 'ACCOUNT_LOCKED',
+          message: 'account_locked',
+        },
+        details: {
+          message: 'This account has been locked. Please contact support if you believe this is an error.',
+        },
+      },
+      { status: 403 }
+    )
   }
 
   const json = await req.json()

@@ -6,6 +6,25 @@ import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 import { logger } from '@/lib/log'
 import { z } from 'zod'
 
+const normalizeLockError = (response: NextResponse) => {
+  if (response.status === 403) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: 'ACCOUNT_LOCKED',
+          message: 'account_locked',
+        },
+        details: {
+          message: 'This account has been locked. Please contact support if you believe this is an error.',
+        },
+      },
+      { status: 403 }
+    )
+  }
+  return response
+}
+
 // Base validation schema for item creation/update
 // Accepts both 'name' and 'title' for backward compatibility (normalized to 'title' internally)
 const ItemV2InputBaseSchema = z.object({
@@ -118,7 +137,7 @@ export async function POST(request: NextRequest) {
       const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
       await assertAccountNotLocked(user.id)
     } catch (error) {
-      if (error instanceof NextResponse) return error
+      if (error instanceof NextResponse) return normalizeLockError(error)
       throw error
     }
     
@@ -300,7 +319,7 @@ export async function PUT(request: NextRequest) {
       const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
       await assertAccountNotLocked(user.id)
     } catch (error) {
-      if (error instanceof NextResponse) return error
+      if (error instanceof NextResponse) return normalizeLockError(error)
       throw error
     }
     
@@ -409,7 +428,7 @@ export async function DELETE(request: NextRequest) {
       const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
       await assertAccountNotLocked(user.id)
     } catch (error) {
-      if (error instanceof NextResponse) return error
+      if (error instanceof NextResponse) return normalizeLockError(error)
       throw error
     }
     

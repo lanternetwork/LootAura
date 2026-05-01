@@ -10,6 +10,25 @@ import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
+const normalizeLockError = (response: NextResponse) => {
+  if (response.status === 403) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: 'ACCOUNT_LOCKED',
+          message: 'account_locked',
+        },
+        details: {
+          message: 'This account has been locked. Please contact support if you believe this is an error.',
+        },
+      },
+      { status: 403 }
+    )
+  }
+  return response
+}
+
 const NotificationPreferencesSchema = z.object({
   email_favorites_digest_enabled: z.boolean().optional(),
   email_seller_weekly_enabled: z.boolean().optional(),
@@ -70,7 +89,7 @@ export async function PUT(request: NextRequest) {
     const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
     await assertAccountNotLocked(user.id)
   } catch (error) {
-    if (error instanceof NextResponse) return error
+    if (error instanceof NextResponse) return normalizeLockError(error)
     throw error
   }
 

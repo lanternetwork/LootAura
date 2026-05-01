@@ -1115,17 +1115,37 @@ async function postHandler(request: NextRequest) {
     // Check if account is locked (fail closed)
     if (process.env.NODE_ENV === 'test' && user.id === 'locked-user-id') {
       const { fail } = await import('@/lib/http/json')
-      return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
-        message: 'This account has been locked. Please contact support if you believe this is an error.'
-      })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'ACCOUNT_LOCKED',
+            message: 'account_locked',
+          },
+          details: {
+            message: 'This account has been locked. Please contact support if you believe this is an error.',
+          },
+        },
+        { status: 403 }
+      )
     }
     const { isAccountLocked } = await import('@/lib/auth/accountLock')
     const locked = await isAccountLocked(user.id)
     if (locked) {
       const { fail } = await import('@/lib/http/json')
-      return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
-        message: 'This account has been locked. Please contact support if you believe this is an error.'
-      })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'ACCOUNT_LOCKED',
+            message: 'account_locked',
+          },
+          details: {
+            message: 'This account has been locked. Please contact support if you believe this is an error.',
+          },
+        },
+        { status: 403 }
+      )
     }
     
     let body: any
@@ -1485,9 +1505,19 @@ async function postHandler(request: NextRequest) {
     // Fail closed for locked users in tests even if earlier logic threw
     if (process.env.NODE_ENV === 'test' && user?.id === 'locked-user-id') {
       const { fail } = await import('@/lib/http/json')
-      return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
-        message: 'This account has been locked. Please contact support if you believe this is an error.'
-      })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'ACCOUNT_LOCKED',
+            message: 'account_locked',
+          },
+          details: {
+            message: 'This account has been locked. Please contact support if you believe this is an error.',
+          },
+        },
+        { status: 403 }
+      )
     }
     return fail(500, 'SALE_CREATE_FAILED', e.message)
   }

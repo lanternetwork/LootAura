@@ -24,21 +24,46 @@ const LOAD_TEST_CLI = join(process.cwd(), 'scripts/load/cli.ts')
 /** Fixed target; request body must not influence spawn arguments beyond scenario id. */
 const FIXED_BASE_URL = 'http://localhost:3000'
 
+function invalidScenarioResponse() {
+  return Response.json(
+    {
+      ok: false,
+      error: {
+        code: 'INVALID_REQUEST',
+        message: 'Invalid scenario',
+      },
+      validScenarios: [...VALID_SCENARIOS],
+    },
+    { status: 400 }
+  )
+}
+
+function errorResponse(code: 'UNAUTHORIZED' | 'FORBIDDEN' | 'INVALID_REQUEST', message: string, status: number) {
+  return Response.json(
+    {
+      ok: false,
+      error: {
+        code,
+        message,
+      },
+    },
+    { status }
+  )
+}
+
 export async function POST(request: NextRequest) {
   try {
     await assertAdminOrThrow(request)
 
     if (process.env.NODE_ENV === 'production') {
-      return new NextResponse('Not found', { status: 404 })
+      return errorResponse('INVALID_REQUEST', 'Not found', 404)
     }
 
     if (process.env.VERCEL === '1') {
-      return NextResponse.json(
-        {
-          error: 'Load testing is unavailable in Vercel environments',
-          message: 'Run load tests locally or use GitHub Actions dispatch from admin tools.',
-        },
-        { status: 501 }
+      return errorResponse(
+        'INVALID_REQUEST',
+        'Load testing is unavailable in Vercel environments. Run load tests locally or use GitHub Actions dispatch from admin tools.',
+        501
       )
     }
 
@@ -46,17 +71,7 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json()
     } catch {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: {
-            code: 'INVALID_REQUEST',
-            message: 'Invalid scenario',
-          },
-          validScenarios: [...VALID_SCENARIOS],
-        },
-        { status: 400 }
-      )
+      return invalidScenarioResponse()
     }
 
     const scenario =
@@ -65,31 +80,11 @@ export async function POST(request: NextRequest) {
         : undefined
 
     if (!scenario) {
-      return Response.json(
-        {
-          ok: false,
-          error: {
-            code: 'INVALID_REQUEST',
-            message: 'Invalid scenario',
-          },
-          validScenarios: [...VALID_SCENARIOS],
-        },
-        { status: 400 }
-      )
+      return invalidScenarioResponse()
     }
 
     if (typeof scenario !== 'string' || !VALID_SCENARIOS.includes(scenario as ValidScenario)) {
-      return Response.json(
-        {
-          ok: false,
-          error: {
-            code: 'INVALID_REQUEST',
-            message: 'Invalid scenario',
-          },
-          validScenarios: [...VALID_SCENARIOS],
-        },
-        { status: 400 }
-      )
+      return invalidScenarioResponse()
     }
 
     const args = [LOAD_TEST_CLI, '--scenario', scenario, '--baseURL', FIXED_BASE_URL]
@@ -192,7 +187,35 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof NextResponse) {
-      return error
+      const status = error.status
+      const code =
+        status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : 'INVALID_REQUEST'
+
+      let message = 'Request failed'
+      try {
+        const payload = (await error.clone().json()) as {
+          error?: string | { message?: string }
+          message?: string
+        }
+        if (typeof payload.error === 'object' && typeof payload.error?.message === 'string') {
+          message = payload.error.message
+        } else if (typeof payload.message === 'string') {
+          message = payload.message
+        } else if (typeof payload.error === 'string') {
+          message = payload.error
+        }
+      } catch {
+        try {
+          const text = await error.clone().text()
+          if (text.trim().length > 0) {
+            message = text
+          }
+        } catch {
+          // Keep default message if body cannot be parsed.
+        }
+      }
+
+      return errorResponse(code, message, status)
     }
     console.error('Load test API error:', error)
     return NextResponse.json(

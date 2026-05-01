@@ -220,17 +220,23 @@ export async function POST(request: NextRequest) {
       emailType,
     })
   } catch (error) {
-    if (error && typeof error === 'object' && 'status' in error) {
+    if (error && typeof error === 'object' && typeof (error as any).json === 'function') {
       const responseError = error as {
         status?: unknown
+        statusCode?: unknown
         json?: () => Promise<any>
         text?: () => Promise<string>
       }
-      const status = typeof responseError.status === 'number' ? responseError.status : 500
+      const status =
+        typeof responseError.status === 'number'
+          ? responseError.status
+          : typeof responseError.statusCode === 'number'
+          ? responseError.statusCode
+          : 403
 
       let message = 'Error'
       try {
-        const data = await responseError.json?.()
+        const data = await responseError.json()
         message =
           data?.error?.message ||
           data?.message ||
@@ -239,9 +245,7 @@ export async function POST(request: NextRequest) {
       } catch {
         try {
           const text = await responseError.text?.()
-          if (typeof text === 'string' && text.length > 0) {
-            message = text
-          }
+          if (typeof text === 'string' && text.length > 0) message = text
         } catch {}
       }
 

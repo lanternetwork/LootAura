@@ -94,7 +94,8 @@ describe('Share API', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid request format')
+      expect(data.error?.message).toBe('Invalid request format')
+      expect(data.error?.code).toBe('INVALID_REQUEST')
     })
 
     it('should handle database errors', async () => {

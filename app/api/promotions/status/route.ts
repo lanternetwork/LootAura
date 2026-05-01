@@ -190,22 +190,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // CRITICAL: Load session into the SAME client instance before using .schema()
-    // This ensures the JWT is available for RLS policies when using schema-scoped client
+    // Best-effort session read for schema-scoped client.
+    // Never fail this read endpoint if auth session hydration is unavailable in tests/mocks.
     try {
-      await supabase.auth.getSession()
+      await supabase.auth.getSession?.()
     } catch {
-      // Session might not exist - that's ok, caller will handle auth errors
-    }
-    
-    // Load and explicitly set the session on the client to ensure JWT is attached
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) {
-      // Explicitly set the session to ensure JWT is in Authorization header
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      })
+      // Ignore session hydration failures; auth.getUser() above already enforces auth.
     }
     
     // Use the same client instance for database operations

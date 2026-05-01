@@ -31,24 +31,17 @@ const TestEmailBodySchema = z.object({
  * Only accessible to admins (debug-mode bypass is controlled in adminGate)
  */
 export async function POST(request: NextRequest) {
-  // Hard-disable in production
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'Not found' },
-      { status: 404 }
-    )
-  }
-
   try {
-    // Require admin access in all environments
-    try {
-      await assertAdminOrThrow(request)
-    } catch {
+    // Hard-disable in production
+    if (process.env.NODE_ENV === 'production') {
       return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
+        { error: 'Not found' },
+        { status: 404 }
       )
     }
+
+    // Require admin access in all environments
+    await assertAdminOrThrow(request)
 
     // Require ENABLE_ADMIN_TOOLS flag (allow in debug mode for development/preview)
     // Note: Production is already handled by early return above
@@ -227,14 +220,43 @@ export async function POST(request: NextRequest) {
       emailType,
     })
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[ADMIN_TEST_EMAIL] Error:', error)
+    if (error instanceof Response) {
+      const status = error.status || 500
+
+      let message = 'Error'
+      try {
+        const data = await error.json()
+        message =
+          data?.error?.message ||
+          data?.message ||
+          data?.error ||
+          message
+      } catch {
+        try {
+          message = await error.text()
+        } catch {}
+      }
+
+      return Response.json(
+        {
+          ok: false,
+          error: {
+            code: status === 403 ? 'FORBIDDEN' : 'ERROR',
+            message
+          }
+        },
+        { status }
+      )
     }
 
-    return NextResponse.json(
-      { error: 'Failed to send test email', details: errorMessage },
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal error'
+        }
+      },
       { status: 500 }
     )
   }

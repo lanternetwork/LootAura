@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { sendSellerWeeklyAnalyticsEmail } from '@/lib/email/sellerAnalytics'
 import { sendEmail } from '@/lib/email/sendEmail'
 import { buildSellerWeeklyAnalyticsSubject } from '@/lib/email/templates/SellerWeeklyAnalyticsEmail'
@@ -47,6 +47,11 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
     process.env.RESEND_FROM_EMAIL = 'no-reply@lootaura.com'
     process.env.NEXT_PUBLIC_SITE_URL = 'https://lootaura.com'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllTimers()
   })
 
   it('should send an email with valid metrics', async () => {

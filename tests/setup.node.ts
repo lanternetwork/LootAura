@@ -1,4 +1,4 @@
-import { beforeAll, afterAll } from 'vitest'
+import { beforeEach, afterEach, vi } from 'vitest'
 
 const rejectionHandler = (reason: unknown) => {
   // Ignore ZodErrors from env validation during tests
@@ -15,20 +15,26 @@ const rejectionHandler = (reason: unknown) => {
   // For other unhandled rejections, let them propagate (Vitest will handle them)
 }
 
-beforeAll(() => {
+beforeEach(() => {
   if (
     typeof process !== 'undefined' &&
-    typeof process.on === 'function'
+    typeof process.on === 'function' &&
+    typeof process.listeners === 'function'
   ) {
-    process.on('unhandledRejection', rejectionHandler)
+    const listeners = process.listeners('unhandledRejection')
+    if (!listeners.includes(rejectionHandler as (...args: any[]) => void)) {
+      process.on('unhandledRejection', rejectionHandler)
+    }
   }
 })
 
-afterAll(() => {
+afterEach(() => {
   if (
     typeof process !== 'undefined' &&
     typeof process.off === 'function'
   ) {
     process.off('unhandledRejection', rejectionHandler)
   }
+  vi.restoreAllMocks()
+  vi.clearAllTimers()
 })

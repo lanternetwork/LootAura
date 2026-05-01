@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import { sendEmail, type SendEmailParams } from '@/lib/email/sendEmail'
 
@@ -29,6 +29,11 @@ describe('sendEmail', () => {
     vi.clearAllMocks()
     vi.unstubAllEnvs()
     sendMock.mockResolvedValue({ data: { id: 'test-email-id' } })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllTimers()
   })
 
   it('sends email normally when RESEND_FROM_EMAIL is present', async () => {

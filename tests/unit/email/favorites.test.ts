@@ -2,7 +2,7 @@
  * Unit tests for favorite email sending functions
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { sendFavoriteSalesStartingSoonDigestEmail } from '@/lib/email/favorites'
 import { sendEmail } from '@/lib/email/sendEmail'
 import { buildFavoriteSalesStartingSoonDigestSubject } from '@/lib/email/templates/FavoriteSalesStartingSoonDigestEmail'
@@ -74,6 +74,11 @@ describe('sendFavoriteSalesStartingSoonDigestEmail', () => {
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
     process.env.RESEND_FROM_EMAIL = 'no-reply@lootaura.com'
     process.env.NEXT_PUBLIC_SITE_URL = 'https://lootaura.com'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllTimers()
   })
 
   it('should send a digest email for a single sale', async () => {

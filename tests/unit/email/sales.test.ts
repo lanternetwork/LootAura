@@ -49,6 +49,8 @@ describe('sendSaleCreatedEmail', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllTimers()
     delete process.env.LOOTAURA_ENABLE_EMAILS
     delete process.env.RESEND_FROM_EMAIL
     delete process.env.NEXT_PUBLIC_SITE_URL

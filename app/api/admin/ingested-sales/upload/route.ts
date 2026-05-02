@@ -7,6 +7,8 @@ import { ManualUploadSchema } from '@/lib/ingestion/schemas'
 import { processIngestedSale } from '@/lib/ingestion/processSale'
 import { findIngestedSaleMatch } from '@/lib/ingestion/dedupe'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { enqueue, isGeocodeQueueConfigured } from '@/lib/ingestion/geocodeQueue'
+import { geocodeIngestedSaleById } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 import type { RawExternalSale, IngestionRunSummary, CityIngestionConfig, FailureReason } from '@/lib/ingestion/types'
 
@@ -191,6 +193,55 @@ function cleanText(value: string | null): string | null {
   return cleaned.length > 0 ? cleaned : null
 }
 
+/**
+ * Spec §9: if Redis queue is available, enqueue; otherwise (or on enqueue failure) run the worker inline.
+ * Never throws to the upload handler — row is already persisted.
+ */
+async function triggerGeocodeAfterPersist(saleId: string, requestId: string, ingestionRunId: string): Promise<void> {
+  try {
+    if (isGeocodeQueueConfigured()) {
+      try {
+        const jobId = await enqueue(saleId)
+        if (jobId !== null) {
+          return
+        }
+        logger.warn('Geocode enqueue returned null; falling back to inline worker', {
+          component: 'ingestion/upload',
+          operation: 'geocode_trigger',
+          requestId,
+          ingestionRunId,
+          saleId,
+        })
+      } catch (error) {
+        logger.warn(
+          'Geocode enqueue failed; falling back to inline worker',
+          {
+            component: 'ingestion/upload',
+            operation: 'geocode_trigger',
+            requestId,
+            ingestionRunId,
+            saleId,
+            message: error instanceof Error ? error.message : String(error),
+          }
+        )
+      }
+    }
+    await geocodeIngestedSaleById(saleId)
+  } catch (error) {
+    logger.error(
+      'Inline geocode after upload failed (row remains for retry)',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        component: 'ingestion/upload',
+        operation: 'geocode_trigger',
+        requestId,
+        ingestionRunId,
+        saleId,
+      }
+    )
+  }
+}
+
 async function uploadHandler(request: NextRequest): Promise<NextResponse> {
   const opId = generateOperationId()
   const startedAt = Date.now()
@@ -349,11 +400,17 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           continue
         }
         summary.updated += 1
+        if (status === 'needs_geocode') {
+          await triggerGeocodeAfterPersist(match.id, opId, ingestionRunId)
+        }
       } else {
-        const { error: insertError } = await fromBase(admin, 'ingested_sales').insert(basePayload)
-        if (insertError) {
+        const { data: insertedRow, error: insertError } = await fromBase(admin, 'ingested_sales')
+          .insert(basePayload)
+          .select('id')
+          .single()
+        if (insertError || !insertedRow?.id) {
           summary.failed += 1
-          logger.error('Failed to insert ingested sale', new Error(insertError.message), {
+          logger.error('Failed to insert ingested sale', new Error(insertError?.message || 'missing id'), {
             component: 'ingestion/upload',
             operation: 'insert_ingested_sale',
             requestId: opId,
@@ -362,6 +419,9 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           continue
         }
         summary.created += 1
+        if (status === 'needs_geocode') {
+          await triggerGeocodeAfterPersist(insertedRow.id as string, opId, ingestionRunId)
+        }
       }
 
       if (isDuplicate) summary.duplicates += 1

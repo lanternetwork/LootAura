@@ -25,7 +25,7 @@ describe('geocodeQueue', () => {
     })
   })
 
-  it('requeue respects max attempts (three deliveries: attempts 0, 1, 2)', async () => {
+  it('requeue does not cap by job.attempts (visibility counter only)', async () => {
     const fetchMock = vi.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
@@ -43,16 +43,43 @@ describe('geocodeQueue', () => {
       return new Response(JSON.stringify({ result: null }))
     })
 
-    const q = await import('@/lib/ingestion/geocodeQueue')
-    expect(q.GEOCODE_QUEUE_MAX_ATTEMPTS).toBe(3)
+    const { requeue } = await import('@/lib/ingestion/geocodeQueue')
+    expect(await requeue({ jobId: 'job-a', saleId: 'sale-1', attempts: 99, priority: 'normal' })).toEqual({ ok: true })
+  })
 
-    const { requeue } = q
-    expect(await requeue({ jobId: 'job-a', saleId: 'sale-1', attempts: 0, priority: 'normal' })).toEqual({ ok: true })
-    expect(await requeue({ jobId: 'job-a', saleId: 'sale-1', attempts: 1, priority: 'normal' })).toEqual({ ok: true })
-    expect(await requeue({ jobId: 'job-a', saleId: 'sale-1', attempts: 2, priority: 'normal' })).toEqual({
-      ok: false,
-      reason: 'max_attempts',
+  it('processGeocodeQueueBatch requeues when worker returns retriable geocode_failed', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    hoisted.geocodeIngestedSaleById.mockResolvedValue({
+      outcome: 'geocode_failed',
+      retriable: true,
     })
+
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const u = String(url)
+      if (u.endsWith('/rpop')) {
+        return new Response(JSON.stringify({ result: 'job-retry' }))
+      }
+      if (u.endsWith('/get')) {
+        return new Response(
+          JSON.stringify({
+            result: JSON.stringify({ saleId: '00000000-0000-4000-8000-0000000000aa', attempts: 5, priority: 'normal' }),
+          })
+        )
+      }
+      if (u.endsWith('/set') || u.endsWith('/expire') || u.endsWith('/lpush')) {
+        return new Response(JSON.stringify({ result: 'OK' }))
+      }
+      return new Response(JSON.stringify({ result: null }))
+    })
+
+    const { processGeocodeQueueBatch } = await import('@/lib/ingestion/geocodeQueue')
+    const summary = await processGeocodeQueueBatch(2)
+
+    expect(summary.dequeued).toBe(1)
+    expect(summary.requeued).toBe(1)
+    expect(summary.completed).toBe(0)
   })
 
   it('dequeueBatch restores job id when payload is missing', async () => {

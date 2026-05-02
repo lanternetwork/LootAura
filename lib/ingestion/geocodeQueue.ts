@@ -3,9 +3,6 @@ import { ENV_SERVER } from '@/lib/env'
 import { geocodeIngestedSaleById, type GeocodeIngestedSaleByIdResult } from '@/lib/ingestion/geocodeWorker'
 import { logger } from '@/lib/log'
 
-/** Matches ingestion spec §7 / §8: three queue-backed delivery attempts (attempts 0, 1, 2). */
-export const GEOCODE_QUEUE_MAX_ATTEMPTS = 3
-
 const QUEUE_HIGH = 'ingestion:geocode:queue:high'
 const QUEUE_NORMAL = 'ingestion:geocode:queue:normal'
 const JOB_PREFIX = 'ingestion:geocode:job:'
@@ -16,20 +13,20 @@ export type GeocodeJobPriority = 'high' | 'normal'
 export interface GeocodeQueueJob {
   jobId: string
   saleId: string
+  /** Debug/visibility only; retry eligibility comes from `geocodeIngestedSaleById` (DB-backed), not this field. */
   attempts: number
   priority: GeocodeJobPriority
 }
 
 export interface RequeueResult {
   ok: boolean
-  reason?: 'max_attempts' | 'redis'
+  reason?: 'redis'
 }
 
 export interface ProcessGeocodeQueueBatchSummary {
   dequeued: number
   completed: number
   requeued: number
-  maxAttemptsReached: number
 }
 
 interface RedisResponse {
@@ -68,10 +65,6 @@ async function redisCommand(command: string, args: unknown[]): Promise<unknown> 
 
 export function isGeocodeQueueConfigured(): boolean {
   return Boolean(ENV_SERVER.UPSTASH_REDIS_REST_URL && ENV_SERVER.UPSTASH_REDIS_REST_TOKEN)
-}
-
-function canRequeueJob(job: GeocodeQueueJob): boolean {
-  return job.attempts < GEOCODE_QUEUE_MAX_ATTEMPTS - 1
 }
 
 function parseJobPayload(raw: unknown, jobId: string): GeocodeQueueJob | null {
@@ -203,19 +196,16 @@ export async function dequeueBatch(limit: number): Promise<GeocodeQueueJob[]> {
 }
 
 /**
- * Re-add a job for retry with attempts incremented. No-op / returns max_attempts when attempts already at cap.
- * Retries are pushed to the normal list (simple backoff / deprioritization).
+ * Re-add a job for retry. Increments `attempts` in Redis for visibility only; whether another run is useful is
+ * decided by the worker / DB (`geocode_attempts`, status), not by this counter.
+ * Retries are pushed to the normal list (simple deprioritization).
  */
 export async function requeue(job: GeocodeQueueJob): Promise<RequeueResult> {
   if (!isGeocodeQueueConfigured()) {
     return { ok: false, reason: 'redis' }
   }
 
-  if (!canRequeueJob(job)) {
-    return { ok: false, reason: 'max_attempts' }
-  }
-
-  const nextAttempts = job.attempts + 1
+  const nextAttempts = Number.isFinite(job.attempts) ? job.attempts + 1 : 1
   const payload = JSON.stringify({
     saleId: job.saleId,
     attempts: nextAttempts,
@@ -249,14 +239,9 @@ async function restoreJobIdToHead(listKey: string, jobId: string): Promise<void>
   }
 }
 
-function shouldRequeueAfterWorkerResult(result: GeocodeIngestedSaleByIdResult, job: GeocodeQueueJob): boolean {
-  if (!canRequeueJob(job)) {
-    return false
-  }
-  if (result.outcome === 'geocode_failed' && result.retriable) {
-    return true
-  }
-  return false
+/** Requeue only when the worker reports a retriable geocode outcome (DB still owns terminal vs retry). */
+function shouldRequeueAfterWorkerResult(result: GeocodeIngestedSaleByIdResult): boolean {
+  return result.outcome === 'geocode_failed' && result.retriable === true
 }
 
 function isTerminalQueueOutcome(result: GeocodeIngestedSaleByIdResult): boolean {
@@ -277,8 +262,8 @@ function isTerminalQueueOutcome(result: GeocodeIngestedSaleByIdResult): boolean 
 
 /**
  * Drain up to `limit` jobs and invoke `geocodeIngestedSaleById` for each.
- * On retriable geocode failure, requeues with incremented attempts (capped at GEOCODE_QUEUE_MAX_ATTEMPTS).
- * On throw, attempts requeue; if requeue fails, restores the job id onto the normal queue so it is not dropped.
+ * Requeues when the worker returns `geocode_failed` with `retriable: true` (DB is source of truth for exhaustion).
+ * On throw (no structured result), requeues to preserve at-least-once delivery; if requeue fails, restores the job id.
  *
  * Invariant: a dequeued job is either completed (Redis job key removed), requeued onto a list, or restored to a list.
  */
@@ -287,7 +272,6 @@ export async function processGeocodeQueueBatch(limit: number): Promise<ProcessGe
     dequeued: 0,
     completed: 0,
     requeued: 0,
-    maxAttemptsReached: 0,
   }
 
   if (!isGeocodeQueueConfigured()) {
@@ -301,20 +285,14 @@ export async function processGeocodeQueueBatch(limit: number): Promise<ProcessGe
     try {
       const result = await geocodeIngestedSaleById(job.saleId)
 
-      if (shouldRequeueAfterWorkerResult(result, job)) {
+      if (shouldRequeueAfterWorkerResult(result)) {
         const rq = await requeue(job)
         if (rq.ok) {
           summary.requeued += 1
-        } else if (rq.reason === 'max_attempts') {
-          summary.maxAttemptsReached += 1
-          await deleteJobRecord(job.jobId)
         } else {
           await restoreJobIdToHead(QUEUE_NORMAL, job.jobId)
           summary.requeued += 1
         }
-      } else if (result.outcome === 'geocode_failed' && result.retriable && !canRequeueJob(job)) {
-        summary.maxAttemptsReached += 1
-        await deleteJobRecord(job.jobId)
       } else if (isTerminalQueueOutcome(result)) {
         await deleteJobRecord(job.jobId)
         summary.completed += 1
@@ -329,17 +307,12 @@ export async function processGeocodeQueueBatch(limit: number): Promise<ProcessGe
         { component: 'ingestion/geocodeQueue', operation: 'process_item', saleId: job.saleId, jobId: job.jobId }
       )
 
-      if (canRequeueJob(job)) {
-        const rq = await requeue(job)
-        if (rq.ok) {
-          summary.requeued += 1
-        } else {
-          await restoreJobIdToHead(QUEUE_NORMAL, job.jobId)
-          summary.requeued += 1
-        }
+      const rq = await requeue(job)
+      if (rq.ok) {
+        summary.requeued += 1
       } else {
-        summary.maxAttemptsReached += 1
-        await deleteJobRecord(job.jobId)
+        await restoreJobIdToHead(QUEUE_NORMAL, job.jobId)
+        summary.requeued += 1
       }
     }
   }

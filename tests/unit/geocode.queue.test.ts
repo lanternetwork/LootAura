@@ -56,10 +56,12 @@ describe('geocodeQueue', () => {
       retriable: true,
     })
 
+    let rpopCalls = 0
     fetchMock.mockImplementation(async (url: string | URL) => {
       const u = String(url)
       if (u.endsWith('/rpop')) {
-        return new Response(JSON.stringify({ result: 'job-retry' }))
+        rpopCalls += 1
+        return new Response(JSON.stringify({ result: rpopCalls === 1 ? 'job-retry' : null }))
       }
       if (u.endsWith('/get')) {
         return new Response(
@@ -87,10 +89,12 @@ describe('geocodeQueue', () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
     let getCalls = 0
+    let rpopCalls = 0
     fetchMock.mockImplementation(async (url: string | URL) => {
       const u = String(url)
       if (u.endsWith('/rpop')) {
-        return new Response(JSON.stringify({ result: 'job-missing' }))
+        rpopCalls += 1
+        return new Response(JSON.stringify({ result: rpopCalls === 1 ? 'job-missing' : null }))
       }
       if (u.endsWith('/get')) {
         getCalls += 1
@@ -114,10 +118,12 @@ describe('geocodeQueue', () => {
     const fetchMock = vi.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
+    let rpopCalls = 0
     fetchMock.mockImplementation(async (url: string | URL) => {
       const u = String(url)
       if (u.endsWith('/rpop')) {
-        return new Response(JSON.stringify({ result: 'job-1' }))
+        rpopCalls += 1
+        return new Response(JSON.stringify({ result: rpopCalls === 1 ? 'job-1' : null }))
       }
       if (u.endsWith('/get')) {
         return new Response(

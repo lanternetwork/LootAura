@@ -53,6 +53,33 @@ function appendFailureReason(reasons: FailureReason[], reason: FailureReason): F
   return [...reasons, reason]
 }
 
+/** After a sale row exists, never leave ingested_sales stuck in `publishing`. */
+async function markIngestedPublishFailedFromPublishing(
+  rowId: string,
+  existingFailureReasons: unknown,
+  errorMessage: string,
+  operation: string
+): Promise<void> {
+  const admin = getAdminDb()
+  const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
+  const { error } = await fromBase(admin, 'ingested_sales')
+    .update({
+      status: 'publish_failed',
+      failure_reasons: mergedReasons,
+      failure_details: { publish_error: errorMessage },
+    })
+    .eq('id', rowId)
+    .eq('status', 'publishing')
+
+  if (error) {
+    logger.error(
+      'markIngestedPublishFailedFromPublishing failed',
+      new Error(error.message),
+      { component: 'ingestion/publishWorker', operation, rowId }
+    )
+  }
+}
+
 /**
  * Idempotent publish for a single ingestion row: claims ready -> publishing, inserts sale, marks published.
  * Safe if cron publish already processed the row (returns skipped).
@@ -129,6 +156,12 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
             saleId,
           }
         )
+        await markIngestedPublishFailedFromPublishing(
+          claimed.id,
+          claimed.failure_reasons,
+          secondUpdate.error.message,
+          'finalize_after_sale_create_single'
+        )
         return { ok: false, error: secondUpdate.error.message }
       }
     }
@@ -143,6 +176,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     return { ok: true, publishedSaleId: saleId }
   } catch (error) {
     if (createdSaleId) {
+      const message = error instanceof Error ? error.message : String(error)
       logger.error(
         'publishReadyIngestedSaleById sale created but finalization failed',
         error instanceof Error ? error : new Error(String(error)),
@@ -153,7 +187,13 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
           saleId: createdSaleId,
         }
       )
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      await markIngestedPublishFailedFromPublishing(
+        claimed.id,
+        claimed.failure_reasons,
+        message,
+        'catch_after_sale_create_single'
+      )
+      return { ok: false, error: message }
     }
 
     const existingReasons = toFailureReasons(claimed.failure_reasons)
@@ -249,6 +289,12 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary>
               saleId,
             }
           )
+          await markIngestedPublishFailedFromPublishing(
+            row.id,
+            row.failure_reasons,
+            secondUpdate.error.message,
+            'finalize_after_sale_create_batch'
+          )
           summary.failed += 1
           continue
         }
@@ -264,6 +310,7 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary>
     } catch (error) {
       summary.failed += 1
       if (createdSaleId) {
+        const message = error instanceof Error ? error.message : String(error)
         logger.error(
           'Publish worker sale was created but row finalization failed before publish_failed transition',
           error instanceof Error ? error : new Error(String(error)),
@@ -274,6 +321,12 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary>
             saleId: createdSaleId,
             result: 'failure_after_sale_create',
           }
+        )
+        await markIngestedPublishFailedFromPublishing(
+          row.id,
+          row.failure_reasons,
+          message,
+          'catch_after_sale_create_batch'
         )
         continue
       }

@@ -96,7 +96,11 @@ export async function createPublishedSale(ingestedSale: PublishableIngestedSale)
     .single()
 
   if (error || !data?.id) {
-    throw new Error(error?.message || 'Failed to create published sale')
+    const err = new Error(error?.message || 'Failed to create published sale') as Error & { pgCode?: string }
+    if (error && typeof error === 'object' && 'code' in error && error.code != null) {
+      err.pgCode = String((error as { code: unknown }).code)
+    }
+    throw err
   }
 
   return { saleId: data.id as string }

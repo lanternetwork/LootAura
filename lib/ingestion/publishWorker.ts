@@ -1,5 +1,5 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
-import { createPublishedSale } from '@/lib/ingestion/publish'
+import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingestion/publish'
 import { logger } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 
@@ -53,6 +53,70 @@ function appendFailureReason(reasons: FailureReason[], reason: FailureReason): F
   return [...reasons, reason]
 }
 
+function isIngestedSaleIdUniqueViolation(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error)
+  const pgCode =
+    error && typeof error === 'object' && 'pgCode' in error
+      ? String((error as { pgCode?: string }).pgCode ?? '')
+      : ''
+  if (pgCode !== '23505') return false
+  return (
+    msg.includes('idx_sales_ingested_sale_id_unique') ||
+    (msg.includes('duplicate key') && msg.includes('ingested_sale_id'))
+  )
+}
+
+async function fetchExistingSaleIdForIngested(ingestedSaleId: string): Promise<string | null> {
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, 'sales')
+    .select('id')
+    .eq('ingested_sale_id', ingestedSaleId)
+    .limit(1)
+  if (error || !data?.length) return null
+  return (data[0] as { id: string }).id
+}
+
+function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngestedSale {
+  return {
+    id: record.id,
+    source_platform: record.source_platform,
+    source_url: record.source_url,
+    title: record.title,
+    description: record.description,
+    normalized_address: record.normalized_address,
+    city: record.city,
+    state: record.state,
+    zip_code: record.zip_code,
+    lat: Number(record.lat),
+    lng: Number(record.lng),
+    date_start: record.date_start,
+    date_end: record.date_end,
+    time_start: record.time_start,
+    time_end: record.time_end,
+    image_cloudinary_url: record.image_cloudinary_url,
+  }
+}
+
+/** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */
+async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<string> {
+  const body = claimedRowToPublishable(record)
+  try {
+    const { saleId } = await createPublishedSale(body)
+    return saleId
+  } catch (err) {
+    if (!isIngestedSaleIdUniqueViolation(err)) throw err
+    const existing = await fetchExistingSaleIdForIngested(record.id)
+    if (!existing) throw err
+    logger.info('publish idempotent: resolved existing sale for ingested row', {
+      component: 'ingestion/publishWorker',
+      operation: 'reuse_existing_sale',
+      rowId: record.id,
+      saleId: existing,
+    })
+    return existing
+  }
+}
+
 /** After a sale row exists, never leave ingested_sales stuck in `publishing`. */
 async function markIngestedPublishFailedFromPublishing(
   rowId: string,
@@ -62,22 +126,51 @@ async function markIngestedPublishFailedFromPublishing(
 ): Promise<void> {
   const admin = getAdminDb()
   const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
-  const { error } = await fromBase(admin, 'ingested_sales')
-    .update({
-      status: 'publish_failed',
-      failure_reasons: mergedReasons,
-      failure_details: { publish_error: errorMessage },
-    })
-    .eq('id', rowId)
-    .eq('status', 'publishing')
-
-  if (error) {
-    logger.error(
-      'markIngestedPublishFailedFromPublishing failed',
-      new Error(error.message),
-      { component: 'ingestion/publishWorker', operation, rowId }
-    )
+  const payload = {
+    status: 'publish_failed' as const,
+    failure_reasons: mergedReasons,
+    failure_details: { publish_error: errorMessage },
   }
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { error } = await fromBase(admin, 'ingested_sales')
+      .update(payload)
+      .eq('id', rowId)
+      .eq('status', 'publishing')
+    if (!error) {
+      return
+    }
+    if (attempt === 1) {
+      logger.error(
+        'markIngestedPublishFailedFromPublishing guarded update failed after 2 attempts',
+        new Error(error.message),
+        { component: 'ingestion/publishWorker', operation, rowId }
+      )
+    } else {
+      logger.error(
+        'markIngestedPublishFailedFromPublishing guarded update failed (will retry)',
+        new Error(error.message),
+        { component: 'ingestion/publishWorker', operation, rowId, attempt: attempt + 1 }
+      )
+    }
+  }
+
+  const { error: fallbackError } = await fromBase(admin, 'ingested_sales').update(payload).eq('id', rowId)
+
+  if (fallbackError) {
+    logger.error(
+      '[CRITICAL] markIngestedPublishFailedFromPublishing fallback update failed — ingested row may still be non-terminal',
+      new Error(fallbackError.message),
+      { component: 'ingestion/publishWorker', operation, rowId, critical: true }
+    )
+    return
+  }
+
+  logger.error(
+    '[CRITICAL] markIngestedPublishFailedFromPublishing used unguarded fallback to clear publishing',
+    new Error(errorMessage),
+    { component: 'ingestion/publishWorker', operation, rowId, critical: true, usedFallbackWithoutStatusGuard: true }
+  )
 }
 
 /**
@@ -117,24 +210,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   let createdSaleId: string | null = null
 
   try {
-    const { saleId } = await createPublishedSale({
-      id: claimed.id,
-      source_platform: claimed.source_platform,
-      source_url: claimed.source_url,
-      title: claimed.title,
-      description: claimed.description,
-      normalized_address: claimed.normalized_address,
-      city: claimed.city,
-      state: claimed.state,
-      zip_code: claimed.zip_code,
-      lat: Number(claimed.lat),
-      lng: Number(claimed.lng),
-      date_start: claimed.date_start,
-      date_end: claimed.date_end,
-      time_start: claimed.time_start,
-      time_end: claimed.time_end,
-      image_cloudinary_url: claimed.image_cloudinary_url,
-    })
+    const saleId = await tryCreatePublishedSaleOrReuseExisting(claimed)
     createdSaleId = saleId
 
     const updatePayload = {
@@ -246,24 +322,7 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary>
   for (const row of claimedRows) {
     let createdSaleId: string | null = null
     try {
-      const { saleId } = await createPublishedSale({
-        id: row.id,
-        source_platform: row.source_platform,
-        source_url: row.source_url,
-        title: row.title,
-        description: row.description,
-        normalized_address: row.normalized_address,
-        city: row.city,
-        state: row.state,
-        zip_code: row.zip_code,
-        lat: row.lat,
-        lng: row.lng,
-        date_start: row.date_start,
-        date_end: row.date_end,
-        time_start: row.time_start,
-        time_end: row.time_end,
-        image_cloudinary_url: row.image_cloudinary_url,
-      })
+      const saleId = await tryCreatePublishedSaleOrReuseExisting(row)
       createdSaleId = saleId
 
       const updatePayload = {

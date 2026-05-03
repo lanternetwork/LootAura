@@ -7,14 +7,11 @@ import type { FailureReason } from '@/lib/ingestion/types'
 interface ClaimedGeocodeRow {
   id: string
   normalized_address: string | null
+  address_raw: string | null
   city: string | null
   state: string | null
   geocode_attempts: number
   failure_reasons: unknown
-}
-
-type GeocodeSourceRow = ClaimedGeocodeRow & {
-  address_raw?: string | null
 }
 
 export interface GeocodeWorkerSummary {
@@ -53,7 +50,7 @@ function appendFailureReason(reasons: FailureReason[], reason: FailureReason): F
   return [...reasons, reason]
 }
 
-function streetLineForGeocode(row: GeocodeSourceRow): string {
+function streetLineForGeocode(row: ClaimedGeocodeRow): string {
   const normalized = row.normalized_address?.trim() || ''
   if (normalized) {
     return normalized
@@ -142,7 +139,7 @@ type AttemptResult =
 /**
  * Shared processor for a row whose `geocode_attempts` has already been incremented (RPC claim or by-id path).
  */
-async function processGeocodeAttempt(row: GeocodeSourceRow): Promise<AttemptResult> {
+async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptResult> {
   const admin = getAdminDb()
   const rowId = row.id
   const attemptCount = row.geocode_attempts
@@ -289,10 +286,10 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
     return { outcome: 'skipped', reason: 'concurrent_status_change' }
   }
 
-  const attemptRow: GeocodeSourceRow = {
+  const attemptRow: ClaimedGeocodeRow = {
     id: r.id,
     normalized_address: r.normalized_address,
-    address_raw: r.address_raw,
+    address_raw: r.address_raw ?? null,
     city: r.city,
     state: r.state,
     geocode_attempts: nextAttempts,

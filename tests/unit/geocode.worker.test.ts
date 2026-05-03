@@ -4,10 +4,13 @@ const hoisted = vi.hoisted(() => ({
   maybeSingleResults: [] as Array<{ data: unknown; error: Error | null }>,
   geocodeAddress: vi.fn(),
   publishReadyIngestedSaleById: vi.fn(),
+  adminRpc: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getAdminDb: vi.fn(() => ({})),
+  getAdminDb: vi.fn(() => ({
+    rpc: hoisted.adminRpc,
+  })),
   fromBase: vi.fn(() => createQueryBuilder()),
 }))
 
@@ -54,6 +57,8 @@ describe('geocodeIngestedSaleById', () => {
     hoisted.maybeSingleResults = []
     hoisted.geocodeAddress.mockReset()
     hoisted.publishReadyIngestedSaleById.mockReset()
+    hoisted.adminRpc.mockReset()
+    hoisted.adminRpc.mockResolvedValue({ data: [], error: null })
     hoisted.publishReadyIngestedSaleById.mockResolvedValue({
       ok: true,
       skipped: true,
@@ -163,5 +168,155 @@ describe('geocodeIngestedSaleById', () => {
       state: 'KY',
     })
     expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000003')
+  })
+
+  it('by-id uses address_raw when normalized_address is empty', async () => {
+    hoisted.maybeSingleResults.push({
+      data: {
+        id: '00000000-0000-4000-8000-000000000004',
+        status: 'needs_geocode',
+        normalized_address: null,
+        address_raw: '55 Raw St',
+        city: 'Louisville',
+        state: 'KY',
+        lat: null,
+        lng: null,
+        geocode_attempts: 0,
+        failure_reasons: [],
+        published_sale_id: null,
+      },
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { id: '00000000-0000-4000-8000-000000000004' },
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { id: '00000000-0000-4000-8000-000000000004' },
+      error: null,
+    })
+
+    hoisted.geocodeAddress.mockResolvedValue({ lat: 38.3, lng: -85.9 })
+    hoisted.publishReadyIngestedSaleById.mockResolvedValue({
+      ok: true,
+      publishedSaleId: 'sale-raw',
+    })
+
+    const { geocodeIngestedSaleById } = await import('@/lib/ingestion/geocodeWorker')
+    const result = await geocodeIngestedSaleById('00000000-0000-4000-8000-000000000004')
+
+    expect(result.outcome).toBe('success')
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
+      address: '55 Raw St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+  })
+})
+
+const claimedRowBase = {
+  id: '00000000-0000-4000-8000-0000000000aa',
+  city: 'Louisville',
+  state: 'KY',
+  failure_reasons: [] as unknown[],
+}
+
+describe('geocodePendingSales (batch / RPC path)', () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    hoisted.maybeSingleResults = []
+    hoisted.geocodeAddress.mockReset()
+    hoisted.publishReadyIngestedSaleById.mockReset()
+    hoisted.adminRpc.mockReset()
+    hoisted.adminRpc.mockResolvedValue({ data: [], error: null })
+    hoisted.publishReadyIngestedSaleById.mockResolvedValue({
+      ok: true,
+      publishedSaleId: 'sale-batch',
+    })
+  })
+
+  it('batch geocode uses normalized_address when present', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b1',
+          normalized_address: '300 Batch Norm',
+          address_raw: 'ignored raw',
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { id: '00000000-0000-4000-8000-0000000000b1' },
+      error: null,
+    })
+    hoisted.geocodeAddress.mockResolvedValue({ lat: 38.4, lng: -85.1 })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.claimed).toBe(1)
+    expect(summary.succeeded).toBe(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
+      address: '300 Batch Norm',
+      city: 'Louisville',
+      state: 'KY',
+    })
+    expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledWith('00000000-0000-4000-8000-0000000000b1')
+  })
+
+  it('batch geocode uses address_raw when normalized_address is empty', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b2',
+          normalized_address: null,
+          address_raw: '400 Only Raw Rd',
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { id: '00000000-0000-4000-8000-0000000000b2' },
+      error: null,
+    })
+    hoisted.geocodeAddress.mockResolvedValue({ lat: 38.5, lng: -85.2 })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.claimed).toBe(1)
+    expect(summary.succeeded).toBe(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
+      address: '400 Only Raw Rd',
+      city: 'Louisville',
+      state: 'KY',
+    })
+  })
+
+  it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b3',
+          normalized_address: null,
+          address_raw: null,
+          geocode_attempts: 3,
+        },
+      ],
+      error: null,
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.claimed).toBe(1)
+    expect(summary.failedTerminal).toBe(1)
+    expect(hoisted.geocodeAddress).not.toHaveBeenCalled()
   })
 })

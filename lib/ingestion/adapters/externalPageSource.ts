@@ -205,8 +205,14 @@ function extractFallbackAddressAndDates(
 
   function scoreAddressCandidate(line: string): number {
     let score = 0
+    const cityLower = city.trim().toLowerCase()
+    const stateLower = state.trim().toLowerCase()
+    const lineLower = line.toLowerCase()
     if (line.includes(',')) score += 2
     if (/\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY|DC)\b/i.test(line)) {
+      score += 1
+    }
+    if ((cityLower && lineLower.includes(cityLower)) || (stateLower && lineLower.includes(stateLower))) {
       score += 1
     }
     if (/\b(ave|avenue|st|street|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|pl|place|way|pkwy|parkway)\b/i.test(line)) {

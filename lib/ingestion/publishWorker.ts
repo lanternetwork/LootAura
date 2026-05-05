@@ -62,8 +62,10 @@ function appendFailureReason(reasons: FailureReason[], reason: FailureReason): F
 /** Stored on `ingested_sales.failure_details` — no raw addresses, titles, or URLs (ops-safe region only). */
 export type PublishFailureDetails = {
   publish_error: string
-  phase: 'create_sale' | 'finalize_ingested_row'
+  phase: 'create_sale' | 'finalize_ingested_row' | 'validation'
   operation: string
+  reason?: 'past_end_date'
+  original_date_end?: string
   region?: { city: string | null; state: string | null }
   /** Present when a `sales` row was created but ingested row could not be marked published. */
   published_sale_id?: string
@@ -74,6 +76,8 @@ function buildPublishFailureDetails(
   ctx: {
     phase: PublishFailureDetails['phase']
     operation: string
+    reason?: PublishFailureDetails['reason']
+    originalDateEnd?: string | null
     city?: string | null
     state?: string | null
     publishedSaleId?: string | null
@@ -83,6 +87,12 @@ function buildPublishFailureDetails(
     publish_error: message,
     phase: ctx.phase,
     operation: ctx.operation,
+  }
+  if (ctx.reason) {
+    out.reason = ctx.reason
+  }
+  if (ctx.originalDateEnd) {
+    out.original_date_end = ctx.originalDateEnd
   }
   if (ctx.city != null || ctx.state != null) {
     out.region = { city: ctx.city ?? null, state: ctx.state ?? null }
@@ -101,6 +111,8 @@ function logPublishFailureStructured(params: {
   city?: string | null
   state?: string | null
   saleId?: string | null
+  reason?: PublishFailureDetails['reason']
+  dateEnd?: string | null
 }): void {
   const context: LogContext = {
     component: 'ingestion/publishWorker',
@@ -113,7 +125,23 @@ function logPublishFailureStructured(params: {
   if (params.saleId) {
     context.saleId = params.saleId
   }
+  if (params.reason) {
+    context.reason = params.reason
+  }
+  if (params.dateEnd) {
+    context.dateEnd = params.dateEnd
+  }
   logger.error('ingested_sales publish failure', new Error(params.message), context)
+}
+
+function utcTodayDateString(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function hasPastEndDate(dateEnd: string | null): boolean {
+  if (!dateEnd) return false
+  const today = utcTodayDateString()
+  return dateEnd < today
 }
 
 function isIngestedSaleIdUniqueViolation(error: unknown): boolean {
@@ -230,6 +258,74 @@ async function markIngestedPublishFailedFromSaleCreateError(
   }
 }
 
+async function markIngestedPublishFailedValidation(
+  rowId: string,
+  existingFailureReasons: unknown,
+  operation: string,
+  city: string | null,
+  state: string | null,
+  dateEnd: string
+): Promise<void> {
+  const admin = getAdminDb()
+  const message = `terminal validation failure: date_end ${dateEnd} is before ${utcTodayDateString()}`
+  const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
+  const payload = {
+    status: 'publish_failed' as const,
+    failure_reasons: mergedReasons,
+    failure_details: buildPublishFailureDetails(message, {
+      phase: 'validation',
+      operation,
+      reason: 'past_end_date',
+      originalDateEnd: dateEnd,
+      city,
+      state,
+    }),
+  }
+
+  logPublishFailureStructured({
+    rowId,
+    message,
+    phase: 'validation',
+    operation,
+    city,
+    state,
+    reason: 'past_end_date',
+    dateEnd,
+  })
+
+  const { error: upErr } = await fromBase(admin, 'ingested_sales')
+    .update(payload)
+    .eq('id', rowId)
+    .eq('status', 'publishing')
+
+  if (!upErr) {
+    return
+  }
+
+  logger.error(
+    'markIngestedPublishFailedValidation guarded update failed; triggering fallback',
+    new Error(upErr.message),
+    { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date' }
+  )
+
+  const { error: fallbackError } = await fromBase(admin, 'ingested_sales').update(payload).eq('id', rowId)
+
+  if (fallbackError) {
+    logger.error(
+      '[CRITICAL] markIngestedPublishFailedValidation fallback update failed — ingested row may still be non-terminal',
+      new Error(fallbackError.message),
+      { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date', critical: true }
+    )
+    return
+  }
+
+  logger.error(
+    '[CRITICAL] markIngestedPublishFailedValidation used unguarded fallback to clear publishing',
+    new Error(message),
+    { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date', critical: true, usedFallbackWithoutStatusGuard: true }
+  )
+}
+
 /** After a sale row exists, never leave ingested_sales stuck in `publishing`. */
 async function markIngestedPublishFailedFromPublishing(
   rowId: string,
@@ -339,6 +435,18 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   }
 
   const claimed = row as unknown as ClaimedPublishRow
+  if (hasPastEndDate(claimed.date_end)) {
+    await markIngestedPublishFailedValidation(
+      claimed.id,
+      claimed.failure_reasons,
+      'validate_end_date_single',
+      claimed.city,
+      claimed.state,
+      claimed.date_end as string
+    )
+    return { ok: false, error: `publish blocked: past end date (${claimed.date_end})` }
+  }
+
   let createdSaleId: string | null = null
 
   try {
@@ -449,6 +557,19 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
   }
 
   for (const row of claimedRows) {
+    if (hasPastEndDate(row.date_end)) {
+      await markIngestedPublishFailedValidation(
+        row.id,
+        row.failure_reasons,
+        'validate_end_date_batch',
+        row.city,
+        row.state,
+        row.date_end as string
+      )
+      summary.failed += 1
+      continue
+    }
+
     let createdSaleId: string | null = null
     try {
       const saleId = await tryCreatePublishedSaleOrReuseExisting(row)

@@ -341,7 +341,7 @@ export function parseExternalPageSourceHtml(
     if (parts[1].toLowerCase() !== stateSegment.toLowerCase()) continue
 
     const addressSlug = parts[3]
-    const addressRaw = addressSlug ? slugSegmentToAddressRaw(addressSlug) : null
+    let addressRaw = addressSlug ? slugSegmentToAddressRaw(addressSlug) : null
 
     let title = (a.textContent || '').replace(/\s+/g, ' ').trim()
     title = title.replace(/[\u200b\s]+$/g, '').replace(/^[\s\u200b]+/g, '')

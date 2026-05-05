@@ -29,10 +29,8 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
 import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
-import type { GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
-import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
-import type { PublishWorkerBatchSummary } from '@/lib/ingestion/publishWorker'
-import { publishReadyIngestedSales } from '@/lib/ingestion/publishWorker'
+import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
+import { publishReadyIngestedSales, type PublishWorkerBatchSummary } from '@/lib/ingestion/publishWorker'
 import { recordIngestionOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
 import {
   normalizeSourcePages,

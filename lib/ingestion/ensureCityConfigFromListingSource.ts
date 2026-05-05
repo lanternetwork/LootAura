@@ -11,8 +11,9 @@
  * existing rows are never updated by this path.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { fromBase } from '@/lib/supabase/clients'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+
+type AdminDb = ReturnType<typeof getAdminDb>
 import { logger } from '@/lib/log'
 
 const YSTM_HOSTS = new Set(['yardsaletreasuremap.com', 'www.yardsaletreasuremap.com'])
@@ -57,7 +58,7 @@ export function deriveYardsaleTreasureMapCityPageUrl(sourceUrl: string): string 
  * → `Prefer: resolution=ignore-duplicates` → SQL `ON CONFLICT DO NOTHING`.
  */
 export async function ensureIngestionCityConfigFromListingSource(
-  admin: SupabaseClient,
+  admin: AdminDb,
   args: {
     city: string
     stateCode: string

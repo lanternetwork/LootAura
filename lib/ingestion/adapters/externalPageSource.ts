@@ -121,7 +121,7 @@ function collectNearbyText(anchor: Element, maxDepth: number): string {
   const parts: string[] = []
   let el: Element | null = anchor
   for (let depth = 0; el && depth < maxDepth; depth++) {
-    const p = el.parentElement
+    const p: Element | null = el.parentElement
     if (!p) break
     parts.push(p.textContent || '')
     el = p

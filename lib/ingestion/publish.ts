@@ -4,6 +4,7 @@ import type { PublishInput } from '@/lib/ingestion/types'
 
 export interface PublishableIngestedSale {
   id: string
+  owner_id?: string | null
   source_platform: string
   source_url: string
   title: string | null
@@ -21,16 +22,12 @@ export interface PublishableIngestedSale {
   image_cloudinary_url: string | null
 }
 
-function requiredOwnerId(): string {
-  const ownerId = process.env.INGESTED_SALES_OWNER_ID
-  if (!ownerId) {
-    throw new Error('INGESTED_SALES_OWNER_ID is required for ingestion publishing')
-  }
-  return ownerId
-}
+// Temporary explicit system owner for ingestion-published sales.
+// Must match an existing profiles.id/auth user id in the target environment.
+const FIXED_INGEST_OWNER_ID = 'b2750036-4a71-404a-9020-1734b5b888b1'
 
 function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishInput {
-  const ownerId = requiredOwnerId()
+  const ownerId = ingestedSale.owner_id?.trim() || FIXED_INGEST_OWNER_ID
   const title = (ingestedSale.title || '').trim() || `${ingestedSale.city || 'Unknown'} Yard Sale`
   const address = ingestedSale.normalized_address?.trim() || null
   const city = (ingestedSale.city || '').trim()

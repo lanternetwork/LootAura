@@ -3,6 +3,10 @@ import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingesti
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 
+// Temporary explicit system owner for ingestion-published sales.
+// Must match an existing profiles.id/auth user id in the target environment.
+const FIXED_INGEST_OWNER_ID = 'b2750036-4a71-404a-9020-1734b5b888b1'
+
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
   | { ok: true; skipped: true; reason: 'not_eligible' }
@@ -170,6 +174,7 @@ async function fetchExistingSaleIdForIngested(ingestedSaleId: string): Promise<s
 function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngestedSale {
   return {
     id: record.id,
+    owner_id: FIXED_INGEST_OWNER_ID,
     source_platform: record.source_platform,
     source_url: record.source_url,
     title: record.title,

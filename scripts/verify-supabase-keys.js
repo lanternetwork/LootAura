@@ -14,19 +14,19 @@ async function verifySupabaseKeys() {
   // Check environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   console.log('📋 Environment Variables:')
   console.log(`  SUPABASE_URL: ${supabaseUrl ? '✅ Set' : '❌ Missing'}`)
   console.log(`  ANON_KEY: ${anonKey ? '✅ Set' : '❌ Missing'}`)
-  console.log(`  SERVICE_ROLE: ${serviceRoleKey ? '✅ Set' : '❌ Missing'}\n`)
+  console.log(`  SERVICE_ROLE_KEY: ${serviceRoleKey ? '✅ Set' : '❌ Missing'}\n`)
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     console.log('❌ Missing required environment variables!')
     console.log('Make sure you have a .env.local file with:')
     console.log('  NEXT_PUBLIC_SUPABASE_URL=your-url')
     console.log('  NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key')
-    console.log('  SUPABASE_SERVICE_ROLE=your-service-role-key')
+    console.log('  SUPABASE_SERVICE_ROLE_KEY=your-service-role-key')
     process.exit(1)
   }
 

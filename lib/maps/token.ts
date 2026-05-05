@@ -1,6 +1,9 @@
 export function getMapboxToken(): string {
-  const t = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_MAP_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
-  return t || ''
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+  if (!mapboxToken) {
+    throw new Error('Missing NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN')
+  }
+  return mapboxToken
 }
 
 

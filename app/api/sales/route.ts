@@ -602,12 +602,14 @@ async function salesHandler(request: NextRequest) {
         query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
       }
       
-      // Fetch a wider slice to allow client-side distance filtering
-      // Account for offset: we need to fetch enough items to cover offset + limit after filtering
-      // Use a multiplier to account for filtering (distance, date) that may reduce results
-      const fetchWindow = Math.min(1000, Math.max((offset + limit) * 3, 200))
+      // Fetch a wider slice to allow client-side distance filtering.
+      // We intentionally avoid id-based ordering here because id order is arbitrary for spatial relevance
+      // and can exclude nearby rows in dense areas before distance filtering runs.
+      // Inflate window size to reduce false exclusions under Supabase/PostgREST non-spatial ordering limits.
+      // True fix: server-side spatial ordering (future PostGIS migration).
+      const fetchWindow = Math.min(1000, Math.max((offset + limit) * 5, 200))
       let { data: salesData, error: salesError } = await query
-        .order('id', { ascending: true })
+        .order('date_start', { ascending: true, nullsFirst: false })
         .range(0, fetchWindow - 1)
       
       // If query failed due to missing moderation_status column, retry without it
@@ -674,7 +676,7 @@ async function salesHandler(request: NextRequest) {
         }
         
         const retryResult = await query
-          .order('id', { ascending: true })
+          .order('date_start', { ascending: true, nullsFirst: false })
           .range(0, fetchWindow - 1)
         
         salesData = retryResult.data

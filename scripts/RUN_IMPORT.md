@@ -43,7 +43,7 @@ If you have the full path to node:
 Make sure your `.env.local` file contains:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE=your_service_role_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 ```
 
 ## Expected Output

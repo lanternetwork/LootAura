@@ -39,7 +39,7 @@ These variables are exposed to the browser and safe for client-side code.
 - `NEXT_PUBLIC_SITE_URL` - Canonical site URL
 
 ### Monitoring & Analytics
-- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for error tracking
+- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for client-side error tracking
 - `NEXT_PUBLIC_CLARITY_ID` - Microsoft Clarity project ID
 
 ### Push Notifications
@@ -56,7 +56,7 @@ These variables are exposed to the browser and safe for client-side code.
 These variables are **never** exposed to the browser and must remain server-side only.
 
 ### Supabase
-- `SUPABASE_SERVICE_ROLE` - Supabase service role key (bypasses RLS)
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (bypasses RLS)
 
 ### Rate Limiting
 - `UPSTASH_REDIS_REST_URL` - Upstash Redis REST URL
@@ -77,6 +77,9 @@ These variables are **never** exposed to the browser and must remain server-side
 
 ### Operations
 - `MAINTENANCE_MODE` - Enable site-wide maintenance page
+
+### Monitoring
+- `SENTRY_DSN` - Sentry DSN for server-side error tracking
 
 ## Setting Environment Variables
 

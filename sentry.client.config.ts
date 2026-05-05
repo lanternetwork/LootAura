@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs'
 
 // Only enable Sentry in production
 const isProduction = process.env.NODE_ENV === 'production'
-const dsn = process.env.SENTRY_DSN
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
 
 Sentry.init({
   dsn: isProduction ? dsn : undefined,

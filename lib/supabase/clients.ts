@@ -122,7 +122,7 @@ export async function getRlsBaseClient(_request?: NextRequest) {
 // Service-role client (server-only)
 export function getAdminDb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE!
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
     throw new Error('Supabase service role credentials missing')

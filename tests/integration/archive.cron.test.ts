@@ -27,13 +27,44 @@ vi.mock('@/lib/jobs/processor', () => ({
 }))
 
 vi.mock('@/lib/email/moderationDigest', () => ({
-  sendModerationDailyDigest: (...args: any[]) => mockSendModerationDailyDigest(...args),
+  sendModerationDailyDigestEmail: (...args: any[]) => mockSendModerationDailyDigest(...args),
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => db.from(table),
 }))
+
+const { mockGeocodePendingSales, mockPublishReadyIngestedSales } = vi.hoisted(() => ({
+  mockGeocodePendingSales: vi.fn(),
+  mockPublishReadyIngestedSales: vi.fn(),
+}))
+
+vi.mock('@/lib/ingestion/geocodeWorker', () => ({
+  geocodePendingSales: (...args: unknown[]) => mockGeocodePendingSales(...args),
+}))
+
+vi.mock('@/lib/ingestion/publishWorker', () => ({
+  publishReadyIngestedSales: (...args: unknown[]) => mockPublishReadyIngestedSales(...args),
+}))
+
+vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
+  recordIngestionOrchestrationRun: vi.fn().mockResolvedValue(undefined),
+}))
+
+const { mockPersistExternalPageSource } = vi.hoisted(() => ({
+  mockPersistExternalPageSource: vi.fn(),
+}))
+
+vi.mock('@/lib/ingestion/adapters/externalPageSource', async () => {
+  const mod = await vi.importActual<typeof import('@/lib/ingestion/adapters/externalPageSource')>(
+    '@/lib/ingestion/adapters/externalPageSource'
+  )
+  return {
+    ...mod,
+    persistExternalPageSource: (...args: unknown[]) => mockPersistExternalPageSource(...args),
+  }
+})
 
 // Mock logger
 vi.mock('@/lib/log', () => ({
@@ -56,6 +87,17 @@ function getDateString(daysOffset: number): string {
   return date.toISOString().split('T')[0] // YYYY-MM-DD
 }
 
+function ingestionCityConfigsDbMock() {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      }),
+    })),
+  }
+}
+
 describe('GET /api/cron/daily - Archive task', () => {
   let GET: any
 
@@ -69,7 +111,28 @@ describe('GET /api/cron/daily - Archive task', () => {
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth
     mockProcessFavoriteSalesStartingSoonJob.mockResolvedValue({ success: true })
     mockSendModerationDailyDigest.mockResolvedValue({ ok: true })
-    
+    mockGeocodePendingSales.mockResolvedValue({
+      claimed: 0,
+      succeeded: 0,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      rate429Count: 0,
+    })
+    mockPublishReadyIngestedSales.mockResolvedValue({
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      skipped: 0,
+    })
+    mockPersistExternalPageSource.mockResolvedValue({
+      fetched: 0,
+      inserted: 0,
+      skipped: 0,
+      invalid: 0,
+      errors: 0,
+      pagesProcessed: 0,
+    })
+
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
   })
@@ -156,6 +219,9 @@ describe('GET /api/cron/daily - Archive task', () => {
           })),
         }
       }
+      if (table === 'ingestion_city_configs') {
+        return ingestionCityConfigsDbMock()
+      }
       return { from: vi.fn() }
     })
 
@@ -171,6 +237,7 @@ describe('GET /api/cron/daily - Archive task', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
+    expect(data.mode).toBe('daily')
     expect(data.tasks.archiveSales).toBeDefined()
     expect(data.tasks.archiveSales.ok).toBe(true)
     expect(data.tasks.archiveSales.archived).toBe(1)
@@ -228,6 +295,9 @@ describe('GET /api/cron/daily - Archive task', () => {
             })),
           })),
         }
+      }
+      if (table === 'ingestion_city_configs') {
+        return ingestionCityConfigsDbMock()
       }
       return { from: vi.fn() }
     })
@@ -298,6 +368,9 @@ describe('GET /api/cron/daily - Archive task', () => {
           })),
         }
       }
+      if (table === 'ingestion_city_configs') {
+        return ingestionCityConfigsDbMock()
+      }
       return { from: vi.fn() }
     })
 
@@ -366,6 +439,9 @@ describe('GET /api/cron/daily - Archive task', () => {
             })),
           })),
         }
+      }
+      if (table === 'ingestion_city_configs') {
+        return ingestionCityConfigsDbMock()
       }
       return { from: vi.fn() }
     })

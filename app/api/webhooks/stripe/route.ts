@@ -327,7 +327,7 @@ async function finalizeDraftPromotion(
     try {
       // Get user email using Admin API
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY
       
       if (!url || !key) {
         // Skip email if env vars not available

@@ -7,6 +7,20 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: "Operation mode"
+        required: true
+        type: choice
+        options:
+          - load-tests
+          - seed-city-configs
+          - verify-city-configs
+        default: load-tests
+      csv_path:
+        description: "CSV/txt path for city config seeding (repo-relative)"
+        required: false
+        type: string
+        default: scripts/data/external-city-page-links.txt
       baseURL:
         description: "Target base URL (e.g., https://<preview>.vercel.app or http://localhost:3000 via tunnel)"
         required: true
@@ -28,6 +42,16 @@ on:
           - multi-ip-sales
   workflow_call:
     inputs:
+      operation:
+        description: "Operation mode"
+        required: false
+        type: string
+        default: load-tests
+      csv_path:
+        description: "CSV/txt path for city config seeding (repo-relative)"
+        required: false
+        type: string
+        default: scripts/data/external-city-page-links.txt
       baseURL:
         description: "Target base URL"
         required: true
@@ -40,6 +64,7 @@ on:
 jobs:
   run-load-tests:
     name: Run Load Tests
+    if: ${{ inputs.operation == 'load-tests' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -117,5 +142,53 @@ jobs:
             echo "- Scenario: ${{ inputs.scenario }}";
             echo "- Logs: uploaded as artifact 'load-results-${{ github.run_id }}'";
           } >> "$GITHUB_STEP_SUMMARY"
+
+  seed-city-configs:
+    name: Seed City Configs
+    if: ${{ inputs.operation == 'seed-city-configs' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Seed ingestion_city_configs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx --yes tsx scripts/seedCityConfigs.ts "${{ inputs.csv_path }}"
+
+  verify-city-configs:
+    name: Verify City Configs
+    if: ${{ inputs.operation == 'verify-city-configs' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify ingestion_city_configs coverage
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx --yes tsx scripts/verifyCityConfigs.ts "${{ inputs.csv_path }}"
 
 

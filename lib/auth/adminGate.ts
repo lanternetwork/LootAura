@@ -47,13 +47,15 @@ export async function assertAdminOrThrow(_req: Request): Promise<{ user: { id: s
  * Redirects to sign-in if not authenticated
  * Returns 404 if authenticated but not an admin
  */
-export async function requireAdminToolsAccess(): Promise<{ user: { id: string; email: string } }> {
+export async function requireAdminToolsAccess(
+  redirectTo: string = '/admin/tools'
+): Promise<{ user: { id: string; email: string } }> {
   const supabase = await createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   // If no user, redirect to sign-in
   if (authError || !user) {
-    redirect('/auth/signin?redirectTo=/admin/tools')
+    redirect(`/auth/signin?redirectTo=${encodeURIComponent(redirectTo)}`)
   }
 
   // Get user email

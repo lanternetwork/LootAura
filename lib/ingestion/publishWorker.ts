@@ -59,6 +59,61 @@ function appendFailureReason(reasons: FailureReason[], reason: FailureReason): F
   return [...reasons, reason]
 }
 
+/** Stored on `ingested_sales.failure_details` — no raw addresses, titles, or URLs (ops-safe region only). */
+export type PublishFailureDetails = {
+  publish_error: string
+  phase: 'create_sale' | 'finalize_ingested_row'
+  operation: string
+  region?: { city: string | null; state: string | null }
+  /** Present when a `sales` row was created but ingested row could not be marked published. */
+  published_sale_id?: string
+}
+
+function buildPublishFailureDetails(
+  message: string,
+  ctx: {
+    phase: PublishFailureDetails['phase']
+    operation: string
+    city?: string | null
+    state?: string | null
+    publishedSaleId?: string | null
+  }
+): PublishFailureDetails {
+  const out: PublishFailureDetails = {
+    publish_error: message,
+    phase: ctx.phase,
+    operation: ctx.operation,
+  }
+  if (ctx.city != null || ctx.state != null) {
+    out.region = { city: ctx.city ?? null, state: ctx.state ?? null }
+  }
+  if (ctx.publishedSaleId) {
+    out.published_sale_id = ctx.publishedSaleId
+  }
+  return out
+}
+
+function logPublishFailureStructured(params: {
+  rowId: string
+  message: string
+  phase: PublishFailureDetails['phase']
+  operation: string
+  city?: string | null
+  state?: string | null
+  saleId?: string | null
+}): void {
+  logger.error('ingested_sales publish failure', {
+    component: 'ingestion/publishWorker',
+    operation: params.operation,
+    phase: params.phase,
+    rowId: params.rowId,
+    message: params.message,
+    city: params.city ?? undefined,
+    state: params.state ?? undefined,
+    saleId: params.saleId ?? undefined,
+  })
+}
+
 function isIngestedSaleIdUniqueViolation(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error)
   const pgCode =
@@ -123,20 +178,89 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
   }
 }
 
+/**
+ * When `createPublishedSale` throws before any sale id: row is still `publishing`.
+ * Persists `publish_failed` + `failure_details` and logs (non-silent).
+ */
+async function markIngestedPublishFailedFromSaleCreateError(
+  rowId: string,
+  existingFailureReasons: unknown,
+  error: unknown,
+  operation: string,
+  city: string | null,
+  state: string | null
+): Promise<void> {
+  const admin = getAdminDb()
+  const message = error instanceof Error ? error.message : String(error)
+  const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
+  const payload = {
+    status: 'publish_failed' as const,
+    failure_reasons: mergedReasons,
+    failure_details: buildPublishFailureDetails(message, {
+      phase: 'create_sale',
+      operation,
+      city,
+      state,
+    }),
+  }
+
+  logPublishFailureStructured({
+    rowId,
+    message,
+    phase: 'create_sale',
+    operation,
+    city,
+    state,
+  })
+
+  const { error: upErr } = await fromBase(admin, 'ingested_sales')
+    .update(payload)
+    .eq('id', rowId)
+    .eq('status', 'publishing')
+
+  if (upErr) {
+    logger.error(
+      'Failed to persist publish_failed after createPublishedSale error',
+      new Error(upErr.message),
+      { component: 'ingestion/publishWorker', operation, rowId, phase: 'create_sale' }
+    )
+    return
+  }
+}
+
 /** After a sale row exists, never leave ingested_sales stuck in `publishing`. */
 async function markIngestedPublishFailedFromPublishing(
   rowId: string,
   existingFailureReasons: unknown,
   errorMessage: string,
-  operation: string
+  operation: string,
+  city: string | null,
+  state: string | null,
+  publishedSaleId: string | null = null
 ): Promise<void> {
   const admin = getAdminDb()
   const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
   const payload = {
     status: 'publish_failed' as const,
     failure_reasons: mergedReasons,
-    failure_details: { publish_error: errorMessage },
+    failure_details: buildPublishFailureDetails(errorMessage, {
+      phase: 'finalize_ingested_row',
+      operation,
+      city,
+      state,
+      publishedSaleId,
+    }),
   }
+
+  logPublishFailureStructured({
+    rowId,
+    message: errorMessage,
+    phase: 'finalize_ingested_row',
+    operation,
+    city,
+    state,
+    saleId: publishedSaleId,
+  })
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const { error } = await fromBase(admin, 'ingested_sales')
@@ -242,7 +366,10 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
           claimed.id,
           claimed.failure_reasons,
           secondUpdate.error.message,
-          'finalize_after_sale_create_single'
+          'finalize_after_sale_create_single',
+          claimed.city,
+          claimed.state,
+          saleId
         )
         return { ok: false, error: secondUpdate.error.message }
       }
@@ -273,28 +400,21 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
         claimed.id,
         claimed.failure_reasons,
         message,
-        'catch_after_sale_create_single'
+        'catch_after_sale_create_single',
+        claimed.city,
+        claimed.state,
+        createdSaleId
       )
       return { ok: false, error: message }
     }
 
-    const existingReasons = toFailureReasons(claimed.failure_reasons)
-    const mergedReasons = appendFailureReason(existingReasons, 'publish_error')
-    await fromBase(admin, 'ingested_sales')
-      .update({
-        status: 'publish_failed',
-        failure_reasons: mergedReasons,
-      })
-      .eq('id', claimed.id)
-
-    logger.error(
-      'publishReadyIngestedSaleById failed',
-      error instanceof Error ? error : new Error(String(error)),
-      {
-        component: 'ingestion/publishWorker',
-        operation: 'single_failure',
-        rowId: claimed.id,
-      }
+    await markIngestedPublishFailedFromSaleCreateError(
+      claimed.id,
+      claimed.failure_reasons,
+      error,
+      'create_sale_single',
+      claimed.city,
+      claimed.state
     )
 
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
@@ -359,7 +479,10 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
             row.id,
             row.failure_reasons,
             secondUpdate.error.message,
-            'finalize_after_sale_create_batch'
+            'finalize_after_sale_create_batch',
+            row.city,
+            row.state,
+            saleId
           )
           summary.failed += 1
           continue
@@ -392,29 +515,21 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
           row.id,
           row.failure_reasons,
           message,
-          'catch_after_sale_create_batch'
+          'catch_after_sale_create_batch',
+          row.city,
+          row.state,
+          createdSaleId
         )
         continue
       }
 
-      const existingReasons = toFailureReasons(row.failure_reasons)
-      const mergedReasons = appendFailureReason(existingReasons, 'publish_error')
-      await fromBase(admin, 'ingested_sales')
-        .update({
-          status: 'publish_failed',
-          failure_reasons: mergedReasons,
-        })
-        .eq('id', row.id)
-
-      logger.error(
-        'Publish worker row failed',
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          component: 'ingestion/publishWorker',
-          operation: 'row_result',
-          rowId: row.id,
-          result: 'failure',
-        }
+      await markIngestedPublishFailedFromSaleCreateError(
+        row.id,
+        row.failure_reasons,
+        error,
+        'create_sale_batch',
+        row.city,
+        row.state
       )
     }
   }

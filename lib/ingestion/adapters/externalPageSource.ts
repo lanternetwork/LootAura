@@ -161,6 +161,103 @@ function cleanDescriptionText(
   return cleaned || null
 }
 
+function extractFallbackAddressAndDates(
+  fullText: string,
+  city: string,
+  state: string
+): { address?: string; start?: string; end?: string } {
+  const lines = fullText
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) return {}
+
+  const dateCandidates: { index: number; start?: string; end?: string }[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const { start, end } = extractDateRangeFromText(lines[i])
+    if (start || end) {
+      dateCandidates.push({ index: i, start, end })
+    }
+  }
+
+  // Broad real-world address match:
+  // - starts with a street number
+  // - has enough trailing characters/words to look like a street line
+  // - does NOT depend on a suffix like Ave/St/etc
+  const addressRegex = /^\d{3,6}\s+[A-Za-z0-9.'\- ]{5,}/
+
+  function isAddressNoiseLine(line: string): boolean {
+    return (
+      /street view|directions|source:/i.test(line) ||
+      /(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(line)
+    )
+  }
+
+  function isInvalidAddressLikeLine(line: string): boolean {
+    const words = line.match(/[A-Za-z]+/g) ?? []
+    const hasAllCapsLongPhrase =
+      words.length >= 4 && words.every((word) => word.length <= 1 || word === word.toUpperCase())
+    if (hasAllCapsLongPhrase) return true
+    if (/\b(SALE|EVENT|HUGE|MOVING|ESTATE)\b/i.test(line)) return true
+    return false
+  }
+
+  function scoreAddressCandidate(line: string): number {
+    let score = 0
+    if (line.includes(',')) score += 2
+    if (/\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY|DC)\b/i.test(line)) {
+      score += 1
+    }
+    if (/\b(ave|avenue|st|street|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|pl|place|way|pkwy|parkway)\b/i.test(line)) {
+      score += 1
+    }
+    const noNumber = line.replace(/^\d{3,6}\s+/, '').trim()
+    const trailingWords = noNumber.match(/[A-Za-z0-9.'-]+/g) ?? []
+    const hasCapitalized = /\b[A-Z][a-zA-Z0-9.'-]*\b/.test(noNumber)
+    if (trailingWords.length >= 2 && hasCapitalized) score += 1
+    return score
+  }
+
+  const addressCandidates: { index: number; line: string; score: number }[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (isAddressNoiseLine(line)) continue
+    if (isInvalidAddressLikeLine(line)) continue
+    if (addressRegex.test(line)) {
+      addressCandidates.push({ index: i, line, score: scoreAddressCandidate(line) })
+    }
+  }
+
+  function findAddressNear(index: number): string | undefined {
+    const windowSize = 4
+    let best: { line: string; score: number } | undefined
+    for (const candidate of addressCandidates) {
+      if (Math.abs(candidate.index - index) <= windowSize) {
+        if (!best || candidate.score > best.score) {
+          best = { line: candidate.line, score: candidate.score }
+        }
+      }
+    }
+    return best?.line
+  }
+
+  // Prefer address/date pairs that appear near each other.
+  for (const candidate of dateCandidates) {
+    const addr = findAddressNear(candidate.index)
+    if (addr) {
+      return { address: addr, start: candidate.start, end: candidate.end }
+    }
+  }
+
+  // Independent fallback: select best candidates even if not adjacent.
+  const bestAddress = [...addressCandidates].sort((a, b) => b.score - a.score)[0]?.line
+  const bestDate = dateCandidates[0]
+  if (!bestAddress && !bestDate) return {}
+
+  return { address: bestAddress, start: bestDate?.start, end: bestDate?.end }
+}
+
 function collectNearbyText(anchor: Element, maxDepth: number): string {
   const parts: string[] = []
   let el: Element | null = anchor
@@ -211,6 +308,7 @@ export function parseExternalPageSourceHtml(
 
   const dom = new JSDOM(html, { url: pageUrl })
   const { document } = dom.window
+  const fullText = document.body?.textContent || ''
   const anchors = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="listing.html"], a[href*="userlisting.html"]'
   )
@@ -253,9 +351,23 @@ export function parseExternalPageSourceHtml(
     }
 
     const nearby = collectNearbyText(a, 4)
-    const { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
+    let { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
     const description = cleanDescriptionText(nearby, addressRaw, config.city, config.state)
     const imageUrls = collectImageUrlsNear(a, 8)
+
+    // Fallback extraction when critical fields are missing from the primary parse.
+    if (!addressRaw || !startDate) {
+      const fallback = extractFallbackAddressAndDates(fullText, config.city, config.state)
+      if (!addressRaw && fallback.address) {
+        addressRaw = fallback.address
+      }
+      if (!startDate && fallback.start) {
+        startDate = fallback.start
+      }
+      if (!endDate && fallback.end) {
+        endDate = fallback.end
+      }
+    }
 
     const externalId = externalIdFromListingUrl(href)
     const rawPayload: Record<string, unknown> = {

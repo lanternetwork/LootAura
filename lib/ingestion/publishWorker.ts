@@ -1,6 +1,6 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingestion/publish'
-import { logger } from '@/lib/log'
+import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 
 export type PublishReadyByIdResult =
@@ -102,16 +102,18 @@ function logPublishFailureStructured(params: {
   state?: string | null
   saleId?: string | null
 }): void {
-  logger.error('ingested_sales publish failure', {
+  const context: LogContext = {
     component: 'ingestion/publishWorker',
     operation: params.operation,
     phase: params.phase,
     rowId: params.rowId,
-    message: params.message,
     city: params.city ?? undefined,
     state: params.state ?? undefined,
-    saleId: params.saleId ?? undefined,
-  })
+  }
+  if (params.saleId) {
+    context.saleId = params.saleId
+  }
+  logger.error('ingested_sales publish failure', new Error(params.message), context)
 }
 
 function isIngestedSaleIdUniqueViolation(error: unknown): boolean {

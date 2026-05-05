@@ -26,12 +26,34 @@ export interface PublishableIngestedSale {
 // Must match an existing profiles.id/auth user id in the target environment.
 const FIXED_INGEST_OWNER_ID = 'b2750036-4a71-404a-9020-1734b5b888b1'
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeAddressForPublish(
+  normalizedAddress: string | null,
+  city: string,
+  state: string
+): string | null {
+  const base = (normalizedAddress || '').replace(/\s+/g, ' ').trim()
+  if (!base) return null
+
+  const cityState = [city, state].map((v) => v.trim()).filter(Boolean).join(', ')
+  if (!cityState) return base
+
+  const suffixPattern = new RegExp(`(?:,\\s*${escapeRegExp(cityState)})+$`, 'i')
+  const withoutDuplicateSuffix = base.replace(suffixPattern, '').replace(/\s*,\s*$/g, '').trim()
+
+  if (!withoutDuplicateSuffix) return cityState
+  return `${withoutDuplicateSuffix}, ${cityState}`
+}
+
 function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishInput {
   const ownerId = ingestedSale.owner_id?.trim() || FIXED_INGEST_OWNER_ID
   const title = (ingestedSale.title || '').trim() || `${ingestedSale.city || 'Unknown'} Yard Sale`
-  const address = ingestedSale.normalized_address?.trim() || null
   const city = (ingestedSale.city || '').trim()
   const state = (ingestedSale.state || '').trim()
+  const address = normalizeAddressForPublish(ingestedSale.normalized_address, city, state)
   const coverImageUrl = ingestedSale.image_cloudinary_url?.trim() || null
   const images = coverImageUrl ? [coverImageUrl] : null
 

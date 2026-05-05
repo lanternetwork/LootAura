@@ -17,6 +17,7 @@ export interface ExternalPageSourceIngestionConfig {
 
 export interface ExternalPageSourceListing {
   title: string
+  description: string | null
   addressRaw: string | null
   city: string
   state: string
@@ -87,8 +88,9 @@ function pad2(n: number): string {
 }
 
 function extractDateRangeFromText(text: string): { start?: string; end?: string } {
-  const year = new Date().getFullYear()
-  const range = text.match(/(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})/)
+  // Keep date values as pure YYYY-MM-DD strings; no Date object conversion to avoid timezone drift.
+  const year = new Date().getUTCFullYear()
+  const range = text.match(/(\d{1,2})\/(\d{1,2})\s*[-–—]\s*(\d{1,2})\/(\d{1,2})/)
   if (range) {
     const m1 = Number.parseInt(range[1], 10)
     const d1 = Number.parseInt(range[2], 10)
@@ -115,6 +117,48 @@ function extractDateRangeFromText(text: string): { start?: string; end?: string 
     }
   }
   return {}
+}
+
+function cleanDescriptionText(
+  nearbyText: string,
+  addressRaw: string | null,
+  city: string,
+  state: string
+): string | null {
+  const addressParts = [addressRaw, city, state]
+    .map((v) => (v || '').trim())
+    .filter(Boolean)
+    .map((v) => v.toLowerCase())
+
+  const lines = nearbyText
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .filter((line) => !/street view|directions|source:/i.test(line))
+    .filter((line) => !/(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(line))
+    .filter((line) => {
+      const lower = line.toLowerCase()
+      if (addressParts.length === 0) return true
+      // Drop lines that are primarily the address/location string.
+      return !addressParts.every((part) => lower.includes(part))
+    })
+
+  const joined = lines.join('\n').trim()
+  if (!joined) return null
+
+  // Remove embedded address fragments from remaining text.
+  let cleaned = joined
+  if (addressRaw) {
+    const escaped = addressRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    cleaned = cleaned.replace(new RegExp(escaped, 'gi'), '')
+  }
+  const cityState = [city, state].map((v) => v.trim()).filter(Boolean).join(', ')
+  if (cityState) {
+    const escaped = cityState.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    cleaned = cleaned.replace(new RegExp(escaped, 'gi'), '')
+  }
+  cleaned = cleaned.replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+  return cleaned || null
 }
 
 function collectNearbyText(anchor: Element, maxDepth: number): string {
@@ -210,6 +254,7 @@ export function parseExternalPageSourceHtml(
 
     const nearby = collectNearbyText(a, 4)
     const { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
+    const description = cleanDescriptionText(nearby, addressRaw, config.city, config.state)
     const imageUrls = collectImageUrlsNear(a, 8)
 
     const externalId = externalIdFromListingUrl(href)
@@ -225,6 +270,7 @@ export function parseExternalPageSourceHtml(
 
     listings.push({
       title,
+      description,
       addressRaw,
       city: config.city,
       state: config.state,
@@ -383,7 +429,7 @@ export async function persistExternalPageSource(
         source_url: listing.sourceUrl,
         external_id: (listing.rawPayload.externalId as string | null) ?? null,
         title: listing.title,
-        description: null,
+        description: listing.description,
         address_raw: listing.addressRaw,
         normalized_address: null,
         city: listing.city,

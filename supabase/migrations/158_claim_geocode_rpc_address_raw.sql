@@ -1,8 +1,11 @@
 -- Include address_raw in geocode claim RPC so batch path matches by-id street-line fallback.
+-- PG forbids changing RETURNS TABLE via CREATE OR REPLACE; drop then create.
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION lootaura_v2.claim_ingested_sales_for_geocoding(
+DROP FUNCTION IF EXISTS lootaura_v2.claim_ingested_sales_for_geocoding(integer, integer);
+
+CREATE FUNCTION lootaura_v2.claim_ingested_sales_for_geocoding(
   p_batch_size integer DEFAULT 100,
   p_cooldown_minutes integer DEFAULT 15
 )

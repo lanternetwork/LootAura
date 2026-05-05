@@ -35,6 +35,37 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: (db: any, table: string) => db.from(table),
 }))
 
+const { mockGeocodePendingSales, mockPublishReadyIngestedSales } = vi.hoisted(() => ({
+  mockGeocodePendingSales: vi.fn(),
+  mockPublishReadyIngestedSales: vi.fn(),
+}))
+
+vi.mock('@/lib/ingestion/geocodeWorker', () => ({
+  geocodePendingSales: (...args: unknown[]) => mockGeocodePendingSales(...args),
+}))
+
+vi.mock('@/lib/ingestion/publishWorker', () => ({
+  publishReadyIngestedSales: (...args: unknown[]) => mockPublishReadyIngestedSales(...args),
+}))
+
+vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
+  recordIngestionOrchestrationRun: vi.fn().mockResolvedValue(undefined),
+}))
+
+const { mockPersistExternalPageSource } = vi.hoisted(() => ({
+  mockPersistExternalPageSource: vi.fn(),
+}))
+
+vi.mock('@/lib/ingestion/adapters/externalPageSource', async () => {
+  const mod = await vi.importActual<typeof import('@/lib/ingestion/adapters/externalPageSource')>(
+    '@/lib/ingestion/adapters/externalPageSource'
+  )
+  return {
+    ...mod,
+    persistExternalPageSource: (...args: unknown[]) => mockPersistExternalPageSource(...args),
+  }
+})
+
 // Mock logger
 vi.mock('@/lib/log', () => ({
   logger: {
@@ -70,6 +101,35 @@ function mockFridayDate() {
   }
 }
 
+function ingestionCityConfigsDbMock() {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      }),
+    })),
+  }
+}
+
+function ingestionCityConfigsExternalPageSourceMock() {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({
+        data: [
+          {
+            city: 'ExampleCity',
+            state: 'IL',
+            source_platform: 'external_page_source',
+            source_pages: ['https://example.com/list-a', 'https://example.com/list-b'],
+          },
+        ],
+        error: null,
+      }),
+    })),
+  }
+}
+
 describe('GET /api/cron/daily', () => {
   let GET: any
 
@@ -83,7 +143,28 @@ describe('GET /api/cron/daily', () => {
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth by default
     mockProcessFavoriteSalesStartingSoonJob.mockResolvedValue({ success: true })
     mockSendModerationDailyDigestEmail.mockResolvedValue({ ok: true })
-    
+    mockGeocodePendingSales.mockResolvedValue({
+      claimed: 0,
+      succeeded: 0,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      rate429Count: 0,
+    })
+    mockPublishReadyIngestedSales.mockResolvedValue({
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      skipped: 0,
+    })
+    mockPersistExternalPageSource.mockResolvedValue({
+      fetched: 0,
+      inserted: 0,
+      skipped: 0,
+      invalid: 0,
+      errors: 0,
+      pagesProcessed: 0,
+    })
+
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
   })
@@ -114,6 +195,28 @@ describe('GET /api/cron/daily', () => {
       expect(mockSendModerationDailyDigestEmail).not.toHaveBeenCalled()
     })
 
+    it('returns 401 for ?mode=ingestion when Authorization header is missing', async () => {
+      const { NextResponse } = await import('next/server')
+      mockAssertCronAuthorized.mockImplementation(() => {
+        throw NextResponse.json(
+          { ok: false, error: 'Unauthorized', code: 'UNAUTHORIZED' },
+          { status: 401 }
+        )
+      })
+
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(401)
+      expect(data.ok).toBe(false)
+      expect(mockGeocodePendingSales).not.toHaveBeenCalled()
+      expect(mockPublishReadyIngestedSales).not.toHaveBeenCalled()
+    })
+
     it('allows request with valid cron auth', async () => {
       // Mock archive sales query (no sales to archive)
       mockAdminDb.from.mockImplementation((table: string) => {
@@ -128,6 +231,9 @@ describe('GET /api/cron/daily', () => {
               })),
             })),
           }
+        }
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsDbMock()
         }
         return { from: vi.fn() }
       })
@@ -145,6 +251,7 @@ describe('GET /api/cron/daily', () => {
       expect(response.status).toBe(200)
       expect(data.ok).toBe(true)
       expect(data.job).toBe('daily')
+      expect(data.mode).toBe('daily')
       expect(data.tasks).toBeDefined()
     })
   })
@@ -178,6 +285,9 @@ describe('GET /api/cron/daily', () => {
             })),
           }
         }
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsDbMock()
+        }
         return { from: vi.fn() }
       })
     })
@@ -199,7 +309,8 @@ describe('GET /api/cron/daily', () => {
 
         expect(response.status).toBe(200)
         expect(data.ok).toBe(true)
-        
+        expect(data.mode).toBe('daily')
+
         // Verify all tasks are present in response
         expect(data.tasks.archiveSales).toBeDefined()
         expect(data.tasks.favoritesStartingSoon).toBeDefined()
@@ -208,6 +319,8 @@ describe('GET /api/cron/daily', () => {
         // Verify job processors were called
         expect(mockProcessFavoriteSalesStartingSoonJob).toHaveBeenCalledTimes(1)
         expect(mockSendModerationDailyDigestEmail).toHaveBeenCalledTimes(1)
+        expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
+        expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
       } finally {
         restoreDate()
       }
@@ -259,6 +372,9 @@ describe('GET /api/cron/daily', () => {
             })),
           }
         }
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsDbMock()
+        }
         return { from: vi.fn() }
       })
 
@@ -309,6 +425,9 @@ describe('GET /api/cron/daily', () => {
               })),
             })),
           }
+        }
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsDbMock()
         }
         return { from: vi.fn() }
       })
@@ -379,6 +498,9 @@ describe('GET /api/cron/daily', () => {
               })),
             }
           }
+          if (table === 'ingestion_city_configs') {
+            return ingestionCityConfigsDbMock()
+          }
           return { from: vi.fn() }
         })
 
@@ -440,6 +562,9 @@ describe('GET /api/cron/daily', () => {
             })),
           }
         }
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsDbMock()
+        }
         return { from: vi.fn() }
       })
     })
@@ -486,6 +611,9 @@ describe('GET /api/cron/daily', () => {
                 })),
               })),
             }
+          }
+          if (table === 'ingestion_city_configs') {
+            return ingestionCityConfigsDbMock()
           }
           return { from: vi.fn() }
         })
@@ -539,6 +667,8 @@ describe('GET /api/cron/daily', () => {
           error: 'Moderation digest failed',
         })
 
+        mockGeocodePendingSales.mockRejectedValue(new Error('forced geocode failure for test'))
+
         // Mock archive sales query to fail (throw error)
         mockAdminDb.from.mockImplementation((table: string) => {
           if (table === 'sales') {
@@ -561,6 +691,9 @@ describe('GET /api/cron/daily', () => {
                 })),
               })),
             }
+          }
+          if (table === 'ingestion_city_configs') {
+            return ingestionCityConfigsDbMock()
           }
           return { from: vi.fn() }
         })
@@ -629,6 +762,9 @@ describe('GET /api/cron/daily', () => {
               })),
             }
           }
+          if (table === 'ingestion_city_configs') {
+            return ingestionCityConfigsDbMock()
+          }
           return { from: vi.fn() }
         })
 
@@ -656,6 +792,106 @@ describe('GET /api/cron/daily', () => {
       } finally {
         restoreDate()
       }
+    })
+  })
+
+  describe('GET /api/cron/daily?mode=ingestion', () => {
+    beforeEach(() => {
+      mockPersistExternalPageSource.mockResolvedValue({
+        fetched: 3,
+        inserted: 2,
+        skipped: 1,
+        invalid: 0,
+        errors: 0,
+        pagesProcessed: 2,
+      })
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsExternalPageSourceMock()
+        }
+        return { from: vi.fn() }
+      })
+    })
+
+    it('runs only ingestion orchestration and reports mode ingestion', async () => {
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer test-cron-secret',
+        },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.ok).toBe(true)
+      expect(data.mode).toBe('ingestion')
+      expect(data.job).toBe('daily')
+      expect(data.tasksRan).toEqual(['ingestionOrchestration'])
+      expect(data.tasks.ingestionOrchestration).toBeDefined()
+      expect(data.tasks.ingestionOrchestration.ok).toBe(true)
+      expect(data.tasks.ingestionOrchestration.steps.geocode).toMatchObject({
+        ok: true,
+        claimed: 0,
+        succeeded: 0,
+        failedRetriable: 0,
+        failedTerminal: 0,
+        rate429Count: 0,
+      })
+      expect(data.tasks.ingestionOrchestration.steps.publish).toMatchObject({
+        ok: true,
+        attempted: 0,
+        succeeded: 0,
+        failed: 0,
+        skipped: 0,
+      })
+      expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+        ok: true,
+        adapter: 'external_page_source',
+        configsProcessed: 1,
+        pagesProcessed: 2,
+        fetched: 3,
+        inserted: 2,
+        skipped: 1,
+        invalid: 0,
+        errors: 0,
+      })
+      expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
+      expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
+      expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips archive, promotions, favorites, and moderation digest', async () => {
+      const tablesTouched: string[] = []
+      mockAdminDb.from.mockImplementation((table: string) => {
+        tablesTouched.push(table)
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsDbMock()
+        }
+        return { from: vi.fn() }
+      })
+
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer test-cron-secret',
+        },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.mode).toBe('ingestion')
+      expect(data.tasks.archiveSales).toBeUndefined()
+      expect(data.tasks.expirePromotions).toBeUndefined()
+      expect(data.tasks.favoritesStartingSoon).toBeUndefined()
+      expect(data.tasks.moderationDigest).toBeUndefined()
+      expect(mockProcessFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
+      expect(mockSendModerationDailyDigestEmail).not.toHaveBeenCalled()
+      expect(tablesTouched).toEqual(['ingestion_city_configs'])
+      expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
     })
   })
 })

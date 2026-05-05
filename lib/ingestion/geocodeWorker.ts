@@ -19,6 +19,7 @@ export interface GeocodeWorkerSummary {
   succeeded: number
   failedRetriable: number
   failedTerminal: number
+  rate429Count: number
 }
 
 export type GeocodeIngestedSaleByIdResult =
@@ -34,6 +35,20 @@ function parseBatchSize(): number {
     return 100
   }
   return Math.min(parsed, 500)
+}
+
+/** Bounded parallelism for processGeocodeAttempt only; capped at 3 per rollout guidance. */
+function parseGeocodeConcurrency(): number {
+  const raw = process.env.GEOCODE_CONCURRENCY
+  const defaultConcurrency = 2
+  if (raw === undefined || raw === '') {
+    return defaultConcurrency
+  }
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return defaultConcurrency
+  }
+  return Math.min(parsed, 3)
 }
 
 function toFailureReasons(value: unknown): FailureReason[] {
@@ -133,8 +148,53 @@ async function applyGeocodeSuccess(
 }
 
 type AttemptResult =
-  | { kind: 'geocode_ok'; publish: PublishReadyByIdResult }
-  | { kind: 'geocode_fail'; retriable: boolean; terminal: boolean }
+  | { kind: 'geocode_ok'; publish: PublishReadyByIdResult; hit429: false }
+  | { kind: 'geocode_fail'; retriable: boolean; terminal: boolean; hit429: boolean }
+
+/**
+ * Process items with at most `concurrency` in-flight tasks (pool / work-queue model).
+ * Per-item failures are contained by the processor; unexpected throws are caught here.
+ */
+async function runClaimedRowsWithConcurrency(
+  claimedRows: ClaimedGeocodeRow[],
+  concurrency: number,
+  processRow: (row: ClaimedGeocodeRow) => Promise<AttemptResult>
+): Promise<AttemptResult[]> {
+  const results: AttemptResult[] = new Array(claimedRows.length)
+  if (claimedRows.length === 0) {
+    return results
+  }
+
+  const limit = Math.max(1, Math.min(concurrency, claimedRows.length))
+  let nextIndex = 0
+
+  const worker = async () => {
+    while (true) {
+      const i = nextIndex++
+      if (i >= claimedRows.length) {
+        return
+      }
+      const row = claimedRows[i]
+      try {
+        results[i] = await processRow(row)
+      } catch (error) {
+        logger.error(
+          'Geocode worker unexpected error processing row',
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            component: 'ingestion/geocodeWorker',
+            operation: 'row_unexpected_error',
+            rowId: row.id,
+          }
+        )
+        results[i] = { kind: 'geocode_fail', retriable: true, terminal: false, hit429: false }
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => worker()))
+  return results
+}
 
 /**
  * Shared processor for a row whose `geocode_attempts` has already been incremented (RPC claim or by-id path).
@@ -148,9 +208,9 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
   const state = row.state?.trim() || ''
 
   if (address && city && state) {
-    const coords = await geocodeAddress({ address, city, state })
-    if (coords) {
-      const outcome = await applyGeocodeSuccess(admin, rowId, coords.lat, coords.lng)
+    const geo = await geocodeAddress({ address, city, state })
+    if (geo.coords) {
+      const outcome = await applyGeocodeSuccess(admin, rowId, geo.coords.lat, geo.coords.lng)
       if (outcome.kind === 'update_failed') {
         logger.warn('Geocode worker row processed', {
           component: 'ingestion/geocodeWorker',
@@ -159,7 +219,7 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
           attemptCount,
           result: 'update_failed_after_geocode',
         })
-        return { kind: 'geocode_fail', retriable: true, terminal: false }
+        return { kind: 'geocode_fail', retriable: true, terminal: false, hit429: false }
       }
 
       logger.info('Geocode worker row processed', {
@@ -170,8 +230,32 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
         result: 'geocode_ok',
       })
 
-      return { kind: 'geocode_ok', publish: outcome.publish }
+      return { kind: 'geocode_ok', publish: outcome.publish, hit429: false }
     }
+    const hit429 = geo.hit429
+    if (attemptCount >= 3) {
+      const ok = await markGeocodeTerminalNeedsCheck(admin, rowId, row.failure_reasons, 'geocode_failed')
+      if (ok) {
+        logger.warn('Geocode worker row processed', {
+          component: 'ingestion/geocodeWorker',
+          operation: 'row_result',
+          rowId,
+          attemptCount,
+          result: 'failed_terminal',
+        })
+        return { kind: 'geocode_fail', retriable: false, terminal: true, hit429 }
+      }
+      return { kind: 'geocode_fail', retriable: true, terminal: false, hit429 }
+    }
+
+    logger.warn('Geocode worker row processed', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'row_result',
+      rowId,
+      attemptCount,
+      result: 'failed_retriable',
+    })
+    return { kind: 'geocode_fail', retriable: true, terminal: false, hit429 }
   }
 
   if (attemptCount >= 3) {
@@ -184,9 +268,9 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
         attemptCount,
         result: 'failed_terminal',
       })
-      return { kind: 'geocode_fail', retriable: false, terminal: true }
+      return { kind: 'geocode_fail', retriable: false, terminal: true, hit429: false }
     }
-    return { kind: 'geocode_fail', retriable: true, terminal: false }
+    return { kind: 'geocode_fail', retriable: true, terminal: false, hit429: false }
   }
 
   logger.warn('Geocode worker row processed', {
@@ -196,7 +280,7 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
     attemptCount,
     result: 'failed_retriable',
   })
-  return { kind: 'geocode_fail', retriable: true, terminal: false }
+  return { kind: 'geocode_fail', retriable: true, terminal: false, hit429: false }
 }
 
 /**
@@ -323,15 +407,26 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
   }
 
   const claimedRows = (Array.isArray(data) ? data : []) as ClaimedGeocodeRow[]
+  const concurrency = parseGeocodeConcurrency()
   const summary: GeocodeWorkerSummary = {
     claimed: claimedRows.length,
     succeeded: 0,
     failedRetriable: 0,
     failedTerminal: 0,
+    rate429Count: 0,
   }
 
-  for (const row of claimedRows) {
-    const rowResult = await processGeocodeAttempt(row)
+  const batchStarted = Date.now()
+  const rowResults = await runClaimedRowsWithConcurrency(
+    claimedRows,
+    concurrency,
+    processGeocodeAttempt
+  )
+
+  for (const rowResult of rowResults) {
+    if (rowResult.kind === 'geocode_fail' && rowResult.hit429) {
+      summary.rate429Count += 1
+    }
     if (rowResult.kind === 'geocode_ok') {
       summary.succeeded += 1
     } else if (rowResult.terminal) {
@@ -341,6 +436,9 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
     }
   }
 
+  const durationMs = Date.now() - batchStarted
+  const failureCount = summary.failedRetriable + summary.failedTerminal
+
   logger.info('Geocode worker completed batch', {
     component: 'ingestion/geocodeWorker',
     operation: 'batch_complete',
@@ -349,6 +447,10 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
     succeeded: summary.succeeded,
     failedRetriable: summary.failedRetriable,
     failedTerminal: summary.failedTerminal,
+    rate429Count: summary.rate429Count,
+    failureCount,
+    durationMs,
+    concurrency,
   })
 
   return summary

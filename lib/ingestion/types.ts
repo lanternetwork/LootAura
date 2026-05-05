@@ -84,6 +84,7 @@ export interface CityIngestionConfig {
   timezone: string
   enabled: boolean
   sourcePlatform: string
+  /** Absolute list-page URLs (`http`/`https`); primary driver for `external_page_source` cron ingestion. */
   sourcePages: string[]
 }
 

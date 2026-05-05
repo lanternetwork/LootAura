@@ -1,0 +1,450 @@
+import { createHash } from 'crypto'
+import { JSDOM } from 'jsdom'
+import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { logger } from '@/lib/log'
+import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
+
+const ADAPTER_ID = 'external_page_source'
+const PARSER_VERSION_ROW = 'external_page_source_mvp_v2'
+
+export interface ExternalPageSourceIngestionConfig {
+  city: string
+  state: string
+  source_platform: string
+  /** JSON array from DB; normalized by `normalizeSourcePages`. */
+  source_pages: unknown
+}
+
+export interface ExternalPageSourceListing {
+  title: string
+  addressRaw: string | null
+  city: string
+  state: string
+  startDate?: string
+  endDate?: string
+  sourceUrl: string
+  /** Listing-level fields only; persist merges page metadata before insert. */
+  rawPayload: Record<string, unknown>
+}
+
+export interface ParseExternalPageSourceResult {
+  listings: ExternalPageSourceListing[]
+  invalid: number
+}
+
+export interface ExternalPageSourcePersistSummary {
+  fetched: number
+  inserted: number
+  skipped: number
+  invalid: number
+  errors: number
+  pagesProcessed: number
+}
+
+export function normalizeSourcePages(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const u = item.trim()
+    if (!/^https?:\/\//i.test(u)) continue
+    try {
+      const parsed = new URL(u)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue
+    } catch {
+      continue
+    }
+    out.push(u)
+  }
+  return out
+}
+
+function hashPageHostname(pageUrl: string): string | null {
+  try {
+    const host = new URL(pageUrl).hostname
+    return createHash('sha256').update(host).digest('hex').slice(0, 16)
+  } catch {
+    return null
+  }
+}
+
+function slugSegmentToAddressRaw(segment: string): string | null {
+  const decoded = decodeURIComponent(segment).trim()
+  if (!decoded) return null
+  if (/^see-source-for-address/i.test(decoded)) {
+    return null
+  }
+  return decoded.replace(/-/g, ' ')
+}
+
+function externalIdFromListingUrl(url: string): string | null {
+  const m = url.match(/\/(\d+)\/(?:listing|userlisting)\.html/i)
+  return m?.[1] ?? null
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n)
+}
+
+function extractDateRangeFromText(text: string): { start?: string; end?: string } {
+  const year = new Date().getFullYear()
+  const range = text.match(/(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})/)
+  if (range) {
+    const m1 = Number.parseInt(range[1], 10)
+    const d1 = Number.parseInt(range[2], 10)
+    const m2 = Number.parseInt(range[3], 10)
+    const d2 = Number.parseInt(range[4], 10)
+    if (
+      [m1, d1, m2, d2].every((x) => Number.isFinite(x) && x > 0) &&
+      m1 <= 12 &&
+      m2 <= 12
+    ) {
+      return {
+        start: `${year}-${pad2(m1)}-${pad2(d1)}`,
+        end: `${year}-${pad2(m2)}-${pad2(d2)}`,
+      }
+    }
+  }
+  const single = text.match(/\b(\d{1,2})\/(\d{1,2})\b/)
+  if (single) {
+    const m = Number.parseInt(single[1], 10)
+    const d = Number.parseInt(single[2], 10)
+    if (Number.isFinite(m) && Number.isFinite(d) && m > 0 && m <= 12 && d > 0 && d <= 31) {
+      const iso = `${year}-${pad2(m)}-${pad2(d)}`
+      return { start: iso, end: iso }
+    }
+  }
+  return {}
+}
+
+function collectNearbyText(anchor: Element, maxDepth: number): string {
+  const parts: string[] = []
+  let el: Element | null = anchor
+  for (let depth = 0; el && depth < maxDepth; depth++) {
+    const p = el.parentElement
+    if (!p) break
+    parts.push(p.textContent || '')
+    el = p
+  }
+  return parts.join('\n').slice(0, 2000)
+}
+
+function collectImageUrlsNear(anchor: Element, max: number): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  let el: Element | null = anchor
+  for (let depth = 0; el && depth < 4 && out.length < max; depth++) {
+    const imgs = el.querySelectorAll<HTMLImageElement>('img[src]')
+    for (const img of imgs) {
+      const src = img.getAttribute('src')?.trim()
+      if (!src || !/^https?:\/\//i.test(src)) continue
+      if (seen.has(src)) continue
+      seen.add(src)
+      out.push(src)
+      if (out.length >= max) break
+    }
+    el = el.parentElement
+  }
+  return out
+}
+
+export function parseExternalPageSourceHtml(
+  html: string,
+  config: ExternalPageSourceIngestionConfig,
+  pageUrl: string
+): ParseExternalPageSourceResult {
+  const stateSegment = resolveUsListStatePathSegment(config.state)
+  if (!stateSegment) {
+    logger.warn('External page source: unknown state for list path filter', {
+      component: 'ingestion/adapters/externalPageSource',
+      operation: 'parse',
+      city: config.city,
+      state: config.state,
+      adapter: ADAPTER_ID,
+    })
+    return { listings: [], invalid: 0 }
+  }
+
+  const dom = new JSDOM(html, { url: pageUrl })
+  const { document } = dom.window
+  const anchors = document.querySelectorAll<HTMLAnchorElement>(
+    'a[href*="listing.html"], a[href*="userlisting.html"]'
+  )
+  const seen = new Set<string>()
+  const listings: ExternalPageSourceListing[] = []
+  let invalid = 0
+
+  for (const a of anchors) {
+    const href = a.href?.trim()
+    if (!href || !/^https?:\/\//i.test(href)) continue
+    if (!/\/(?:listing|userlisting)\.html/i.test(href)) continue
+    if (seen.has(href)) continue
+    seen.add(href)
+
+    let urlObj: URL
+    try {
+      urlObj = new URL(href)
+    } catch {
+      invalid += 1
+      continue
+    }
+    const parts = urlObj.pathname.split('/').filter(Boolean)
+    if (parts.length < 6 || parts[0] !== 'US') continue
+    if (parts[1].toLowerCase() !== stateSegment.toLowerCase()) continue
+
+    const addressSlug = parts[3]
+    const addressRaw = addressSlug ? slugSegmentToAddressRaw(addressSlug) : null
+
+    let title = (a.textContent || '').replace(/\s+/g, ' ').trim()
+    title = title.replace(/[\u200b\s]+$/g, '').replace(/^[\s\u200b]+/g, '')
+    if (!title) {
+      title = addressRaw ? addressRaw.trim() : ''
+    }
+    if (!title.trim() && addressRaw == null) {
+      invalid += 1
+      continue
+    }
+    if (!title.trim()) {
+      title = 'Listing'
+    }
+
+    const nearby = collectNearbyText(a, 4)
+    const { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
+    const imageUrls = collectImageUrlsNear(a, 8)
+
+    const externalId = externalIdFromListingUrl(href)
+    const rawPayload: Record<string, unknown> = {
+      adapter: ADAPTER_ID,
+      externalId,
+      pathCitySlug: parts[2],
+      addressSlug: addressSlug ?? null,
+    }
+    if (imageUrls.length > 0) {
+      rawPayload.imageUrls = imageUrls
+    }
+
+    listings.push({
+      title,
+      addressRaw,
+      city: config.city,
+      state: config.state,
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
+      sourceUrl: href,
+      rawPayload,
+    })
+  }
+
+  return { listings, invalid }
+}
+
+export async function fetchExternalPageSource(
+  _config: ExternalPageSourceIngestionConfig,
+  pageUrl: string
+): Promise<string> {
+  const res = await fetch(pageUrl, {
+    redirect: 'follow',
+    headers: {
+      Accept: 'text/html,application/xhtml+xml',
+      'User-Agent':
+        'Mozilla/5.0 (compatible; LootAura/1.0; +https://lootaura.com) AppleWebKit/537.36 (KHTML, like Gecko)',
+    },
+  })
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
+  return res.text()
+}
+
+function buildRowRawPayload(
+  listing: ExternalPageSourceListing,
+  pageIndex: number,
+  pageHostHash: string | null
+): Record<string, unknown> {
+  const rp = listing.rawPayload as {
+    pathCitySlug?: unknown
+    addressSlug?: unknown
+    externalId?: unknown
+    imageUrls?: unknown
+    adapter?: unknown
+  }
+  const out: Record<string, unknown> = {
+    adapter: typeof rp.adapter === 'string' ? rp.adapter : ADAPTER_ID,
+    parser_version: PARSER_VERSION_ROW,
+    page_index: pageIndex,
+    page_host_hash: pageHostHash,
+    extractedFields: {
+      pathCitySlug: rp.pathCitySlug ?? null,
+      addressSlug: rp.addressSlug ?? null,
+      externalId: rp.externalId ?? null,
+    },
+  }
+  if (Array.isArray(rp.imageUrls) && rp.imageUrls.length > 0) {
+    out.imageUrls = rp.imageUrls
+  }
+  return out
+}
+
+export async function persistExternalPageSource(
+  config: ExternalPageSourceIngestionConfig
+): Promise<ExternalPageSourcePersistSummary> {
+  const summary: ExternalPageSourcePersistSummary = {
+    fetched: 0,
+    inserted: 0,
+    skipped: 0,
+    invalid: 0,
+    errors: 0,
+    pagesProcessed: 0,
+  }
+
+  const pages = normalizeSourcePages(config.source_pages)
+  if (pages.length === 0) {
+    return summary
+  }
+
+  const admin = getAdminDb()
+  const platform = config.source_platform || ADAPTER_ID
+
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const pageUrl = pages[pageIndex]
+    summary.pagesProcessed += 1
+    const pageHostHash = hashPageHostname(pageUrl)
+
+    let html: string
+    try {
+      html = await fetchExternalPageSource(config, pageUrl)
+    } catch (e) {
+      summary.errors += 1
+      logger.warn('External page source: page fetch failed', {
+        component: 'ingestion/adapters/externalPageSource',
+        operation: 'fetch_page',
+        city: config.city,
+        state: config.state,
+        adapter: ADAPTER_ID,
+        pageIndex,
+        pageHostHash,
+        message: e instanceof Error ? e.message : String(e),
+      })
+      continue
+    }
+
+    let parseResult: ParseExternalPageSourceResult
+    try {
+      parseResult = parseExternalPageSourceHtml(html, config, pageUrl)
+    } catch (e) {
+      summary.errors += 1
+      logger.warn('External page source: parse failed', {
+        component: 'ingestion/adapters/externalPageSource',
+        operation: 'parse_page',
+        city: config.city,
+        state: config.state,
+        adapter: ADAPTER_ID,
+        pageIndex,
+        pageHostHash,
+        message: e instanceof Error ? e.message : String(e),
+      })
+      continue
+    }
+
+    summary.invalid += parseResult.invalid
+    summary.fetched += parseResult.listings.length
+
+    for (const listing of parseResult.listings) {
+      const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
+
+      const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
+        .select('id')
+        .eq('source_url', listing.sourceUrl)
+        .maybeSingle()
+
+      if (selErr) {
+        summary.errors += 1
+        logger.error(
+          'External page source: source_url lookup failed',
+          new Error(selErr.message),
+          {
+            component: 'ingestion/adapters/externalPageSource',
+            operation: 'dedupe_lookup',
+            city: config.city,
+            state: config.state,
+            adapter: ADAPTER_ID,
+            externalId: listing.rawPayload.externalId ?? null,
+          }
+        )
+        continue
+      }
+      if (existing?.id) {
+        summary.skipped += 1
+        continue
+      }
+
+      const { error: insErr } = await fromBase(admin, 'ingested_sales').insert({
+        source_platform: platform,
+        source_url: listing.sourceUrl,
+        external_id: (listing.rawPayload.externalId as string | null) ?? null,
+        title: listing.title,
+        description: null,
+        address_raw: listing.addressRaw,
+        normalized_address: null,
+        city: listing.city,
+        state: listing.state,
+        zip_code: null,
+        lat: null,
+        lng: null,
+        date_start: listing.startDate ?? null,
+        date_end: listing.endDate ?? null,
+        time_start: null,
+        time_end: null,
+        date_source: listing.startDate ? 'external_list_page' : null,
+        time_source: null,
+        image_source_url: null,
+        raw_text: null,
+        raw_payload: rowPayload,
+        status: 'needs_geocode',
+        failure_reasons: [],
+        parser_version: PARSER_VERSION_ROW,
+        parse_confidence: 'low',
+        is_duplicate: false,
+        duplicate_of: null,
+      })
+
+      if (insErr) {
+        if (/duplicate key|unique constraint|23505/i.test(insErr.message)) {
+          summary.skipped += 1
+          continue
+        }
+        summary.errors += 1
+        logger.error(
+          'External page source: insert failed',
+          new Error(insErr.message),
+          {
+            component: 'ingestion/adapters/externalPageSource',
+            operation: 'insert',
+            city: config.city,
+            state: config.state,
+            adapter: ADAPTER_ID,
+            externalId: listing.rawPayload.externalId ?? null,
+          }
+        )
+        continue
+      }
+      summary.inserted += 1
+    }
+  }
+
+  logger.info('External page source config ingest', {
+    component: 'ingestion/adapters/externalPageSource',
+    operation: 'persist_config_complete',
+    city: config.city,
+    state: config.state,
+    adapter: ADAPTER_ID,
+    fetched: summary.fetched,
+    inserted: summary.inserted,
+    skipped: summary.skipped,
+    invalid: summary.invalid,
+    errors: summary.errors,
+    pagesProcessed: summary.pagesProcessed,
+  })
+
+  return summary
+}

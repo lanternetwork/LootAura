@@ -6,7 +6,7 @@ on:
       csv_path:
         description: 'Repository-relative path to city CSV/txt input file'
         required: true
-        default: 'scripts/data/YSTM City Links.txt'
+        default: 'scripts/data/external-city-page-links.txt'
 
 jobs:
   seed-city-configs:

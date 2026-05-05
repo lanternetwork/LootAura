@@ -18,6 +18,9 @@
  * Schedule recommendation:
  * - Daily at 02:00 UTC
  * - Purpose: Archive ended sales and send favorite sale reminders
+ *
+ * Query `?mode=ingestion` runs only ingestion orchestration (geocode + publish),
+ * skipping archive, promotions, emails, and moderation digest. Omit `mode` for full daily.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -26,8 +29,15 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
 import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
+import type { GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
+import type { PublishWorkerBatchSummary } from '@/lib/ingestion/publishWorker'
 import { publishReadyIngestedSales } from '@/lib/ingestion/publishWorker'
+import { recordIngestionOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
+import {
+  normalizeSourcePages,
+  persistExternalPageSource,
+} from '@/lib/ingestion/adapters/externalPageSource'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
@@ -59,18 +69,56 @@ async function handleRequest(request: NextRequest) {
       throw error
     }
 
+    const cronModeParam = request.nextUrl.searchParams.get('mode')
+    const isIngestionOnly = cronModeParam === 'ingestion'
+    const mode = isIngestionOnly ? 'ingestion' : 'daily'
+
     logger.info('Daily cron job triggered', withOpId({
       component: 'api/cron/daily',
       runAt,
       env,
+      mode,
     }))
 
     const results: any = {
       ok: true,
       job: 'daily',
+      mode,
       runAt,
       env,
       tasks: {},
+    }
+
+    if (isIngestionOnly) {
+      results.tasksRan = ['ingestionOrchestration'] as const
+      try {
+        const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'ingestion')
+        results.tasks.ingestionOrchestration = ingestionOrchestrationResult
+      } catch (error) {
+        logger.error('Ingestion orchestration task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+          component: 'api/cron/daily',
+          task: 'ingestion-orchestration',
+        }))
+        results.tasks.ingestionOrchestration = {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      }
+
+      const hasSuccess = results.tasks.ingestionOrchestration?.ok === true
+      if (!hasSuccess) {
+        results.ok = false
+      }
+
+      logger.info('Daily cron job completed (ingestion-only)', withOpId({
+        component: 'api/cron/daily',
+        runAt,
+        env,
+        mode,
+        results,
+      }))
+
+      return NextResponse.json(results, { status: results.ok ? 200 : 500 })
     }
 
     // Task 1: Auto-archive sales that have ended
@@ -160,7 +208,7 @@ async function handleRequest(request: NextRequest) {
 
     // Task 5: Ingestion orchestration (ingestion -> geocode -> publish)
     try {
-      const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId)
+      const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'daily')
       results.tasks.ingestionOrchestration = ingestionOrchestrationResult
     } catch (error) {
       logger.error('Ingestion orchestration task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
@@ -216,11 +264,13 @@ async function handleRequest(request: NextRequest) {
 }
 
 async function runIngestionOrchestration(
-  withOpId: (context?: any) => any
+  withOpId: (context?: any) => any,
+  mode: 'daily' | 'ingestion'
 ): Promise<any> {
   logger.info('Starting ingestion orchestration task', withOpId({
     component: 'api/cron/daily',
     task: 'ingestion-orchestration',
+    mode,
   }))
 
   const taskResult: any = {
@@ -228,7 +278,10 @@ async function runIngestionOrchestration(
     steps: {},
   }
 
-  // Step 1: Source ingestion placeholder (manual upload path is admin-triggered).
+  let geocodeSummary: GeocodeWorkerSummary | null = null
+  let publishSummary: PublishWorkerBatchSummary | null = null
+
+  // Step 1: External page source — config-driven list URLs per enabled city row; geocode/publish follow in later steps.
   try {
     logger.info('Ingestion step started', withOpId({
       component: 'api/cron/daily',
@@ -238,26 +291,85 @@ async function runIngestionOrchestration(
 
     const adminDb = getAdminDb()
     const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
-      .select('city, state, source_platform')
+      .select('city, state, source_platform, source_pages')
       .eq('enabled', true)
 
     if (cityError) {
       throw new Error(cityError.message || 'Failed to load ingestion city configs')
     }
 
+    const totals = {
+      fetched: 0,
+      inserted: 0,
+      skipped: 0,
+      invalid: 0,
+      errors: 0,
+      configsProcessed: 0,
+      pagesProcessed: 0,
+    }
+
+    const rows = (enabledCities || []) as Array<{
+      city: string
+      state: string
+      source_platform: string
+      source_pages: unknown
+    }>
+
+    for (const row of rows) {
+      if (row.source_platform !== 'external_page_source') {
+        continue
+      }
+      const pages = normalizeSourcePages(row.source_pages)
+      if (pages.length === 0) {
+        logger.warn('External page source: skipping config — no valid source_pages URLs', {
+          component: 'api/cron/daily',
+          task: 'ingestion-orchestration',
+          step: 'ingestion',
+          city: row.city,
+          state: row.state,
+          adapter: 'external_page_source',
+        })
+        continue
+      }
+      totals.configsProcessed += 1
+      const s = await persistExternalPageSource({
+        city: row.city,
+        state: row.state,
+        source_platform: row.source_platform,
+        source_pages: row.source_pages,
+      })
+      totals.fetched += s.fetched
+      totals.inserted += s.inserted
+      totals.skipped += s.skipped
+      totals.invalid += s.invalid
+      totals.errors += s.errors
+      totals.pagesProcessed += s.pagesProcessed
+    }
+
     taskResult.steps.ingestion = {
       ok: true,
-      skipped: true,
-      reason: 'no_external_adapter_implemented',
-      enabledCities: (enabledCities || []).length,
+      adapter: 'external_page_source',
+      configsProcessed: totals.configsProcessed,
+      pagesProcessed: totals.pagesProcessed,
+      fetched: totals.fetched,
+      inserted: totals.inserted,
+      skipped: totals.skipped,
+      invalid: totals.invalid,
+      errors: totals.errors,
     }
 
     logger.info('Ingestion step completed', withOpId({
       component: 'api/cron/daily',
       task: 'ingestion-orchestration',
       step: 'ingestion',
-      enabledCities: (enabledCities || []).length,
-      skipped: true,
+      adapter: 'external_page_source',
+      configsProcessed: totals.configsProcessed,
+      pagesProcessed: totals.pagesProcessed,
+      fetched: totals.fetched,
+      inserted: totals.inserted,
+      skipped: totals.skipped,
+      invalid: totals.invalid,
+      errors: totals.errors,
     }))
   } catch (error) {
     taskResult.ok = false
@@ -272,6 +384,8 @@ async function runIngestionOrchestration(
     }))
   }
 
+  const geoPublishStartMs = Date.now()
+
   // Step 2: Geocode pending sales.
   try {
     logger.info('Geocode step started', withOpId({
@@ -279,7 +393,7 @@ async function runIngestionOrchestration(
       task: 'ingestion-orchestration',
       step: 'geocode',
     }))
-    const geocodeSummary = await geocodePendingSales()
+    geocodeSummary = await geocodePendingSales()
     taskResult.steps.geocode = {
       ok: true,
       ...geocodeSummary,
@@ -310,7 +424,7 @@ async function runIngestionOrchestration(
       task: 'ingestion-orchestration',
       step: 'publish',
     }))
-    const publishSummary = await publishReadyIngestedSales()
+    publishSummary = await publishReadyIngestedSales()
     taskResult.steps.publish = {
       ok: true,
       ...publishSummary,
@@ -333,6 +447,14 @@ async function runIngestionOrchestration(
       step: 'publish',
     }))
   }
+
+  const orchestrationGeoPublishDurationMs = Date.now() - geoPublishStartMs
+  await recordIngestionOrchestrationRun({
+    mode,
+    orchestrationGeoPublishDurationMs,
+    geocodeSummary,
+    publishSummary,
+  })
 
   logger.info('Ingestion orchestration task completed', withOpId({
     component: 'api/cron/daily',

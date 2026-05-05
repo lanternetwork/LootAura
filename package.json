@@ -38,6 +38,7 @@
     "load:local:burst": "tsx scripts/load/local-test.ts --scenario sales-burst",
     "import:zipcodes": "tsx scripts/import-zipcodes.ts",
     "seed:cities": "tsx scripts/seedCityConfigs.ts",
+    "backfill:city-source-pages": "tsx scripts/backfillCityConfigSourcePages.ts",
     "generate:hardcoded-zips": "tsx scripts/generate-hardcoded-zips.ts"
   },
   "dependencies": {

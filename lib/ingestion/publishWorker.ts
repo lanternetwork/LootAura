@@ -28,10 +28,16 @@ interface ClaimedPublishRow {
   failure_reasons: unknown
 }
 
-export interface PublishWorkerSummary {
-  claimed: number
-  published: number
+/** Batch publish worker: one count set per `publishReadyIngestedSales()` invocation. */
+export interface PublishWorkerBatchSummary {
+  /** Rows returned from claim RPC for this batch. */
+  attempted: number
+  /** Rows finalized as `published` (including idempotent duplicate-key reuse). */
+  succeeded: number
+  /** Rows in `publish_failed` or unrecoverable finalize errors after claim. */
   failed: number
+  /** Claimed rows not published (e.g. not eligible); batch path is usually 0. */
+  skipped: number
 }
 
 function parseBatchSize(): number {
@@ -295,7 +301,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   }
 }
 
-export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary> {
+export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSummary> {
   const admin = getAdminDb()
   const batchSize = parseBatchSize()
 
@@ -313,10 +319,11 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary>
   }
 
   const claimedRows = (Array.isArray(data) ? data : []) as ClaimedPublishRow[]
-  const summary: PublishWorkerSummary = {
-    claimed: claimedRows.length,
-    published: 0,
+  const summary: PublishWorkerBatchSummary = {
+    attempted: claimedRows.length,
+    succeeded: 0,
     failed: 0,
+    skipped: 0,
   }
 
   for (const row of claimedRows) {
@@ -359,7 +366,7 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary>
         }
       }
 
-      summary.published += 1
+      summary.succeeded += 1
       logger.info('Publish worker row processed', {
         component: 'ingestion/publishWorker',
         operation: 'row_result',
@@ -415,9 +422,10 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerSummary>
   logger.info('Publish worker completed batch', {
     component: 'ingestion/publishWorker',
     operation: 'batch_complete',
-    claimed: summary.claimed,
-    published: summary.published,
+    attempted: summary.attempted,
+    succeeded: summary.succeeded,
     failed: summary.failed,
+    skipped: summary.skipped,
   })
 
   return summary

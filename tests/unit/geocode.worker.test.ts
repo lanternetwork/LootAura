@@ -152,7 +152,7 @@ describe('geocodeIngestedSaleById', () => {
       error: null,
     })
 
-    hoisted.geocodeAddress.mockResolvedValue({ lat: 38.2, lng: -85.8 })
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.2, lng: -85.8 }, hit429: false })
     hoisted.publishReadyIngestedSaleById.mockResolvedValue({
       ok: true,
       publishedSaleId: 'sale-2',
@@ -196,7 +196,7 @@ describe('geocodeIngestedSaleById', () => {
       error: null,
     })
 
-    hoisted.geocodeAddress.mockResolvedValue({ lat: 38.3, lng: -85.9 })
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.3, lng: -85.9 }, hit429: false })
     hoisted.publishReadyIngestedSaleById.mockResolvedValue({
       ok: true,
       publishedSaleId: 'sale-raw',
@@ -252,7 +252,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       data: { id: '00000000-0000-4000-8000-0000000000b1' },
       error: null,
     })
-    hoisted.geocodeAddress.mockResolvedValue({ lat: 38.4, lng: -85.1 })
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.4, lng: -85.1 }, hit429: false })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const summary = await geocodePendingSales()
@@ -284,7 +284,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       data: { id: '00000000-0000-4000-8000-0000000000b2' },
       error: null,
     })
-    hoisted.geocodeAddress.mockResolvedValue({ lat: 38.5, lng: -85.2 })
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.5, lng: -85.2 }, hit429: false })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const summary = await geocodePendingSales()
@@ -318,5 +318,74 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(summary.claimed).toBe(1)
     expect(summary.failedTerminal).toBe(1)
     expect(hoisted.geocodeAddress).not.toHaveBeenCalled()
+  })
+
+  it('batch processes multiple claimed rows under concurrent pool', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000c1',
+          normalized_address: '500 First',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000c2',
+          normalized_address: '600 Second',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push(
+      { data: { id: '00000000-0000-4000-8000-0000000000c1' }, error: null },
+      { data: { id: '00000000-0000-4000-8000-0000000000c2' }, error: null }
+    )
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.6, lng: -85.3 }, hit429: false })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary).toEqual({
+      claimed: 2,
+      succeeded: 2,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      rate429Count: 0,
+    })
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(2)
+    expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledTimes(2)
+  })
+
+  it('batch isolates unexpected publish errors as retriable row failures', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000d1',
+          normalized_address: '700 Boom',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { id: '00000000-0000-4000-8000-0000000000d1' },
+      error: null,
+    })
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.7, lng: -85.4 }, hit429: false })
+    hoisted.publishReadyIngestedSaleById.mockRejectedValue(new Error('publish exploded'))
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.claimed).toBe(1)
+    expect(summary.succeeded).toBe(0)
+    expect(summary.failedRetriable).toBe(1)
+    expect(summary.failedTerminal).toBe(0)
   })
 })

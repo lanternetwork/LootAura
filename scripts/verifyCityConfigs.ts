@@ -175,7 +175,7 @@ async function main(): Promise<void> {
   const csvPath = process.argv[2]
   if (!csvPath) {
     console.error('CSV path required.')
-    console.error('Usage: npx tsx scripts/verifyCityConfigs.ts "scripts/data/YSTM City Links.txt"')
+    console.error('Usage: npx tsx scripts/verifyCityConfigs.ts "<path-to-city-links-file>"')
     process.exit(1)
   }
 

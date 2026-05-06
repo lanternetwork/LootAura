@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/upload/signed-url/route'
+import { createSupabaseServerMock } from '@/tests/utils/mocks/supabaseServerMock'
 
 // Mock the server client
 vi.mock('@/lib/supabase/server', () => ({
@@ -24,26 +25,7 @@ describe('Upload Rate Limiting', () => {
 
   it('should allow requests within rate limit', async () => {
     mockRateLimitMiddleware.mockReturnValue({ allowed: true })
-
-    const mockSupabase = {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-123' } },
-          error: null,
-        }),
-      },
-      storage: {
-        from: vi.fn(() => ({
-          createSignedUploadUrl: vi.fn().mockResolvedValue({
-            data: { signedUrl: 'https://signed-url.example.com' },
-            error: null,
-          }),
-          getPublicUrl: vi.fn().mockReturnValue({
-            data: { publicUrl: 'https://public-url.example.com/image.jpg' }
-          }),
-        })),
-      },
-    }
+    const mockSupabase = createSupabaseServerMock({ userId: 'user-123', withStorage: true })
 
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
@@ -111,8 +93,10 @@ describe('Upload Rate Limiting', () => {
     })
 
     await POST(request)
-    // Depending on environment, logs may be suppressed; assert no throw and keep behavior check above
-    expect(true).toBe(true)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[UPLOAD] Unexpected error',
+      expect.objectContaining({ event: 'upload-signer', status: 'fail' })
+    )
 
     consoleSpy.mockRestore()
   })

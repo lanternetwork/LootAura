@@ -156,7 +156,14 @@ export async function GET(request: NextRequest) {
       claimed_count: number
       geocode_succeeded_count: number
       publish_succeeded_count: number
-    }>(admin, 'ingestion_orchestration_runs', 'created_at, duration_ms, rate_429_count, claimed_count, geocode_succeeded_count, publish_succeeded_count', (q) =>
+      notes: {
+        external_ingestion?: {
+          budgetExit?: boolean
+          lockSkipped?: boolean
+          overlapPrevented?: boolean
+        }
+      } | null
+    }>(admin, 'ingestion_orchestration_runs', 'created_at, duration_ms, rate_429_count, claimed_count, geocode_succeeded_count, publish_succeeded_count, notes', (q) =>
       q.gte('created_at', iso48h)
     )
 
@@ -244,6 +251,23 @@ export async function GET(request: NextRequest) {
       publishSuccessByHour.set(k, (publishSuccessByHour.get(k) ?? 0) + row.publish_succeeded_count)
     }
 
+    let lockSkippedRuns48h = 0
+    let budgetExitRuns48h = 0
+    let overlapPreventionEvents48h = 0
+    for (const row of orchRows) {
+      const external = row.notes?.external_ingestion
+      if (!external) continue
+      if (external.lockSkipped === true) {
+        lockSkippedRuns48h += 1
+      }
+      if (external.budgetExit === true) {
+        budgetExitRuns48h += 1
+      }
+      if (external.overlapPrevented === true) {
+        overlapPreventionEvents48h += 1
+      }
+    }
+
     const durationMsByHour = mapToSortedDurationAvg(durationSumByHour, durationCountByHour)
     const rate429ByHourSeries = mapToSortedSeries(rate429ByHourMap)
 
@@ -269,6 +293,11 @@ export async function GET(request: NextRequest) {
         claimedByHour: mapToSortedSeries(claimedByHour),
         geocodeSuccessByHour: mapToSortedSeries(geocodeSuccessByHour),
         publishSuccessByHour: mapToSortedSeries(publishSuccessByHour),
+      },
+      orchestrationVisibility: {
+        lockSkippedRuns48h,
+        budgetExitRuns48h,
+        overlapPreventionEvents48h,
       },
       oldestStuckRows: stuckRows.map((r) => ({
         id: r.id as string,

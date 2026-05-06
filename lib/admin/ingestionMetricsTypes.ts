@@ -21,6 +21,11 @@ export interface IngestionMetricsResponse {
     geocodeSuccessByHour: Array<{ bucket: string; count: number }>
     publishSuccessByHour: Array<{ bucket: string; count: number }>
   }
+  orchestrationVisibility: {
+    lockSkippedRuns48h: number
+    budgetExitRuns48h: number
+    overlapPreventionEvents48h: number
+  }
   oldestStuckRows: Array<{
     id: string
     status: string

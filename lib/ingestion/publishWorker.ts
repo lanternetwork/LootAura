@@ -1,12 +1,9 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingestion/publish'
+import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
-
-// Temporary explicit system owner for ingestion-published sales.
-// Must match an existing profiles.id/auth user id in the target environment.
-const FIXED_INGEST_OWNER_ID = 'b2750036-4a71-404a-9020-1734b5b888b1'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }

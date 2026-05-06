@@ -1,4 +1,5 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
 import { PublishInputSchema } from '@/lib/ingestion/schemas'
 import type { PublishInput } from '@/lib/ingestion/types'
 
@@ -22,10 +23,6 @@ export interface PublishableIngestedSale {
   image_cloudinary_url: string | null
   image_urls?: string[] | null
 }
-
-// Temporary explicit system owner for ingestion-published sales.
-// Must match an existing profiles.id/auth user id in the target environment.
-const FIXED_INGEST_OWNER_ID = 'b2750036-4a71-404a-9020-1734b5b888b1'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

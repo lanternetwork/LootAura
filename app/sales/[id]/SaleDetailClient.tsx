@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { isDebugEnabled } from '@/lib/debug'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
@@ -28,27 +27,28 @@ import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@
 import { isNativeApp } from '@/lib/runtime/isNativeApp'
 import { queryClient } from '@/lib/queryClient'
 
+function isTrustedNextImageHost(urlString: string): boolean {
+  try {
+    const u = new URL(urlString)
+    if (u.protocol !== 'https:') return false
+    const host = u.hostname.toLowerCase()
+    if (host === 'res.cloudinary.com') return true
+    if (host === 'storage.googleapis.com') return true
+    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
+      return u.pathname.startsWith('/storage/v1/object/public/')
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
   const [useFallback, setUseFallback] = useState(false)
-  
-  // Debug logging (only in debug mode)
-  useEffect(() => {
-    if (isDebugEnabled) {
-      console.debug('[ItemImage] Rendering image', { 
-        src: src ? `${src.substring(0, 50)}...` : null, 
-        srcType: typeof src,
-        srcLength: src?.length || 0,
-        alt, 
-        imageError, 
-        isLoading: imageLoading, 
-        useFallback 
-      })
-    }
-  }, [src, alt, imageError, imageLoading, useFallback])
-  
+
   if (imageError) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-200" role="img" aria-label={`${alt} - no image available`}>
@@ -66,16 +66,10 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
         className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
         onLoad={() => {
           setImageLoading(false)
-          if (isDebugEnabled) {
-            console.debug('[ItemImage] Fallback image loaded successfully', { src: src?.substring(0, 50) + '...' })
-          }
         }}
-        onError={(e) => {
+        onError={() => {
           setImageError(true)
           setImageLoading(false)
-          if (isDebugEnabled) {
-            console.error('[ItemImage] Fallback image failed to load', { src: src?.substring(0, 50) + '...', error: e })
-          }
         }}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />
@@ -97,24 +91,15 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
       unoptimized={shouldUnoptimize}
       onLoad={() => {
         setImageLoading(false)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.debug('[ItemImage] Image loaded successfully', { src: src?.substring(0, 50) + '...' })
-        }
       }}
-      onError={(e) => {
+      onError={() => {
         // Try fallback to regular img tag before giving up
         if (!useFallback) {
-          if (isDebugEnabled) {
-            console.warn('[ItemImage] Next.js Image failed, trying fallback img tag', { src: src?.substring(0, 50) + '...' })
-          }
           setUseFallback(true)
           setImageLoading(true)
         } else {
           setImageError(true)
           setImageLoading(false)
-          if (isDebugEnabled) {
-            console.error('[ItemImage] Image failed to load after fallback', { src: src?.substring(0, 50) + '...', error: e })
-          }
         }
       }}
     />
@@ -140,36 +125,6 @@ export default function SaleDetailClient({
   promotionsEnabled = false,
   paymentsEnabled = false,
 }: SaleDetailClientProps) {
-  // Debug logging to diagnose items visibility issue (only in debug mode)
-  if (isDebugEnabled) {
-    console.log('[SALE_DETAIL_CLIENT] Items received', {
-      itemsCount: items.length,
-      items: items.map(i => ({ id: i.id, name: i.name, hasPhoto: !!i.photo })),
-      saleId: sale.id,
-      saleStatus: sale.status,
-    })
-    
-    // Also log the raw items array to see if it's actually empty
-    console.log('[SALE_DETAIL_CLIENT] Raw items array:', items)
-    console.log('[SALE_DETAIL_CLIENT] Items length:', items.length)
-    console.log('[SALE_DETAIL_CLIENT] Items.length === 0?', items.length === 0)
-    
-    // Log each item individually
-    if (items.length > 0) {
-      console.log('[SALE_DETAIL_CLIENT] Items found:', items.length)
-      items.forEach((item, index) => {
-        console.log(`[SALE_DETAIL_CLIENT] Item ${index}:`, {
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          photo: item.photo,
-          hasPhoto: !!item.photo,
-        })
-      })
-    } else {
-      console.warn('[SALE_DETAIL_CLIENT] ⚠️ NO ITEMS RECEIVED - items array is empty!')
-    }
-  }
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
   
@@ -325,9 +280,6 @@ export default function SaleDetailClient({
         type: 'favoriteState',
         isFavorited: isFavorited
       }
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALE_DETAIL] Sending initial favoriteState to native:', message)
-      }
       (window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
     }
   }, [isFavorited, sale.id])
@@ -379,19 +331,11 @@ export default function SaleDetailClient({
         // Handle both window and document event formats
         const eventData = event.data || (event as any).data || (event as any).message
         const message = typeof eventData === 'string' ? JSON.parse(eventData) : eventData
-        
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALE_DETAIL] Received message from native:', message)
-        }
-        
+
         if (message && message.type === 'navigate') {
           handleNavigate()
         } else if (message && message.type === 'toggleFavorite') {
           // Handle favorite toggle from native footer
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALE_DETAIL] Processing toggleFavorite request')
-          }
-          
           // Reuse existing handleFavoriteToggle which has auth gating
           handleFavoriteToggle().then((newFavorited) => {
             // If newFavorited is undefined, user was redirected (not logged in)
@@ -401,33 +345,17 @@ export default function SaleDetailClient({
                 type: 'favoriteState', 
                 isFavorited: newFavorited 
               }
-              
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[SALE_DETAIL] Sending favoriteState to native:', responseMessage)
-              }
-              
+
               (window as any).ReactNativeWebView.postMessage(
                 JSON.stringify(responseMessage)
               )
-            } else if (newFavorited === undefined) {
-              // User was redirected to sign-in
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[SALE_DETAIL] User not logged in, redirecting to sign-in (no favoriteState sent)')
-              }
             }
-          }).catch((error) => {
-            // If toggle fails, don't send message
-            // Error handling is done in handleFavoriteToggle (alert shown)
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.warn('[SALE_DETAIL] Favorite toggle failed:', error)
-            }
+          }).catch(() => {
+            // If toggle fails, don't send message — error handling is in handleFavoriteToggle
           })
         }
-      } catch (error) {
+      } catch {
         // Ignore invalid messages or parse errors
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.warn('[SALE_DETAIL] Failed to process postMessage:', error)
-        }
       }
     }
 
@@ -782,13 +710,25 @@ export default function SaleDetailClient({
         {/* Primary Photo */}
         <div className="relative w-full overflow-hidden rounded-2xl bg-gray-100 aspect-[4/3]">
           {cover ? (
-            <Image
-              src={cover.url}
-              alt={cover.alt}
-              fill
-              className="object-contain"
-              sizes="100vw"
-            />
+            isTrustedNextImageHost(cover.url) ? (
+              <Image
+                src={cover.url}
+                alt={cover.alt}
+                data-testid="sale-detail-cover-next-image"
+                fill
+                className="object-contain"
+                sizes="100vw"
+              />
+            ) : (
+              <img
+                src={cover.url}
+                alt={cover.alt}
+                data-testid="sale-detail-cover-external-img"
+                className="h-full w-full object-contain"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            )
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
               <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
@@ -963,13 +903,25 @@ export default function SaleDetailClient({
           <div className="bg-white rounded-lg shadow-sm">
             <div className="relative w-full overflow-hidden rounded-t-lg bg-gray-100 aspect-[16/9] md:aspect-[4/3]">
               {cover ? (
-                <Image
-                  src={cover.url}
-                  alt={cover.alt}
-                  fill
-                  className="object-contain"
-                  sizes="(min-width:1024px) 66vw, 100vw"
-                />
+                isTrustedNextImageHost(cover.url) ? (
+                  <Image
+                    src={cover.url}
+                    alt={cover.alt}
+                    data-testid="sale-detail-cover-next-image"
+                    fill
+                    className="object-contain"
+                    sizes="(min-width:1024px) 66vw, 100vw"
+                  />
+                ) : (
+                  <img
+                    src={cover.url}
+                    alt={cover.alt}
+                    data-testid="sale-detail-cover-external-img"
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                )
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
                   <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
@@ -1117,20 +1069,6 @@ export default function SaleDetailClient({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map((item) => {
-                  // Debug logging (only in debug mode)
-                  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                    console.debug('[SaleDetailClient] Item card rendering', {
-                      itemId: item.id,
-                      itemName: item.name,
-                      hasPhoto: !!item.photo,
-                      photoType: typeof item.photo,
-                      photoValue: item.photo ? `${item.photo.substring(0, 50)}...` : null,
-                      photoLength: item.photo?.length || 0,
-                      photoTrimmedLength: item.photo?.trim().length || 0,
-                      willRenderImage: !!(item.photo && item.photo.trim().length > 0),
-                    })
-                  }
-                  
                   return (
                     <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">

@@ -49,6 +49,14 @@ export function hashHostForLog(hostname: string): string {
   return createHash('sha256').update(hostname.toLowerCase()).digest('hex').slice(0, 16)
 }
 
+function normalizeHostForIpChecks(hostname: string): string {
+  const trimmed = hostname.trim()
+  if (trimmed.startsWith('[') && trimmed.endsWith(']') && trimmed.length > 2) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
 function ipv4ToUint32(ip: string): number | null {
   const parts = ip.split('.')
   if (parts.length !== 4) return null
@@ -143,7 +151,7 @@ export function validateExternalHttpsUrlForFetch(urlString: string): URL {
   if (!url.hostname) {
     throw new Error(`${EXTERNAL_FETCH_REASON.INVALID_URL}: no host`)
   }
-  const host = url.hostname
+  const host = normalizeHostForIpChecks(url.hostname)
   if (isForbiddenHostname(host)) {
     throw new Error(`${EXTERNAL_FETCH_REASON.FORBIDDEN_HOSTNAME}`)
   }
@@ -157,18 +165,19 @@ export function validateExternalHttpsUrlForFetch(urlString: string): URL {
 }
 
 async function resolveAndAssertPublicHost(hostname: string): Promise<void> {
-  if (isIPv4(hostname) || isIPv6(hostname)) {
-    if (isNonPublicIpAddress(hostname)) {
+  const host = normalizeHostForIpChecks(hostname)
+  if (isIPv4(host) || isIPv6(host)) {
+    if (isNonPublicIpAddress(host)) {
       throw new Error(`${EXTERNAL_FETCH_REASON.NON_PUBLIC_IP}`)
     }
     return
   }
-  if (isForbiddenHostname(hostname)) {
+  if (isForbiddenHostname(host)) {
     throw new Error(`${EXTERNAL_FETCH_REASON.FORBIDDEN_HOSTNAME}`)
   }
   let records: Array<{ address: string; family: number }>
   try {
-    records = await dns.lookup(hostname, { all: true, verbatim: true })
+    records = await dns.lookup(host, { all: true, verbatim: true })
   } catch {
     throw new Error(`${EXTERNAL_FETCH_REASON.DNS_FAILURE}`)
   }

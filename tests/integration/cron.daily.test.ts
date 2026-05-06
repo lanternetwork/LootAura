@@ -136,6 +136,86 @@ function ingestionCityConfigsExternalPageSourceMock() {
   }
 }
 
+function ingestionCityConfigsExternalPageSourceRowsMock(rows: unknown[]) {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({
+        data: rows,
+        error: null,
+      }),
+    })),
+  }
+}
+
+function createIngestionOrchestrationStateTableMock(initial: {
+  cursor?: number
+  lease_owner?: string | null
+  lease_expires_at?: string | null
+}) {
+  const state = {
+    key: 'external_page_source',
+    cursor: initial.cursor ?? 0,
+    lease_owner: initial.lease_owner ?? null,
+    lease_expires_at: initial.lease_expires_at ?? null,
+  }
+  return {
+    upsert: vi.fn().mockResolvedValue({ error: null }),
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        limit: vi.fn().mockResolvedValue({
+          data: [{ ...state }],
+          error: null,
+        }),
+      })),
+    })),
+    update: vi.fn((payload: Record<string, unknown>) => {
+      const conditions: Record<string, unknown> = {}
+      const addEq = (field: string, value: unknown) => {
+        conditions[field] = { op: 'eq', value }
+      }
+      const addIs = (field: string, value: unknown) => {
+        conditions[field] = { op: 'is', value }
+      }
+      const evaluateMatches = () => {
+        const keys = Object.keys(conditions)
+        for (const field of keys) {
+          const c = conditions[field] as { op: 'eq' | 'is'; value: unknown }
+          const actual = (state as Record<string, unknown>)[field]
+          if (c.op === 'eq') {
+            // Match Postgres/PostgREST semantics: `= NULL` never matches.
+            if (c.value === null) return false
+            if (actual !== c.value) return false
+          } else if (c.op === 'is') {
+            if (actual !== c.value) return false
+          }
+        }
+        return true
+      }
+
+      const chain = {
+        eq: vi.fn((field: string, value: unknown) => {
+          addEq(field, value)
+          return chain
+        }),
+        is: vi.fn((field: string, value: unknown) => {
+          addIs(field, value)
+          return chain
+        }),
+        select: vi.fn((selection?: string) => {
+          if (!evaluateMatches()) return Promise.resolve({ data: [], error: null })
+          Object.assign(state, payload)
+          if (selection === 'cursor') {
+            return Promise.resolve({ data: [{ cursor: state.cursor }], error: null })
+          }
+          return Promise.resolve({ data: [{ key: state.key }], error: null })
+        }),
+      }
+      return chain
+    }),
+    __getState: () => ({ ...state }),
+  }
+}
+
 describe('GET /api/cron/daily', () => {
   let GET: any
 
@@ -803,7 +883,11 @@ describe('GET /api/cron/daily', () => {
   })
 
   describe('GET /api/cron/daily?mode=ingestion', () => {
+    let stateTableMock: ReturnType<typeof createIngestionOrchestrationStateTableMock>
+
     beforeEach(() => {
+      process.env.INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE = '2'
+      process.env.INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS = '45000'
       mockPersistExternalPageSource.mockResolvedValue({
         fetched: 3,
         inserted: 2,
@@ -812,9 +896,13 @@ describe('GET /api/cron/daily', () => {
         errors: 0,
         pagesProcessed: 2,
       })
+      stateTableMock = createIngestionOrchestrationStateTableMock({})
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'ingestion_city_configs') {
           return ingestionCityConfigsExternalPageSourceMock()
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
         }
         return { from: vi.fn() }
       })
@@ -856,6 +944,12 @@ describe('GET /api/cron/daily', () => {
       expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
         ok: true,
         adapter: 'external_page_source',
+        totalConfigs: 1,
+        batchSize: 2,
+        configsRemaining: 0,
+        cursorStart: 0,
+        cursorNext: 0,
+        executionBudgetExit: false,
         configsProcessed: 1,
         pagesProcessed: 2,
         fetched: 3,
@@ -863,6 +957,44 @@ describe('GET /api/cron/daily', () => {
         skipped: 1,
         invalid: 0,
         errors: 0,
+      })
+      expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
+      expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
+      expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+    })
+
+    it('acquires lease from clean unlocked null state and proceeds with ingestion', async () => {
+      stateTableMock = createIngestionOrchestrationStateTableMock({
+        cursor: 0,
+        lease_owner: null,
+        lease_expires_at: null,
+      })
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsExternalPageSourceMock()
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
+        }
+        return { from: vi.fn() }
+      })
+
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer test-cron-secret',
+        },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+        ok: true,
+        skipped: undefined,
+        reason: undefined,
+        configsProcessed: 1,
       })
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
@@ -903,12 +1035,123 @@ describe('GET /api/cron/daily', () => {
       }
     })
 
+    it('prevents overlap when another active orchestration lease exists', async () => {
+      const activeLeaseUntil = new Date(Date.now() + 60_000).toISOString()
+      stateTableMock = createIngestionOrchestrationStateTableMock({
+        cursor: 0,
+        lease_owner: 'existing-run-owner',
+        lease_expires_at: activeLeaseUntil,
+      })
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsExternalPageSourceMock()
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
+        }
+        return { from: vi.fn() }
+      })
+
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: { authorization: 'Bearer test-cron-secret' },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+        ok: true,
+        skipped: true,
+        reason: 'active_orchestration_lock',
+      })
+      expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
+      expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
+      expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+    })
+
+    it('recovers stale lease and advances cursor with bounded processing', async () => {
+      const staleLeaseUntil = new Date(Date.now() - 60_000).toISOString()
+      stateTableMock = createIngestionOrchestrationStateTableMock({
+        cursor: 1,
+        lease_owner: 'stale-owner',
+        lease_expires_at: staleLeaseUntil,
+      })
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsExternalPageSourceRowsMock([
+            { city: 'A', state: 'CA', source_platform: 'external_page_source', source_pages: ['https://a.com'] },
+            { city: 'B', state: 'CA', source_platform: 'external_page_source', source_pages: ['https://b.com'] },
+            { city: 'C', state: 'CA', source_platform: 'external_page_source', source_pages: ['https://c.com'] },
+          ])
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
+        }
+        return { from: vi.fn() }
+      })
+
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: { authorization: 'Bearer test-cron-secret' },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+        ok: true,
+        totalConfigs: 3,
+        batchSize: 2,
+        cursorStart: 1,
+        cursorNext: 0,
+        configsProcessed: 2,
+      })
+      expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(2)
+    })
+
+    it('exits ingestion early on execution budget and remains resumable', async () => {
+      process.env.INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS = '1'
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsExternalPageSourceRowsMock([
+            { city: 'A', state: 'CA', source_platform: 'external_page_source', source_pages: ['https://a.com'] },
+            { city: 'B', state: 'CA', source_platform: 'external_page_source', source_pages: ['https://b.com'] },
+          ])
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
+        }
+        return { from: vi.fn() }
+      })
+
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: { authorization: 'Bearer test-cron-secret' },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion.executionBudgetExit).toBe(true)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion.configsProcessed).toBe(0)
+      expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
+      expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
+      expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+    })
+
     it('skips archive, promotions, favorites, and moderation digest', async () => {
       const tablesTouched: string[] = []
       mockAdminDb.from.mockImplementation((table: string) => {
         tablesTouched.push(table)
         if (table === 'ingestion_city_configs') {
           return ingestionCityConfigsDbMock()
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
         }
         return { from: vi.fn() }
       })
@@ -931,7 +1174,7 @@ describe('GET /api/cron/daily', () => {
       expect(data.tasks.moderationDigest).toBeUndefined()
       expect(mockProcessFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
       expect(mockSendModerationDailyDigestEmail).not.toHaveBeenCalled()
-      expect(tablesTouched).toEqual(['ingestion_city_configs'])
+      expect(tablesTouched).toEqual(['ingestion_orchestration_state', 'ingestion_orchestration_state', 'ingestion_orchestration_state', 'ingestion_city_configs', 'ingestion_orchestration_state'])
       expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
     })
   })

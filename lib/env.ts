@@ -164,9 +164,10 @@ export function isProduction(): boolean {
   return process.env.NODE_ENV === 'production'
 }
 
-// Helper to check if debug mode is enabled
+// Helper to check if debug mode is enabled (read process env at call time so tests and runtime toggles apply)
 export function isDebugMode(): boolean {
-  return ENV_PUBLIC.NEXT_PUBLIC_DEBUG === true
+  const v = process.env.NEXT_PUBLIC_DEBUG
+  return v === 'true' || v === '1'
 }
 
 // Helper to check if AdSense is enabled

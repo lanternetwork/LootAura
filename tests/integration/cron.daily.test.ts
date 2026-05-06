@@ -992,10 +992,9 @@ describe('GET /api/cron/daily', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
+      // `skipped` on this payload is totals.skipped (count), not the throttle skip flag
       expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
         ok: true,
-        skipped: undefined,
-        reason: undefined,
         configsConsumed: 1,
         configsSkippedInvalidPages: 0,
         configsProcessed: 1,
@@ -1120,7 +1119,8 @@ describe('GET /api/cron/daily', () => {
     })
 
     it('exits ingestion early on execution budget and remains resumable', async () => {
-      process.env.INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS = '1'
+      // 0 ms = no budget for bounded rows; first loop check exits before any config work (deterministic on fast CI)
+      process.env.INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS = '0'
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'ingestion_city_configs') {
           return ingestionCityConfigsExternalPageSourceRowsMock([

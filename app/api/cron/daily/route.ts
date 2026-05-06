@@ -196,7 +196,9 @@ function parseIngestionOrchestrationExecutionBudgetMs(): number {
   const defaultBudgetMs = 45_000
   if (raw === undefined || raw === '') return defaultBudgetMs
   const parsed = Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed) || parsed < 1) return defaultBudgetMs
+  if (!Number.isFinite(parsed) || parsed < 0) return defaultBudgetMs
+  // 0 = no wall time budget for bounded config work (exit before first row; tests / emergency brake)
+  if (parsed === 0) return 0
   return Math.min(parsed, 240_000)
 }
 

@@ -48,8 +48,14 @@ vi.mock('@/lib/ingestion/publishWorker', () => ({
   publishReadyIngestedSales: (...args: unknown[]) => mockPublishReadyIngestedSales(...args),
 }))
 
+const { mockFetchLastSuccessfulExternalIngestionAt } = vi.hoisted(() => ({
+  mockFetchLastSuccessfulExternalIngestionAt: vi.fn(),
+}))
+
 vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
   recordIngestionOrchestrationRun: vi.fn().mockResolvedValue(undefined),
+  fetchLastSuccessfulExternalIngestionAt: (...args: unknown[]) =>
+    mockFetchLastSuccessfulExternalIngestionAt(...args),
 }))
 
 const { mockPersistExternalPageSource } = vi.hoisted(() => ({
@@ -140,6 +146,7 @@ describe('GET /api/cron/daily', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFetchLastSuccessfulExternalIngestionAt.mockResolvedValue(null)
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth by default
     mockProcessFavoriteSalesStartingSoonJob.mockResolvedValue({ success: true })
     mockSendModerationDailyDigestEmail.mockResolvedValue({ ok: true })
@@ -860,6 +867,40 @@ describe('GET /api/cron/daily', () => {
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
       expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips external ingestion when last successful run is within min interval', async () => {
+      const tenMinutesAgo = new Date(MOCK_BASE_DATE.getTime() - 10 * 60 * 1000).toISOString()
+      mockFetchLastSuccessfulExternalIngestionAt.mockResolvedValue(tenMinutesAgo)
+
+      vi.useFakeTimers({ now: MOCK_BASE_DATE })
+
+      try {
+        const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+          method: 'GET',
+          headers: {
+            authorization: 'Bearer test-cron-secret',
+          },
+        })
+
+        const response = await GET(request)
+        const data = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(data.ok).toBe(true)
+        expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+          ok: true,
+          skipped: true,
+          reason: 'ingestion_interval',
+          minIntervalMinutes: 30,
+          lastSuccessfulExternalIngestionAt: tenMinutesAgo,
+        })
+        expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
+        expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
+        expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('skips archive, promotions, favorites, and moderation digest', async () => {

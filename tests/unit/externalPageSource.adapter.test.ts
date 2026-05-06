@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
 
 describe('normalizeSourcePages', () => {
-  it('returns only valid http(s) URLs from array', async () => {
+  it('returns only valid HTTPS URLs from array', async () => {
     const { normalizeSourcePages } = await import('@/lib/ingestion/adapters/externalPageSource')
     const out = normalizeSourcePages([
       'https://example.com/a',
+      'http://example.com/insecure',
       'ftp://bad',
       'not-a-url',
       '  https://example.com/b  ',
@@ -79,5 +80,31 @@ describe('parseExternalPageSourceHtml', () => {
       LIST
     )
     expect(listings).toHaveLength(1)
+  })
+
+  it('extracts og:image and img candidates as normalized HTTPS with max 3', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <meta property="og:image" content="/images/og-photo.jpg" />
+      <a href="https://example.com/US/Illinois/Chicago/1-A/99/listing.html">One</a>
+      <div>
+        <img src="https://cdn.example.com/a.jpg" />
+        <img src="/gallery/b.jpg" />
+        <img src="http://cdn.example.com/insecure.jpg" />
+        <img src="https://cdn.example.com/a.jpg" />
+        <img src="https://cdn.example.com/c.jpg" />
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].rawPayload.imageUrls).toEqual([
+      'https://example.com/images/og-photo.jpg',
+      'https://cdn.example.com/a.jpg',
+      'https://example.com/gallery/b.jpg',
+    ])
   })
 })

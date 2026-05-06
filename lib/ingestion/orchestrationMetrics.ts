@@ -7,16 +7,17 @@ export type OrchestrationMode = 'daily' | 'ingestion'
 
 function parseGeocodeBatchSizeForMetrics(): number {
   const raw = process.env.GEOCODE_BATCH_SIZE
-  const parsed = raw ? Number.parseInt(raw, 10) : 100
+  const defaultBatch = 300
+  const parsed = raw ? Number.parseInt(raw, 10) : defaultBatch
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 100
+    return defaultBatch
   }
   return Math.min(parsed, 500)
 }
 
 function parseGeocodeConcurrencyForMetrics(): number {
   const raw = process.env.GEOCODE_CONCURRENCY
-  const defaultConcurrency = 2
+  const defaultConcurrency = 4
   if (raw === undefined || raw === '') {
     return defaultConcurrency
   }
@@ -24,7 +25,61 @@ function parseGeocodeConcurrencyForMetrics(): number {
   if (!Number.isFinite(parsed) || parsed < 1) {
     return defaultConcurrency
   }
-  return Math.min(parsed, 3)
+  return Math.min(parsed, 5)
+}
+
+export type ExternalIngestionOrchestrationNote = {
+  status: 'completed' | 'skipped_throttle' | 'failed'
+  completedAt?: string
+  reason?: string
+  minIntervalMinutes?: number
+  lastSuccessfulExternalIngestionAt?: string
+}
+
+type NotesPayload = {
+  external_ingestion?: ExternalIngestionOrchestrationNote
+}
+
+/**
+ * Latest successful external_page_source ingestion completion time from orchestration metrics (any mode).
+ * Used to throttle frequent `mode=ingestion` cron without slowing geocode/publish.
+ */
+export async function fetchLastSuccessfulExternalIngestionAt(): Promise<string | null> {
+  try {
+    const admin = getAdminDb()
+    const { data, error } = await fromBase(admin, 'ingestion_orchestration_runs')
+      .select('notes')
+      .not('notes', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (error) {
+      logger.warn('fetchLastSuccessfulExternalIngestionAt query failed', {
+        component: 'ingestion/orchestrationMetrics',
+        operation: 'select_last_ingestion',
+        message: error.message,
+      })
+      return null
+    }
+    if (!Array.isArray(data)) {
+      return null
+    }
+    for (const row of data as { notes: unknown }[]) {
+      const notes = row.notes as NotesPayload | null
+      const ext = notes?.external_ingestion
+      if (ext?.status === 'completed' && typeof ext.completedAt === 'string' && ext.completedAt.length > 0) {
+        return ext.completedAt
+      }
+    }
+    return null
+  } catch (err) {
+    logger.error(
+      'fetchLastSuccessfulExternalIngestionAt threw',
+      err instanceof Error ? err : new Error(String(err)),
+      { component: 'ingestion/orchestrationMetrics', operation: 'select_last_ingestion' }
+    )
+    return null
+  }
 }
 
 const emptyGeocode: GeocodeWorkerSummary = {
@@ -47,9 +102,14 @@ export async function recordIngestionOrchestrationRun(params: {
   orchestrationGeoPublishDurationMs: number
   geocodeSummary: GeocodeWorkerSummary | null
   publishSummary: PublishWorkerBatchSummary | null
+  externalIngestion?: ExternalIngestionOrchestrationNote | null
 }): Promise<void> {
   const geocode = params.geocodeSummary ?? emptyGeocode
   const publish = params.publishSummary ?? emptyPublish
+  const notes: NotesPayload | null =
+    params.externalIngestion != null
+      ? { external_ingestion: params.externalIngestion }
+      : null
 
   try {
     const admin = getAdminDb()
@@ -67,6 +127,7 @@ export async function recordIngestionOrchestrationRun(params: {
       publish_skipped_count: publish.skipped,
       duration_ms: params.orchestrationGeoPublishDurationMs,
       rate_429_count: geocode.rate429Count,
+      notes,
     })
     if (error) {
       logger.error(

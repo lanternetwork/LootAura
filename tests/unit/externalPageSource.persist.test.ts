@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockFrom = vi.fn()
 
+const { persistDnsLookup } = vi.hoisted(() => ({
+  persistDnsLookup: vi.fn(),
+}))
+
+vi.mock('node:dns/promises', () => ({
+  lookup: persistDnsLookup,
+}))
+
 vi.mock('@/lib/log', () => ({
   logger: {
     warn: vi.fn(),
@@ -19,8 +27,16 @@ vi.mock('@/lib/supabase/clients', () => ({
 const listHtml =
   '<a href="https://example.com/US/Illinois/Chicago/100-A/1001/listing.html">One</a>'
 
+function htmlFetchResponse(html: string): Response {
+  return new Response(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  })
+}
+
 describe('persistExternalPageSource', () => {
   beforeEach(() => {
+    persistDnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
     mockFrom.mockReset()
     mockFrom.mockImplementation((table: string) => {
       if (table !== 'ingested_sales') {
@@ -36,14 +52,7 @@ describe('persistExternalPageSource', () => {
       }
     })
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: async () => listHtml,
-      })
-    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(htmlFetchResponse(listHtml)))
   })
 
   afterEach(() => {
@@ -68,11 +77,7 @@ describe('persistExternalPageSource', () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new Error('network'))
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => listHtml,
-      })
+      .mockResolvedValueOnce(htmlFetchResponse(listHtml))
     vi.stubGlobal('fetch', fetchMock)
 
     const { persistExternalPageSource } = await import('@/lib/ingestion/adapters/externalPageSource')
@@ -106,14 +111,7 @@ describe('persistExternalPageSource', () => {
       <a href="https://example.com/US/Illinois/Chicago/200-B/2002/listing.html">A</a>
       <a href="https://example.com/US/Illinois/Chicago/200-B/2003/listing.html">B</a>
     `
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: async () => html,
-      })
-    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(htmlFetchResponse(html)))
 
     const { persistExternalPageSource } = await import('@/lib/ingestion/adapters/externalPageSource')
     const summary = await persistExternalPageSource({
@@ -125,5 +123,22 @@ describe('persistExternalPageSource', () => {
     expect(summary.fetched).toBe(2)
     expect(summary.inserted).toBe(1)
     expect(summary.skipped).toBe(1)
+  })
+
+  it('invokes beforePageFetch hook for each page without changing coverage', async () => {
+    const beforePageFetch = vi.fn().mockResolvedValue(undefined)
+    const { persistExternalPageSource } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const summary = await persistExternalPageSource(
+      {
+        city: 'Chicago',
+        state: 'IL',
+        source_platform: 'external_page_source',
+        source_pages: ['https://example.com/p1', 'https://example.com/p2'],
+      },
+      { beforePageFetch }
+    )
+    expect(beforePageFetch).toHaveBeenCalledTimes(2)
+    expect(summary.pagesProcessed).toBe(2)
+    expect(summary.fetched).toBe(2)
   })
 })

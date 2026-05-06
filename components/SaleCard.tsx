@@ -15,6 +15,22 @@ interface SaleCardProps {
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
 }
 
+function isTrustedNextImageHost(urlString: string): boolean {
+  try {
+    const u = new URL(urlString)
+    if (u.protocol !== 'https:') return false
+    const host = u.hostname.toLowerCase()
+    if (host === 'res.cloudinary.com') return true
+    if (host === 'storage.googleapis.com') return true
+    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
+      return u.pathname.startsWith('/storage/v1/object/public/')
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   if (!sale) return null
   const cover = getSaleCoverUrl(sale)
@@ -46,14 +62,26 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
     >
       <div className="relative bg-gray-100 h-36 sm:h-[158px] md:h-[144px] overflow-hidden">
         {cover ? (
-          <Image
-            src={cover.url}
-            alt={cover.alt}
-            fill
-            sizes="(min-width:1024px) 33vw, (min-width:768px) 50vw, 100vw"
-            className="object-cover transform-gpu scale-[1.3]"
-            priority={false}
-          />
+          isTrustedNextImageHost(cover.url) ? (
+            <Image
+              src={cover.url}
+              alt={cover.alt}
+              data-testid="sale-card-next-image"
+              fill
+              sizes="(min-width:1024px) 33vw, (min-width:768px) 50vw, 100vw"
+              className="object-cover transform-gpu scale-[1.3]"
+              priority={false}
+            />
+          ) : (
+            <img
+              src={cover.url}
+              alt={cover.alt}
+              data-testid="sale-card-external-img"
+              className="h-full w-full object-cover transform-gpu scale-[1.3]"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
             <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.69]" />

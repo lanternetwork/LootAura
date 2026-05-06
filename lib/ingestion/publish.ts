@@ -20,6 +20,7 @@ export interface PublishableIngestedSale {
   time_start: string | null
   time_end: string | null
   image_cloudinary_url: string | null
+  image_urls?: string[] | null
 }
 
 // Temporary explicit system owner for ingestion-published sales.
@@ -54,8 +55,18 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
   const city = (ingestedSale.city || '').trim()
   const state = (ingestedSale.state || '').trim()
   const address = normalizeAddressForPublish(ingestedSale.normalized_address, city, state)
-  const coverImageUrl = ingestedSale.image_cloudinary_url?.trim() || null
-  const images = coverImageUrl ? [coverImageUrl] : null
+  const normalizedImages = Array.isArray(ingestedSale.image_urls)
+    ? ingestedSale.image_urls
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : []
+  const cloudinaryFallback = ingestedSale.image_cloudinary_url?.trim() || null
+  if (normalizedImages.length === 0 && cloudinaryFallback) {
+    normalizedImages.push(cloudinaryFallback)
+  }
+  const coverImageUrl = normalizedImages[0] || null
+  const images = normalizedImages
 
   return {
     ownerId,

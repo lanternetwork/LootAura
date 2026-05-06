@@ -30,17 +30,18 @@ export type GeocodeIngestedSaleByIdResult =
 
 function parseBatchSize(): number {
   const raw = process.env.GEOCODE_BATCH_SIZE
-  const parsed = raw ? Number.parseInt(raw, 10) : 100
+  const defaultBatch = 300
+  const parsed = raw ? Number.parseInt(raw, 10) : defaultBatch
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 100
+    return defaultBatch
   }
   return Math.min(parsed, 500)
 }
 
-/** Bounded parallelism for processGeocodeAttempt only; capped at 3 per rollout guidance. */
+/** Bounded parallelism for processGeocodeAttempt; cap keeps Nominatim load predictable. */
 function parseGeocodeConcurrency(): number {
   const raw = process.env.GEOCODE_CONCURRENCY
-  const defaultConcurrency = 2
+  const defaultConcurrency = 4
   if (raw === undefined || raw === '') {
     return defaultConcurrency
   }
@@ -48,7 +49,7 @@ function parseGeocodeConcurrency(): number {
   if (!Number.isFinite(parsed) || parsed < 1) {
     return defaultConcurrency
   }
-  return Math.min(parsed, 3)
+  return Math.min(parsed, 5)
 }
 
 function toFailureReasons(value: unknown): FailureReason[] {
@@ -390,7 +391,7 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
 export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
   const admin = getAdminDb()
   const batchSize = parseBatchSize()
-  const cooldownMinutes = 15
+  const cooldownMinutes = 2
 
   const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_geocoding', {
     p_batch_size: batchSize,

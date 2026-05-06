@@ -50,6 +50,7 @@ vi.mock('@/lib/ingestion/publishWorker', () => ({
 
 vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
   recordIngestionOrchestrationRun: vi.fn().mockResolvedValue(undefined),
+  fetchLastSuccessfulExternalIngestionAt: vi.fn().mockResolvedValue(null),
 }))
 
 const { mockPersistExternalPageSource } = vi.hoisted(() => ({

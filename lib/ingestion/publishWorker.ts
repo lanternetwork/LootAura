@@ -2,6 +2,7 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingestion/publish'
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
+import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 
 // Temporary explicit system owner for ingestion-published sales.
 // Must match an existing profiles.id/auth user id in the target environment.
@@ -29,6 +30,7 @@ interface ClaimedPublishRow {
   time_start: string | null
   time_end: string | null
   image_cloudinary_url: string | null
+  raw_payload?: unknown
   failure_reasons: unknown
 }
 
@@ -171,6 +173,27 @@ async function fetchExistingSaleIdForIngested(ingestedSaleId: string): Promise<s
   return (data[0] as { id: string }).id
 }
 
+async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<ClaimedPublishRow[]> {
+  if (rows.length === 0) return rows
+  if (rows.every((row) => row.raw_payload != null)) return rows
+  const admin = getAdminDb()
+  const ids = rows.map((row) => row.id)
+  const { data, error } = await fromBase(admin, 'ingested_sales')
+    .select('id, raw_payload')
+    .in('id', ids)
+  if (error || !Array.isArray(data)) {
+    return rows
+  }
+  const payloadById = new Map<string, unknown>()
+  for (const row of data as Array<{ id: string; raw_payload?: unknown }>) {
+    payloadById.set(row.id, row.raw_payload ?? null)
+  }
+  return rows.map((row) => ({
+    ...row,
+    raw_payload: row.raw_payload ?? payloadById.get(row.id) ?? null,
+  }))
+}
+
 function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngestedSale {
   return {
     id: record.id,
@@ -190,12 +213,40 @@ function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngested
     time_start: record.time_start,
     time_end: record.time_end,
     image_cloudinary_url: record.image_cloudinary_url,
+    image_urls: [],
   }
+}
+
+function extractRawPayloadImageCandidates(rawPayload: unknown): string[] {
+  if (!rawPayload || typeof rawPayload !== 'object') return []
+  const imageUrls = (rawPayload as { imageUrls?: unknown }).imageUrls
+  if (!Array.isArray(imageUrls)) return []
+  return imageUrls.filter((value): value is string => typeof value === 'string')
 }
 
 /** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */
 async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<string> {
   const body = claimedRowToPublishable(record)
+  try {
+    const sanitizedImages = await sanitizeExternalImageUrls(extractRawPayloadImageCandidates(record.raw_payload), {
+      rowId: record.id,
+      city: record.city,
+      state: record.state,
+      max: 3,
+    })
+    if (sanitizedImages.length > 0) {
+      body.image_urls = sanitizedImages
+    }
+  } catch (error) {
+    logger.warn('Publish image processing failed; continuing without images', {
+      component: 'ingestion/publishWorker',
+      operation: 'sanitize_external_images',
+      rowId: record.id,
+      city: record.city,
+      state: record.state,
+      message: error instanceof Error ? error.message : String(error),
+    })
+  }
   try {
     const { saleId } = await createPublishedSale(body)
     return saleId
@@ -422,7 +473,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     .not('lat', 'is', null)
     .not('lng', 'is', null)
     .select(
-      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, failure_reasons'
+      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, raw_payload, failure_reasons'
     )
     .maybeSingle()
 
@@ -553,7 +604,7 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
     throw error
   }
 
-  const claimedRows = (Array.isArray(data) ? data : []) as ClaimedPublishRow[]
+  const claimedRows = await hydrateClaimedRowsRawPayload((Array.isArray(data) ? data : []) as ClaimedPublishRow[])
   const summary: PublishWorkerBatchSummary = {
     attempted: claimedRows.length,
     succeeded: 0,

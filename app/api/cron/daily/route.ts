@@ -19,11 +19,14 @@
  * - Daily at 02:00 UTC
  * - Purpose: Archive ended sales and send favorite sale reminders
  *
- * Query `?mode=ingestion` runs only ingestion orchestration (geocode + publish),
+ * Query `?mode=ingestion` runs ingestion orchestration (external fetch + geocode + publish),
  * skipping archive, promotions, emails, and moderation digest. Omit `mode` for full daily.
+ * High-frequency `mode=ingestion` crons throttle the external fetch step to at most once per
+ * `INGESTION_ORCHESTRATION_MIN_MINUTES` (default 30); geocode and publish always run.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { assertCronAuthorized } from '@/lib/auth/cron'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
@@ -31,7 +34,11 @@ import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import { publishReadyIngestedSales, type PublishWorkerBatchSummary } from '@/lib/ingestion/publishWorker'
-import { recordIngestionOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
+import {
+  fetchLastSuccessfulExternalIngestionAt,
+  recordIngestionOrchestrationRun,
+  type ExternalIngestionOrchestrationNote,
+} from '@/lib/ingestion/orchestrationMetrics'
 import {
   normalizeSourcePages,
   persistExternalPageSource,
@@ -39,6 +46,114 @@ import {
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
+
+/** Minimum minutes between external_page_source ingestion runs when `mode=ingestion` (geocode/publish always run). */
+function parseIngestionOrchestrationMinMinutes(): number {
+  const raw = process.env.INGESTION_ORCHESTRATION_MIN_MINUTES
+  const defaultMinutes = 30
+  if (raw === undefined || raw === '') {
+    return defaultMinutes
+  }
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return defaultMinutes
+  }
+  return Math.min(parsed, 24 * 60)
+}
+
+function parseExternalFetchDomainMinSpacingMs(): number {
+  const raw = process.env.EXTERNAL_FETCH_DOMAIN_MIN_SPACING_MS
+  const defaultMs = 500
+  if (raw === undefined || raw === '') return defaultMs
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || parsed < 0) return defaultMs
+  return Math.min(parsed, 60_000)
+}
+
+function parseExternalFetchJitterRangeMs(): { minMs: number; maxMs: number } {
+  const rawMin = process.env.EXTERNAL_FETCH_JITTER_MIN_MS
+  const rawMax = process.env.EXTERNAL_FETCH_JITTER_MAX_MS
+  const defaultMin = 300
+  const defaultMax = 800
+  const parsedMin = rawMin === undefined || rawMin === '' ? defaultMin : Number.parseInt(rawMin, 10)
+  const parsedMax = rawMax === undefined || rawMax === '' ? defaultMax : Number.parseInt(rawMax, 10)
+  const safeMin = Number.isFinite(parsedMin) && parsedMin >= 0 ? parsedMin : defaultMin
+  const safeMax = Number.isFinite(parsedMax) && parsedMax >= safeMin ? parsedMax : defaultMax
+  return { minMs: Math.min(safeMin, 60_000), maxMs: Math.min(Math.max(safeMax, safeMin), 60_000) }
+}
+
+function hashStringShort(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 16)
+}
+
+function hashStringToUint32(input: string): number {
+  const digest = createHash('sha256').update(input).digest()
+  return digest.readUInt32BE(0)
+}
+
+function makeSeededPrng(seed: number): () => number {
+  let state = seed >>> 0
+  if (state === 0) state = 0x9e3779b9
+  return () => {
+    state ^= state << 13
+    state ^= state >>> 17
+    state ^= state << 5
+    return (state >>> 0) / 0x100000000
+  }
+}
+
+function sleepMs(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve()
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+type ExternalConfigRow = {
+  city: string
+  state: string
+  source_platform: string
+  source_pages: unknown
+}
+
+function pickPrimaryDomainFromSourcePages(rawPages: unknown): string | null {
+  const pages = normalizeSourcePages(rawPages)
+  for (const page of pages) {
+    try {
+      return new URL(page).hostname.toLowerCase()
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
+function interleaveConfigsByDomain(rows: ExternalConfigRow[]): ExternalConfigRow[] {
+  const byDomain = new Map<string, ExternalConfigRow[]>()
+  const domainOrder: string[] = []
+  for (const row of rows) {
+    const domain = pickPrimaryDomainFromSourcePages(row.source_pages) ?? '__unknown__'
+    if (!byDomain.has(domain)) {
+      byDomain.set(domain, [])
+      domainOrder.push(domain)
+    }
+    byDomain.get(domain)!.push(row)
+  }
+
+  const out: ExternalConfigRow[] = []
+  while (true) {
+    let added = false
+    for (const domain of domainOrder) {
+      const q = byDomain.get(domain)
+      if (!q || q.length === 0) continue
+      const next = q.shift()
+      if (next) {
+        out.push(next)
+        added = true
+      }
+    }
+    if (!added) break
+  }
+  return out
+}
 
 export async function GET(request: NextRequest) {
   return handleRequest(request)
@@ -278,108 +393,213 @@ async function runIngestionOrchestration(
 
   let geocodeSummary: GeocodeWorkerSummary | null = null
   let publishSummary: PublishWorkerBatchSummary | null = null
+  let externalIngestionNote: ExternalIngestionOrchestrationNote | null = null
 
-  // Step 1: External page source — config-driven list URLs per enabled city row; geocode/publish follow in later steps.
-  try {
-    logger.info('Ingestion step started', withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-    }))
+  const minIngestionMinutes = mode === 'ingestion' ? parseIngestionOrchestrationMinMinutes() : 0
+  let skipExternalIngestion = false
 
-    const adminDb = getAdminDb()
-    const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
-      .select('city, state, source_platform, source_pages')
-      .eq('enabled', true)
-
-    if (cityError) {
-      throw new Error(cityError.message || 'Failed to load ingestion city configs')
-    }
-
-    const totals = {
-      fetched: 0,
-      inserted: 0,
-      skipped: 0,
-      invalid: 0,
-      errors: 0,
-      configsProcessed: 0,
-      pagesProcessed: 0,
-    }
-
-    const rows = (enabledCities || []) as Array<{
-      city: string
-      state: string
-      source_platform: string
-      source_pages: unknown
-    }>
-
-    for (const row of rows) {
-      if (row.source_platform !== 'external_page_source') {
-        continue
-      }
-      const pages = normalizeSourcePages(row.source_pages)
-      if (pages.length === 0) {
-        logger.warn('External page source: skipping config — no valid source_pages URLs', {
+  if (mode === 'ingestion' && minIngestionMinutes > 0) {
+    const lastCompletedAt = await fetchLastSuccessfulExternalIngestionAt()
+    if (lastCompletedAt) {
+      const elapsedMs = Date.now() - Date.parse(lastCompletedAt)
+      const minMs = minIngestionMinutes * 60_000
+      if (Number.isFinite(elapsedMs) && elapsedMs >= 0 && elapsedMs < minMs) {
+        skipExternalIngestion = true
+        taskResult.steps.ingestion = {
+          ok: true,
+          skipped: true,
+          reason: 'ingestion_interval',
+          minIntervalMinutes: minIngestionMinutes,
+          lastSuccessfulExternalIngestionAt: lastCompletedAt,
+        }
+        externalIngestionNote = {
+          status: 'skipped_throttle',
+          reason: 'ingestion_interval',
+          minIntervalMinutes: minIngestionMinutes,
+          lastSuccessfulExternalIngestionAt: lastCompletedAt,
+        }
+        logger.info('Ingestion step skipped (min interval not elapsed)', withOpId({
           component: 'api/cron/daily',
           task: 'ingestion-orchestration',
           step: 'ingestion',
-          city: row.city,
-          state: row.state,
-          adapter: 'external_page_source',
-        })
-        continue
+          minIntervalMinutes: minIngestionMinutes,
+          lastSuccessfulExternalIngestionAt: lastCompletedAt,
+        }))
       }
-      totals.configsProcessed += 1
-      const s = await persistExternalPageSource({
-        city: row.city,
-        state: row.state,
-        source_platform: row.source_platform,
-        source_pages: row.source_pages,
-      })
-      totals.fetched += s.fetched
-      totals.inserted += s.inserted
-      totals.skipped += s.skipped
-      totals.invalid += s.invalid
-      totals.errors += s.errors
-      totals.pagesProcessed += s.pagesProcessed
     }
+  }
 
-    taskResult.steps.ingestion = {
-      ok: true,
-      adapter: 'external_page_source',
-      configsProcessed: totals.configsProcessed,
-      pagesProcessed: totals.pagesProcessed,
-      fetched: totals.fetched,
-      inserted: totals.inserted,
-      skipped: totals.skipped,
-      invalid: totals.invalid,
-      errors: totals.errors,
-    }
+  // Step 1: External page source — config-driven list URLs per enabled city row; geocode/publish follow in later steps.
+  if (!skipExternalIngestion) {
+    try {
+      logger.info('Ingestion step started', withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'ingestion',
+      }))
 
-    logger.info('Ingestion step completed', withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-      adapter: 'external_page_source',
-      configsProcessed: totals.configsProcessed,
-      pagesProcessed: totals.pagesProcessed,
-      fetched: totals.fetched,
-      inserted: totals.inserted,
-      skipped: totals.skipped,
-      invalid: totals.invalid,
-      errors: totals.errors,
-    }))
-  } catch (error) {
-    taskResult.ok = false
-    taskResult.steps.ingestion = {
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      const adminDb = getAdminDb()
+      const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
+        .select('city, state, source_platform, source_pages')
+        .eq('enabled', true)
+
+      if (cityError) {
+        throw new Error(cityError.message || 'Failed to load ingestion city configs')
+      }
+
+      const totals = {
+        fetched: 0,
+        inserted: 0,
+        skipped: 0,
+        invalid: 0,
+        errors: 0,
+        configsProcessed: 0,
+        pagesProcessed: 0,
+      }
+
+      const rows = ((enabledCities || []) as ExternalConfigRow[]).filter(
+        (row) => row.source_platform === 'external_page_source'
+      )
+      const plannedRows = interleaveConfigsByDomain(rows)
+      const domainMinSpacingMs = parseExternalFetchDomainMinSpacingMs()
+      const jitterRangeMs = parseExternalFetchJitterRangeMs()
+      const jitterSeedString = `ingestion:${mode}:${new Date().toISOString()}`
+      const jitterSeed = hashStringToUint32(jitterSeedString)
+      const nextRandom = makeSeededPrng(jitterSeed)
+      const lastRequestAtByDomain = new Map<string, number>()
+      const requestsByDomain = new Map<string, number>()
+
+      logger.info('Ingestion external fetch pacing initialized', withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'ingestion',
+        adapter: 'external_page_source',
+        domainMinSpacingMs,
+        jitterMinMs: jitterRangeMs.minMs,
+        jitterMaxMs: jitterRangeMs.maxMs,
+        jitterSeedHash: hashStringShort(jitterSeedString),
+      }))
+
+      for (const row of plannedRows) {
+        const pages = normalizeSourcePages(row.source_pages)
+        if (pages.length === 0) {
+          logger.warn('External page source: skipping config — no valid source_pages URLs', {
+            component: 'api/cron/daily',
+            task: 'ingestion-orchestration',
+            step: 'ingestion',
+            city: row.city,
+            state: row.state,
+            adapter: 'external_page_source',
+          })
+          continue
+        }
+        totals.configsProcessed += 1
+        const s = await persistExternalPageSource(
+          {
+            city: row.city,
+            state: row.state,
+            source_platform: row.source_platform,
+            source_pages: row.source_pages,
+          },
+          {
+            beforePageFetch: async ({ pageUrl, pageIndex, city, state }) => {
+              let domain = 'unknown-host'
+              try {
+                domain = new URL(pageUrl).hostname.toLowerCase()
+              } catch {
+                // URL validation happens inside safe fetch; fallback keeps pacing logs non-PII.
+              }
+              const now = Date.now()
+              const last = lastRequestAtByDomain.get(domain)
+              const sameDomainDelayMs =
+                last === undefined ? 0 : Math.max(0, last + domainMinSpacingMs - now)
+              const jitterSpan = jitterRangeMs.maxMs - jitterRangeMs.minMs
+              const jitterDelayMs =
+                jitterRangeMs.minMs + Math.floor(nextRandom() * (jitterSpan + 1))
+              const appliedDelayMs = sameDomainDelayMs + jitterDelayMs
+              if (appliedDelayMs > 0) {
+                await sleepMs(appliedDelayMs)
+              }
+              lastRequestAtByDomain.set(domain, Date.now())
+              requestsByDomain.set(domain, (requestsByDomain.get(domain) ?? 0) + 1)
+
+              logger.info('External fetch pacing applied', withOpId({
+                component: 'api/cron/daily',
+                task: 'ingestion-orchestration',
+                step: 'ingestion',
+                operation: 'external_fetch_pacing',
+                adapter: 'external_page_source',
+                city,
+                state,
+                pageIndex,
+                domainHash: hashStringShort(domain),
+                sameDomainDelayMs,
+                jitterDelayMs,
+                appliedDelayMs,
+              }))
+            },
+          }
+        )
+        totals.fetched += s.fetched
+        totals.inserted += s.inserted
+        totals.skipped += s.skipped
+        totals.invalid += s.invalid
+        totals.errors += s.errors
+        totals.pagesProcessed += s.pagesProcessed
+      }
+
+      taskResult.steps.ingestion = {
+        ok: true,
+        adapter: 'external_page_source',
+        configsProcessed: totals.configsProcessed,
+        pagesProcessed: totals.pagesProcessed,
+        fetched: totals.fetched,
+        inserted: totals.inserted,
+        skipped: totals.skipped,
+        invalid: totals.invalid,
+        errors: totals.errors,
+      }
+
+      const completedAt = new Date().toISOString()
+      externalIngestionNote = { status: 'completed', completedAt }
+
+      logger.info('Ingestion step completed', withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'ingestion',
+        adapter: 'external_page_source',
+        configsProcessed: totals.configsProcessed,
+        pagesProcessed: totals.pagesProcessed,
+        fetched: totals.fetched,
+        inserted: totals.inserted,
+        skipped: totals.skipped,
+        invalid: totals.invalid,
+        errors: totals.errors,
+      }))
+      for (const [domain, count] of requestsByDomain.entries()) {
+        logger.info('External fetch domain request totals', withOpId({
+          component: 'api/cron/daily',
+          task: 'ingestion-orchestration',
+          step: 'ingestion',
+          operation: 'external_fetch_domain_totals',
+          adapter: 'external_page_source',
+          domainHash: hashStringShort(domain),
+          requestCount: count,
+        }))
+      }
+    } catch (error) {
+      taskResult.ok = false
+      taskResult.steps.ingestion = {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+      externalIngestionNote = { status: 'failed' }
+      logger.error('Ingestion step failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'ingestion',
+      }))
     }
-    logger.error('Ingestion step failed', error instanceof Error ? error : new Error(String(error)), withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-    }))
   }
 
   const geoPublishStartMs = Date.now()
@@ -452,6 +672,7 @@ async function runIngestionOrchestration(
     orchestrationGeoPublishDurationMs,
     geocodeSummary,
     publishSummary,
+    externalIngestion: externalIngestionNote,
   })
 
   logger.info('Ingestion orchestration task completed', withOpId({

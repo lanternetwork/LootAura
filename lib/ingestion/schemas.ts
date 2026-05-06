@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { FAILURE_REASONS } from '@/lib/ingestion/types'
 
 export const FailureReasonSchema = z.enum(FAILURE_REASONS)
@@ -40,8 +39,14 @@ const ImageUrlSchema = z
   .string()
   .url()
   .max(2048)
-  .refine((value: string): boolean => isAllowedImageUrl(value), {
-    message: 'Image URL must be an allowed Cloudinary upload URL',
+  .refine((value: string): boolean => {
+    try {
+      return new URL(value).protocol === 'https:'
+    } catch {
+      return false
+    }
+  }, {
+    message: 'Image URL must be a valid HTTPS URL',
   })
 
 export const PublishInputSchema = z.object({

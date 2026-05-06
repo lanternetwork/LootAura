@@ -3,6 +3,7 @@ import { JSDOM } from 'jsdom'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
+import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v2'
@@ -42,16 +43,26 @@ export interface ExternalPageSourcePersistSummary {
   pagesProcessed: number
 }
 
+export type ExternalPageSourcePersistOptions = {
+  beforePageFetch?: (params: {
+    pageUrl: string
+    pageIndex: number
+    city: string
+    state: string
+  }) => Promise<void> | void
+}
+
+/** HTTPS-only list URLs for server-side fetch (SSRF-safe layer). */
 export function normalizeSourcePages(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []
   const out: string[] = []
   for (const item of raw) {
     if (typeof item !== 'string') continue
     const u = item.trim()
-    if (!/^https?:\/\//i.test(u)) continue
+    if (!/^https:\/\//i.test(u)) continue
     try {
       const parsed = new URL(u)
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue
+      if (parsed.protocol !== 'https:') continue
     } catch {
       continue
     }
@@ -276,7 +287,19 @@ function collectNearbyText(anchor: Element, maxDepth: number): string {
   return parts.join('\n').slice(0, 2000)
 }
 
-function collectImageUrlsNear(anchor: Element, max: number): string[] {
+function normalizeAbsoluteHttpsUrl(raw: string, baseUrl: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  try {
+    const url = new URL(trimmed, baseUrl)
+    if (url.protocol !== 'https:') return null
+    return url.href
+  } catch {
+    return null
+  }
+}
+
+function collectImageUrlsNear(anchor: Element, baseUrl: string, max: number): string[] {
   const out: string[] = []
   const seen = new Set<string>()
   let el: Element | null = anchor
@@ -284,15 +307,38 @@ function collectImageUrlsNear(anchor: Element, max: number): string[] {
     const imgs = el.querySelectorAll<HTMLImageElement>('img[src]')
     for (const img of imgs) {
       const src = img.getAttribute('src')?.trim()
-      if (!src || !/^https?:\/\//i.test(src)) continue
-      if (seen.has(src)) continue
-      seen.add(src)
-      out.push(src)
+      if (!src) continue
+      const normalized = normalizeAbsoluteHttpsUrl(src, baseUrl)
+      if (!normalized || seen.has(normalized)) continue
+      seen.add(normalized)
+      out.push(normalized)
       if (out.length >= max) break
     }
     el = el.parentElement
   }
   return out
+}
+
+function collectImageUrlsForListing(anchor: Element, document: Document, pageUrl: string, max: number): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  const ogImage = document
+    .querySelector<HTMLMetaElement>('meta[property="og:image"], meta[name="og:image"]')
+    ?.getAttribute('content')
+  if (ogImage) {
+    const normalizedOg = normalizeAbsoluteHttpsUrl(ogImage, pageUrl)
+    if (normalizedOg) {
+      seen.add(normalizedOg)
+      out.push(normalizedOg)
+    }
+  }
+  for (const imageUrl of collectImageUrlsNear(anchor, pageUrl, max)) {
+    if (seen.has(imageUrl)) continue
+    seen.add(imageUrl)
+    out.push(imageUrl)
+    if (out.length >= max) break
+  }
+  return out.slice(0, max)
 }
 
 export function parseExternalPageSourceHtml(
@@ -359,7 +405,7 @@ export function parseExternalPageSourceHtml(
     const nearby = collectNearbyText(a, 4)
     let { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
     const description = cleanDescriptionText(nearby, addressRaw, config.city, config.state)
-    const imageUrls = collectImageUrlsNear(a, 8)
+    const imageUrls = collectImageUrlsForListing(a, document, pageUrl, 3)
 
     // Fallback extraction when critical fields are missing from the primary parse.
     if (!addressRaw || !startDate) {
@@ -403,21 +449,16 @@ export function parseExternalPageSourceHtml(
 }
 
 export async function fetchExternalPageSource(
-  _config: ExternalPageSourceIngestionConfig,
-  pageUrl: string
+  config: ExternalPageSourceIngestionConfig,
+  pageUrl: string,
+  pageIndex: number
 ): Promise<string> {
-  const res = await fetch(pageUrl, {
-    redirect: 'follow',
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      'User-Agent':
-        'Mozilla/5.0 (compatible; LootAura/1.0; +https://lootaura.com) AppleWebKit/537.36 (KHTML, like Gecko)',
-    },
+  return fetchSafeExternalPageHtml(pageUrl, {
+    city: config.city,
+    state: config.state,
+    pageIndex,
+    adapter: ADAPTER_ID,
   })
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`)
-  }
-  return res.text()
 }
 
 function buildRowRawPayload(
@@ -450,7 +491,8 @@ function buildRowRawPayload(
 }
 
 export async function persistExternalPageSource(
-  config: ExternalPageSourceIngestionConfig
+  config: ExternalPageSourceIngestionConfig,
+  options?: ExternalPageSourcePersistOptions
 ): Promise<ExternalPageSourcePersistSummary> {
   const summary: ExternalPageSourcePersistSummary = {
     fetched: 0,
@@ -474,9 +516,32 @@ export async function persistExternalPageSource(
     summary.pagesProcessed += 1
     const pageHostHash = hashPageHostname(pageUrl)
 
+    if (options?.beforePageFetch) {
+      try {
+        await options.beforePageFetch({
+          pageUrl,
+          pageIndex,
+          city: config.city,
+          state: config.state,
+        })
+      } catch (e) {
+        summary.errors += 1
+        logger.warn('External page source: pre-fetch pacing hook failed', {
+          component: 'ingestion/adapters/externalPageSource',
+          operation: 'prefetch_hook',
+          city: config.city,
+          state: config.state,
+          adapter: ADAPTER_ID,
+          pageIndex,
+          pageHostHash,
+          message: e instanceof Error ? e.message : String(e),
+        })
+      }
+    }
+
     let html: string
     try {
-      html = await fetchExternalPageSource(config, pageUrl)
+      html = await fetchExternalPageSource(config, pageUrl, pageIndex)
     } catch (e) {
       summary.errors += 1
       logger.warn('External page source: page fetch failed', {

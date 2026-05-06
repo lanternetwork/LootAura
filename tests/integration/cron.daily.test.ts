@@ -946,6 +946,8 @@ describe('GET /api/cron/daily', () => {
         adapter: 'external_page_source',
         totalConfigs: 1,
         batchSize: 2,
+        configsConsumed: 1,
+        configsSkippedInvalidPages: 0,
         configsRemaining: 0,
         cursorStart: 0,
         cursorNext: 0,
@@ -994,6 +996,8 @@ describe('GET /api/cron/daily', () => {
         ok: true,
         skipped: undefined,
         reason: undefined,
+        configsConsumed: 1,
+        configsSkippedInvalidPages: 0,
         configsProcessed: 1,
       })
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
@@ -1107,7 +1111,10 @@ describe('GET /api/cron/daily', () => {
         batchSize: 2,
         cursorStart: 1,
         cursorNext: 0,
+        configsConsumed: 2,
+        configsSkippedInvalidPages: 0,
         configsProcessed: 2,
+        configsRemaining: 0,
       })
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(2)
     })
@@ -1137,10 +1144,127 @@ describe('GET /api/cron/daily', () => {
 
       expect(response.status).toBe(200)
       expect(data.tasks.ingestionOrchestration.steps.ingestion.executionBudgetExit).toBe(true)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion.configsConsumed).toBe(0)
       expect(data.tasks.ingestionOrchestration.steps.ingestion.configsProcessed).toBe(0)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion.configsRemaining).toBe(2)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion.cursorStart).toBe(
+        data.tasks.ingestionOrchestration.steps.ingestion.cursorNext
+      )
       expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
       expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+    })
+
+    it('advances cursor past leading invalid config with batch size 1 so next run reaches valid config', async () => {
+      process.env.INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE = '1'
+      const rows = [
+        {
+          city: 'Bad',
+          state: 'CA',
+          source_platform: 'external_page_source',
+          source_pages: [],
+        },
+        {
+          city: 'Good',
+          state: 'CA',
+          source_platform: 'external_page_source',
+          source_pages: ['https://good.example/list'],
+        },
+      ]
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsExternalPageSourceRowsMock(rows)
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
+        }
+        return { from: vi.fn() }
+      })
+
+      const request1 = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: { authorization: 'Bearer test-cron-secret' },
+      })
+      const response1 = await GET(request1)
+      const data1 = await response1.json()
+      expect(response1.status).toBe(200)
+      expect(data1.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+        configsConsumed: 1,
+        configsSkippedInvalidPages: 1,
+        configsProcessed: 0,
+        cursorStart: 0,
+        cursorNext: 1,
+        configsRemaining: 0,
+      })
+      expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
+
+      mockPersistExternalPageSource.mockClear()
+      const request2 = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: { authorization: 'Bearer test-cron-secret' },
+      })
+      const response2 = await GET(request2)
+      const data2 = await response2.json()
+      expect(response2.status).toBe(200)
+      expect(data2.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+        configsConsumed: 1,
+        configsSkippedInvalidPages: 0,
+        configsProcessed: 1,
+        cursorStart: 1,
+        cursorNext: 0,
+        configsRemaining: 0,
+      })
+      expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
+    })
+
+    it('counts consumed vs processed when bounded slice has invalid then valid configs', async () => {
+      process.env.INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE = '2'
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'ingestion_city_configs') {
+          return ingestionCityConfigsExternalPageSourceRowsMock([
+            {
+              city: 'Bad',
+              state: 'CA',
+              source_platform: 'external_page_source',
+              source_pages: [],
+            },
+            {
+              city: 'Good',
+              state: 'CA',
+              source_platform: 'external_page_source',
+              source_pages: ['https://good.example/a'],
+            },
+            {
+              city: 'Later',
+              state: 'CA',
+              source_platform: 'external_page_source',
+              source_pages: ['https://later.example/b'],
+            },
+          ])
+        }
+        if (table === 'ingestion_orchestration_state') {
+          return stateTableMock
+        }
+        return { from: vi.fn() }
+      })
+
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: { authorization: 'Bearer test-cron-secret' },
+      })
+      const response = await GET(request)
+      const data = await response.json()
+      expect(response.status).toBe(200)
+      expect(data.tasks.ingestionOrchestration.steps.ingestion).toMatchObject({
+        totalConfigs: 3,
+        configsConsumed: 2,
+        configsSkippedInvalidPages: 1,
+        configsProcessed: 1,
+        cursorStart: 0,
+        cursorNext: 2,
+        configsRemaining: 0,
+      })
+      expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
     })
 
     it('skips archive, promotions, favorites, and moderation digest', async () => {

@@ -708,7 +708,8 @@ async function runIngestionOrchestration(
           ? []
           : Array.from({ length: cappedCount }, (_, offset) => plannedRows[(baseCursor + offset) % totalConfigs])
       let budgetExited = false
-      let processedRows = 0
+      let configsConsumed = 0
+      let configsSkippedInvalidPages = 0
       const domainMinSpacingMs = parseExternalFetchDomainMinSpacingMs()
       const jitterRangeMs = parseExternalFetchJitterRangeMs()
       const jitterSeedString = `ingestion:${mode}:${new Date().toISOString()}`
@@ -747,8 +748,10 @@ async function runIngestionOrchestration(
           }))
           break
         }
+        configsConsumed += 1
         const pages = normalizeSourcePages(row.source_pages)
         if (pages.length === 0) {
+          configsSkippedInvalidPages += 1
           logger.warn('External page source: skipping config — no valid source_pages URLs', {
             component: 'api/cron/daily',
             task: 'ingestion-orchestration',
@@ -759,7 +762,6 @@ async function runIngestionOrchestration(
           })
           continue
         }
-        processedRows += 1
         totals.configsProcessed += 1
         const s = await persistExternalPageSource(
           {
@@ -817,16 +819,18 @@ async function runIngestionOrchestration(
 
       nextCursor =
         totalConfigs > 0
-          ? (baseCursor + processedRows) % totalConfigs
+          ? (baseCursor + configsConsumed) % totalConfigs
           : 0
       markCompleted = true
-      const configsRemaining = Math.max(totalConfigs - processedRows, 0)
+      const configsRemaining = Math.max(0, boundedRows.length - configsConsumed)
 
       taskResult.steps.ingestion = {
         ok: true,
         adapter: 'external_page_source',
         totalConfigs,
         batchSize,
+        configsConsumed,
+        configsSkippedInvalidPages,
         configsRemaining,
         cursorStart: baseCursor,
         cursorNext: nextCursor,
@@ -846,6 +850,8 @@ async function runIngestionOrchestration(
         status: 'completed',
         completedAt,
         configsProcessed: totals.configsProcessed,
+        configsConsumed,
+        configsSkippedInvalidPages,
         configsRemaining,
         budgetExit: budgetExited,
         overlapPrevented: false,
@@ -858,6 +864,8 @@ async function runIngestionOrchestration(
         step: 'ingestion',
         adapter: 'external_page_source',
         configsProcessed: totals.configsProcessed,
+        configsConsumed,
+        configsSkippedInvalidPages,
         pagesProcessed: totals.pagesProcessed,
         fetched: totals.fetched,
         inserted: totals.inserted,

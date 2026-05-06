@@ -29,11 +29,21 @@ function parseGeocodeConcurrencyForMetrics(): number {
 }
 
 export type ExternalIngestionOrchestrationNote = {
-  status: 'completed' | 'skipped_throttle' | 'failed'
+  status: 'completed' | 'skipped_throttle' | 'skipped_lock_active' | 'failed'
   completedAt?: string
   reason?: string
   minIntervalMinutes?: number
   lastSuccessfulExternalIngestionAt?: string
+  configsProcessed?: number
+  /** Config slots advanced this run (cursor); includes invalid/empty configs examined. */
+  configsConsumed?: number
+  configsSkippedInvalidPages?: number
+  /** Unexamined slots remaining in the bounded slice for this invocation (e.g. budget exit). */
+  configsRemaining?: number
+  budgetExit?: boolean
+  overlapPrevented?: boolean
+  staleLockRecovered?: boolean
+  lockSkipped?: boolean
 }
 
 type NotesPayload = {

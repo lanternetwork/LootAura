@@ -48,9 +48,9 @@ export interface PublishWorkerBatchSummary {
 
 function parseBatchSize(): number {
   const raw = process.env.INGEST_BATCH_SIZE
-  const parsed = raw ? Number.parseInt(raw, 10) : 100
+  const parsed = raw ? Number.parseInt(raw, 10) : 150
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 100
+    return 150
   }
   return Math.min(parsed, 500)
 }

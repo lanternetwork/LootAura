@@ -13,7 +13,7 @@ import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_QUEUE_BATCH = 25
+const DEFAULT_QUEUE_BATCH = 50
 const MAX_QUEUE_BATCH = 100
 
 function parseQueueBatchLimit(): number {

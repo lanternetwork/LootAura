@@ -50,7 +50,7 @@ export const dynamic = 'force-dynamic'
 /** Minimum minutes between external_page_source ingestion runs when `mode=ingestion` (geocode/publish always run). */
 function parseIngestionOrchestrationMinMinutes(): number {
   const raw = process.env.INGESTION_ORCHESTRATION_MIN_MINUTES
-  const defaultMinutes = 30
+  const defaultMinutes = 10
   if (raw === undefined || raw === '') {
     return defaultMinutes
   }

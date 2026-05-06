@@ -5,7 +5,7 @@ permissions:
 
 on:
   deployment_status:
-    types: [created, success]
+    types: [created]
 
 jobs:
   determine-url:

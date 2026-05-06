@@ -86,8 +86,11 @@ export function isNonPublicIpv6(ip: string): boolean {
   if (lower === '::1' || lower === '0:0:0:0:0:0:0:1') return true
   if (lower === '::' || lower === '0:0:0:0:0:0:0:0') return true
 
+  // Treat IPv4-mapped IPv6 as non-public for SSRF safety.
+  if (lower.startsWith('::ffff:')) return true
+
   const v4m = lower.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i)
-  if (v4m) {
+  if (v4m?.[1]) {
     return isNonPublicIpv4(v4m[1])
   }
 
@@ -163,7 +166,7 @@ async function resolveAndAssertPublicHost(hostname: string): Promise<void> {
   if (isForbiddenHostname(hostname)) {
     throw new Error(`${EXTERNAL_FETCH_REASON.FORBIDDEN_HOSTNAME}`)
   }
-  let records: dns.LookupAddress[]
+  let records: Array<{ address: string; family: number }>
   try {
     records = await dns.lookup(hostname, { all: true, verbatim: true })
   } catch {
@@ -368,7 +371,7 @@ export async function fetchSafeExternalPageHtml(pageUrl: string, context: SafeFe
       }
       redirectsFollowed += 1
       try {
-        currentUrl = new URL(loc.trim(), res.url)
+        currentUrl = new URL(loc.trim(), currentUrl.href)
       } catch {
         logFetchDecision({ ...baseLog, hostHash, reason: EXTERNAL_FETCH_REASON.INVALID_URL, httpStatus: res.status }, 'warn')
         throw new Error(`${EXTERNAL_FETCH_REASON.INVALID_URL}: redirect target`)

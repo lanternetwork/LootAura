@@ -52,7 +52,7 @@ describe('persistExternalPageSource', () => {
       }
     })
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(htmlFetchResponse(listHtml)))
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(htmlFetchResponse(listHtml))))
   })
 
   afterEach(() => {
@@ -111,7 +111,7 @@ describe('persistExternalPageSource', () => {
       <a href="https://example.com/US/Illinois/Chicago/200-B/2002/listing.html">A</a>
       <a href="https://example.com/US/Illinois/Chicago/200-B/2003/listing.html">B</a>
     `
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(htmlFetchResponse(html)))
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(htmlFetchResponse(html))))
 
     const { persistExternalPageSource } = await import('@/lib/ingestion/adapters/externalPageSource')
     const summary = await persistExternalPageSource({

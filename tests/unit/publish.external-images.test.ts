@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const insertSingle = vi.fn()
 const insertSelect = vi.fn(() => ({ single: insertSingle }))
 const insert = vi.fn(() => ({ select: insertSelect }))
-const fromBaseMock = vi.fn(() => ({ insert }))
+const fromBaseMock = vi.fn((_db: unknown, _table: string) => ({ insert }))
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: vi.fn(() => ({})),
-  fromBase: (...args: unknown[]) => fromBaseMock(...args),
+  fromBase: (db: unknown, table: string) => fromBaseMock(db, table),
 }))
 
 describe('createPublishedSale image handling', () => {
@@ -39,7 +39,9 @@ describe('createPublishedSale image handling', () => {
     })
 
     expect(insert).toHaveBeenCalled()
-    const payload = insert.mock.calls[0][0]
+    const firstCall = insert.mock.calls[0]
+    expect(firstCall).toBeDefined()
+    const payload = firstCall[0] as { cover_image_url: string | null; images: string[] }
     expect(payload.cover_image_url).toBe('https://images.example.org/a.jpg')
     expect(payload.images).toEqual(['https://images.example.org/a.jpg', 'https://cdn.example.org/b.jpg'])
   })
@@ -66,7 +68,9 @@ describe('createPublishedSale image handling', () => {
       image_urls: [],
     })
 
-    const payload = insert.mock.calls[0][0]
+    const firstCall = insert.mock.calls[0]
+    expect(firstCall).toBeDefined()
+    const payload = firstCall[0] as { cover_image_url: string | null; images: string[] }
     expect(payload.cover_image_url).toBeNull()
     expect(payload.images).toEqual([])
   })

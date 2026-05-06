@@ -39,9 +39,9 @@ describe('createPublishedSale image handling', () => {
     })
 
     expect(insert).toHaveBeenCalled()
-    const firstCall = insert.mock.calls[0]
+    const firstCall = insert.mock.calls.at(0)
     expect(firstCall).toBeDefined()
-    const payload = firstCall[0] as { cover_image_url: string | null; images: string[] }
+    const payload = (firstCall as unknown[])[0] as { cover_image_url: string | null; images: string[] }
     expect(payload.cover_image_url).toBe('https://images.example.org/a.jpg')
     expect(payload.images).toEqual(['https://images.example.org/a.jpg', 'https://cdn.example.org/b.jpg'])
   })
@@ -68,9 +68,9 @@ describe('createPublishedSale image handling', () => {
       image_urls: [],
     })
 
-    const firstCall = insert.mock.calls[0]
+    const firstCall = insert.mock.calls.at(0)
     expect(firstCall).toBeDefined()
-    const payload = firstCall[0] as { cover_image_url: string | null; images: string[] }
+    const payload = (firstCall as unknown[])[0] as { cover_image_url: string | null; images: string[] }
     expect(payload.cover_image_url).toBeNull()
     expect(payload.images).toEqual([])
   })

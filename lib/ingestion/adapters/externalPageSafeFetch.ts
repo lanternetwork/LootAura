@@ -358,6 +358,10 @@ export async function fetchSafeExternalPageHtml(pageUrl: string, context: SafeFe
       logFetchDecision({ ...baseLog, hostHash, reason: reasonFromErrorMessage(msg), httpStatus: undefined }, 'warn')
       throw e instanceof Error ? e : new Error(EXTERNAL_FETCH_REASON.FETCH_FAILED)
     }
+    if (!res || typeof res.status !== 'number') {
+      logFetchDecision({ ...baseLog, hostHash, reason: EXTERNAL_FETCH_REASON.FETCH_FAILED, httpStatus: undefined }, 'warn')
+      throw new Error(EXTERNAL_FETCH_REASON.FETCH_FAILED)
+    }
 
     if (isRedirectStatus(res.status)) {
       if (redirectsFollowed >= MAX_REDIRECTS) {

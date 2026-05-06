@@ -870,8 +870,8 @@ describe('GET /api/cron/daily', () => {
     })
 
     it('skips external ingestion when last successful run is within min interval', async () => {
-      const tenMinutesAgo = new Date(MOCK_BASE_DATE.getTime() - 10 * 60 * 1000).toISOString()
-      mockFetchLastSuccessfulExternalIngestionAt.mockResolvedValue(tenMinutesAgo)
+      const fiveMinutesAgo = new Date(MOCK_BASE_DATE.getTime() - 5 * 60 * 1000).toISOString()
+      mockFetchLastSuccessfulExternalIngestionAt.mockResolvedValue(fiveMinutesAgo)
 
       vi.useFakeTimers({ now: MOCK_BASE_DATE })
 
@@ -892,8 +892,8 @@ describe('GET /api/cron/daily', () => {
           ok: true,
           skipped: true,
           reason: 'ingestion_interval',
-          minIntervalMinutes: 30,
-          lastSuccessfulExternalIngestionAt: tenMinutesAgo,
+          minIntervalMinutes: 10,
+          lastSuccessfulExternalIngestionAt: fiveMinutesAgo,
         })
         expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
         expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)

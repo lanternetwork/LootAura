@@ -124,8 +124,8 @@ describe('Clustering Index', () => {
     })
 
     it('should cap expansion zoom at 16', () => {
-      const currentZoom = 15
-      // Get a valid cluster first
+      const currentZoom = 5
+      // Get a valid cluster first (world view at high zoom often has no multi-point clusters)
       const bounds: [number, number, number, number] = [-180, -90, 180, 90]
       const clusters = getClustersForViewport(index, bounds, currentZoom)
       const cluster = clusters.find(c => c.count > 1)

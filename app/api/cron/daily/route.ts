@@ -196,7 +196,7 @@ function parseIngestionOrchestrationExecutionBudgetMs(): number {
   const defaultBudgetMs = 45_000
   if (raw === undefined || raw === '') return defaultBudgetMs
   const parsed = Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed) || parsed < 1_000) return defaultBudgetMs
+  if (!Number.isFinite(parsed) || parsed < 1) return defaultBudgetMs
   return Math.min(parsed, 240_000)
 }
 
@@ -251,12 +251,14 @@ async function acquireIngestionOrchestrationLease(
   }
 
   const current = stateRows[0] as IngestionOrchestrationStateRow
+  const ownerNow = current.lease_owner ?? null
+  const expiresNow = current.lease_expires_at ?? null
   const currentExpiresMs =
-    typeof current.lease_expires_at === 'string' && current.lease_expires_at.length > 0
-      ? Date.parse(current.lease_expires_at)
+    typeof expiresNow === 'string' && expiresNow.length > 0
+      ? Date.parse(expiresNow)
       : Number.NaN
   const leaseActive =
-    !!current.lease_owner &&
+    !!ownerNow &&
     Number.isFinite(currentExpiresMs) &&
     currentExpiresMs > nowMs
 
@@ -277,7 +279,7 @@ async function acquireIngestionOrchestrationLease(
     }
   }
 
-  const staleRecovered = !!current.lease_owner && Number.isFinite(currentExpiresMs) && currentExpiresMs <= nowMs
+  const staleRecovered = !!ownerNow && Number.isFinite(currentExpiresMs) && currentExpiresMs <= nowMs
   const leaseUpdatePayload = {
     lease_owner: owner,
     lease_expires_at: leaseExpiresAtIso,
@@ -289,13 +291,13 @@ async function acquireIngestionOrchestrationLease(
     .eq('key', 'external_page_source')
 
   leaseUpdateQuery =
-    current.lease_owner === null
+    ownerNow === null
       ? leaseUpdateQuery.is('lease_owner', null)
-      : leaseUpdateQuery.eq('lease_owner', current.lease_owner)
+      : leaseUpdateQuery.eq('lease_owner', ownerNow)
   leaseUpdateQuery =
-    current.lease_expires_at === null
+    expiresNow === null
       ? leaseUpdateQuery.is('lease_expires_at', null)
-      : leaseUpdateQuery.eq('lease_expires_at', current.lease_expires_at)
+      : leaseUpdateQuery.eq('lease_expires_at', expiresNow)
 
   const { data: updatedRows, error: updateError } = await leaseUpdateQuery.select('cursor')
 

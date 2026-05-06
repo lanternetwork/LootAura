@@ -279,7 +279,7 @@ export default function SaleDetailClient({
       const message = {
         type: 'favoriteState',
         isFavorited: isFavorited
-      }
+      };
       (window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
     }
   }, [isFavorited, sale.id])
@@ -344,7 +344,7 @@ export default function SaleDetailClient({
               const responseMessage = { 
                 type: 'favoriteState', 
                 isFavorited: newFavorited 
-              }
+              };
 
               (window as any).ReactNativeWebView.postMessage(
                 JSON.stringify(responseMessage)

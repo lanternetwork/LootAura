@@ -7,7 +7,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import SaleDetailClient from '@/app/sales/[id]/SaleDetailClient'
 
-const mockGetSaleCoverUrl = vi.fn()
+const { mockGetSaleCoverUrl } = vi.hoisted(() => ({
+  mockGetSaleCoverUrl: vi.fn(),
+}))
 
 vi.mock('next/navigation', async () => {
   const actual = await vi.importActual('next/navigation')
@@ -67,9 +69,27 @@ vi.mock('react-toastify', () => ({
 }))
 
 vi.mock('next/image', () => ({
-  default: ({ src, alt, ...rest }: { src: string; alt: string }) => (
-    <img src={src} alt={alt} {...rest} />
-  ),
+  default: (props: {
+    src: string
+    alt: string
+    className?: string
+    sizes?: string
+    'data-testid'?: string
+    fill?: boolean
+    priority?: boolean
+    [key: string]: unknown
+  }) => {
+    const { src, alt, className, sizes, 'data-testid': dataTestId } = props
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        sizes={sizes}
+        data-testid={dataTestId}
+      />
+    )
+  },
 }))
 
 const mockSale = {

@@ -94,7 +94,7 @@ describe('Upload Rate Limiting', () => {
 
     await POST(request)
     expect(consoleSpy).toHaveBeenCalledWith(
-      '[UPLOAD] Unexpected error',
+      '[UPLOAD] Rate limited',
       expect.objectContaining({ event: 'upload-signer', status: 'fail' })
     )
 

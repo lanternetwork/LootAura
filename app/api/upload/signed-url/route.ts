@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
     const { allowed, error: rateLimitError } = rateLimitMiddleware(request)
     
     if (!allowed) {
+      const { isDebugMode } = await import('@/lib/env')
+      if (isDebugMode()) {
+        console.log('[UPLOAD] Rate limited', {
+          event: 'upload-signer',
+          status: 'fail',
+          code: rateLimitError,
+        })
+      }
       return NextResponse.json(
         { error: rateLimitError },
         { status: 429 }

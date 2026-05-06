@@ -17,7 +17,7 @@ export function createSupabaseServerMock(options: SupabaseMockOptions = {}) {
   })
 
   if (options.withStorage) {
-    base.storage = {
+    ;(base as Record<string, unknown>).storage = {
       from: vi.fn(() => ({
         createSignedUploadUrl: vi.fn().mockResolvedValue({
           data: { signedUrl: 'https://signed-url.example.com' },

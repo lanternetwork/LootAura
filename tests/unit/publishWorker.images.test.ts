@@ -788,7 +788,7 @@ describe('publish worker finalization consistency', () => {
         return {
           select: (fields: string) => {
             if (fields === 'id') {
-              let q = {
+              const q = {
                 eq: (_k: string, _v: unknown) => q,
                 limit: async () => ({ data: [{ id: linkedSaleId }], error: null }),
               }

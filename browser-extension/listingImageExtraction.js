@@ -276,6 +276,31 @@
   }
 
   /**
+   * @param {Candidate[]} candidates
+   * @param {number} max
+   * @returns {string[]}
+   */
+  function rankCandidates(candidates, max) {
+    const sorted = candidates
+      .slice()
+      .sort(function (a, b) {
+        const aScore = a.tier * 1e12 + Math.min(a.area || 0, 1e10) + (PHOTO_EXT.test(a.url) ? 5000 : 0);
+        const bScore = b.tier * 1e12 + Math.min(b.area || 0, 1e10) + (PHOTO_EXT.test(b.url) ? 5000 : 0);
+        return bScore - aScore;
+      });
+    const out = [];
+    const seen = {};
+    for (let i = 0; i < sorted.length; i++) {
+      const url = sorted[i].url;
+      if (!url || seen[url]) continue;
+      seen[url] = true;
+      out.push(url);
+      if (out.length >= max) break;
+    }
+    return out;
+  }
+
+  /**
    * @param {Document} doc
    * @param {string} pageUrl
    * @returns {string|null}
@@ -303,7 +328,37 @@
     return pickBest(bucket);
   }
 
+  /**
+   * @param {Document} doc
+   * @param {string} pageUrl
+   * @param {number} max
+   * @returns {string[]}
+   */
+  function extractListingImageUrls(doc, pageUrl, max) {
+    if (!doc || !pageUrl) return [];
+    const bucket = [];
+
+    findModalRoots(doc).forEach(function (root) {
+      collectImagesUnder(root, 100, pageUrl, bucket);
+    });
+
+    findListingContentRoots(doc).forEach(function (root) {
+      collectImagesUnder(root, 70, pageUrl, bucket);
+    });
+
+    const h1 = doc.querySelector("h1");
+    if (h1) {
+      const local = h1.parentElement;
+      if (local) collectImagesUnder(local, 85, pageUrl, bucket);
+    }
+
+    collectImagesUnder(doc.body, 20, pageUrl, bucket);
+    const cap = Number.isFinite(max) && max > 0 ? Math.min(max, 6) : 3;
+    return rankCandidates(bucket, cap);
+  }
+
   global.LootAuraListingImage = {
     extractListingPrimaryImageUrl: extractListingPrimaryImageUrl,
+    extractListingImageUrls: extractListingImageUrls,
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);

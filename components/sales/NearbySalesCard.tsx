@@ -12,6 +12,22 @@ interface NearbySalesCardProps {
   nearbySales: Array<Sale & { distance_m: number }>
 }
 
+function isTrustedNextImageHost(urlString: string): boolean {
+  try {
+    const u = new URL(urlString)
+    if (u.protocol !== 'https:') return false
+    const host = u.hostname.toLowerCase()
+    if (host === 'res.cloudinary.com') return true
+    if (host === 'storage.googleapis.com') return true
+    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
+      return u.pathname.startsWith('/storage/v1/object/public/')
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
   // Don't render if no nearby sales
   if (!nearbySales || nearbySales.length === 0) {
@@ -127,13 +143,21 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
                 {/* Thumbnail */}
                 <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                   {cover ? (
-                    <Image
-                      src={cover.url}
-                      alt={nearbySale.title}
-                      fill
-                      className="object-cover"
-                      sizes="96px"
-                    />
+                    isTrustedNextImageHost(cover.url) ? (
+                      <Image
+                        src={cover.url}
+                        alt={nearbySale.title}
+                        fill
+                        className="object-cover"
+                        sizes="96px"
+                      />
+                    ) : (
+                      <img
+                        src={cover.url}
+                        alt={nearbySale.title}
+                        className="w-full h-full object-cover"
+                      />
+                    )
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
                       <SalePlaceholder className="w-12 h-12 opacity-60" />

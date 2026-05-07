@@ -368,9 +368,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     map.flyTo(flyToOptions)
     
-    // Call the onClusterClick callback if provided
+    // Call the active onClusterClick callback for both legacy pins and hybrid pins.
     pins?.onClusterClick?.(cluster)
-  }, [pins, bottomSheetHeight])
+    hybridPins?.onClusterClick?.(cluster)
+  }, [pins, hybridPins, bottomSheetHeight])
 
   // Handle map click (not on markers/pins)
   const handleMapClick = useCallback((e: any) => {

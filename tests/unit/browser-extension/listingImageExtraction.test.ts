@@ -12,6 +12,7 @@ const EXT_ROOT = join(__dirname, '../../../browser-extension')
 interface WindowWithListingImage extends Window {
   LootAuraListingImage: {
     extractListingPrimaryImageUrl: (doc: Document, pageUrl: string) => string | null
+    extractListingImageUrls: (doc: Document, pageUrl: string, max?: number) => string[]
   }
 }
 
@@ -124,5 +125,37 @@ describe('listingImageExtraction (browser extension)', () => {
       dom.window.location.href
     )
     expect(url).toContain('detail-shot.jpg')
+  })
+
+  it('returns ordered multi-image candidates for listing pages', () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>
+        <header><img src="https://yardsaletreasuremap.com/pics/YSTM_site_logo.png" width="120" height="40"/></header>
+        <main class="content">
+          <h1>Yard sale</h1>
+          <img src="https://yardsaletreasuremap.com/uploads/listing/photo1.jpg" width="600" height="400" />
+          <img src="https://yardsaletreasuremap.com/uploads/listing/photo2.jpg" width="500" height="350" />
+        </main>
+      </body></html>`,
+      {
+        url: 'https://yardsaletreasuremap.com/US/Pennsylvania/Folsom/408-Tome-St/310341545/listing.html',
+        ...JSDOM_SCRIPT_OPTIONS,
+      }
+    )
+    const win = listingWindow(dom)
+    const urls = win.LootAuraListingImage.extractListingImageUrls(
+      dom.window.document,
+      dom.window.location.href,
+      3
+    )
+    expect(urls).toEqual([
+      'https://yardsaletreasuremap.com/uploads/listing/photo1.jpg',
+      'https://yardsaletreasuremap.com/uploads/listing/photo2.jpg',
+    ])
+    const primary = win.LootAuraListingImage.extractListingPrimaryImageUrl(
+      dom.window.document,
+      dom.window.location.href
+    )
+    expect(primary).toBe(urls[0])
   })
 })

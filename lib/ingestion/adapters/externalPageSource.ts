@@ -165,6 +165,22 @@ function extractDateRangeFromText(text: string): { start?: string; end?: string 
     return { start: found[0], end: found[0] }
   }
 
+  const compactMonthRange = text.match(
+    /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{1,2})\s*[-–—]\s*(\d{1,2})(?:,\s*(\d{4}))?/i
+  )
+  if (compactMonthRange) {
+    const monKey = (compactMonthRange[1] || '').toLowerCase().replace(/\.$/, '')
+    const mon = monthNames[monKey]
+    const d1 = Number.parseInt(compactMonthRange[2] || '', 10)
+    const d2 = Number.parseInt(compactMonthRange[3] || '', 10)
+    const y = compactMonthRange[4] ? Number.parseInt(compactMonthRange[4], 10) : year
+    const start = mon ? toIso(y, mon, d1) : null
+    const end = mon ? toIso(y, mon, d2) : null
+    if (start && end) {
+      return { start, end }
+    }
+  }
+
   return {}
 }
 
@@ -368,10 +384,59 @@ function decodeJsSingleQuotedJson(raw: string): string {
     .replace(/\\t/g, '\t')
 }
 
-type MetadataSaleShape = { url?: unknown; address?: unknown; date?: unknown; end_date?: unknown; description?: unknown }
-type MetadataSaleInfo = { address?: string; startDate?: string; endDate?: string }
+type MetadataSaleShape = {
+  url?: unknown
+  address?: unknown
+  date?: unknown
+  end_date?: unknown
+  description?: unknown
+  image?: unknown
+  image_url?: unknown
+  photo?: unknown
+  photos?: unknown
+  image_urls?: unknown
+}
+type MetadataSaleInfo = { address?: string; startDate?: string; endDate?: string; imageUrls?: string[] }
 
-function extractListingMetadataFromScripts(document: Document): Map<string, MetadataSaleInfo> {
+function parseMetadataDateValue(raw: unknown): string | null {
+  if (typeof raw === 'number') return epochSecondsToIsoDate(raw)
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (/^\d{9,11}$/.test(trimmed)) {
+    const epoch = Number.parseInt(trimmed, 10)
+    return epochSecondsToIsoDate(epoch)
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  const extracted = extractDateRangeFromText(trimmed)
+  return extracted.start ?? null
+}
+
+function collectMetadataImageUrls(sale: MetadataSaleShape, pageUrl: string): string[] {
+  const candidates: string[] = []
+  const scalarFields = [sale.image, sale.image_url, sale.photo]
+  for (const field of scalarFields) {
+    if (typeof field === 'string') candidates.push(field)
+  }
+  const arrayFields = [sale.photos, sale.image_urls]
+  for (const field of arrayFields) {
+    if (!Array.isArray(field)) continue
+    for (const item of field) {
+      if (typeof item === 'string') candidates.push(item)
+    }
+  }
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of candidates) {
+    const normalized = normalizeAbsoluteHttpsUrl(raw, pageUrl)
+    if (!normalized || shouldRejectImageUrl(normalized) || seen.has(normalized)) continue
+    seen.add(normalized)
+    out.push(normalized)
+  }
+  return out
+}
+
+function extractListingMetadataFromScripts(document: Document, pageUrl: string): Map<string, MetadataSaleInfo> {
   const out = new Map<string, MetadataSaleInfo>()
   const scripts = Array.from(document.querySelectorAll('script'))
 
@@ -395,20 +460,22 @@ function extractListingMetadataFromScripts(document: Document): Map<string, Meta
       const url = typeof sale?.url === 'string' ? normalizeListingUrlForLookup(sale.url) : null
       const address = typeof sale?.address === 'string' ? sale.address.replace(/\s+/g, ' ').trim() : null
       if (!url) continue
-      const fromEpoch = typeof sale?.date === 'number' ? epochSecondsToIsoDate(sale.date) : null
-      const endFromEpoch = typeof sale?.end_date === 'number' ? epochSecondsToIsoDate(sale.end_date) : null
+      const fromEpoch = parseMetadataDateValue(sale?.date)
+      const endFromEpoch = parseMetadataDateValue(sale?.end_date)
       const fromDescription =
         typeof sale?.description === 'string' ? extractDateRangeFromText(sale.description) : {}
+      const metadataImageUrls = collectMetadataImageUrls(sale, pageUrl)
       const info: MetadataSaleInfo = {
         ...(address ? { address } : {}),
         ...(fromEpoch ? { startDate: fromEpoch } : {}),
         ...(endFromEpoch ? { endDate: endFromEpoch } : {}),
+        ...(metadataImageUrls.length > 0 ? { imageUrls: metadataImageUrls } : {}),
       }
       if (!info.startDate && fromDescription.start) info.startDate = fromDescription.start
       if (!info.endDate && fromDescription.end) info.endDate = fromDescription.end
       if (!info.startDate && info.endDate) info.startDate = info.endDate
       if (!info.endDate && info.startDate) info.endDate = info.startDate
-      if (!info.address && !info.startDate && !info.endDate) continue
+      if (!info.address && !info.startDate && !info.endDate && !info.imageUrls) continue
       const externalId = externalIdFromListingUrl(url)
       if (externalId) {
         out.set(`id:${externalId}`, info)
@@ -479,18 +546,47 @@ function shouldRejectImageUrl(rawUrl: string): boolean {
 function collectImageUrlsNear(anchor: Element, baseUrl: string, max: number): string[] {
   const out: string[] = []
   const seen = new Set<string>()
+  const imgAttrs = ['src', 'data-src', 'data-lazy-src', 'data-original', 'data-lazy', 'data-url']
   let el: Element | null = anchor
   for (let depth = 0; el && depth < 4 && out.length < max; depth++) {
-    const imgs = el.querySelectorAll<HTMLImageElement>('img[src]')
+    const imgs = el.querySelectorAll<HTMLImageElement>('img')
     for (const img of imgs) {
-      const src = img.getAttribute('src')?.trim()
-      if (!src) continue
-      const normalized = normalizeAbsoluteHttpsUrl(src, baseUrl)
+      for (const attr of imgAttrs) {
+        const src = img.getAttribute(attr)?.trim()
+        if (!src) continue
+        const normalized = normalizeAbsoluteHttpsUrl(src, baseUrl)
+        if (!normalized || shouldRejectImageUrl(normalized) || seen.has(normalized)) continue
+        seen.add(normalized)
+        out.push(normalized)
+        if (out.length >= max) break
+      }
+      if (out.length >= max) break
+      const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset')
+      if (srcset) {
+        const first = srcset.split(',')[0]?.trim().split(/\s+/)[0]
+        if (first) {
+          const normalized = normalizeAbsoluteHttpsUrl(first, baseUrl)
+          if (normalized && !shouldRejectImageUrl(normalized) && !seen.has(normalized)) {
+            seen.add(normalized)
+            out.push(normalized)
+          }
+        }
+      }
+      if (out.length >= max) break
+    }
+    const bgEls = el.querySelectorAll<HTMLElement>("[style*='background-image']")
+    for (const bgEl of bgEls) {
+      const bg = bgEl.style.backgroundImage || ''
+      const m = bg.match(/url\(\s*['"]?([^'")]+)['"]?\s*\)/i)
+      const rawBg = m?.[1]?.trim()
+      if (!rawBg) continue
+      const normalized = normalizeAbsoluteHttpsUrl(rawBg, baseUrl)
       if (!normalized || shouldRejectImageUrl(normalized) || seen.has(normalized)) continue
       seen.add(normalized)
       out.push(normalized)
       if (out.length >= max) break
     }
+    if (out.length >= max) break
     el = el.parentElement
   }
   return out
@@ -542,7 +638,7 @@ export function parseExternalPageSourceHtml(
   const dom = new JSDOM(html, { url: pageUrl })
   const { document } = dom.window
   const fullText = document.body?.textContent || ''
-  const metadataByListing = extractListingMetadataFromScripts(document)
+  const metadataByListing = extractListingMetadataFromScripts(document, pageUrl)
   const anchors = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="listing.html"], a[href*="userlisting.html"]'
   )
@@ -591,7 +687,7 @@ export function parseExternalPageSourceHtml(
     }
     let { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
     const description = cleanDescriptionText(nearby, addressRaw, config.city, config.state)
-    const imageUrls = collectImageUrlsForListing(a, document, pageUrl, 3)
+    let imageUrls = collectImageUrlsForListing(a, document, pageUrl, 3)
 
     // Fallback extraction when critical fields are missing from the primary parse.
     if (!addressRaw || !startDate) {
@@ -617,6 +713,9 @@ export function parseExternalPageSourceHtml(
         if (!addressRaw && meta.address) addressRaw = meta.address
         if (!startDate && meta.startDate) startDate = meta.startDate
         if (!endDate && meta.endDate) endDate = meta.endDate
+        if (imageUrls.length === 0 && Array.isArray(meta.imageUrls) && meta.imageUrls.length > 0) {
+          imageUrls = meta.imageUrls.slice(0, 3)
+        }
       }
     }
     const rawPayload: Record<string, unknown> = {

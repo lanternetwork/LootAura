@@ -97,6 +97,19 @@ vi.mock('@/components/location/PinMarker', () => ({
   }
 }))
 
+vi.mock('@/components/location/HybridPinsOverlay', () => ({
+  default: function MockHybridPinsOverlay({ onClusterClick }: any) {
+    return (
+      <button
+        data-testid="hybrid-cluster"
+        onClick={() => onClusterClick?.({ id: 9, lat: 38.25, lng: -85.75, expandToZoom: 14 })}
+      >
+        Hybrid Cluster
+      </button>
+    )
+  },
+}))
+
 describe('SimpleMap Clusters Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -202,6 +215,27 @@ describe('SimpleMap Clusters Integration', () => {
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
+    })
+
+    it('should forward cluster clicks from hybrid pins callback', async () => {
+      const onClusterClick = vi.fn()
+      const { getByTestId, unmount } = render(
+        <SimpleMap
+          {...defaultProps}
+          pins={undefined}
+          hybridPins={{
+            sales: testSales,
+            selectedId: null,
+            onLocationClick: vi.fn(),
+            onClusterClick,
+            viewport: { bounds: [-86, 37, -85, 39], zoom: 10 },
+          }}
+        />
+      )
+
+      fireEvent.click(getByTestId('hybrid-cluster'))
+      expect(onClusterClick).toHaveBeenCalledWith({ id: 9, lat: 38.25, lng: -85.75, expandToZoom: 14 })
+      unmount()
     })
   })
 

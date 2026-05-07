@@ -437,20 +437,39 @@ function extractDate() {
   return line ? line.trim().slice(0, 200) : "";
 }
 
-function extractImage() {
+function extractImages() {
   try {
-    if (typeof globalThis.LootAuraListingImage?.extractListingPrimaryImageUrl === "function") {
-      return globalThis.LootAuraListingImage.extractListingPrimaryImageUrl(document, window.location.href);
+    const imageApi = globalThis.LootAuraListingImage;
+    const listFn = imageApi?.extractListingImageUrls;
+    if (typeof listFn === "function") {
+      const urls = listFn(document, window.location.href, 3);
+      if (Array.isArray(urls) && urls.length > 0) {
+        return {
+          primary: urls[0],
+          urls,
+        };
+      }
+    }
+    const singleFn = imageApi?.extractListingPrimaryImageUrl;
+    if (typeof singleFn === "function") {
+      const primary = singleFn(document, window.location.href);
+      if (primary) {
+        return {
+          primary,
+          urls: [primary],
+        };
+      }
     }
   } catch (e) {
     console.warn("[LootAura] listing image extraction failed:", e);
   }
-  return null;
+  return { primary: null, urls: [] };
 }
 
 function buildSubmissionPayload(session, currentUrl, selectedTags) {
   const addressRaw = extractAddress();
   const { city, state } = extractCityState(addressRaw);
+  const imageExtract = extractImages();
   console.log("City/state extracted:", { city, state });
 
   return {
@@ -463,12 +482,13 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
         description: extractDescription(),
         addressRaw,
         dateRaw: extractDate(),
-        imageSourceUrl: extractImage(),
+        imageSourceUrl: imageExtract.primary,
         cityHint: city || session.city,
         stateHint: state || session.state,
         rawPayload: {
           tags: selectedTags,
           collectedAt: Date.now(),
+          ...(imageExtract.urls.length > 0 ? { imageUrls: imageExtract.urls } : {}),
         },
       },
     ],

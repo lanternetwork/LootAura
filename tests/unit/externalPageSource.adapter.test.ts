@@ -109,6 +109,28 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].imageSourceUrl).toBe('https://cdn.example.com/a.jpg')
   })
 
+  it('extracts lazy image attributes and srcset near listing anchors', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <a href="https://example.com/US/Illinois/Chicago/1-A/199/listing.html">Lazy sale</a>
+      <div class="content">
+        <img data-src="/images/lazy-a.jpg" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" />
+        <img srcset="https://cdn.example.com/lazy-b.webp 2x, https://cdn.example.com/lazy-b-small.webp 1x" />
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].rawPayload.imageUrls).toEqual([
+      'https://example.com/images/lazy-a.jpg',
+      'https://cdn.example.com/lazy-b.webp',
+    ])
+    expect(listings[0].imageSourceUrl).toBe('https://example.com/images/lazy-a.jpg')
+  })
+
   it('rejects og:image when it is a logo asset', async () => {
     const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
     const html = `
@@ -291,6 +313,49 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].addressRaw).toBe('8559 S Maryland Ave, Chicago, IL')
     expect(listings[0].startDate).toBe('2026-05-08')
     expect(listings[0].endDate).toBe('2026-05-09')
+  })
+
+  it('fills hidden-address date range from compact month-name metadata description', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718698/userlisting.html?s=tl">Estate Sale</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718698/userlisting.html?s=tl","address":"8559 S Maryland Ave, Chicago, IL","description":"May 8-9, 2026 8am-2pm"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe('2026-05-08')
+    expect(listings[0].endDate).toBe('2026-05-09')
+  })
+
+  it('uses metadata image fields when nearby listing images are missing', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718699/userlisting.html?s=tl">Estate Sale</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718699/userlisting.html?s=tl","address":"8559 S Maryland Ave, Chicago, IL","date":"2026-05-08","end_date":"2026-05-09","image_urls":["https://cdn.example.com/a.jpg","https://cdn.example.com/b.jpg"]}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].imageSourceUrl).toBe('https://cdn.example.com/a.jpg')
+    expect(listings[0].rawPayload.imageUrls).toEqual([
+      'https://cdn.example.com/a.jpg',
+      'https://cdn.example.com/b.jpg',
+    ])
   })
 
   it('keeps dates absent when listing has no trustworthy date source', async () => {

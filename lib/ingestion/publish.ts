@@ -1,5 +1,6 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
+import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { PublishInputSchema } from '@/lib/ingestion/schemas'
 import type { PublishInput } from '@/lib/ingestion/types'
 
@@ -28,7 +29,30 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function normalizeAddressForPublish(
+/** City + state (USPS or full name) and optional ZIP already present — do not append again. */
+function addressAlreadyContainsCityState(address: string, city: string, state: string): boolean {
+  const cityNorm = city.replace(/\s+/g, ' ').trim()
+  const stateNorm = state.replace(/\s+/g, ' ').trim()
+  if (!cityNorm || !stateNorm) return false
+
+  const cityEsc = escapeRegExp(cityNorm)
+  const optionalZip = '(?:\\s+\\d{5}(?:-\\d{4})?)?'
+  const statePatterns = [escapeRegExp(stateNorm)]
+  if (stateNorm.length === 2) {
+    const full = uspsCodeToFullNameForAddress(stateNorm)
+    if (full) statePatterns.push(escapeRegExp(full))
+  }
+
+  for (const stateEsc of statePatterns) {
+    if (new RegExp(`${cityEsc}\\s*,\\s*${stateEsc}${optionalZip}`, 'i').test(address)) {
+      return true
+    }
+  }
+  return false
+}
+
+/** Normalizes ingested address lines for publish; exported for unit tests. */
+export function normalizeAddressForPublish(
   normalizedAddress: string | null,
   city: string,
   state: string
@@ -43,6 +67,9 @@ function normalizeAddressForPublish(
   const withoutDuplicateSuffix = base.replace(suffixPattern, '').replace(/\s*,\s*$/g, '').trim()
 
   if (!withoutDuplicateSuffix) return cityState
+  if (addressAlreadyContainsCityState(withoutDuplicateSuffix, city, state)) {
+    return withoutDuplicateSuffix
+  }
   return `${withoutDuplicateSuffix}, ${cityState}`
 }
 

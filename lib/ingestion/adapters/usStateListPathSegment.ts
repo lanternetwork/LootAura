@@ -57,6 +57,17 @@ const USPS_TO_SEGMENT: Record<string, string> = {
 }
 
 /**
+ * USPS code → full state name with spaces (e.g. `IL` → `Illinois`) for address matching.
+ */
+export function uspsCodeToFullNameForAddress(code: string): string | null {
+  const k = code.trim().toUpperCase()
+  if (k.length !== 2) return null
+  const seg = USPS_TO_SEGMENT[k]
+  if (!seg) return null
+  return seg.replace(/-/g, ' ')
+}
+
+/**
  * Returns the `/US/{segment}/` state segment for filtering listing links, or null if unknown.
  */
 export function resolveUsListStatePathSegment(state: string): string | null {

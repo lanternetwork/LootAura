@@ -27,6 +27,8 @@ interface ClaimedPublishRow {
   time_start: string | null
   time_end: string | null
   image_cloudinary_url: string | null
+  /** Present when row was loaded with explicit columns; omitted on RPC-claimed batch rows until hydrated. */
+  image_source_url?: string | null
   raw_payload?: unknown
   failure_reasons: unknown
 }
@@ -172,23 +174,38 @@ async function fetchExistingSaleIdForIngested(ingestedSaleId: string): Promise<s
 
 async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<ClaimedPublishRow[]> {
   if (rows.length === 0) return rows
-  if (rows.every((row) => row.raw_payload != null)) return rows
+  const fullyHydrated = rows.every(
+    (row) =>
+      Object.prototype.hasOwnProperty.call(row, 'raw_payload') &&
+      Object.prototype.hasOwnProperty.call(row, 'image_source_url')
+  )
+  if (fullyHydrated) return rows
+
   const admin = getAdminDb()
   const ids = rows.map((row) => row.id)
   const { data, error } = await fromBase(admin, 'ingested_sales')
-    .select('id, raw_payload')
+    .select('id, raw_payload, image_source_url')
     .in('id', ids)
   if (error || !Array.isArray(data)) {
     return rows
   }
-  const payloadById = new Map<string, unknown>()
-  for (const row of data as Array<{ id: string; raw_payload?: unknown }>) {
-    payloadById.set(row.id, row.raw_payload ?? null)
+  const payloadById = new Map<string, { raw_payload: unknown; image_source_url: string | null }>()
+  for (const row of data as Array<{ id: string; raw_payload?: unknown; image_source_url?: string | null }>) {
+    payloadById.set(row.id, {
+      raw_payload: row.raw_payload ?? null,
+      image_source_url: row.image_source_url ?? null,
+    })
   }
-  return rows.map((row) => ({
-    ...row,
-    raw_payload: row.raw_payload ?? payloadById.get(row.id) ?? null,
-  }))
+  return rows.map((row) => {
+    const extra = payloadById.get(row.id)
+    const hasRawKey = Object.prototype.hasOwnProperty.call(row, 'raw_payload')
+    const hasImgKey = Object.prototype.hasOwnProperty.call(row, 'image_source_url')
+    return {
+      ...row,
+      raw_payload: hasRawKey ? row.raw_payload ?? null : extra?.raw_payload ?? null,
+      image_source_url: hasImgKey ? row.image_source_url ?? null : extra?.image_source_url ?? null,
+    }
+  })
 }
 
 function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngestedSale {
@@ -221,11 +238,36 @@ function extractRawPayloadImageCandidates(rawPayload: unknown): string[] {
   return imageUrls.filter((value): value is string => typeof value === 'string')
 }
 
+/** Image URLs for publish: `raw_payload.imageUrls` first, then `image_source_url`, deduped in order. */
+export function extractPublishImageCandidates(
+  rawPayload: unknown,
+  imageSourceUrl: string | null | undefined
+): string[] {
+  const fromPayload = extractRawPayloadImageCandidates(rawPayload)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const u of fromPayload) {
+    const t = u.trim()
+    if (!t || seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+  if (typeof imageSourceUrl === 'string') {
+    const t = imageSourceUrl.trim()
+    if (t && !seen.has(t)) {
+      seen.add(t)
+      out.push(t)
+    }
+  }
+  return out
+}
+
 /** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */
 async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<string> {
   const body = claimedRowToPublishable(record)
   try {
-    const sanitizedImages = await sanitizeExternalImageUrls(extractRawPayloadImageCandidates(record.raw_payload), {
+    const candidates = extractPublishImageCandidates(record.raw_payload, record.image_source_url)
+    const sanitizedImages = await sanitizeExternalImageUrls(candidates, {
       rowId: record.id,
       city: record.city,
       state: record.state,
@@ -470,7 +512,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     .not('lat', 'is', null)
     .not('lng', 'is', null)
     .select(
-      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, raw_payload, failure_reasons'
+      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, image_source_url, raw_payload, failure_reasons'
     )
     .maybeSingle()
 

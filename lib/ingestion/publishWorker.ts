@@ -1,6 +1,7 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
-import { createPublishedSale, normalizeAddressForPublish, type PublishableIngestedSale } from '@/lib/ingestion/publish'
+import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingestion/publish'
 import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
+import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
@@ -266,7 +267,32 @@ function looksGenericDescription(value: string | null | undefined): boolean {
   return /^yard sale\b/i.test(t) || /^garage sale\b/i.test(t) || /^estate sale\b/i.test(t) || /^listing\b/i.test(t)
 }
 
-function normalizeAddressForPublishFallback(
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function addressAlreadyContainsCityState(address: string, city: string, state: string): boolean {
+  const cityNorm = city.replace(/\s+/g, ' ').trim()
+  const stateNorm = state.replace(/\s+/g, ' ').trim()
+  if (!cityNorm || !stateNorm) return false
+
+  const cityEsc = escapeRegExp(cityNorm)
+  const optionalZip = '(?:\\s+\\d{5}(?:-\\d{4})?)?'
+  const statePatterns = [escapeRegExp(stateNorm)]
+  if (stateNorm.length === 2) {
+    const full = uspsCodeToFullNameForAddress(stateNorm)
+    if (full) statePatterns.push(escapeRegExp(full))
+  }
+
+  for (const stateEsc of statePatterns) {
+    if (new RegExp(`${cityEsc}\\s*,\\s*${stateEsc}${optionalZip}`, 'i').test(address)) {
+      return true
+    }
+  }
+  return false
+}
+
+function normalizeAddressForPublishLocal(
   normalizedAddress: string | null,
   city: string,
   state: string
@@ -275,10 +301,12 @@ function normalizeAddressForPublishFallback(
   if (!base) return null
   const cityState = [city, state].map((v) => v.trim()).filter(Boolean).join(', ')
   if (!cityState) return base
-  const cityStateEsc = cityState.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const suffixPattern = new RegExp(`(?:,\\s*${cityStateEsc})+$`, 'i')
+  const suffixPattern = new RegExp(`(?:,\\s*${escapeRegExp(cityState)})+$`, 'i')
   const withoutDuplicateSuffix = base.replace(suffixPattern, '').replace(/\s*,\s*$/g, '').trim()
   if (!withoutDuplicateSuffix) return cityState
+  if (addressAlreadyContainsCityState(withoutDuplicateSuffix, city, state)) {
+    return withoutDuplicateSuffix
+  }
   return `${withoutDuplicateSuffix}, ${cityState}`
 }
 
@@ -287,10 +315,7 @@ function normalizeAddressForPublishSafe(
   city: string,
   state: string
 ): string | null {
-  if (typeof normalizeAddressForPublish === 'function') {
-    return normalizeAddressForPublish(normalizedAddress, city, state)
-  }
-  return normalizeAddressForPublishFallback(normalizedAddress, city, state)
+  return normalizeAddressForPublishLocal(normalizedAddress, city, state)
 }
 
 async function sanitizePublishImagesForRecord(record: ClaimedPublishRow): Promise<string[]> {

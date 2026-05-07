@@ -21,6 +21,7 @@ vi.mock('react-map-gl', () => ({
           getMap: () => ({
             getZoom: () => 10,
             flyTo: () => {},
+            resize: () => {},
             isStyleLoaded: () => true,
             getBounds: () => ({
               getWest: () => -86,

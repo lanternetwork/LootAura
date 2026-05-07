@@ -141,4 +141,37 @@ describe('persistExternalPageSource', () => {
     expect(summary.pagesProcessed).toBe(2)
     expect(summary.fetched).toBe(2)
   })
+
+  it('persists image_source_url from first accepted parser candidate', async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null })
+    mockFrom.mockImplementation(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        })),
+      })),
+      insert,
+    }))
+
+    const html = `
+      <meta property="og:image" content="https://yardsaletreasuremap.com/pics/YSTM_site_logo.png" />
+      <a href="https://example.com/US/Illinois/Chicago/200-B/2002/listing.html">A</a>
+      <div><img src="https://cdn.example.com/listing-primary.jpg" /></div>
+    `
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(htmlFetchResponse(html))))
+
+    const { persistExternalPageSource } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const summary = await persistExternalPageSource({
+      city: 'Chicago',
+      state: 'IL',
+      source_platform: 'external_page_source',
+      source_pages: ['https://example.com/one-page'],
+    })
+
+    expect(summary.inserted).toBe(1)
+    expect(insert).toHaveBeenCalledTimes(1)
+    const insertedRow = insert.mock.calls[0]?.[0]
+    expect(insertedRow.image_source_url).toBe('https://cdn.example.com/listing-primary.jpg')
+    expect(insertedRow.raw_payload.imageUrls).toEqual(['https://cdn.example.com/listing-primary.jpg'])
+  })
 })

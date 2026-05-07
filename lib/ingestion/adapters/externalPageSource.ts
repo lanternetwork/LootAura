@@ -25,6 +25,7 @@ export interface ExternalPageSourceListing {
   startDate?: string
   endDate?: string
   sourceUrl: string
+  imageSourceUrl: string | null
   /** Listing-level fields only; persist merges page metadata before insert. */
   rawPayload: Record<string, unknown>
 }
@@ -443,6 +444,38 @@ function normalizeAbsoluteHttpsUrl(raw: string, baseUrl: string): string | null 
   }
 }
 
+const IMAGE_REJECT_SUBSTRINGS = [
+  'logo',
+  'site_logo',
+  'ystm_site',
+  'icon',
+  'sprite',
+  'favicon',
+  'banner',
+  'avatar',
+  '/nav',
+  '/header',
+  'header_',
+  '_header',
+  'navbar',
+  'tracking',
+  'pixel',
+]
+
+function shouldRejectImageUrl(rawUrl: string): boolean {
+  try {
+    const path = new URL(rawUrl).pathname.toLowerCase()
+    if (!path) return true
+    if (/1x1|blank\.gif|spacer\./i.test(path)) return true
+    for (const token of IMAGE_REJECT_SUBSTRINGS) {
+      if (path.includes(token)) return true
+    }
+    return false
+  } catch {
+    return true
+  }
+}
+
 function collectImageUrlsNear(anchor: Element, baseUrl: string, max: number): string[] {
   const out: string[] = []
   const seen = new Set<string>()
@@ -453,7 +486,7 @@ function collectImageUrlsNear(anchor: Element, baseUrl: string, max: number): st
       const src = img.getAttribute('src')?.trim()
       if (!src) continue
       const normalized = normalizeAbsoluteHttpsUrl(src, baseUrl)
-      if (!normalized || seen.has(normalized)) continue
+      if (!normalized || shouldRejectImageUrl(normalized) || seen.has(normalized)) continue
       seen.add(normalized)
       out.push(normalized)
       if (out.length >= max) break
@@ -466,21 +499,25 @@ function collectImageUrlsNear(anchor: Element, baseUrl: string, max: number): st
 function collectImageUrlsForListing(anchor: Element, document: Document, pageUrl: string, max: number): string[] {
   const out: string[] = []
   const seen = new Set<string>()
-  const ogImage = document
-    .querySelector<HTMLMetaElement>('meta[property="og:image"], meta[name="og:image"]')
-    ?.getAttribute('content')
-  if (ogImage) {
-    const normalizedOg = normalizeAbsoluteHttpsUrl(ogImage, pageUrl)
-    if (normalizedOg) {
-      seen.add(normalizedOg)
-      out.push(normalizedOg)
-    }
-  }
+  // Prefer listing-local content images first.
   for (const imageUrl of collectImageUrlsNear(anchor, pageUrl, max)) {
     if (seen.has(imageUrl)) continue
     seen.add(imageUrl)
     out.push(imageUrl)
     if (out.length >= max) break
+  }
+
+  if (out.length >= max) return out.slice(0, max)
+
+  const ogImage = document
+    .querySelector<HTMLMetaElement>('meta[property="og:image"], meta[name="og:image"]')
+    ?.getAttribute('content')
+  if (ogImage) {
+    const normalizedOg = normalizeAbsoluteHttpsUrl(ogImage, pageUrl)
+    if (normalizedOg && !shouldRejectImageUrl(normalizedOg) && !seen.has(normalizedOg)) {
+      seen.add(normalizedOg)
+      out.push(normalizedOg)
+    }
   }
   return out.slice(0, max)
 }
@@ -601,6 +638,7 @@ export function parseExternalPageSourceHtml(
       ...(startDate ? { startDate } : {}),
       ...(endDate ? { endDate } : {}),
       sourceUrl: href,
+      imageSourceUrl: imageUrls[0] ?? null,
       rawPayload,
     })
   }
@@ -786,7 +824,7 @@ export async function persistExternalPageSource(
         time_end: null,
         date_source: listing.startDate ? 'external_list_page' : null,
         time_source: null,
-        image_source_url: null,
+        image_source_url: listing.imageSourceUrl,
         raw_text: null,
         raw_payload: rowPayload,
         status: 'needs_geocode',

@@ -82,7 +82,7 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(1)
   })
 
-  it('extracts og:image and img candidates as normalized HTTPS with max 3', async () => {
+  it('extracts image candidates as normalized HTTPS with max 3 and sets imageSourceUrl', async () => {
     const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
     const html = `
       <meta property="og:image" content="/images/og-photo.jpg" />
@@ -102,10 +102,48 @@ describe('parseExternalPageSourceHtml', () => {
     )
     expect(listings).toHaveLength(1)
     expect(listings[0].rawPayload.imageUrls).toEqual([
-      'https://example.com/images/og-photo.jpg',
       'https://cdn.example.com/a.jpg',
       'https://example.com/gallery/b.jpg',
+      'https://cdn.example.com/c.jpg',
     ])
+    expect(listings[0].imageSourceUrl).toBe('https://cdn.example.com/a.jpg')
+  })
+
+  it('rejects og:image when it is a logo asset', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <meta property="og:image" content="https://yardsaletreasuremap.com/pics/YSTM_site_logo.png" />
+      <a href="https://example.com/US/Illinois/Chicago/1-A/99/listing.html">One</a>
+      <div><img src="https://cdn.example.com/listing-photo.jpg" /></div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].rawPayload.imageUrls).toEqual(['https://cdn.example.com/listing-photo.jpg'])
+    expect(listings[0].imageSourceUrl).toBe('https://cdn.example.com/listing-photo.jpg')
+  })
+
+  it('returns no image when page only exposes logo/branding images', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <meta property="og:image" content="https://yardsaletreasuremap.com/pics/YSTM_site_logo.png" />
+      <a href="https://example.com/US/Illinois/Chicago/1-A/99/listing.html">One</a>
+      <div>
+        <img src="https://yardsaletreasuremap.com/pics/YSTM_site_logo.png" />
+        <img src="https://example.com/assets/header_banner.png" />
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].imageSourceUrl).toBeNull()
+    expect(listings[0].rawPayload.imageUrls).toBeUndefined()
   })
 
   it('extracts alphanumeric house-number address from nearby detail-like text', async () => {

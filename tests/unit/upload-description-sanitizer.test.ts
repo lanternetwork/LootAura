@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeUploadDescription } from '@/app/api/admin/ingested-sales/upload/route'
+import { sanitizeUploadDescription } from '@/lib/ingestion/uploadDescriptionSanitizer'
 
 describe('sanitizeUploadDescription', () => {
   it('removes ingestion noise tokens from polluted description', () => {

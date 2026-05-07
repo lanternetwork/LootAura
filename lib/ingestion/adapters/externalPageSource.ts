@@ -311,7 +311,6 @@ function extractAddressFromNearbyText(nearbyText: string): string | null {
 function decodeJsSingleQuotedJson(raw: string): string {
   // Decode common JS single-quoted escapes used in inline metadata blobs.
   return raw
-    .replace(/\\\\/g, '\\')
     .replace(/\\'/g, "'")
     .replace(/\\"/g, '"')
     .replace(/\\n/g, '\n')

@@ -107,4 +107,74 @@ describe('parseExternalPageSourceHtml', () => {
       'https://example.com/gallery/b.jpg',
     ])
   })
+
+  it('extracts alphanumeric house-number address from nearby detail-like text', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div class="listing">
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Oak-Brook/See-source-for-address-after-2026-05-08-22%3A00%3A00/38733355/userlisting.html?s=tl">Garage Sale</a>
+        <div class="meta">15W303 61st Pl, Burr Ridge, IL Street View Directions</div>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Oak Brook', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].addressRaw).toBe('15W303 61st Pl, Burr Ridge, IL')
+  })
+
+  it('extracts address from embedded metadataStr JSON when URL slug is hidden', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div class="listing">
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Elmwood-Park/See-source-for-address-after-2026-05-08-22%3A00%3A00/38733355/userlisting.html?s=tl">Elmwood Park Estate Sale</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Elmwood-Park/See-source-for-address-after-2026-05-08-22%3A00%3A00/38733355/userlisting.html?s=tl","address":"1234 W Fullerton Ave, Elmwood Park, IL"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Elmwood Park', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].addressRaw).toBe('1234 W Fullerton Ave, Elmwood Park, IL')
+  })
+
+  it('extracts address from metadataStr by external listing id when query differs', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <a href="https://yardsaletreasuremap.com/US/Illinois/Oak-Brook/See-source-for-address-after-2026-05-08-22%3A00%3A00/38735077/userlisting.html?s=tl">Sale</a>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Oak-Brook/See-source-for-address-after-2026-05-08-22%3A00%3A00/38735077/userlisting.html","address":"15W303 61st Pl, Burr Ridge, IL"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Oak Brook', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].addressRaw).toBe('15W303 61st Pl, Burr Ridge, IL')
+  })
+
+  it('keeps address null when hidden slug has no trustworthy nearby/metadata address', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718697/userlisting.html?s=tl">Estate Sale</a>
+        <div>Great vintage finds and collectibles 8:00 am - 3:00 pm 5/9 - 5/9</div>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].addressRaw).toBeNull()
+  })
 })

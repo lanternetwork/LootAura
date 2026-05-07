@@ -196,7 +196,8 @@ function extractFallbackAddressAndDates(
   // - starts with a street number
   // - has enough trailing characters/words to look like a street line
   // - does NOT depend on a suffix like Ave/St/etc
-  const addressRegex = /^\d{3,6}\s+[A-Za-z0-9.'\- ]{5,}/
+  // Accept numeric + alphanumeric civic numbers (e.g. "15W303", "N123W456", "100A").
+  const addressRegex = /^\d[\dA-Za-z-]{0,8}\s+[A-Za-z0-9.'#\- ]{5,}/
 
   function isAddressNoiseLine(line: string): boolean {
     return (
@@ -273,6 +274,81 @@ function extractFallbackAddressAndDates(
   if (!bestAddress && !bestDate) return {}
 
   return { address: bestAddress, start: bestDate?.start, end: bestDate?.end }
+}
+
+function normalizeListingUrlForLookup(raw: string): string {
+  try {
+    const u = new URL(raw.trim())
+    u.hash = ''
+    return u.href
+  } catch {
+    return raw.trim()
+  }
+}
+
+function extractAddressFromNearbyText(nearbyText: string): string | null {
+  const lines = nearbyText
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .filter((line) => !/street view|directions|source:/i.test(line))
+  if (lines.length === 0) return null
+
+  const addressLike = /^\d[\dA-Za-z-]{0,8}\s+[A-Za-z0-9.'#\- ]{4,}/
+  for (const line of lines) {
+    if (addressLike.test(line) && !/(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(line)) {
+      return line
+    }
+  }
+  return null
+}
+
+function decodeJsSingleQuotedJson(raw: string): string {
+  // Decode common JS single-quoted escapes used in inline metadata blobs.
+  return raw
+    .replace(/\\\\/g, '\\')
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+}
+
+type MetadataSaleShape = { url?: unknown; address?: unknown }
+
+function extractAddressByListingUrlFromScripts(document: Document): Map<string, string> {
+  const out = new Map<string, string>()
+  const scripts = Array.from(document.querySelectorAll('script'))
+
+  for (const script of scripts) {
+    const text = script.textContent || ''
+    const m = text.match(/metadataStr\s*=\s*'([\s\S]*?)';/)
+    if (!m?.[1]) continue
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(decodeJsSingleQuotedJson(m[1]))
+    } catch {
+      continue
+    }
+    if (!parsed || typeof parsed !== 'object') continue
+
+    const sales = (parsed as { sales?: unknown }).sales
+    if (!Array.isArray(sales)) continue
+
+    for (const sale of sales as MetadataSaleShape[]) {
+      const url = typeof sale?.url === 'string' ? normalizeListingUrlForLookup(sale.url) : null
+      const address = typeof sale?.address === 'string' ? sale.address.replace(/\s+/g, ' ').trim() : null
+      if (!url || !address) continue
+      const externalId = externalIdFromListingUrl(url)
+      if (externalId) {
+        out.set(`id:${externalId}`, address)
+      }
+      out.set(`url:${url}`, address)
+    }
+  }
+
+  return out
 }
 
 function collectNearbyText(anchor: Element, maxDepth: number): string {
@@ -361,6 +437,7 @@ export function parseExternalPageSourceHtml(
   const dom = new JSDOM(html, { url: pageUrl })
   const { document } = dom.window
   const fullText = document.body?.textContent || ''
+  const metadataAddressByListing = extractAddressByListingUrlFromScripts(document)
   const anchors = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="listing.html"], a[href*="userlisting.html"]'
   )
@@ -403,6 +480,10 @@ export function parseExternalPageSourceHtml(
     }
 
     const nearby = collectNearbyText(a, 4)
+    const nearbyAddress = extractAddressFromNearbyText(nearby)
+    if (!addressRaw && nearbyAddress) {
+      addressRaw = nearbyAddress
+    }
     let { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
     const description = cleanDescriptionText(nearby, addressRaw, config.city, config.state)
     const imageUrls = collectImageUrlsForListing(a, document, pageUrl, 3)
@@ -422,6 +503,14 @@ export function parseExternalPageSourceHtml(
     }
 
     const externalId = externalIdFromListingUrl(href)
+    if (!addressRaw) {
+      const normalizedHref = normalizeListingUrlForLookup(href)
+      const byId = externalId ? metadataAddressByListing.get(`id:${externalId}`) : null
+      const byUrl = metadataAddressByListing.get(`url:${normalizedHref}`) ?? null
+      if (byId || byUrl) {
+        addressRaw = (byId ?? byUrl) || null
+      }
+    }
     const rawPayload: Record<string, unknown> = {
       adapter: ADAPTER_ID,
       externalId,

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { runInContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { JSDOM } from 'jsdom'
 
@@ -16,14 +17,14 @@ interface WindowWithListingImage extends Window {
 
 const JSDOM_SCRIPT_OPTIONS = { runScripts: 'dangerously' as const }
 
-function loadExtractor(win: Window) {
+function loadExtractor(dom: JSDOM) {
   const code = readFileSync(join(EXT_ROOT, 'listingImageExtraction.js'), 'utf8')
-  // Run in jsdom window scope so the IIFE attaches LootAuraListingImage to globalThis/window.
-  win.eval(code)
+  // Same execution realm as the jsdom Window (requires runScripts: "dangerously").
+  runInContext(code, dom.getInternalVMContext())
 }
 
 function listingWindow(dom: JSDOM): WindowWithListingImage {
-  loadExtractor(dom.window)
+  loadExtractor(dom)
   return dom.window as unknown as WindowWithListingImage
 }
 

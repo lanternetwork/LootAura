@@ -266,6 +266,88 @@ function looksGenericDescription(value: string | null | undefined): boolean {
   return /^yard sale\b/i.test(t) || /^garage sale\b/i.test(t) || /^estate sale\b/i.test(t) || /^listing\b/i.test(t)
 }
 
+function normalizeAddressForPublishFallback(
+  normalizedAddress: string | null,
+  city: string,
+  state: string
+): string | null {
+  const base = (normalizedAddress || '').replace(/\s+/g, ' ').trim()
+  if (!base) return null
+  const cityState = [city, state].map((v) => v.trim()).filter(Boolean).join(', ')
+  if (!cityState) return base
+  const cityStateEsc = cityState.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const suffixPattern = new RegExp(`(?:,\\s*${cityStateEsc})+$`, 'i')
+  const withoutDuplicateSuffix = base.replace(suffixPattern, '').replace(/\s*,\s*$/g, '').trim()
+  if (!withoutDuplicateSuffix) return cityState
+  return `${withoutDuplicateSuffix}, ${cityState}`
+}
+
+function normalizeAddressForPublishSafe(
+  normalizedAddress: string | null,
+  city: string,
+  state: string
+): string | null {
+  if (typeof normalizeAddressForPublish === 'function') {
+    return normalizeAddressForPublish(normalizedAddress, city, state)
+  }
+  return normalizeAddressForPublishFallback(normalizedAddress, city, state)
+}
+
+async function sanitizePublishImagesForRecord(record: ClaimedPublishRow): Promise<string[]> {
+  const hasRawField = Object.prototype.hasOwnProperty.call(record, 'raw_payload')
+  const hasImageField = Object.prototype.hasOwnProperty.call(record, 'image_source_url')
+  if (!hasRawField || !hasImageField) {
+    logger.warn('Publish claim row missing expected media fields', {
+      component: 'ingestion/publishWorker',
+      operation: 'publish_claim_media_shape_check',
+      rowId: record.id,
+      hasRawPayloadField: hasRawField,
+      hasImageSourceField: hasImageField,
+    })
+  }
+
+  try {
+    const candidates = extractPublishImageCandidates(record.raw_payload, record.image_source_url)
+    if (candidates.length === 0 && hasRawField && hasImageField) {
+      logger.info('Publish image candidate extraction produced zero candidates', {
+        component: 'ingestion/publishWorker',
+        operation: 'extract_publish_image_candidates',
+        rowId: record.id,
+        hasRawPayloadField: hasRawField,
+        hasImageSourceField: hasImageField,
+        imageSourceIsNull: record.image_source_url === null,
+      })
+    }
+    const sanitized = await sanitizeExternalImageUrls(candidates, {
+      rowId: record.id,
+      city: record.city,
+      state: record.state,
+      max: 3,
+    })
+    if (candidates.length > 0 && sanitized.length === 0) {
+      logger.warn('Publish image candidates rejected by sanitizer; continuing without images', {
+        component: 'ingestion/publishWorker',
+        operation: 'sanitize_external_images',
+        rowId: record.id,
+        city: record.city,
+        state: record.state,
+        candidateCount: candidates.length,
+      })
+    }
+    return sanitized
+  } catch (error) {
+    logger.warn('Publish image processing failed; continuing without images', {
+      component: 'ingestion/publishWorker',
+      operation: 'sanitize_external_images',
+      rowId: record.id,
+      city: record.city,
+      state: record.state,
+      message: error instanceof Error ? error.message : String(error),
+    })
+    return []
+  }
+}
+
 /**
  * When a sale already exists (idempotent publish) or was inserted without media, fill
  * `cover_image_url` / `images` from sanitized ingest URLs only if both fields are empty.
@@ -327,7 +409,7 @@ async function maybeSyncExistingSaleFromLatestIngest(
 
     const city = normalizeTextOrNull(record.city)
     const state = normalizeTextOrNull(record.state)
-    const normalizedAddress = normalizeAddressForPublish(record.normalized_address, city ?? '', state ?? '')
+    const normalizedAddress = normalizeAddressForPublishSafe(record.normalized_address, city ?? '', state ?? '')
     const normalizedTitle = normalizeTextOrNull(record.title) || `${record.city || 'Unknown'} Yard Sale`
     const normalizedDescription = normalizeTextOrNull(record.description)
     const normalizedDateStart = normalizeTextOrNull(record.date_start)
@@ -522,59 +604,9 @@ export function extractPublishImageCandidates(
 /** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */
 async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<string> {
   const body = claimedRowToPublishable(record)
-  const hasRawField = Object.prototype.hasOwnProperty.call(record, 'raw_payload')
-  const hasImageField = Object.prototype.hasOwnProperty.call(record, 'image_source_url')
-  if (!hasRawField || !hasImageField) {
-    logger.warn('Publish claim row missing expected media fields', {
-      component: 'ingestion/publishWorker',
-      operation: 'publish_claim_media_shape_check',
-      rowId: record.id,
-      hasRawPayloadField: hasRawField,
-      hasImageSourceField: hasImageField,
-    })
-  }
-  let sanitizedImages: string[] = []
-  try {
-    const candidates = extractPublishImageCandidates(record.raw_payload, record.image_source_url)
-    if (candidates.length === 0 && hasRawField && hasImageField) {
-      logger.info('Publish image candidate extraction produced zero candidates', {
-        component: 'ingestion/publishWorker',
-        operation: 'extract_publish_image_candidates',
-        rowId: record.id,
-        hasRawPayloadField: hasRawField,
-        hasImageSourceField: hasImageField,
-        imageSourceIsNull: record.image_source_url === null,
-      })
-    }
-    sanitizedImages = await sanitizeExternalImageUrls(candidates, {
-      rowId: record.id,
-      city: record.city,
-      state: record.state,
-      max: 3,
-    })
-    if (candidates.length > 0 && sanitizedImages.length === 0) {
-      logger.warn('Publish image candidates rejected by sanitizer; continuing without images', {
-        component: 'ingestion/publishWorker',
-        operation: 'sanitize_external_images',
-        rowId: record.id,
-        city: record.city,
-        state: record.state,
-        candidateCount: candidates.length,
-      })
-    }
-    if (sanitizedImages.length > 0) {
-      body.image_urls = sanitizedImages
-    }
-  } catch (error) {
-    sanitizedImages = []
-    logger.warn('Publish image processing failed; continuing without images', {
-      component: 'ingestion/publishWorker',
-      operation: 'sanitize_external_images',
-      rowId: record.id,
-      city: record.city,
-      state: record.state,
-      message: error instanceof Error ? error.message : String(error),
-    })
+  const sanitizedImages = await sanitizePublishImagesForRecord(record)
+  if (sanitizedImages.length > 0) {
+    body.image_urls = sanitizedImages
   }
 
   const patchCtx = { rowId: record.id, city: record.city, state: record.state }
@@ -840,9 +872,17 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   let createdSaleId: string | null = null
 
   try {
+    const sanitizedImages = await sanitizePublishImagesForRecord(claimed)
     const linkedSaleId = await linkedSaleIdForRow(claimed)
     const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(claimed))
     createdSaleId = saleId
+    if (linkedSaleId) {
+      await maybeSyncExistingSaleFromLatestIngest(saleId, claimed, sanitizedImages, {
+        rowId: claimed.id,
+        city: claimed.city,
+        state: claimed.state,
+      })
+    }
 
     const updatePayload = {
       status: 'published' as const,
@@ -963,9 +1003,17 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
 
     let createdSaleId: string | null = null
     try {
+      const sanitizedImages = await sanitizePublishImagesForRecord(row)
       const linkedSaleId = await linkedSaleIdForRow(row)
       const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(row))
       createdSaleId = saleId
+      if (linkedSaleId) {
+        await maybeSyncExistingSaleFromLatestIngest(saleId, row, sanitizedImages, {
+          rowId: row.id,
+          city: row.city,
+          state: row.state,
+        })
+      }
 
       const updatePayload = {
         status: 'published',

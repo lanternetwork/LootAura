@@ -30,6 +30,9 @@ vi.mock('react-map-gl', () => ({
             }),
             getCenter: () => ({ lat: 38.2527, lng: -85.7585 }),
             on: () => {},
+            once: (_event: string, cb?: () => void) => {
+              cb?.()
+            },
             off: () => {},
           }),
         }),

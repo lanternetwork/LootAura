@@ -177,4 +177,99 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(1)
     expect(listings[0].addressRaw).toBeNull()
   })
+
+  it('parses weekday-prefixed single day like "Fri 5/8"', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://example.com/US/Illinois/Chicago/100-Main-St/100/listing.html">Sale</a>
+        <span>Fri 5/8 8:00 am - 2:00 pm</span>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    const year = new Date().getUTCFullYear()
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe(`${year}-05-08`)
+    expect(listings[0].endDate).toBe(`${year}-05-08`)
+  })
+
+  it('parses explicit slash-date range "5/7 - 5/9"', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://example.com/US/Illinois/Chicago/100-Main-St/101/listing.html">Sale</a>
+        <span>8:00 am - 3:00 pm 5/7 - 5/9</span>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    const year = new Date().getUTCFullYear()
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe(`${year}-05-07`)
+    expect(listings[0].endDate).toBe(`${year}-05-09`)
+  })
+
+  it('parses month-name date range text "Friday, May 8, 2026 ... Saturday, May 9"', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://example.com/US/Illinois/Chicago/100-Main-St/102/listing.html">Sale</a>
+        <p>Friday, May 8, 2026 from 8 am - 2 pm / Saturday, May 9, 2026 from 9 am - 1 pm</p>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe('2026-05-08')
+    expect(listings[0].endDate).toBe('2026-05-09')
+  })
+
+  it('fills hidden-address variant dates from metadataStr epoch date', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718697/userlisting.html?s=tl">Estate Sale</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718697/userlisting.html?s=tl","address":"8559 S Maryland Ave, Chicago, IL","date":1778072404,"description":"Friday, May 8, 2026 from 8 am - 2 pm / Saturday, May 9, 2026 from 9 am - 1 pm"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].addressRaw).toBe('8559 S Maryland Ave, Chicago, IL')
+    expect(listings[0].startDate).toBe('2026-05-08')
+    expect(listings[0].endDate).toBe('2026-05-09')
+  })
+
+  it('keeps dates absent when listing has no trustworthy date source', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://example.com/US/Illinois/Chicago/100-Main-St/103/listing.html">No Date Sale</a>
+        <div>Address only, no date tokens here.</div>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBeUndefined()
+    expect(listings[0].endDate).toBeUndefined()
+  })
 })

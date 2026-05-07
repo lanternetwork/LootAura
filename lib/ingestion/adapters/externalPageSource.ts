@@ -101,33 +101,82 @@ function pad2(n: number): string {
 function extractDateRangeFromText(text: string): { start?: string; end?: string } {
   // Keep date values as pure YYYY-MM-DD strings; no Date object conversion to avoid timezone drift.
   const year = new Date().getUTCFullYear()
+  function toIso(y: number, m: number, d: number): string | null {
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null
+    return `${y}-${pad2(m)}-${pad2(d)}`
+  }
+
   const range = text.match(/(\d{1,2})\/(\d{1,2})\s*[-–—]\s*(\d{1,2})\/(\d{1,2})/)
   if (range) {
     const m1 = Number.parseInt(range[1], 10)
     const d1 = Number.parseInt(range[2], 10)
     const m2 = Number.parseInt(range[3], 10)
     const d2 = Number.parseInt(range[4], 10)
-    if (
-      [m1, d1, m2, d2].every((x) => Number.isFinite(x) && x > 0) &&
-      m1 <= 12 &&
-      m2 <= 12
-    ) {
-      return {
-        start: `${year}-${pad2(m1)}-${pad2(d1)}`,
-        end: `${year}-${pad2(m2)}-${pad2(d2)}`,
-      }
+    const start = toIso(year, m1, d1)
+    const end = toIso(year, m2, d2)
+    if (start && end) {
+      return { start, end }
     }
   }
+
   const single = text.match(/\b(\d{1,2})\/(\d{1,2})\b/)
   if (single) {
     const m = Number.parseInt(single[1], 10)
     const d = Number.parseInt(single[2], 10)
-    if (Number.isFinite(m) && Number.isFinite(d) && m > 0 && m <= 12 && d > 0 && d <= 31) {
-      const iso = `${year}-${pad2(m)}-${pad2(d)}`
+    const iso = toIso(year, m, d)
+    if (iso) {
       return { start: iso, end: iso }
     }
   }
+
+  const monthNames: Record<string, number> = {
+    jan: 1, january: 1,
+    feb: 2, february: 2,
+    mar: 3, march: 3,
+    apr: 4, april: 4,
+    may: 5,
+    jun: 6, june: 6,
+    jul: 7, july: 7,
+    aug: 8, august: 8,
+    sep: 9, sept: 9, september: 9,
+    oct: 10, october: 10,
+    nov: 11, november: 11,
+    dec: 12, december: 12,
+  }
+  const monthNameRegex = /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,\s*(\d{4}))?/gi
+  const found: string[] = []
+  let mm: RegExpExecArray | null
+  while ((mm = monthNameRegex.exec(text)) !== null) {
+    const monKey = (mm[1] || '').toLowerCase().replace(/\.$/, '')
+    const mon = monthNames[monKey]
+    const day = Number.parseInt(mm[2] || '', 10)
+    const y = mm[3] ? Number.parseInt(mm[3], 10) : year
+    const iso = mon ? toIso(y, mon, day) : null
+    if (iso && !found.includes(iso)) {
+      found.push(iso)
+    }
+  }
+  if (found.length >= 2) {
+    return { start: found[0], end: found[1] }
+  }
+  if (found.length === 1) {
+    return { start: found[0], end: found[0] }
+  }
+
   return {}
+}
+
+function epochSecondsToIsoDate(value: number): string | null {
+  if (!Number.isFinite(value)) return null
+  // Guard against tiny numbers that are unlikely to be unix epoch seconds.
+  if (value < 946684800) return null // 2000-01-01
+  const d = new Date(value * 1000)
+  if (Number.isNaN(d.getTime())) return null
+  const y = d.getUTCFullYear()
+  const m = d.getUTCMonth() + 1
+  const day = d.getUTCDate()
+  return `${y}-${pad2(m)}-${pad2(day)}`
 }
 
 function cleanDescriptionText(
@@ -318,10 +367,11 @@ function decodeJsSingleQuotedJson(raw: string): string {
     .replace(/\\t/g, '\t')
 }
 
-type MetadataSaleShape = { url?: unknown; address?: unknown }
+type MetadataSaleShape = { url?: unknown; address?: unknown; date?: unknown; end_date?: unknown; description?: unknown }
+type MetadataSaleInfo = { address?: string; startDate?: string; endDate?: string }
 
-function extractAddressByListingUrlFromScripts(document: Document): Map<string, string> {
-  const out = new Map<string, string>()
+function extractListingMetadataFromScripts(document: Document): Map<string, MetadataSaleInfo> {
+  const out = new Map<string, MetadataSaleInfo>()
   const scripts = Array.from(document.querySelectorAll('script'))
 
   for (const script of scripts) {
@@ -343,12 +393,26 @@ function extractAddressByListingUrlFromScripts(document: Document): Map<string, 
     for (const sale of sales as MetadataSaleShape[]) {
       const url = typeof sale?.url === 'string' ? normalizeListingUrlForLookup(sale.url) : null
       const address = typeof sale?.address === 'string' ? sale.address.replace(/\s+/g, ' ').trim() : null
-      if (!url || !address) continue
+      if (!url) continue
+      const fromEpoch = typeof sale?.date === 'number' ? epochSecondsToIsoDate(sale.date) : null
+      const endFromEpoch = typeof sale?.end_date === 'number' ? epochSecondsToIsoDate(sale.end_date) : null
+      const fromDescription =
+        typeof sale?.description === 'string' ? extractDateRangeFromText(sale.description) : {}
+      const info: MetadataSaleInfo = {
+        ...(address ? { address } : {}),
+        ...(fromEpoch ? { startDate: fromEpoch } : {}),
+        ...(endFromEpoch ? { endDate: endFromEpoch } : {}),
+      }
+      if (!info.startDate && fromDescription.start) info.startDate = fromDescription.start
+      if (!info.endDate && fromDescription.end) info.endDate = fromDescription.end
+      if (!info.startDate && info.endDate) info.startDate = info.endDate
+      if (!info.endDate && info.startDate) info.endDate = info.startDate
+      if (!info.address && !info.startDate && !info.endDate) continue
       const externalId = externalIdFromListingUrl(url)
       if (externalId) {
-        out.set(`id:${externalId}`, address)
+        out.set(`id:${externalId}`, info)
       }
-      out.set(`url:${url}`, address)
+      out.set(`url:${url}`, info)
     }
   }
 
@@ -441,7 +505,7 @@ export function parseExternalPageSourceHtml(
   const dom = new JSDOM(html, { url: pageUrl })
   const { document } = dom.window
   const fullText = document.body?.textContent || ''
-  const metadataAddressByListing = extractAddressByListingUrlFromScripts(document)
+  const metadataByListing = extractListingMetadataFromScripts(document)
   const anchors = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="listing.html"], a[href*="userlisting.html"]'
   )
@@ -507,12 +571,15 @@ export function parseExternalPageSourceHtml(
     }
 
     const externalId = externalIdFromListingUrl(href)
-    if (!addressRaw) {
+    if (!addressRaw || !startDate || !endDate) {
       const normalizedHref = normalizeListingUrlForLookup(href)
-      const byId = externalId ? metadataAddressByListing.get(`id:${externalId}`) : null
-      const byUrl = metadataAddressByListing.get(`url:${normalizedHref}`) ?? null
-      if (byId || byUrl) {
-        addressRaw = (byId ?? byUrl) || null
+      const byId = externalId ? metadataByListing.get(`id:${externalId}`) : null
+      const byUrl = metadataByListing.get(`url:${normalizedHref}`) ?? null
+      const meta = byId ?? byUrl
+      if (meta) {
+        if (!addressRaw && meta.address) addressRaw = meta.address
+        if (!startDate && meta.startDate) startDate = meta.startDate
+        if (!endDate && meta.endDate) endDate = meta.endDate
       }
     }
     const rawPayload: Record<string, unknown> = {

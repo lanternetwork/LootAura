@@ -13,8 +13,29 @@ vi.mock('react-map-gl', () => ({
     const React = require('react') as typeof import('react')
     return React.forwardRef(function MockMap(
       { children, onLoad, onMoveEnd, onClick, ...props }: any,
-      _ref: React.Ref<HTMLDivElement>
+      ref: React.Ref<any>
     ) {
+      React.useImperativeHandle(
+        ref,
+        () => ({
+          getMap: () => ({
+            getZoom: () => 10,
+            flyTo: () => {},
+            isStyleLoaded: () => true,
+            getBounds: () => ({
+              getWest: () => -86,
+              getSouth: () => 37,
+              getEast: () => -85,
+              getNorth: () => 39,
+            }),
+            getCenter: () => ({ lat: 38.2527, lng: -85.7585 }),
+            on: () => {},
+            off: () => {},
+          }),
+        }),
+        []
+      )
+
       React.useEffect(() => {
         onLoad?.({ type: 'load' })
       }, [onLoad])

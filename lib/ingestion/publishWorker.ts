@@ -359,6 +359,57 @@ async function maybeSyncExistingSaleFromLatestIngest(
   sanitizedImages: string[],
   ctx: { rowId: string; city: string | null; state: string | null }
 ): Promise<void> {
+  const city = normalizeTextOrNull(record.city)
+  const state = normalizeTextOrNull(record.state)
+  const normalizedAddress = normalizeAddressForPublishSafe(record.normalized_address, city ?? '', state ?? '')
+  const normalizedDateStart = normalizeTextOrNull(record.date_start)
+  const normalizedDateEnd = normalizeTextOrNull(record.date_end)
+  const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
+  const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
+  const bestEffortPatch: Record<string, unknown> = {}
+  if (normalizedAddress) bestEffortPatch.address = normalizedAddress
+  if (normalizedDateStart) bestEffortPatch.date_start = normalizedDateStart
+  bestEffortPatch.date_end = normalizedDateEnd
+  bestEffortPatch.time_start = normalizedTimeStart
+  bestEffortPatch.time_end = normalizedTimeEnd
+  if (sanitizedImages.length > 0) {
+    bestEffortPatch.cover_image_url = sanitizedImages[0]
+    bestEffortPatch.images = sanitizedImages
+  }
+
+  const attemptBestEffortSync = async (reason: string): Promise<void> => {
+    try {
+      if (Object.keys(bestEffortPatch).length === 0) return
+      const admin = getAdminDb()
+      const { error: fallbackErr } = await fromBase(admin, 'sales')
+        .update(bestEffortPatch)
+        .eq('id', saleId)
+      if (fallbackErr) {
+        logger.warn('Existing linked sale best-effort sync failed; continuing publish', {
+          component: 'ingestion/publishWorker',
+          operation: 'sync_existing_sale_from_ingest',
+          rowId: ctx.rowId,
+          saleId,
+          city: ctx.city,
+          state: ctx.state,
+          reason,
+          message: fallbackErr.message,
+        })
+      }
+    } catch (fallbackError) {
+      logger.warn('Existing linked sale best-effort sync threw; continuing publish', {
+        component: 'ingestion/publishWorker',
+        operation: 'sync_existing_sale_from_ingest',
+        rowId: ctx.rowId,
+        saleId,
+        city: ctx.city,
+        state: ctx.state,
+        reason,
+        message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+      })
+    }
+  }
+
   try {
     const admin = getAdminDb()
     const { data, error } = await fromBase(admin, 'sales')
@@ -376,6 +427,7 @@ async function maybeSyncExistingSaleFromLatestIngest(
         state: ctx.state,
         message: error.message,
       })
+      await attemptBestEffortSync('load_failed')
       return
     }
 
@@ -407,27 +459,10 @@ async function maybeSyncExistingSaleFromLatestIngest(
       return
     }
 
-    const city = normalizeTextOrNull(record.city)
-    const state = normalizeTextOrNull(record.state)
-    const normalizedAddress = normalizeAddressForPublishSafe(record.normalized_address, city ?? '', state ?? '')
     const normalizedTitle = normalizeTextOrNull(record.title) || `${record.city || 'Unknown'} Yard Sale`
     const normalizedDescription = normalizeTextOrNull(record.description)
-    const normalizedDateStart = normalizeTextOrNull(record.date_start)
-    const normalizedDateEnd = normalizeTextOrNull(record.date_end)
-    const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
-    const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
 
-    const patch: Record<string, unknown> = {}
-
-    if (normalizedAddress) {
-      patch.address = normalizedAddress
-    }
-    if (normalizedDateStart) {
-      patch.date_start = normalizedDateStart
-    }
-    patch.date_end = normalizedDateEnd
-    patch.time_start = normalizedTimeStart
-    patch.time_end = normalizedTimeEnd
+    const patch: Record<string, unknown> = { ...bestEffortPatch }
 
     if (looksGenericTitle(row.title, record.city)) {
       patch.title = normalizedTitle
@@ -439,6 +474,9 @@ async function maybeSyncExistingSaleFromLatestIngest(
     if (sanitizedImages.length > 0 && existingSaleImagesReplaceable(row)) {
       patch.cover_image_url = sanitizedImages[0]
       patch.images = sanitizedImages
+    } else if (sanitizedImages.length > 0) {
+      delete patch.cover_image_url
+      delete patch.images
     }
 
     if (Object.keys(patch).length === 0) {
@@ -470,6 +508,7 @@ async function maybeSyncExistingSaleFromLatestIngest(
       state: ctx.state,
       message: error instanceof Error ? error.message : String(error),
     })
+    await attemptBestEffortSync('unexpected_error')
   }
 }
 

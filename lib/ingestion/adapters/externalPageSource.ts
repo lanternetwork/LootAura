@@ -158,12 +158,6 @@ function extractDateRangeFromText(text: string): { start?: string; end?: string 
       found.push(iso)
     }
   }
-  if (found.length >= 2) {
-    return { start: found[0], end: found[1] }
-  }
-  if (found.length === 1) {
-    return { start: found[0], end: found[0] }
-  }
 
   const compactMonthRange = text.match(
     /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{1,2})\s*[-–—]\s*(\d{1,2})(?:,\s*(\d{4}))?/i
@@ -179,6 +173,12 @@ function extractDateRangeFromText(text: string): { start?: string; end?: string 
     if (start && end) {
       return { start, end }
     }
+  }
+  if (found.length >= 2) {
+    return { start: found[0], end: found[1] }
+  }
+  if (found.length === 1) {
+    return { start: found[0], end: found[0] }
   }
 
   return {}

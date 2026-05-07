@@ -277,104 +277,116 @@ async function maybeSyncExistingSaleFromLatestIngest(
   sanitizedImages: string[],
   ctx: { rowId: string; city: string | null; state: string | null }
 ): Promise<void> {
-  const admin = getAdminDb()
-  const { data, error } = await fromBase(admin, 'sales')
-    .select('ingested_sale_id, title, description, address, date_start, date_end, time_start, time_end, cover_image_url, images')
-    .eq('id', saleId)
-    .maybeSingle()
+  try {
+    const admin = getAdminDb()
+    const { data, error } = await fromBase(admin, 'sales')
+      .select('ingested_sale_id, title, description, address, date_start, date_end, time_start, time_end, cover_image_url, images')
+      .eq('id', saleId)
+      .maybeSingle()
 
-  if (error) {
-    logger.warn('Existing linked sale sync skipped: load failed', {
+    if (error) {
+      logger.warn('Existing linked sale sync skipped: load failed', {
+        component: 'ingestion/publishWorker',
+        operation: 'sync_existing_sale_from_ingest',
+        rowId: ctx.rowId,
+        saleId,
+        city: ctx.city,
+        state: ctx.state,
+        message: error.message,
+      })
+      return
+    }
+
+    const row = data as {
+      ingested_sale_id: string | null
+      title: string | null
+      description: string | null
+      address: string | null
+      date_start: string | null
+      date_end: string | null
+      time_start: string | null
+      time_end: string | null
+      cover_image_url: string | null
+      images: unknown
+    } | null
+    if (!row) {
+      return
+    }
+    if (row.ingested_sale_id !== ctx.rowId) {
+      logger.warn('Existing linked sale sync skipped: ingested row ownership mismatch', {
+        component: 'ingestion/publishWorker',
+        operation: 'sync_existing_sale_from_ingest',
+        rowId: ctx.rowId,
+        saleId,
+        linkedIngestedSaleId: row.ingested_sale_id,
+        city: ctx.city,
+        state: ctx.state,
+      })
+      return
+    }
+
+    const city = normalizeTextOrNull(record.city)
+    const state = normalizeTextOrNull(record.state)
+    const normalizedAddress = normalizeAddressForPublish(record.normalized_address, city ?? '', state ?? '')
+    const normalizedTitle = normalizeTextOrNull(record.title) || `${record.city || 'Unknown'} Yard Sale`
+    const normalizedDescription = normalizeTextOrNull(record.description)
+    const normalizedDateStart = normalizeTextOrNull(record.date_start)
+    const normalizedDateEnd = normalizeTextOrNull(record.date_end)
+    const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
+    const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
+
+    const patch: Record<string, unknown> = {}
+
+    if (normalizedAddress) {
+      patch.address = normalizedAddress
+    }
+    if (normalizedDateStart) {
+      patch.date_start = normalizedDateStart
+    }
+    patch.date_end = normalizedDateEnd
+    patch.time_start = normalizedTimeStart
+    patch.time_end = normalizedTimeEnd
+
+    if (looksGenericTitle(row.title, record.city)) {
+      patch.title = normalizedTitle
+    }
+    if (looksGenericDescription(row.description) && normalizedDescription) {
+      patch.description = normalizedDescription
+    }
+
+    if (sanitizedImages.length > 0 && existingSaleImagesReplaceable(row)) {
+      patch.cover_image_url = sanitizedImages[0]
+      patch.images = sanitizedImages
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return
+    }
+
+    const { error: upErr } = await fromBase(admin, 'sales')
+      .update(patch)
+      .eq('id', saleId)
+
+    if (upErr) {
+      logger.warn('Existing linked sale sync failed; continuing publish', {
+        component: 'ingestion/publishWorker',
+        operation: 'sync_existing_sale_from_ingest',
+        rowId: ctx.rowId,
+        saleId,
+        city: ctx.city,
+        state: ctx.state,
+        message: upErr.message,
+      })
+    }
+  } catch (error) {
+    logger.warn('Existing linked sale sync raised unexpected error; continuing publish', {
       component: 'ingestion/publishWorker',
       operation: 'sync_existing_sale_from_ingest',
       rowId: ctx.rowId,
       saleId,
       city: ctx.city,
       state: ctx.state,
-      message: error.message,
-    })
-    return
-  }
-
-  const row = data as {
-    ingested_sale_id: string | null
-    title: string | null
-    description: string | null
-    address: string | null
-    date_start: string | null
-    date_end: string | null
-    time_start: string | null
-    time_end: string | null
-    cover_image_url: string | null
-    images: unknown
-  } | null
-  if (!row) {
-    return
-  }
-  if (row.ingested_sale_id !== ctx.rowId) {
-    logger.warn('Existing linked sale sync skipped: ingested row ownership mismatch', {
-      component: 'ingestion/publishWorker',
-      operation: 'sync_existing_sale_from_ingest',
-      rowId: ctx.rowId,
-      saleId,
-      linkedIngestedSaleId: row.ingested_sale_id,
-      city: ctx.city,
-      state: ctx.state,
-    })
-    return
-  }
-
-  const city = normalizeTextOrNull(record.city)
-  const state = normalizeTextOrNull(record.state)
-  const normalizedAddress = normalizeAddressForPublish(record.normalized_address, city ?? '', state ?? '')
-  const normalizedTitle = normalizeTextOrNull(record.title) || `${record.city || 'Unknown'} Yard Sale`
-  const normalizedDescription = normalizeTextOrNull(record.description)
-  const normalizedDateStart = normalizeTextOrNull(record.date_start)
-  const normalizedDateEnd = normalizeTextOrNull(record.date_end)
-  const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
-  const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
-
-  const patch: Record<string, unknown> = {}
-
-  if (normalizedAddress) {
-    patch.address = normalizedAddress
-  }
-  if (normalizedDateStart) {
-    patch.date_start = normalizedDateStart
-  }
-  patch.date_end = normalizedDateEnd
-  patch.time_start = normalizedTimeStart
-  patch.time_end = normalizedTimeEnd
-
-  if (looksGenericTitle(row.title, record.city)) {
-    patch.title = normalizedTitle
-  }
-  if (looksGenericDescription(row.description) && normalizedDescription) {
-    patch.description = normalizedDescription
-  }
-
-  if (sanitizedImages.length > 0 && existingSaleImagesReplaceable(row)) {
-    patch.cover_image_url = sanitizedImages[0]
-    patch.images = sanitizedImages
-  }
-
-  if (Object.keys(patch).length === 0) {
-    return
-  }
-
-  const { error: upErr } = await fromBase(admin, 'sales')
-    .update(patch)
-    .eq('id', saleId)
-
-  if (upErr) {
-    logger.warn('Existing linked sale sync failed; continuing publish', {
-      component: 'ingestion/publishWorker',
-      operation: 'sync_existing_sale_from_ingest',
-      rowId: ctx.rowId,
-      saleId,
-      city: ctx.city,
-      state: ctx.state,
-      message: upErr.message,
+      message: error instanceof Error ? error.message : String(error),
     })
   }
 }

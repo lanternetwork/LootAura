@@ -438,14 +438,14 @@ function extractDate() {
 }
 
 function extractImage() {
-  const img = document.querySelector("img");
-  const src = img?.getAttribute("src");
-  if (!src) return null;
   try {
-    return new URL(src, window.location.origin).toString();
-  } catch {
-    return null;
+    if (typeof globalThis.LootAuraListingImage?.extractListingPrimaryImageUrl === "function") {
+      return globalThis.LootAuraListingImage.extractListingPrimaryImageUrl(document, window.location.href);
+    }
+  } catch (e) {
+    console.warn("[LootAura] listing image extraction failed:", e);
   }
+  return null;
 }
 
 function buildSubmissionPayload(session, currentUrl, selectedTags) {

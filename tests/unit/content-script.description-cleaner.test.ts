@@ -45,7 +45,7 @@ function installChrome(win: WindowWithContentScriptTest) {
 }
 
 function loadContentScript(dom: JSDOM) {
-  installChrome(dom.window as WindowWithContentScriptTest)
+  installChrome(dom.window as unknown as WindowWithContentScriptTest)
   runInContext(CONTENT_SCRIPT, dom.getInternalVMContext())
 }
 
@@ -54,7 +54,7 @@ describe('content-script description cleaner', () => {
     const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://example.com/listing' })
     loadContentScript(dom)
 
-    const win = dom.window as WindowWithContentScriptTest
+    const win = dom.window as unknown as WindowWithContentScriptTest
     const cleaner = win.__LootAuraContentScriptTest?.cleanExtractedDescription
     expect(typeof cleaner).toBe('function')
 

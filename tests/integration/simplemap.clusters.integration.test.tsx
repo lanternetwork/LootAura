@@ -10,6 +10,7 @@ import { PinPoint } from '@/lib/pins/types'
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
   default: ({ children, onLoad, onMoveEnd, onClick, ...props }: any) => {
+    onLoad?.({ type: 'load' })
     const handleClick = (e: any) => {
       // Provide a mock event structure that matches react-map-gl's MapLayerMouseEvent
       // Ensure originalEvent and target are always present

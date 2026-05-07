@@ -27,6 +27,7 @@ interface ClaimedPublishRow {
   time_start: string | null
   time_end: string | null
   image_cloudinary_url: string | null
+  published_sale_id?: string | null
   /** Present on direct/single select and new claim RPC; absent on older RPC versions until hydrated fallback runs. */
   image_source_url?: string | null
   raw_payload?: unknown
@@ -172,6 +173,35 @@ async function fetchExistingSaleIdForIngested(ingestedSaleId: string): Promise<s
   return (data[0] as { id: string }).id
 }
 
+async function linkedSaleIdForRow(record: ClaimedPublishRow): Promise<string | null> {
+  const linkedId =
+    typeof record.published_sale_id === 'string' && record.published_sale_id.trim()
+      ? record.published_sale_id.trim()
+      : null
+  if (!linkedId) return null
+
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, 'sales')
+    .select('id')
+    .eq('id', linkedId)
+    .eq('ingested_sale_id', record.id)
+    .limit(1)
+
+  if (error || !Array.isArray(data) || data.length === 0) {
+    logger.warn('Publish row has published_sale_id link but linked sale lookup failed; will continue with create/reuse path', {
+      component: 'ingestion/publishWorker',
+      operation: 'resolve_linked_sale_id',
+      rowId: record.id,
+      saleId: linkedId,
+      city: record.city,
+      state: record.state,
+      message: error?.message,
+    })
+    return null
+  }
+  return linkedId
+}
+
 function saleRowImageFieldsEmpty(row: {
   cover_image_url: string | null
   images: unknown
@@ -261,7 +291,7 @@ async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<
   const admin = getAdminDb()
   const ids = rows.map((row) => row.id)
   const { data, error } = await fromBase(admin, 'ingested_sales')
-    .select('id, raw_payload, image_source_url')
+    .select('id, raw_payload, image_source_url, published_sale_id')
     .in('id', ids)
   if (error || !Array.isArray(data)) {
     logger.warn('Publish worker media hydration fallback failed; proceeding without hydrated media fields', {
@@ -273,8 +303,11 @@ async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<
     })
     return rows
   }
-  const payloadById = new Map<string, { raw_payload: unknown; image_source_url: string | null }>()
-  for (const row of data as Array<{ id: string; raw_payload?: unknown; image_source_url?: string | null }>) {
+  const payloadById = new Map<
+    string,
+    { raw_payload: unknown; image_source_url: string | null; published_sale_id: string | null }
+  >()
+  for (const row of data as Array<{ id: string; raw_payload?: unknown; image_source_url?: string | null; published_sale_id?: string | null }>) {
     if (!row?.id) {
       logger.warn('Publish worker media hydration row missing id; skipping hydration row', {
         component: 'ingestion/publishWorker',
@@ -285,6 +318,7 @@ async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<
     payloadById.set(row.id, {
       raw_payload: row.raw_payload ?? null,
       image_source_url: row.image_source_url ?? null,
+      published_sale_id: row.published_sale_id ?? null,
     })
   }
   if (payloadById.size < rows.length) {
@@ -299,10 +333,12 @@ async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<
     const extra = payloadById.get(row.id)
     const hasRawKey = Object.prototype.hasOwnProperty.call(row, 'raw_payload')
     const hasImgKey = Object.prototype.hasOwnProperty.call(row, 'image_source_url')
+    const hasPubIdKey = Object.prototype.hasOwnProperty.call(row, 'published_sale_id')
     return {
       ...row,
       raw_payload: hasRawKey ? row.raw_payload ?? null : extra?.raw_payload ?? null,
       image_source_url: hasImgKey ? row.image_source_url ?? null : extra?.image_source_url ?? null,
+      published_sale_id: hasPubIdKey ? row.published_sale_id ?? null : extra?.published_sale_id ?? null,
     }
   })
 }
@@ -646,11 +682,10 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     .eq('id', ingestedSaleId)
     .eq('status', 'ready')
     .eq('is_duplicate', false)
-    .is('published_sale_id', null)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
     .select(
-      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, image_source_url, raw_payload, failure_reasons'
+      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, image_source_url, raw_payload, published_sale_id, failure_reasons'
     )
     .maybeSingle()
 
@@ -683,7 +718,8 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   let createdSaleId: string | null = null
 
   try {
-    const saleId = await tryCreatePublishedSaleOrReuseExisting(claimed)
+    const linkedSaleId = await linkedSaleIdForRow(claimed)
+    const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(claimed))
     createdSaleId = saleId
 
     const updatePayload = {
@@ -805,7 +841,8 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
 
     let createdSaleId: string | null = null
     try {
-      const saleId = await tryCreatePublishedSaleOrReuseExisting(row)
+      const linkedSaleId = await linkedSaleIdForRow(row)
+      const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(row))
       createdSaleId = saleId
 
       const updatePayload = {

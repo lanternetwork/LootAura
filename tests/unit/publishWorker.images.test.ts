@@ -701,6 +701,130 @@ describe('publish worker batch media hydration and visibility', () => {
   })
 })
 
+describe('publish worker finalization consistency', () => {
+  const ingestedId = '55555555-5555-4555-8555-555555555555'
+
+  function singleClaimRow(overrides: Record<string, unknown> = {}) {
+    return baseRow({
+      id: ingestedId,
+      raw_payload: { tags: [] },
+      image_source_url: null,
+      published_sale_id: null,
+      ...overrides,
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
+  })
+
+  it('sale created + finalization update success marks ingested row published', async () => {
+    createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-final-1' })
+    const finalizeUpdate = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) return makeClaimBuilder(singleClaimRow())
+        return { update: (payload: unknown) => finalizeUpdate(payload) }
+      }
+      if (table === 'sales') return salesMockPatchNoOp()
+      return { update: () => ({ eq: async () => ({ error: null }) }) }
+    })
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(createPublishedSaleMock).toHaveBeenCalledTimes(1)
+    expect(finalizeUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'published',
+        published_sale_id: 'sale-final-1',
+      })
+    )
+  })
+
+  it('sale created + first finalization update failure retries and succeeds', async () => {
+    createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-final-2' })
+    const finalizeUpdate = vi
+      .fn()
+      .mockReturnValueOnce({ eq: async () => ({ error: { message: 'transient' } }) })
+      .mockReturnValueOnce({ eq: async () => ({ error: null }) })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) return makeClaimBuilder(singleClaimRow())
+        return { update: (payload: unknown) => finalizeUpdate(payload) }
+      }
+      if (table === 'sales') return salesMockPatchNoOp()
+      return { update: () => ({ eq: async () => ({ error: null }) }) }
+    })
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(createPublishedSaleMock).toHaveBeenCalledTimes(1)
+    expect(finalizeUpdate).toHaveBeenCalledTimes(2)
+  })
+
+  it('ready row with published_sale_id finalizes without recreating sale', async () => {
+    createPublishedSaleMock.mockResolvedValue({ saleId: 'should-not-be-used' })
+    const finalizeUpdate = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+    const linkedSaleId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) return makeClaimBuilder(singleClaimRow({ published_sale_id: linkedSaleId }))
+        return { update: (payload: unknown) => finalizeUpdate(payload) }
+      }
+      if (table === 'sales') {
+        return {
+          select: (fields: string) => {
+            if (fields === 'id') {
+              let q = {
+                eq: (_k: string, _v: unknown) => q,
+                limit: async () => ({ data: [{ id: linkedSaleId }], error: null }),
+              }
+              return q
+            }
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    cover_image_url: 'https://existing.example.org/cover.jpg',
+                    images: ['https://existing.example.org/cover.jpg'],
+                  },
+                  error: null,
+                }),
+              }),
+            }
+          },
+          update: () => ({ eq: async () => ({ error: null }) }),
+        }
+      }
+      return { update: () => ({ eq: async () => ({ error: null }) }) }
+    })
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(createPublishedSaleMock).not.toHaveBeenCalled()
+    expect(finalizeUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'published',
+        published_sale_id: linkedSaleId,
+      })
+    )
+  })
+})
+
 describe('extractPublishImageCandidates', () => {
   it('orders raw_payload first then image_source_url', async () => {
     const { extractPublishImageCandidates } = await import('@/lib/ingestion/publishWorker')

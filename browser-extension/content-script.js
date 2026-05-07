@@ -370,29 +370,72 @@ function extractTitle() {
   return heading?.textContent?.trim() || document.title || "";
 }
 
+function isDescriptionNoiseLine(line) {
+  const normalized = String(line || "").replace(/\s+/g, " ").trim();
+  if (!normalized) return true;
+  const lower = normalized.toLowerCase();
+  if (
+    lower.includes("street view") ||
+    lower.includes("directions") ||
+    lower.includes("source:") ||
+    lower.includes("view on map") ||
+    lower.includes("report listing") ||
+    lower.includes("share listing")
+  ) {
+    return true;
+  }
+  if (/(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(normalized)) return true;
+  if (/^\s*\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i.test(normalized)) return true;
+  if (/^\s*(\d{1,2}:\d{2}\s*(am|pm)?\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)?)\s*$/i.test(normalized)) return true;
+  if (/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i.test(normalized)) return true;
+  if (/^\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*(?:[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)?\s*$/i.test(normalized)) return true;
+  if (normalized.length < 8) return true;
+  return false;
+}
+
+function cleanExtractedDescription(rawText) {
+  const lines = String(rawText || "")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter((line) => !isDescriptionNoiseLine(line));
+
+  const deduped = [];
+  const seen = new Set();
+  for (const line of lines) {
+    const key = line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(line);
+  }
+  const joined = deduped.join(" ").replace(/\s+/g, " ").trim();
+  return joined || "";
+}
+
 function extractDescription() {
-  const contentEls = Array.from(document.querySelectorAll(".content"));
+  const contentEls = Array.from(document.querySelectorAll(".content, .description, .listing-description, .details, [class*='description']"));
   const target = contentEls
     .filter((el) => el instanceof HTMLElement)
     .map((el) => {
       const text = el.innerText || "";
       const hasDate = /(\d{1,2}\/\d{1,2})/.test(text);
       const hasTime = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.test(text);
-      const normalizedLength = text.replace(/\s+/g, " ").trim().length;
+      const cleaned = cleanExtractedDescription(text);
+      const normalizedLength = cleaned.length;
+      const hasSentenceLikeText = /[a-z].+[a-z]/i.test(cleaned) && !/^\d/.test(cleaned);
 
       // Prefer blocks with date/time signals; use text length as tie-breaker.
-      const signalScore = (hasDate ? 100 : 0) + (hasTime ? 60 : 0) + normalizedLength;
-      return { el, text, signalScore };
+      const signalScore = (hasSentenceLikeText ? 120 : 0) + (hasDate ? 40 : 0) + (hasTime ? 30 : 0) + normalizedLength;
+      return { el, text, cleaned, signalScore };
     })
     .sort((a, b) => b.signalScore - a.signalScore)[0]?.el;
 
-  const description = (target && target instanceof HTMLElement
+  const rawDescription = (target && target instanceof HTMLElement
     ? target.innerText
     : contentEls
         .map((el) => (el instanceof HTMLElement ? el.innerText : ""))
         .join(" "))
-    .replace(/\s+/g, " ")
-    .trim();
+  const description = cleanExtractedDescription(rawDescription);
   console.log("EXTRACTED DESCRIPTION:", description);
   return description;
 }
@@ -660,5 +703,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 resumeSessionIfActive();
+
+// Expose cleaner for test harnesses only.
+if (typeof globalThis !== "undefined") {
+  globalThis.__LootAuraContentScriptTest = {
+    isDescriptionNoiseLine,
+    cleanExtractedDescription,
+  };
+}
 })();
 

@@ -957,11 +957,11 @@ export default function SaleDetailClient({
           {/* Sale Header */}
           <div className="bg-white rounded-lg shadow-sm">
             <div className="relative w-full overflow-hidden rounded-t-lg bg-gray-100 aspect-[16/9] md:aspect-[4/3]">
-              {cover ? (
-                isTrustedNextImageHost(cover.url) ? (
+              {selectedImageUrl ? (
+                isTrustedNextImageHost(selectedImageUrl) ? (
                   <Image
-                    src={cover.url}
-                    alt={cover.alt}
+                    src={selectedImageUrl}
+                    alt={selectedImageAlt}
                     data-testid="sale-detail-cover-next-image"
                     fill
                     className="object-contain"
@@ -969,8 +969,8 @@ export default function SaleDetailClient({
                   />
                 ) : (
                   <img
-                    src={cover.url}
-                    alt={cover.alt}
+                    src={selectedImageUrl}
+                    alt={selectedImageAlt}
                     data-testid="sale-detail-cover-external-img"
                     className="h-full w-full object-contain"
                     loading="lazy"
@@ -982,7 +982,46 @@ export default function SaleDetailClient({
                   <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
                 </div>
               )}
+              {canStepGallery && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Previous sale image"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                    onClick={() => setSelectedImageIndex((idx) => (idx === 0 ? galleryImages.length - 1 : idx - 1))}
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next sale image"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                    onClick={() => setSelectedImageIndex((idx) => (idx + 1) % galleryImages.length)}
+                  >
+                    Next
+                  </button>
+                </>
+              )}
             </div>
+            {galleryImages.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto p-3">
+                {galleryImages.map((url, idx) => (
+                  <button
+                    key={`desktop-${url}-${idx}`}
+                    type="button"
+                    aria-label={`Show sale image ${idx + 1}`}
+                    onClick={() => setSelectedImageIndex(idx)}
+                    className={`h-16 w-16 overflow-hidden rounded border ${idx === selectedImageIndex ? 'border-purple-600' : 'border-gray-200'}`}
+                  >
+                    {isTrustedNextImageHost(url) ? (
+                      <Image src={url} alt={`Sale thumbnail ${idx + 1}`} width={64} height={64} className="h-full w-full object-cover" />
+                    ) : (
+                      <img src={url} alt={`Sale thumbnail ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">

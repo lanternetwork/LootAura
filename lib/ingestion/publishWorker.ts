@@ -705,18 +705,37 @@ async function markIngestedPublishFailedFromSaleCreateError(
     state,
   })
 
-  const { error: upErr } = await fromBase(admin, 'ingested_sales')
-    .update(payload)
-    .eq('id', rowId)
-    .eq('status', 'publishing')
-
-  if (upErr) {
+  let upErr: { message: string } | null = null
+  try {
+    const result = await fromBase(admin, 'ingested_sales')
+      .update(payload)
+      .eq('id', rowId)
+      .eq('status', 'publishing')
+    upErr = result?.error ?? null
+  } catch (error) {
     logger.error(
-      'Failed to persist publish_failed after createPublishedSale error',
-      new Error(upErr.message),
+      'markIngestedPublishFailedFromSaleCreateError guarded update threw; trying fallback',
+      error instanceof Error ? error : new Error(String(error)),
       { component: 'ingestion/publishWorker', operation, rowId, phase: 'create_sale' }
     )
-    return
+    upErr = { message: error instanceof Error ? error.message : String(error) }
+  }
+
+  if (upErr) {
+    const { error: fallbackError } = await fromBase(admin, 'ingested_sales').update(payload).eq('id', rowId)
+    if (!fallbackError) {
+      logger.error(
+        '[CRITICAL] markIngestedPublishFailedFromSaleCreateError used unguarded fallback to clear publishing',
+        new Error(message),
+        { component: 'ingestion/publishWorker', operation, rowId, phase: 'create_sale', critical: true, usedFallbackWithoutStatusGuard: true }
+      )
+      return
+    }
+    logger.error(
+      'Failed to persist publish_failed after createPublishedSale error',
+      new Error(fallbackError.message),
+      { component: 'ingestion/publishWorker', operation, rowId, phase: 'create_sale' }
+    )
   }
 }
 

@@ -90,6 +90,14 @@ function salesMockPatchNoOp() {
         eq: () => ({
           maybeSingle: async () => ({
             data: {
+              ingested_sale_id: '33333333-3333-4333-8333-333333333333',
+              title: 'Existing sale title',
+              description: 'Existing sale description',
+              address: 'Existing address',
+              date_start: '2026-05-06',
+              date_end: null,
+              time_start: '09:00:00',
+              time_end: null,
               cover_image_url: 'https://synthetic-post-insert.lootaura.test/skip-patch.jpg',
               images: ['https://synthetic-post-insert.lootaura.test/skip-patch.jpg'],
             },
@@ -274,7 +282,18 @@ describe('publish worker idempotent sale images', () => {
             return {
               eq: () => ({
                 maybeSingle: async () => ({
-                  data: { cover_image_url: null, images: null },
+                  data: {
+                    ingested_sale_id: ingestedId,
+                    title: 'Yard Sale',
+                    description: '',
+                    address: null,
+                    date_start: null,
+                    date_end: null,
+                    time_start: null,
+                    time_end: null,
+                    cover_image_url: null,
+                    images: null,
+                  },
                   error: null,
                 }),
               }),
@@ -297,10 +316,15 @@ describe('publish worker idempotent sale images', () => {
     expect(result.ok).toBe(true)
     expect(result).toMatchObject({ publishedSaleId: existingSaleId })
     expect(createPublishedSaleMock).toHaveBeenCalledTimes(1)
-    expect(updateSpy).toHaveBeenCalledWith({
-      cover_image_url: okUrl,
-      images: [okUrl],
-    })
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: '1 Main St, Chicago, IL',
+        date_start: '2026-05-06',
+        time_start: '09:00:00',
+        cover_image_url: okUrl,
+        images: [okUrl],
+      })
+    )
   })
 
   it('on unique conflict, does not overwrite existing sale media', async () => {
@@ -340,8 +364,16 @@ describe('publish worker idempotent sale images', () => {
               eq: () => ({
                 maybeSingle: async () => ({
                   data: {
+                    ingested_sale_id: ingestedId,
+                    title: 'Custom User Title',
+                    description: 'Custom description',
+                    address: '5918 Park Ave, Berkeley, IL',
+                    date_start: '2026-05-06',
+                    date_end: null,
+                    time_start: '09:00:00',
+                    time_end: null,
                     cover_image_url: 'https://images.example.org/existing-cover.jpg',
-                    images: [],
+                    images: ['https://images.example.org/existing-cover.jpg'],
                   },
                   error: null,
                 }),
@@ -363,7 +395,14 @@ describe('publish worker idempotent sale images', () => {
     const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
     const result = await publishReadyIngestedSaleById(ingestedId)
     expect(result.ok).toBe(true)
-    expect(updateSpy).not.toHaveBeenCalled()
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: '1 Main St, Chicago, IL',
+        date_start: '2026-05-06',
+        time_start: '09:00:00',
+      })
+    )
+    expect(updateSpy).not.toHaveBeenCalledWith(expect.objectContaining({ images: [okUrl] }))
   })
 
   it('image patch failure does not fail publish', async () => {
@@ -402,7 +441,18 @@ describe('publish worker idempotent sale images', () => {
             return {
               eq: () => ({
                 maybeSingle: async () => ({
-                  data: { cover_image_url: null, images: null },
+                  data: {
+                    ingested_sale_id: ingestedId,
+                    title: 'Yard Sale',
+                    description: '',
+                    address: null,
+                    date_start: null,
+                    date_end: null,
+                    time_start: null,
+                    time_end: null,
+                    cover_image_url: null,
+                    images: null,
+                  },
                   error: null,
                 }),
               }),
@@ -455,6 +505,14 @@ describe('publish worker idempotent sale images', () => {
             eq: () => ({
               maybeSingle: async () => ({
                 data: {
+                  ingested_sale_id: ingestedId,
+                  title: 'Sale',
+                  description: 'Existing sale description',
+                  address: '1 Main St, Chicago, IL',
+                  date_start: '2026-05-06',
+                  date_end: null,
+                  time_start: '09:00:00',
+                  time_end: null,
                   cover_image_url: 'https://synthetic-post-insert.lootaura.test/skip-patch.jpg',
                   images: [url],
                 },
@@ -479,7 +537,14 @@ describe('publish worker idempotent sale images', () => {
     expect(result.ok).toBe(true)
     const body = createPublishedSaleMock.mock.calls[0][0]
     expect(body.image_urls).toEqual([url])
-    expect(salesImageUpdate).not.toHaveBeenCalled()
+    expect(salesImageUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: '1 Main St, Chicago, IL',
+        date_start: '2026-05-06',
+        time_start: '09:00:00',
+      })
+    )
+    expect(salesImageUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ images: [url] }))
   })
 
   it('invalid image_source_url still publishes with only validated URLs on create payload', async () => {
@@ -776,6 +841,9 @@ describe('publish worker finalization consistency', () => {
     const finalizeUpdate = vi.fn().mockReturnValue({
       eq: async () => ({ error: null }),
     })
+    const syncUpdate = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
     const linkedSaleId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 
     mockFromBase.mockImplementation((_db: unknown, table: string) => {
@@ -798,15 +866,23 @@ describe('publish worker finalization consistency', () => {
               eq: () => ({
                 maybeSingle: async () => ({
                   data: {
-                    cover_image_url: 'https://existing.example.org/cover.jpg',
-                    images: ['https://existing.example.org/cover.jpg'],
+                    ingested_sale_id: ingestedId,
+                    title: 'Yard Sale',
+                    description: '',
+                    address: null,
+                    date_start: null,
+                    date_end: null,
+                    time_start: null,
+                    time_end: null,
+                    cover_image_url: null,
+                    images: null,
                   },
                   error: null,
                 }),
               }),
             }
           },
-          update: () => ({ eq: async () => ({ error: null }) }),
+          update: (payload: unknown) => syncUpdate(payload),
         }
       }
       return { update: () => ({ eq: async () => ({ error: null }) }) }
@@ -816,6 +892,76 @@ describe('publish worker finalization consistency', () => {
     const result = await publishReadyIngestedSaleById(ingestedId)
     expect(result.ok).toBe(true)
     expect(createPublishedSaleMock).not.toHaveBeenCalled()
+    expect(syncUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: '1 Main St, Chicago, IL',
+        date_start: '2026-05-06',
+        time_start: '09:00:00',
+      })
+    )
+    expect(finalizeUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'published',
+        published_sale_id: linkedSaleId,
+      })
+    )
+  })
+
+  it('linked sale ownership mismatch prevents sale sync and still finalizes', async () => {
+    const finalizeUpdate = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+    const syncUpdate = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+    const linkedSaleId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) return makeClaimBuilder(singleClaimRow({ published_sale_id: linkedSaleId }))
+        return { update: (payload: unknown) => finalizeUpdate(payload) }
+      }
+      if (table === 'sales') {
+        return {
+          select: (fields: string) => {
+            if (fields === 'id') {
+              const q = {
+                eq: (_k: string, _v: unknown) => q,
+                limit: async () => ({ data: [{ id: linkedSaleId }], error: null }),
+              }
+              return q
+            }
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    ingested_sale_id: 'different-ingested-row-id',
+                    title: 'Yard Sale',
+                    description: '',
+                    address: null,
+                    date_start: null,
+                    date_end: null,
+                    time_start: null,
+                    time_end: null,
+                    cover_image_url: null,
+                    images: null,
+                  },
+                  error: null,
+                }),
+              }),
+            }
+          },
+          update: (payload: unknown) => syncUpdate(payload),
+        }
+      }
+      return { update: () => ({ eq: async () => ({ error: null }) }) }
+    })
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(syncUpdate).not.toHaveBeenCalled()
     expect(finalizeUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'published',

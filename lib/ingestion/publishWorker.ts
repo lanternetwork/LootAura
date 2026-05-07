@@ -1,5 +1,5 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
-import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingestion/publish'
+import { createPublishedSale, normalizeAddressForPublish, type PublishableIngestedSale } from '@/lib/ingestion/publish'
 import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
@@ -213,28 +213,80 @@ function saleRowImageFieldsEmpty(row: {
   return coverEmpty && imagesEmpty
 }
 
+function normalizeTextOrNull(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const out = value.trim()
+  return out.length > 0 ? out : null
+}
+
+function isLogoLikeImageUrl(value: string): boolean {
+  const lower = value.toLowerCase()
+  return (
+    lower.includes('logo') ||
+    lower.includes('site_logo') ||
+    lower.includes('ystm_site') ||
+    lower.includes('icon') ||
+    lower.includes('sprite') ||
+    lower.includes('favicon') ||
+    lower.includes('banner') ||
+    lower.includes('avatar') ||
+    lower.includes('tracking') ||
+    lower.includes('pixel') ||
+    lower.includes('placeholder') ||
+    lower.includes('default') ||
+    lower.includes('blank') ||
+    lower.includes('spacer')
+  )
+}
+
+function existingSaleImagesReplaceable(row: {
+  cover_image_url: string | null
+  images: unknown
+}): boolean {
+  if (saleRowImageFieldsEmpty(row)) return true
+  const cover = normalizeTextOrNull(row.cover_image_url)
+  if (!cover) return true
+  if (isLogoLikeImageUrl(cover)) return true
+  return false
+}
+
+function looksGenericTitle(value: string | null | undefined, city: string | null): boolean {
+  const t = normalizeTextOrNull(value)
+  if (!t) return true
+  if (/^yard sale$/i.test(t) || /^garage sale$/i.test(t) || /^estate sale$/i.test(t)) return true
+  if (/^listing$/i.test(t)) return true
+  const cityNorm = normalizeTextOrNull(city)
+  if (cityNorm && t.toLowerCase() === `${cityNorm.toLowerCase()} yard sale`) return true
+  return false
+}
+
+function looksGenericDescription(value: string | null | undefined): boolean {
+  const t = normalizeTextOrNull(value)
+  if (!t) return true
+  return /^yard sale\b/i.test(t) || /^garage sale\b/i.test(t) || /^estate sale\b/i.test(t) || /^listing\b/i.test(t)
+}
+
 /**
  * When a sale already exists (idempotent publish) or was inserted without media, fill
  * `cover_image_url` / `images` from sanitized ingest URLs only if both fields are empty.
  * Failures are logged; publish flow must not throw.
  */
-async function maybePatchExistingSaleImages(
+async function maybeSyncExistingSaleFromLatestIngest(
   saleId: string,
+  record: ClaimedPublishRow,
   sanitizedImages: string[],
   ctx: { rowId: string; city: string | null; state: string | null }
 ): Promise<void> {
-  if (!sanitizedImages.length) return
-
   const admin = getAdminDb()
   const { data, error } = await fromBase(admin, 'sales')
-    .select('cover_image_url, images')
+    .select('ingested_sale_id, title, description, address, date_start, date_end, time_start, time_end, cover_image_url, images')
     .eq('id', saleId)
     .maybeSingle()
 
   if (error) {
-    logger.warn('Existing sale image patch skipped: load failed', {
+    logger.warn('Existing linked sale sync skipped: load failed', {
       component: 'ingestion/publishWorker',
-      operation: 'maybe_patch_sale_images',
+      operation: 'sync_existing_sale_from_ingest',
       rowId: ctx.rowId,
       saleId,
       city: ctx.city,
@@ -244,22 +296,80 @@ async function maybePatchExistingSaleImages(
     return
   }
 
-  const row = data as { cover_image_url: string | null; images: unknown } | null
-  if (!row || !saleRowImageFieldsEmpty(row)) {
+  const row = data as {
+    ingested_sale_id: string | null
+    title: string | null
+    description: string | null
+    address: string | null
+    date_start: string | null
+    date_end: string | null
+    time_start: string | null
+    time_end: string | null
+    cover_image_url: string | null
+    images: unknown
+  } | null
+  if (!row) {
+    return
+  }
+  if (row.ingested_sale_id !== ctx.rowId) {
+    logger.warn('Existing linked sale sync skipped: ingested row ownership mismatch', {
+      component: 'ingestion/publishWorker',
+      operation: 'sync_existing_sale_from_ingest',
+      rowId: ctx.rowId,
+      saleId,
+      linkedIngestedSaleId: row.ingested_sale_id,
+      city: ctx.city,
+      state: ctx.state,
+    })
+    return
+  }
+
+  const city = normalizeTextOrNull(record.city)
+  const state = normalizeTextOrNull(record.state)
+  const normalizedAddress = normalizeAddressForPublish(record.normalized_address, city ?? '', state ?? '')
+  const normalizedTitle = normalizeTextOrNull(record.title) || `${record.city || 'Unknown'} Yard Sale`
+  const normalizedDescription = normalizeTextOrNull(record.description)
+  const normalizedDateStart = normalizeTextOrNull(record.date_start)
+  const normalizedDateEnd = normalizeTextOrNull(record.date_end)
+  const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
+  const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
+
+  const patch: Record<string, unknown> = {}
+
+  if (normalizedAddress) {
+    patch.address = normalizedAddress
+  }
+  if (normalizedDateStart) {
+    patch.date_start = normalizedDateStart
+  }
+  patch.date_end = normalizedDateEnd
+  patch.time_start = normalizedTimeStart
+  patch.time_end = normalizedTimeEnd
+
+  if (looksGenericTitle(row.title, record.city)) {
+    patch.title = normalizedTitle
+  }
+  if (looksGenericDescription(row.description) && normalizedDescription) {
+    patch.description = normalizedDescription
+  }
+
+  if (sanitizedImages.length > 0 && existingSaleImagesReplaceable(row)) {
+    patch.cover_image_url = sanitizedImages[0]
+    patch.images = sanitizedImages
+  }
+
+  if (Object.keys(patch).length === 0) {
     return
   }
 
   const { error: upErr } = await fromBase(admin, 'sales')
-    .update({
-      cover_image_url: sanitizedImages[0],
-      images: sanitizedImages,
-    })
+    .update(patch)
     .eq('id', saleId)
 
   if (upErr) {
-    logger.warn('Existing sale image patch failed; continuing publish', {
+    logger.warn('Existing linked sale sync failed; continuing publish', {
       component: 'ingestion/publishWorker',
-      operation: 'maybe_patch_sale_images',
+      operation: 'sync_existing_sale_from_ingest',
       rowId: ctx.rowId,
       saleId,
       city: ctx.city,
@@ -473,7 +583,7 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
     })
   }
 
-  await maybePatchExistingSaleImages(saleId, sanitizedImages, patchCtx)
+  await maybeSyncExistingSaleFromLatestIngest(saleId, record, sanitizedImages, patchCtx)
   return saleId
 }
 

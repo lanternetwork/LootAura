@@ -842,10 +842,21 @@ async function markIngestedPublishFailedFromPublishing(
   })
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { error } = await fromBase(admin, 'ingested_sales')
-      .update(payload)
-      .eq('id', rowId)
-      .eq('status', 'publishing')
+    let error: { message: string } | null = null
+    try {
+      const result = await fromBase(admin, 'ingested_sales')
+        .update(payload)
+        .eq('id', rowId)
+        .eq('status', 'publishing')
+      error = result?.error ?? null
+    } catch (thrown) {
+      error = { message: thrown instanceof Error ? thrown.message : String(thrown) }
+      logger.error(
+        'markIngestedPublishFailedFromPublishing guarded update threw',
+        thrown instanceof Error ? thrown : new Error(String(thrown)),
+        { component: 'ingestion/publishWorker', operation, rowId, attempt: attempt + 1 }
+      )
+    }
     if (!error) {
       return
     }

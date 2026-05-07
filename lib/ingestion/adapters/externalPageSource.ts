@@ -291,13 +291,18 @@ function extractAddressFromNearbyText(nearbyText: string): string | null {
     .split('\n')
     .map((line) => line.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
-    .filter((line) => !/street view|directions|source:/i.test(line))
   if (lines.length === 0) return null
 
   const addressLike = /^\d[\dA-Za-z-]{0,8}\s+[A-Za-z0-9.'#\- ]{4,}/
   for (const line of lines) {
-    if (addressLike.test(line) && !/(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(line)) {
-      return line
+    const scrubbed = line
+      .replace(/\bstreet view\b.*$/i, '')
+      .replace(/\bdirections\b.*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!scrubbed) continue
+    if (addressLike.test(scrubbed) && !/(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(scrubbed)) {
+      return scrubbed
     }
   }
   return null

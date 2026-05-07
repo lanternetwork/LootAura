@@ -1,14 +1,9 @@
-function cleanText(value: string | null): string | null {
-  if (value == null) return null
-  const cleaned = value.replace(/\s+/g, ' ').trim()
-  return cleaned.length > 0 ? cleaned : null
-}
-
 export function sanitizeUploadDescription(value: string | null): string | null {
-  const normalized = cleanText(value)
-  if (!normalized) return null
-  const lines = normalized
-    .split(/\n+/)
+  if (value == null) return null
+  // Split on line breaks first so noise tokens on separate lines are not merged into
+  // one blob (collapsing whitespace first would defeat per-line filtering).
+  const lines = String(value)
+    .split(/\r?\n+/)
     .map((line) => line.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
     .filter((line) => !/street view|directions|source:|view on map|report listing|share listing/i.test(line))

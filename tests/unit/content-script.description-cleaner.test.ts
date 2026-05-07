@@ -1,24 +1,61 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { runInContext, createContext } from 'node:vm'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { runInContext } from 'node:vm'
+import { describe, expect, it } from 'vitest'
+import { JSDOM } from 'jsdom'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const CONTENT_SCRIPT = readFileSync(join(__dirname, '../../browser-extension/content-script.js'), 'utf8')
+
+type WindowWithContentScriptTest = Window & {
+  chrome?: {
+    runtime: { onMessage: { addListener: () => void } }
+    storage: {
+      local: {
+        get: (_k: string, cb: (obj: Record<string, unknown>) => void) => void
+        set: (_d: unknown, cb?: () => void) => void
+        remove: (_k: string, cb?: () => void) => void
+      }
+    }
+  }
+  __LootAuraContentScriptTest?: { cleanExtractedDescription: (raw: string) => string }
+}
+
+function installChrome(win: WindowWithContentScriptTest) {
+  win.chrome = {
+    runtime: { onMessage: { addListener: () => {} } },
+    storage: {
+      local: {
+        get: (_k, cb) => {
+          cb({})
+        },
+        set: (_d, cb) => {
+          cb?.()
+        },
+        remove: (_k, cb) => {
+          cb?.()
+        },
+      },
+    },
+  }
+}
+
+function loadContentScript(dom: JSDOM) {
+  installChrome(dom.window as WindowWithContentScriptTest)
+  runInContext(CONTENT_SCRIPT, dom.getInternalVMContext())
+}
 
 describe('content-script description cleaner', () => {
-  beforeEach(() => {
-    ;(globalThis as any).chrome = {
-      runtime: { onMessage: { addListener: () => {} } },
-      storage: { local: { get: (_k: unknown, cb: (value: unknown) => void) => cb({}), set: () => {}, remove: () => {} } },
-    }
-  })
-
   it('removes Street View/Directions/Source/address/date-time noise', () => {
-    const source = readFileSync('C:\\LootAura\\LootAura\\browser-extension\\content-script.js', 'utf-8')
-    const ctx = createContext(globalThis as any)
-    runInContext(source, ctx)
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://example.com/listing' })
+    loadContentScript(dom)
 
-    const cleaner = (globalThis as any).__LootAuraContentScriptTest?.cleanExtractedDescription
+    const win = dom.window as WindowWithContentScriptTest
+    const cleaner = win.__LootAuraContentScriptTest?.cleanExtractedDescription
     expect(typeof cleaner).toBe('function')
 
     const dirty = `
@@ -30,9 +67,8 @@ describe('content-script description cleaner', () => {
       5/9 - 5/9
       Lots of tools, furniture, and baby items available.
     `
-    const cleaned = cleaner(dirty)
+    const cleaned = cleaner!(dirty)
     expect(cleaned).toContain('Lots of tools, furniture, and baby items available.')
     expect(cleaned).not.toMatch(/Street View|Directions|Source:|Orland Park|5\/9|8:30/i)
   })
 })
-

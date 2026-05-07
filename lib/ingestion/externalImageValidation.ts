@@ -9,29 +9,40 @@ import {
 } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 
 export async function isValidExternalImageUrl(urlString: string): Promise<boolean> {
+  const result = await validateExternalImageUrlWithReason(urlString)
+  return result.ok
+}
+
+async function validateExternalImageUrlWithReason(
+  urlString: string
+): Promise<{ ok: true } | { ok: false; reason: string }> {
   let parsed: URL
   try {
     parsed = validateExternalHttpsUrlForFetch(urlString)
-  } catch {
-    return false
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    const reason = msg.split(':')[0]?.trim() || EXTERNAL_FETCH_REASON.INVALID_URL
+    return { ok: false, reason }
   }
 
   const host = parsed.hostname
   if (isIPv4(host) || isIPv6(host)) {
-    return !isNonPublicIpAddress(host)
+    return isNonPublicIpAddress(host)
+      ? { ok: false, reason: EXTERNAL_FETCH_REASON.NON_PUBLIC_IP }
+      : { ok: true }
   }
 
   try {
     const addresses = await dns.lookup(host, { all: true, verbatim: true })
-    if (!addresses.length) return false
+    if (!addresses.length) return { ok: false, reason: EXTERNAL_FETCH_REASON.DNS_FAILURE }
     for (const addr of addresses) {
       if (isNonPublicIpAddress(addr.address)) {
-        return false
+        return { ok: false, reason: EXTERNAL_FETCH_REASON.NON_PUBLIC_IP }
       }
     }
-    return true
+    return { ok: true }
   } catch {
-    return false
+    return { ok: false, reason: EXTERNAL_FETCH_REASON.DNS_FAILURE }
   }
 }
 
@@ -49,8 +60,8 @@ export async function sanitizeExternalImageUrls(
     if (!trimmed || seen.has(trimmed)) continue
     seen.add(trimmed)
 
-    const ok = await isValidExternalImageUrl(trimmed)
-    if (!ok) {
+    const validation = await validateExternalImageUrlWithReason(trimmed)
+    if (!validation.ok) {
       let hostHash: string | null = null
       try {
         hostHash = hashHostForLog(new URL(trimmed).hostname)
@@ -64,7 +75,7 @@ export async function sanitizeExternalImageUrls(
         city: context.city,
         state: context.state,
         hostHash,
-        reason: EXTERNAL_FETCH_REASON.NON_PUBLIC_IP,
+        reason: validation.reason,
       })
       continue
     }

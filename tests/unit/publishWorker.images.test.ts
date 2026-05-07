@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { dnsLookup } = vi.hoisted(() => ({
+const { dnsLookup, loggerWarn, loggerInfo, loggerError, rpcMock, adminDb } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
+  loggerWarn: vi.fn(),
+  loggerInfo: vi.fn(),
+  loggerError: vi.fn(),
+  rpcMock: vi.fn(),
+  adminDb: {} as { rpc?: (...args: unknown[]) => unknown },
 }))
 
 vi.mock('node:dns/promises', () => ({
@@ -12,12 +17,23 @@ const createPublishedSaleMock = vi.fn()
 
 const mockFromBase = vi.fn()
 vi.mock('@/lib/supabase/clients', () => ({
-  getAdminDb: vi.fn(() => ({})),
+  getAdminDb: vi.fn(() => {
+    adminDb.rpc = rpcMock
+    return adminDb
+  }),
   fromBase: (...args: unknown[]) => mockFromBase(...args),
 }))
 
 vi.mock('@/lib/ingestion/publish', () => ({
   createPublishedSale: (...args: unknown[]) => createPublishedSaleMock(...args),
+}))
+
+vi.mock('@/lib/log', () => ({
+  logger: {
+    info: (...args: unknown[]) => loggerInfo(...args),
+    warn: (...args: unknown[]) => loggerWarn(...args),
+    error: (...args: unknown[]) => loggerError(...args),
+  },
 }))
 
 function baseRow(overrides: Record<string, unknown> = {}) {
@@ -480,6 +496,208 @@ describe('publish worker idempotent sale images', () => {
     expect(result.ok).toBe(true)
     const body = createPublishedSaleMock.mock.calls[0][0]
     expect(body.image_urls).toEqual(['https://images.example.org/ok.jpg'])
+  })
+})
+
+describe('publish worker batch media hydration and visibility', () => {
+  const rowId = '44444444-4444-4444-8444-444444444444'
+
+  function baseBatchRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: rowId,
+      source_platform: 'external_page_source',
+      source_url: 'https://example.com/listing/2',
+      title: 'Batch Sale',
+      description: null,
+      normalized_address: '2 Main St',
+      city: 'Austin',
+      state: 'TX',
+      zip_code: null,
+      lat: 30.2,
+      lng: -97.7,
+      date_start: '2026-05-06',
+      date_end: null,
+      time_start: '10:00:00',
+      time_end: null,
+      image_cloudinary_url: null,
+      failure_reasons: [],
+      ...overrides,
+    }
+  }
+
+  function buildBatchUpdateBuilder() {
+    return {
+      update: () => ({
+        eq: async () => ({ error: null }),
+      }),
+    }
+  }
+
+  function mockBatchFromBase(opts: {
+    hydrationRows?: unknown[]
+    hydrationError?: { message: string } | null
+  } = {}) {
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        let mode: 'update' | 'select' = 'update'
+        return {
+          update: () => {
+            mode = 'update'
+            return {
+              eq: async () => ({ error: null }),
+            }
+          },
+          select: (_fields: string) => {
+            mode = 'select'
+            return {
+              in: async () => ({ data: opts.hydrationRows ?? [], error: opts.hydrationError ?? null }),
+            }
+          },
+          eq: async () => {
+            if (mode === 'update') return { error: null }
+            return { data: opts.hydrationRows ?? [], error: opts.hydrationError ?? null }
+          },
+        }
+      }
+      if (table === 'sales') return salesMockPatchNoOp()
+      return buildBatchUpdateBuilder()
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
+    createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-batch-1' })
+  })
+
+  it('uses image_source_url from RPC claim row to publish image_urls', async () => {
+    rpcMock.mockResolvedValue({
+      data: [baseBatchRow({ image_source_url: 'https://images.example.org/rpc-source.jpg', raw_payload: { tags: [] } })],
+      error: null,
+    })
+    mockBatchFromBase()
+
+    const { publishReadyIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    const summary = await publishReadyIngestedSales()
+    expect(summary.succeeded).toBe(1)
+    const body = createPublishedSaleMock.mock.calls[0][0]
+    expect(body.image_urls).toEqual(['https://images.example.org/rpc-source.jpg'])
+  })
+
+  it('uses raw_payload.imageUrls from RPC claim row to publish image_urls', async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        baseBatchRow({
+          raw_payload: { imageUrls: ['https://images.example.org/from-raw.jpg'] },
+          image_source_url: null,
+        }),
+      ],
+      error: null,
+    })
+    mockBatchFromBase()
+
+    const { publishReadyIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    const summary = await publishReadyIngestedSales()
+    expect(summary.succeeded).toBe(1)
+    const body = createPublishedSaleMock.mock.calls[0][0]
+    expect(body.image_urls).toEqual(['https://images.example.org/from-raw.jpg'])
+  })
+
+  it('falls back to hydration when RPC row lacks media fields', async () => {
+    rpcMock.mockResolvedValue({
+      data: [baseBatchRow({})],
+      error: null,
+    })
+    mockBatchFromBase({
+      hydrationRows: [{ id: rowId, raw_payload: { tags: [] }, image_source_url: 'https://images.example.org/hydrated.jpg' }],
+    })
+
+    const { publishReadyIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    const summary = await publishReadyIngestedSales()
+    expect(summary.succeeded).toBe(1)
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Publish worker media hydration fallback engaged',
+      expect.objectContaining({ operation: 'hydrate_claimed_rows_media_fallback' })
+    )
+    const body = createPublishedSaleMock.mock.calls[0][0]
+    expect(body.image_urls).toEqual(['https://images.example.org/hydrated.jpg'])
+  })
+
+  it('logs hydration fallback failure and still publishes without images', async () => {
+    rpcMock.mockResolvedValue({
+      data: [baseBatchRow({})],
+      error: null,
+    })
+    mockBatchFromBase({
+      hydrationError: { message: 'hydration_select_failed' },
+    })
+
+    const { publishReadyIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    const summary = await publishReadyIngestedSales()
+    expect(summary.succeeded).toBe(1)
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'Publish worker media hydration fallback failed; proceeding without hydrated media fields',
+      expect.objectContaining({ operation: 'hydrate_claimed_rows_media_fallback' })
+    )
+    const body = createPublishedSaleMock.mock.calls[0][0]
+    expect(body.image_urls).toEqual([])
+  })
+
+  it('treats null image_source_url as present-null (no missing media field warning)', async () => {
+    rpcMock.mockResolvedValue({
+      data: [baseBatchRow({ raw_payload: { tags: [] }, image_source_url: null })],
+      error: null,
+    })
+    mockBatchFromBase()
+
+    const { publishReadyIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    await publishReadyIngestedSales()
+    expect(loggerWarn).not.toHaveBeenCalledWith(
+      'Publish claim row missing expected media fields',
+      expect.anything()
+    )
+  })
+
+  it('logs when candidates sanitize to zero and still publishes', async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        baseBatchRow({
+          raw_payload: { imageUrls: ['https://127.0.0.1/private.jpg'] },
+          image_source_url: null,
+        }),
+      ],
+      error: null,
+    })
+    mockBatchFromBase()
+
+    const { publishReadyIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    const summary = await publishReadyIngestedSales()
+    expect(summary.succeeded).toBe(1)
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'Publish image candidates rejected by sanitizer; continuing without images',
+      expect.objectContaining({ operation: 'sanitize_external_images', candidateCount: 1 })
+    )
+    const body = createPublishedSaleMock.mock.calls[0][0]
+    expect(body.image_urls).toEqual([])
+  })
+
+  it('rejection logs do not include raw URL values', async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        baseBatchRow({
+          raw_payload: { imageUrls: ['https://127.0.0.1/private.jpg'] },
+          image_source_url: null,
+        }),
+      ],
+      error: null,
+    })
+    mockBatchFromBase()
+
+    const { publishReadyIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    await publishReadyIngestedSales()
+    const rejectionCall = loggerWarn.mock.calls.find((c) => c[0] === 'Publish image candidate rejected')
+    expect(rejectionCall).toBeTruthy()
+    expect(JSON.stringify(rejectionCall?.[1] ?? {})).not.toContain('127.0.0.1/private.jpg')
   })
 })
 

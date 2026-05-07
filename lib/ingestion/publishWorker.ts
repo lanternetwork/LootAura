@@ -27,7 +27,7 @@ interface ClaimedPublishRow {
   time_start: string | null
   time_end: string | null
   image_cloudinary_url: string | null
-  /** Present when row was loaded with explicit columns; omitted on RPC-claimed batch rows until hydrated. */
+  /** Present on direct/single select and new claim RPC; absent on older RPC versions until hydrated fallback runs. */
   image_source_url?: string | null
   raw_payload?: unknown
   failure_reasons: unknown
@@ -248,19 +248,51 @@ async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<
   )
   if (fullyHydrated) return rows
 
+  const missingRawCount = rows.filter((row) => !Object.prototype.hasOwnProperty.call(row, 'raw_payload')).length
+  const missingImageCount = rows.filter((row) => !Object.prototype.hasOwnProperty.call(row, 'image_source_url')).length
+  logger.info('Publish worker media hydration fallback engaged', {
+    component: 'ingestion/publishWorker',
+    operation: 'hydrate_claimed_rows_media_fallback',
+    rowCount: rows.length,
+    missingRawPayloadCount: missingRawCount,
+    missingImageSourceCount: missingImageCount,
+  })
+
   const admin = getAdminDb()
   const ids = rows.map((row) => row.id)
   const { data, error } = await fromBase(admin, 'ingested_sales')
     .select('id, raw_payload, image_source_url')
     .in('id', ids)
   if (error || !Array.isArray(data)) {
+    logger.warn('Publish worker media hydration fallback failed; proceeding without hydrated media fields', {
+      component: 'ingestion/publishWorker',
+      operation: 'hydrate_claimed_rows_media_fallback',
+      rowCount: rows.length,
+      hasArrayData: Array.isArray(data),
+      message: error?.message ?? 'non_array_hydration_result',
+    })
     return rows
   }
   const payloadById = new Map<string, { raw_payload: unknown; image_source_url: string | null }>()
   for (const row of data as Array<{ id: string; raw_payload?: unknown; image_source_url?: string | null }>) {
+    if (!row?.id) {
+      logger.warn('Publish worker media hydration row missing id; skipping hydration row', {
+        component: 'ingestion/publishWorker',
+        operation: 'hydrate_claimed_rows_media_fallback',
+      })
+      continue
+    }
     payloadById.set(row.id, {
       raw_payload: row.raw_payload ?? null,
       image_source_url: row.image_source_url ?? null,
+    })
+  }
+  if (payloadById.size < rows.length) {
+    logger.warn('Publish worker media hydration fallback returned fewer rows than requested', {
+      component: 'ingestion/publishWorker',
+      operation: 'hydrate_claimed_rows_media_fallback',
+      requestedCount: rows.length,
+      hydratedCount: payloadById.size,
     })
   }
   return rows.map((row) => {
@@ -332,15 +364,46 @@ export function extractPublishImageCandidates(
 /** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */
 async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<string> {
   const body = claimedRowToPublishable(record)
+  const hasRawField = Object.prototype.hasOwnProperty.call(record, 'raw_payload')
+  const hasImageField = Object.prototype.hasOwnProperty.call(record, 'image_source_url')
+  if (!hasRawField || !hasImageField) {
+    logger.warn('Publish claim row missing expected media fields', {
+      component: 'ingestion/publishWorker',
+      operation: 'publish_claim_media_shape_check',
+      rowId: record.id,
+      hasRawPayloadField: hasRawField,
+      hasImageSourceField: hasImageField,
+    })
+  }
   let sanitizedImages: string[] = []
   try {
     const candidates = extractPublishImageCandidates(record.raw_payload, record.image_source_url)
+    if (candidates.length === 0 && hasRawField && hasImageField) {
+      logger.info('Publish image candidate extraction produced zero candidates', {
+        component: 'ingestion/publishWorker',
+        operation: 'extract_publish_image_candidates',
+        rowId: record.id,
+        hasRawPayloadField: hasRawField,
+        hasImageSourceField: hasImageField,
+        imageSourceIsNull: record.image_source_url === null,
+      })
+    }
     sanitizedImages = await sanitizeExternalImageUrls(candidates, {
       rowId: record.id,
       city: record.city,
       state: record.state,
       max: 3,
     })
+    if (candidates.length > 0 && sanitizedImages.length === 0) {
+      logger.warn('Publish image candidates rejected by sanitizer; continuing without images', {
+        component: 'ingestion/publishWorker',
+        operation: 'sanitize_external_images',
+        rowId: record.id,
+        city: record.city,
+        state: record.state,
+        candidateCount: candidates.length,
+      })
+    }
     if (sanitizedImages.length > 0) {
       body.image_urls = sanitizedImages
     }

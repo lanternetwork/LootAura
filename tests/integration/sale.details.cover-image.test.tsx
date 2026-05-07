@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import SaleDetailClient from '@/app/sales/[id]/SaleDetailClient'
 
 const { mockGetSaleCoverUrl } = vi.hoisted(() => ({
@@ -158,5 +158,28 @@ describe('SaleDetailClient cover image rendering', () => {
     render(<SaleDetailClient sale={mockSale as any} displayCategories={[]} items={[]} />)
 
     expect(screen.getAllByTestId('sale-placeholder').length).toBeGreaterThan(0)
+  })
+
+  it('renders gallery thumbnails and switches selected image', () => {
+    mockGetSaleCoverUrl.mockReturnValue({
+      url: 'https://res.cloudinary.com/demo/image/upload/v1/cover.jpg',
+      alt: 'Trusted image',
+    })
+    const saleWithGallery = {
+      ...mockSale,
+      images: [
+        'https://res.cloudinary.com/demo/image/upload/v1/1.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/2.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/3.jpg',
+      ],
+    }
+
+    render(<SaleDetailClient sale={saleWithGallery as any} displayCategories={[]} items={[]} />)
+
+    const nextImageButton = screen.getByLabelText('Next sale image')
+    fireEvent.click(nextImageButton)
+
+    expect(screen.getAllByAltText(/Sale thumbnail/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('sale-detail-cover-next-image').length).toBeGreaterThan(0)
   })
 })

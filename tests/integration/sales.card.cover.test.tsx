@@ -78,5 +78,32 @@ describe('SaleCard cover rendering', () => {
       expect(svg).toBeTruthy()
     }
   })
+
+  it('does not duplicate city/state when address already contains them', () => {
+    const sale: any = {
+      id: 's4',
+      title: 'Address Sale',
+      address: '123 Main St, Louisville, KY 40202',
+      city: 'Louisville',
+      state: 'KY',
+      date_start: '2024-01-01',
+      time_start: '09:00',
+    }
+    renderWithProviders(<SaleCard sale={sale} />)
+    expect(screen.getAllByText('123 Main St, Louisville, KY 40202').length).toBeGreaterThan(0)
+  })
+
+  it('formats date-only without timezone rollback drift', () => {
+    const sale: any = {
+      id: 's5',
+      title: 'Date Sale',
+      city: 'Louisville',
+      state: 'KY',
+      date_start: '2024-01-01',
+      time_start: '09:00',
+    }
+    renderWithProviders(<SaleCard sale={sale} />)
+    expect(screen.getByText(/Jan 1/i)).toBeTruthy()
+  })
 })
 

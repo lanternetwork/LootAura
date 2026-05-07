@@ -10,6 +10,8 @@ import AddressLink from '@/components/common/AddressLink'
 import FavoriteButton from '@/components/FavoriteButton'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
+import { displayAddress } from '@/lib/display/address'
+import { formatDateOnly } from '@/lib/display/date'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null
@@ -110,9 +112,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
   const getNavigationUrl = useCallback(() => {
     if (!sale) return ''
     
-    const address = sale.address && sale.city && sale.state 
-      ? `${sale.address}, ${sale.city}, ${sale.state}` 
-      : sale.address ?? undefined
+    const address = displayAddress(sale.address, sale.city, sale.state) || undefined
 
     if (!isClient || platform === 'desktop') {
       return buildDesktopGoogleMapsUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
@@ -147,12 +147,12 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
   const formatDate = (dateStr: string, timeStr?: string) => {
     if (!dateStr) return ''
     try {
-      const date = timeStr ? new Date(`${dateStr}T${timeStr}`) : new Date(dateStr)
-      return date.toLocaleDateString('en-US', { 
+      const base = formatDateOnly(dateStr, {
         month: 'short', 
         day: 'numeric',
-        ...(timeStr ? { hour: 'numeric', minute: '2-digit' } : {})
       })
+      if (!timeStr) return base
+      return `${base} ${timeStr}`
     } catch {
       return dateStr
     }
@@ -238,10 +238,9 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address}
+                    address={displayAddress(sale.address, sale.city, sale.state)}
                   >
-                    {sale.address}
-                    {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                    {displayAddress(sale.address, sale.city, sale.state)}
                   </AddressLink>
                 </p>
               )}
@@ -384,10 +383,9 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address}
+                    address={displayAddress(sale.address, sale.city, sale.state)}
                   >
-                    {sale.address}
-                    {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                    {displayAddress(sale.address, sale.city, sale.state)}
                   </AddressLink>
                 </p>
               )}

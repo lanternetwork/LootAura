@@ -251,6 +251,14 @@ function existingSaleImagesReplaceable(row: {
   return false
 }
 
+function normalizeImageArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 function looksGenericTitle(value: string | null | undefined, city: string | null): boolean {
   const t = normalizeTextOrNull(value)
   if (!t) return true
@@ -496,12 +504,22 @@ async function maybeSyncExistingSaleFromLatestIngest(
       patch.description = normalizedDescription
     }
 
-    if (sanitizedImages.length > 0 && existingSaleImagesReplaceable(row)) {
-      patch.cover_image_url = sanitizedImages[0]
-      patch.images = sanitizedImages
-    } else if (sanitizedImages.length > 0) {
-      delete patch.cover_image_url
-      delete patch.images
+    if (sanitizedImages.length > 0) {
+      const existingImages = normalizeImageArray(row.images)
+      const shouldReplaceMedia = existingSaleImagesReplaceable(row)
+      const shouldExpandMedia = !shouldReplaceMedia && sanitizedImages.length > existingImages.length
+      if (shouldReplaceMedia || shouldExpandMedia) {
+        patch.images = sanitizedImages
+        const existingCover = normalizeTextOrNull(row.cover_image_url)
+        if (existingCover && sanitizedImages.includes(existingCover)) {
+          patch.cover_image_url = existingCover
+        } else {
+          patch.cover_image_url = sanitizedImages[0]
+        }
+      } else {
+        delete patch.cover_image_url
+        delete patch.images
+      }
     }
 
     if (Object.keys(patch).length === 0) {

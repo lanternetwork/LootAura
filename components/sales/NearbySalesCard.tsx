@@ -7,6 +7,8 @@ import { formatDistance } from '@/lib/utils/distance'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import AddressLink from '@/components/common/AddressLink'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
+import { displayAddress } from '@/lib/display/address'
+import { formatDateOnly, parseDateOnlyLocal } from '@/lib/display/date'
 
 interface NearbySalesCardProps {
   nearbySales: Array<Sale & { distance_m: number }>
@@ -36,7 +38,8 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
 
   const formatDate = (dateString: string, timeString?: string, endDateString?: string): string => {
     try {
-      const date = new Date(`${dateString}T${timeString || '00:00'}`)
+      const date = parseDateOnlyLocal(dateString)
+      if (!date) return dateString
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const tomorrow = new Date(today)
@@ -46,17 +49,8 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
       
       // Multi-day sale: show date range with start time
       if (endDateString && endDateString !== dateString) {
-        const startFormatted = date.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        })
-        const endDate = new Date(endDateString)
-        const endFormatted = endDate.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        })
+        const startFormatted = formatDateOnly(dateString, { weekday: 'short', month: 'short', day: 'numeric' })
+        const endFormatted = formatDateOnly(endDateString, { weekday: 'short', month: 'short', day: 'numeric' })
         if (timeString) {
           const [hours, minutes] = timeString.split(':')
           const hour = parseInt(hours, 10)
@@ -92,11 +86,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
       }
       
       // Format as "Sat, Nov 16" with time if available
-      const dateFormatted = date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      })
+      const dateFormatted = formatDateOnly(dateString, { weekday: 'short', month: 'short', day: 'numeric' })
       if (timeString) {
         const [hours, minutes] = timeString.split(':')
         const hour = parseInt(hours, 10)
@@ -121,9 +111,7 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
           const dateText = nearbySale.date_start 
             ? formatDate(nearbySale.date_start, nearbySale.time_start, nearbySale.date_end) || 'Date TBD'
             : 'Date TBD'
-          const locationText = nearbySale.city && nearbySale.state 
-            ? `${nearbySale.city}, ${nearbySale.state}`
-            : nearbySale.city || nearbySale.state || ''
+          const locationText = displayAddress(nearbySale.address, nearbySale.city, nearbySale.state)
 
           return (
             <div

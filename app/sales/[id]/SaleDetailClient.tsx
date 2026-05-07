@@ -26,6 +26,8 @@ import { BadgeCheck } from 'lucide-react'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 import { isNativeApp } from '@/lib/runtime/isNativeApp'
 import { queryClient } from '@/lib/queryClient'
+import { displayAddress } from '@/lib/display/address'
+import { formatDateOnly } from '@/lib/display/date'
 
 function isTrustedNextImageHost(urlString: string): boolean {
   try {
@@ -206,6 +208,24 @@ export default function SaleDetailClient({
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)
+  const galleryImages = useMemo(() => {
+    const base = Array.isArray(sale.images)
+      ? sale.images.filter((value): value is string => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
+      : []
+    const coverUrl = typeof sale.cover_image_url === 'string' ? sale.cover_image_url.trim() : ''
+    if (coverUrl && !base.includes(coverUrl)) {
+      return [coverUrl, ...base]
+    }
+    return base
+  }, [sale.images, sale.cover_image_url])
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  useEffect(() => {
+    setSelectedImageIndex(0)
+  }, [sale.id, galleryImages.length])
+  const selectedImageUrl = galleryImages[selectedImageIndex] ?? cover?.url ?? null
+  const selectedImageAlt = `${sale.title || 'Sale'} image ${selectedImageIndex + 1}`
+  const canStepGallery = galleryImages.length > 1
+  const saleAddressDisplay = displayAddress(sale.address, sale.city, sale.state)
   const viewTrackedRef = useRef(false)
   const isOptimisticRef = useRef(false)
   const [promotionStatus, setPromotionStatus] = useState<{
@@ -288,9 +308,7 @@ export default function SaleDetailClient({
   useEffect(() => {
     const handleNavigate = () => {
       // Use sale location data to build maps URL
-      const address = sale.address 
-        ? `${sale.address}, ${sale.city}, ${sale.state}` 
-        : `${sale.city}, ${sale.state}`
+      const address = saleAddressDisplay
       
       // Detect platform (same logic as AddressLink)
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
@@ -379,8 +397,7 @@ export default function SaleDetailClient({
   }, [sale.lat, sale.lng, sale.address, sale.city, sale.state, sale.id])
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return formatDateOnly(dateString, {
       weekday: 'long',
       month: 'long', 
       day: 'numeric',
@@ -398,8 +415,7 @@ export default function SaleDetailClient({
 
   // Format date/time for meta chips (mobile)
   const formatDateShort = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return formatDateOnly(dateString, {
       weekday: 'short',
       month: 'short', 
       day: 'numeric'
@@ -605,12 +621,12 @@ export default function SaleDetailClient({
     shareTextParts.push(`${sale.city}, ${sale.state}`)
   }
   if (sale.date_start) {
-    const startDate = new Date(sale.date_start)
+    const startDate = formatDateOnly(sale.date_start, { weekday: 'short', month: 'short', day: 'numeric' })
     if (sale.date_end && sale.date_end !== sale.date_start) {
-      const endDate = new Date(sale.date_end)
-      shareTextParts.push(`${startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`)
+      const endDate = formatDateOnly(sale.date_end, { weekday: 'short', month: 'short', day: 'numeric' })
+      shareTextParts.push(`${startDate} - ${endDate}`)
     } else {
-      shareTextParts.push(startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
+      shareTextParts.push(startDate)
     }
   }
   const shareText = shareTextParts.length > 0 ? shareTextParts.join(' — ') : undefined
@@ -697,11 +713,11 @@ export default function SaleDetailClient({
               <AddressLink
                 lat={sale.lat ?? undefined}
                 lng={sale.lng ?? undefined}
-                address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+                address={saleAddressDisplay}
                 className="text-gray-900 font-medium break-words"
                 onClick={handleNavigationClick}
               >
-                {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
+                {saleAddressDisplay}
               </AddressLink>
             </div>
           </div>
@@ -709,11 +725,11 @@ export default function SaleDetailClient({
 
         {/* Primary Photo */}
         <div className="relative w-full overflow-hidden rounded-2xl bg-gray-100 aspect-[4/3]">
-          {cover ? (
-            isTrustedNextImageHost(cover.url) ? (
+          {selectedImageUrl ? (
+            isTrustedNextImageHost(selectedImageUrl) ? (
               <Image
-                src={cover.url}
-                alt={cover.alt}
+                src={selectedImageUrl}
+                alt={selectedImageAlt}
                 data-testid="sale-detail-cover-next-image"
                 fill
                 className="object-contain"
@@ -721,8 +737,8 @@ export default function SaleDetailClient({
               />
             ) : (
               <img
-                src={cover.url}
-                alt={cover.alt}
+                src={selectedImageUrl}
+                alt={selectedImageAlt}
                 data-testid="sale-detail-cover-external-img"
                 className="h-full w-full object-contain"
                 loading="lazy"
@@ -734,7 +750,46 @@ export default function SaleDetailClient({
               <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
             </div>
           )}
+          {canStepGallery && (
+            <>
+              <button
+                type="button"
+                aria-label="Previous sale image"
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                onClick={() => setSelectedImageIndex((idx) => (idx === 0 ? galleryImages.length - 1 : idx - 1))}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                aria-label="Next sale image"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                onClick={() => setSelectedImageIndex((idx) => (idx + 1) % galleryImages.length)}
+              >
+                Next
+              </button>
+            </>
+          )}
         </div>
+        {galleryImages.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto">
+            {galleryImages.map((url, idx) => (
+              <button
+                key={`${url}-${idx}`}
+                type="button"
+                aria-label={`Show sale image ${idx + 1}`}
+                onClick={() => setSelectedImageIndex(idx)}
+                className={`h-16 w-16 overflow-hidden rounded border ${idx === selectedImageIndex ? 'border-purple-600' : 'border-gray-200'}`}
+              >
+                {isTrustedNextImageHost(url) ? (
+                  <Image src={url} alt={`Sale thumbnail ${idx + 1}`} width={64} height={64} className="h-full w-full object-cover" />
+                ) : (
+                  <img src={url} alt={`Sale thumbnail ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Description & Key Details */}
         {sale.description && (
@@ -846,14 +901,14 @@ export default function SaleDetailClient({
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address}
+                    address={saleAddressDisplay}
                     onClick={handleNavigationClick}
                   >
-                    {sale.address}
+                    {saleAddressDisplay}
                   </AddressLink>
                 </p>
               )}
-              <p>
+              {!sale.address && <p>
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
@@ -862,7 +917,7 @@ export default function SaleDetailClient({
                   >
                   {sale.city}, {sale.state} {sale.zip_code}
                 </AddressLink>
-              </p>
+              </p>}
               {sale.address && (
                 <div className="mt-2">
                   <OSMAttribution showGeocoding={true} />
@@ -948,11 +1003,11 @@ export default function SaleDetailClient({
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+                    address={saleAddressDisplay}
                     onClick={handleNavigationClick}
                     className="underline hover:no-underline"
                   >
-                    {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
+                    {saleAddressDisplay}
                   </AddressLink>
                 </div>
               </div>
@@ -1136,14 +1191,14 @@ export default function SaleDetailClient({
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address}
+                    address={saleAddressDisplay}
                     onClick={handleNavigationClick}
                   >
-                    {sale.address}
+                    {saleAddressDisplay}
                   </AddressLink>
                 </p>
               )}
-              <p>
+              {!sale.address && <p>
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
@@ -1152,7 +1207,7 @@ export default function SaleDetailClient({
                   >
                   {sale.city}, {sale.state} {sale.zip_code}
                 </AddressLink>
-              </p>
+              </p>}
               {/* OSM Attribution - show when address exists (addresses are geocoded via Nominatim/OSM) */}
               {sale.address && (
                 <div className="mt-2">
@@ -1294,7 +1349,7 @@ export default function SaleDetailClient({
             <AddressLink
               lat={sale.lat ?? undefined}
               lng={sale.lng ?? undefined}
-              address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+              address={saleAddressDisplay}
               className="flex-1 inline-flex items-center justify-center px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] whitespace-nowrap"
               onClick={handleNavigationClick}
             >

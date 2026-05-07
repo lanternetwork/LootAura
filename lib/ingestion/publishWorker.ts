@@ -172,6 +172,73 @@ async function fetchExistingSaleIdForIngested(ingestedSaleId: string): Promise<s
   return (data[0] as { id: string }).id
 }
 
+function saleRowImageFieldsEmpty(row: {
+  cover_image_url: string | null
+  images: unknown
+}): boolean {
+  const coverEmpty =
+    row.cover_image_url == null || String(row.cover_image_url).trim() === ''
+  const imgs = row.images
+  const imagesEmpty = imgs == null || (Array.isArray(imgs) && imgs.length === 0)
+  return coverEmpty && imagesEmpty
+}
+
+/**
+ * When a sale already exists (idempotent publish) or was inserted without media, fill
+ * `cover_image_url` / `images` from sanitized ingest URLs only if both fields are empty.
+ * Failures are logged; publish flow must not throw.
+ */
+async function maybePatchExistingSaleImages(
+  saleId: string,
+  sanitizedImages: string[],
+  ctx: { rowId: string; city: string | null; state: string | null }
+): Promise<void> {
+  if (!sanitizedImages.length) return
+
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, 'sales')
+    .select('cover_image_url, images')
+    .eq('id', saleId)
+    .maybeSingle()
+
+  if (error) {
+    logger.warn('Existing sale image patch skipped: load failed', {
+      component: 'ingestion/publishWorker',
+      operation: 'maybe_patch_sale_images',
+      rowId: ctx.rowId,
+      saleId,
+      city: ctx.city,
+      state: ctx.state,
+      message: error.message,
+    })
+    return
+  }
+
+  const row = data as { cover_image_url: string | null; images: unknown } | null
+  if (!row || !saleRowImageFieldsEmpty(row)) {
+    return
+  }
+
+  const { error: upErr } = await fromBase(admin, 'sales')
+    .update({
+      cover_image_url: sanitizedImages[0],
+      images: sanitizedImages,
+    })
+    .eq('id', saleId)
+
+  if (upErr) {
+    logger.warn('Existing sale image patch failed; continuing publish', {
+      component: 'ingestion/publishWorker',
+      operation: 'maybe_patch_sale_images',
+      rowId: ctx.rowId,
+      saleId,
+      city: ctx.city,
+      state: ctx.state,
+      message: upErr.message,
+    })
+  }
+}
+
 async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<ClaimedPublishRow[]> {
   if (rows.length === 0) return rows
   const fullyHydrated = rows.every(
@@ -265,9 +332,10 @@ export function extractPublishImageCandidates(
 /** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */
 async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<string> {
   const body = claimedRowToPublishable(record)
+  let sanitizedImages: string[] = []
   try {
     const candidates = extractPublishImageCandidates(record.raw_payload, record.image_source_url)
-    const sanitizedImages = await sanitizeExternalImageUrls(candidates, {
+    sanitizedImages = await sanitizeExternalImageUrls(candidates, {
       rowId: record.id,
       city: record.city,
       state: record.state,
@@ -277,6 +345,7 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
       body.image_urls = sanitizedImages
     }
   } catch (error) {
+    sanitizedImages = []
     logger.warn('Publish image processing failed; continuing without images', {
       component: 'ingestion/publishWorker',
       operation: 'sanitize_external_images',
@@ -286,21 +355,27 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
       message: error instanceof Error ? error.message : String(error),
     })
   }
+
+  const patchCtx = { rowId: record.id, city: record.city, state: record.state }
+  let saleId: string
   try {
-    const { saleId } = await createPublishedSale(body)
-    return saleId
+    const created = await createPublishedSale(body)
+    saleId = created.saleId
   } catch (err) {
     if (!isIngestedSaleIdUniqueViolation(err)) throw err
     const existing = await fetchExistingSaleIdForIngested(record.id)
     if (!existing) throw err
+    saleId = existing
     logger.info('publish idempotent: resolved existing sale for ingested row', {
       component: 'ingestion/publishWorker',
       operation: 'reuse_existing_sale',
       rowId: record.id,
       saleId: existing,
     })
-    return existing
   }
+
+  await maybePatchExistingSaleImages(saleId, sanitizedImages, patchCtx)
+  return saleId
 }
 
 /**

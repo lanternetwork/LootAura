@@ -59,6 +59,35 @@ function makeClaimBuilder(row: unknown) {
   return self
 }
 
+/** Pretend the sale row already has media so maybePatchExistingSaleImages is a no-op. */
+function salesMockPatchNoOp() {
+  return {
+    select: (fields: string) => {
+      if (fields === 'id') {
+        return {
+          eq: () => ({
+            limit: async () => ({ data: [{ id: 'existing-sale-for-ingested' }], error: null }),
+          }),
+        }
+      }
+      return {
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: {
+              cover_image_url: 'https://synthetic-post-insert.lootaura.test/skip-patch.jpg',
+              images: ['https://synthetic-post-insert.lootaura.test/skip-patch.jpg'],
+            },
+            error: null,
+          }),
+        }),
+      }
+    },
+    update: () => ({
+      eq: async () => ({ error: null }),
+    }),
+  }
+}
+
 function mockIngestedSalesClaimSequence(row: unknown) {
   mockFromBase.mockImplementation((_db: unknown, table: string) => {
     if (table === 'ingested_sales') {
@@ -71,6 +100,9 @@ function mockIngestedSalesClaimSequence(row: unknown) {
           eq: async () => ({ error: null }),
         }),
       }
+    }
+    if (table === 'sales') {
+      return salesMockPatchNoOp()
     }
     return {
       update: () => ({
@@ -170,6 +202,284 @@ describe('publish worker image consumption', () => {
     const body = createPublishedSaleMock.mock.calls[0][0]
     expect(body.image_urls?.length).toBe(3)
     expect(body.image_urls).toEqual(urls.slice(0, 3))
+  })
+})
+
+describe('publish worker idempotent sale images', () => {
+  const ingestedId = '33333333-3333-4333-8333-333333333333'
+  const existingSaleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+
+  function uniqueIngestedSaleViolation() {
+    const err = new Error(
+      'duplicate key value violates unique constraint "idx_sales_ingested_sale_id_unique"'
+    ) as Error & { pgCode?: string }
+    err.pgCode = '23505'
+    return err
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
+  })
+
+  it('on unique conflict, patches existing sale when image fields are empty and sanitized URLs exist', async () => {
+    const okUrl = 'https://images.example.org/patch-me.jpg'
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) {
+          return makeClaimBuilder(
+            baseRow({
+              raw_payload: { tags: [] },
+              image_source_url: okUrl,
+            })
+          )
+        }
+        return {
+          update: () => ({
+            eq: async () => ({ error: null }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: (fields: string) => {
+            if (fields === 'id') {
+              return {
+                eq: () => ({
+                  limit: async () => ({ data: [{ id: existingSaleId }], error: null }),
+                }),
+              }
+            }
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { cover_image_url: null, images: null },
+                  error: null,
+                }),
+              }),
+            }
+          },
+          update: (payload: unknown) => updateSpy(payload),
+        }
+      }
+      return {
+        update: () => ({
+          eq: async () => ({ error: null }),
+        }),
+      }
+    })
+
+    createPublishedSaleMock.mockRejectedValueOnce(uniqueIngestedSaleViolation())
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(result).toMatchObject({ publishedSaleId: existingSaleId })
+    expect(createPublishedSaleMock).toHaveBeenCalledTimes(1)
+    expect(updateSpy).toHaveBeenCalledWith({
+      cover_image_url: okUrl,
+      images: [okUrl],
+    })
+  })
+
+  it('on unique conflict, does not overwrite existing sale media', async () => {
+    const okUrl = 'https://images.example.org/new.jpg'
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) {
+          return makeClaimBuilder(
+            baseRow({
+              raw_payload: { tags: [] },
+              image_source_url: okUrl,
+            })
+          )
+        }
+        return {
+          update: () => ({
+            eq: async () => ({ error: null }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: (fields: string) => {
+            if (fields === 'id') {
+              return {
+                eq: () => ({
+                  limit: async () => ({ data: [{ id: existingSaleId }], error: null }),
+                }),
+              }
+            }
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    cover_image_url: 'https://images.example.org/existing-cover.jpg',
+                    images: [],
+                  },
+                  error: null,
+                }),
+              }),
+            }
+          },
+          update: (payload: unknown) => updateSpy(payload),
+        }
+      }
+      return {
+        update: () => ({
+          eq: async () => ({ error: null }),
+        }),
+      }
+    })
+
+    createPublishedSaleMock.mockRejectedValueOnce(uniqueIngestedSaleViolation())
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(updateSpy).not.toHaveBeenCalled()
+  })
+
+  it('image patch failure does not fail publish', async () => {
+    const okUrl = 'https://images.example.org/patch-me.jpg'
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: async () => ({ error: { message: 'simulated update failure' } }),
+    })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) {
+          return makeClaimBuilder(
+            baseRow({
+              raw_payload: { tags: [] },
+              image_source_url: okUrl,
+            })
+          )
+        }
+        return {
+          update: () => ({
+            eq: async () => ({ error: null }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: (fields: string) => {
+            if (fields === 'id') {
+              return {
+                eq: () => ({
+                  limit: async () => ({ data: [{ id: existingSaleId }], error: null }),
+                }),
+              }
+            }
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { cover_image_url: null, images: null },
+                  error: null,
+                }),
+              }),
+            }
+          },
+          update: (payload: unknown) => updateSpy(payload),
+        }
+      }
+      return {
+        update: () => ({
+          eq: async () => ({ error: null }),
+        }),
+      }
+    })
+
+    createPublishedSaleMock.mockRejectedValueOnce(uniqueIngestedSaleViolation())
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(updateSpy).toHaveBeenCalled()
+  })
+
+  it('normal first insert still sets images on create payload and skips redundant sale update', async () => {
+    const url = 'https://images.example.org/first-insert.jpg'
+    const salesImageUpdate = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) {
+          return makeClaimBuilder(
+            baseRow({
+              raw_payload: { tags: [] },
+              image_source_url: url,
+            })
+          )
+        }
+        return {
+          update: () => ({
+            eq: async () => ({ error: null }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: (_fields: string) => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  cover_image_url: 'https://synthetic-post-insert.lootaura.test/skip-patch.jpg',
+                  images: [url],
+                },
+                error: null,
+              }),
+            }),
+          }),
+          update: (payload: unknown) => salesImageUpdate(payload),
+        }
+      }
+      return {
+        update: () => ({
+          eq: async () => ({ error: null }),
+        }),
+      }
+    })
+
+    createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-new' })
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    const body = createPublishedSaleMock.mock.calls[0][0]
+    expect(body.image_urls).toEqual([url])
+    expect(salesImageUpdate).not.toHaveBeenCalled()
+  })
+
+  it('invalid image_source_url still publishes with only validated URLs on create payload', async () => {
+    mockIngestedSalesClaimSequence(
+      baseRow({
+        raw_payload: { imageUrls: ['https://images.example.org/ok.jpg'] },
+        image_source_url: 'https://127.0.0.1/bad.jpg',
+      })
+    )
+    createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-1' })
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    const body = createPublishedSaleMock.mock.calls[0][0]
+    expect(body.image_urls).toEqual(['https://images.example.org/ok.jpg'])
   })
 })
 

@@ -187,6 +187,12 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
   }
 
   state.inFlight = true
+  const previousLastCompletedAtMs = state.lastCompletedAtMs
+  let completedGeocodeWork = false
+  let geocodeInvoked = false
+  let geocodeResolvedSuccessfully = false
+  let claimedBeforeCooldownMutation: number | null = null
+
   const startedAtMs = Date.now()
   const leaseTtlSeconds = parseLeaseTtlSeconds()
   logger.info('Preview backlog drain started', {
@@ -283,10 +289,33 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
       }
     }
 
+    geocodeInvoked = true
+    logger.info('Preview backlog drain invoking geocode worker', {
+      component: COMPONENT,
+      operation: 'geocode_pending_await_start',
+      source,
+      NODE_ENV,
+      VERCEL_ENV,
+      batchSize,
+      durationMs: Date.now() - startedAtMs,
+    })
     try {
       const summary = await geocodePendingSales({
         batchSizeOverride: batchSize,
         captureClaimedRowIds: true,
+      })
+      geocodeResolvedSuccessfully = true
+      const claimed = Number(summary.claimed ?? 0)
+      claimedBeforeCooldownMutation = claimed
+      completedGeocodeWork = true
+      logger.info('Preview backlog drain geocode await resolved', {
+        component: COMPONENT,
+        operation: 'geocode_pending_await_resolved',
+        source,
+        NODE_ENV,
+        VERCEL_ENV,
+        claimed,
+        durationMs: Date.now() - startedAtMs,
       })
       const failed = Number(summary.failedRetriable ?? 0) + Number(summary.failedTerminal ?? 0)
       logger.info('Preview backlog drain completed', {
@@ -300,7 +329,7 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         cooldownMs,
         msSinceLastRun,
         batchSize,
-        claimed: Number(summary.claimed ?? 0),
+        claimed,
         processed: Number(summary.processed ?? 0),
         failed,
         publishTriggered: Number(summary.publishTriggered ?? 0),
@@ -311,7 +340,7 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
       })
       return {
         status: 'completed',
-        claimed: Number(summary.claimed ?? 0),
+        claimed,
         processed: Number(summary.processed ?? 0),
         failed,
         publishTriggered: Number(summary.publishTriggered ?? 0),
@@ -319,6 +348,7 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         firstClaimedRowIds: (summary.claimedRowIds ?? []).slice(0, 3),
       }
     } catch (error) {
+      geocodeResolvedSuccessfully = false
       logger.warn('Preview backlog drain failed during geocode pending sales run', {
         component: COMPONENT,
         operation: 'drain_error',
@@ -331,6 +361,9 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         msSinceLastRun,
         batchSize,
         durationMs: Date.now() - startedAtMs,
+        geocodeInvoked: true,
+        geocodeResolvedSuccessfully: false,
+        cooldownTimestampMutated: false,
         errorName: error instanceof Error ? error.name : 'UnknownError',
         errorMessage: error instanceof Error ? error.message : String(error),
       })
@@ -345,8 +378,26 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
       }
     }
   } finally {
-    state.lastCompletedAtMs = Date.now()
     state.inFlight = false
+    const cooldownTimestampMutated = completedGeocodeWork
+    if (completedGeocodeWork) {
+      state.lastCompletedAtMs = Date.now()
+    }
+    logger.info('Preview backlog drain lifecycle', {
+      component: COMPONENT,
+      operation: 'drain_lifecycle',
+      source,
+      NODE_ENV,
+      VERCEL_ENV,
+      hasRedisEnv,
+      cooldownTimestampMutated,
+      previousLastCompletedAtMs,
+      lastCompletedAtMs: state.lastCompletedAtMs,
+      geocodeInvoked,
+      geocodeResolvedSuccessfully,
+      claimedBeforeCooldownMutation: completedGeocodeWork ? claimedBeforeCooldownMutation : null,
+      durationMs: Date.now() - startedAtMs,
+    })
   }
 }
 

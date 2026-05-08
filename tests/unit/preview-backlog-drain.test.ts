@@ -70,9 +70,14 @@ describe('preview backlog drain', () => {
     delete env.UPSTASH_REDIS_REST_TOKEN
 
     await maybeRunPreviewBacklogDrain('test')
+    await maybeRunPreviewBacklogDrain('test')
 
     expect(hoisted.geocodePendingSales).not.toHaveBeenCalled()
     expect(hoisted.loggerWarn).toHaveBeenCalled()
+    const cooldownSkips = hoisted.loggerInfo.mock.calls.filter(
+      (c) => c[1]?.operation === 'cooldown_skip'
+    )
+    expect(cooldownSkips.length).toBe(0)
   })
 
   it('enforces in-process cooldown/debounce', async () => {
@@ -140,6 +145,69 @@ describe('preview backlog drain', () => {
     })
     expect(completed).toBe(true)
     expect(hoisted.loggerInfo).toHaveBeenCalled()
+  })
+
+  it('does not advance cooldown when lease is not acquired', async () => {
+    const env = process.env as Record<string, string | undefined>
+    const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
+      '@/lib/ingestion/previewBacklogDrain'
+    )
+    __resetPreviewBacklogDrainStateForTests()
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ result: null }),
+      })
+    )
+
+    await maybeRunPreviewBacklogDrain('test')
+    await maybeRunPreviewBacklogDrain('test')
+
+    expect(hoisted.geocodePendingSales).not.toHaveBeenCalled()
+    const cooldownSkips = hoisted.loggerInfo.mock.calls.filter(
+      (c) => c[1]?.operation === 'cooldown_skip'
+    )
+    expect(cooldownSkips.length).toBe(0)
+    const lifecycles = hoisted.loggerInfo.mock.calls.filter((c) => c[1]?.operation === 'drain_lifecycle')
+    expect(lifecycles.every((c) => c[1]?.cooldownTimestampMutated === false)).toBe(true)
+  })
+
+  it('does not advance cooldown when geocodePendingSales throws', async () => {
+    const env = process.env as Record<string, string | undefined>
+    const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
+      '@/lib/ingestion/previewBacklogDrain'
+    )
+    __resetPreviewBacklogDrainStateForTests()
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
+    hoisted.geocodePendingSales
+      .mockRejectedValueOnce(new Error('geocode failed'))
+      .mockResolvedValueOnce({
+        claimed: 1,
+        succeeded: 1,
+        failedRetriable: 0,
+        failedTerminal: 0,
+        rate429Count: 0,
+        processed: 1,
+        publishTriggered: 0,
+        publishOk: 0,
+        publishFailed: 0,
+        claimedRowIds: ['a'],
+      })
+
+    const r1 = await maybeRunPreviewBacklogDrain('test')
+    const r2 = await maybeRunPreviewBacklogDrain('test')
+
+    expect(r1.status).toBe('error')
+    expect(r2.status).toBe('completed')
+    expect(hoisted.geocodePendingSales).toHaveBeenCalledTimes(2)
+    const cooldownSkips = hoisted.loggerInfo.mock.calls.filter(
+      (c) => c[1]?.operation === 'cooldown_skip'
+    )
+    expect(cooldownSkips.length).toBe(0)
   })
 })
 

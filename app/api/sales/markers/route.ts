@@ -7,6 +7,7 @@ import { toDbSet } from '@/lib/shared/categoryContract'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail } from '@/lib/http/json'
+import { maybeRunPreviewBacklogDrain } from '@/lib/ingestion/previewBacklogDrain'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,8 @@ async function markersHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
+    await maybeRunPreviewBacklogDrain('api/sales/markers')
+
     const url = new URL(request.url)
     const q = url.searchParams
     const latParam = q.get('lat')

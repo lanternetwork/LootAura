@@ -176,11 +176,14 @@ describe('SaleDetailClient cover image rendering', () => {
 
     render(<SaleDetailClient sale={saleWithGallery as any} displayCategories={[]} items={[]} />)
 
-    const nextImageButtons = screen.getAllByLabelText('Next sale image')
-    expect(nextImageButtons.length).toBeGreaterThanOrEqual(2)
-    fireEvent.click(nextImageButtons[0])
+    const thumbnails = screen.getAllByLabelText('Show sale image 3')
+    expect(thumbnails.length).toBeGreaterThanOrEqual(2)
+    fireEvent.click(thumbnails[0])
 
     expect(screen.getAllByAltText(/Sale thumbnail/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByTestId('sale-detail-cover-next-image').length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('sale-detail-cover-next-image')[0]).toHaveAttribute(
+      'src',
+      'https://res.cloudinary.com/demo/image/upload/v1/3.jpg'
+    )
   })
 })

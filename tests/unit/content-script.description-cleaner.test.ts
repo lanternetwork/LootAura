@@ -90,4 +90,20 @@ describe('content-script description cleaner', () => {
     const cleaned = cleaner!(dirty)
     expect(cleaned).toBe('Lots of new bikes and toys for kids.')
   })
+
+  it('strips weekday-prefixed ranges, labeled times, CTA junk, and zip/country tails', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+      url: 'https://example.com/listing',
+      runScripts: 'dangerously',
+    })
+    loadContentScript(dom)
+    const win = dom.window as unknown as WindowWithContentScriptTest
+    const cleaner = win.__LootAuraContentScriptTest?.cleanExtractedDescription
+    expect(typeof cleaner).toBe('function')
+
+    const dirty =
+      'Great furniture and toys. Fri 5/8 Start time: 8am Starts at 9:30am For more information please visit us at click here see listing 46307, USA'
+    const cleaned = cleaner!(dirty)
+    expect(cleaned).toBe('Great furniture and toys.')
+  })
 })

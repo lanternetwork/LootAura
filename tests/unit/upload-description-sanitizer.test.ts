@@ -32,5 +32,17 @@ describe('sanitizeUploadDescription', () => {
     const cleaned = sanitizeUploadDescription(dirty)
     expect(cleaned).toBe('Lots of new bikes and toys for kids.')
   })
+
+  it('strips weekday-prefixed ranges and labeled single times', () => {
+    const dirty = 'Vintage tools and records. Thu 5/7 - Sat 5/9 Start time: 8am Starts at 9:30am'
+    const cleaned = sanitizeUploadDescription(dirty)
+    expect(cleaned).toBe('Vintage tools and records.')
+  })
+
+  it('strips flattened CTA and zip/country pollution while preserving prose', () => {
+    const dirty = 'Collectibles and bikes available. For more information please visit us at click here see listing 46307, USA'
+    const cleaned = sanitizeUploadDescription(dirty)
+    expect(cleaned).toBe('Collectibles and bikes available.')
+  })
 })
 

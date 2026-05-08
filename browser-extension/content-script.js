@@ -397,10 +397,26 @@ function cleanExtractedDescription(rawText) {
     text = text.replace(/\bView on map\b/gi, "");
     text = text.replace(/\bReport listing\b/gi, "");
     text = text.replace(/\bShare listing\b/gi, "");
+    text = text.replace(/\bFor more information\b/gi, "");
+    text = text.replace(/\bplease visit us at\b/gi, "");
+    text = text.replace(/\bclick here\b/gi, "");
+    text = text.replace(/\bsee listing\b/gi, "");
+    text = text.replace(
+      /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
+      ""
+    );
+    text = text.replace(
+      /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
+      ""
+    );
+    text = text.replace(/\bstart(?:s)?\s*time\s*:\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi, "");
+    text = text.replace(/\bstarts?\s+at\s+\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi, "");
     text = text.replace(
       /(?:,?\s*)\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?(?=\s|$)/gi,
       ""
     );
+    text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\s*,?\s*USA\b/gi, " ");
+    text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\b(?=\s*$)/gi, " ");
     text = text.replace(
       /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
       ""

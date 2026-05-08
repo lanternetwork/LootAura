@@ -15,11 +15,30 @@ export function sanitizeUploadDescription(value: string | null): string | null {
     text = text.replace(/\bView on map\b/gi, '')
     text = text.replace(/\bReport listing\b/gi, '')
     text = text.replace(/\bShare listing\b/gi, '')
+    text = text.replace(/\bFor more information\b/gi, '')
+    text = text.replace(/\bplease visit us at\b/gi, '')
+    text = text.replace(/\bclick here\b/gi, '')
+    text = text.replace(/\bsee listing\b/gi, '')
+    // Weekday-prefixed date ranges and single-day date labels.
+    text = text.replace(
+      /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
+      ''
+    )
+    text = text.replace(
+      /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
+      ''
+    )
+    // Labeled single-time fragments.
+    text = text.replace(/\bstart(?:s)?\s*time\s*:\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi, '')
+    text = text.replace(/\bstarts?\s+at\s+\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi, '')
     // Address tails.
     text = text.replace(
       /(?:,?\s*)\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?(?=\s|$)/gi,
       ''
     )
+    // ZIP/country tails.
+    text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\s*,?\s*USA\b/gi, ' ')
+    text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\b(?=\s*$)/gi, ' ')
     // Date ranges.
     text = text.replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi, '')
     // Time ranges.
@@ -43,6 +62,11 @@ export function sanitizeUploadDescription(value: string | null): string | null {
       if (/^\s*(\d{1,2}:\d{2}\s*(am|pm)?\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)?)\s*$/i.test(line)) return false
       if (/^\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*(?:[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)?\s*$/i.test(line)) return false
       if (/^(street view|directions|view on map|report listing|share listing)$/i.test(line)) return false
+      if (/^(for more information|please visit us at|click here|see listing)$/i.test(line)) return false
+      if (/^start(?:s)?\s*time\s*:\s*\d{1,2}(?::\d{2})?\s*(am|pm)$/i.test(line)) return false
+      if (/^starts?\s+at\s+\d{1,2}(?::\d{2})?\s*(am|pm)$/i.test(line)) return false
+      if (/^\d{5}(?:-\d{4})?\s*,?\s*USA$/i.test(line)) return false
+      if (/^(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/i.test(line)) return false
       if (/^source:\s*/i.test(line)) return false
       if (/^(https?:\/\/|www\.)/i.test(line)) return false
       return true

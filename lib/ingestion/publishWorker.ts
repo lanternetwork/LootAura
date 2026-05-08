@@ -282,7 +282,17 @@ function looksPollutedDescription(value: string | null | undefined): boolean {
   if (lower.includes('street view')) return true
   if (lower.includes('directions')) return true
   if (lower.includes('source:')) return true
+  if (lower.includes('for more information')) return true
+  if (lower.includes('please visit us at')) return true
+  if (lower.includes('click here')) return true
+  if (lower.includes('see listing')) return true
   if (/(garagesalefinder\.com|yardsaletreasuremap\.com|craigslist\.org|estatesales\.net)/i.test(lower)) return true
+  if (/\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}/i.test(lower)) return true
+  if (/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}/i.test(lower)) return true
+  if (/\bstart(?:s)?\s*time\s*:\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/i.test(lower)) return true
+  if (/\bstarts?\s+at\s+\d{1,2}(?::\d{2})?\s*(am|pm)\b/i.test(lower)) return true
+  if (/\b\d{5}(?:-\d{4})?\s*,?\s*usa\b/i.test(lower)) return true
+  if (/\b\d{3,6}\s+[a-z0-9.\-'\s]+,\s*[a-z.\-\s]+,\s*[a-z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b/i.test(lower)) return true
   return false
 }
 
@@ -507,6 +517,11 @@ async function maybeSyncExistingSaleFromLatestIngest(
     const normalizedDescription = normalizeTextOrNull(record.description)
 
     const patch: Record<string, unknown> = { ...bestEffortPatch }
+    const existingAddressNormalized =
+      city && state ? normalizeAddressForPublishSafe(row.address, city, state) : normalizeTextOrNull(row.address)
+    if (existingAddressNormalized && existingAddressNormalized !== normalizeTextOrNull(row.address)) {
+      patch.address = existingAddressNormalized
+    }
 
     if (looksGenericTitle(row.title, record.city)) {
       patch.title = normalizedTitle

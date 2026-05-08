@@ -1,8 +1,10 @@
 import * as Sentry from '@sentry/nextjs'
+import { startIngestedSalesAutoRepair } from '@/lib/ingestion/startupAutoRepair'
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./sentry.server.config')
+    startIngestedSalesAutoRepair()
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {

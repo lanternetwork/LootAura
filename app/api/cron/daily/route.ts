@@ -367,11 +367,40 @@ export async function POST(request: NextRequest) {
   return handleRequest(request)
 }
 
+function deriveCronHealthFromIngestionTask(task: any, durationMs: number, environment: string) {
+  const geocode = task?.steps?.geocode
+  const publish = task?.steps?.publish
+  const claimed = Number(geocode?.claimed ?? 0)
+  const geocodeFailed = Number(geocode?.failedRetriable ?? 0) + Number(geocode?.failedTerminal ?? 0)
+  const processed = Number(geocode?.succeeded ?? 0) + geocodeFailed
+  const publishFailed = Number(publish?.failed ?? 0)
+  return {
+    claimed,
+    processed,
+    failed: geocodeFailed + publishFailed,
+    duration_ms: durationMs,
+    environment,
+  }
+}
+
 async function handleRequest(request: NextRequest) {
   const runAt = new Date().toISOString()
   const env = process.env.NODE_ENV || 'development'
+  const deploymentEnv = process.env.VERCEL_ENV || 'unknown'
+  const startedAt = Date.now()
   const opId = generateOperationId()
   const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+
+  logger.info('Daily cron route hit', withOpId({
+    component: 'api/cron/daily',
+    operation: 'route_hit',
+    method: request.method,
+    route: request.nextUrl.pathname,
+    search: request.nextUrl.search,
+    env,
+    deploymentEnv,
+    runAt,
+  }))
 
   try {
     // Validate cron authentication
@@ -380,6 +409,14 @@ async function handleRequest(request: NextRequest) {
     } catch (error) {
       // assertCronAuthorized throws NextResponse if unauthorized or misconfigured
       if (error instanceof NextResponse) {
+        logger.warn('Daily cron exited early due to auth failure', withOpId({
+          component: 'api/cron/daily',
+          operation: 'auth_failed_early_exit',
+          mode: request.nextUrl.searchParams.get('mode') === 'ingestion' ? 'ingestion' : 'daily',
+          env,
+          deploymentEnv,
+          durationMs: Date.now() - startedAt,
+        }))
         return error
       }
       // If it's not a NextResponse, rethrow
@@ -435,6 +472,10 @@ async function handleRequest(request: NextRequest) {
         results,
       }))
 
+      const durationMs = Date.now() - startedAt
+      results.health = deriveCronHealthFromIngestionTask(results.tasks.ingestionOrchestration, durationMs, env)
+      results.duration_ms = durationMs
+      results.deployment_environment = deploymentEnv
       return NextResponse.json(results, { status: results.ok ? 200 : 500 })
     }
 
@@ -552,6 +593,10 @@ async function handleRequest(request: NextRequest) {
       results,
     }))
 
+    const durationMs = Date.now() - startedAt
+    results.health = deriveCronHealthFromIngestionTask(results.tasks.ingestionOrchestration, durationMs, env)
+    results.duration_ms = durationMs
+    results.deployment_environment = deploymentEnv
     return NextResponse.json(results, { status: results.ok ? 200 : 500 })
   } catch (error) {
     // Handle auth errors (thrown by assertCronAuthorized)
@@ -573,6 +618,9 @@ async function handleRequest(request: NextRequest) {
         job: 'daily',
         runAt,
         env,
+        deployment_environment: deploymentEnv,
+        duration_ms: Date.now() - startedAt,
+        health: deriveCronHealthFromIngestionTask(null, Date.now() - startedAt, env),
         error: 'Internal server error',
       },
       { status: 500 }
@@ -584,6 +632,7 @@ async function runIngestionOrchestration(
   withOpId: (context?: any) => any,
   mode: 'daily' | 'ingestion'
 ): Promise<any> {
+  const orchestrationStartedAt = Date.now()
   logger.info('Starting ingestion orchestration task', withOpId({
     component: 'api/cron/daily',
     task: 'ingestion-orchestration',
@@ -628,6 +677,13 @@ async function runIngestionOrchestration(
           step: 'ingestion',
           minIntervalMinutes: minIngestionMinutes,
           lastSuccessfulExternalIngestionAt: lastCompletedAt,
+        }))
+        logger.warn('Ingestion orchestration early skip due to throttle window', withOpId({
+          component: 'api/cron/daily',
+          task: 'ingestion-orchestration',
+          step: 'ingestion',
+          operation: 'skip_throttled',
+          minIntervalMinutes: minIngestionMinutes,
         }))
       }
     }
@@ -904,6 +960,12 @@ async function runIngestionOrchestration(
     } catch (error) {
       if (error instanceof Error && error.message === '__LOCK_SKIP__') {
         // Intentional no-op; lock-active skip already recorded.
+        logger.warn('Ingestion orchestration early skip due to active lease', withOpId({
+          component: 'api/cron/daily',
+          task: 'ingestion-orchestration',
+          step: 'ingestion',
+          operation: 'skip_active_lease',
+        }))
       } else {
       taskResult.ok = false
       taskResult.steps.ingestion = {
@@ -948,6 +1010,14 @@ async function runIngestionOrchestration(
       step: 'geocode',
       ...geocodeSummary,
     }))
+    if (geocodeSummary.claimed === 0) {
+      logger.warn('Geocode step claimed zero rows', withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'geocode',
+        operation: 'claim_zero',
+      }))
+    }
   } catch (error) {
     taskResult.ok = false
     taskResult.steps.geocode = {
@@ -1004,9 +1074,11 @@ async function runIngestionOrchestration(
   logger.info('Ingestion orchestration task completed', withOpId({
     component: 'api/cron/daily',
     task: 'ingestion-orchestration',
+    durationMs: Date.now() - orchestrationStartedAt,
     result: taskResult,
   }))
 
+  taskResult.duration_ms = Date.now() - orchestrationStartedAt
   return taskResult
 }
 

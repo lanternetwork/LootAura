@@ -392,6 +392,18 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
   const admin = getAdminDb()
   const batchSize = parseBatchSize()
   const cooldownMinutes = 2
+  const batchStarted = Date.now()
+  const environment = process.env.NODE_ENV || 'development'
+  const deploymentEnv = process.env.VERCEL_ENV || 'unknown'
+
+  logger.info('Geocode worker batch started', {
+    component: 'ingestion/geocodeWorker',
+    operation: 'batch_start',
+    batchSize,
+    cooldownMinutes,
+    environment,
+    deploymentEnv,
+  })
 
   const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_geocoding', {
     p_batch_size: batchSize,
@@ -417,7 +429,18 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
     rate429Count: 0,
   }
 
-  const batchStarted = Date.now()
+  if (summary.claimed === 0) {
+    logger.warn('Geocode worker claimed zero rows', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'claim_rows_empty',
+      batchSize,
+      cooldownMinutes,
+      environment,
+      deploymentEnv,
+      durationMs: Date.now() - batchStarted,
+    })
+  }
+
   const rowResults = await runClaimedRowsWithConcurrency(
     claimedRows,
     concurrency,
@@ -439,16 +462,50 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
 
   const durationMs = Date.now() - batchStarted
   const failureCount = summary.failedRetriable + summary.failedTerminal
+  const processedCount = summary.succeeded + failureCount
+  let publishTriggeredCount = 0
+  let publishOkCount = 0
+  let publishFailedCount = 0
+
+  for (const rowResult of rowResults) {
+    if (rowResult.kind !== 'geocode_ok') continue
+    publishTriggeredCount += 1
+    const publish = rowResult.publish
+    if (publish.ok) {
+      publishOkCount += 1
+    } else {
+      publishFailedCount += 1
+    }
+  }
+
+  if (failureCount > 0) {
+    logger.warn('Geocode worker encountered geocode/provider failures', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'batch_failures',
+      claimed: summary.claimed,
+      processed: processedCount,
+      failedRetriable: summary.failedRetriable,
+      failedTerminal: summary.failedTerminal,
+      rate429Count: summary.rate429Count,
+      durationMs,
+    })
+  }
 
   logger.info('Geocode worker completed batch', {
     component: 'ingestion/geocodeWorker',
     operation: 'batch_complete',
+    environment,
+    deploymentEnv,
     batchSize,
     claimed: summary.claimed,
+    processed: processedCount,
     succeeded: summary.succeeded,
     failedRetriable: summary.failedRetriable,
     failedTerminal: summary.failedTerminal,
     rate429Count: summary.rate429Count,
+    publishTriggered: publishTriggeredCount,
+    publishOk: publishOkCount,
+    publishFailed: publishFailedCount,
     failureCount,
     durationMs,
     concurrency,

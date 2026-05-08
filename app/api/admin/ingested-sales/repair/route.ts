@@ -43,10 +43,15 @@ function normalizeText(value: string | null | undefined): string | null {
 }
 
 function hasDuplicatedCityStateSuffix(address: string, city: string, state: string): boolean {
-  const cityState = `${city.trim()}, ${state.trim()}`
-  const esc = cityState.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const dupPattern = new RegExp(`,\\s*${esc}\\s*,\\s*${esc}\\s*$`, 'i')
-  return dupPattern.test(address)
+  const cityNorm = city.trim()
+  const stateNorm = state.trim()
+  const cityEsc = cityNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const stateEsc = stateNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const cityStatePattern = new RegExp(`${cityEsc}\\s*,\\s*${stateEsc}(?:\\s+\\d{5}(?:-\\d{4})?)?`, 'gi')
+  const matches = address.match(cityStatePattern) ?? []
+  if (matches.length < 2) return false
+  const trailingCityState = new RegExp(`,\\s*${cityEsc}\\s*,\\s*${stateEsc}\\s*$`, 'i')
+  return trailingCityState.test(address)
 }
 
 function jsonError(status: number, code: string, message: string) {

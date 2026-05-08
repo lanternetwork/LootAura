@@ -51,7 +51,10 @@ function loadContentScript(dom: JSDOM) {
 
 describe('content-script description cleaner', () => {
   it('removes Street View/Directions/Source/address/date-time noise', () => {
-    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://example.com/listing' })
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+      url: 'https://example.com/listing',
+      runScripts: 'dangerously',
+    })
     loadContentScript(dom)
 
     const win = dom.window as unknown as WindowWithContentScriptTest

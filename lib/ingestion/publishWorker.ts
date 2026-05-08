@@ -467,7 +467,7 @@ async function maybeSyncExistingSaleFromLatestIngest(
   try {
     const admin = getAdminDb()
     const { data, error } = await fromBase(admin, 'sales')
-      .select('ingested_sale_id, title, description, address, date_start, date_end, time_start, time_end, cover_image_url, images')
+      .select('ingested_sale_id, title, description, address, city, state, date_start, date_end, time_start, time_end, cover_image_url, images')
       .eq('id', saleId)
       .maybeSingle()
 
@@ -490,6 +490,8 @@ async function maybeSyncExistingSaleFromLatestIngest(
       title: string | null
       description: string | null
       address: string | null
+      city: string | null
+      state: string | null
       date_start: string | null
       date_end: string | null
       time_start: string | null
@@ -517,8 +519,12 @@ async function maybeSyncExistingSaleFromLatestIngest(
     const normalizedDescription = normalizeTextOrNull(record.description)
 
     const patch: Record<string, unknown> = { ...bestEffortPatch }
+    const saleCity = normalizeTextOrNull(row.city) || city
+    const saleState = normalizeTextOrNull(row.state) || state
     const existingAddressNormalized =
-      city && state ? normalizeAddressForPublishSafe(row.address, city, state) : normalizeTextOrNull(row.address)
+      saleCity && saleState
+        ? normalizeAddressForPublishSafe(row.address, saleCity, saleState)
+        : normalizeTextOrNull(row.address)
     if (existingAddressNormalized && existingAddressNormalized !== normalizeTextOrNull(row.address)) {
       patch.address = existingAddressNormalized
     }

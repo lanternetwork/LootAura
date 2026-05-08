@@ -27,7 +27,13 @@ type LinkedRepairRow = {
     raw_text: string | null
     city: string | null
     state: string | null
-  } | null
+  } | Array<{
+    id: string
+    description: string | null
+    raw_text: string | null
+    city: string | null
+    state: string | null
+  }> | null
 }
 
 function normalizeText(value: string | null | undefined): string | null {
@@ -45,6 +51,21 @@ function hasDuplicatedCityStateSuffix(address: string, city: string, state: stri
 
 function jsonError(status: number, code: string, message: string) {
   return NextResponse.json({ ok: false, code, message }, { status })
+}
+
+function getLinkedIngestedRow(value: LinkedRepairRow['ingested']): {
+  id: string
+  description: string | null
+  raw_text: string | null
+  city: string | null
+  state: string | null
+} | null {
+  if (!value) return null
+  if (Array.isArray(value)) {
+    const first = value[0]
+    return first && typeof first.id === 'string' ? first : null
+  }
+  return typeof value.id === 'string' ? value : null
 }
 
 async function repairHandler(request: NextRequest) {
@@ -87,7 +108,7 @@ async function repairHandler(request: NextRequest) {
     return jsonError(500, 'LOAD_FAILED', 'Failed to load linked rows')
   }
 
-  const rows = (Array.isArray(data) ? data : []) as LinkedRepairRow[]
+  const rows = (Array.isArray(data) ? (data as unknown as LinkedRepairRow[]) : [])
 
   let scanned = 0
   let ingestedDescriptionRepairs = 0
@@ -97,13 +118,14 @@ async function repairHandler(request: NextRequest) {
 
   for (const row of rows) {
     scanned += 1
-    if (!row.ingested_sale_id || !row.ingested?.id) continue
+    const linkedIngested = getLinkedIngestedRow(row.ingested)
+    if (!row.ingested_sale_id || !linkedIngested?.id) continue
 
-    const ingestedDescriptionOriginal = normalizeText(row.ingested.description)
+    const ingestedDescriptionOriginal = normalizeText(linkedIngested.description)
     const ingestedDescriptionClean = sanitizeUploadDescription(ingestedDescriptionOriginal)
     const shouldRepairIngestedDescription =
       ingestedDescriptionClean !== ingestedDescriptionOriginal ||
-      normalizeText(row.ingested.raw_text) !== ingestedDescriptionClean
+      normalizeText(linkedIngested.raw_text) !== ingestedDescriptionClean
 
     if (shouldRepairIngestedDescription) {
       ingestedDescriptionRepairs += 1
@@ -113,7 +135,7 @@ async function repairHandler(request: NextRequest) {
             description: ingestedDescriptionClean,
             raw_text: ingestedDescriptionClean,
           })
-          .eq('id', row.ingested.id)
+          .eq('id', linkedIngested.id)
         if (!upErr) writes += 1
       }
     }
@@ -135,8 +157,8 @@ async function repairHandler(request: NextRequest) {
       }
     }
 
-    const city = normalizeText(row.city ?? row.ingested.city)
-    const state = normalizeText(row.state ?? row.ingested.state)
+    const city = normalizeText(row.city ?? linkedIngested.city)
+    const state = normalizeText(row.state ?? linkedIngested.state)
     const saleAddressOriginal = normalizeText(row.address)
     const normalizedAddress =
       saleAddressOriginal && city && state ? normalizeAddressForPublish(saleAddressOriginal, city, state) : saleAddressOriginal

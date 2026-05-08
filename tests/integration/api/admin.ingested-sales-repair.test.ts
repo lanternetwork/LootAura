@@ -43,7 +43,7 @@ function makeRows() {
       address: '620 lincoln ave, winnetka, il 60093, Winnetka, IL',
       city: 'Winnetka',
       state: 'IL',
-      ingested: {
+      ingested: [{
         id: 'ing-1',
         description:
           'Great bikes and toys. Street View Directions Source: garagesalefinder.com',
@@ -51,7 +51,7 @@ function makeRows() {
           'Great bikes and toys. Street View Directions Source: garagesalefinder.com',
         city: 'Winnetka',
         state: 'IL',
-      },
+      }],
     },
     {
       id: 'sale-2',
@@ -60,13 +60,13 @@ function makeRows() {
       address: '5918 Park Ave, Berkeley, IL',
       city: 'Berkeley',
       state: 'IL',
-      ingested: {
+      ingested: [{
         id: 'ing-2',
         description: 'Clean curated description.',
         raw_text: 'Clean curated description.',
         city: 'Berkeley',
         state: 'IL',
-      },
+      }],
     },
   ]
 }

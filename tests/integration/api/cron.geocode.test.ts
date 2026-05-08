@@ -24,10 +24,11 @@ vi.mock('@/lib/log', () => ({
 
 describe('GET /api/cron/geocode', () => {
   beforeEach(() => {
+    const env = process.env as Record<string, string | undefined>
     vi.clearAllMocks()
-    delete process.env.GEOCODE_BACKLOG_BATCH_SIZE
-    process.env.NODE_ENV = 'test'
-    process.env.VERCEL_ENV = 'preview'
+    delete env.GEOCODE_BACKLOG_BATCH_SIZE
+    env.NODE_ENV = 'test'
+    env.VERCEL_ENV = 'preview'
   })
 
   it('processes queue and then drains DB backlog', async () => {

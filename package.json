@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "preview:post-deploy-geocode-cron-once": "tsx scripts/preview-post-deploy-geocode-cron-once.ts",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",

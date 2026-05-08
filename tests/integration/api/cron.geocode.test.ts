@@ -61,7 +61,10 @@ describe('GET /api/cron/geocode', () => {
 
     expect(res.status).toBe(200)
     expect(processGeocodeQueueBatch).toHaveBeenCalledWith(50)
-    expect(geocodePendingSales).toHaveBeenCalledWith({ batchSizeOverride: 25 })
+    expect(geocodePendingSales).toHaveBeenCalledWith({
+      batchSizeOverride: 25,
+      captureClaimedRowIds: true,
+    })
     expect(data.queue).toEqual({
       processed: 3,
       completed: 2,
@@ -105,6 +108,10 @@ describe('GET /api/cron/geocode', () => {
     expect(res.status).toBe(200)
     expect(processGeocodeQueueBatch).toHaveBeenCalledTimes(1)
     expect(geocodePendingSales).toHaveBeenCalledTimes(1)
+    expect(geocodePendingSales).toHaveBeenCalledWith({
+      batchSizeOverride: 25,
+      captureClaimedRowIds: true,
+    })
     expect(data.queue.processed).toBe(0)
     expect(data.backlog.claimed).toBe(2)
   })
@@ -137,7 +144,10 @@ describe('GET /api/cron/geocode', () => {
     const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
     await GET(req)
 
-    expect(geocodePendingSales).toHaveBeenCalledWith({ batchSizeOverride: 100 })
+    expect(geocodePendingSales).toHaveBeenCalledWith({
+      batchSizeOverride: 100,
+      captureClaimedRowIds: true,
+    })
   })
 
   it('returns queue metrics even when backlog drain fails', async () => {

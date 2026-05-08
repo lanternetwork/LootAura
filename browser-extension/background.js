@@ -1,5 +1,5 @@
 const LOOTAURA_ORIGIN =
-  "https://loot-aura-9qgxxp788-lanternetworks-projects.vercel.app";
+  "https://loot-aura-rmw5ynpqn-lanternetworks-projects.vercel.app";
 const MAX_PREFLIGHT_ATTEMPTS = 3;
 const PREFLIGHT_BACKOFF_MS = [1000, 2000, 5000];
 /** Brief retries after programmatic inject (frame paint / SW timing). */

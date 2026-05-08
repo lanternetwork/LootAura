@@ -254,6 +254,7 @@ describe('GET /api/cron/daily', () => {
 
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
+    delete process.env.GEOCODE_BACKLOG_BATCH_SIZE
   })
 
   describe('Cron authentication', () => {
@@ -962,7 +963,22 @@ describe('GET /api/cron/daily', () => {
       })
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
+      expect(mockGeocodePendingSales).toHaveBeenCalledWith({ batchSizeOverride: 25 })
       expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
+    })
+
+    it('ingestion geocode step caps GEOCODE_BACKLOG_BATCH_SIZE at 100', async () => {
+      process.env.GEOCODE_BACKLOG_BATCH_SIZE = '999'
+      const request = new NextRequest('http://localhost/api/cron/daily?mode=ingestion', {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer test-cron-secret',
+        },
+      })
+
+      const response = await GET(request)
+      expect(response.status).toBe(200)
+      expect(mockGeocodePendingSales).toHaveBeenCalledWith({ batchSizeOverride: 100 })
     })
 
     it('acquires lease from clean unlocked null state and proceeds with ingestion', async () => {

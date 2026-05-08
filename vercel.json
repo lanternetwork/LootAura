@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm install --include=dev && npm run build",
+  "buildCommand": "npm install --include=dev && npm run build && npm run preview:post-deploy-geocode-cron-once",
   "installCommand": "npm install --include=dev",
   "framework": "nextjs",
   "crons": [

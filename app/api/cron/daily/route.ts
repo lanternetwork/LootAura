@@ -23,6 +23,10 @@
  * skipping archive, promotions, emails, and moderation digest. Omit `mode` for full daily.
  * High-frequency `mode=ingestion` crons throttle the external fetch step to at most once per
  * `INGESTION_ORCHESTRATION_MIN_MINUTES` (default 30); geocode and publish always run.
+ *
+ * Ingestion geocode step: bounded DB backlog only —
+ * `geocodePendingSales({ batchSizeOverride })` using `GEOCODE_BACKLOG_BATCH_SIZE` (default 25, cap 100).
+ * Does not pass `captureClaimedRowIds` (cron geocode route owns that for observability).
  */
 
 import { NextRequest, NextResponse } from 'next/server'

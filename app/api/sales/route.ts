@@ -15,10 +15,6 @@ import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
-import {
-  applyPreviewBacklogDrainHeaders,
-  maybeRunPreviewBacklogDrain,
-} from '@/lib/ingestion/previewBacklogDrain'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -41,10 +37,6 @@ async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
   const { logger, generateOperationId } = await import('@/lib/log')
   const opId = generateOperationId()
-  const drainResult = await maybeRunPreviewBacklogDrain('api/sales')
-  const applyDrainHeader = (response: NextResponse): NextResponse =>
-    applyPreviewBacklogDrainHeaders(response, drainResult)
-  
   // Helper to add opId to log context
   const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
   
@@ -436,12 +428,12 @@ async function salesHandler(request: NextRequest) {
       const cached = await getSalesApiCache(salesCacheKey)
       if (cached != null) {
         const { addCacheHeaders } = await import('@/lib/http/cache')
-        return applyDrainHeader(addCacheHeaders(NextResponse.json(cached), {
+        return addCacheHeaders(NextResponse.json(cached), {
           maxAge: 30,
           sMaxAge: 120,
           staleWhileRevalidate: 60,
           public: true,
-        }))
+        })
       }
     }
     
@@ -1031,12 +1023,12 @@ async function salesHandler(request: NextRequest) {
     // Add optimized cache headers for public sales data
     const { addCacheHeaders } = await import('@/lib/http/cache')
     const cachedResponse = NextResponse.json(response)
-    return applyDrainHeader(addCacheHeaders(cachedResponse, {
+    return addCacheHeaders(cachedResponse, {
       maxAge: 30, // 30 seconds client cache
       sMaxAge: 120, // 2 minutes CDN cache
       staleWhileRevalidate: 60, // Serve stale for 60s while revalidating
       public: true
-    }))
+    })
     
   } catch (error: any) {
     const { logger, generateOperationId } = await import('@/lib/log')

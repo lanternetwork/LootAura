@@ -2,7 +2,13 @@
  * GET /api/cron/geocode
  * POST /api/cron/geocode
  *
- * Drains the Redis-backed geocode job queue for one bounded batch (spec §10).
+ * Deterministic cron-only geocode drain (no public/request-path triggers):
+ * 1. One bounded batch from the Redis-backed job queue (`processGeocodeQueueBatch`).
+ * 2. One bounded DB backlog batch via `geocodePendingSales({ batchSizeOverride, captureClaimedRowIds: true })`.
+ *
+ * Backlog batch size: `GEOCODE_BACKLOG_BATCH_SIZE` (default 25, hard cap 100).
+ * Response JSON includes `queue` and `backlog` metrics.
+ *
  * Protected by CRON_SECRET Bearer authentication (same pattern as other cron routes).
  */
 
@@ -110,7 +116,10 @@ async function handleGeocodeCron(request: NextRequest) {
 
     const backlogStartedAt = Date.now()
     try {
-      const backlog = await geocodePendingSales({ batchSizeOverride: backlogBatchSize })
+      const backlog = await geocodePendingSales({
+        batchSizeOverride: backlogBatchSize,
+        captureClaimedRowIds: true,
+      })
       backlogDurationMs = Date.now() - backlogStartedAt
       backlogClaimed = backlog.claimed
       backlogProcessed =

@@ -391,7 +391,7 @@ function cleanExtractedDescription(rawText) {
     let text = String(input || "");
     text = text.replace(/\b(https?:\/\/\S+|www\.\S+|[a-z0-9.-]+\.(com|net|org|info|io|co)\b\S*)/gi, "");
     text = text.replace(/\bSource:\s*[^\s,.]+(?:\s+[^\s,.]+)*/gi, "");
-    text = text.replace(/\bSource:\b/gi, "");
+    text = text.replace(/\bSource:\s*/gi, "");
     text = text.replace(/\bStreet View\b/gi, "");
     text = text.replace(/\bDirections\b/gi, "");
     text = text.replace(/\bView on map\b/gi, "");

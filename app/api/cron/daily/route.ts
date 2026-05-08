@@ -46,6 +46,8 @@ import {
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
+const DEFAULT_BACKLOG_BATCH = 25
+const MAX_BACKLOG_BATCH = 100
 
 /** Minimum minutes between external_page_source ingestion runs when `mode=ingestion` (geocode/publish always run). */
 function parseIngestionOrchestrationMinMinutes(): number {
@@ -59,6 +61,15 @@ function parseIngestionOrchestrationMinMinutes(): number {
     return defaultMinutes
   }
   return Math.min(parsed, 24 * 60)
+}
+
+function parseBacklogBatchLimit(): number {
+  const raw = process.env.GEOCODE_BACKLOG_BATCH_SIZE
+  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_BACKLOG_BATCH
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_BACKLOG_BATCH
+  }
+  return Math.min(parsed, MAX_BACKLOG_BATCH)
 }
 
 function parseExternalFetchDomainMinSpacingMs(): number {
@@ -994,14 +1005,17 @@ async function runIngestionOrchestration(
 
   // Step 2: Geocode pending sales.
   try {
+    const backlogBatchSize = parseBacklogBatchLimit()
     logger.info('Geocode step started', withOpId({
       component: 'api/cron/daily',
       task: 'ingestion-orchestration',
       step: 'geocode',
+      backlogBatchSize,
     }))
-    geocodeSummary = await geocodePendingSales()
+    geocodeSummary = await geocodePendingSales({ batchSizeOverride: backlogBatchSize })
     taskResult.steps.geocode = {
       ok: true,
+      backlogBatchSize,
       ...geocodeSummary,
     }
     logger.info('Geocode step completed', withOpId({

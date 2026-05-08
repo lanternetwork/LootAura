@@ -9,12 +9,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized } from '@/lib/auth/cron'
 import { processGeocodeQueueBatch } from '@/lib/ingestion/geocodeQueue'
+import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
 
 const DEFAULT_QUEUE_BATCH = 50
 const MAX_QUEUE_BATCH = 100
+const DEFAULT_BACKLOG_BATCH = 25
+const MAX_BACKLOG_BATCH = 100
 
 function parseQueueBatchLimit(): number {
   const raw = process.env.GEOCODE_CRON_QUEUE_BATCH
@@ -23,6 +26,15 @@ function parseQueueBatchLimit(): number {
     return DEFAULT_QUEUE_BATCH
   }
   return Math.min(parsed, MAX_QUEUE_BATCH)
+}
+
+function parseBacklogBatchLimit(): number {
+  const raw = process.env.GEOCODE_BACKLOG_BATCH_SIZE
+  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_BACKLOG_BATCH
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_BACKLOG_BATCH
+  }
+  return Math.min(parsed, MAX_BACKLOG_BATCH)
 }
 
 export async function GET(request: NextRequest) {
@@ -68,10 +80,17 @@ async function handleGeocodeCron(request: NextRequest) {
   }
 
   const limit = parseQueueBatchLimit()
+  const backlogBatchSize = parseBacklogBatchLimit()
   let processed = 0
   let requeued = 0
   let completed = 0
   let errors = 0
+  let backlogClaimed = 0
+  let backlogProcessed = 0
+  let backlogFailed = 0
+  let backlogPublishTriggered = 0
+  let backlogDurationMs = 0
+  let backlogError: string | null = null
 
   try {
     const batch = await processGeocodeQueueBatch(limit)
@@ -87,6 +106,77 @@ async function handleGeocodeCron(request: NextRequest) {
         environment,
         deploymentEnv,
       })
+    }
+
+    const backlogStartedAt = Date.now()
+    try {
+      const backlog = await geocodePendingSales({ batchSizeOverride: backlogBatchSize })
+      backlogDurationMs = Date.now() - backlogStartedAt
+      backlogClaimed = backlog.claimed
+      backlogProcessed =
+        backlog.processed ??
+        (Number(backlog.succeeded ?? 0) + Number(backlog.failedRetriable ?? 0) + Number(backlog.failedTerminal ?? 0))
+      backlogFailed = Number(backlog.failedRetriable ?? 0) + Number(backlog.failedTerminal ?? 0)
+      backlogPublishTriggered = Number(backlog.publishTriggered ?? 0)
+      if (backlogClaimed === 0) {
+        logger.warn('Geocode cron backlog drain claimed zero rows', {
+          component: 'api/cron/geocode',
+          operation: 'backlog_empty',
+          requestId,
+          backlogBatchSize,
+          environment,
+          deploymentEnv,
+        })
+      }
+    } catch (error) {
+      backlogDurationMs = Date.now() - backlogStartedAt
+      backlogError = error instanceof Error ? error.message : String(error)
+      logger.error(
+        'Geocode cron backlog drain failed',
+        error instanceof Error ? error : new Error(backlogError),
+        {
+          component: 'api/cron/geocode',
+          operation: 'backlog_drain',
+          requestId,
+          backlogBatchSize,
+          environment,
+          deploymentEnv,
+        }
+      )
+      errors = 1
+      const durationMs = Date.now() - startedAt
+      return NextResponse.json(
+        {
+          ok: false,
+          environment,
+          deployment_environment: deploymentEnv,
+          duration_ms: durationMs,
+          claimed: processed,
+          processed,
+          failed: errors,
+          requeued,
+          completed,
+          errors,
+          limit,
+          queue: {
+            processed,
+            completed,
+            requeued,
+            failed: 0,
+          },
+          backlog: {
+            batch_size: backlogBatchSize,
+            claimed: backlogClaimed,
+            processed: backlogProcessed,
+            failed: backlogFailed,
+            publishTriggered: backlogPublishTriggered,
+            duration_ms: backlogDurationMs,
+            error: backlogError,
+          },
+          error: backlogError,
+        },
+        { status: 500 }
+      )
     }
   } catch (error) {
     errors = 1
@@ -116,6 +206,21 @@ async function handleGeocodeCron(request: NextRequest) {
         completed,
         errors,
         limit,
+        queue: {
+          processed,
+          completed,
+          requeued,
+          failed: errors,
+        },
+        backlog: {
+          batch_size: backlogBatchSize,
+          claimed: backlogClaimed,
+          processed: backlogProcessed,
+          failed: backlogFailed,
+          publishTriggered: backlogPublishTriggered,
+          duration_ms: backlogDurationMs,
+          error: backlogError,
+        },
         error: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
@@ -135,6 +240,12 @@ async function handleGeocodeCron(request: NextRequest) {
     completed,
     requeued,
     failed: errors,
+    backlogBatchSize,
+    backlogClaimed,
+    backlogProcessed,
+    backlogFailed,
+    backlogPublishTriggered,
+    backlogDurationMs,
   })
 
   return NextResponse.json({
@@ -149,5 +260,20 @@ async function handleGeocodeCron(request: NextRequest) {
     completed,
     errors,
     limit,
+    queue: {
+      processed,
+      completed,
+      requeued,
+      failed: 0,
+    },
+    backlog: {
+      batch_size: backlogBatchSize,
+      claimed: backlogClaimed,
+      processed: backlogProcessed,
+      failed: backlogFailed,
+      publishTriggered: backlogPublishTriggered,
+      duration_ms: backlogDurationMs,
+      error: backlogError,
+    },
   })
 }

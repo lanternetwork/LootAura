@@ -7,6 +7,8 @@ export function sanitizeUploadDescription(value: string | null): string | null {
     text = text.replace(/\b(https?:\/\/\S+|www\.\S+|[a-z0-9.-]+\.(com|net|org|info|io|co)\b\S*)/gi, '')
     // Inline "Source: ..." fragments.
     text = text.replace(/\bSource:\s*[^\s,.]+(?:\s+[^\s,.]+)*/gi, '')
+    // Standalone "Source:" label (no trailing token).
+    text = text.replace(/\bSource:\b/gi, '')
     // Navigation/action labels.
     text = text.replace(/\bStreet View\b/gi, '')
     text = text.replace(/\bDirections\b/gi, '')

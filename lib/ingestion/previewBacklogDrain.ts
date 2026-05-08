@@ -8,6 +8,7 @@ const MIN_COOLDOWN_MINUTES = 2
 const MAX_COOLDOWN_MINUTES = 5
 const DEFAULT_LEASE_TTL_SECONDS = 120
 const LOCK_KEY = 'ingestion:preview_backlog_drain:lock'
+const COMPONENT = 'ingestion/previewBacklogDrain'
 
 type DrainState = {
   inFlight: boolean
@@ -61,13 +62,7 @@ function parseLeaseTtlSeconds(): number {
 async function acquireRedisLease(ttlSeconds: number): Promise<boolean> {
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
-  if (!redisUrl || !redisToken) {
-    logger.warn('Preview backlog drain skipped: distributed lease unavailable', {
-      component: 'ingestion/preview-backlog-drain',
-      operation: 'lease_unavailable',
-    })
-    return false
-  }
+  if (!redisUrl || !redisToken) return false
 
   const response = await fetch(`${redisUrl}/set/${LOCK_KEY}/1`, {
     method: 'POST',
@@ -87,68 +82,181 @@ async function acquireRedisLease(ttlSeconds: number): Promise<boolean> {
 }
 
 export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void> {
+  const NODE_ENV = process.env.NODE_ENV || 'development'
+  const VERCEL_ENV = process.env.VERCEL_ENV || 'unknown'
+  const hasRedisEnv = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  const source = trigger
   if (!isPreviewRuntime()) {
+    logger.info('Preview backlog drain skipped by runtime gate', {
+      component: COMPONENT,
+      operation: 'gate_skip',
+      reason: 'not_preview_runtime',
+      source,
+      NODE_ENV,
+      VERCEL_ENV,
+      hasRedisEnv,
+      cooldownMs: parseCooldownMinutes() * 60 * 1000,
+      msSinceLastRun: null,
+      batchSize: parseBatchSize(),
+      durationMs: 0,
+    })
     return
   }
 
   const state = getState()
   const nowMs = Date.now()
   const cooldownMs = parseCooldownMinutes() * 60 * 1000
+  const msSinceLastRun = state.lastCompletedAtMs > 0 ? nowMs - state.lastCompletedAtMs : null
+  const batchSize = parseBatchSize()
   if (state.inFlight) {
+    logger.info('Preview backlog drain skipped because a run is already in flight', {
+      component: COMPONENT,
+      operation: 'inflight_skip',
+      reason: 'in_flight',
+      source,
+      NODE_ENV,
+      VERCEL_ENV,
+      hasRedisEnv,
+      cooldownMs,
+      msSinceLastRun,
+      batchSize,
+      durationMs: 0,
+    })
     return
   }
   if (state.lastCompletedAtMs > 0 && nowMs - state.lastCompletedAtMs < cooldownMs) {
+    logger.info('Preview backlog drain skipped due to cooldown', {
+      component: COMPONENT,
+      operation: 'cooldown_skip',
+      reason: 'cooldown_active',
+      source,
+      NODE_ENV,
+      VERCEL_ENV,
+      hasRedisEnv,
+      cooldownMs,
+      msSinceLastRun,
+      batchSize,
+      durationMs: 0,
+    })
     return
   }
 
   state.inFlight = true
   const startedAtMs = Date.now()
-  const batchSize = parseBatchSize()
   const leaseTtlSeconds = parseLeaseTtlSeconds()
+  logger.info('Preview backlog drain started', {
+    component: COMPONENT,
+    operation: 'drain_start',
+    reason: 'eligible',
+    source,
+    NODE_ENV,
+    VERCEL_ENV,
+    hasRedisEnv,
+    cooldownMs,
+    msSinceLastRun,
+    batchSize,
+    durationMs: 0,
+  })
   try {
-    const leaseAcquired = await acquireRedisLease(leaseTtlSeconds)
-    if (!leaseAcquired) {
-      logger.warn('Preview backlog drain skipped: lease busy', {
-        component: 'ingestion/preview-backlog-drain',
-        operation: 'lease_busy',
-        trigger,
+    if (!hasRedisEnv) {
+      logger.warn('Preview backlog drain skipped: distributed lease unavailable', {
+        component: COMPONENT,
+        operation: 'lease_unavailable',
+        reason: 'missing_redis_env',
+        source,
+        NODE_ENV,
+        VERCEL_ENV,
+        hasRedisEnv,
+        cooldownMs,
+        msSinceLastRun,
         batchSize,
-        leaseTtlSeconds,
+        durationMs: Date.now() - startedAtMs,
       })
       return
     }
 
-    const summary = await geocodePendingSales({
-      batchSizeOverride: batchSize,
-      captureClaimedRowIds: true,
-    })
-    const failed = Number(summary.failedRetriable ?? 0) + Number(summary.failedTerminal ?? 0)
-    logger.info('Preview backlog drain completed', {
-      component: 'ingestion/preview-backlog-drain',
-      operation: 'drain_complete',
-      trigger,
-      batchSize,
-      leaseTtlSeconds,
-      claimed: Number(summary.claimed ?? 0),
-      processed: Number(summary.processed ?? 0),
-      failed,
-      publishTriggered: Number(summary.publishTriggered ?? 0),
-      publishOk: Number(summary.publishOk ?? 0),
-      publishFailed: Number(summary.publishFailed ?? 0),
-      firstClaimedRowIds: (summary.claimedRowIds ?? []).slice(0, 3),
-      durationMs: Date.now() - startedAtMs,
-    })
-  } catch (error) {
-    logger.warn('Preview backlog drain skipped due to lease/runtime error', {
-      component: 'ingestion/preview-backlog-drain',
-      operation: 'drain_error',
-      trigger,
-      batchSize,
-      leaseTtlSeconds,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : String(error),
-      durationMs: Date.now() - startedAtMs,
-    })
+    let leaseAcquired = false
+    try {
+      leaseAcquired = await acquireRedisLease(leaseTtlSeconds)
+    } catch (error) {
+      logger.warn('Preview backlog drain skipped: lease acquisition errored', {
+        component: COMPONENT,
+        operation: 'lease_error',
+        reason: 'lease_request_failed',
+        source,
+        NODE_ENV,
+        VERCEL_ENV,
+        hasRedisEnv,
+        cooldownMs,
+        msSinceLastRun,
+        batchSize,
+        durationMs: Date.now() - startedAtMs,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+      return
+    }
+
+    if (!leaseAcquired) {
+      logger.warn('Preview backlog drain skipped: lease busy', {
+        component: COMPONENT,
+        operation: 'lease_busy',
+        reason: 'lease_not_acquired',
+        source,
+        NODE_ENV,
+        VERCEL_ENV,
+        hasRedisEnv,
+        cooldownMs,
+        msSinceLastRun,
+        batchSize,
+        durationMs: Date.now() - startedAtMs,
+      })
+      return
+    }
+
+    try {
+      const summary = await geocodePendingSales({
+        batchSizeOverride: batchSize,
+        captureClaimedRowIds: true,
+      })
+      const failed = Number(summary.failedRetriable ?? 0) + Number(summary.failedTerminal ?? 0)
+      logger.info('Preview backlog drain completed', {
+        component: COMPONENT,
+        operation: 'drain_complete',
+        reason: 'completed',
+        source,
+        NODE_ENV,
+        VERCEL_ENV,
+        hasRedisEnv,
+        cooldownMs,
+        msSinceLastRun,
+        batchSize,
+        claimed: Number(summary.claimed ?? 0),
+        processed: Number(summary.processed ?? 0),
+        failed,
+        publishTriggered: Number(summary.publishTriggered ?? 0),
+        publishOk: Number(summary.publishOk ?? 0),
+        publishFailed: Number(summary.publishFailed ?? 0),
+        firstClaimedRowIds: (summary.claimedRowIds ?? []).slice(0, 3),
+        durationMs: Date.now() - startedAtMs,
+      })
+    } catch (error) {
+      logger.warn('Preview backlog drain failed during geocode pending sales run', {
+        component: COMPONENT,
+        operation: 'drain_error',
+        reason: 'geocode_pending_failed',
+        source,
+        NODE_ENV,
+        VERCEL_ENV,
+        hasRedisEnv,
+        cooldownMs,
+        msSinceLastRun,
+        batchSize,
+        durationMs: Date.now() - startedAtMs,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+    }
   } finally {
     state.lastCompletedAtMs = Date.now()
     state.inFlight = false

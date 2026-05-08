@@ -20,6 +20,11 @@ export interface GeocodeWorkerSummary {
   failedRetriable: number
   failedTerminal: number
   rate429Count: number
+  processed?: number
+  publishTriggered?: number
+  publishOk?: number
+  publishFailed?: number
+  claimedRowIds?: string[]
 }
 
 export type GeocodeIngestedSaleByIdResult =
@@ -27,6 +32,12 @@ export type GeocodeIngestedSaleByIdResult =
   | { outcome: 'success'; published?: boolean; publishedSaleId?: string }
   | { outcome: 'geocode_failed'; retriable: boolean }
   | { outcome: 'publish_failed'; error: string }
+
+export interface GeocodeWorkerRunOptions {
+  batchSizeOverride?: number
+  cooldownMinutesOverride?: number
+  captureClaimedRowIds?: boolean
+}
 
 function parseBatchSize(): number {
   const raw = process.env.GEOCODE_BATCH_SIZE
@@ -388,10 +399,19 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
   return { outcome: 'geocode_failed', retriable: attempt.retriable }
 }
 
-export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
+export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Promise<GeocodeWorkerSummary> {
   const admin = getAdminDb()
-  const batchSize = parseBatchSize()
-  const cooldownMinutes = 2
+  const defaultBatchSize = parseBatchSize()
+  const batchSizeCandidate = options?.batchSizeOverride
+  const batchSize =
+    typeof batchSizeCandidate === 'number' && Number.isFinite(batchSizeCandidate) && batchSizeCandidate > 0
+      ? Math.min(Math.floor(batchSizeCandidate), 500)
+      : defaultBatchSize
+  const cooldownCandidate = options?.cooldownMinutesOverride
+  const cooldownMinutes =
+    typeof cooldownCandidate === 'number' && Number.isFinite(cooldownCandidate) && cooldownCandidate >= 0
+      ? Math.min(Math.floor(cooldownCandidate), 60)
+      : 2
   const batchStarted = Date.now()
   const environment = process.env.NODE_ENV || 'development'
   const deploymentEnv = process.env.VERCEL_ENV || 'unknown'
@@ -427,6 +447,9 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
     failedRetriable: 0,
     failedTerminal: 0,
     rate429Count: 0,
+    ...(options?.captureClaimedRowIds
+      ? { claimedRowIds: claimedRows.map((row) => row.id).slice(0, 3) }
+      : {}),
   }
 
   if (summary.claimed === 0) {
@@ -510,6 +533,11 @@ export async function geocodePendingSales(): Promise<GeocodeWorkerSummary> {
     durationMs,
     concurrency,
   })
+
+  summary.processed = processedCount
+  summary.publishTriggered = publishTriggeredCount
+  summary.publishOk = publishOkCount
+  summary.publishFailed = publishFailedCount
 
   return summary
 }

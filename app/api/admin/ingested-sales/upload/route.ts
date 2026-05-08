@@ -13,6 +13,10 @@ import { geocodeIngestedSaleById } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 import type { RawExternalSale, IngestionRunSummary, CityIngestionConfig, FailureReason } from '@/lib/ingestion/types'
 import { ensureIngestionCityConfigFromListingSource } from '@/lib/ingestion/ensureCityConfigFromListingSource'
+import {
+  maybeRunPreviewBacklogDrain,
+  PREVIEW_BACKLOG_DRAIN_HEADER,
+} from '@/lib/ingestion/previewBacklogDrain'
 
 export const dynamic = 'force-dynamic'
 
@@ -505,8 +509,8 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
     failed: summary.failed,
     durationMs,
   })
-
-  return NextResponse.json({
+  const drainResult = await maybeRunPreviewBacklogDrain('api/admin/ingested-sales/upload')
+  const response = NextResponse.json({
     ok: true,
     ingestionRunId,
     summary,
@@ -516,6 +520,10 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
       published: 0,
     },
   })
+  if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview') {
+    response.headers.set(PREVIEW_BACKLOG_DRAIN_HEADER, drainResult.status)
+  }
+  return response
 }
 
 export const POST = withRateLimit(uploadHandler, [Policies.ADMIN_TOOLS, Policies.ADMIN_HOURLY])

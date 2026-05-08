@@ -9,10 +9,31 @@ const MAX_COOLDOWN_MINUTES = 5
 const DEFAULT_LEASE_TTL_SECONDS = 120
 const LOCK_KEY = 'ingestion:preview_backlog_drain:lock'
 const COMPONENT = 'ingestion/previewBacklogDrain'
+export const PREVIEW_BACKLOG_DRAIN_HEADER = 'x-lootaura-preview-backlog-drain'
 
 type DrainState = {
   inFlight: boolean
   lastCompletedAtMs: number
+}
+
+export type PreviewBacklogDrainStatus =
+  | 'started'
+  | 'completed'
+  | 'cooldown_skip'
+  | 'inflight_skip'
+  | 'lease_busy'
+  | 'lease_unavailable'
+  | 'gate_skip'
+  | 'error'
+
+export type PreviewBacklogDrainResult = {
+  status: PreviewBacklogDrainStatus
+  claimed: number
+  processed: number
+  failed: number
+  publishTriggered: number
+  durationMs: number
+  firstClaimedRowIds: string[]
 }
 
 function getState(): DrainState {
@@ -81,7 +102,7 @@ async function acquireRedisLease(ttlSeconds: number): Promise<boolean> {
   return payload.result === 'OK'
 }
 
-export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void> {
+export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<PreviewBacklogDrainResult> {
   const NODE_ENV = process.env.NODE_ENV || 'development'
   const VERCEL_ENV = process.env.VERCEL_ENV || 'unknown'
   const hasRedisEnv = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
@@ -100,7 +121,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
       batchSize: parseBatchSize(),
       durationMs: 0,
     })
-    return
+    return {
+      status: 'gate_skip',
+      claimed: 0,
+      processed: 0,
+      failed: 0,
+      publishTriggered: 0,
+      durationMs: 0,
+      firstClaimedRowIds: [],
+    }
   }
 
   const state = getState()
@@ -122,7 +151,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
       batchSize,
       durationMs: 0,
     })
-    return
+    return {
+      status: 'inflight_skip',
+      claimed: 0,
+      processed: 0,
+      failed: 0,
+      publishTriggered: 0,
+      durationMs: 0,
+      firstClaimedRowIds: [],
+    }
   }
   if (state.lastCompletedAtMs > 0 && nowMs - state.lastCompletedAtMs < cooldownMs) {
     logger.info('Preview backlog drain skipped due to cooldown', {
@@ -138,7 +175,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
       batchSize,
       durationMs: 0,
     })
-    return
+    return {
+      status: 'cooldown_skip',
+      claimed: 0,
+      processed: 0,
+      failed: 0,
+      publishTriggered: 0,
+      durationMs: 0,
+      firstClaimedRowIds: [],
+    }
   }
 
   state.inFlight = true
@@ -172,7 +217,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
         batchSize,
         durationMs: Date.now() - startedAtMs,
       })
-      return
+      return {
+        status: 'lease_unavailable',
+        claimed: 0,
+        processed: 0,
+        failed: 0,
+        publishTriggered: 0,
+        durationMs: Date.now() - startedAtMs,
+        firstClaimedRowIds: [],
+      }
     }
 
     let leaseAcquired = false
@@ -194,7 +247,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
         errorName: error instanceof Error ? error.name : 'UnknownError',
         errorMessage: error instanceof Error ? error.message : String(error),
       })
-      return
+      return {
+        status: 'error',
+        claimed: 0,
+        processed: 0,
+        failed: 0,
+        publishTriggered: 0,
+        durationMs: Date.now() - startedAtMs,
+        firstClaimedRowIds: [],
+      }
     }
 
     if (!leaseAcquired) {
@@ -211,7 +272,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
         batchSize,
         durationMs: Date.now() - startedAtMs,
       })
-      return
+      return {
+        status: 'lease_busy',
+        claimed: 0,
+        processed: 0,
+        failed: 0,
+        publishTriggered: 0,
+        durationMs: Date.now() - startedAtMs,
+        firstClaimedRowIds: [],
+      }
     }
 
     try {
@@ -240,6 +309,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
         firstClaimedRowIds: (summary.claimedRowIds ?? []).slice(0, 3),
         durationMs: Date.now() - startedAtMs,
       })
+      return {
+        status: 'completed',
+        claimed: Number(summary.claimed ?? 0),
+        processed: Number(summary.processed ?? 0),
+        failed,
+        publishTriggered: Number(summary.publishTriggered ?? 0),
+        durationMs: Date.now() - startedAtMs,
+        firstClaimedRowIds: (summary.claimedRowIds ?? []).slice(0, 3),
+      }
     } catch (error) {
       logger.warn('Preview backlog drain failed during geocode pending sales run', {
         component: COMPONENT,
@@ -256,6 +334,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<void
         errorName: error instanceof Error ? error.name : 'UnknownError',
         errorMessage: error instanceof Error ? error.message : String(error),
       })
+      return {
+        status: 'error',
+        claimed: 0,
+        processed: 0,
+        failed: 0,
+        publishTriggered: 0,
+        durationMs: Date.now() - startedAtMs,
+        firstClaimedRowIds: [],
+      }
     }
   } finally {
     state.lastCompletedAtMs = Date.now()

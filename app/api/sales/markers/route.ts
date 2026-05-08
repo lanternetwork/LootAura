@@ -7,7 +7,11 @@ import { toDbSet } from '@/lib/shared/categoryContract'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail } from '@/lib/http/json'
-import { maybeRunPreviewBacklogDrain } from '@/lib/ingestion/previewBacklogDrain'
+import {
+  maybeRunPreviewBacklogDrain,
+  PREVIEW_BACKLOG_DRAIN_HEADER,
+  type PreviewBacklogDrainResult,
+} from '@/lib/ingestion/previewBacklogDrain'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -19,7 +23,13 @@ async function markersHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
-    await maybeRunPreviewBacklogDrain('api/sales/markers')
+    const drainResult = await maybeRunPreviewBacklogDrain('api/sales/markers')
+    const applyDrainHeader = (response: NextResponse): NextResponse => {
+      if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview') {
+        response.headers.set(PREVIEW_BACKLOG_DRAIN_HEADER, drainResult.status)
+      }
+      return response
+    }
 
     const url = new URL(request.url)
     const q = url.searchParams
@@ -37,7 +47,7 @@ async function markersHandler(request: NextRequest) {
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
     const originLng = lngParam !== null ? parseFloat(lngParam) : NaN
     if (!Number.isFinite(originLat) || !Number.isFinite(originLng)) {
-      return NextResponse.json({ error: 'Missing or invalid lat/lng' }, { status: 400 })
+      return applyDrainHeader(NextResponse.json({ error: 'Missing or invalid lat/lng' }, { status: 400 }))
     }
     // Normalize distance (km)
     const distanceKm = Number.isFinite(parseFloat(String(distanceParam))) ? Math.max(0, parseFloat(String(distanceParam))) : 40
@@ -66,7 +76,7 @@ async function markersHandler(request: NextRequest) {
     // Validate and parse date range parameters early (before query)
     const dateValidation = dateBounds.validateDateRange(startDate, endDate)
     if (!dateValidation.valid) {
-      return NextResponse.json({ error: dateValidation.error }, { status: 400 })
+      return applyDrainHeader(NextResponse.json({ error: dateValidation.error }, { status: 400 }))
     }
     
     // Parse date bounds using shared helper
@@ -81,7 +91,9 @@ async function markersHandler(request: NextRequest) {
     if (favoritesOnly) {
       const { data: { user }, error: authError } = await sb.auth.getUser()
       if (authError || !user) {
-        return NextResponse.json({ error: 'Authentication required for favorites-only filter' }, { status: 401 })
+        return applyDrainHeader(
+          NextResponse.json({ error: 'Authentication required for favorites-only filter' }, { status: 401 })
+        )
       }
       
       // Fetch user's favorite sale IDs
@@ -91,14 +103,14 @@ async function markersHandler(request: NextRequest) {
         .eq('user_id', user.id)
       
       if (favoritesError) {
-        return NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 })
+        return applyDrainHeader(NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 }))
       }
       
       favoriteSaleIds = favorites?.map(f => f.sale_id) || []
       
       // If user has no favorites, return empty results
       if (favoriteSaleIds.length === 0) {
-        return NextResponse.json([])
+        return applyDrainHeader(NextResponse.json([]))
       }
     }
 
@@ -177,7 +189,7 @@ async function markersHandler(request: NextRequest) {
           component: 'sales',
           operation: 'markers_category_filter'
         })
-        return fail(500, 'CATEGORY_FILTER_ERROR', 'Category filter failed')
+        return applyDrainHeader(fail(500, 'CATEGORY_FILTER_ERROR', 'Category filter failed'))
       }
       
       const saleIds = salesWithCategories?.map(item => item.sale_id) || []
@@ -196,14 +208,14 @@ async function markersHandler(request: NextRequest) {
         query = query.in('id', saleIds)
       } else {
         // No sales match the categories, return empty result
-        return NextResponse.json({
+        return applyDrainHeader(NextResponse.json({
           ok: true,
           data: [],
           center: { lat: originLat, lng: originLng },
           distanceKm,
           count: 0,
           durationMs: Date.now() - startedAt
-        })
+        }))
       }
     }
 
@@ -259,14 +271,14 @@ async function markersHandler(request: NextRequest) {
         if (saleIds.length > 0) {
           query = query.in('id', saleIds)
         } else {
-          return NextResponse.json({
+          return applyDrainHeader(NextResponse.json({
             ok: true,
             data: [],
             center: { lat: originLat, lng: originLng },
             distanceKm,
             count: 0,
             durationMs: Date.now() - startedAt
-          })
+          }))
         }
       }
       
@@ -284,7 +296,7 @@ async function markersHandler(request: NextRequest) {
         component: 'sales',
         operation: 'markers_query'
       })
-      return fail(500, 'QUERY_ERROR', 'Database query failed')
+      return applyDrainHeader(fail(500, 'QUERY_ERROR', 'Database query failed'))
     }
 
     // Debug logging (date filtering now done in DB)
@@ -335,7 +347,7 @@ async function markersHandler(request: NextRequest) {
     }
 
     // Return structured response matching /api/sales format
-    return NextResponse.json({
+    return applyDrainHeader(NextResponse.json({
       ok: true,
       data: markers,
       center: { lat: originLat, lng: originLng },
@@ -348,7 +360,7 @@ async function markersHandler(request: NextRequest) {
         'CDN-Cache-Control': 'public, max-age=600',
         'Vary': 'Accept-Encoding'
       }
-    })
+    }))
   } catch (error: any) {
     const { logger } = await import('@/lib/log')
     logger.error('Markers API error', error instanceof Error ? error : new Error(String(error)), {
@@ -356,7 +368,14 @@ async function markersHandler(request: NextRequest) {
       operation: 'markers_handler',
       durationMs: Date.now() - startedAt
     })
-    return fail(500, 'INTERNAL_ERROR', 'Internal server error')
+    const fallback = {
+      status: 'error',
+    } as PreviewBacklogDrainResult
+    const response = fail(500, 'INTERNAL_ERROR', 'Internal server error')
+    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview') {
+      response.headers.set(PREVIEW_BACKLOG_DRAIN_HEADER, fallback.status)
+    }
+    return response
   }
 }
 

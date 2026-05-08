@@ -8,9 +8,8 @@ import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail } from '@/lib/http/json'
 import {
+  applyPreviewBacklogDrainHeaders,
   maybeRunPreviewBacklogDrain,
-  PREVIEW_BACKLOG_DRAIN_HEADER,
-  type PreviewBacklogDrainResult,
 } from '@/lib/ingestion/previewBacklogDrain'
 
 // Force dynamic rendering for this API route
@@ -21,15 +20,12 @@ export const dynamic = 'force-dynamic'
 // [{ id: string, title: string, lat: number, lng: number }]
 async function markersHandler(request: NextRequest) {
   const startedAt = Date.now()
-  
+  let drainResult: Awaited<ReturnType<typeof maybeRunPreviewBacklogDrain>> | undefined
+
   try {
-    const drainResult = await maybeRunPreviewBacklogDrain('api/sales/markers')
-    const applyDrainHeader = (response: NextResponse): NextResponse => {
-      if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview') {
-        response.headers.set(PREVIEW_BACKLOG_DRAIN_HEADER, drainResult.status)
-      }
-      return response
-    }
+    drainResult = await maybeRunPreviewBacklogDrain('api/sales/markers')
+    const applyDrainHeader = (response: NextResponse): NextResponse =>
+      applyPreviewBacklogDrainHeaders(response, drainResult!)
 
     const url = new URL(request.url)
     const q = url.searchParams
@@ -368,12 +364,9 @@ async function markersHandler(request: NextRequest) {
       operation: 'markers_handler',
       durationMs: Date.now() - startedAt
     })
-    const fallback = {
-      status: 'error',
-    } as PreviewBacklogDrainResult
     const response = fail(500, 'INTERNAL_ERROR', 'Internal server error')
-    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview') {
-      response.headers.set(PREVIEW_BACKLOG_DRAIN_HEADER, fallback.status)
+    if (drainResult) {
+      applyPreviewBacklogDrainHeaders(response, drainResult)
     }
     return response
   }

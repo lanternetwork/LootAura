@@ -202,12 +202,69 @@ describe('preview backlog drain', () => {
     const r2 = await maybeRunPreviewBacklogDrain('test')
 
     expect(r1.status).toBe('error')
+    expect(r1.geocodeInvoked).toBe(true)
+    expect(r1.geocodeResolvedSuccessfully).toBe(false)
+    expect(r1.cooldownTimestampMutated).toBe(false)
     expect(r2.status).toBe('completed')
     expect(hoisted.geocodePendingSales).toHaveBeenCalledTimes(2)
     const cooldownSkips = hoisted.loggerInfo.mock.calls.filter(
       (c) => c[1]?.operation === 'cooldown_skip'
     )
     expect(cooldownSkips.length).toBe(0)
+  })
+
+  it('cooldown_skip result has geocodeInvoked false and msSinceLastRun after a successful run', async () => {
+    const env = process.env as Record<string, string | undefined>
+    const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
+      '@/lib/ingestion/previewBacklogDrain'
+    )
+    __resetPreviewBacklogDrainStateForTests()
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
+    env.PREVIEW_GEOCODE_BACKLOG_COOLDOWN_MINUTES = '5'
+
+    hoisted.geocodePendingSales.mockResolvedValue({
+      claimed: 1,
+      succeeded: 1,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      rate429Count: 0,
+      processed: 1,
+      publishTriggered: 0,
+      publishOk: 0,
+      publishFailed: 0,
+      claimedRowIds: ['id-a'],
+    })
+
+    await maybeRunPreviewBacklogDrain('first')
+    const second = await maybeRunPreviewBacklogDrain('second')
+
+    expect(second.status).toBe('cooldown_skip')
+    expect(second.reason).toBe('cooldown_active')
+    expect(second.geocodeInvoked).toBe(false)
+    expect(second.geocodeResolvedSuccessfully).toBe(false)
+    expect(second.cooldownTimestampMutated).toBe(false)
+    expect(second.msSinceLastRun).not.toBeNull()
+    expect(typeof second.msSinceLastRun).toBe('number')
+    expect(hoisted.geocodePendingSales).toHaveBeenCalledTimes(1)
+  })
+
+  it('lease_unavailable result exposes missing_redis_env reason', async () => {
+    const env = process.env as Record<string, string | undefined>
+    const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
+      '@/lib/ingestion/previewBacklogDrain'
+    )
+    __resetPreviewBacklogDrainStateForTests()
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
+    delete env.UPSTASH_REDIS_REST_URL
+    delete env.UPSTASH_REDIS_REST_TOKEN
+
+    const r = await maybeRunPreviewBacklogDrain('test')
+
+    expect(r.status).toBe('lease_unavailable')
+    expect(r.reason).toBe('missing_redis_env')
+    expect(r.geocodeInvoked).toBe(false)
   })
 })
 

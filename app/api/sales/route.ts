@@ -16,8 +16,8 @@ import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
 import {
+  applyPreviewBacklogDrainHeaders,
   maybeRunPreviewBacklogDrain,
-  PREVIEW_BACKLOG_DRAIN_HEADER,
 } from '@/lib/ingestion/previewBacklogDrain'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
@@ -42,12 +42,8 @@ async function salesHandler(request: NextRequest) {
   const { logger, generateOperationId } = await import('@/lib/log')
   const opId = generateOperationId()
   const drainResult = await maybeRunPreviewBacklogDrain('api/sales')
-  const applyDrainHeader = (response: NextResponse): NextResponse => {
-    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview') {
-      response.headers.set(PREVIEW_BACKLOG_DRAIN_HEADER, drainResult.status)
-    }
-    return response
-  }
+  const applyDrainHeader = (response: NextResponse): NextResponse =>
+    applyPreviewBacklogDrainHeaders(response, drainResult)
   
   // Helper to add opId to log context
   const withOpId = (context: any = {}) => ({ ...context, requestId: opId })

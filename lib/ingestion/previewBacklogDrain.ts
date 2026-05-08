@@ -1,5 +1,6 @@
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
 import { logger } from '@/lib/log'
+import type { NextResponse } from 'next/server'
 
 const DEFAULT_BATCH_SIZE = 25
 const MAX_BATCH_SIZE = 100
@@ -9,7 +10,33 @@ const MAX_COOLDOWN_MINUTES = 5
 const DEFAULT_LEASE_TTL_SECONDS = 120
 const LOCK_KEY = 'ingestion:preview_backlog_drain:lock'
 const COMPONENT = 'ingestion/previewBacklogDrain'
+
 export const PREVIEW_BACKLOG_DRAIN_HEADER = 'x-lootaura-preview-backlog-drain'
+export const PREVIEW_BACKLOG_HEADER_REASON = 'x-lootaura-preview-backlog-reason'
+export const PREVIEW_BACKLOG_HEADER_CLAIMED = 'x-lootaura-preview-backlog-claimed'
+export const PREVIEW_BACKLOG_HEADER_PROCESSED = 'x-lootaura-preview-backlog-processed'
+export const PREVIEW_BACKLOG_HEADER_FAILED = 'x-lootaura-preview-backlog-failed'
+export const PREVIEW_BACKLOG_HEADER_GEOCODE_INVOKED = 'x-lootaura-preview-backlog-geocode-invoked'
+export const PREVIEW_BACKLOG_HEADER_GEOCODE_RESOLVED = 'x-lootaura-preview-backlog-geocode-resolved'
+export const PREVIEW_BACKLOG_HEADER_COOLDOWN_MUTATED = 'x-lootaura-preview-backlog-cooldown-mutated'
+export const PREVIEW_BACKLOG_HEADER_MS_SINCE_LAST_RUN = 'x-lootaura-preview-backlog-ms-since-last-run'
+export const PREVIEW_BACKLOG_HEADER_FIRST_CLAIMED_IDS = 'x-lootaura-preview-backlog-first-claimed-ids'
+export const PREVIEW_BACKLOG_HEADER_DURATION_MS = 'x-lootaura-preview-backlog-duration-ms'
+
+/** All preview-only backlog observability headers (for tests). */
+export const PREVIEW_BACKLOG_DRAIN_HEADER_NAMES = [
+  PREVIEW_BACKLOG_DRAIN_HEADER,
+  PREVIEW_BACKLOG_HEADER_REASON,
+  PREVIEW_BACKLOG_HEADER_CLAIMED,
+  PREVIEW_BACKLOG_HEADER_PROCESSED,
+  PREVIEW_BACKLOG_HEADER_FAILED,
+  PREVIEW_BACKLOG_HEADER_GEOCODE_INVOKED,
+  PREVIEW_BACKLOG_HEADER_GEOCODE_RESOLVED,
+  PREVIEW_BACKLOG_HEADER_COOLDOWN_MUTATED,
+  PREVIEW_BACKLOG_HEADER_MS_SINCE_LAST_RUN,
+  PREVIEW_BACKLOG_HEADER_FIRST_CLAIMED_IDS,
+  PREVIEW_BACKLOG_HEADER_DURATION_MS,
+] as const
 
 type DrainState = {
   inFlight: boolean
@@ -28,12 +55,76 @@ export type PreviewBacklogDrainStatus =
 
 export type PreviewBacklogDrainResult = {
   status: PreviewBacklogDrainStatus
+  reason: string
   claimed: number
   processed: number
   failed: number
   publishTriggered: number
+  publishOk: number
+  publishFailed: number
+  geocodeInvoked: boolean
+  geocodeResolvedSuccessfully: boolean
+  cooldownTimestampMutated: boolean
+  msSinceLastRun: number | null
   durationMs: number
   firstClaimedRowIds: string[]
+}
+
+function isPreviewResponseHeadersRuntime(): boolean {
+  return process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview'
+}
+
+/** Sets compact preview-only headers; no-op outside preview production. */
+export function applyPreviewBacklogDrainHeaders(
+  response: NextResponse,
+  result: PreviewBacklogDrainResult
+): NextResponse {
+  if (!isPreviewResponseHeadersRuntime()) {
+    return response
+  }
+  const ids = result.firstClaimedRowIds.slice(0, 5).join(',')
+  response.headers.set(PREVIEW_BACKLOG_DRAIN_HEADER, result.status)
+  response.headers.set(PREVIEW_BACKLOG_HEADER_REASON, result.reason)
+  response.headers.set(PREVIEW_BACKLOG_HEADER_CLAIMED, String(result.claimed))
+  response.headers.set(PREVIEW_BACKLOG_HEADER_PROCESSED, String(result.processed))
+  response.headers.set(PREVIEW_BACKLOG_HEADER_FAILED, String(result.failed))
+  response.headers.set(PREVIEW_BACKLOG_HEADER_GEOCODE_INVOKED, result.geocodeInvoked ? 'true' : 'false')
+  response.headers.set(
+    PREVIEW_BACKLOG_HEADER_GEOCODE_RESOLVED,
+    result.geocodeResolvedSuccessfully ? 'true' : 'false'
+  )
+  response.headers.set(
+    PREVIEW_BACKLOG_HEADER_COOLDOWN_MUTATED,
+    result.cooldownTimestampMutated ? 'true' : 'false'
+  )
+  response.headers.set(
+    PREVIEW_BACKLOG_HEADER_MS_SINCE_LAST_RUN,
+    result.msSinceLastRun == null ? '' : String(result.msSinceLastRun)
+  )
+  response.headers.set(PREVIEW_BACKLOG_HEADER_FIRST_CLAIMED_IDS, ids)
+  response.headers.set(PREVIEW_BACKLOG_HEADER_DURATION_MS, String(result.durationMs))
+  return response
+}
+
+function baseResult(
+  partial: Partial<PreviewBacklogDrainResult> & Pick<PreviewBacklogDrainResult, 'status' | 'reason'>
+): PreviewBacklogDrainResult {
+  return {
+    status: partial.status,
+    reason: partial.reason,
+    claimed: partial.claimed ?? 0,
+    processed: partial.processed ?? 0,
+    failed: partial.failed ?? 0,
+    publishTriggered: partial.publishTriggered ?? 0,
+    publishOk: partial.publishOk ?? 0,
+    publishFailed: partial.publishFailed ?? 0,
+    geocodeInvoked: partial.geocodeInvoked ?? false,
+    geocodeResolvedSuccessfully: partial.geocodeResolvedSuccessfully ?? false,
+    cooldownTimestampMutated: partial.cooldownTimestampMutated ?? false,
+    msSinceLastRun: partial.msSinceLastRun ?? null,
+    durationMs: partial.durationMs ?? 0,
+    firstClaimedRowIds: partial.firstClaimedRowIds ?? [],
+  }
 }
 
 function getState(): DrainState {
@@ -121,15 +212,11 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
       batchSize: parseBatchSize(),
       durationMs: 0,
     })
-    return {
+    return baseResult({
       status: 'gate_skip',
-      claimed: 0,
-      processed: 0,
-      failed: 0,
-      publishTriggered: 0,
-      durationMs: 0,
-      firstClaimedRowIds: [],
-    }
+      reason: 'not_preview_runtime',
+      msSinceLastRun: null,
+    })
   }
 
   const state = getState()
@@ -151,15 +238,11 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
       batchSize,
       durationMs: 0,
     })
-    return {
+    return baseResult({
       status: 'inflight_skip',
-      claimed: 0,
-      processed: 0,
-      failed: 0,
-      publishTriggered: 0,
-      durationMs: 0,
-      firstClaimedRowIds: [],
-    }
+      reason: 'in_flight',
+      msSinceLastRun,
+    })
   }
   if (state.lastCompletedAtMs > 0 && nowMs - state.lastCompletedAtMs < cooldownMs) {
     logger.info('Preview backlog drain skipped due to cooldown', {
@@ -175,15 +258,12 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
       batchSize,
       durationMs: 0,
     })
-    return {
+    return baseResult({
       status: 'cooldown_skip',
-      claimed: 0,
-      processed: 0,
-      failed: 0,
-      publishTriggered: 0,
-      durationMs: 0,
-      firstClaimedRowIds: [],
-    }
+      reason: 'cooldown_active',
+      msSinceLastRun,
+      cooldownTimestampMutated: false,
+    })
   }
 
   state.inFlight = true
@@ -223,15 +303,12 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         batchSize,
         durationMs: Date.now() - startedAtMs,
       })
-      return {
+      return baseResult({
         status: 'lease_unavailable',
-        claimed: 0,
-        processed: 0,
-        failed: 0,
-        publishTriggered: 0,
+        reason: 'missing_redis_env',
+        msSinceLastRun,
         durationMs: Date.now() - startedAtMs,
-        firstClaimedRowIds: [],
-      }
+      })
     }
 
     let leaseAcquired = false
@@ -253,15 +330,12 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         errorName: error instanceof Error ? error.name : 'UnknownError',
         errorMessage: error instanceof Error ? error.message : String(error),
       })
-      return {
+      return baseResult({
         status: 'error',
-        claimed: 0,
-        processed: 0,
-        failed: 0,
-        publishTriggered: 0,
+        reason: 'lease_request_failed',
+        msSinceLastRun,
         durationMs: Date.now() - startedAtMs,
-        firstClaimedRowIds: [],
-      }
+      })
     }
 
     if (!leaseAcquired) {
@@ -278,15 +352,12 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         batchSize,
         durationMs: Date.now() - startedAtMs,
       })
-      return {
+      return baseResult({
         status: 'lease_busy',
-        claimed: 0,
-        processed: 0,
-        failed: 0,
-        publishTriggered: 0,
+        reason: 'lease_not_acquired',
+        msSinceLastRun,
         durationMs: Date.now() - startedAtMs,
-        firstClaimedRowIds: [],
-      }
+      })
     }
 
     geocodeInvoked = true
@@ -308,6 +379,7 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
       const claimed = Number(summary.claimed ?? 0)
       claimedBeforeCooldownMutation = claimed
       completedGeocodeWork = true
+      const firstIds = (summary.claimedRowIds ?? []).slice(0, 5)
       logger.info('Preview backlog drain geocode await resolved', {
         component: COMPONENT,
         operation: 'geocode_pending_await_resolved',
@@ -318,6 +390,9 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         durationMs: Date.now() - startedAtMs,
       })
       const failed = Number(summary.failedRetriable ?? 0) + Number(summary.failedTerminal ?? 0)
+      const publishTriggered = Number(summary.publishTriggered ?? 0)
+      const publishOk = Number(summary.publishOk ?? 0)
+      const publishFailed = Number(summary.publishFailed ?? 0)
       logger.info('Preview backlog drain completed', {
         component: COMPONENT,
         operation: 'drain_complete',
@@ -332,21 +407,28 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         claimed,
         processed: Number(summary.processed ?? 0),
         failed,
-        publishTriggered: Number(summary.publishTriggered ?? 0),
-        publishOk: Number(summary.publishOk ?? 0),
-        publishFailed: Number(summary.publishFailed ?? 0),
-        firstClaimedRowIds: (summary.claimedRowIds ?? []).slice(0, 3),
+        publishTriggered,
+        publishOk,
+        publishFailed,
+        firstClaimedRowIds: firstIds,
         durationMs: Date.now() - startedAtMs,
       })
-      return {
+      return baseResult({
         status: 'completed',
+        reason: 'completed',
         claimed,
         processed: Number(summary.processed ?? 0),
         failed,
-        publishTriggered: Number(summary.publishTriggered ?? 0),
+        publishTriggered,
+        publishOk,
+        publishFailed,
+        geocodeInvoked: true,
+        geocodeResolvedSuccessfully: true,
+        cooldownTimestampMutated: true,
+        msSinceLastRun,
         durationMs: Date.now() - startedAtMs,
-        firstClaimedRowIds: (summary.claimedRowIds ?? []).slice(0, 3),
-      }
+        firstClaimedRowIds: firstIds,
+      })
     } catch (error) {
       geocodeResolvedSuccessfully = false
       logger.warn('Preview backlog drain failed during geocode pending sales run', {
@@ -367,15 +449,15 @@ export async function maybeRunPreviewBacklogDrain(trigger: string): Promise<Prev
         errorName: error instanceof Error ? error.name : 'UnknownError',
         errorMessage: error instanceof Error ? error.message : String(error),
       })
-      return {
+      return baseResult({
         status: 'error',
-        claimed: 0,
-        processed: 0,
-        failed: 0,
-        publishTriggered: 0,
+        reason: 'geocode_pending_failed',
+        geocodeInvoked: true,
+        geocodeResolvedSuccessfully: false,
+        cooldownTimestampMutated: false,
+        msSinceLastRun,
         durationMs: Date.now() - startedAtMs,
-        firstClaimedRowIds: [],
-      }
+      })
     }
   } finally {
     state.inFlight = false
@@ -410,4 +492,3 @@ export function __resetPreviewBacklogDrainStateForTests(): void {
     lastCompletedAtMs: 0,
   }
 }
-

@@ -613,7 +613,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     failedTerminal: 0,
     rate429Count: 0,
     ...(options?.captureClaimedRowIds
-      ? { claimedRowIds: claimedRows.map((row) => row.id).slice(0, 3) }
+      ? { claimedRowIds: claimedRows.map((row) => row.id).slice(0, 5) }
       : {}),
   }
 

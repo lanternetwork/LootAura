@@ -1,14 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
+import type { PreviewBacklogDrainResult } from '@/lib/ingestion/previewBacklogDrain'
 
 const hoisted = vi.hoisted(() => ({
   maybeRunPreviewBacklogDrain: vi.fn(),
 }))
 
-vi.mock('@/lib/ingestion/previewBacklogDrain', () => ({
-  maybeRunPreviewBacklogDrain: hoisted.maybeRunPreviewBacklogDrain,
-  PREVIEW_BACKLOG_DRAIN_HEADER: 'x-lootaura-preview-backlog-drain',
-}))
+vi.mock('@/lib/ingestion/previewBacklogDrain', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/ingestion/previewBacklogDrain')>()
+  return {
+    ...mod,
+    maybeRunPreviewBacklogDrain: hoisted.maybeRunPreviewBacklogDrain,
+  }
+})
+
+function mockDrainResult(overrides: Partial<PreviewBacklogDrainResult> = {}): PreviewBacklogDrainResult {
+  return {
+    status: 'completed',
+    reason: 'completed',
+    claimed: 1,
+    processed: 1,
+    failed: 0,
+    publishTriggered: 1,
+    publishOk: 1,
+    publishFailed: 0,
+    geocodeInvoked: true,
+    geocodeResolvedSuccessfully: true,
+    cooldownTimestampMutated: true,
+    msSinceLastRun: null,
+    durationMs: 10,
+    firstClaimedRowIds: ['row-1'],
+    ...overrides,
+  }
+}
 
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
   withRateLimit: (handler: any) => handler,
@@ -25,18 +49,10 @@ describe('preview backlog drain route wiring', () => {
     vi.clearAllMocks()
     env.NODE_ENV = 'production'
     env.VERCEL_ENV = 'preview'
-    hoisted.maybeRunPreviewBacklogDrain.mockResolvedValue({
-      status: 'completed',
-      claimed: 1,
-      processed: 1,
-      failed: 0,
-      publishTriggered: 1,
-      durationMs: 10,
-      firstClaimedRowIds: ['row-1'],
-    })
+    hoisted.maybeRunPreviewBacklogDrain.mockResolvedValue(mockDrainResult())
   })
 
-  it('sales route drains before cache return and sets preview header', async () => {
+  it('sales route drains before cache return and sets preview self-verify headers', async () => {
     vi.doMock('@/lib/supabase/server', () => ({
       createSupabaseServerClient: vi.fn().mockResolvedValue({}),
     }))
@@ -55,6 +71,12 @@ describe('preview backlog drain route wiring', () => {
 
     expect(hoisted.maybeRunPreviewBacklogDrain).toHaveBeenCalledWith('api/sales')
     expect(response.headers.get('x-lootaura-preview-backlog-drain')).toBe('completed')
+    expect(response.headers.get('x-lootaura-preview-backlog-reason')).toBe('completed')
+    expect(response.headers.get('x-lootaura-preview-backlog-claimed')).toBe('1')
+    expect(response.headers.get('x-lootaura-preview-backlog-processed')).toBe('1')
+    expect(response.headers.get('x-lootaura-preview-backlog-geocode-invoked')).toBe('true')
+    expect(response.headers.get('x-lootaura-preview-backlog-geocode-resolved')).toBe('true')
+    expect(response.headers.get('x-lootaura-preview-backlog-first-claimed-ids')).toBe('row-1')
   })
 
   it('markers route still invokes preview drain and sets status header', async () => {
@@ -67,7 +89,7 @@ describe('preview backlog drain route wiring', () => {
     expect(response.headers.get('x-lootaura-preview-backlog-drain')).toBe('completed')
   })
 
-  it('production never adds preview drain header', async () => {
+  it('production never adds preview backlog headers', async () => {
     const env = process.env as Record<string, string | undefined>
     env.VERCEL_ENV = 'production'
 
@@ -83,11 +105,113 @@ describe('preview backlog drain route wiring', () => {
       addCacheHeaders: (response: NextResponse) => response,
     }))
 
+    const { PREVIEW_BACKLOG_DRAIN_HEADER_NAMES } = await import('@/lib/ingestion/previewBacklogDrain')
     const route = await import('@/app/api/sales/route')
     const request = new NextRequest('http://localhost:3000/api/sales?lat=41.1&lng=-87.1')
     const response = await route.GET(request)
 
-    expect(response.headers.get('x-lootaura-preview-backlog-drain')).toBeNull()
+    for (const name of PREVIEW_BACKLOG_DRAIN_HEADER_NAMES) {
+      expect(response.headers.get(name)).toBeNull()
+    }
+  })
+
+  it('cooldown_skip exposes geocode-invoked false and ms-since-last-run', async () => {
+    hoisted.maybeRunPreviewBacklogDrain.mockResolvedValue(
+      mockDrainResult({
+        status: 'cooldown_skip',
+        reason: 'cooldown_active',
+        claimed: 0,
+        processed: 0,
+        publishTriggered: 0,
+        publishOk: 0,
+        publishFailed: 0,
+        geocodeInvoked: false,
+        geocodeResolvedSuccessfully: false,
+        cooldownTimestampMutated: false,
+        msSinceLastRun: 42,
+        durationMs: 0,
+        firstClaimedRowIds: [],
+      })
+    )
+    vi.doMock('@/lib/supabase/server', () => ({
+      createSupabaseServerClient: vi.fn().mockResolvedValue({}),
+    }))
+    vi.doMock('@/lib/cache/salesApiCache', () => ({
+      buildSalesCacheKey: vi.fn().mockReturnValue('cache-key'),
+      getSalesApiCache: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      setSalesApiCache: vi.fn(),
+    }))
+    vi.doMock('@/lib/http/cache', () => ({
+      addCacheHeaders: (response: NextResponse) => response,
+    }))
+
+    const route = await import('@/app/api/sales/route')
+    const response = await route.GET(new NextRequest('http://localhost:3000/api/sales?lat=41.1&lng=-87.1'))
+
+    expect(response.headers.get('x-lootaura-preview-backlog-drain')).toBe('cooldown_skip')
+    expect(response.headers.get('x-lootaura-preview-backlog-geocode-invoked')).toBe('false')
+    expect(response.headers.get('x-lootaura-preview-backlog-ms-since-last-run')).toBe('42')
+  })
+
+  it('lease_unavailable exposes reason header', async () => {
+    hoisted.maybeRunPreviewBacklogDrain.mockResolvedValue(
+      mockDrainResult({
+        status: 'lease_unavailable',
+        reason: 'missing_redis_env',
+        geocodeInvoked: false,
+        geocodeResolvedSuccessfully: false,
+        cooldownTimestampMutated: false,
+        durationMs: 5,
+      })
+    )
+    vi.doMock('@/lib/supabase/server', () => ({
+      createSupabaseServerClient: vi.fn().mockResolvedValue({}),
+    }))
+    vi.doMock('@/lib/cache/salesApiCache', () => ({
+      buildSalesCacheKey: vi.fn().mockReturnValue('cache-key'),
+      getSalesApiCache: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      setSalesApiCache: vi.fn(),
+    }))
+    vi.doMock('@/lib/http/cache', () => ({
+      addCacheHeaders: (response: NextResponse) => response,
+    }))
+
+    const route = await import('@/app/api/sales/route')
+    const response = await route.GET(new NextRequest('http://localhost:3000/api/sales?lat=41.1&lng=-87.1'))
+
+    expect(response.headers.get('x-lootaura-preview-backlog-drain')).toBe('lease_unavailable')
+    expect(response.headers.get('x-lootaura-preview-backlog-reason')).toBe('missing_redis_env')
+  })
+
+  it('error exposes geocode-resolved false and cooldown-mutated false', async () => {
+    hoisted.maybeRunPreviewBacklogDrain.mockResolvedValue(
+      mockDrainResult({
+        status: 'error',
+        reason: 'geocode_pending_failed',
+        geocodeInvoked: true,
+        geocodeResolvedSuccessfully: false,
+        cooldownTimestampMutated: false,
+        durationMs: 99,
+      })
+    )
+    vi.doMock('@/lib/supabase/server', () => ({
+      createSupabaseServerClient: vi.fn().mockResolvedValue({}),
+    }))
+    vi.doMock('@/lib/cache/salesApiCache', () => ({
+      buildSalesCacheKey: vi.fn().mockReturnValue('cache-key'),
+      getSalesApiCache: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      setSalesApiCache: vi.fn(),
+    }))
+    vi.doMock('@/lib/http/cache', () => ({
+      addCacheHeaders: (response: NextResponse) => response,
+    }))
+
+    const route = await import('@/app/api/sales/route')
+    const response = await route.GET(new NextRequest('http://localhost:3000/api/sales?lat=41.1&lng=-87.1'))
+
+    expect(response.headers.get('x-lootaura-preview-backlog-drain')).toBe('error')
+    expect(response.headers.get('x-lootaura-preview-backlog-geocode-resolved')).toBe('false')
+    expect(response.headers.get('x-lootaura-preview-backlog-cooldown-mutated')).toBe('false')
   })
 
   it('upload route invokes preview drain after successful persist and sets header', async () => {

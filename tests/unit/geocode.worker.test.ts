@@ -392,4 +392,57 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(summary.failedRetriable).toBe(1)
     expect(summary.failedTerminal).toBe(0)
   })
+
+  it('keeps backlog batch bounded and passes override to claim RPC', async () => {
+    hoisted.adminRpc.mockResolvedValue({ data: [], error: null })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales({ batchSizeOverride: 25, cooldownMinutesOverride: 2 })
+
+    expect(hoisted.adminRpc).toHaveBeenCalledWith('claim_ingested_sales_for_geocoding', {
+      p_batch_size: 25,
+      p_cooldown_minutes: 2,
+    })
+  })
+
+  it('treats old stuck row shape as claim-eligible when returned by RPC', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '0cf56898-9e83-4172-8779-3da22cada7d2',
+          normalized_address: null,
+          address_raw: '742 Evergreen Terrace',
+          geocode_attempts: 0,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { id: '0cf56898-9e83-4172-8779-3da22cada7d2' },
+      error: null,
+    })
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.55, lng: -85.55 }, hit429: false })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.claimed).toBe(1)
+    expect(summary.succeeded).toBe(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
+      address: '742 Evergreen Terrace',
+      city: 'Louisville',
+      state: 'KY',
+    })
+  })
+
+  it('surfaces claim RPC errors (no silent empty-claim fallback)', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: null,
+      error: new Error('rpc failed'),
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await expect(geocodePendingSales()).rejects.toThrow('rpc failed')
+  })
 })

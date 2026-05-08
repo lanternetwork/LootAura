@@ -74,4 +74,20 @@ describe('content-script description cleaner', () => {
     expect(cleaned).toContain('Lots of tools, furniture, and baby items available.')
     expect(cleaned).not.toMatch(/Street View|Directions|Source:|Orland Park|5\/9|8:30/i)
   })
+
+  it('strips inline pollution from single-line mixed description', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+      url: 'https://example.com/listing',
+      runScripts: 'dangerously',
+    })
+    loadContentScript(dom)
+    const win = dom.window as unknown as WindowWithContentScriptTest
+    const cleaner = win.__LootAuraContentScriptTest?.cleanExtractedDescription
+    expect(typeof cleaner).toBe('function')
+
+    const dirty =
+      'Lots of new bikes and toys for kids. 8:30 am - 5:00 pm 5/9 - 5/9 9001 W 147th St, Orland Park, IL 60462 Street View Directions Source: garagesalefinder.com'
+    const cleaned = cleaner!(dirty)
+    expect(cleaned).toBe('Lots of new bikes and toys for kids.')
+  })
 })

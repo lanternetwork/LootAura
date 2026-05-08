@@ -485,6 +485,160 @@ describe('publish worker idempotent sale images', () => {
     )
   })
 
+  it('on unique conflict, replaces polluted existing sale description from latest ingest', async () => {
+    const okUrl = 'https://images.example.org/patch-desc.jpg'
+    const polluted =
+      '8:30 am - 5:00 pm 5/9 - 5/9 9001 W 147th St, Orland Park, IL 60462 Street View Directions Source: garagesalefinder.com'
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) {
+          return makeClaimBuilder(
+            baseRow({
+              raw_payload: { tags: [] },
+              image_source_url: okUrl,
+              description: 'Clean ingest description text.',
+            })
+          )
+        }
+        return {
+          update: () => ({
+            eq: async () => ({ error: null }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: (fields: string) => {
+            if (fields === 'id') {
+              return {
+                eq: () => ({
+                  limit: async () => ({ data: [{ id: existingSaleId }], error: null }),
+                }),
+              }
+            }
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    ingested_sale_id: ingestedId,
+                    title: 'Yard Sale',
+                    description: polluted,
+                    address: null,
+                    date_start: null,
+                    date_end: null,
+                    time_start: null,
+                    time_end: null,
+                    cover_image_url: null,
+                    images: null,
+                  },
+                  error: null,
+                }),
+              }),
+            }
+          },
+          update: (payload: unknown) => updateSpy(payload),
+        }
+      }
+      return {
+        update: () => ({
+          eq: async () => ({ error: null }),
+        }),
+      }
+    })
+
+    createPublishedSaleMock.mockRejectedValueOnce(uniqueIngestedSaleViolation())
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Clean ingest description text.',
+      })
+    )
+  })
+
+  it('on unique conflict, preserves good existing sale description', async () => {
+    const okUrl = 'https://images.example.org/keep-desc.jpg'
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: async () => ({ error: null }),
+    })
+
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        const n = mockFromBase.mock.calls.filter((c) => c[1] === 'ingested_sales').length
+        if (n === 1) {
+          return makeClaimBuilder(
+            baseRow({
+              raw_payload: { tags: [] },
+              image_source_url: okUrl,
+              description: 'New ingest description that should not overwrite.',
+            })
+          )
+        }
+        return {
+          update: () => ({
+            eq: async () => ({ error: null }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: (fields: string) => {
+            if (fields === 'id') {
+              return {
+                eq: () => ({
+                  limit: async () => ({ data: [{ id: existingSaleId }], error: null }),
+                }),
+              }
+            }
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    ingested_sale_id: ingestedId,
+                    title: 'Custom User Title',
+                    description: 'Hand-written curated description that should be preserved.',
+                    address: '5918 Park Ave, Berkeley, IL',
+                    date_start: '2026-05-06',
+                    date_end: null,
+                    time_start: '09:00:00',
+                    time_end: null,
+                    cover_image_url: 'https://images.example.org/existing-cover.jpg',
+                    images: ['https://images.example.org/existing-cover.jpg'],
+                  },
+                  error: null,
+                }),
+              }),
+            }
+          },
+          update: (payload: unknown) => updateSpy(payload),
+        }
+      }
+      return {
+        update: () => ({
+          eq: async () => ({ error: null }),
+        }),
+      }
+    })
+
+    createPublishedSaleMock.mockRejectedValueOnce(uniqueIngestedSaleViolation())
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    const result = await publishReadyIngestedSaleById(ingestedId)
+    expect(result.ok).toBe(true)
+    expect(updateSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'New ingest description that should not overwrite.',
+      })
+    )
+  })
+
   it('image patch failure does not fail publish', async () => {
     const okUrl = 'https://images.example.org/patch-me.jpg'
     const updateSpy = vi.fn().mockReturnValue({

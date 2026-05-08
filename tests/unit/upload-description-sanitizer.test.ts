@@ -25,5 +25,12 @@ describe('sanitizeUploadDescription', () => {
     const cleaned = sanitizeUploadDescription('Street View Directions Source: garagesalefinder.com 5/9 - 5/9')
     expect(cleaned).toBeNull()
   })
+
+  it('strips inline address/date/time fragments while preserving prose', () => {
+    const dirty =
+      'Lots of new bikes and toys for kids. 8:30 am - 5:00 pm 5/9 - 5/9 9001 W 147th St, Orland Park, IL 60462 Street View Directions Source: garagesalefinder.com'
+    const cleaned = sanitizeUploadDescription(dirty)
+    expect(cleaned).toBe('Lots of new bikes and toys for kids.')
+  })
 })
 

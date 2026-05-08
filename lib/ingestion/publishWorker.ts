@@ -275,6 +275,17 @@ function looksGenericDescription(value: string | null | undefined): boolean {
   return /^yard sale\b/i.test(t) || /^garage sale\b/i.test(t) || /^estate sale\b/i.test(t) || /^listing\b/i.test(t)
 }
 
+function looksPollutedDescription(value: string | null | undefined): boolean {
+  const t = normalizeTextOrNull(value)
+  if (!t) return false
+  const lower = t.toLowerCase()
+  if (lower.includes('street view')) return true
+  if (lower.includes('directions')) return true
+  if (lower.includes('source:')) return true
+  if (/(garagesalefinder\.com|yardsaletreasuremap\.com|craigslist\.org|estatesales\.net)/i.test(lower)) return true
+  return false
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -500,8 +511,10 @@ async function maybeSyncExistingSaleFromLatestIngest(
     if (looksGenericTitle(row.title, record.city)) {
       patch.title = normalizedTitle
     }
-    if (looksGenericDescription(row.description) && normalizedDescription) {
-      patch.description = normalizedDescription
+    if (normalizedDescription) {
+      if (looksGenericDescription(row.description) || looksPollutedDescription(row.description)) {
+        patch.description = normalizedDescription
+      }
     }
 
     if (sanitizedImages.length > 0) {

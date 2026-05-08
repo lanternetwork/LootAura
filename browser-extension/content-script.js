@@ -394,21 +394,47 @@ function isDescriptionNoiseLine(line) {
 }
 
 function cleanExtractedDescription(rawText) {
-  const lines = String(rawText || "")
-    .split("\n")
+  const raw = String(rawText || "");
+  const lines = raw
+    .split(/\r?\n+/)
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .filter((line) => !isDescriptionNoiseLine(line));
 
-  const deduped = [];
-  const seen = new Set();
-  for (const line of lines) {
-    const key = line.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(line);
-  }
-  const joined = deduped.join(" ").replace(/\s+/g, " ").trim();
+  // First pass: drop whole-line noise, then join.
+  let text = lines.join(" ");
+
+  // Inline pollution removal for mixed-content descriptions.
+  // URLs and obvious source domains.
+  text = text.replace(
+    /\b(https?:\/\/\S+|www\.\S+|[a-z0-9.-]+\.(com|net|org|info|io|co)\b\S*)/gi,
+    ""
+  );
+  // Inline "Source: ..." fragments.
+  text = text.replace(/\bSource:\s*[^\s,.]+(?:\s+[^\s,.]+)*/gi, "");
+  // Navigation/action labels that may appear inline.
+  text = text.replace(/\bStreet View\b/gi, "");
+  text = text.replace(/\bDirections\b/gi, "");
+  text = text.replace(/\bView on map\b/gi, "");
+  text = text.replace(/\bReport listing\b/gi, "");
+  text = text.replace(/\bShare listing\b/gi, "");
+  // Address-like tails (keep preceding prose).
+  text = text.replace(
+    /(?:,?\s*)\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?(?=\s|$)/gi,
+    ""
+  );
+  // Date ranges like "5/9 - 5/9" or "5/9 - 5/10".
+  text = text.replace(
+    /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
+    ""
+  );
+  // Time ranges like "8:30 am - 5:00 pm".
+  text = text.replace(
+    /\b\d{1,2}(?::\d{2})?\s*(am|pm)\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,
+    ""
+  );
+
+  const joined = text.replace(/\s+/g, " ").trim();
   return joined || "";
 }
 

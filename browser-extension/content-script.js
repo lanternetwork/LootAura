@@ -373,18 +373,11 @@ function extractTitle() {
 function isDescriptionNoiseLine(line) {
   const normalized = String(line || "").replace(/\s+/g, " ").trim();
   if (!normalized) return true;
-  const lower = normalized.toLowerCase();
-  if (
-    lower.includes("street view") ||
-    lower.includes("directions") ||
-    lower.includes("source:") ||
-    lower.includes("view on map") ||
-    lower.includes("report listing") ||
-    lower.includes("share listing")
-  ) {
-    return true;
-  }
-  if (/(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(normalized)) return true;
+  const lower = normalized.toLowerCase().trim();
+  // Only treat as "noise line" if the line is essentially just a label/link.
+  if (/^(street view|directions|view on map|report listing|share listing)$/i.test(lower)) return true;
+  if (/^source:\s*/i.test(lower)) return true;
+  if (/^(https?:\/\/|www\.)/i.test(lower)) return true;
   if (/^\s*\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i.test(normalized)) return true;
   if (/^\s*(\d{1,2}:\d{2}\s*(am|pm)?\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)?)\s*$/i.test(normalized)) return true;
   if (/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i.test(normalized)) return true;
@@ -394,47 +387,43 @@ function isDescriptionNoiseLine(line) {
 }
 
 function cleanExtractedDescription(rawText) {
+  function stripInlinePollution(input) {
+    let text = String(input || "");
+    text = text.replace(/\b(https?:\/\/\S+|www\.\S+|[a-z0-9.-]+\.(com|net|org|info|io|co)\b\S*)/gi, "");
+    text = text.replace(/\bSource:\s*[^\s,.]+(?:\s+[^\s,.]+)*/gi, "");
+    text = text.replace(/\bStreet View\b/gi, "");
+    text = text.replace(/\bDirections\b/gi, "");
+    text = text.replace(/\bView on map\b/gi, "");
+    text = text.replace(/\bReport listing\b/gi, "");
+    text = text.replace(/\bShare listing\b/gi, "");
+    text = text.replace(
+      /(?:,?\s*)\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?(?=\s|$)/gi,
+      ""
+    );
+    text = text.replace(
+      /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
+      ""
+    );
+    text = text.replace(
+      /\b\d{1,2}(?::\d{2})?\s*(am|pm)\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,
+      ""
+    );
+    text = text.replace(/\s+/g, " ").trim();
+    text = text.replace(/\s+([,.;:!?])/g, "$1");
+    text = text.replace(/^[,.;:!?]+\s*/g, "");
+    return text.trim();
+  }
+
   const raw = String(rawText || "");
   const lines = raw
     .split(/\r?\n+/)
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
-    .filter((line) => !isDescriptionNoiseLine(line));
+    .filter((line) => !isDescriptionNoiseLine(line))
+    .map((line) => stripInlinePollution(line))
+    .filter(Boolean);
 
-  // First pass: drop whole-line noise, then join.
-  let text = lines.join(" ");
-
-  // Inline pollution removal for mixed-content descriptions.
-  // URLs and obvious source domains.
-  text = text.replace(
-    /\b(https?:\/\/\S+|www\.\S+|[a-z0-9.-]+\.(com|net|org|info|io|co)\b\S*)/gi,
-    ""
-  );
-  // Inline "Source: ..." fragments.
-  text = text.replace(/\bSource:\s*[^\s,.]+(?:\s+[^\s,.]+)*/gi, "");
-  // Navigation/action labels that may appear inline.
-  text = text.replace(/\bStreet View\b/gi, "");
-  text = text.replace(/\bDirections\b/gi, "");
-  text = text.replace(/\bView on map\b/gi, "");
-  text = text.replace(/\bReport listing\b/gi, "");
-  text = text.replace(/\bShare listing\b/gi, "");
-  // Address-like tails (keep preceding prose).
-  text = text.replace(
-    /(?:,?\s*)\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?(?=\s|$)/gi,
-    ""
-  );
-  // Date ranges like "5/9 - 5/9" or "5/9 - 5/10".
-  text = text.replace(
-    /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
-    ""
-  );
-  // Time ranges like "8:30 am - 5:00 pm".
-  text = text.replace(
-    /\b\d{1,2}(?::\d{2})?\s*(am|pm)\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,
-    ""
-  );
-
-  const joined = text.replace(/\s+/g, " ").trim();
+  const joined = stripInlinePollution(lines.join(" "));
   return joined || "";
 }
 

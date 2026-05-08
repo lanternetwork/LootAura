@@ -146,7 +146,7 @@ async function runPreviewGeocodeClaimDiagnostics(
   try {
     const cooldownOr = eligibleGeocodeCooldownOrFilter(cooldownMinutes)
     const eligibleBase = () =>
-      fromBase(admin, 'ingested_sales')
+      (fromBase(admin, 'ingested_sales') as any)
         .eq('status', 'needs_geocode')
         .lt('geocode_attempts', 3)
         .or(cooldownOr)

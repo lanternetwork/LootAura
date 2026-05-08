@@ -22,11 +22,11 @@ async function acquireRedisLease(ttlSeconds: number): Promise<boolean> {
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
 
   if (!redisUrl || !redisToken) {
-    logger.warn('Auto repair running without distributed lease (Upstash not configured)', {
+    logger.warn('Auto repair skipped because distributed lease is unavailable (Upstash not configured)', {
       component: 'ingestion/auto-repair',
-      operation: 'lease_skip',
+      operation: 'lease_unavailable',
     })
-    return true
+    return false
   }
 
   const response = await fetch(`${redisUrl}/set/${LOCK_KEY}/1`, {
@@ -90,12 +90,14 @@ export function startIngestedSalesAutoRepair(): void {
         durationMs: Date.now() - startedAt,
       })
     } catch (error) {
-      logger.error('Auto repair failed', error instanceof Error ? error : new Error(String(error)), {
+      logger.warn('Auto repair skipped because distributed lease acquisition failed', {
         component: 'ingestion/auto-repair',
-        operation: 'repair_error',
+        operation: 'lease_error',
         dryRun: false,
         limit,
         lockTtlSeconds,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : String(error),
         durationMs: Date.now() - startedAt,
       })
     }

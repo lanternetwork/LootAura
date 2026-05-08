@@ -349,12 +349,16 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const summary = await geocodePendingSales()
 
-    expect(summary).toEqual({
+    expect(summary).toMatchObject({
       claimed: 2,
       succeeded: 2,
       failedRetriable: 0,
       failedTerminal: 0,
       rate429Count: 0,
+      processed: 2,
+      publishTriggered: 2,
+      publishOk: 2,
+      publishFailed: 0,
     })
     expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(2)
     expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledTimes(2)

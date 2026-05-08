@@ -63,6 +63,171 @@ function parseGeocodeConcurrency(): number {
   return Math.min(parsed, 5)
 }
 
+/** Preview-only: no production log expansion. Matches `claim_ingested_sales_for_geocoding` eligibility (no PII). */
+function isPreviewGeocodeClaimDiagnosticsEnabled(): boolean {
+  return process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview'
+}
+
+function eligibleGeocodeCooldownOrFilter(cooldownMinutes: number): string {
+  const cutoffIso = new Date(Date.now() - cooldownMinutes * 60 * 1000).toISOString()
+  return `last_geocode_attempt_at.is.null,last_geocode_attempt_at.lt.${cutoffIso}`
+}
+
+type AdminDb = ReturnType<typeof getAdminDb>
+
+async function runPreviewGeocodeClaimDiagnostics(
+  admin: AdminDb,
+  claimedRows: ClaimedGeocodeRow[],
+  batchSize: number,
+  cooldownMinutes: number,
+  environment: string,
+  deploymentEnv: string
+): Promise<void> {
+  if (!isPreviewGeocodeClaimDiagnosticsEnabled()) {
+    return
+  }
+
+  const first25 = claimedRows.slice(0, 25)
+  const firstClaimedRowIds = first25.map((row) => row.id)
+  const firstClaimedRowGeocodeAttempts = first25.map((row) => Number(row.geocode_attempts ?? 0))
+
+  logger.info('Geocode claim RPC resolved (preview diagnostic)', {
+    component: 'ingestion/geocodeWorker',
+    operation: 'claim_rpc_resolved',
+    claimedCount: claimedRows.length,
+    firstClaimedRowIds,
+    firstClaimedRowGeocodeAttempts,
+    batchSize,
+    cooldownMinutes,
+    environment,
+    deploymentEnv,
+  })
+
+  if (firstClaimedRowIds.length > 0) {
+    try {
+      const { data, error } = await fromBase(admin, 'ingested_sales')
+        .select('id, created_at, updated_at, geocode_attempts')
+        .in('id', firstClaimedRowIds)
+      if (error) {
+        logger.warn('Preview geocode claim snapshot read failed', {
+          component: 'ingestion/geocodeWorker',
+          operation: 'claim_rpc_claimed_row_snapshot',
+          message: error.message,
+          batchSize,
+          cooldownMinutes,
+        })
+      } else {
+        const rows = (Array.isArray(data) ? data : []).map((row: Record<string, unknown>) => ({
+          id: String(row.id ?? ''),
+          createdAt: row.created_at != null ? String(row.created_at) : null,
+          updatedAt: row.updated_at != null ? String(row.updated_at) : null,
+          geocodeAttempts: Number(row.geocode_attempts ?? 0),
+        }))
+        logger.info('Geocode claim claimed-row snapshot (preview diagnostic)', {
+          component: 'ingestion/geocodeWorker',
+          operation: 'claim_rpc_claimed_row_snapshot',
+          rows,
+          batchSize,
+          cooldownMinutes,
+          environment,
+          deploymentEnv,
+        })
+      }
+    } catch (err) {
+      logger.warn('Preview geocode claim snapshot threw', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'claim_rpc_claimed_row_snapshot',
+        errorName: err instanceof Error ? err.name : 'UnknownError',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  try {
+    const cooldownOr = eligibleGeocodeCooldownOrFilter(cooldownMinutes)
+    const eligibleBase = () =>
+      fromBase(admin, 'ingested_sales')
+        .eq('status', 'needs_geocode')
+        .lt('geocode_attempts', 3)
+        .or(cooldownOr)
+
+    const { count: eligibleCountRaw, error: eligibleCountError } = await eligibleBase().select('*', {
+      count: 'exact',
+      head: true,
+    })
+    if (eligibleCountError) {
+      logger.warn('Preview eligible population count failed', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'claim_rpc_eligible_population',
+        message: eligibleCountError.message,
+        cooldownMinutes,
+      })
+    }
+
+    const { count: neverAttemptedRaw, error: neverErr } = await eligibleBase()
+      .eq('geocode_attempts', 0)
+      .select('*', { count: 'exact', head: true })
+    if (neverErr) {
+      logger.warn('Preview never-attempted eligible count failed', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'claim_rpc_eligible_population',
+        message: neverErr.message,
+        cooldownMinutes,
+      })
+    }
+
+    const { data: oldestCreatedRows, error: ocErr } = await eligibleBase()
+      .select('created_at')
+      .order('created_at', { ascending: true, nullsFirst: false })
+      .limit(1)
+    if (ocErr) {
+      logger.warn('Preview oldest eligible created_at query failed', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'claim_rpc_eligible_population',
+        message: ocErr.message,
+      })
+    }
+
+    const { data: oldestUpdatedRows, error: ouErr } = await eligibleBase()
+      .select('updated_at')
+      .order('updated_at', { ascending: true, nullsFirst: false })
+      .limit(1)
+    if (ouErr) {
+      logger.warn('Preview oldest eligible updated_at query failed', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'claim_rpc_eligible_population',
+        message: ouErr.message,
+      })
+    }
+
+    const oldestRowC = oldestCreatedRows?.[0] as { created_at?: string | null } | undefined
+    const oldestRowU = oldestUpdatedRows?.[0] as { updated_at?: string | null } | undefined
+    const oldestEligibleCreatedAt =
+      oldestRowC?.created_at != null && oldestRowC.created_at !== '' ? String(oldestRowC.created_at) : null
+    const oldestEligibleUpdatedAt =
+      oldestRowU?.updated_at != null && oldestRowU.updated_at !== '' ? String(oldestRowU.updated_at) : null
+
+    logger.info('Geocode claim eligible population (preview diagnostic)', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'claim_rpc_eligible_population',
+      eligibleCount: eligibleCountRaw ?? 0,
+      neverAttemptedEligibleCount: neverAttemptedRaw ?? 0,
+      oldestEligibleCreatedAt,
+      oldestEligibleUpdatedAt,
+      cooldownMinutes,
+      environment,
+      deploymentEnv,
+    })
+  } catch (err) {
+    logger.warn('Preview eligible population diagnostic threw', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'claim_rpc_eligible_population',
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      errorMessage: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
 function toFailureReasons(value: unknown): FailureReason[] {
   if (!Array.isArray(value)) {
     return []
@@ -451,6 +616,15 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       ? { claimedRowIds: claimedRows.map((row) => row.id).slice(0, 3) }
       : {}),
   }
+
+  await runPreviewGeocodeClaimDiagnostics(
+    admin,
+    claimedRows,
+    batchSize,
+    cooldownMinutes,
+    environment,
+    deploymentEnv
+  )
 
   if (summary.claimed === 0) {
     logger.warn('Geocode worker claimed zero rows', {

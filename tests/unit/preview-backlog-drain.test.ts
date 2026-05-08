@@ -21,15 +21,16 @@ vi.mock('@/lib/log', () => ({
 
 describe('preview backlog drain', () => {
   beforeEach(async () => {
+    const env = process.env as Record<string, string | undefined>
     vi.resetModules()
     vi.clearAllMocks()
-    process.env.NODE_ENV = 'test'
-    process.env.VERCEL_ENV = 'test'
-    delete process.env.GEOCODE_BACKLOG_BATCH_SIZE
-    delete process.env.PREVIEW_GEOCODE_BACKLOG_COOLDOWN_MINUTES
-    delete process.env.PREVIEW_GEOCODE_BACKLOG_LEASE_TTL_SECONDS
-    process.env.UPSTASH_REDIS_REST_URL = 'https://redis.example.com'
-    process.env.UPSTASH_REDIS_REST_TOKEN = 'token'
+    env.NODE_ENV = 'test'
+    env.VERCEL_ENV = 'test'
+    delete env.GEOCODE_BACKLOG_BATCH_SIZE
+    delete env.PREVIEW_GEOCODE_BACKLOG_COOLDOWN_MINUTES
+    delete env.PREVIEW_GEOCODE_BACKLOG_LEASE_TTL_SECONDS
+    env.UPSTASH_REDIS_REST_URL = 'https://redis.example.com'
+    env.UPSTASH_REDIS_REST_TOKEN = 'token'
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -40,31 +41,33 @@ describe('preview backlog drain', () => {
   })
 
   it('is preview-gated and impossible in production/staging paths', async () => {
+    const env = process.env as Record<string, string | undefined>
     const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
       '@/lib/ingestion/previewBacklogDrain'
     )
     __resetPreviewBacklogDrainStateForTests()
 
-    process.env.NODE_ENV = 'production'
-    process.env.VERCEL_ENV = 'production'
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'production'
     await maybeRunPreviewBacklogDrain('test')
     expect(hoisted.geocodePendingSales).not.toHaveBeenCalled()
 
-    process.env.NODE_ENV = 'production'
-    process.env.VERCEL_ENV = 'preview'
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
     await maybeRunPreviewBacklogDrain('test')
     expect(hoisted.geocodePendingSales).toHaveBeenCalledTimes(1)
   })
 
   it('fails closed when redis lease config is missing', async () => {
+    const env = process.env as Record<string, string | undefined>
     const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
       '@/lib/ingestion/previewBacklogDrain'
     )
     __resetPreviewBacklogDrainStateForTests()
-    process.env.NODE_ENV = 'production'
-    process.env.VERCEL_ENV = 'preview'
-    delete process.env.UPSTASH_REDIS_REST_URL
-    delete process.env.UPSTASH_REDIS_REST_TOKEN
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
+    delete env.UPSTASH_REDIS_REST_URL
+    delete env.UPSTASH_REDIS_REST_TOKEN
 
     await maybeRunPreviewBacklogDrain('test')
 
@@ -73,13 +76,14 @@ describe('preview backlog drain', () => {
   })
 
   it('enforces in-process cooldown/debounce', async () => {
+    const env = process.env as Record<string, string | undefined>
     const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
       '@/lib/ingestion/previewBacklogDrain'
     )
     __resetPreviewBacklogDrainStateForTests()
-    process.env.NODE_ENV = 'production'
-    process.env.VERCEL_ENV = 'preview'
-    process.env.PREVIEW_GEOCODE_BACKLOG_COOLDOWN_MINUTES = '5'
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
+    env.PREVIEW_GEOCODE_BACKLOG_COOLDOWN_MINUTES = '5'
 
     hoisted.geocodePendingSales.mockResolvedValue({
       claimed: 1,
@@ -101,13 +105,14 @@ describe('preview backlog drain', () => {
   })
 
   it('caps batch size at 100 and awaits geocodePendingSales', async () => {
+    const env = process.env as Record<string, string | undefined>
     const { maybeRunPreviewBacklogDrain, __resetPreviewBacklogDrainStateForTests } = await import(
       '@/lib/ingestion/previewBacklogDrain'
     )
     __resetPreviewBacklogDrainStateForTests()
-    process.env.NODE_ENV = 'production'
-    process.env.VERCEL_ENV = 'preview'
-    process.env.GEOCODE_BACKLOG_BATCH_SIZE = '999'
+    env.NODE_ENV = 'production'
+    env.VERCEL_ENV = 'preview'
+    env.GEOCODE_BACKLOG_BATCH_SIZE = '999'
 
     let completed = false
     hoisted.geocodePendingSales.mockImplementation(async () => {

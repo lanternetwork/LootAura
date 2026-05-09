@@ -308,6 +308,12 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
     published: 0,
     failed: 0,
   }
+  const dedupeDecisionCounts: Record<'source_url' | 'exact_address_date' | 'soft_date_window' | 'none', number> = {
+    source_url: 0,
+    exact_address_date: 0,
+    soft_date_window: 0,
+    none: 0,
+  }
 
   for (const rawSale of records) {
     try {
@@ -366,7 +372,18 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           closestCandidates: lookupResult.closestCandidates,
         })
       }
-      const match = await findIngestedSaleMatch(rawSale.sourceUrl, processed)
+      const match = await findIngestedSaleMatch(rawSale.sourceUrl, processed, {
+        sourcePlatform: rawSale.sourcePlatform,
+      })
+      if (match?.matchType === 'source_url') {
+        dedupeDecisionCounts.source_url += 1
+      } else if (match?.matchType === 'address_date') {
+        dedupeDecisionCounts.exact_address_date += 1
+      } else if (match?.matchType === 'soft_address_date') {
+        dedupeDecisionCounts.soft_date_window += 1
+      } else {
+        dedupeDecisionCounts.none += 1
+      }
       const isDuplicate = match?.matchType === 'soft_address_date'
       const failureReasons = dedupeFailureReasons([
         ...processed.failureReasons,
@@ -503,6 +520,7 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
     needsCheck: summary.needsCheck,
     duplicates: summary.duplicates,
     failed: summary.failed,
+    dedupeDecisionCounts,
     durationMs,
   })
   return NextResponse.json({

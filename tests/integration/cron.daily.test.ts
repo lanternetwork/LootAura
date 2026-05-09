@@ -35,9 +35,10 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: (db: any, table: string) => db.from(table),
 }))
 
-const { mockGeocodePendingSales, mockPublishReadyIngestedSales } = vi.hoisted(() => ({
+const { mockGeocodePendingSales, mockPublishReadyIngestedSales, mockFinalizeLinkedPublishedIngestedSales } = vi.hoisted(() => ({
   mockGeocodePendingSales: vi.fn(),
   mockPublishReadyIngestedSales: vi.fn(),
+  mockFinalizeLinkedPublishedIngestedSales: vi.fn(),
 }))
 
 vi.mock('@/lib/ingestion/geocodeWorker', () => ({
@@ -46,6 +47,7 @@ vi.mock('@/lib/ingestion/geocodeWorker', () => ({
 
 vi.mock('@/lib/ingestion/publishWorker', () => ({
   publishReadyIngestedSales: (...args: unknown[]) => mockPublishReadyIngestedSales(...args),
+  finalizeLinkedPublishedIngestedSales: (...args: unknown[]) => mockFinalizeLinkedPublishedIngestedSales(...args),
 }))
 
 const { mockFetchLastSuccessfulExternalIngestionAt } = vi.hoisted(() => ({
@@ -242,6 +244,13 @@ describe('GET /api/cron/daily', () => {
       succeeded: 0,
       failed: 0,
       skipped: 0,
+    })
+    mockFinalizeLinkedPublishedIngestedSales.mockResolvedValue({
+      attempted: 0,
+      finalized: 0,
+      alreadyPublished: 0,
+      linkMismatch: 0,
+      missingLinkedSale: 0,
     })
     mockPersistExternalPageSource.mockResolvedValue({
       fetched: 0,

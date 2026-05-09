@@ -20,6 +20,7 @@ import { assertCronAuthorized } from '@/lib/auth/cron'
 import { processGeocodeQueueBatch } from '@/lib/ingestion/geocodeQueue'
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
+import { recordGeocodeCronOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,6 +101,7 @@ async function handleGeocodeCron(request: NextRequest) {
   let backlogPublishTriggered = 0
   let backlogDurationMs = 0
   let backlogError: string | null = null
+  let backlogRate429Count = 0
 
   try {
     const batch = await processGeocodeQueueBatch(limit)
@@ -124,6 +126,7 @@ async function handleGeocodeCron(request: NextRequest) {
         captureClaimedRowIds: true,
       })
       backlogDurationMs = Date.now() - backlogStartedAt
+      backlogRate429Count = Number(backlog.rate429Count ?? 0)
       backlogClaimed = backlog.claimed
       backlogProcessed =
         backlog.processed ??
@@ -157,6 +160,16 @@ async function handleGeocodeCron(request: NextRequest) {
       )
       errors = 1
       const durationMs = Date.now() - startedAt
+      await recordGeocodeCronOrchestrationRun({
+        durationMs,
+        backlogClaimed: 0,
+        queueProcessed: processed,
+        queueCompleted: completed,
+        queueRequeued: requeued,
+        rate429Count: 0,
+        ok: false,
+        error: backlogError,
+      })
       return NextResponse.json(
         {
           ok: false,
@@ -205,6 +218,16 @@ async function handleGeocodeCron(request: NextRequest) {
       }
     )
     const durationMs = Date.now() - startedAt
+    await recordGeocodeCronOrchestrationRun({
+      durationMs,
+      backlogClaimed,
+      queueProcessed: processed,
+      queueCompleted: completed,
+      queueRequeued: requeued,
+      rate429Count: 0,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return NextResponse.json(
       {
         ok: false,
@@ -240,6 +263,15 @@ async function handleGeocodeCron(request: NextRequest) {
   }
 
   const durationMs = Date.now() - startedAt
+  await recordGeocodeCronOrchestrationRun({
+    durationMs,
+    backlogClaimed,
+    queueProcessed: processed,
+    queueCompleted: completed,
+    queueRequeued: requeued,
+    rate429Count: backlogRate429Count,
+    ok: true,
+  })
   logger.info('Geocode cron completed', {
     component: 'api/cron/geocode',
     operation: 'cron_complete',

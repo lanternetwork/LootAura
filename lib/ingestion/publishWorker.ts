@@ -47,11 +47,28 @@ export interface PublishWorkerBatchSummary {
   skipped: number
 }
 
+export interface LinkedSaleFinalizeSummary {
+  attempted: number
+  finalized: number
+  alreadyPublished: number
+  linkMismatch: number
+  missingLinkedSale: number
+}
+
 function parseBatchSize(): number {
   const raw = process.env.INGEST_BATCH_SIZE
   const parsed = raw ? Number.parseInt(raw, 10) : 150
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return 150
+  }
+  return Math.min(parsed, 500)
+}
+
+function parseLinkedSaleFinalizeBatchSize(): number {
+  const raw = process.env.INGEST_LINKED_FINALIZE_BATCH_SIZE
+  const parsed = raw ? Number.parseInt(raw, 10) : 100
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 100
   }
   return Math.min(parsed, 500)
 }
@@ -139,6 +156,183 @@ function logPublishFailureStructured(params: {
     context.dateEnd = params.dateEnd
   }
   logger.error('ingested_sales publish failure', new Error(params.message), context)
+}
+
+function isTransientPublishFailureDetails(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const phase = (value as { phase?: unknown }).phase
+  return phase === 'create_sale' || phase === 'finalize_ingested_row'
+}
+
+type LinkedFinalizeCandidateRow = {
+  id: string
+  status: string
+  published_sale_id: string | null
+  published_at: string | null
+  failure_reasons: unknown
+  failure_details: unknown
+}
+
+type LinkedSaleRow = {
+  id: string
+  ingested_sale_id: string | null
+}
+
+function sanitizeFailureReasonsAfterLinkedFinalize(value: unknown): FailureReason[] | null {
+  const reasons = toFailureReasons(value)
+  if (!reasons.includes('publish_error')) {
+    return null
+  }
+  const next = reasons.filter((r) => r !== 'publish_error')
+  return next
+}
+
+export async function finalizeLinkedPublishedIngestedSales(
+  options?: { batchSizeOverride?: number }
+): Promise<LinkedSaleFinalizeSummary> {
+  const admin = getAdminDb()
+  const configuredBatch = parseLinkedSaleFinalizeBatchSize()
+  const batchSizeCandidate = options?.batchSizeOverride
+  const batchSize =
+    typeof batchSizeCandidate === 'number' && Number.isFinite(batchSizeCandidate) && batchSizeCandidate > 0
+      ? Math.min(Math.floor(batchSizeCandidate), 500)
+      : configuredBatch
+
+  const summary: LinkedSaleFinalizeSummary = {
+    attempted: 0,
+    finalized: 0,
+    alreadyPublished: 0,
+    linkMismatch: 0,
+    missingLinkedSale: 0,
+  }
+
+  const { data, error } = await fromBase(admin, 'ingested_sales')
+    .select('id, status, published_sale_id, published_at, failure_reasons, failure_details')
+    .not('published_sale_id', 'is', null)
+    .neq('status', 'published')
+    .order('updated_at', { ascending: true })
+    .limit(batchSize)
+
+  if (error) {
+    logger.error('Linked-sale finalization failed to load candidates', new Error(error.message), {
+      component: 'ingestion/publishWorker',
+      operation: 'linked_finalize_load',
+      batchSize,
+    })
+    throw error
+  }
+
+  const rows = (Array.isArray(data) ? data : []) as LinkedFinalizeCandidateRow[]
+  summary.attempted = rows.length
+
+  for (const row of rows) {
+    const linkedSaleId =
+      typeof row.published_sale_id === 'string' && row.published_sale_id.trim().length > 0
+        ? row.published_sale_id.trim()
+        : null
+    if (!linkedSaleId) {
+      continue
+    }
+
+    const { data: linkedSaleRows, error: linkedSaleError } = await fromBase(admin, 'sales')
+      .select('id, ingested_sale_id')
+      .eq('id', linkedSaleId)
+      .limit(1)
+
+    if (linkedSaleError) {
+      logger.error('Linked-sale finalization failed to load linked sale', new Error(linkedSaleError.message), {
+        component: 'ingestion/publishWorker',
+        operation: 'linked_finalize_validate_link',
+        rowId: row.id,
+        saleId: linkedSaleId,
+      })
+      summary.missingLinkedSale += 1
+      continue
+    }
+
+    const linkedSale = Array.isArray(linkedSaleRows) && linkedSaleRows.length > 0
+      ? (linkedSaleRows[0] as LinkedSaleRow)
+      : null
+    if (!linkedSale) {
+      summary.missingLinkedSale += 1
+      logger.error('Linked-sale finalization skipped due to missing linked sale', new Error('link_mismatch'), {
+        component: 'ingestion/publishWorker',
+        operation: 'linked_finalize_link_mismatch',
+        rowId: row.id,
+        saleId: linkedSaleId,
+        reason: 'link_mismatch',
+      })
+      continue
+    }
+
+    if (linkedSale.ingested_sale_id !== row.id) {
+      summary.linkMismatch += 1
+      logger.error('Linked-sale finalization skipped due to mismatched sale linkage', new Error('link_mismatch'), {
+        component: 'ingestion/publishWorker',
+        operation: 'linked_finalize_link_mismatch',
+        rowId: row.id,
+        saleId: linkedSaleId,
+        reason: 'link_mismatch',
+      })
+      if (row.status !== 'publish_failed') {
+        const nextReasons = appendFailureReason(toFailureReasons(row.failure_reasons), 'publish_error')
+        await fromBase(admin, 'ingested_sales')
+          .update({
+            status: 'publish_failed',
+            failure_reasons: nextReasons,
+          })
+          .eq('id', row.id)
+          .neq('status', 'published')
+      }
+      continue
+    }
+
+    const sanitizedReasons = sanitizeFailureReasonsAfterLinkedFinalize(row.failure_reasons)
+    const shouldClearFailureDetails = isTransientPublishFailureDetails(row.failure_details)
+    const payload: Record<string, unknown> = {
+      status: 'published',
+      published_at: row.published_at ?? new Date().toISOString(),
+    }
+    if (sanitizedReasons !== null) {
+      payload.failure_reasons = sanitizedReasons
+    }
+    if (shouldClearFailureDetails) {
+      payload.failure_details = null
+    }
+
+    const { error: updateError } = await fromBase(admin, 'ingested_sales')
+      .update(payload)
+      .eq('id', row.id)
+      .eq('published_sale_id', linkedSaleId)
+      .neq('status', 'published')
+
+    if (updateError) {
+      logger.error('Linked-sale finalization update failed', new Error(updateError.message), {
+        component: 'ingestion/publishWorker',
+        operation: 'linked_finalize_update',
+        rowId: row.id,
+        saleId: linkedSaleId,
+      })
+      continue
+    }
+
+    summary.finalized += 1
+    logger.info('Linked-sale finalization completed', {
+      component: 'ingestion/publishWorker',
+      operation: 'linked_finalize_update',
+      rowId: row.id,
+      saleId: linkedSaleId,
+    })
+  }
+
+  logger.info('Linked-sale finalization batch completed', {
+    component: 'ingestion/publishWorker',
+    operation: 'linked_finalize_batch_complete',
+    ...summary,
+    batchSize,
+  })
+
+  return summary
 }
 
 function utcTodayDateString(): string {

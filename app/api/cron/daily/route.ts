@@ -37,7 +37,11 @@ import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
 import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
-import { publishReadyIngestedSales, type PublishWorkerBatchSummary } from '@/lib/ingestion/publishWorker'
+import {
+  finalizeLinkedPublishedIngestedSales,
+  publishReadyIngestedSales,
+  type PublishWorkerBatchSummary,
+} from '@/lib/ingestion/publishWorker'
 import {
   fetchLastSuccessfulExternalIngestionAt,
   recordIngestionOrchestrationRun,
@@ -1057,15 +1061,18 @@ async function runIngestionOrchestration(
       step: 'publish',
     }))
     publishSummary = await publishReadyIngestedSales()
+    const linkedFinalizeSummary = await finalizeLinkedPublishedIngestedSales()
     taskResult.steps.publish = {
       ok: true,
       ...publishSummary,
+      linkedFinalize: linkedFinalizeSummary,
     }
     logger.info('Publish step completed', withOpId({
       component: 'api/cron/daily',
       task: 'ingestion-orchestration',
       step: 'publish',
       ...publishSummary,
+      linkedFinalize: linkedFinalizeSummary,
     }))
   } catch (error) {
     taskResult.ok = false

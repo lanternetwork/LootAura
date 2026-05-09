@@ -767,10 +767,19 @@ export function parseExternalPageSourceHtml(
 
     const pathCity = normalizeIngestionCity(parts[2]?.replace(/-/g, ' ') ?? null)
     const parsedFromAddress = extractCityStateFromAddressRaw(addressRaw)
-    const configCity = normalizeIngestionCity(config.city)
-    const configState = normalizeIngestionState(config.state)
-    const listingCity = parsedFromAddress.city || pathCity || configCity || config.city
-    const listingState = parsedFromAddress.state || configState || config.state
+    const pathState = normalizeIngestionState(parts[1]?.replace(/-/g, ' ') ?? null)
+    const listingCity = parsedFromAddress.city || pathCity
+    const listingState = parsedFromAddress.state || pathState
+    const citySource = parsedFromAddress.city ? 'address' : pathCity ? 'path' : 'none'
+    const stateSource = parsedFromAddress.state ? 'address' : pathState ? 'path' : 'none'
+    if (!listingCity || !listingState) {
+      invalid += 1
+      continue
+    }
+    rawPayload.citySource = citySource
+    rawPayload.stateSource = stateSource
+    rawPayload.resolvedCity = listingCity
+    rawPayload.resolvedState = listingState
 
     listings.push({
       title,
@@ -811,6 +820,10 @@ function buildRowRawPayload(
     pathCitySlug?: unknown
     addressSlug?: unknown
     externalId?: unknown
+    citySource?: unknown
+    stateSource?: unknown
+    resolvedCity?: unknown
+    resolvedState?: unknown
     imageUrls?: unknown
     adapter?: unknown
   }
@@ -823,6 +836,10 @@ function buildRowRawPayload(
       pathCitySlug: rp.pathCitySlug ?? null,
       addressSlug: rp.addressSlug ?? null,
       externalId: rp.externalId ?? null,
+      citySource: rp.citySource ?? null,
+      stateSource: rp.stateSource ?? null,
+      resolvedCity: rp.resolvedCity ?? null,
+      resolvedState: rp.resolvedState ?? null,
     },
   }
   if (Array.isArray(rp.imageUrls) && rp.imageUrls.length > 0) {

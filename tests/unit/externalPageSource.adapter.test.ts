@@ -473,6 +473,7 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(3)
     expect(listings.map((l) => l.city)).toEqual(['Plainfield', 'Joliet', 'Tinley Park'])
     expect(listings.every((l) => l.state === 'IL')).toBe(true)
+    expect(listings.map((l) => l.rawPayload.citySource)).toEqual(['path', 'path', 'path'])
   })
 
   it('normalizes path city slug artifacts and never emits Chicago.html', async () => {
@@ -490,5 +491,6 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(1)
     expect(listings[0].city).toBe('Chicago')
     expect(listings[0].city).not.toBe('Chicago.html')
+    expect(listings[0].rawPayload.citySource).toBe('path')
   })
 })

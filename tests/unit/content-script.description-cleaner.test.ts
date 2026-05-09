@@ -22,7 +22,11 @@ type WindowWithContentScriptTest = Window & {
       }
     }
   }
-  __LootAuraContentScriptTest?: { cleanExtractedDescription: (raw: string) => string }
+  __LootAuraContentScriptTest?: {
+    cleanExtractedDescription: (raw: string) => string
+    normalizeCityFromPathSegment: (raw: string) => string
+    deriveCityStateFromUrl: (rawUrl: string) => { city: string; state: string }
+  }
 }
 
 function installChrome(win: WindowWithContentScriptTest) {
@@ -105,5 +109,33 @@ describe('content-script description cleaner', () => {
       'Great furniture and toys. Fri 5/8 Start time: 8am Starts at 9:30am For more information please visit us at click here see listing 46307, USA'
     const cleaned = cleaner!(dirty)
     expect(cleaned).toBe('Great furniture and toys.')
+  })
+
+  it('derives listing-specific city/state from listing URL path', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+      url: 'https://yardsaletreasuremap.com/US/Illinois/Chicago.html',
+      runScripts: 'dangerously',
+    })
+    loadContentScript(dom)
+    const win = dom.window as unknown as WindowWithContentScriptTest
+    const derive = win.__LootAuraContentScriptTest?.deriveCityStateFromUrl
+    expect(typeof derive).toBe('function')
+
+    const resolved = derive!(
+      'https://yardsaletreasuremap.com/US/Illinois/Antioch/101-Main-St/100/listing.html?s=tl'
+    )
+    expect(resolved).toEqual({ city: 'Antioch', state: 'IL' })
+  })
+
+  it('normalizes .html city artifacts from URL path segments', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+      url: 'https://yardsaletreasuremap.com/US/Illinois/Chicago.html',
+      runScripts: 'dangerously',
+    })
+    loadContentScript(dom)
+    const win = dom.window as unknown as WindowWithContentScriptTest
+    const normalizeCity = win.__LootAuraContentScriptTest?.normalizeCityFromPathSegment
+    expect(typeof normalizeCity).toBe('function')
+    expect(normalizeCity!('Chicago.html')).toBe('Chicago')
   })
 })

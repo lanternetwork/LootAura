@@ -576,6 +576,11 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
   const addressRaw = extractAddress();
   const { city, state } = extractCityState(addressRaw);
   const urlDerived = deriveCityStateFromUrl(currentUrl);
+  const resolvedCity = city || urlDerived.city;
+  const resolvedState = state || urlDerived.state;
+  if (!resolvedCity || !resolvedState) {
+    throw new Error("Unable to determine city/state from listing address or URL");
+  }
   const imageExtract = extractImages();
   console.log("City/state extracted:", { city, state });
 
@@ -590,8 +595,8 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
         addressRaw,
         dateRaw: extractDate(),
         imageSourceUrl: imageExtract.primary,
-        cityHint: city || urlDerived.city || session.city,
-        stateHint: state || urlDerived.state || session.state,
+        cityHint: resolvedCity,
+        stateHint: resolvedState,
         rawPayload: {
           tags: selectedTags,
           collectedAt: Date.now(),
@@ -699,7 +704,19 @@ function renderOverlay(session, currentUrl) {
       .filter((el) => el.checked)
       .map((el) => el.getAttribute("data-tag") || "")
       .filter(Boolean);
-    const payload = buildSubmissionPayload(session, currentUrl, selectedTags);
+    let payload;
+    try {
+      payload = buildSubmissionPayload(session, currentUrl, selectedTags);
+    } catch (error) {
+      console.error("[LootAura] Failed to build submission payload:", error);
+      alert(
+        error instanceof Error
+          ? `Cannot submit this listing: ${error.message}`
+          : `Cannot submit this listing: ${String(error)}`
+      );
+      enableButtons();
+      return;
+    }
     console.log("[LootAura] Payload built:", payload);
 
     try {

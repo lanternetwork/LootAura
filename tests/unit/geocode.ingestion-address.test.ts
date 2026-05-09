@@ -6,12 +6,13 @@ vi.mock('@/lib/env', () => ({
 
 const loggerError = vi.fn()
 const loggerWarn = vi.fn()
+const loggerInfo = vi.fn()
 
 vi.mock('@/lib/log', () => ({
   logger: {
     error: (...args: unknown[]) => loggerError(...args),
     warn: (...args: unknown[]) => loggerWarn(...args),
-    info: vi.fn(),
+    info: (...args: unknown[]) => loggerInfo(...args),
     debug: vi.fn(),
   },
 }))
@@ -20,6 +21,7 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
   beforeEach(() => {
     loggerError.mockClear()
     loggerWarn.mockClear()
+    loggerInfo.mockClear()
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -49,6 +51,29 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
     expect(String(fetchCall)).toContain('limit=3')
     expect(String(fetchCall)).toContain('100%20Main%20St%2C%20Louisville%2C%20KY%2C%20USA')
     expect(loggerWarn).not.toHaveBeenCalled()
+  })
+
+  it('normalizes hyphenated locality for Nominatim q= without touching street hyphens', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress({
+      address: '100 North-Walk Rd, 95628',
+      city: 'Fair-Oaks',
+      state: 'CA',
+    })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    const decoded = decodeURIComponent(String(fetchCall).split('q=')[1]?.split('&')[0] ?? '')
+    expect(decoded).toContain('North-Walk')
+    expect(decoded).toContain('Fair Oaks')
+    expect(decoded).not.toContain('Fair-Oaks')
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Nominatim geocode query prepared',
+      expect.objectContaining({
+        geocode_city_raw: 'Fair-Oaks',
+        geocode_city_normalized: 'Fair Oaks',
+        queryFingerprint: expect.any(String),
+      })
+    )
   })
 
   it('builds residential query with unit + zip context (does not drop apartment detail)', async () => {

@@ -87,6 +87,26 @@ function sanitizeCityArtifacts(value: string): string {
   return collapseWhitespace(candidate)
 }
 
+/**
+ * Locality/city only (never pass a full street line). Expands URL-slug-style
+ * letter–letter hyphens and Unicode dash punctuation for Nominatim queries.
+ * Does not split digit-only or digit-mixed segments (e.g. route-style tokens).
+ */
+export function normalizeLocalityForGeocodeQuery(value: string | null): string | null {
+  if (value == null) return null
+  let s = collapseWhitespace(value.normalize('NFKC'))
+  if (!s) return null
+  s = s.replace(/\p{Pd}+/gu, ' ')
+  s = collapseWhitespace(s)
+  let prev = ''
+  while (s !== prev) {
+    prev = s
+    s = s.replace(/([\p{L}\p{M}]+)-([\p{L}\p{M}]+)/gu, '$1 $2')
+  }
+  s = collapseWhitespace(s)
+  return normalizeIngestionCity(s)
+}
+
 /** Trim, collapse whitespace, naive title case per word. */
 export function normalizeIngestionCity(value: string | null): string | null {
   if (value == null) return null

@@ -1,7 +1,11 @@
 import { getNominatimEmail } from '@/lib/env'
 import { logger } from '@/lib/log'
 import { createHash } from 'node:crypto'
-import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
+import {
+  normalizeIngestionCity,
+  normalizeIngestionState,
+  normalizeLocalityForGeocodeQuery,
+} from '@/lib/ingestion/normalizeIngestionLocation'
 
 const RATE_LIMIT_BACKOFF_MS = 250
 
@@ -124,10 +128,18 @@ function buildResidentialQuery(address: string, city: string, state: string, pos
  */
 export async function geocodeAddress(input: GeocodeAddressInput): Promise<GeocodeAddressOutcome> {
   const address = input.address.trim()
-  const city = input.city.trim()
+  const cityRaw = input.city.trim()
   const state = input.state.trim()
 
-  if (!address || !city || !state) {
+  if (!address || !cityRaw || !state) {
+    logger.info('Nominatim geocode skipped (empty locality inputs)', {
+      component: 'geocode/geocodeAddress',
+      operation: 'nominatim_query',
+      geocode_city_raw: cityRaw || undefined,
+      geocode_city_normalized: undefined,
+      queryFingerprint: undefined,
+      providerClassification: 'empty_results' as const,
+    })
     return {
       coords: null,
       hit429: false,
@@ -136,12 +148,21 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     }
   }
 
+  const cityNormalized = normalizeLocalityForGeocodeQuery(cityRaw) ?? cityRaw
+
   try {
     const email = getNominatimEmail()
     const postalCodeMatch = address.match(/\b\d{5}(?:-\d{4})?\b/)
     const postalCode = postalCodeMatch?.[0] ?? null
-    const query = buildResidentialQuery(address, city, state, postalCode)
+    const query = buildResidentialQuery(address, cityNormalized, state, postalCode)
     const queryFingerprint = createHash('sha256').update(query.toLowerCase()).digest('hex').slice(0, 16)
+    logger.info('Nominatim geocode query prepared', {
+      component: 'geocode/geocodeAddress',
+      operation: 'nominatim_query',
+      geocode_city_raw: cityRaw,
+      geocode_city_normalized: cityNormalized,
+      queryFingerprint,
+    })
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
       query
     )}&email=${email}&limit=3&addressdetails=1&countrycodes=us`
@@ -157,7 +178,10 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         component: 'geocode/geocodeAddress',
         operation: 'nominatim_fetch',
         status: 429,
+        geocode_city_raw: cityRaw,
+        geocode_city_normalized: cityNormalized,
         queryFingerprint,
+        providerClassification: 'rate_limited' as const,
       })
       await sleep(RATE_LIMIT_BACKOFF_MS)
       return {
@@ -174,7 +198,10 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         component: 'geocode/geocodeAddress',
         operation: 'nominatim_fetch',
         status: response.status,
+        geocode_city_raw: cityRaw,
+        geocode_city_normalized: cityNormalized,
         queryFingerprint,
+        providerClassification: 'http_not_ok' as const,
       })
       return {
         coords: null,
@@ -203,6 +230,14 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         (remainingRaw != null && remainingRaw.trim() === '0') ||
         (retryAfterRaw != null && retryAfterRaw.trim().length > 0)
       if (isSoftRateLimit) {
+        logger.info('Nominatim geocode outcome', {
+          component: 'geocode/geocodeAddress',
+          operation: 'nominatim_complete',
+          geocode_city_raw: cityRaw,
+          geocode_city_normalized: cityNormalized,
+          queryFingerprint,
+          providerClassification: 'rate_limited_soft' as const,
+        })
         return {
           coords: null,
           hit429: true,
@@ -211,6 +246,14 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
           providerClassification: 'rate_limited_soft',
         }
       }
+      logger.info('Nominatim geocode outcome', {
+        component: 'geocode/geocodeAddress',
+        operation: 'nominatim_complete',
+        geocode_city_raw: cityRaw,
+        geocode_city_normalized: cityNormalized,
+        queryFingerprint,
+        providerClassification: 'empty_results' as const,
+      })
       return {
         coords: null,
         hit429: false,
@@ -223,6 +266,14 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     const lat = Number.parseFloat(first.lat)
     const lng = Number.parseFloat(first.lon)
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      logger.info('Nominatim geocode outcome', {
+        component: 'geocode/geocodeAddress',
+        operation: 'nominatim_complete',
+        geocode_city_raw: cityRaw,
+        geocode_city_normalized: cityNormalized,
+        queryFingerprint,
+        providerClassification: 'invalid_coordinates' as const,
+      })
       return {
         coords: null,
         hit429: false,
@@ -243,9 +294,10 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     const type = (first.type || '').toLowerCase()
     const providerCity = first.address?.city || first.address?.town || first.address?.village || first.address?.hamlet || ''
     const providerState = first.address?.state || ''
+    const cityCanonical = normalizeIngestionCity(cityNormalized) ?? cityNormalized
     const cityMismatch =
       Boolean(providerCity) &&
-      normalizeIngestionCity(providerCity) !== normalizeIngestionCity(city)
+      normalizeIngestionCity(providerCity) !== cityCanonical
     const stateMismatch =
       Boolean(providerState) &&
       normalizeIngestionState(providerState) !== normalizeIngestionState(state)
@@ -270,7 +322,10 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       logger.warn('Nominatim returned low-confidence geocode candidate', {
         component: 'geocode/geocodeAddress',
         operation: 'nominatim_classify',
+        geocode_city_raw: cityRaw,
+        geocode_city_normalized: cityNormalized,
         queryFingerprint,
+        providerClassification: 'low_confidence' as const,
         lowConfidenceReasons,
       })
       return {
@@ -283,6 +338,14 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       }
     }
 
+    logger.info('Nominatim geocode succeeded', {
+      component: 'geocode/geocodeAddress',
+      operation: 'nominatim_complete',
+      geocode_city_raw: cityRaw,
+      geocode_city_normalized: cityNormalized,
+      queryFingerprint,
+      providerClassification: 'ok' as const,
+    })
     return { coords: { lat, lng }, hit429: false, queryFingerprint, providerClassification: 'ok' }
   } catch (error) {
     logger.error(
@@ -291,6 +354,9 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       {
         component: 'geocode/geocodeAddress',
         operation: 'nominatim_fetch',
+        geocode_city_raw: cityRaw,
+        geocode_city_normalized: cityNormalized,
+        providerClassification: 'fetch_exception' as const,
       }
     )
     return {

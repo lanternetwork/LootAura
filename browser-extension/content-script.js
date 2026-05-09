@@ -152,6 +152,115 @@ function deriveCityStateFromUrl(rawUrl) {
   return { city: "", state: "" };
 }
 
+function isLikelyNonCityPathSegment(segment) {
+  let s = String(segment || "");
+  try {
+    s = decodeURIComponent(s);
+  } catch {
+    /* keep raw */
+  }
+  if (/^\d/.test(s)) return true;
+  if (/see-?source/i.test(s)) return true;
+  if (/address-after/i.test(s)) return true;
+  if (s.length > 48) return true;
+  return false;
+}
+
+function hubBaseSlugFromSegment(hubSegment) {
+  return String(hubSegment || "").replace(/\.html?$/i, "");
+}
+
+function parseYstmListingPathForPayload(listingUrl) {
+  try {
+    const url = new URL(listingUrl, window.location.origin);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts[0] !== "US" || parts.length < 6) return null;
+    const pathStateSegment = parts[1] || null;
+    const seg2 = parts[2] || "";
+    let hubSegment = null;
+    let pathCitySlugRaw = null;
+    let addressIdx;
+    if (/\.html?$/i.test(seg2) && parts[3]) {
+      hubSegment = seg2;
+      const cand = parts[3];
+      if (!isLikelyNonCityPathSegment(cand)) {
+        pathCitySlugRaw = cand;
+        addressIdx = 4;
+      } else {
+        pathCitySlugRaw = hubBaseSlugFromSegment(seg2);
+        addressIdx = 3;
+      }
+    } else if (seg2) {
+      pathCitySlugRaw = seg2;
+      addressIdx = 3;
+    } else return null;
+    return {
+      pathStateSegment,
+      hubSegment,
+      pathCitySlugRaw,
+      addressSlugSegment: parts[addressIdx] || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function extractAddressTailCityStateForAuthority(addressRaw) {
+  if (!addressRaw) return { addressTailCity: "", addressTailState: "" };
+  const match = String(addressRaw).match(
+    /,\s*([^,]+?),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?(?:,\s*USA)?$/i
+  );
+  if (!match) return { addressTailCity: "", addressTailState: "" };
+  return {
+    addressTailCity: normalizeCityFromPathSegment(match[1].trim()),
+    addressTailState: match[2].toUpperCase(),
+  };
+}
+
+/** Mirrors server `resolveYstmListingCityAuthority` for upload payloads. */
+function resolveYstmListingCityAuthorityJs(listingUrl, addressRaw) {
+  const tail = extractAddressTailCityStateForAuthority(addressRaw || "");
+  const parsed = parseYstmListingPathForPayload(listingUrl);
+  if (!parsed) {
+    const hasTail = Boolean(tail.addressTailCity && tail.addressTailState);
+    return {
+      isYstmPath: false,
+      pathCitySlug: null,
+      hubSegment: null,
+      addressTailCity: tail.addressTailCity || null,
+      cityConflict: false,
+      citySource: hasTail ? "address_tail" : "none",
+      stateSource: hasTail ? "address_tail" : "none",
+      resolvedCity: tail.addressTailCity || "",
+      resolvedState: tail.addressTailState || "",
+      urlMunicipalityNormalized: "",
+      pathStateNormalized: "",
+    };
+  }
+  const urlCity = normalizeCityFromPathSegment(parsed.pathCitySlugRaw || "");
+  const urlState = normalizeStateFromName(parsed.pathStateSegment);
+  const addrCity = tail.addressTailCity;
+  const addrState = tail.addressTailState;
+  const cityConflict = Boolean(
+    urlCity && addrCity && urlCity.toLowerCase() !== addrCity.toLowerCase()
+  );
+  const resolvedCity = urlCity || addrCity || "";
+  const resolvedState = urlState || addrState || "";
+  return {
+    isYstmPath: true,
+    pathCitySlug: parsed.pathCitySlugRaw,
+    hubSegment: parsed.hubSegment,
+    addressTailCity: addrCity || null,
+    cityConflict,
+    citySource: urlCity ? "listing_url" : addrCity ? "address_tail" : "none",
+    stateSource: urlState ? "listing_url" : addrState ? "address_tail" : "none",
+    resolvedCity,
+    resolvedState,
+    urlMunicipalityNormalized: urlCity,
+    pathStateNormalized: urlState,
+  };
+}
+
 function deriveCityStateFromPage() {
   const parts = window.location.pathname
     .split("/")
@@ -824,10 +933,19 @@ function extractImages() {
 
 function buildSubmissionPayload(session, currentUrl, selectedTags) {
   const addressRaw = extractAddress();
-  const { city, state } = extractCityState(addressRaw);
-  const urlDerived = deriveCityStateFromUrl(currentUrl);
-  const resolvedCity = city || urlDerived.city;
-  const resolvedState = state || urlDerived.state;
+  const auth = resolveYstmListingCityAuthorityJs(currentUrl, addressRaw);
+
+  let resolvedCity = auth.resolvedCity;
+  let resolvedState = auth.resolvedState;
+
+  if (!auth.isYstmPath) {
+    const urlDerived = deriveCityStateFromUrl(currentUrl);
+    const legacy = extractCityState(addressRaw);
+    const tail = extractAddressTailCityStateForAuthority(addressRaw);
+    resolvedCity = tail.addressTailCity || urlDerived.city || legacy.city || "";
+    resolvedState = tail.addressTailState || urlDerived.state || legacy.state || "";
+  }
+
   if (!resolvedCity || !resolvedState) {
     throw new Error("Unable to determine city/state from listing address or URL");
   }
@@ -853,6 +971,17 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
         rawPayload: {
           tags: selectedTags,
           collectedAt: Date.now(),
+          ystmListingCityAuthority: {
+            pathCitySlug: auth.pathCitySlug,
+            hubSegment: auth.hubSegment,
+            addressTailCity: auth.addressTailCity,
+            cityConflict: auth.cityConflict,
+            citySource: auth.citySource,
+            stateSource: auth.stateSource,
+            resolvedCity: auth.isYstmPath ? auth.resolvedCity : resolvedCity,
+            resolvedState: auth.isYstmPath ? auth.resolvedState : resolvedState,
+            urlMunicipalityNormalized: auth.urlMunicipalityNormalized || null,
+          },
           ...(imageExtract.urls.length > 0 ? { imageUrls: imageExtract.urls } : {}),
           ...(isoPair ? { ystmCanonicalDateStart: isoPair.start, ystmCanonicalDateEnd: isoPair.end } : {}),
         },

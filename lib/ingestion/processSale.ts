@@ -1,5 +1,6 @@
 import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureReason } from '@/lib/ingestion/types'
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
+import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 
 function cleanText(value: string | null): string | null {
   if (value == null) return null
@@ -313,12 +314,27 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
   const failureReasons: FailureReason[] = []
   const addressRaw = cleanText(rawSale.addressRaw)
   const parsedLocation = extractCityStateFromAddressRaw(addressRaw)
-  const city = normalizeIngestionCity(
-    parsedLocation.city || cleanText(rawSale.cityHint) || cleanText(cityConfig.city)
-  )
-  const state = normalizeIngestionState(
-    parsedLocation.state || cleanText(rawSale.stateHint) || cleanText(cityConfig.state)
-  )
+  const authority = resolveYstmListingCityAuthority(rawSale.sourceUrl ?? '', addressRaw)
+
+  let city: string | null
+  let state: string | null
+  if (authority.isYstmPath) {
+    city =
+      authority.resolvedCity ??
+      normalizeIngestionCity(cleanText(rawSale.cityHint)) ??
+      normalizeIngestionCity(cleanText(cityConfig.city))
+    state =
+      authority.resolvedState ??
+      normalizeIngestionState(cleanText(rawSale.stateHint)) ??
+      normalizeIngestionState(cleanText(cityConfig.state))
+  } else {
+    city = normalizeIngestionCity(
+      parsedLocation.city || cleanText(rawSale.cityHint) || cleanText(cityConfig.city)
+    )
+    state = normalizeIngestionState(
+      parsedLocation.state || cleanText(rawSale.stateHint) || cleanText(cityConfig.state)
+    )
+  }
 
   const normalizedAddress = addressRaw?.toLowerCase().replace(/\s+/g, ' ') || null
   if (!hasStreetNumberAndName(addressRaw)) {

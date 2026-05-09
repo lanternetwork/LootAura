@@ -5,6 +5,7 @@ import { logger } from '@/lib/log'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
+import { parseYstmListingPathParts, resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v2'
@@ -375,16 +376,6 @@ function extractAddressFromNearbyText(nearbyText: string): string | null {
   return null
 }
 
-function extractCityStateFromAddressRaw(address: string | null): { city: string | null; state: string | null } {
-  if (!address) return { city: null, state: null }
-  const match = address.match(/,\s*([^,]+?),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?(?:,\s*USA)?$/i)
-  if (!match) return { city: null, state: null }
-  return {
-    city: normalizeIngestionCity(match[1] ?? null),
-    state: normalizeIngestionState(match[2] ?? null),
-  }
-}
-
 function decodeJsSingleQuotedJson(raw: string): string {
   // Decode common JS single-quoted escapes used in inline metadata blobs.
   return raw
@@ -690,18 +681,14 @@ export function parseExternalPageSourceHtml(
     if (seen.has(href)) continue
     seen.add(href)
 
-    let urlObj: URL
-    try {
-      urlObj = new URL(href)
-    } catch {
+    const pathInfo = parseYstmListingPathParts(href)
+    if (!pathInfo) {
       invalid += 1
       continue
     }
-    const parts = urlObj.pathname.split('/').filter(Boolean)
-    if (parts.length < 6 || parts[0] !== 'US') continue
-    if (parts[1].toLowerCase() !== stateSegment.toLowerCase()) continue
+    if (pathInfo.pathStateSegment?.toLowerCase() !== stateSegment.toLowerCase()) continue
 
-    const addressSlug = parts[3]
+    const addressSlug = pathInfo.addressSlugSegment
     let addressRaw = addressSlug ? slugSegmentToAddressRaw(addressSlug) : null
 
     let title = (a.textContent || '').replace(/\s+/g, ' ').trim()
@@ -755,38 +742,36 @@ export function parseExternalPageSourceHtml(
         }
       }
     }
+    const authority = resolveYstmListingCityAuthority(href, addressRaw)
+    if (!authority.resolvedCity || !authority.resolvedState) {
+      invalid += 1
+      continue
+    }
+
     const rawPayload: Record<string, unknown> = {
       adapter: ADAPTER_ID,
       externalId,
-      pathCitySlug: parts[2],
+      pathCitySlug: authority.pathCitySlug,
+      hubSegment: authority.hubSegment,
       addressSlug: addressSlug ?? null,
+      addressTailCity: authority.addressTailCity,
+      cityConflict: authority.cityConflict,
+      citySource: authority.citySource,
+      stateSource: authority.stateSource,
+      resolvedCity: authority.resolvedCity,
+      resolvedState: authority.resolvedState,
+      urlMunicipalityNormalized: authority.urlMunicipalityNormalized,
     }
     if (imageUrls.length > 0) {
       rawPayload.imageUrls = imageUrls
     }
 
-    const pathCity = normalizeIngestionCity(parts[2]?.replace(/-/g, ' ') ?? null)
-    const parsedFromAddress = extractCityStateFromAddressRaw(addressRaw)
-    const pathState = normalizeIngestionState(parts[1]?.replace(/-/g, ' ') ?? null)
-    const listingCity = parsedFromAddress.city || pathCity
-    const listingState = parsedFromAddress.state || pathState
-    const citySource = parsedFromAddress.city ? 'address' : pathCity ? 'path' : 'none'
-    const stateSource = parsedFromAddress.state ? 'address' : pathState ? 'path' : 'none'
-    if (!listingCity || !listingState) {
-      invalid += 1
-      continue
-    }
-    rawPayload.citySource = citySource
-    rawPayload.stateSource = stateSource
-    rawPayload.resolvedCity = listingCity
-    rawPayload.resolvedState = listingState
-
     listings.push({
       title,
       description,
       addressRaw,
-      city: listingCity,
-      state: listingState,
+      city: authority.resolvedCity,
+      state: authority.resolvedState,
       ...(startDate ? { startDate } : {}),
       ...(endDate ? { endDate } : {}),
       sourceUrl: href,
@@ -818,12 +803,16 @@ function buildRowRawPayload(
 ): Record<string, unknown> {
   const rp = listing.rawPayload as {
     pathCitySlug?: unknown
+    hubSegment?: unknown
     addressSlug?: unknown
+    addressTailCity?: unknown
+    cityConflict?: unknown
     externalId?: unknown
     citySource?: unknown
     stateSource?: unknown
     resolvedCity?: unknown
     resolvedState?: unknown
+    urlMunicipalityNormalized?: unknown
     imageUrls?: unknown
     adapter?: unknown
   }
@@ -834,12 +823,16 @@ function buildRowRawPayload(
     page_host_hash: pageHostHash,
     extractedFields: {
       pathCitySlug: rp.pathCitySlug ?? null,
+      hubSegment: rp.hubSegment ?? null,
       addressSlug: rp.addressSlug ?? null,
+      addressTailCity: rp.addressTailCity ?? null,
+      cityConflict: typeof rp.cityConflict === 'boolean' ? rp.cityConflict : null,
       externalId: rp.externalId ?? null,
       citySource: rp.citySource ?? null,
       stateSource: rp.stateSource ?? null,
       resolvedCity: rp.resolvedCity ?? null,
       resolvedState: rp.resolvedState ?? null,
+      urlMunicipalityNormalized: rp.urlMunicipalityNormalized ?? null,
     },
   }
   if (Array.isArray(rp.imageUrls) && rp.imageUrls.length > 0) {

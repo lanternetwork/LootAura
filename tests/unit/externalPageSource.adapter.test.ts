@@ -473,7 +473,7 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(3)
     expect(listings.map((l) => l.city)).toEqual(['Plainfield', 'Joliet', 'Tinley Park'])
     expect(listings.every((l) => l.state === 'IL')).toBe(true)
-    expect(listings.map((l) => l.rawPayload.citySource)).toEqual(['path', 'path', 'path'])
+    expect(listings.map((l) => l.rawPayload.citySource)).toEqual(['listing_url', 'listing_url', 'listing_url'])
   })
 
   it('normalizes path city slug artifacts and never emits Chicago.html', async () => {
@@ -491,6 +491,43 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(1)
     expect(listings[0].city).toBe('Chicago')
     expect(listings[0].city).not.toBe('Chicago.html')
-    expect(listings[0].rawPayload.citySource).toBe('path')
+    expect(listings[0].rawPayload.citySource).toBe('listing_url')
+  })
+
+  it('prefers URL Fair Oaks when address tail says Munster', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/100-Main-St/38730010/listing.html">Sale</a>
+        <div>123 Example St, Munster, IN 46321</div>
+      </div>
+    `
+    const { listings, invalid } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Highland', state: 'IN', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(invalid).toBe(0)
+    expect(listings).toHaveLength(1)
+    expect(listings[0].city).toBe('Fair Oaks')
+    expect(listings[0].rawPayload.cityConflict).toBe(true)
+    expect(listings[0].rawPayload.addressTailCity).toBe('Munster')
+    expect(listings[0].rawPayload.citySource).toBe('listing_url')
+  })
+
+  it('hub Chicago.html then Park-City yields Park City', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago.html/Park-City/100-Main-St/38730011/listing.html">Sale</a>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].city).toBe('Park City')
+    expect(listings[0].rawPayload.hubSegment).toBe('Chicago.html')
+    expect(listings[0].rawPayload.pathCitySlug).toBe('Park-City')
   })
 })

@@ -91,6 +91,58 @@ describe('processIngestedSale — city/state normalization', () => {
     expect(processed.state).toBe('IL')
   })
 
+  it('YSTM listing URL city wins over conflicting address tail (upload parity with cron)', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl:
+          'https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/100-Main-St/38730020/listing.html',
+        addressRaw: '123 St, Munster, IN 46321',
+        cityHint: 'Munster',
+        stateHint: 'IN',
+      }),
+      config
+    )
+    expect(processed.city).toBe('Fair Oaks')
+    expect(processed.state).toBe('IN')
+  })
+
+  it('YSTM hub path: Park City from URL beats Chicago address tail', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl:
+          'https://yardsaletreasuremap.com/US/Illinois/Chicago.html/Park-City/100-Main-St/38730021/listing.html',
+        addressRaw: '1 Wacker Dr, Chicago, IL 60601',
+        cityHint: 'Chicago',
+        stateHint: 'IL',
+      }),
+      config
+    )
+    expect(processed.city).toBe('Park City')
+    expect(processed.state).toBe('IL')
+  })
+
+  it('extension-style rawPayload is optional; sourceUrl + addressRaw drive YSTM authority', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl:
+          'https://yardsaletreasuremap.com/US/Indiana/Saint-John/200-Oak/38730022/listing.html',
+        addressRaw: '99 Oak, Saint John, IN 46373',
+        cityHint: 'Saint John',
+        stateHint: 'IN',
+        rawPayload: {
+          ystmListingCityAuthority: {
+            pathCitySlug: 'Saint-John',
+            citySource: 'listing_url',
+            cityConflict: false,
+          },
+        },
+      }),
+      config
+    )
+    expect(processed.city).toBe('Saint John')
+    expect(processed.state).toBe('IN')
+  })
+
   it('uses normalized cityConfig when hints empty', async () => {
     const cfg: CityIngestionConfig = {
       ...config,

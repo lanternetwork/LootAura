@@ -14,6 +14,50 @@ type DedupeTelemetryContext = {
   sourcePlatform?: string
 }
 
+export type DedupeDecisionAggregate = {
+  source_url: number
+  exact_address_date: number
+  soft_date_window: number
+  no_match: number
+  duplicateDecisionTrue: number
+  duplicateDecisionFalse: number
+}
+
+export function createEmptyDedupeDecisionAggregate(): DedupeDecisionAggregate {
+  return {
+    source_url: 0,
+    exact_address_date: 0,
+    soft_date_window: 0,
+    no_match: 0,
+    duplicateDecisionTrue: 0,
+    duplicateDecisionFalse: 0,
+  }
+}
+
+export function accumulateDedupeDecisionAggregate(
+  aggregate: DedupeDecisionAggregate,
+  match: IngestedSaleMatch | null
+): DedupeDecisionAggregate {
+  if (match?.matchType === 'source_url') {
+    aggregate.source_url += 1
+    aggregate.duplicateDecisionFalse += 1
+    return aggregate
+  }
+  if (match?.matchType === 'address_date') {
+    aggregate.exact_address_date += 1
+    aggregate.duplicateDecisionFalse += 1
+    return aggregate
+  }
+  if (match?.matchType === 'soft_address_date') {
+    aggregate.soft_date_window += 1
+    aggregate.duplicateDecisionTrue += 1
+    return aggregate
+  }
+  aggregate.no_match += 1
+  aggregate.duplicateDecisionFalse += 1
+  return aggregate
+}
+
 function dateDeltaBucketFromDays(deltaDays: number): DateDeltaBucket {
   if (deltaDays === 0) return 'same_day'
   if (deltaDays === -1) return 'minus_1_day'

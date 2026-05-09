@@ -969,6 +969,15 @@ describe('GET /api/cron/daily', () => {
         skipped: 1,
         invalid: 0,
         errors: 0,
+        dedupeTelemetrySummary: {
+          source_url: 0,
+          exact_address_date: 0,
+          soft_date_window: 0,
+          no_match: 0,
+          duplicateDecisionTrue: 0,
+          duplicateDecisionFalse: 0,
+          aggregationMode: 'not_applicable_external_page_source',
+        },
       })
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)

@@ -184,3 +184,40 @@ describe('findIngestedSaleMatch telemetry', () => {
   })
 })
 
+describe('dedupe telemetry aggregation', () => {
+  it('aggregation counts increment correctly', async () => {
+    const {
+      accumulateDedupeDecisionAggregate,
+      createEmptyDedupeDecisionAggregate,
+    } = await import('@/lib/ingestion/dedupe')
+    const agg = createEmptyDedupeDecisionAggregate()
+
+    accumulateDedupeDecisionAggregate(agg, { id: '1', matchType: 'source_url' })
+    accumulateDedupeDecisionAggregate(agg, { id: '2', matchType: 'address_date' })
+    accumulateDedupeDecisionAggregate(agg, { id: '3', matchType: 'soft_address_date' })
+    accumulateDedupeDecisionAggregate(agg, null)
+
+    expect(agg).toEqual({
+      source_url: 1,
+      exact_address_date: 1,
+      soft_date_window: 1,
+      no_match: 1,
+      duplicateDecisionTrue: 1,
+      duplicateDecisionFalse: 3,
+    })
+  })
+
+  it('aggregation output remains bounded and non-PII', async () => {
+    const { createEmptyDedupeDecisionAggregate } = await import('@/lib/ingestion/dedupe')
+    const agg = createEmptyDedupeDecisionAggregate()
+    expect(Object.keys(agg).sort()).toEqual([
+      'duplicateDecisionFalse',
+      'duplicateDecisionTrue',
+      'exact_address_date',
+      'no_match',
+      'soft_date_window',
+      'source_url',
+    ])
+  })
+})
+

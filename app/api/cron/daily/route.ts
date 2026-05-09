@@ -51,6 +51,7 @@ import {
   normalizeSourcePages,
   persistExternalPageSource,
 } from '@/lib/ingestion/adapters/externalPageSource'
+import { createEmptyDedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
@@ -666,6 +667,10 @@ async function runIngestionOrchestration(
   let geocodeSummary: GeocodeWorkerSummary | null = null
   let publishSummary: PublishWorkerBatchSummary | null = null
   let externalIngestionNote: ExternalIngestionOrchestrationNote | null = null
+  const ingestionDedupeTelemetrySummary = {
+    ...createEmptyDedupeDecisionAggregate(),
+    aggregationMode: 'not_applicable_external_page_source' as const,
+  }
 
   const minIngestionMinutes = mode === 'ingestion' ? parseIngestionOrchestrationMinMinutes() : 0
   let skipExternalIngestion = false
@@ -683,6 +688,7 @@ async function runIngestionOrchestration(
           reason: 'ingestion_interval',
           minIntervalMinutes: minIngestionMinutes,
           lastSuccessfulExternalIngestionAt: lastCompletedAt,
+          dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
         }
         externalIngestionNote = {
           status: 'skipped_throttle',
@@ -727,6 +733,7 @@ async function runIngestionOrchestration(
           ok: true,
           skipped: true,
           reason: 'active_orchestration_lock',
+          dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
         }
         externalIngestionNote = {
           status: 'skipped_lock_active',
@@ -922,6 +929,7 @@ async function runIngestionOrchestration(
         skipped: totals.skipped,
         invalid: totals.invalid,
         errors: totals.errors,
+        dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
       }
 
       const completedAt = new Date().toISOString()
@@ -951,6 +959,7 @@ async function runIngestionOrchestration(
         skipped: totals.skipped,
         invalid: totals.invalid,
         errors: totals.errors,
+        dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
         totalConfigs,
         configsRemaining,
         cursorStart: baseCursor,
@@ -990,6 +999,7 @@ async function runIngestionOrchestration(
       taskResult.steps.ingestion = {
         ok: false,
         error: error instanceof Error ? error.message : String(error),
+        dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
       }
       externalIngestionNote = { status: 'failed' }
       logger.error('Ingestion step failed', error instanceof Error ? error : new Error(String(error)), withOpId({

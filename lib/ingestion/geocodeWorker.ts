@@ -20,6 +20,9 @@ export interface GeocodeWorkerSummary {
   failedRetriable: number
   failedTerminal: number
   rate429Count: number
+  providerNoCoordsSummary?: Record<string, number>
+  repeatedEmptyResultRetries?: number
+  repeatedEmptyResultQueryFingerprints?: Record<string, number>
   processed?: number
   publishTriggered?: number
   publishOk?: number
@@ -339,7 +342,16 @@ async function applyGeocodeSuccess(
 
 type AttemptResult =
   | { kind: 'geocode_ok'; publish: PublishReadyByIdResult; hit429: false }
-  | { kind: 'geocode_fail'; retriable: boolean; terminal: boolean; hit429: boolean }
+  | {
+      kind: 'geocode_fail'
+      retriable: boolean
+      terminal: boolean
+      hit429: boolean
+      noCoordsReason?: string
+      providerClassification?: string
+      queryFingerprint?: string
+      attemptCount?: number
+    }
 
 /**
  * Process items with at most `concurrency` in-flight tasks (pool / work-queue model).
@@ -417,8 +429,17 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
           rowId,
           attemptCount,
           result: 'update_failed_after_geocode',
+          queryFingerprint: geo.queryFingerprint,
         })
-        return { kind: 'geocode_fail', retriable: true, terminal: false, hit429: false }
+        return {
+          kind: 'geocode_fail',
+          retriable: true,
+          terminal: false,
+          hit429: false,
+          providerClassification: geo.providerClassification,
+          queryFingerprint: geo.queryFingerprint,
+          attemptCount,
+        }
       }
 
       logger.info('Geocode worker row processed', {
@@ -440,6 +461,8 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
         attemptCount,
         path: 'provider_no_coords',
         noCoordsReason: geo.noCoordsReason ?? 'unknown',
+        providerClassification: geo.providerClassification ?? 'unknown',
+        queryFingerprint: geo.queryFingerprint ?? null,
         hit429,
         httpStatus: geo.httpStatus,
       })
@@ -453,10 +476,31 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
           rowId,
           attemptCount,
           result: 'failed_terminal',
+          noCoordsReason: geo.noCoordsReason ?? 'unknown',
+          providerClassification: geo.providerClassification ?? 'unknown',
+          queryFingerprint: geo.queryFingerprint ?? null,
         })
-        return { kind: 'geocode_fail', retriable: false, terminal: true, hit429 }
+        return {
+          kind: 'geocode_fail',
+          retriable: false,
+          terminal: true,
+          hit429,
+          noCoordsReason: geo.noCoordsReason,
+          providerClassification: geo.providerClassification,
+          queryFingerprint: geo.queryFingerprint,
+          attemptCount,
+        }
       }
-      return { kind: 'geocode_fail', retriable: true, terminal: false, hit429 }
+      return {
+        kind: 'geocode_fail',
+        retriable: true,
+        terminal: false,
+        hit429,
+        noCoordsReason: geo.noCoordsReason,
+        providerClassification: geo.providerClassification,
+        queryFingerprint: geo.queryFingerprint,
+        attemptCount,
+      }
     }
 
     logger.warn('Geocode worker row processed', {
@@ -465,8 +509,30 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
       rowId,
       attemptCount,
       result: 'failed_retriable',
+      noCoordsReason: geo.noCoordsReason ?? 'unknown',
+      providerClassification: geo.providerClassification ?? 'unknown',
+      queryFingerprint: geo.queryFingerprint ?? null,
     })
-    return { kind: 'geocode_fail', retriable: true, terminal: false, hit429 }
+    if (geo.noCoordsReason === 'empty_results' && attemptCount > 1) {
+      logger.warn('Geocode worker repeated empty-result retry', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'repeated_empty_results_retry',
+        rowId,
+        attemptCount,
+        queryFingerprint: geo.queryFingerprint ?? null,
+        providerClassification: geo.providerClassification ?? 'empty_results',
+      })
+    }
+    return {
+      kind: 'geocode_fail',
+      retriable: true,
+      terminal: false,
+      hit429,
+      noCoordsReason: geo.noCoordsReason,
+      providerClassification: geo.providerClassification,
+      queryFingerprint: geo.queryFingerprint,
+      attemptCount,
+    }
   }
 
   if (attemptCount >= 3) {
@@ -656,6 +722,9 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     failedRetriable: 0,
     failedTerminal: 0,
     rate429Count: 0,
+    providerNoCoordsSummary: {},
+    repeatedEmptyResultRetries: 0,
+    repeatedEmptyResultQueryFingerprints: {},
     ...(options?.captureClaimedRowIds
       ? { claimedRowIds: claimedRows.map((row) => row.id).slice(0, 5) }
       : {}),
@@ -691,6 +760,20 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
   for (const rowResult of rowResults) {
     if (rowResult.kind === 'geocode_fail' && rowResult.hit429) {
       summary.rate429Count += 1
+    }
+    if (rowResult.kind === 'geocode_fail') {
+      const reason = rowResult.noCoordsReason || rowResult.providerClassification || 'unknown'
+      summary.providerNoCoordsSummary![reason] = (summary.providerNoCoordsSummary![reason] || 0) + 1
+      const repeatedEmpty =
+        rowResult.attemptCount != null && rowResult.attemptCount > 1 && rowResult.noCoordsReason === 'empty_results'
+      if (repeatedEmpty) {
+        summary.repeatedEmptyResultRetries = (summary.repeatedEmptyResultRetries || 0) + 1
+        const fp = rowResult.queryFingerprint?.trim()
+        if (fp) {
+          summary.repeatedEmptyResultQueryFingerprints![fp] =
+            (summary.repeatedEmptyResultQueryFingerprints![fp] || 0) + 1
+        }
+      }
     }
     if (rowResult.kind === 'geocode_ok') {
       summary.succeeded += 1
@@ -728,6 +811,9 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       failedRetriable: summary.failedRetriable,
       failedTerminal: summary.failedTerminal,
       rate429Count: summary.rate429Count,
+      providerNoCoordsSummary: summary.providerNoCoordsSummary,
+      repeatedEmptyResultRetries: summary.repeatedEmptyResultRetries,
+      repeatedEmptyResultQueryFingerprints: summary.repeatedEmptyResultQueryFingerprints,
       durationMs,
     })
   }
@@ -744,6 +830,9 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     failedRetriable: summary.failedRetriable,
     failedTerminal: summary.failedTerminal,
     rate429Count: summary.rate429Count,
+    providerNoCoordsSummary: summary.providerNoCoordsSummary,
+    repeatedEmptyResultRetries: summary.repeatedEmptyResultRetries,
+    repeatedEmptyResultQueryFingerprints: summary.repeatedEmptyResultQueryFingerprints,
     publishTriggered: publishTriggeredCount,
     publishOk: publishOkCount,
     publishFailed: publishFailedCount,

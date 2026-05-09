@@ -298,6 +298,37 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     })
   })
 
+  it('tracks repeated empty-result retries in batch summary', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b4',
+          normalized_address: '410 Retry Ln',
+          address_raw: null,
+          geocode_attempts: 2,
+        },
+      ],
+      error: null,
+    })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'empty_results',
+      providerClassification: 'empty_results',
+      queryFingerprint: 'abc123',
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.claimed).toBe(1)
+    expect(summary.failedRetriable).toBe(1)
+    expect(summary.repeatedEmptyResultRetries).toBe(1)
+    expect(summary.providerNoCoordsSummary).toMatchObject({ empty_results: 1 })
+    expect(summary.repeatedEmptyResultQueryFingerprints).toMatchObject({ abc123: 1 })
+  })
+
   it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [

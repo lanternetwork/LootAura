@@ -8,6 +8,17 @@
     return match ? decodeURIComponent(match[1]) : null;
   }
 
+  /** Parse JSON from any response; non-JSON becomes a small diagnostic object. */
+  async function parseResponseBody(res) {
+    const text = await res.text();
+    if (!text || !String(text).trim()) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { _nonJson: true, _textPreview: String(text).slice(0, 2000) };
+    }
+  }
+
   function parseRetryAfterFromResponse(res, jsonFallback) {
     let retryAfterSec = null;
     const retryHdr = res.headers.get("Retry-After");
@@ -41,14 +52,22 @@
     return { ok: true, reason: "ok" };
   }
 
-  async function tryParseJson(res) {
-    try {
-      const ct = res.headers.get("content-type") || "";
-      if (!ct.includes("application/json")) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
+  function serverFieldsFromBody(body, status) {
+    const code =
+      body && typeof body.code === "string"
+        ? body.code
+        : status === 401
+          ? "UPLOAD_AUTH_UNAUTHORIZED"
+          : status === 403
+            ? "UPLOAD_AUTH_FORBIDDEN"
+            : undefined;
+    const message =
+      body && typeof body.message === "string"
+        ? body.message
+        : body && typeof body.error === "string"
+          ? body.error
+          : undefined;
+    return { serverCode: code, serverMessage: message };
   }
 
   /** Auth/capability check: GET admin list (no upload body, no CSRF). */
@@ -59,11 +78,19 @@
         credentials: "include",
       });
 
-      const body = await tryParseJson(res);
-      const retryAfterSec = parseRetryAfterFromResponse(res, body || {});
+      const responseBody = await parseResponseBody(res);
+      const retryAfterSec = parseRetryAfterFromResponse(res, responseBody || {});
 
       if (res.status === 401 || res.status === 403) {
-        return { ok: false, status: res.status, error: "Admin auth failed" };
+        const { serverCode, serverMessage } = serverFieldsFromBody(responseBody, res.status);
+        return {
+          ok: false,
+          status: res.status,
+          error: serverMessage || "Admin auth failed",
+          serverCode,
+          serverMessage,
+          responseBody,
+        };
       }
       if (res.status === 429) {
         return {
@@ -71,31 +98,41 @@
           status: 429,
           error: "Rate limited",
           ...(typeof retryAfterSec === "number" ? { retryAfterSec } : {}),
+          responseBody,
         };
       }
       if (res.status >= 500) {
         return {
           ok: false,
           status: res.status,
-          error: body && body.message ? String(body.message) : `Server error (${res.status})`,
+          error:
+            (responseBody && (responseBody.message || responseBody.error)) ||
+            `Server error (${res.status})`,
+          responseBody,
         };
       }
-      if (res.status !== 200 || !body || body.ok !== true) {
+      if (res.status !== 200 || !responseBody || responseBody.ok !== true) {
+        const { serverCode, serverMessage } = serverFieldsFromBody(responseBody, res.status);
         return {
           ok: false,
           status: res.status,
           error:
-            (body && (body.message || body.error)) ||
+            serverMessage ||
+            (responseBody && responseBody.message) ||
             (res.status === 400 ? "Bad request" : `HTTP ${res.status}`),
+          serverCode,
+          serverMessage,
+          responseBody,
         };
       }
 
-      return { ok: true, status: 200 };
+      return { ok: true, status: 200, responseBody };
     } catch (error) {
       return {
         ok: false,
         status: 0,
         error: error instanceof Error ? error.message : String(error),
+        responseBody: null,
       };
     }
   }
@@ -103,7 +140,15 @@
   async function runManualUpload(payload) {
     const csrf = getCsrfToken();
     if (!csrf) {
-      return { ok: false, status: 0, error: "Missing CSRF token", ackReason: "missing_csrf" };
+      return {
+        ok: false,
+        status: 0,
+        error: "Missing CSRF token",
+        ackReason: "missing_csrf",
+        responseBody: null,
+        serverCode: "UPLOAD_CLIENT_MISSING_CSRF",
+        serverMessage: "csrf-token cookie not found in LootAura tab",
+      };
     }
 
     try {
@@ -117,15 +162,23 @@
         body: JSON.stringify(payload),
       });
 
-      const body = await tryParseJson(res);
-      const retryAfterSec = parseRetryAfterFromResponse(res, body || {});
+      const responseBody = await parseResponseBody(res);
+      const retryAfterSec = parseRetryAfterFromResponse(res, responseBody || {});
+      const { serverCode, serverMessage } = serverFieldsFromBody(responseBody, res.status);
+
+      const rid =
+        responseBody && typeof responseBody.requestId === "string" ? responseBody.requestId : undefined;
 
       if (res.status === 401 || res.status === 403) {
         return {
           ok: false,
           status: res.status,
-          error: "Admin access or CSRF failed",
+          error: serverMessage || "Admin access or CSRF failed",
           ackReason: "auth",
+          serverCode,
+          serverMessage,
+          requestId: rid,
+          responseBody,
         };
       }
 
@@ -136,56 +189,109 @@
           error: "Rate limited",
           ...(typeof retryAfterSec === "number" ? { retryAfterSec } : {}),
           ackReason: "rate_limit",
+          serverCode: responseBody && responseBody.code ? String(responseBody.code) : "RATE_LIMITED",
+          serverMessage: responseBody && responseBody.message ? String(responseBody.message) : undefined,
+          requestId: rid,
+          responseBody,
         };
       }
 
       if (res.status === 400) {
         const detail =
-          body && Array.isArray(body.details)
-            ? JSON.stringify(body.details).slice(0, 500)
-            : body && body.error
-              ? String(body.error)
-              : "Invalid upload payload";
+          serverMessage ||
+          (responseBody && Array.isArray(responseBody.details)
+            ? JSON.stringify(responseBody.details).slice(0, 800)
+            : responseBody && responseBody.error
+              ? String(responseBody.error)
+              : "Invalid upload payload");
         return {
           ok: false,
           status: 400,
           error: detail,
-          body,
           ackReason: "validation",
+          serverCode: serverCode || "UPLOAD_VALIDATION_FAILED",
+          serverMessage: serverMessage || detail,
+          requestId: rid,
+          responseBody,
+        };
+      }
+
+      if (res.status === 422) {
+        const msg =
+          serverMessage ||
+          (responseBody && responseBody.message) ||
+          "Upload did not persist rows.";
+        return {
+          ok: false,
+          status: 422,
+          error: msg,
+          ackReason: "no_persistence_server",
+          serverCode: serverCode || "UPLOAD_ZERO_OR_PARTIAL",
+          serverMessage: msg,
+          summary: responseBody && responseBody.summary ? responseBody.summary : undefined,
+          requestId: rid,
+          ingestionRunId:
+            responseBody && typeof responseBody.ingestionRunId === "string"
+              ? responseBody.ingestionRunId
+              : undefined,
+          responseBody,
         };
       }
 
       if (res.status >= 500) {
+        const msg =
+          serverMessage ||
+          (responseBody && responseBody.message) ||
+          (responseBody && responseBody.error) ||
+          `Server error (${res.status})`;
         return {
           ok: false,
           status: res.status,
-          error: body && body.error ? String(body.error) : `Server error (${res.status})`,
-          body,
+          error: msg,
           ackReason: "server",
+          serverCode,
+          serverMessage: msg,
+          requestId: rid,
+          responseBody,
         };
       }
 
       if (res.status !== 200) {
+        const msg =
+          serverMessage ||
+          (responseBody && (responseBody.error || responseBody.message)) ||
+          `Unexpected HTTP ${res.status}`;
         return {
           ok: false,
           status: res.status,
-          error:
-            (body && (body.error || body.message)) ||
-            `Unexpected HTTP ${res.status}`,
-          body,
+          error: msg,
           ackReason: "http",
+          serverCode,
+          serverMessage: msg,
+          requestId: rid,
+          responseBody,
         };
       }
 
-      const evalResult = evaluateManualUploadPersistenceAck(res.status, body);
+      const evalResult = evaluateManualUploadPersistenceAck(res.status, responseBody);
       const persistenceOk = evalResult.ok;
 
       const out = {
         ok: persistenceOk,
         status: res.status,
         ackReason: evalResult.reason,
-        ...(body ? { body } : {}),
-        ...(body && body.summary ? { summary: body.summary } : {}),
+        serverCode: responseBody && responseBody.code ? String(responseBody.code) : undefined,
+        serverMessage: undefined,
+        summary: responseBody && responseBody.summary ? responseBody.summary : undefined,
+        ingestionRunId:
+          responseBody && typeof responseBody.ingestionRunId === "string"
+            ? responseBody.ingestionRunId
+            : undefined,
+        requestId:
+          responseBody && typeof responseBody.requestId === "string"
+            ? responseBody.requestId
+            : undefined,
+        responseBody,
       };
 
       if (!persistenceOk) {
@@ -200,6 +306,7 @@
         return {
           ...out,
           error: msg,
+          serverMessage: msg,
         };
       }
 
@@ -210,6 +317,8 @@
         status: 0,
         error: error instanceof Error ? error.message : String(error),
         ackReason: "network",
+        responseBody: null,
+        serverCode: "UPLOAD_CLIENT_NETWORK",
       };
     }
   }
@@ -237,6 +346,7 @@
           ok: false,
           status: 0,
           error: e instanceof Error ? e.message : String(e),
+          responseBody: null,
         });
       }
     })();

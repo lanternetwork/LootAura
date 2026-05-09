@@ -10,6 +10,17 @@ describe('evaluateManualUploadPersistenceAck', () => {
     expect(r.ok).toBe(true)
   })
 
+  it('accepts success shape with code and requestId from upload route', () => {
+    const r = evaluateManualUploadPersistenceAck(200, {
+      ok: true,
+      code: 'UPLOAD_SUCCESS',
+      requestId: 'req_test',
+      ingestionRunId: 'run_test',
+      summary: { created: 1, updated: 0, failed: 0 },
+    })
+    expect(r.ok).toBe(true)
+  })
+
   it('accepts updated-only persistence', () => {
     const r = evaluateManualUploadPersistenceAck(200, {
       ok: true,

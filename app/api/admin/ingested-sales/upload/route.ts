@@ -20,6 +20,32 @@ import { ensureIngestionCityConfigFromListingSource } from '@/lib/ingestion/ensu
 
 export const dynamic = 'force-dynamic'
 
+/** Structured errors for admin manual upload (extension + tools). */
+function manualUploadErrorJson(
+  code: string,
+  message: string,
+  requestId: string,
+  extra?: Record<string, unknown>
+) {
+  return {
+    ok: false as const,
+    code,
+    message,
+    requestId,
+    ...extra,
+  }
+}
+
+function manualUploadErrorResponse(
+  status: number,
+  code: string,
+  message: string,
+  requestId: string,
+  extra?: Record<string, unknown>
+) {
+  return NextResponse.json(manualUploadErrorJson(code, message, requestId, extra), { status })
+}
+
 interface UploadBody {
   records: unknown
   publishReady?: boolean
@@ -258,34 +284,108 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
   const opId = generateOperationId()
   const startedAt = Date.now()
 
+  logger.info('Manual upload request received', {
+    component: 'ingestion/upload',
+    operation: 'manual_upload_request',
+    requestId: opId,
+    path: request.nextUrl.pathname,
+  })
+
   const csrfError = await checkCsrfIfRequired(request)
-  if (csrfError) return csrfError
+  if (csrfError) {
+    logger.warn('Manual upload blocked: CSRF', {
+      component: 'ingestion/upload',
+      operation: 'manual_upload_csrf',
+      requestId: opId,
+      status: csrfError.status,
+    })
+    return manualUploadErrorResponse(
+      csrfError.status,
+      'UPLOAD_CSRF_INVALID',
+      'Invalid or missing CSRF token. Refresh the LootAura tab and try again.',
+      opId
+    )
+  }
 
   try {
     await assertAdminOrThrow(request)
   } catch (error) {
-    if (error instanceof NextResponse) return error
-    return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
+    if (error instanceof NextResponse) {
+      const status = error.status
+      const code =
+        status === 401 ? 'UPLOAD_AUTH_UNAUTHORIZED' : 'UPLOAD_AUTH_FORBIDDEN'
+      const message =
+        status === 401
+          ? 'Not signed in. Open LootAura and sign in, then retry.'
+          : 'Admin access required. Ensure your account is in ADMIN_EMAILS.'
+      logger.warn('Manual upload blocked: auth', {
+        component: 'ingestion/upload',
+        operation: 'manual_upload_auth',
+        requestId: opId,
+        status,
+        code,
+      })
+      return manualUploadErrorResponse(status, code, message, opId)
+    }
+    return manualUploadErrorResponse(
+      403,
+      'UPLOAD_AUTH_FORBIDDEN',
+      'Admin access required.',
+      opId
+    )
   }
 
   let body: UploadBody
   try {
     body = (await request.json()) as UploadBody
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    logger.warn('Manual upload blocked: invalid JSON', {
+      component: 'ingestion/upload',
+      operation: 'manual_upload_json_invalid',
+      requestId: opId,
+    })
+    return manualUploadErrorResponse(
+      400,
+      'UPLOAD_JSON_INVALID',
+      'Request body is not valid JSON.',
+      opId
+    )
   }
+
+  logger.info('Manual upload JSON parsed', {
+    component: 'ingestion/upload',
+    operation: 'manual_upload_json_parsed',
+    requestId: opId,
+    recordCount: Array.isArray(body.records) ? body.records.length : 'non-array',
+  })
 
   const parsed = ManualUploadSchema.safeParse(body.records)
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Invalid upload payload', details: parsed.error.issues },
-      { status: 400 }
+    logger.warn('Manual upload blocked: schema validation', {
+      component: 'ingestion/upload',
+      operation: 'manual_upload_validation_failed',
+      requestId: opId,
+      issueCount: parsed.error.issues.length,
+    })
+    return manualUploadErrorResponse(
+      400,
+      'UPLOAD_VALIDATION_FAILED',
+      'Upload payload failed schema validation.',
+      opId,
+      { details: parsed.error.issues }
     )
   }
 
   const records = parsed.data as RawExternalSale[]
   const publishReady = body.publishReady === true
   const admin = getAdminDb()
+
+  logger.info('Manual upload schema validated', {
+    component: 'ingestion/upload',
+    operation: 'manual_upload_schema_ok',
+    requestId: opId,
+    recordCount: records.length,
+  })
 
   const runInsert = await fromBase(admin, 'ingestion_runs')
     .insert({
@@ -299,14 +399,29 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
     .select('id')
     .single()
   if (runInsert.error || !runInsert.data?.id) {
-    logger.error('Failed to create ingestion run', new Error(runInsert.error?.message || 'unknown'), {
+    const msg = runInsert.error?.message || 'unknown'
+    logger.error('Failed to create ingestion run', new Error(msg), {
       component: 'ingestion/upload',
       operation: 'create_run',
       requestId: opId,
+      failureCode: 'UPLOAD_RUN_CREATE_FAILED',
     })
-    return NextResponse.json({ error: 'Failed to create ingestion run' }, { status: 500 })
+    return manualUploadErrorResponse(
+      500,
+      'UPLOAD_RUN_CREATE_FAILED',
+      'Could not create ingestion run (database error).',
+      opId,
+      { supabaseMessage: msg }
+    )
   }
   const ingestionRunId = runInsert.data.id as string
+
+  logger.info('Manual upload ingestion run created', {
+    component: 'ingestion/upload',
+    operation: 'manual_upload_run_created',
+    requestId: opId,
+    ingestionRunId,
+  })
 
   const summary: IngestionRunSummary = {
     fetched: records.length,
@@ -435,6 +550,9 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
             operation: 'update_ingested_sale',
             requestId: opId,
             ingestionRunId,
+            failureCode: 'UPLOAD_ROW_UPDATE_FAILED',
+            sourceUrl: rawSale.sourceUrl,
+            supabaseMessage: updateError.message,
           })
           continue
         }
@@ -449,11 +567,15 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           .single()
         if (insertError || !insertedRow?.id) {
           summary.failed += 1
-          logger.error('Failed to insert ingested sale', new Error(insertError?.message || 'missing id'), {
+          const insMsg = insertError?.message || 'missing id'
+          logger.error('Failed to insert ingested sale', new Error(insMsg), {
             component: 'ingestion/upload',
             operation: 'insert_ingested_sale',
             requestId: opId,
             ingestionRunId,
+            failureCode: 'UPLOAD_ROW_INSERT_FAILED',
+            sourceUrl: rawSale.sourceUrl,
+            supabaseMessage: insMsg,
           })
           continue
         }
@@ -504,6 +626,37 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
     })
     .eq('id', ingestionRunId)
 
+  const persisted = summary.created + summary.updated
+  const hasFailures = summary.failed > 0
+  const zeroPersistence = persisted === 0
+
+  if (hasFailures || zeroPersistence) {
+    const code = hasFailures
+      ? 'UPLOAD_PARTIAL_OR_ROW_FAILURE'
+      : 'UPLOAD_ZERO_PERSISTENCE'
+    const message = hasFailures
+      ? `${summary.failed} record(s) failed during processing (see server logs for UPLOAD_ROW_*).`
+      : 'No ingested_sales rows were created or updated for this upload.'
+    logger.warn('Manual upload finished without successful row persistence', {
+      component: 'ingestion/upload',
+      operation: 'manual_upload_no_row_persistence',
+      requestId: opId,
+      ingestionRunId,
+      code,
+      summary,
+      dedupeDecisionCounts,
+      durationMs,
+    })
+    return NextResponse.json(
+      manualUploadErrorJson(code, message, opId, {
+        ingestionRunId,
+        summary,
+        dedupeDecisionCounts,
+      }),
+      { status: 422 }
+    )
+  }
+
   logger.info('Manual ingestion upload completed', {
     component: 'ingestion/upload',
     operation: 'manual_upload',
@@ -520,8 +673,20 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
     dedupeDecisionCounts,
     durationMs,
   })
+
+  logger.info('Manual upload request completed successfully', {
+    component: 'ingestion/upload',
+    operation: 'manual_upload_complete',
+    requestId: opId,
+    ingestionRunId,
+    summary,
+    durationMs,
+  })
+
   return NextResponse.json({
     ok: true,
+    code: 'UPLOAD_SUCCESS',
+    requestId: opId,
     ingestionRunId,
     summary,
     publish: {

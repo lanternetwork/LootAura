@@ -939,28 +939,33 @@ function extractImages() {
 
 function formatUploadFailureMessage(response) {
   if (!response) return "No response from upload bridge.";
+  const lines = [];
   const status = Number(response.status || 0);
+  lines.push(`HTTP ${Number.isFinite(status) && status > 0 ? status : "?"}`);
+
+  if (response.serverCode) lines.push(`Server code: ${response.serverCode}`);
+  if (response.serverMessage) lines.push(`Server message: ${response.serverMessage}`);
+  else if (response.error) lines.push(`Detail: ${response.error}`);
+
+  if (response.summary != null) {
+    try {
+      lines.push(`Summary: ${JSON.stringify(response.summary)}`);
+    } catch {
+      lines.push("Summary: (unserializable)");
+    }
+  }
+
+  if (response.requestId) lines.push(`Request ID: ${response.requestId}`);
+  if (response.ingestionRunId) lines.push(`Ingestion run: ${response.ingestionRunId}`);
+
   if (status === 429) {
     const sec = response.retryAfterSec;
     if (typeof sec === "number" && sec > 0) {
-      return `Rate limited. Try again in about ${sec} second(s).`;
+      lines.push(`Retry-After: about ${sec} second(s)`);
     }
-    return "Rate limited. Try again shortly.";
   }
-  if (status === 401 || status === 403) {
-    return "Admin access denied or CSRF failed. Stay logged in as admin on the LootAura tab.";
-  }
-  if (status === 400) {
-    return `Upload rejected:\n\n${response.error || "Invalid payload"}`;
-  }
-  if (status >= 500) {
-    const tail = response.error ? `\n\n${response.error}` : "";
-    return `Server error (${status}).${tail}`;
-  }
-  if (status === 0) {
-    return response.error || "Network or extension error.";
-  }
-  return response.error || `Upload not acknowledged (HTTP ${status}).`;
+
+  return lines.join("\n");
 }
 
 function buildSubmissionPayload(session, currentUrl, selectedTags) {
@@ -1149,6 +1154,11 @@ function renderOverlay(session, currentUrl) {
         return;
       }
 
+      try {
+        console.log("[LootAura] Full upload response payload:", JSON.stringify(response, null, 2));
+      } catch (e) {
+        console.log("[LootAura] Full upload response (non-serializable):", response);
+      }
       console.log("[LootAura] Submission response:", response?.status, response?.ok);
 
       if (!response || !response.ok) {

@@ -1,5 +1,5 @@
 const LOOTAURA_ORIGIN =
-  "https://loot-aura-fh2pqy3zz-lanternetworks-projects.vercel.app";
+  "https://loot-aura-r5j2mg4r9-lanternetworks-projects.vercel.app";
 /** Brief retries after programmatic inject (frame paint / SW timing). */
 const SEND_MESSAGE_RETRIES = 12;
 const SEND_MESSAGE_RETRY_MS = 150;

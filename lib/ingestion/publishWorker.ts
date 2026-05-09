@@ -164,6 +164,15 @@ function isTransientPublishFailureDetails(value: unknown): boolean {
   return phase === 'create_sale' || phase === 'finalize_ingested_row'
 }
 
+function shouldClearFailureDetailsAfterLinkedFinalize(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const details = value as { publish_error?: unknown }
+  if (typeof details.publish_error === 'string' && details.publish_error.trim().length > 0) {
+    return true
+  }
+  return isTransientPublishFailureDetails(value)
+}
+
 type LinkedFinalizeCandidateRow = {
   id: string
   status: string
@@ -180,10 +189,10 @@ type LinkedSaleRow = {
 
 function sanitizeFailureReasonsAfterLinkedFinalize(value: unknown): FailureReason[] | null {
   const reasons = toFailureReasons(value)
-  if (!reasons.includes('publish_error')) {
+  const next = reasons.filter((reason) => reason !== 'publish_error' && reason !== 'invalid_date')
+  if (next.length === reasons.length) {
     return null
   }
-  const next = reasons.filter((r) => r !== 'publish_error')
   return next
 }
 
@@ -288,7 +297,7 @@ export async function finalizeLinkedPublishedIngestedSales(
     }
 
     const sanitizedReasons = sanitizeFailureReasonsAfterLinkedFinalize(row.failure_reasons)
-    const shouldClearFailureDetails = isTransientPublishFailureDetails(row.failure_details)
+    const shouldClearFailureDetails = shouldClearFailureDetailsAfterLinkedFinalize(row.failure_details)
     const payload: Record<string, unknown> = {
       status: 'published',
       published_at: row.published_at ?? new Date().toISOString(),

@@ -179,6 +179,37 @@ describe('finalizeLinkedPublishedIngestedSales', () => {
     expect(ctx.ingestedRows[0].failure_details).toBeNull()
   })
 
+  it('needs_check with valid linked sale converges to published and clears invalid_date', async () => {
+    ctx.ingestedRows.push({
+      id: 'ing-needs-check',
+      status: 'needs_check',
+      published_sale_id: 'sale-needs-check',
+      published_at: null,
+      failure_reasons: ['invalid_date', 'publish_error'],
+      failure_details: {
+        phase: 'validation',
+        operation: 'publish_validation',
+        reason: 'past_end_date',
+        publish_error: 'date window invalid',
+      },
+      updated_at: '2026-05-09T01:00:00.000Z',
+    })
+    ctx.salesRows.push({ id: 'sale-needs-check', ingested_sale_id: 'ing-needs-check' })
+
+    const { finalizeLinkedPublishedIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    const summary = await finalizeLinkedPublishedIngestedSales({ batchSizeOverride: 10 })
+
+    expect(summary).toMatchObject({
+      attempted: 1,
+      finalized: 1,
+      linkMismatch: 0,
+      missingLinkedSale: 0,
+    })
+    expect(ctx.ingestedRows[0].status).toBe('published')
+    expect(ctx.ingestedRows[0].failure_reasons).toEqual([])
+    expect(ctx.ingestedRows[0].failure_details).toBeNull()
+  })
+
   it('already published rows are no-op', async () => {
     ctx.ingestedRows.push({
       id: 'ing-2',
@@ -221,6 +252,35 @@ describe('finalizeLinkedPublishedIngestedSales', () => {
       expect.any(Error),
       expect.objectContaining({ reason: 'link_mismatch', rowId: 'ing-3', saleId: 'sale-3' })
     )
+  })
+
+  it('preserves terminal validation reasons when link is invalid', async () => {
+    ctx.ingestedRows.push({
+      id: 'ing-terminal',
+      status: 'ready',
+      published_sale_id: 'sale-terminal',
+      published_at: null,
+      failure_reasons: ['invalid_date'],
+      failure_details: {
+        phase: 'validation',
+        operation: 'publish_validation',
+        reason: 'past_end_date',
+      },
+      updated_at: '2026-05-09T01:00:00.000Z',
+    })
+    ctx.salesRows.push({ id: 'sale-terminal', ingested_sale_id: 'ing-other' })
+
+    const { finalizeLinkedPublishedIngestedSales } = await import('@/lib/ingestion/publishWorker')
+    const summary = await finalizeLinkedPublishedIngestedSales({ batchSizeOverride: 10 })
+
+    expect(summary).toMatchObject({ finalized: 0, linkMismatch: 1 })
+    expect(ctx.ingestedRows[0].status).toBe('publish_failed')
+    expect(ctx.ingestedRows[0].failure_reasons).toEqual(['invalid_date', 'publish_error'])
+    expect(ctx.ingestedRows[0].failure_details).toEqual({
+      phase: 'validation',
+      operation: 'publish_validation',
+      reason: 'past_end_date',
+    })
   })
 
   it('missing linked sale fails closed and preserves row state', async () => {

@@ -673,6 +673,7 @@ function isDescriptionNoiseLine(line) {
   if (/^\s*\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i.test(normalized)) return true;
   if (/^\s*(\d{1,2}:\d{2}\s*(am|pm)?\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)?)\s*$/i.test(normalized)) return true;
   if (/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i.test(normalized)) return true;
+  if (/^\s*\d{1,2}\/\d{1,2}\s*[-–—]\s*\d{1,2}\/\d{1,2}\s*$/i.test(normalized)) return true;
   if (normalized.length < 8) return true;
   return false;
 }
@@ -704,8 +705,14 @@ function cleanExtractedDescription(rawText) {
       /\b\d{1,2}(?::\d{2})?\s*(am|pm)\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,
       ""
     );
+    text = text.replace(/\b\d{1,2}\/\d{1,2}\s*[-–—]\s*\d{1,2}\/\d{1,2}\b/gi, "");
+    text = text.replace(
+      /\b(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)\.?\s+\d{1,2}\/\d{1,2}\b/gi,
+      ""
+    );
     text = text.replace(/\s+/g, " ").trim();
     text = text.replace(/\s+([,.;:!?])/g, "$1");
+    text = text.replace(/\.\s+\./g, ".");
     text = text.replace(/^[,.;:!?]+\s*/g, "");
     return text.trim();
   }

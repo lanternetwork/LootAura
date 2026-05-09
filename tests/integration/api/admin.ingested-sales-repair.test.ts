@@ -177,7 +177,7 @@ describe('POST /api/admin/ingested-sales/repair', () => {
       description: 'Great bikes and toys.',
     })
     expect(salesUpdate).toHaveBeenCalledWith({
-      address: '620 lincoln ave, winnetka, il 60093',
+      address: '620 Lincoln Ave, Winnetka, IL 60093',
     })
     expect(json.writes).toBe(3)
   })

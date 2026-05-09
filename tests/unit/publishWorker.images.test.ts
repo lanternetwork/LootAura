@@ -798,7 +798,7 @@ describe('publish worker idempotent sale images', () => {
     expect(result.ok).toBe(true)
     expect(updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        address: '620 lincoln ave, winnetka, il 60093',
+        address: '620 Lincoln Ave, Winnetka, IL 60093',
       })
     )
   })

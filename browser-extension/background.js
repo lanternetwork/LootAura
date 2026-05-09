@@ -1,5 +1,5 @@
 const LOOTAURA_ORIGIN =
-  "https://loot-aura-57cvpme72-lanternetworks-projects.vercel.app";
+  "https://loot-aura-fh2pqy3zz-lanternetworks-projects.vercel.app";
 /** Brief retries after programmatic inject (frame paint / SW timing). */
 const SEND_MESSAGE_RETRIES = 12;
 const SEND_MESSAGE_RETRY_MS = 150;
@@ -124,16 +124,8 @@ async function sendToLootAuraTab(tabId, message) {
   throw new Error(lastErr);
 }
 
-/** Single POST — retries on 429 burn quota; server Retry-After reflects longest deny. */
-async function runPreflight(tabId, payload) {
-  return sendToLootAuraTab(tabId, {
-    type: "PREFLIGHT_UPLOAD",
-    payload,
-  });
-}
-
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (!msg || (msg.type !== "PREFLIGHT_UPLOAD" && msg.type !== "SUBMIT_SALE")) {
+  if (!msg || (msg.type !== "PREFLIGHT_CHECK" && msg.type !== "SUBMIT_SALE")) {
     return false;
   }
 
@@ -146,8 +138,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
       console.log("[LootAura][BG] LootAura tab found/created:", lootauraTab.id);
 
-      if (msg.type === "PREFLIGHT_UPLOAD") {
-        const preflightResult = await runPreflight(lootauraTab.id, msg.payload);
+      if (msg.type === "PREFLIGHT_CHECK") {
+        const preflightResult = await sendToLootAuraTab(lootauraTab.id, {
+          type: "PREFLIGHT_CHECK",
+        });
         sendResponse(preflightResult);
         return;
       }

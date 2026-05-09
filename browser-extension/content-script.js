@@ -361,8 +361,7 @@ function sendRuntimeMessage(message) {
 async function runPreflight() {
   try {
     const result = await sendRuntimeMessage({
-      type: "PREFLIGHT_UPLOAD",
-      payload: { records: [] },
+      type: "PREFLIGHT_CHECK",
     });
     return result || { ok: false, status: 0, error: "No preflight response" };
   } catch (error) {
@@ -938,6 +937,32 @@ function extractImages() {
   return { primary: null, urls: [] };
 }
 
+function formatUploadFailureMessage(response) {
+  if (!response) return "No response from upload bridge.";
+  const status = Number(response.status || 0);
+  if (status === 429) {
+    const sec = response.retryAfterSec;
+    if (typeof sec === "number" && sec > 0) {
+      return `Rate limited. Try again in about ${sec} second(s).`;
+    }
+    return "Rate limited. Try again shortly.";
+  }
+  if (status === 401 || status === 403) {
+    return "Admin access denied or CSRF failed. Stay logged in as admin on the LootAura tab.";
+  }
+  if (status === 400) {
+    return `Upload rejected:\n\n${response.error || "Invalid payload"}`;
+  }
+  if (status >= 500) {
+    const tail = response.error ? `\n\n${response.error}` : "";
+    return `Server error (${status}).${tail}`;
+  }
+  if (status === 0) {
+    return response.error || "Network or extension error.";
+  }
+  return response.error || `Upload not acknowledged (HTTP ${status}).`;
+}
+
 function buildSubmissionPayload(session, currentUrl, selectedTags) {
   const addressRaw = extractAddress();
   const auth = resolveYstmListingCityAuthorityJs(currentUrl, addressRaw);
@@ -1087,49 +1112,59 @@ function renderOverlay(session, currentUrl) {
   }
 
   submitBtn.addEventListener("click", () => {
-    disableButtons();
-    console.log("[LootAura] Submit clicked:", currentUrl);
+    void (async () => {
+      disableButtons();
+      console.log("[LootAura] Submit clicked:", currentUrl);
 
-    const selectedTags = Array.from(tagsWrap.querySelectorAll("input[type='checkbox']"))
-      .filter((el) => el.checked)
-      .map((el) => el.getAttribute("data-tag") || "")
-      .filter(Boolean);
-    let payload;
-    try {
-      payload = buildSubmissionPayload(session, currentUrl, selectedTags);
-    } catch (error) {
-      console.error("[LootAura] Failed to build submission payload:", error);
-      alert(
-        error instanceof Error
-          ? `Cannot submit this listing: ${error.message}`
-          : `Cannot submit this listing: ${String(error)}`
-      );
-      enableButtons();
-      return;
-    }
-    console.log("[LootAura] Payload built:", payload);
+      const selectedTags = Array.from(tagsWrap.querySelectorAll("input[type='checkbox']"))
+        .filter((el) => el.checked)
+        .map((el) => el.getAttribute("data-tag") || "")
+        .filter(Boolean);
+      let payload;
+      try {
+        payload = buildSubmissionPayload(session, currentUrl, selectedTags);
+      } catch (error) {
+        console.error("[LootAura] Failed to build submission payload:", error);
+        alert(
+          error instanceof Error
+            ? `Cannot submit this listing: ${error.message}`
+            : `Cannot submit this listing: ${String(error)}`
+        );
+        enableButtons();
+        return;
+      }
+      console.log("[LootAura] Payload built:", payload);
 
-    try {
-      chrome.runtime.sendMessage({ type: "SUBMIT_SALE", payload }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("[LootAura] Submit transport failed:", chrome.runtime.lastError.message);
-          enableButtons();
-          return;
-        }
-        console.log("[LootAura] Submission response status:", response?.status);
-      });
-    } catch (error) {
-      console.error("[LootAura] Submit transport exception:", error);
-      enableButtons();
-      return;
-    }
+      let response;
+      try {
+        response = await sendRuntimeMessage({ type: "SUBMIT_SALE", payload });
+      } catch (error) {
+        console.error("[LootAura] Submit transport failed:", error);
+        alert(
+          error instanceof Error
+            ? `Submit failed: ${error.message}`
+            : `Submit failed: ${String(error)}`
+        );
+        enableButtons();
+        return;
+      }
 
-    if (!Array.isArray(session.processedUrls)) session.processedUrls = [];
-    if (!session.processedUrls.includes(currentUrl)) {
-      session.processedUrls.push(currentUrl);
-    }
-    session.currentIndex += 1;
-    saveSessionAndNavigate(session);
+      console.log("[LootAura] Submission response:", response?.status, response?.ok);
+
+      if (!response || !response.ok) {
+        alert(`Upload not saved.\n\n${formatUploadFailureMessage(response)}`);
+        console.warn("[LootAura] Submit not acknowledged:", response);
+        enableButtons();
+        return;
+      }
+
+      if (!Array.isArray(session.processedUrls)) session.processedUrls = [];
+      if (!session.processedUrls.includes(currentUrl)) {
+        session.processedUrls.push(currentUrl);
+      }
+      session.currentIndex += 1;
+      saveSessionAndNavigate(session);
+    })();
   });
 
   skipBtn.addEventListener("click", () => {

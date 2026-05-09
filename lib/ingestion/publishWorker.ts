@@ -9,6 +9,7 @@ import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateLi
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
+import { mergeSanitizedCloudinaryIntoPublishable } from '@/lib/ingestion/sanitizePublishCloudinaryFallback'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 
 export type PublishReadyByIdResult =
@@ -957,6 +958,7 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
   if (sanitizedImages.length > 0) {
     body.image_urls = sanitizedImages
   }
+  await mergeSanitizedCloudinaryIntoPublishable(body)
 
   const patchCtx = { rowId: record.id, city: record.city, state: record.state }
   let saleId: string

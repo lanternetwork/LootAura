@@ -66,7 +66,10 @@ describe('createPublishedSale image handling', () => {
       vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 }))
     )
     const { createPublishedSale } = await import('@/lib/ingestion/publish')
-    await createPublishedSale({
+    const { mergeSanitizedCloudinaryIntoPublishable } = await import(
+      '@/lib/ingestion/sanitizePublishCloudinaryFallback'
+    )
+    const body = {
       id: '66666666-6666-4666-8666-666666666666',
       source_platform: 'external_page_source',
       source_url: 'https://example.com/listing/cloud-brand',
@@ -83,8 +86,10 @@ describe('createPublishedSale image handling', () => {
       time_start: '09:00:00',
       time_end: null,
       image_cloudinary_url: 'https://res.cloudinary.com/acct/image/upload/v1/ystm/hero.png',
-      image_urls: [],
-    })
+      image_urls: [] as string[],
+    }
+    await mergeSanitizedCloudinaryIntoPublishable(body)
+    await createPublishedSale(body)
 
     const firstCall = insert.mock.calls.at(0)
     expect(firstCall).toBeDefined()
@@ -99,8 +104,11 @@ describe('createPublishedSale image handling', () => {
       vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 }))
     )
     const { createPublishedSale } = await import('@/lib/ingestion/publish')
+    const { mergeSanitizedCloudinaryIntoPublishable } = await import(
+      '@/lib/ingestion/sanitizePublishCloudinaryFallback'
+    )
     const okUrl = 'https://res.cloudinary.com/acct/image/upload/v1/listing/yard-photo.jpg'
-    await createPublishedSale({
+    const body = {
       id: '77777777-7777-4777-8777-777777777777',
       source_platform: 'external_page_source',
       source_url: 'https://example.com/listing/cloud-ok',
@@ -117,8 +125,10 @@ describe('createPublishedSale image handling', () => {
       time_start: '09:00:00',
       time_end: null,
       image_cloudinary_url: okUrl,
-      image_urls: [],
-    })
+      image_urls: [] as string[],
+    }
+    await mergeSanitizedCloudinaryIntoPublishable(body)
+    await createPublishedSale(body)
 
     const firstCall = insert.mock.calls.at(0)
     expect(firstCall).toBeDefined()

@@ -2,6 +2,8 @@ import { logger } from '@/lib/log'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { sanitizeUploadDescription } from '@/lib/ingestion/uploadDescriptionSanitizer'
 import { normalizeAddressForPublish } from '@/lib/ingestion/publish'
+import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
 
 type LinkedRepairRow = {
   id: string
@@ -166,12 +168,23 @@ export async function runIngestedSalesRepair(input: IngestedSalesRepairInput): P
       normalizedAddress !== saleAddressOriginal &&
       hasDuplicatedCityStateSuffix(saleAddressOriginal, city, state)
 
+    let addressPassesPublishGate = false
     if (shouldRepairSaleAddress) {
+      try {
+        validateResolvedAddressForPublish(normalizedAddress, city, state)
+        addressPassesPublishGate = true
+      } catch {
+        addressPassesPublishGate = false
+      }
+    }
+
+    if (shouldRepairSaleAddress && addressPassesPublishGate) {
       rowHadRepair = true
       salesAddressRepairs += 1
+      const displayAddress = formatAddressForPublishedSaleDisplay(normalizedAddress)
       if (!input.dryRun) {
         const { error: upErr } = await fromBase(admin, 'sales')
-          .update({ address: normalizedAddress })
+          .update({ address: displayAddress })
           .eq('id', row.id)
         if (!upErr) writes += 1
       }

@@ -5,6 +5,7 @@ import { PublishInputSchema } from '@/lib/ingestion/schemas'
 import type { PublishInput } from '@/lib/ingestion/types'
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 
 export interface PublishableIngestedSale {
   id: string
@@ -87,10 +88,7 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
         .map((value) => value.trim())
         .filter(Boolean)
     : []
-  const cloudinaryFallback = ingestedSale.image_cloudinary_url?.trim() || null
-  if (normalizedImages.length === 0 && cloudinaryFallback) {
-    normalizedImages.push(cloudinaryFallback)
-  }
+  /** Cloudinary fallback is merged in `applySanitizedCloudinaryFallback` so it cannot bypass branding checks. */
   const coverImageUrl = normalizedImages[0] || null
   const images = normalizedImages
 
@@ -116,9 +114,34 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
   }
 }
 
+/**
+ * When listing URLs were all rejected, optionally fill images from `image_cloudinary_url`
+ * only after the same external-image validation as other candidates.
+ */
+export async function applySanitizedCloudinaryFallback(
+  ingestedSale: PublishableIngestedSale,
+  draftInput: PublishInput
+): Promise<void> {
+  const hasImages =
+    (Array.isArray(draftInput.images) && draftInput.images.length > 0) || !!draftInput.coverImageUrl
+  if (hasImages) return
+  const raw = ingestedSale.image_cloudinary_url?.trim()
+  if (!raw) return
+  const sanitized = await sanitizeExternalImageUrls([raw], {
+    rowId: ingestedSale.id,
+    city: ingestedSale.city,
+    state: ingestedSale.state,
+    max: 3,
+  })
+  if (sanitized.length === 0) return
+  draftInput.coverImageUrl = sanitized[0]!
+  draftInput.images = [...sanitized]
+}
+
 export async function createPublishedSale(ingestedSale: PublishableIngestedSale): Promise<{ saleId: string }> {
   const admin = getAdminDb()
   const draftInput = normalizePublishInput(ingestedSale)
+  await applySanitizedCloudinaryFallback(ingestedSale, draftInput)
   const validated = PublishInputSchema.parse(draftInput)
   validateResolvedAddressForPublish(validated.address, validated.city, validated.state)
   const displayAddress = formatAddressForPublishedSaleDisplay(validated.address as string)

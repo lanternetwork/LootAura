@@ -1,5 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InsufficientAddressForPublishError } from '@/lib/ingestion/publishValidation'
+
+const { dnsLookup } = vi.hoisted(() => ({
+  dnsLookup: vi.fn(),
+}))
+
+vi.mock('node:dns/promises', () => ({
+  lookup: dnsLookup,
+}))
 
 const insertSingle = vi.fn()
 const insertSelect = vi.fn(() => ({ single: insertSingle }))
@@ -14,7 +22,12 @@ vi.mock('@/lib/supabase/clients', () => ({
 describe('createPublishedSale image handling', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
     insertSingle.mockResolvedValue({ data: { id: 'sale-1' }, error: null })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('publishes using external HTTPS image URLs', async () => {
@@ -45,6 +58,73 @@ describe('createPublishedSale image handling', () => {
     const payload = (firstCall as unknown[])[0] as { cover_image_url: string | null; images: string[] }
     expect(payload.cover_image_url).toBe('https://images.example.org/a.jpg')
     expect(payload.images).toEqual(['https://images.example.org/a.jpg', 'https://cdn.example.org/b.jpg'])
+  })
+
+  it('rejects branding image_cloudinary_url via sanitizer (no raw fallback)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 }))
+    )
+    const { createPublishedSale } = await import('@/lib/ingestion/publish')
+    await createPublishedSale({
+      id: '66666666-6666-4666-8666-666666666666',
+      source_platform: 'external_page_source',
+      source_url: 'https://example.com/listing/cloud-brand',
+      title: 'Sale',
+      description: null,
+      normalized_address: '1 Main St',
+      city: 'Chicago',
+      state: 'IL',
+      zip_code: null,
+      lat: 41.8,
+      lng: -87.6,
+      date_start: '2026-05-06',
+      date_end: null,
+      time_start: '09:00:00',
+      time_end: null,
+      image_cloudinary_url: 'https://res.cloudinary.com/acct/image/upload/v1/ystm/hero.png',
+      image_urls: [],
+    })
+
+    const firstCall = insert.mock.calls.at(0)
+    expect(firstCall).toBeDefined()
+    const payload = (firstCall as unknown[])[0] as { cover_image_url: string | null; images: string[] }
+    expect(payload.cover_image_url).toBeNull()
+    expect(payload.images).toEqual([])
+  })
+
+  it('accepts image_cloudinary_url when sanitizer allows the URL', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 }))
+    )
+    const { createPublishedSale } = await import('@/lib/ingestion/publish')
+    const okUrl = 'https://res.cloudinary.com/acct/image/upload/v1/listing/yard-photo.jpg'
+    await createPublishedSale({
+      id: '77777777-7777-4777-8777-777777777777',
+      source_platform: 'external_page_source',
+      source_url: 'https://example.com/listing/cloud-ok',
+      title: 'Sale',
+      description: null,
+      normalized_address: '1 Main St',
+      city: 'Chicago',
+      state: 'IL',
+      zip_code: null,
+      lat: 41.8,
+      lng: -87.6,
+      date_start: '2026-05-06',
+      date_end: null,
+      time_start: '09:00:00',
+      time_end: null,
+      image_cloudinary_url: okUrl,
+      image_urls: [],
+    })
+
+    const firstCall = insert.mock.calls.at(0)
+    expect(firstCall).toBeDefined()
+    const payload = (firstCall as unknown[])[0] as { cover_image_url: string | null; images: string[] }
+    expect(payload.cover_image_url).toBe(okUrl)
+    expect(payload.images).toEqual([okUrl])
   })
 
   it('publishes with empty images when none are valid/present', async () => {

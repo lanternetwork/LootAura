@@ -748,8 +748,18 @@ async function maybeSyncExistingSaleFromLatestIngest(
       saleCity && saleState
         ? normalizeAddressForPublishSafe(row.address, saleCity, saleState)
         : normalizeTextOrNull(row.address)
-    if (existingAddressNormalized && existingAddressNormalized !== normalizeTextOrNull(row.address)) {
-      patch.address = existingAddressNormalized
+    if (
+      existingAddressNormalized &&
+      existingAddressNormalized !== normalizeTextOrNull(row.address) &&
+      saleCity &&
+      saleState
+    ) {
+      try {
+        validateResolvedAddressForPublish(existingAddressNormalized, saleCity, saleState)
+        patch.address = formatAddressForPublishedSaleDisplay(existingAddressNormalized)
+      } catch {
+        /* do not write unvalidated or placeholder-normalized lines */
+      }
     }
 
     if (looksGenericTitle(row.title, record.city)) {
@@ -1241,11 +1251,13 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   }
 
   let createdSaleId: string | null = null
+  let publishFailureOperation: string = 'create_sale_single'
 
   try {
     const sanitizedImages = await sanitizePublishImagesForRecord(claimed)
     const linkedSaleId = await linkedSaleIdForRow(claimed)
     if (linkedSaleId) {
+      publishFailureOperation = 'linked_address_validation_single'
       validateClaimedRowResolvedAddress(claimed)
     }
     const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(claimed))
@@ -1327,7 +1339,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
       claimed.id,
       claimed.failure_reasons,
       error,
-      'create_sale_single',
+      publishFailureOperation,
       claimed.city,
       claimed.state
     )
@@ -1376,10 +1388,12 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
     }
 
     let createdSaleId: string | null = null
+    let publishFailureOperation: string = 'create_sale_batch'
     try {
       const sanitizedImages = await sanitizePublishImagesForRecord(row)
       const linkedSaleId = await linkedSaleIdForRow(row)
       if (linkedSaleId) {
+        publishFailureOperation = 'linked_address_validation_batch'
         validateClaimedRowResolvedAddress(row)
       }
       const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(row))
@@ -1467,7 +1481,7 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
         row.id,
         row.failure_reasons,
         error,
-        'create_sale_batch',
+        publishFailureOperation,
         row.city,
         row.state
       )

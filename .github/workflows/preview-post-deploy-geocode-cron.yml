@@ -105,6 +105,27 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: npm run preview:invoke-deployment-geocode-cron
 
+      - name: Invoke /api/cron/daily?mode=ingestion (bounded orchestration)
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="${DEPLOYMENT_URL%/}/api/cron/daily?mode=ingestion"
+          echo "::notice::Invoking bounded ingestion orchestration at ${URL}"
+          STATUS="$(curl -sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL}")"
+          echo "::notice::Ingestion orchestration HTTP status: ${STATUS}"
+          if [ "${STATUS}" -lt 200 ] || [ "${STATUS}" -ge 300 ]; then
+            echo "::error::Ingestion orchestration invocation failed with status ${STATUS}"
+            echo "::error::Response body follows:"
+            cat /tmp/ingestion-orchestration-response.json
+            exit 1
+          fi
+          echo "::notice::Ingestion orchestration invocation succeeded"
+
   invoke-geocode-cron-manual:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
@@ -183,3 +204,23 @@ jobs:
           PREVIEW_DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: npm run preview:invoke-deployment-geocode-cron
+
+      - name: Invoke /api/cron/daily?mode=ingestion (bounded orchestration)
+        env:
+          DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="${DEPLOYMENT_URL%/}/api/cron/daily?mode=ingestion"
+          echo "::notice::Invoking bounded ingestion orchestration at ${URL}"
+          STATUS="$(curl -sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL}")"
+          echo "::notice::Ingestion orchestration HTTP status: ${STATUS}"
+          if [ "${STATUS}" -lt 200 ] || [ "${STATUS}" -ge 300 ]; then
+            echo "::error::Ingestion orchestration invocation failed with status ${STATUS}"
+            echo "::error::Response body follows:"
+            cat /tmp/ingestion-orchestration-response.json
+            exit 1
+          fi
+          echo "::notice::Ingestion orchestration invocation succeeded"

@@ -4,6 +4,7 @@ import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateLi
 import { PublishInputSchema } from '@/lib/ingestion/schemas'
 import type { PublishInput } from '@/lib/ingestion/types'
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
+import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 
 export interface PublishableIngestedSale {
   id: string
@@ -120,12 +121,13 @@ export async function createPublishedSale(ingestedSale: PublishableIngestedSale)
   const draftInput = normalizePublishInput(ingestedSale)
   const validated = PublishInputSchema.parse(draftInput)
   validateResolvedAddressForPublish(validated.address, validated.city, validated.state)
+  const displayAddress = formatAddressForPublishedSaleDisplay(validated.address as string)
 
   const salePayload = {
     owner_id: validated.ownerId,
     title: validated.title,
     description: validated.description,
-    address: validated.address as string,
+    address: displayAddress,
     city: validated.city,
     state: validated.state,
     zip_code: validated.zipCode,

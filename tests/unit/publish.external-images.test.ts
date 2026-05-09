@@ -76,6 +76,34 @@ describe('createPublishedSale image handling', () => {
     expect(payload.images).toEqual([])
   })
 
+  it('applies display-only title case to published address after validation', async () => {
+    const { createPublishedSale } = await import('@/lib/ingestion/publish')
+    await createPublishedSale({
+      id: '44444444-4444-4444-8444-444444444444',
+      source_platform: 'external_page_source',
+      source_url: 'https://example.com/listing/cased',
+      title: 'Sale',
+      description: null,
+      normalized_address: '123 main st',
+      city: 'Chicago',
+      state: 'IL',
+      zip_code: '60601',
+      lat: 41.8,
+      lng: -87.6,
+      date_start: '2026-05-06',
+      date_end: null,
+      time_start: '09:00:00',
+      time_end: null,
+      image_cloudinary_url: null,
+      image_urls: [],
+    })
+
+    const firstCall = insert.mock.calls.at(0)
+    expect(firstCall).toBeDefined()
+    const payload = (firstCall as unknown[])[0] as { address: string }
+    expect(payload.address).toBe('123 Main St, Chicago, IL')
+  })
+
   it('does not insert when address is an unresolved placeholder', async () => {
     const { createPublishedSale } = await import('@/lib/ingestion/publish')
     await expect(

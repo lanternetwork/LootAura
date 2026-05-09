@@ -111,6 +111,10 @@ export function dimensionsSuggestBrandOrTrackerAsset(dim: { w: number; h: number
 function urlPathSuggestsNonSalePhoto(u: URL): string | null {
   const path = `${u.pathname} ${u.search} ${u.hash}`.toLowerCase()
   if (
+    /\bystm\b/.test(path) ||
+    /\byardsale[_-]?time[_-]?machine\b/.test(path) ||
+    /\bystm[_-]?(?:site|logo|banner|brand|header|hero)\b/.test(path) ||
+    /\b(?:site[_-]?logo|site[_-]?header|provider[_-]?logo|white[_-]?label)\b/.test(path) ||
     /(?:^|[/_-])(?:logo|logos)(?:[/_-]|\.|$)/.test(path) ||
     /\blogo\b/.test(path) ||
     /\b(?:branding|brand-asset|brand_asset)\b/.test(path) ||

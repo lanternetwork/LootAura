@@ -62,6 +62,27 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
     fetchSpy.mockRestore()
   })
 
+  it('rejects YSTM / provider branding paths without fetching', async () => {
+    const { sanitizeExternalImageUrls } = await import('@/lib/ingestion/externalImageValidation')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('fetch should not run'))
+    const urls = [
+      'https://cdn.example.com/ystm/hero.png',
+      'https://img.example.org/branding/ystm_logo.jpg',
+      'https://assets.example.org/yardsale-time-machine/badge.png',
+    ]
+    for (const u of urls) {
+      const out = await sanitizeExternalImageUrls([u], {
+        rowId: '11111111-1111-4111-8111-111111111111',
+        city: 'A',
+        state: 'B',
+        max: 3,
+      })
+      expect(out).toEqual([])
+    }
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+
   it('rejects wide banner dimensions from raster probe', async () => {
     const { sanitizeExternalImageUrls, parseRasterImageDimensionsFromBytes } = await import(
       '@/lib/ingestion/externalImageValidation'

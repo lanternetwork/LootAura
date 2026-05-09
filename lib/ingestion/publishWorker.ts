@@ -9,6 +9,7 @@ import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateLi
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
+import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
@@ -554,6 +555,14 @@ function normalizeAddressForPublishSafe(
   return normalizeAddressForPublishLocal(normalizedAddress, city, state)
 }
 
+/** Same resolved line + checks as `createPublishedSale`; required for pre-linked idempotent rows. */
+function validateClaimedRowResolvedAddress(record: ClaimedPublishRow): void {
+  const city = normalizeTextOrNull(record.city) ?? ''
+  const state = normalizeTextOrNull(record.state) ?? ''
+  const normalizedAddress = normalizeAddressForPublishSafe(record.normalized_address, city, state)
+  validateResolvedAddressForPublish(normalizedAddress, city, state)
+}
+
 async function sanitizePublishImagesForRecord(record: ClaimedPublishRow): Promise<string[]> {
   const hasRawField = Object.prototype.hasOwnProperty.call(record, 'raw_payload')
   const hasImageField = Object.prototype.hasOwnProperty.call(record, 'image_source_url')
@@ -631,7 +640,7 @@ async function maybeSyncExistingSaleFromLatestIngest(
   if (normalizedAddress && city && state) {
     try {
       validateResolvedAddressForPublish(normalizedAddress, city, state)
-      bestEffortPatch.address = normalizedAddress
+      bestEffortPatch.address = formatAddressForPublishedSaleDisplay(normalizedAddress)
     } catch {
       /* omit low-quality ingest addresses from best-effort sale sync */
     }
@@ -1236,6 +1245,9 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   try {
     const sanitizedImages = await sanitizePublishImagesForRecord(claimed)
     const linkedSaleId = await linkedSaleIdForRow(claimed)
+    if (linkedSaleId) {
+      validateClaimedRowResolvedAddress(claimed)
+    }
     const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(claimed))
     createdSaleId = saleId
     if (linkedSaleId) {
@@ -1367,6 +1379,9 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
     try {
       const sanitizedImages = await sanitizePublishImagesForRecord(row)
       const linkedSaleId = await linkedSaleIdForRow(row)
+      if (linkedSaleId) {
+        validateClaimedRowResolvedAddress(row)
+      }
       const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(row))
       createdSaleId = saleId
       if (linkedSaleId) {

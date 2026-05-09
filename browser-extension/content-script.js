@@ -952,7 +952,7 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
   const imageExtract = extractImages();
   const dateRaw = buildCanonicalDateRaw(currentUrl);
   const isoPair = parseIsoPairFromCanonicalDateRaw(dateRaw);
-  console.log("City/state extracted:", { city, state });
+  console.log("City/state extracted:", { city: resolvedCity, state: resolvedState });
   console.log("[LootAura] Canonical dateRaw / ISO:", { dateRaw, isoPair });
 
   return {

@@ -20,11 +20,24 @@ export interface GeocodeAddressResult {
   lng: number
 }
 
+/** Why Nominatim returned no coordinates (PII-free; for worker diagnostics). */
+export type GeocodeNoCoordsReason =
+  | 'empty_input'
+  | 'rate_limited'
+  | 'http_not_ok'
+  | 'empty_results'
+  | 'invalid_coordinates'
+  | 'fetch_exception'
+
 /** Outcome of a single Nominatim lookup for ingestion geocoding. */
 export interface GeocodeAddressOutcome {
   coords: GeocodeAddressResult | null
   /** True only when the provider responded with HTTP 429 (retriable). */
   hit429: boolean
+  /** Set when `coords` is null; classifies the silent no-result path. */
+  noCoordsReason?: GeocodeNoCoordsReason
+  /** HTTP status when `noCoordsReason` is `http_not_ok`. */
+  httpStatus?: number
 }
 
 /**
@@ -37,7 +50,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
   const state = input.state.trim()
 
   if (!address || !city || !state) {
-    return { coords: null, hit429: false }
+    return { coords: null, hit429: false, noCoordsReason: 'empty_input' }
   }
 
   try {
@@ -58,7 +71,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         status: 429,
       })
       await sleep(RATE_LIMIT_BACKOFF_MS)
-      return { coords: null, hit429: true }
+      return { coords: null, hit429: true, noCoordsReason: 'rate_limited' }
     }
 
     if (!response.ok) {
@@ -67,19 +80,19 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         operation: 'nominatim_fetch',
         status: response.status,
       })
-      return { coords: null, hit429: false }
+      return { coords: null, hit429: false, noCoordsReason: 'http_not_ok', httpStatus: response.status }
     }
 
     const payload = (await response.json()) as Array<{ lat?: string; lon?: string }>
     const first = payload[0]
     if (!first?.lat || !first?.lon) {
-      return { coords: null, hit429: false }
+      return { coords: null, hit429: false, noCoordsReason: 'empty_results' }
     }
 
     const lat = Number.parseFloat(first.lat)
     const lng = Number.parseFloat(first.lon)
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return { coords: null, hit429: false }
+      return { coords: null, hit429: false, noCoordsReason: 'invalid_coordinates' }
     }
 
     return { coords: { lat, lng }, hit429: false }
@@ -92,7 +105,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         operation: 'nominatim_fetch',
       }
     )
-    return { coords: null, hit429: false }
+    return { coords: null, hit429: false, noCoordsReason: 'fetch_exception' }
   }
 }
 

@@ -63,8 +63,8 @@ function parseGeocodeConcurrency(): number {
   return Math.min(parsed, 5)
 }
 
-/** Preview-only: no production log expansion. Matches `claim_ingested_sales_for_geocoding` eligibility (no PII). */
-function isPreviewGeocodeClaimDiagnosticsEnabled(): boolean {
+/** Preview-only: structured diagnostics without addresses or provider payloads (no PII). */
+function isPreviewGeocodeDiagnosticsEnabled(): boolean {
   return process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'preview'
 }
 
@@ -83,7 +83,7 @@ async function runPreviewGeocodeClaimDiagnostics(
   environment: string,
   deploymentEnv: string
 ): Promise<void> {
-  if (!isPreviewGeocodeClaimDiagnosticsEnabled()) {
+  if (!isPreviewGeocodeDiagnosticsEnabled()) {
     return
   }
 
@@ -279,6 +279,19 @@ async function markGeocodeTerminalNeedsCheck(
   return true
 }
 
+/** One retry: third attempt leaves geocode_attempts at 3 so the claim RPC will never pick the row again if this fails. */
+async function markGeocodeTerminalNeedsCheckOnceRetry(
+  admin: ReturnType<typeof getAdminDb>,
+  rowId: string,
+  failureReasons: unknown,
+  reason: FailureReason
+): Promise<boolean> {
+  const first = await markGeocodeTerminalNeedsCheck(admin, rowId, failureReasons, reason)
+  if (first) return true
+  await new Promise((r) => setTimeout(r, 150))
+  return markGeocodeTerminalNeedsCheck(admin, rowId, failureReasons, reason)
+}
+
 function mapPublishResultToByIdOutcome(publish: PublishReadyByIdResult): GeocodeIngestedSaleByIdResult {
   if (publish.ok && 'publishedSaleId' in publish) {
     return { outcome: 'success', published: true, publishedSaleId: publish.publishedSaleId }
@@ -389,6 +402,15 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
     if (geo.coords) {
       const outcome = await applyGeocodeSuccess(admin, rowId, geo.coords.lat, geo.coords.lng)
       if (outcome.kind === 'update_failed') {
+        if (isPreviewGeocodeDiagnosticsEnabled()) {
+          logger.info('Geocode pipeline attempt outcome (preview diagnostic)', {
+            component: 'ingestion/geocodeWorker',
+            operation: 'process_geocode_attempt',
+            rowId,
+            attemptCount,
+            path: 'apply_ready_update_failed',
+          })
+        }
         logger.warn('Geocode worker row processed', {
           component: 'ingestion/geocodeWorker',
           operation: 'row_result',
@@ -410,8 +432,20 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
       return { kind: 'geocode_ok', publish: outcome.publish, hit429: false }
     }
     const hit429 = geo.hit429
+    if (isPreviewGeocodeDiagnosticsEnabled()) {
+      logger.info('Geocode pipeline attempt outcome (preview diagnostic)', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'process_geocode_attempt',
+        rowId,
+        attemptCount,
+        path: 'provider_no_coords',
+        noCoordsReason: geo.noCoordsReason ?? 'unknown',
+        hit429,
+        httpStatus: geo.httpStatus,
+      })
+    }
     if (attemptCount >= 3) {
-      const ok = await markGeocodeTerminalNeedsCheck(admin, rowId, row.failure_reasons, 'geocode_failed')
+      const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')
       if (ok) {
         logger.warn('Geocode worker row processed', {
           component: 'ingestion/geocodeWorker',
@@ -436,7 +470,7 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
   }
 
   if (attemptCount >= 3) {
-    const ok = await markGeocodeTerminalNeedsCheck(admin, rowId, row.failure_reasons, 'geocode_failed')
+    const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')
     if (ok) {
       logger.warn('Geocode worker row processed', {
         component: 'ingestion/geocodeWorker',
@@ -448,6 +482,16 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
       return { kind: 'geocode_fail', retriable: false, terminal: true, hit429: false }
     }
     return { kind: 'geocode_fail', retriable: true, terminal: false, hit429: false }
+  }
+
+  if (isPreviewGeocodeDiagnosticsEnabled()) {
+    logger.info('Geocode pipeline attempt outcome (preview diagnostic)', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'process_geocode_attempt',
+      rowId,
+      attemptCount,
+      path: 'missing_address_components',
+    })
   }
 
   logger.warn('Geocode worker row processed', {

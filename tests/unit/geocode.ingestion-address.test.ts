@@ -42,7 +42,7 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
       city: 'Louisville',
       state: 'KY',
     })
-    expect(result).toEqual({ coords: { lat: 38.25, lng: -85.75 }, hit429: false })
+    expect(result).toMatchObject({ coords: { lat: 38.25, lng: -85.75 }, hit429: false })
     expect(loggerWarn).not.toHaveBeenCalled()
   })
 
@@ -66,7 +66,7 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
       await vi.advanceTimersByTimeAsync(300)
       const result = await promise
 
-      expect(result).toEqual({ coords: null, hit429: true })
+      expect(result).toMatchObject({ coords: null, hit429: true, noCoordsReason: 'rate_limited' })
       expect(loggerWarn).toHaveBeenCalledWith(
         'Nominatim rate limited (HTTP 429); treating as retriable geocode failure',
         expect.objectContaining({
@@ -97,12 +97,38 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
       state: 'KY',
     })
 
-    expect(result).toEqual({ coords: null, hit429: false })
+    expect(result).toMatchObject({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'http_not_ok',
+      httpStatus: 503,
+    })
     expect(loggerWarn).toHaveBeenCalledWith(
       'Nominatim geocode request failed (non-OK response)',
       expect.objectContaining({
         status: 503,
       })
     )
+  })
+
+  it('returns empty_results when Nominatim returns no matches', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({ coords: null, hit429: false, noCoordsReason: 'empty_results' })
   })
 })

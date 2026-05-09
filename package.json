@@ -42,7 +42,9 @@
     "backfill:city-source-pages": "tsx scripts/backfillCityConfigSourcePages.ts",
     "generate:hardcoded-zips": "tsx scripts/generate-hardcoded-zips.ts",
     "repair:ingested-sales:dry": "tsx scripts/repair-ingested-sales.ts --dry-run",
-    "repair:ingested-sales": "tsx scripts/repair-ingested-sales.ts"
+    "repair:ingested-sales": "tsx scripts/repair-ingested-sales.ts",
+    "remediate:ingested-location-casing:dry": "tsx scripts/remediate-ingested-location-casing.ts --dry-run",
+    "remediate:ingested-location-casing": "tsx scripts/remediate-ingested-location-casing.ts --execute"
   },
   "dependencies": {
     "@react-email/components": "^0.0.19",

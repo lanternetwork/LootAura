@@ -1,4 +1,5 @@
 import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureReason } from '@/lib/ingestion/types'
+import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 
 function cleanText(value: string | null): string | null {
   if (value == null) return null
@@ -290,8 +291,8 @@ function resolveTimes(candidates: ClockPart[]): { timeStart: string; timeEnd: st
 export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: CityIngestionConfig): Promise<ProcessedIngestedSale> {
   const failureReasons: FailureReason[] = []
   const addressRaw = cleanText(rawSale.addressRaw)
-  const city = cleanText(rawSale.cityHint) || cleanText(cityConfig.city)
-  const state = cleanText(rawSale.stateHint) || cleanText(cityConfig.state)
+  const city = normalizeIngestionCity(cleanText(rawSale.cityHint) || cleanText(cityConfig.city))
+  const state = normalizeIngestionState(cleanText(rawSale.stateHint) || cleanText(cityConfig.state))
 
   const normalizedAddress = addressRaw?.toLowerCase().replace(/\s+/g, ' ') || null
   if (!hasStreetNumberAndName(addressRaw)) {

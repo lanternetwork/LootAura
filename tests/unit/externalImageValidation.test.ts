@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { dnsLookup } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
@@ -35,5 +35,62 @@ describe('external image URL validation', () => {
     dnsLookup.mockResolvedValue([{ address: '192.168.1.9', family: 4 }])
     const { isValidExternalImageUrl } = await import('@/lib/ingestion/externalImageValidation')
     await expect(isValidExternalImageUrl('https://images.example.org/a.jpg')).resolves.toBe(false)
+  })
+})
+
+describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('rejects logo path segments without fetching', async () => {
+    const { sanitizeExternalImageUrls } = await import('@/lib/ingestion/externalImageValidation')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('fetch should not run'))
+    const out = await sanitizeExternalImageUrls(['https://cdn.example.com/assets/site-logo-v2.png'], {
+      rowId: '11111111-1111-4111-8111-111111111111',
+      city: 'A',
+      state: 'B',
+      max: 3,
+    })
+    expect(out).toEqual([])
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+
+  it('rejects wide banner dimensions from raster probe', async () => {
+    const { sanitizeExternalImageUrls, parseRasterImageDimensionsFromBytes } = await import(
+      '@/lib/ingestion/externalImageValidation'
+    )
+    const pngHeader = new Uint8Array(24)
+    pngHeader.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const w = 900
+    const h = 72
+    pngHeader[16] = (w >>> 24) & 0xff
+    pngHeader[17] = (w >>> 16) & 0xff
+    pngHeader[18] = (w >>> 8) & 0xff
+    pngHeader[19] = w & 0xff
+    pngHeader[20] = (h >>> 24) & 0xff
+    pngHeader[21] = (h >>> 16) & 0xff
+    pngHeader[22] = (h >>> 8) & 0xff
+    pngHeader[23] = h & 0xff
+    expect(parseRasterImageDimensionsFromBytes(pngHeader)).toEqual({ w: 900, h: 72 })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(pngHeader.buffer.slice(0, pngHeader.byteLength), { status: 206 }))
+    )
+
+    const out = await sanitizeExternalImageUrls(['https://images.example.org/hero.png'], {
+      rowId: '22222222-2222-4222-8222-222222222222',
+      city: 'A',
+      state: 'B',
+      max: 3,
+    })
+    expect(out).toEqual([])
   })
 })

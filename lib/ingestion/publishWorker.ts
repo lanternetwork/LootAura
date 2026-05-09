@@ -1,5 +1,9 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { createPublishedSale, type PublishableIngestedSale } from '@/lib/ingestion/publish'
+import {
+  InsufficientAddressForPublishError,
+  validateResolvedAddressForPublish,
+} from '@/lib/ingestion/publishValidation'
 import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
 import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { logger, type LogContext } from '@/lib/log'
@@ -624,7 +628,14 @@ async function maybeSyncExistingSaleFromLatestIngest(
   const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
   const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
   const bestEffortPatch: Record<string, unknown> = {}
-  if (normalizedAddress) bestEffortPatch.address = normalizedAddress
+  if (normalizedAddress && city && state) {
+    try {
+      validateResolvedAddressForPublish(normalizedAddress, city, state)
+      bestEffortPatch.address = normalizedAddress
+    } catch {
+      /* omit low-quality ingest addresses from best-effort sale sync */
+    }
+  }
   if (normalizedDateStart) bestEffortPatch.date_start = normalizedDateStart
   bestEffortPatch.date_end = normalizedDateEnd
   bestEffortPatch.time_start = normalizedTimeStart
@@ -964,7 +975,9 @@ async function markIngestedPublishFailedFromSaleCreateError(
 ): Promise<void> {
   const admin = getAdminDb()
   const message = error instanceof Error ? error.message : String(error)
-  const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
+  const primaryFailure: FailureReason =
+    error instanceof InsufficientAddressForPublishError ? 'invalid_address_format' : 'publish_error'
+  const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), primaryFailure)
   const payload = {
     status: 'publish_failed' as const,
     failure_reasons: mergedReasons,

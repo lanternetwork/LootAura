@@ -141,6 +141,8 @@ describe('publish worker image consumption', () => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
     createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-1' })
+    // Ingestion image sanitizer probes raster headers via fetch; empty body => inconclusive => allow.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
   })
 
   it('consumes raw_payload.imageUrls and keeps only validated external URLs', async () => {
@@ -244,6 +246,7 @@ describe('publish worker idempotent sale images', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
   })
 
   it('on unique conflict, patches existing sale when image fields are empty and sanitized URLs exist', async () => {
@@ -1028,6 +1031,7 @@ describe('publish worker batch media hydration and visibility', () => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
     createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-batch-1' })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
   })
 
   it('uses image_source_url from RPC claim row to publish image_urls', async () => {
@@ -1177,6 +1181,7 @@ describe('publish worker finalization consistency', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
   })
 
   it('sale created + finalization update success marks ingested row published', async () => {

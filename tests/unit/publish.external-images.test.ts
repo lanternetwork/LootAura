@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { InsufficientAddressForPublishError } from '@/lib/ingestion/publishValidation'
 
 const insertSingle = vi.fn()
 const insertSelect = vi.fn(() => ({ single: insertSingle }))
@@ -73,5 +74,32 @@ describe('createPublishedSale image handling', () => {
     const payload = (firstCall as unknown[])[0] as { cover_image_url: string | null; images: string[] }
     expect(payload.cover_image_url).toBeNull()
     expect(payload.images).toEqual([])
+  })
+
+  it('does not insert when address is an unresolved placeholder', async () => {
+    const { createPublishedSale } = await import('@/lib/ingestion/publish')
+    await expect(
+      createPublishedSale({
+        id: '33333333-3333-4333-8333-333333333333',
+        source_platform: 'external_page_source',
+        source_url: 'https://example.com/listing/bad-addr',
+        title: 'Sale',
+        description: null,
+        normalized_address: 'Unknown address',
+        city: 'Munster',
+        state: 'IN',
+        zip_code: '46321',
+        lat: 41.56,
+        lng: -87.51,
+        date_start: '2026-05-06',
+        date_end: null,
+        time_start: '09:00:00',
+        time_end: null,
+        image_cloudinary_url: null,
+        image_urls: [],
+      })
+    ).rejects.toThrow(InsufficientAddressForPublishError)
+
+    expect(insert).not.toHaveBeenCalled()
   })
 })

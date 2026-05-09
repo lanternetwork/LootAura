@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
@@ -43,6 +43,64 @@ function isTrustedNextImageHost(urlString: string): boolean {
   } catch {
     return false
   }
+}
+
+/** "Show more" only when line-clamp actually hides text; re-measures on layout, fonts, resize. */
+function ExpandableDescription({
+  text,
+  paragraphClassName,
+  buttonClassName,
+}: {
+  text: string
+  paragraphClassName: string
+  buttonClassName: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [showToggle, setShowToggle] = useState(false)
+  const pRef = useRef<HTMLParagraphElement>(null)
+
+  useLayoutEffect(() => {
+    const el = pRef.current
+    if (!el) return
+
+    const measure = () => {
+      if (expanded) return
+      setShowToggle(el.scrollHeight - el.clientHeight > 1)
+    }
+
+    measure()
+    const ro = new ResizeObserver(() => measure())
+    ro.observe(el)
+
+    let cancelled = false
+    if (document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (!cancelled) measure()
+      })
+    }
+
+    return () => {
+      cancelled = true
+      ro.disconnect()
+    }
+  }, [text, expanded])
+
+  return (
+    <>
+      <p ref={pRef} className={`${paragraphClassName} ${expanded ? '' : 'line-clamp-3'}`}>
+        {text}
+      </p>
+      {(showToggle || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={buttonClassName}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </>
+  )
 }
 
 // Item image component with error handling
@@ -205,7 +263,6 @@ export default function SaleDetailClient({
   const { data: currentUser } = useAuth()
   const { data: favoriteSales = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
-  const [showFullDescription, setShowFullDescription] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)
   const galleryImages = useMemo(() => {
@@ -796,17 +853,11 @@ export default function SaleDetailClient({
           <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
             <h2 className="text-lg font-semibold text-gray-900">Sale details</h2>
             <div className="prose prose-gray max-w-none">
-              <p className={`text-gray-700 text-sm leading-relaxed ${!showFullDescription && 'line-clamp-3'}`}>
-                {sale.description}
-              </p>
-              {sale.description.length > 200 && (
-                <button
-                  onClick={() => setShowFullDescription(!showFullDescription)}
-                  className="mt-2 text-sm text-purple-600 font-medium hover:text-purple-700"
-                >
-                  {showFullDescription ? 'Show less' : 'Show more'}
-                </button>
-              )}
+              <ExpandableDescription
+                text={sale.description}
+                paragraphClassName="text-gray-700 text-sm leading-relaxed"
+                buttonClassName="mt-2 text-sm text-purple-600 font-medium hover:text-purple-700"
+              />
             </div>
             
             {/* Date & Time Details */}
@@ -1138,17 +1189,11 @@ export default function SaleDetailClient({
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
               <div className="prose prose-gray max-w-none">
-                <p className={`text-gray-700 ${!showFullDescription && 'line-clamp-3'}`}>
-                  {sale.description}
-                </p>
-                {sale.description.length > 200 && (
-                  <button
-                    onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="mt-2 link-accent font-medium"
-                  >
-                    {showFullDescription ? 'Show less' : 'Show more'}
-                  </button>
-                )}
+                <ExpandableDescription
+                  text={sale.description}
+                  paragraphClassName="text-gray-700"
+                  buttonClassName="mt-2 link-accent font-medium"
+                />
               </div>
             </div>
           )}

@@ -3,6 +3,7 @@ import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
 import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { PublishInputSchema } from '@/lib/ingestion/schemas'
 import type { PublishInput } from '@/lib/ingestion/types'
+import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
 
 export interface PublishableIngestedSale {
   id: string
@@ -118,12 +119,13 @@ export async function createPublishedSale(ingestedSale: PublishableIngestedSale)
   const admin = getAdminDb()
   const draftInput = normalizePublishInput(ingestedSale)
   const validated = PublishInputSchema.parse(draftInput)
+  validateResolvedAddressForPublish(validated.address, validated.city, validated.state)
 
   const salePayload = {
     owner_id: validated.ownerId,
     title: validated.title,
     description: validated.description,
-    address: validated.address || 'Unknown address',
+    address: validated.address as string,
     city: validated.city,
     state: validated.state,
     zip_code: validated.zipCode,

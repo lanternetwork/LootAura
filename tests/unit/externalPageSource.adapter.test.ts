@@ -496,10 +496,11 @@ describe('parseExternalPageSourceHtml', () => {
 
   it('prefers URL Fair Oaks when address tail says Munster', async () => {
     const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    // See-source slug yields no address from path so nearby Munster line becomes address_raw (real crawl shape).
     const html = `
-      <div>
-        <a href="https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/100-Main-St/38730010/listing.html">Sale</a>
-        <div>123 Example St, Munster, IN 46321</div>
+      <div class="listing">
+        <a href="https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/See-source-for-address-after-2026-05-10-10%3A00%3A00/38730010/userlisting.html?s=tl">Sale</a>
+        <div class="meta">123 Example St, Munster, IN 46321 8:00 am 5/10 - 5/10</div>
       </div>
     `
     const { listings, invalid } = parseExternalPageSourceHtml(

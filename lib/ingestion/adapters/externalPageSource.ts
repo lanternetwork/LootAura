@@ -4,7 +4,6 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
-import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 import { parseYstmListingPathParts, resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 
 const ADAPTER_ID = 'external_page_source'

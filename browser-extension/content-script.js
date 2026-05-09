@@ -396,6 +396,267 @@ function goToNext(session) {
   window.location = nextUrl;
 }
 
+/** --- YSTM / listing date extraction (mirrors server `externalPageSource` metadata precedence) --- */
+
+function pad2(n) {
+  return n < 10 ? "0" + n : String(n);
+}
+
+function epochSecondsToIsoDate(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value < 946684800) return null;
+  const d = new Date(value * 1000);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() + 1;
+  const day = d.getUTCDate();
+  return `${y}-${pad2(m)}-${pad2(day)}`;
+}
+
+function extractDateRangeFromText(text) {
+  const year = new Date().getFullYear();
+  function toIso(y, m, d) {
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    return `${y}-${pad2(m)}-${pad2(d)}`;
+  }
+
+  const range = text.match(/(\d{1,2})\/(\d{1,2})\s*[-–—]\s*(\d{1,2})\/(\d{1,2})/);
+  if (range) {
+    const m1 = parseInt(range[1], 10);
+    const d1 = parseInt(range[2], 10);
+    const m2 = parseInt(range[3], 10);
+    const d2 = parseInt(range[4], 10);
+    const start = toIso(year, m1, d1);
+    const end = toIso(year, m2, d2);
+    if (start && end) return { start, end };
+  }
+
+  const single = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if (single) {
+    const m = parseInt(single[1], 10);
+    const d = parseInt(single[2], 10);
+    let yy = year;
+    if (single[3]) {
+      const yPart = parseInt(single[3], 10);
+      yy = single[3].length === 2 ? 2000 + yPart : yPart;
+    }
+    const iso = toIso(yy, m, d);
+    if (iso) return { start: iso, end: iso };
+  }
+
+  const monthNames = {
+    jan: 1,
+    january: 1,
+    feb: 2,
+    february: 2,
+    mar: 3,
+    march: 3,
+    apr: 4,
+    april: 4,
+    may: 5,
+    jun: 6,
+    june: 6,
+    jul: 7,
+    july: 7,
+    aug: 8,
+    august: 8,
+    sep: 9,
+    sept: 9,
+    september: 9,
+    oct: 10,
+    october: 10,
+    nov: 11,
+    november: 11,
+    dec: 12,
+    december: 12,
+  };
+  const monthNameRegex =
+    /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,\s*(\d{4}))?/gi;
+  const found = [];
+  let mm;
+  while ((mm = monthNameRegex.exec(text)) !== null) {
+    const monKey = (mm[1] || "").toLowerCase().replace(/\.$/, "");
+    const mon = monthNames[monKey];
+    const day = parseInt(mm[2] || "", 10);
+    const y = mm[3] ? parseInt(mm[3], 10) : year;
+    const iso = mon ? toIso(y, mon, day) : null;
+    if (iso && found.indexOf(iso) === -1) found.push(iso);
+  }
+
+  const compactMonthRange = text.match(
+    /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{1,2})\s*[-–—]\s*(\d{1,2})(?:,\s*(\d{4}))?/i
+  );
+  if (compactMonthRange) {
+    const monKey = (compactMonthRange[1] || "").toLowerCase().replace(/\.$/, "");
+    const mon = monthNames[monKey];
+    const d1 = parseInt(compactMonthRange[2] || "", 10);
+    const d2 = parseInt(compactMonthRange[3] || "", 10);
+    const y = compactMonthRange[4] ? parseInt(compactMonthRange[4], 10) : year;
+    const start = mon ? toIso(y, mon, d1) : null;
+    const end = mon ? toIso(y, mon, d2) : null;
+    if (start && end) return { start, end };
+  }
+  if (found.length >= 2) return { start: found[0], end: found[1] };
+  if (found.length === 1) return { start: found[0], end: found[0] };
+
+  const isoPlain = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (isoPlain) {
+    const iso = `${isoPlain[1]}-${isoPlain[2]}-${isoPlain[3]}`;
+    return { start: iso, end: iso };
+  }
+
+  return {};
+}
+
+function decodeJsSingleQuotedJson(raw) {
+  return String(raw)
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t");
+}
+
+function parseMetadataDateValue(raw) {
+  if (typeof raw === "number") return epochSecondsToIsoDate(raw);
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^\d{9,11}$/.test(trimmed)) {
+    const epoch = parseInt(trimmed, 10);
+    return epochSecondsToIsoDate(epoch);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) return trimmed.slice(0, 10);
+  const extracted = extractDateRangeFromText(trimmed);
+  return extracted.start || null;
+}
+
+function normalizeListingUrlForLookup(raw) {
+  try {
+    const u = new URL(String(raw).trim(), window.location.origin);
+    u.hash = "";
+    return u.href;
+  } catch {
+    return String(raw).trim();
+  }
+}
+
+function externalIdFromListingUrl(url) {
+  const m = String(url).match(/\/(\d+)\/(?:listing|userlisting)\.html/i);
+  return m ? m[1] : null;
+}
+
+function metadataInfoFromSale(sale) {
+  const url = typeof sale?.url === "string" ? normalizeListingUrlForLookup(sale.url) : null;
+  if (!url) return null;
+  const startFromFields = [sale?.date, sale?.start_date, sale?.startDate, sale?.date_start]
+    .map(parseMetadataDateValue)
+    .find(function (v) {
+      return typeof v === "string" && v.length > 0;
+    });
+  const endFromFields = [sale?.end_date, sale?.endDate, sale?.date_end]
+    .map(parseMetadataDateValue)
+    .find(function (v) {
+      return typeof v === "string" && v.length > 0;
+    });
+  const fromDescription =
+    typeof sale?.description === "string" ? extractDateRangeFromText(sale.description) : {};
+  const fromTitle = typeof sale?.title === "string" ? extractDateRangeFromText(sale.title) : {};
+  let startDate = startFromFields || null;
+  let endDate = endFromFields || null;
+  if (!startDate && fromTitle.start) startDate = fromTitle.start;
+  if (!endDate && fromTitle.end) endDate = fromTitle.end;
+  if (!startDate && fromDescription.start) startDate = fromDescription.start;
+  if (!endDate && fromDescription.end) endDate = fromDescription.end;
+  if (!startDate && endDate) startDate = endDate;
+  if (!endDate && startDate) endDate = startDate;
+  if (!startDate && !endDate) return null;
+  return { url, startDate, endDate };
+}
+
+function extractYstmMetadataSaleDates(pageUrl) {
+  const normalizedHref = normalizeListingUrlForLookup(pageUrl);
+  const canonicalHref = canonicalizeUrl(pageUrl);
+  const externalId = externalIdFromListingUrl(pageUrl);
+  const scripts = Array.from(document.querySelectorAll("script"));
+  for (let s = 0; s < scripts.length; s++) {
+    const text = scripts[s].textContent || "";
+    const m = text.match(/metadataStr\s*=\s*'([\s\S]*?)';/);
+    if (!m || !m[1]) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(decodeJsSingleQuotedJson(m[1]));
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== "object") continue;
+    const sales = parsed.sales;
+    if (!Array.isArray(sales)) continue;
+    for (let i = 0; i < sales.length; i++) {
+      const info = metadataInfoFromSale(sales[i]);
+      if (!info || !info.startDate) continue;
+      const saleUrl = info.url;
+      const matchUrl =
+        saleUrl === normalizedHref ||
+        saleUrl === canonicalHref ||
+        canonicalizeUrl(saleUrl) === canonicalHref ||
+        normalizeListingUrlForLookup(saleUrl) === normalizedHref;
+      const id = externalIdFromListingUrl(saleUrl);
+      const matchId = externalId && id === externalId;
+      if (matchUrl || matchId) {
+        return { start: info.startDate, end: info.endDate || info.startDate };
+      }
+    }
+  }
+  return null;
+}
+
+function extractDomPrimaryDateRaw() {
+  const body = document.body.innerText || "";
+  const chunk = body.slice(0, 12000);
+  let r = extractDateRangeFromText(chunk);
+  if (r.start) return r.end && r.end !== r.start ? r.start + "\n" + r.end : r.start;
+  const lines = body
+    .split("\n")
+    .map(function (l) {
+      return l.trim();
+    })
+    .filter(Boolean);
+  for (let i = 0; i < lines.length; i++) {
+    r = extractDateRangeFromText(lines[i]);
+    if (r.start) return r.end && r.end !== r.start ? r.start + "\n" + r.end : r.start;
+  }
+  return "";
+}
+
+function buildCanonicalDateRaw(pageUrl) {
+  const meta = extractYstmMetadataSaleDates(pageUrl);
+  if (meta && meta.start) {
+    return meta.end && meta.end !== meta.start ? meta.start + "\n" + meta.end : meta.start;
+  }
+  return extractDomPrimaryDateRaw();
+}
+
+function parseIsoPairFromCanonicalDateRaw(canonical) {
+  const lines = String(canonical || "")
+    .split(/\n/)
+    .map(function (l) {
+      return l.trim();
+    })
+    .filter(Boolean);
+  if (!lines.length) return null;
+  const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoRe.test(lines[0])) {
+    return {
+      start: lines[0],
+      end: lines.length > 1 && isoRe.test(lines[1]) ? lines[1] : lines[0],
+    };
+  }
+  return null;
+}
+
 function extractTitle() {
   const heading = document.querySelector("h1");
   return heading?.textContent?.trim() || document.title || "";
@@ -412,7 +673,6 @@ function isDescriptionNoiseLine(line) {
   if (/^\s*\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i.test(normalized)) return true;
   if (/^\s*(\d{1,2}:\d{2}\s*(am|pm)?\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)?)\s*$/i.test(normalized)) return true;
   if (/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i.test(normalized)) return true;
-  if (/^\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*(?:[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)?\s*$/i.test(normalized)) return true;
   if (normalized.length < 8) return true;
   return false;
 }
@@ -432,14 +692,6 @@ function cleanExtractedDescription(rawText) {
     text = text.replace(/\bplease visit us at\b/gi, "");
     text = text.replace(/\bclick here\b/gi, "");
     text = text.replace(/\bsee listing\b/gi, "");
-    text = text.replace(
-      /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
-      ""
-    );
-    text = text.replace(
-      /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
-      ""
-    );
     text = text.replace(/\bstart(?:s)?\s*time\s*:\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi, "");
     text = text.replace(/\bstarts?\s+at\s+\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi, "");
     text = text.replace(
@@ -448,10 +700,6 @@ function cleanExtractedDescription(rawText) {
     );
     text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\s*,?\s*USA\b/gi, " ");
     text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\b(?=\s*$)/gi, " ");
-    text = text.replace(
-      /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi,
-      ""
-    );
     text = text.replace(
       /\b\d{1,2}(?::\d{2})?\s*(am|pm)\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,
       ""
@@ -481,7 +729,10 @@ function extractDescription() {
     .filter((el) => el instanceof HTMLElement)
     .map((el) => {
       const text = el.innerText || "";
-      const hasDate = /(\d{1,2}\/\d{1,2})/.test(text);
+      const hasDate =
+        /(\d{1,2}\/\d{1,2})|(\b\d{4}-\d{2}-\d{2}\b)|(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2}/i.test(
+          text
+        );
       const hasTime = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.test(text);
       const cleaned = cleanExtractedDescription(text);
       const normalizedLength = cleaned.length;
@@ -535,14 +786,6 @@ function extractCityState(address) {
   };
 }
 
-function extractDate() {
-  const text = document.body.innerText || "";
-  const line = text
-    .split("\n")
-    .find((entry) => /\b(\d{1,2}\/\d{1,2}\/\d{2,4}|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(entry));
-  return line ? line.trim().slice(0, 200) : "";
-}
-
 function extractImages() {
   try {
     const imageApi = globalThis.LootAuraListingImage;
@@ -582,7 +825,10 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
     throw new Error("Unable to determine city/state from listing address or URL");
   }
   const imageExtract = extractImages();
+  const dateRaw = buildCanonicalDateRaw(currentUrl);
+  const isoPair = parseIsoPairFromCanonicalDateRaw(dateRaw);
   console.log("City/state extracted:", { city, state });
+  console.log("[LootAura] Canonical dateRaw / ISO:", { dateRaw, isoPair });
 
   return {
     records: [
@@ -593,7 +839,7 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
         title: extractTitle(),
         description: extractDescription(),
         addressRaw,
-        dateRaw: extractDate(),
+        dateRaw,
         imageSourceUrl: imageExtract.primary,
         cityHint: resolvedCity,
         stateHint: resolvedState,
@@ -601,6 +847,7 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
           tags: selectedTags,
           collectedAt: Date.now(),
           ...(imageExtract.urls.length > 0 ? { imageUrls: imageExtract.urls } : {}),
+          ...(isoPair ? { ystmCanonicalDateStart: isoPair.start, ystmCanonicalDateEnd: isoPair.end } : {}),
         },
       },
     ],

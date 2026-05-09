@@ -298,6 +298,17 @@ function resolveTimes(candidates: ClockPart[]): { timeStart: string; timeEnd: st
   }
 }
 
+/** ISO dates from browser extension metadata/DOM pipeline (`content-script.js`). */
+function extractExtensionCanonicalIsoDates(rawPayload: unknown): { start: string; end: string } | null {
+  if (!rawPayload || typeof rawPayload !== 'object') return null
+  const o = rawPayload as Record<string, unknown>
+  const s = o.ystmCanonicalDateStart
+  const e = o.ystmCanonicalDateEnd
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
+  const end = typeof e === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e) ? e : s
+  return { start: s, end }
+}
+
 export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: CityIngestionConfig): Promise<ProcessedIngestedSale> {
   const failureReasons: FailureReason[] = []
   const addressRaw = cleanText(rawSale.addressRaw)
@@ -314,52 +325,59 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     failureReasons.push(addressRaw ? 'invalid_address_format' : 'missing_address')
   }
 
+  const extensionIso = extractExtensionCanonicalIsoDates(rawSale.rawPayload)
   const combinedRaw = `${rawSale.description || ''}\n${rawSale.dateRaw || ''}`
   const combinedText = sanitizeText(combinedRaw)
   const baseYear = new Date().getFullYear()
 
-  const rawDateCandidates = extractDateCandidates(combinedText)
-  const dedupedDateCandidates = dedupeDateCandidates(rawDateCandidates)
-  const dateCandidates =
-    rawDateCandidates.length >= 2 && dedupedDateCandidates.length < 2
-      ? (() => {
-          // eslint-disable-next-line no-console
-          console.error('date_candidate_dedupe_collapse', {
-            rawCount: rawDateCandidates.length,
-            dedupedCount: dedupedDateCandidates.length,
-            raw: rawDateCandidates,
-            deduped: dedupedDateCandidates,
-          })
-          return rawDateCandidates
-        })()
-      : dedupedDateCandidates
-
   let dateStart: string | null = null
   let dateEnd: string | null = null
-
   let invalidDate = false
-  if (!combinedText) {
+  let rawDateCandidates: DateCandidate[] = []
+  let dedupedDateCandidates: DateCandidate[] = []
+  let dateCandidates: DateCandidate[] = []
+
+  if (extensionIso) {
+    dateStart = extensionIso.start
+    dateEnd = extensionIso.end
+  } else if (!combinedText) {
     failureReasons.push('missing_date')
   } else {
+    rawDateCandidates = extractDateCandidates(combinedText)
+    dedupedDateCandidates = dedupeDateCandidates(rawDateCandidates)
+    dateCandidates =
+      rawDateCandidates.length >= 2 && dedupedDateCandidates.length < 2
+        ? (() => {
+            // eslint-disable-next-line no-console
+            console.error('date_candidate_dedupe_collapse', {
+              rawCount: rawDateCandidates.length,
+              dedupedCount: dedupedDateCandidates.length,
+              raw: rawDateCandidates,
+              deduped: dedupedDateCandidates,
+            })
+            return rawDateCandidates
+          })()
+        : dedupedDateCandidates
+
     const resolvedDates = resolveDates(dateCandidates, baseYear)
     dateStart = resolvedDates.dateStart
     dateEnd = resolvedDates.dateEnd
     invalidDate = resolvedDates.invalidDate
     if (invalidDate) failureReasons.push('invalid_date')
-  }
 
-  // Invariant: if extraction found tokens, resolution must either produce dateStart
-  // or explicitly mark invalid_date. Never silently collapse.
-  if (rawDateCandidates.length >= 1 && !dateStart && !invalidDate) {
-    // eslint-disable-next-line no-console
-    console.error('date_resolution_invariant_failed', {
-      rawCount: rawDateCandidates.length,
-      dedupedCount: dedupedDateCandidates.length,
-      usedCount: dateCandidates.length,
-      raw: rawDateCandidates,
-      deduped: dedupedDateCandidates,
-    })
-    failureReasons.push('invalid_date')
+    // Invariant: if extraction found tokens, resolution must either produce dateStart
+    // or explicitly mark invalid_date. Never silently collapse.
+    if (rawDateCandidates.length >= 1 && !dateStart && !invalidDate) {
+      // eslint-disable-next-line no-console
+      console.error('date_resolution_invariant_failed', {
+        rawCount: rawDateCandidates.length,
+        dedupedCount: dedupedDateCandidates.length,
+        usedCount: dateCandidates.length,
+        raw: rawDateCandidates,
+        deduped: dedupedDateCandidates,
+      })
+      failureReasons.push('invalid_date')
+    }
   }
 
   const timeCandidates = extractTimeCandidates(combinedText)
@@ -370,6 +388,12 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
   const status: ProcessedIngestedSale['status'] =
     !hasAddressError && !hasDateError ? 'needs_geocode' : 'needs_check'
   const parseConfidence: ProcessedIngestedSale['parseConfidence'] = status === 'needs_geocode' ? 'high' : 'low'
+
+  const dateSource: string | null = extensionIso
+    ? 'extension_canonical_iso'
+    : combinedText
+      ? 'source_date_raw'
+      : null
 
   return {
     normalizedAddress,
@@ -382,7 +406,7 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     timeStart: resolvedTimes.timeStart,
     timeEnd: resolvedTimes.timeEnd,
     timeSource: resolvedTimes.timeSource,
-    dateSource: combinedText ? 'source_date_raw' : null,
+    dateSource,
     status,
     failureReasons,
     parseConfidence,

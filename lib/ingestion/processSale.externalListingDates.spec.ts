@@ -287,4 +287,49 @@ describe('processIngestedSale — external listing date/time (weekday M/D, start
     expect(processed.dateStart).toBe('2026-05-02')
     expect(processed.dateEnd).toBe('2026-05-03')
   })
+
+  it('uses ystmCanonicalDateStart/End when description has no parseable dates (extension upload path)', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({
+        description: 'Tools and toys.',
+        dateRaw: '',
+        rawPayload: {
+          ystmCanonicalDateStart: '2026-05-10',
+          ystmCanonicalDateEnd: '2026-05-11',
+        },
+      }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-10')
+    expect(processed.dateEnd).toBe('2026-05-11')
+    expect(processed.dateSource).toBe('extension_canonical_iso')
+    expect(processed.status).toBe('needs_geocode')
+  })
+
+  it('defaults ystmCanonicalDateEnd to start when only start is provided', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({
+        description: '',
+        dateRaw: '',
+        rawPayload: { ystmCanonicalDateStart: '2026-06-01' },
+      }),
+      homewoodConfig
+    )
+    expect(processed.dateStart).toBe('2026-06-01')
+    expect(processed.dateEnd).toBe('2026-06-01')
+    expect(processed.dateSource).toBe('extension_canonical_iso')
+  })
+
+  it('ignores malformed ystmCanonical ISO and parses description instead', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({
+        description: 'May 15',
+        rawPayload: { ystmCanonicalDateStart: '05-15-2026' },
+      }),
+      homewoodConfig
+    )
+    expect(processed.dateSource).toBe('source_date_raw')
+    expect(processed.dateStart).toBe('2026-05-15')
+  })
 })

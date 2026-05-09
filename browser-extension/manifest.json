@@ -9,7 +9,7 @@
     "https://*/*",
     "https://lootaura.com/*",
     "https://www.lootaura.com/*",
-    "https://loot-aura-rmw5ynpqn-lanternetworks-projects.vercel.app/*"
+    "https://loot-aura-18d05e025-lanternetworks-projects.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js"

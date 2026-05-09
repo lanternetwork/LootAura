@@ -9,6 +9,9 @@
  * Backlog batch size: `GEOCODE_BACKLOG_BATCH_SIZE` (default 25, hard cap 100).
  * Response JSON includes `queue` and `backlog` metrics.
  *
+ * Preview: workflow `.github/workflows/preview-post-deploy-geocode-cron.yml` calls this
+ * route on the live URL after Vercel `repository_dispatch` (or legacy `deployment_status`).
+ *
  * Protected by CRON_SECRET Bearer authentication (same pattern as other cron routes).
  */
 

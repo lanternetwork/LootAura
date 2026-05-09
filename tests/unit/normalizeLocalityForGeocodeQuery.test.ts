@@ -12,8 +12,8 @@ describe('normalizeLocalityForGeocodeQuery', () => {
     expect(normalizeLocalityForGeocodeQuery('Park\u2013City')).toBe('Park City')
   })
 
-  it('does not treat digit segments as part of letter–letter slug splits (hyphen becomes space via city sanitize)', () => {
-    expect(normalizeLocalityForGeocodeQuery('Route-66')).toBe('Route 66')
+  it('does not match letter–hyphen–digit slug splits; digits are then removed by ingestion city sanitization', () => {
+    expect(normalizeLocalityForGeocodeQuery('Route-66')).toBe('Route')
   })
 
   it('compound US place names still title-case to a space form suitable for geocoding', () => {

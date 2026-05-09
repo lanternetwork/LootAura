@@ -20,6 +20,35 @@ import { ensureIngestionCityConfigFromListingSource } from '@/lib/ingestion/ensu
 
 export const dynamic = 'force-dynamic'
 
+/** Exported for unit tests — manual upload geocode retry reset after prior terminal geocode failure. */
+
+export function stripGeocodeFailedFromFailureReasons(reasons: FailureReason[]): FailureReason[] {
+  return reasons.filter((r) => r !== 'geocode_failed')
+}
+
+function priorFailureReasonsIncludeGeocodeFailed(reasons: unknown): boolean {
+  if (!Array.isArray(reasons)) return false
+  return reasons.some((x) => x === 'geocode_failed')
+}
+
+export function priorIndicatesTerminalGeocodeFailureForRetryReset(prior: {
+  status: string | null
+  failure_reasons: unknown
+  geocode_attempts: number | null
+}): boolean {
+  if ((prior.geocode_attempts ?? 0) >= 3) return true
+  if (prior.status === 'needs_check') return true
+  return priorFailureReasonsIncludeGeocodeFailed(prior.failure_reasons)
+}
+
+export function shouldResetGeocodeRetryAfterUploadUpdate(params: {
+  newStatus: string
+  prior: { status: string | null; failure_reasons: unknown; geocode_attempts: number | null }
+}): boolean {
+  if (params.newStatus !== 'needs_geocode') return false
+  return priorIndicatesTerminalGeocodeFailureForRetryReset(params.prior)
+}
+
 /** Structured errors for admin manual upload (extension + tools). */
 function manualUploadErrorJson(
   code: string,
@@ -540,8 +569,57 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
       }
 
       if (match) {
+        const { data: priorRow, error: priorFetchError } = await fromBase(admin, 'ingested_sales')
+          .select('status, failure_reasons, geocode_attempts')
+          .eq('id', match.id)
+          .maybeSingle()
+
+        if (priorFetchError) {
+          logger.warn('Could not read prior ingested_sale for geocode retry reset', {
+            component: 'ingestion/upload',
+            operation: 'geocode_retry_reset_prior_fetch',
+            requestId: opId,
+            ingestionRunId,
+            ingestedSaleId: match.id,
+            message: priorFetchError.message,
+          })
+        }
+
+        let updatePayload: Record<string, unknown> = { ...basePayload }
+        if (
+          !priorFetchError &&
+          priorRow &&
+          shouldResetGeocodeRetryAfterUploadUpdate({
+            newStatus: status,
+            prior: {
+              status: priorRow.status != null ? String(priorRow.status) : null,
+              failure_reasons: priorRow.failure_reasons,
+              geocode_attempts:
+                priorRow.geocode_attempts != null && Number.isFinite(Number(priorRow.geocode_attempts))
+                  ? Number(priorRow.geocode_attempts)
+                  : null,
+            },
+          })
+        ) {
+          updatePayload = {
+            ...basePayload,
+            failure_reasons: stripGeocodeFailedFromFailureReasons(failureReasons),
+            geocode_attempts: 0,
+            last_geocode_attempt_at: null,
+          }
+          logger.info('Manual upload reset geocode retry state (post-terminal)', {
+            component: 'ingestion/upload',
+            operation: 'geocode_retry_reset',
+            requestId: opId,
+            ingestionRunId,
+            ingestedSaleId: match.id,
+            priorStatus: priorRow.status,
+            priorGeocodeAttempts: priorRow.geocode_attempts,
+          })
+        }
+
         const { error: updateError } = await fromBase(admin, 'ingested_sales')
-          .update(basePayload)
+          .update(updatePayload)
           .eq('id', match.id)
         if (updateError) {
           summary.failed += 1

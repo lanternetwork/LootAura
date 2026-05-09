@@ -20,6 +20,14 @@ describe('normalizeIngestionCity', () => {
   it('collapses whitespace', () => {
     expect(normalizeIngestionCity('  new   york  ')).toBe('New York')
   })
+
+  it('strips html suffix artifacts from city', () => {
+    expect(normalizeIngestionCity('Chicago.html')).toBe('Chicago')
+  })
+
+  it('extracts city token from YSTM-style source path fragment', () => {
+    expect(normalizeIngestionCity('/US/Illinois/Chicago/100-Main-St/100/listing.html')).toBe('Chicago')
+  })
 })
 
 describe('normalizeIngestionState', () => {

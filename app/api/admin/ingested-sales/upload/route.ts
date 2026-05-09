@@ -131,7 +131,13 @@ function extractUrlCityFromSourceUrl(sourceUrl: string): string | null {
     const pathname = new URL(sourceUrl).pathname
     const segments = pathname.split('/').filter(Boolean)
     if (segments.length >= 4 && segments[0] === 'US') {
-      return decodeURIComponent(segments[2]).replace(/-/g, ' ')
+      const rawCity = decodeURIComponent(segments[2])
+      const sanitized = rawCity
+        .replace(/\.(?:html?|php|aspx?)$/i, '')
+        .replace(/[?#].*$/, '')
+        .replace(/-/g, ' ')
+        .trim()
+      return sanitized || null
     }
   } catch {
     // Ignore parse errors for diagnostics-only helper.

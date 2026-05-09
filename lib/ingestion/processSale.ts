@@ -12,6 +12,16 @@ function hasStreetNumberAndName(address: string | null): boolean {
   return /^\s*\d+\s+.+/.test(address)
 }
 
+function extractCityStateFromAddressRaw(address: string | null): { city: string | null; state: string | null } {
+  if (!address) return { city: null, state: null }
+  const match = address.match(/,\s*([^,]+?),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?(?:,\s*USA)?$/i)
+  if (!match) return { city: null, state: null }
+  return {
+    city: cleanText(match[1] ?? null),
+    state: cleanText(match[2] ?? null),
+  }
+}
+
 function sanitizeText(input: string): string {
   if (!input) return ''
 
@@ -291,8 +301,13 @@ function resolveTimes(candidates: ClockPart[]): { timeStart: string; timeEnd: st
 export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: CityIngestionConfig): Promise<ProcessedIngestedSale> {
   const failureReasons: FailureReason[] = []
   const addressRaw = cleanText(rawSale.addressRaw)
-  const city = normalizeIngestionCity(cleanText(rawSale.cityHint) || cleanText(cityConfig.city))
-  const state = normalizeIngestionState(cleanText(rawSale.stateHint) || cleanText(cityConfig.state))
+  const parsedLocation = extractCityStateFromAddressRaw(addressRaw)
+  const city = normalizeIngestionCity(
+    parsedLocation.city || cleanText(rawSale.cityHint) || cleanText(cityConfig.city)
+  )
+  const state = normalizeIngestionState(
+    parsedLocation.state || cleanText(rawSale.stateHint) || cleanText(cityConfig.state)
+  )
 
   const normalizedAddress = addressRaw?.toLowerCase().replace(/\s+/g, ' ') || null
   if (!hasStreetNumberAndName(addressRaw)) {

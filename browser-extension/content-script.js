@@ -121,6 +121,16 @@ function normalizeStateFromName(stateName) {
   return STATE_NAME_TO_CODE[normalized] || "";
 }
 
+function normalizeCityFromPathSegment(segment) {
+  const cleaned = String(segment || "")
+    .replace(/[?#].*$/, "")
+    .replace(/\.(?:html?|php|aspx?)$/i, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return toTitleCase(cleaned);
+}
+
 function deriveCityStateFromPage() {
   const parts = window.location.pathname
     .split("/")
@@ -136,7 +146,7 @@ function deriveCityStateFromPage() {
   const usIndex = parts.findIndex((p) => p.toUpperCase() === "US");
   if (usIndex >= 0 && parts[usIndex + 1] && parts[usIndex + 2]) {
     state = normalizeStateFromName(parts[usIndex + 1]);
-    city = toTitleCase(parts[usIndex + 2].replace(/-/g, " ").trim());
+    city = normalizeCityFromPathSegment(parts[usIndex + 2]);
   }
 
   if (!city) {

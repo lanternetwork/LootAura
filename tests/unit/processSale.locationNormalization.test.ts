@@ -62,6 +62,35 @@ describe('processIngestedSale — city/state normalization', () => {
     expect(processed.state).toBe('IL')
   })
 
+  it('normalizes city hints polluted by listing path fragments', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl: 'https://yardsaletreasuremap.com/US/Illinois/Chicago/100-Main-St/100/listing.html',
+        cityHint: 'Chicago.html',
+        stateHint: 'Illinois',
+      }),
+      config
+    )
+    expect(processed.city).toBe('Chicago')
+    expect(processed.city).not.toBe('Chicago.html')
+    expect(processed.state).toBe('IL')
+  })
+
+  it('prefers structured city/state from address over polluted hints', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl: 'https://yardsaletreasuremap.com/US/Illinois/Chicago/100-Main-St/100/listing.html',
+        addressRaw: '8559 S Maryland Ave, Chicago, IL 60619',
+        cityHint: 'Chicago.html',
+        stateHint: 'Illinois',
+      }),
+      config
+    )
+    expect(processed.city).toBe('Chicago')
+    expect(processed.city).not.toBe('Chicago.html')
+    expect(processed.state).toBe('IL')
+  })
+
   it('uses normalized cityConfig when hints empty', async () => {
     const cfg: CityIngestionConfig = {
       ...config,

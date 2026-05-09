@@ -67,10 +67,31 @@ function titleCaseWord(word: string): string {
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
+function sanitizeCityArtifacts(value: string): string {
+  let candidate = value
+  const hasSlash = candidate.includes('/')
+  if (hasSlash) {
+    const segments = candidate.split('/').map((segment) => segment.trim()).filter(Boolean)
+    const usIndex = segments.findIndex((segment) => segment.toUpperCase() === 'US')
+    if (usIndex >= 0 && segments[usIndex + 2]) {
+      candidate = segments[usIndex + 2]
+    } else if (segments.length > 0) {
+      candidate = segments[segments.length - 1]
+    }
+  }
+  candidate = candidate
+    .replace(/[?#].*$/, '')
+    .replace(/\.(?:html?|php|aspx?)$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/[^\p{L}\p{M}'\s.-]/gu, ' ')
+  return collapseWhitespace(candidate)
+}
+
 /** Trim, collapse whitespace, naive title case per word. */
 export function normalizeIngestionCity(value: string | null): string | null {
   if (value == null) return null
-  const collapsed = collapseWhitespace(value.normalize('NFKC'))
+  const normalized = value.normalize('NFKC').replace(/\\+/g, '/')
+  const collapsed = sanitizeCityArtifacts(collapseWhitespace(normalized))
   if (!collapsed) return null
   return collapsed.split(/\s+/).map(titleCaseWord).join(' ')
 }

@@ -131,6 +131,27 @@ function normalizeCityFromPathSegment(segment) {
   return toTitleCase(cleaned);
 }
 
+function deriveCityStateFromUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl, window.location.origin);
+    const parts = url.pathname
+      .split("/")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => decodeURIComponent(p));
+    const usIndex = parts.findIndex((p) => p.toUpperCase() === "US");
+    if (usIndex >= 0 && parts[usIndex + 1] && parts[usIndex + 2]) {
+      return {
+        city: normalizeCityFromPathSegment(parts[usIndex + 2]),
+        state: normalizeStateFromName(parts[usIndex + 1]),
+      };
+    }
+  } catch {
+    // Ignore malformed URL and fall through.
+  }
+  return { city: "", state: "" };
+}
+
 function deriveCityStateFromPage() {
   const parts = window.location.pathname
     .split("/")
@@ -554,6 +575,7 @@ function extractImages() {
 function buildSubmissionPayload(session, currentUrl, selectedTags) {
   const addressRaw = extractAddress();
   const { city, state } = extractCityState(addressRaw);
+  const urlDerived = deriveCityStateFromUrl(currentUrl);
   const imageExtract = extractImages();
   console.log("City/state extracted:", { city, state });
 
@@ -568,8 +590,8 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
         addressRaw,
         dateRaw: extractDate(),
         imageSourceUrl: imageExtract.primary,
-        cityHint: city || session.city,
-        stateHint: state || session.state,
+        cityHint: city || urlDerived.city || session.city,
+        stateHint: state || urlDerived.state || session.state,
         rawPayload: {
           tags: selectedTags,
           collectedAt: Date.now(),
@@ -751,6 +773,8 @@ if (typeof globalThis !== "undefined") {
   globalThis.__LootAuraContentScriptTest = {
     isDescriptionNoiseLine,
     cleanExtractedDescription,
+    normalizeCityFromPathSegment,
+    deriveCityStateFromUrl,
   };
 }
 })();

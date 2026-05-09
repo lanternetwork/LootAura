@@ -455,4 +455,40 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].startDate).toBeUndefined()
     expect(listings[0].endDate).toBeUndefined()
   })
+
+  it('avoids cross-listing city contamination from config city on mixed-city links', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Plainfield/14030-S-Chatham-Ct/38720001/listing.html">Plainfield listing</a>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Joliet/201-W-Jefferson-St/38720002/listing.html">Joliet listing</a>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Tinley-Park/17345-67th-Ct/38720003/listing.html">Tinley Park listing</a>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Berkeley', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(3)
+    expect(listings.map((l) => l.city)).toEqual(['Plainfield', 'Joliet', 'Tinley Park'])
+    expect(listings.every((l) => l.state === 'IL')).toBe(true)
+  })
+
+  it('normalizes path city slug artifacts and never emits Chicago.html', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago.html/100-Main-St/38720004/listing.html">Listing</a>
+      </div>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago.html', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].city).toBe('Chicago')
+    expect(listings[0].city).not.toBe('Chicago.html')
+  })
 })

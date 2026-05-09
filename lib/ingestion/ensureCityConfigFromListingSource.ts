@@ -12,6 +12,7 @@
  */
 
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 
 type AdminDb = ReturnType<typeof getAdminDb>
 import { logger } from '@/lib/log'
@@ -69,8 +70,8 @@ export async function ensureIngestionCityConfigFromListingSource(
   if (args.sourcePlatform !== EXTERNAL_PAGE_SOURCE) {
     return { ok: false, reason: 'unsupported_source_platform' }
   }
-  const city = args.city.replace(/\s+/g, ' ').trim()
-  const stateCode = args.stateCode.trim().toUpperCase()
+  const city = normalizeIngestionCity(args.city) ?? ''
+  const stateCode = normalizeIngestionState(args.stateCode) ?? ''
   if (!city || !stateCode) {
     return { ok: false, reason: 'missing_city_or_state' }
   }

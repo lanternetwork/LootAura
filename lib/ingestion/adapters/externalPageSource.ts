@@ -4,6 +4,7 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
+import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v2'
@@ -372,6 +373,16 @@ function extractAddressFromNearbyText(nearbyText: string): string | null {
     }
   }
   return null
+}
+
+function extractCityStateFromAddressRaw(address: string | null): { city: string | null; state: string | null } {
+  if (!address) return { city: null, state: null }
+  const match = address.match(/,\s*([^,]+?),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?(?:,\s*USA)?$/i)
+  if (!match) return { city: null, state: null }
+  return {
+    city: normalizeIngestionCity(match[1] ?? null),
+    state: normalizeIngestionState(match[2] ?? null),
+  }
 }
 
 function decodeJsSingleQuotedJson(raw: string): string {
@@ -754,12 +765,19 @@ export function parseExternalPageSourceHtml(
       rawPayload.imageUrls = imageUrls
     }
 
+    const pathCity = normalizeIngestionCity(parts[2]?.replace(/-/g, ' ') ?? null)
+    const parsedFromAddress = extractCityStateFromAddressRaw(addressRaw)
+    const configCity = normalizeIngestionCity(config.city)
+    const configState = normalizeIngestionState(config.state)
+    const listingCity = parsedFromAddress.city || pathCity || configCity || config.city
+    const listingState = parsedFromAddress.state || configState || config.state
+
     listings.push({
       title,
       description,
       addressRaw,
-      city: config.city,
-      state: config.state,
+      city: listingCity,
+      state: listingState,
       ...(startDate ? { startDate } : {}),
       ...(endDate ? { endDate } : {}),
       sourceUrl: href,

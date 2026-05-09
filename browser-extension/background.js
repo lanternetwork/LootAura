@@ -1,7 +1,5 @@
 const LOOTAURA_ORIGIN =
-  "https://loot-aura-ivydqly0i-lanternetworks-projects.vercel.app";
-const MAX_PREFLIGHT_ATTEMPTS = 3;
-const PREFLIGHT_BACKOFF_MS = [1000, 2000, 5000];
+  "https://loot-aura-57cvpme72-lanternetworks-projects.vercel.app";
 /** Brief retries after programmatic inject (frame paint / SW timing). */
 const SEND_MESSAGE_RETRIES = 12;
 const SEND_MESSAGE_RETRY_MS = 150;
@@ -126,29 +124,12 @@ async function sendToLootAuraTab(tabId, message) {
   throw new Error(lastErr);
 }
 
-async function runPreflightWithRetry(tabId, payload) {
-  let attempt = 0;
-  while (attempt < MAX_PREFLIGHT_ATTEMPTS) {
-    attempt += 1;
-    const response = await sendToLootAuraTab(tabId, {
-      type: "PREFLIGHT_UPLOAD",
-      payload,
-      attempt,
-    });
-
-    const status = Number(response?.status || 0);
-    if (response?.ok) return response;
-    if (status !== 429) return response;
-
-    const backoff = PREFLIGHT_BACKOFF_MS[attempt - 1] || PREFLIGHT_BACKOFF_MS[PREFLIGHT_BACKOFF_MS.length - 1];
-    await delay(backoff);
-  }
-
-  return {
-    ok: false,
-    status: 429,
-    error: "Rate limited after preflight retries",
-  };
+/** Single POST — retries on 429 burn quota; server Retry-After reflects longest deny. */
+async function runPreflight(tabId, payload) {
+  return sendToLootAuraTab(tabId, {
+    type: "PREFLIGHT_UPLOAD",
+    payload,
+  });
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -166,7 +147,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       console.log("[LootAura][BG] LootAura tab found/created:", lootauraTab.id);
 
       if (msg.type === "PREFLIGHT_UPLOAD") {
-        const preflightResult = await runPreflightWithRetry(lootauraTab.id, msg.payload);
+        const preflightResult = await runPreflight(lootauraTab.id, msg.payload);
         sendResponse(preflightResult);
         return;
       }

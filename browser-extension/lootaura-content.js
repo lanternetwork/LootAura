@@ -25,10 +25,31 @@
         body: JSON.stringify(payload),
       });
 
-      return {
+      let retryAfterSec = null;
+      const retryHdr = res.headers.get("Retry-After");
+      if (retryHdr != null && retryHdr !== "") {
+        const n = parseInt(retryHdr, 10);
+        if (Number.isFinite(n)) retryAfterSec = n;
+      }
+      if (res.status === 429 && retryAfterSec == null) {
+        try {
+          const ct = res.headers.get("content-type") || "";
+          if (ct.includes("application/json")) {
+            const data = await res.clone().json();
+            if (data && typeof data.retryAfterSec === "number" && Number.isFinite(data.retryAfterSec)) {
+              retryAfterSec = Math.max(1, Math.floor(data.retryAfterSec));
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const base = {
         ok: res.status === 200 || res.status === 400,
         status: res.status,
       };
+      return retryAfterSec != null ? { ...base, retryAfterSec } : base;
     } catch (error) {
       return {
         ok: false,
@@ -58,7 +79,14 @@
             return;
           }
           if (result.status === 429) {
-            sendResponse({ ok: false, status: 429, error: "Rate limited" });
+            sendResponse({
+              ok: false,
+              status: 429,
+              error: "Rate limited",
+              ...(typeof result.retryAfterSec === "number"
+                ? { retryAfterSec: result.retryAfterSec }
+                : {}),
+            });
             return;
           }
           sendResponse(result);

@@ -402,7 +402,14 @@ async function startSession() {
     } else if (String(preflight?.error || "").toLowerCase().includes("csrf")) {
       alert("Missing CSRF token in LootAura tab.");
     } else if (status === 429) {
-      alert("Preflight rate-limited after retries. Try again shortly.");
+      const sec = preflight?.retryAfterSec;
+      if (typeof sec === "number" && sec > 0) {
+        alert(
+          `Preflight rate-limited. Try again in about ${sec} second${sec === 1 ? "" : "s"}.`
+        );
+      } else {
+        alert("Preflight rate-limited. Try again shortly.");
+      }
     } else {
       const detail =
         (preflight && typeof preflight.error === "string" && preflight.error) ||

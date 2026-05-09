@@ -387,8 +387,14 @@ function decodeJsSingleQuotedJson(raw: string): string {
 type MetadataSaleShape = {
   url?: unknown
   address?: unknown
+  title?: unknown
   date?: unknown
+  start_date?: unknown
+  startDate?: unknown
+  date_start?: unknown
   end_date?: unknown
+  endDate?: unknown
+  date_end?: unknown
   description?: unknown
   image?: unknown
   image_url?: unknown
@@ -408,6 +414,9 @@ function parseMetadataDateValue(raw: unknown): string | null {
     return epochSecondsToIsoDate(epoch)
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+    return trimmed.slice(0, 10)
+  }
   const extracted = extractDateRangeFromText(trimmed)
   return extracted.start ?? null
 }
@@ -460,17 +469,34 @@ function extractListingMetadataFromScripts(document: Document, pageUrl: string):
       const url = typeof sale?.url === 'string' ? normalizeListingUrlForLookup(sale.url) : null
       const address = typeof sale?.address === 'string' ? sale.address.replace(/\s+/g, ' ').trim() : null
       if (!url) continue
-      const fromEpoch = parseMetadataDateValue(sale?.date)
-      const endFromEpoch = parseMetadataDateValue(sale?.end_date)
+      const startFromFields = [
+        sale?.date,
+        sale?.start_date,
+        sale?.startDate,
+        sale?.date_start,
+      ]
+        .map(parseMetadataDateValue)
+        .find((value): value is string => typeof value === 'string' && value.length > 0)
+      const endFromFields = [
+        sale?.end_date,
+        sale?.endDate,
+        sale?.date_end,
+      ]
+        .map(parseMetadataDateValue)
+        .find((value): value is string => typeof value === 'string' && value.length > 0)
       const fromDescription =
         typeof sale?.description === 'string' ? extractDateRangeFromText(sale.description) : {}
+      const fromTitle =
+        typeof sale?.title === 'string' ? extractDateRangeFromText(sale.title) : {}
       const metadataImageUrls = collectMetadataImageUrls(sale, pageUrl)
       const info: MetadataSaleInfo = {
         ...(address ? { address } : {}),
-        ...(fromEpoch ? { startDate: fromEpoch } : {}),
-        ...(endFromEpoch ? { endDate: endFromEpoch } : {}),
+        ...(startFromFields ? { startDate: startFromFields } : {}),
+        ...(endFromFields ? { endDate: endFromFields } : {}),
         ...(metadataImageUrls.length > 0 ? { imageUrls: metadataImageUrls } : {}),
       }
+      if (!info.startDate && fromTitle.start) info.startDate = fromTitle.start
+      if (!info.endDate && fromTitle.end) info.endDate = fromTitle.end
       if (!info.startDate && fromDescription.start) info.startDate = fromDescription.start
       if (!info.endDate && fromDescription.end) info.endDate = fromDescription.end
       if (!info.startDate && info.endDate) info.startDate = info.endDate

@@ -335,6 +335,86 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].endDate).toBe('2026-05-09')
   })
 
+  it("parses Pre-Mother's Garage Sale metadata start/end_date fields", async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718701/userlisting.html?s=tl">Pre-Mother's Garage Sale</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718701/userlisting.html?s=tl","title":"Pre-Mother\\'s Garage Sale","address":"1409 W Arthur Ave, Chicago, IL","start_date":"2026-05-08","end_date":"2026-05-09"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe('2026-05-08')
+    expect(listings[0].endDate).toBe('2026-05-09')
+  })
+
+  it('parses multi Family yard sale metadata date_start/date_end fields', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718702/userlisting.html?s=tl">multi Family yard sale</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718702/userlisting.html?s=tl","title":"multi Family yard sale","address":"7217 S Seeley Ave, Chicago, IL","date_start":"2026-05-09","date_end":"2026-05-10"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe('2026-05-09')
+    expect(listings[0].endDate).toBe('2026-05-10')
+  })
+
+  it('parses Evanston Estate Sale metadata ISO datetime fields', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Evanston/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718703/userlisting.html?s=tl">Evanston Estate Sale</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Evanston/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718703/userlisting.html?s=tl","title":"Evanston Estate Sale","address":"2020 Central St, Evanston, IL","startDate":"2026-05-10T00:00:00.000Z","endDate":"2026-05-11T00:00:00.000Z"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Evanston', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe('2026-05-10')
+    expect(listings[0].endDate).toBe('2026-05-11')
+  })
+
+  it("parses CAIT'S estate sale dates from metadata title when description lacks date", async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div>
+        <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718704/userlisting.html?s=tl">CAIT'S estate sale examples</a>
+      </div>
+      <script>
+        const metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718704/userlisting.html?s=tl","title":"CAIT\\'S estate sale May 11-12, 2026","address":"5524 N Sawyer Ave, Chicago, IL","description":"Estate sale details posted soon"}]}';
+      </script>
+    `
+    const { listings } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Chicago', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(listings).toHaveLength(1)
+    expect(listings[0].startDate).toBe('2026-05-11')
+    expect(listings[0].endDate).toBe('2026-05-12')
+  })
+
   it('uses metadata image fields when nearby listing images are missing', async () => {
     const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
     const html = `

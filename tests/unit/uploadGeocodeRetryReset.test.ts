@@ -4,7 +4,7 @@ import {
   stripGeocodeFailedFromFailureReasons,
   priorIndicatesTerminalGeocodeFailureForRetryReset,
   shouldResetGeocodeRetryAfterUploadUpdate,
-} from '@/app/api/admin/ingested-sales/upload/route'
+} from '@/lib/ingestion/uploadGeocodeRetryReset'
 
 describe('stripGeocodeFailedFromFailureReasons', () => {
   it('removes geocode_failed and preserves other reasons', () => {

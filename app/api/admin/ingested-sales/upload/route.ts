@@ -17,37 +17,12 @@ import { geocodeIngestedSaleById } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 import type { RawExternalSale, IngestionRunSummary, CityIngestionConfig, FailureReason } from '@/lib/ingestion/types'
 import { ensureIngestionCityConfigFromListingSource } from '@/lib/ingestion/ensureCityConfigFromListingSource'
+import {
+  shouldResetGeocodeRetryAfterUploadUpdate,
+  stripGeocodeFailedFromFailureReasons,
+} from '@/lib/ingestion/uploadGeocodeRetryReset'
 
 export const dynamic = 'force-dynamic'
-
-/** Exported for unit tests — manual upload geocode retry reset after prior terminal geocode failure. */
-
-export function stripGeocodeFailedFromFailureReasons(reasons: FailureReason[]): FailureReason[] {
-  return reasons.filter((r) => r !== 'geocode_failed')
-}
-
-function priorFailureReasonsIncludeGeocodeFailed(reasons: unknown): boolean {
-  if (!Array.isArray(reasons)) return false
-  return reasons.some((x) => x === 'geocode_failed')
-}
-
-export function priorIndicatesTerminalGeocodeFailureForRetryReset(prior: {
-  status: string | null
-  failure_reasons: unknown
-  geocode_attempts: number | null
-}): boolean {
-  if ((prior.geocode_attempts ?? 0) >= 3) return true
-  if (prior.status === 'needs_check') return true
-  return priorFailureReasonsIncludeGeocodeFailed(prior.failure_reasons)
-}
-
-export function shouldResetGeocodeRetryAfterUploadUpdate(params: {
-  newStatus: string
-  prior: { status: string | null; failure_reasons: unknown; geocode_attempts: number | null }
-}): boolean {
-  if (params.newStatus !== 'needs_geocode') return false
-  return priorIndicatesTerminalGeocodeFailureForRetryReset(params.prior)
-}
 
 /** Structured errors for admin manual upload (extension + tools). */
 function manualUploadErrorJson(

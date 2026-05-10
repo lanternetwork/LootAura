@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 
+/** Expected to match `resolveYstmListingCityAuthorityJs` in `browser-extension/content-script.js`. */
 describe('resolveYstmListingCityAuthority', () => {
   it('prefers address tail when it conflicts with URL municipality and the street line is concrete', () => {
     const href =
@@ -13,6 +14,7 @@ describe('resolveYstmListingCityAuthority', () => {
     expect(r.cityConflict).toBe(true)
     expect(r.citySource).toBe('address_tail')
     expect(r.pathCitySlug).toBe('Fair-Oaks')
+    expect(r.streetConcrete).toBe(true)
   })
 
   it('prefers URL municipality when tail conflicts but street before tail is not concrete', () => {
@@ -22,6 +24,7 @@ describe('resolveYstmListingCityAuthority', () => {
     const r = resolveYstmListingCityAuthority(href, addressRaw)
     expect(r.resolvedCity).toBe('Fair Oaks')
     expect(r.citySource).toBe('listing_url')
+    expect(r.streetConcrete).toBe(false)
   })
 
   it('uses real city slug after hub when address tail matches URL (no conflict)', () => {
@@ -83,5 +86,6 @@ describe('resolveYstmListingCityAuthority', () => {
     expect(r.resolvedCity).toBe('Chicago')
     expect(r.pathCitySlug).toBe('Chicago')
     expect(r.hubSegment).toBe('Chicago.html')
+    expect(r.urlMunicipalityNormalized).toBe('Chicago')
   })
 })

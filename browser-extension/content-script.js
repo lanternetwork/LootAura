@@ -217,9 +217,23 @@ function extractAddressTailCityStateForAuthority(addressRaw) {
   };
 }
 
-/** Mirrors server `resolveYstmListingCityAuthority` for upload payloads. */
+/** Same predicate as server `hasConcreteStreetLineBeforeAddressTail`. */
+function hasConcreteStreetLineBeforeAddressTailJs(addressRaw) {
+  const s = String(addressRaw || "").trim();
+  if (!s) return false;
+  const m = s.match(/,\s*([^,]+?),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?(?:,\s*USA)?$/i);
+  if (!m || typeof m.index !== "number" || m.index === 0) return false;
+  const streetPart = s.slice(0, m.index).trim();
+  return /^\s*\d+\s+.+/.test(streetPart);
+}
+
+/**
+ * Mirrors server `resolveYstmListingCityAuthority` for upload payloads.
+ * Keep behavior aligned with `tests/unit/ystmListingCityAuthority.test.ts` (Vitest).
+ */
 function resolveYstmListingCityAuthorityJs(listingUrl, addressRaw) {
   const tail = extractAddressTailCityStateForAuthority(addressRaw || "");
+  const streetConcrete = hasConcreteStreetLineBeforeAddressTailJs(addressRaw || "");
   const parsed = parseYstmListingPathForPayload(listingUrl);
   if (!parsed) {
     const hasTail = Boolean(tail.addressTailCity && tail.addressTailState);
@@ -229,6 +243,7 @@ function resolveYstmListingCityAuthorityJs(listingUrl, addressRaw) {
       hubSegment: null,
       addressTailCity: tail.addressTailCity || null,
       cityConflict: false,
+      streetConcrete,
       citySource: hasTail ? "address_tail" : "none",
       stateSource: hasTail ? "address_tail" : "none",
       resolvedCity: tail.addressTailCity || "",
@@ -244,16 +259,30 @@ function resolveYstmListingCityAuthorityJs(listingUrl, addressRaw) {
   const cityConflict = Boolean(
     urlCity && addrCity && urlCity.toLowerCase() !== addrCity.toLowerCase()
   );
-  const resolvedCity = urlCity || addrCity || "";
-  const resolvedState = urlState || addrState || "";
+  let resolvedCity = "";
+  let resolvedState = "";
+  let citySource = "none";
+  let stateSource = "none";
+  if (cityConflict && streetConcrete && addrCity && addrState) {
+    resolvedCity = addrCity;
+    resolvedState = addrState;
+    citySource = "address_tail";
+    stateSource = "address_tail";
+  } else {
+    resolvedCity = urlCity || addrCity || "";
+    resolvedState = urlState || addrState || "";
+    citySource = urlCity ? "listing_url" : addrCity ? "address_tail" : "none";
+    stateSource = urlState ? "listing_url" : addrState ? "address_tail" : "none";
+  }
   return {
     isYstmPath: true,
     pathCitySlug: parsed.pathCitySlugRaw,
     hubSegment: parsed.hubSegment,
     addressTailCity: addrCity || null,
     cityConflict,
-    citySource: urlCity ? "listing_url" : addrCity ? "address_tail" : "none",
-    stateSource: urlState ? "listing_url" : addrState ? "address_tail" : "none",
+    streetConcrete,
+    citySource,
+    stateSource,
     resolvedCity,
     resolvedState,
     urlMunicipalityNormalized: urlCity,
@@ -1013,6 +1042,7 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
             hubSegment: auth.hubSegment,
             addressTailCity: auth.addressTailCity,
             cityConflict: auth.cityConflict,
+            streetConcrete: auth.streetConcrete,
             citySource: auth.citySource,
             stateSource: auth.stateSource,
             resolvedCity: auth.isYstmPath ? auth.resolvedCity : resolvedCity,

@@ -2,6 +2,7 @@ import { getNominatimEmail } from '@/lib/env'
 import { logger } from '@/lib/log'
 import { createHash } from 'node:crypto'
 import {
+  minimalNormalizeLocalityForPrimaryGeocode,
   normalizeIngestionCity,
   normalizeIngestionState,
   normalizeLocalityForGeocodeQuery,
@@ -19,6 +20,22 @@ export interface GeocodeAddressInput {
   address: string
   city: string
   state: string
+}
+
+/** `fallback_arbitrated` expands hyphenated localities for Nominatim; `primary` keeps visible tokens. */
+export type GeocodeMode = 'primary' | 'fallback_arbitrated'
+
+export interface GeocodeAddressOptions {
+  mode?: GeocodeMode
+}
+
+export type GeocodeQueryStrategy = 'minimal_locality' | 'normalize_locality'
+
+export interface GeocodeAttemptLog {
+  mode: GeocodeMode
+  queryStrategy: GeocodeQueryStrategy
+  queryString: string
+  queryFingerprint?: string
 }
 
 export interface GeocodeAddressResult {
@@ -64,6 +81,8 @@ export interface GeocodeAddressOutcome {
   geocodeCityRaw?: string
   /** City token after `normalizeLocalityForGeocodeQuery`; persisted on failed attempts only. */
   geocodeCityNormalized?: string
+  /** Single-attempt diagnostics (query text logged at info; fingerprint safe for DB). */
+  attemptLog?: GeocodeAttemptLog
 }
 
 function normalizeWhitespace(value: string): string {
@@ -130,10 +149,15 @@ function buildResidentialQuery(address: string, city: string, state: string, pos
  * Minimal provider wrapper for deferred ingestion geocoding.
  * This is intentionally isolated from ingestion parsing flow.
  */
-export async function geocodeAddress(input: GeocodeAddressInput): Promise<GeocodeAddressOutcome> {
+export async function geocodeAddress(
+  input: GeocodeAddressInput,
+  options?: GeocodeAddressOptions
+): Promise<GeocodeAddressOutcome> {
   const address = input.address.trim()
   const cityRaw = input.city.trim()
   const state = input.state.trim()
+  const mode: GeocodeMode = options?.mode ?? 'fallback_arbitrated'
+  const queryStrategy: GeocodeQueryStrategy = mode === 'primary' ? 'minimal_locality' : 'normalize_locality'
 
   if (!address || !cityRaw || !state) {
     logger.info('Nominatim geocode skipped (empty locality inputs)', {
@@ -142,6 +166,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       geocode_city_raw: cityRaw || undefined,
       geocode_city_normalized: undefined,
       queryFingerprint: undefined,
+      geocodeMode: mode,
+      queryStrategy,
       providerClassification: 'empty_results' as const,
     })
     return {
@@ -151,10 +177,18 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       providerClassification: 'empty_results',
       geocodeCityRaw: cityRaw || undefined,
       geocodeCityNormalized: undefined,
+      attemptLog: {
+        mode,
+        queryStrategy,
+        queryString: '',
+      },
     }
   }
 
-  const cityNormalized = normalizeLocalityForGeocodeQuery(cityRaw) ?? cityRaw
+  const cityNormalized =
+    mode === 'primary'
+      ? minimalNormalizeLocalityForPrimaryGeocode(cityRaw)
+      : (normalizeLocalityForGeocodeQuery(cityRaw) ?? cityRaw)
 
   try {
     const email = getNominatimEmail()
@@ -162,12 +196,21 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     const postalCode = postalCodeMatch?.[0] ?? null
     const query = buildResidentialQuery(address, cityNormalized, state, postalCode)
     const queryFingerprint = createHash('sha256').update(query.toLowerCase()).digest('hex').slice(0, 16)
+    const attemptLog: GeocodeAttemptLog = {
+      mode,
+      queryStrategy,
+      queryString: query,
+      queryFingerprint,
+    }
     logger.info('Nominatim geocode query prepared', {
       component: 'geocode/geocodeAddress',
       operation: 'nominatim_query',
       geocode_city_raw: cityRaw,
       geocode_city_normalized: cityNormalized,
       queryFingerprint,
+      geocodeMode: mode,
+      queryStrategy,
+      queryString: query,
     })
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
       query
@@ -198,6 +241,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         providerClassification: 'rate_limited',
         geocodeCityRaw: cityRaw,
         geocodeCityNormalized: cityNormalized,
+        attemptLog,
       }
     }
 
@@ -220,6 +264,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         providerClassification: 'http_not_ok',
         geocodeCityRaw: cityRaw,
         geocodeCityNormalized: cityNormalized,
+        attemptLog,
       }
     }
 
@@ -256,6 +301,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
           providerClassification: 'rate_limited_soft',
           geocodeCityRaw: cityRaw,
           geocodeCityNormalized: cityNormalized,
+          attemptLog,
         }
       }
       logger.info('Nominatim geocode outcome', {
@@ -274,6 +320,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         providerClassification: 'empty_results',
         geocodeCityRaw: cityRaw,
         geocodeCityNormalized: cityNormalized,
+        attemptLog,
       }
     }
 
@@ -296,6 +343,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         providerClassification: 'invalid_coordinates',
         geocodeCityRaw: cityRaw,
         geocodeCityNormalized: cityNormalized,
+        attemptLog,
       }
     }
 
@@ -353,6 +401,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         lowConfidenceReasons,
         geocodeCityRaw: cityRaw,
         geocodeCityNormalized: cityNormalized,
+        attemptLog,
       }
     }
 
@@ -372,6 +421,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       providerClassification: 'ok',
       geocodeCityRaw: cityRaw,
       geocodeCityNormalized: cityNormalized,
+      attemptLog,
     }
   } catch (error) {
     logger.error(
@@ -392,6 +442,11 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       providerClassification: 'fetch_exception',
       geocodeCityRaw: cityRaw,
       geocodeCityNormalized: cityNormalized,
+      attemptLog: {
+        mode,
+        queryStrategy,
+        queryString: '',
+      },
     }
   }
 }

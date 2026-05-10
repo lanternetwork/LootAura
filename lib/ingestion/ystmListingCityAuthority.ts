@@ -21,6 +21,8 @@ export type YstmListingCityAuthorityResult = {
   addressTailCity: string | null
   addressTailState: string | null
   cityConflict: boolean
+  /** True when trailing `, City, ST` exists and the pre-tail line matches `^\\s*\\d+\\s+.+`. */
+  streetConcrete: boolean
   citySource: YstmCitySource
   stateSource: YstmStateSource
   resolvedCity: string | null
@@ -119,6 +121,21 @@ export function parseYstmListingPathParts(listingUrl: string): {
   return { parts, pathCitySlugRaw, hubSegment, pathStateSegment, addressSlugSegment }
 }
 
+/**
+ * URL municipality + state from the listing path only (no address line).
+ * Always normalizes city so `.html` hub segments never leak (e.g. Chicago.html → Chicago).
+ */
+export function getYstmPathMunicipalityPreview(listingUrl: string): {
+  city: string | null
+  state: string | null
+} {
+  const parsed = parseYstmListingPathParts(listingUrl)
+  if (!parsed) return { city: null, state: null }
+  const pathStateNormalized = normalizeIngestionState(parsed.pathStateSegment?.replace(/-/g, ' ') ?? null)
+  const urlMunicipalityNormalized = normalizeIngestionCity(parsed.pathCitySlugRaw)
+  return { city: urlMunicipalityNormalized, state: pathStateNormalized }
+}
+
 export function resolveYstmListingCityAuthority(
   listingUrl: string,
   addressRaw: string | null
@@ -137,6 +154,7 @@ export function resolveYstmListingCityAuthority(
       addressTailCity: tail.addressTailCity,
       addressTailState: tail.addressTailState,
       cityConflict: false,
+      streetConcrete: hasConcreteStreetLineBeforeAddressTail(addressRaw),
       citySource: hasTail ? 'address_tail' : 'none',
       stateSource: hasTail ? 'address_tail' : 'none',
       resolvedCity: tail.addressTailCity,
@@ -180,6 +198,7 @@ export function resolveYstmListingCityAuthority(
     addressTailCity: addrCity,
     addressTailState: addrState,
     cityConflict,
+    streetConcrete,
     citySource,
     stateSource,
     resolvedCity,

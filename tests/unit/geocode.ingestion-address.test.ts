@@ -76,6 +76,31 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
     )
   })
 
+  it('primary mode keeps hyphenated locality visible (fallback path expands)', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress(
+      {
+        address: '100 North-Walk Rd, 95628',
+        city: 'Fair-Oaks',
+        state: 'CA',
+      },
+      { mode: 'primary' }
+    )
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    const decoded = decodeURIComponent(String(fetchCall).split('q=')[1]?.split('&')[0] ?? '')
+    expect(decoded).toContain('North-Walk')
+    expect(decoded).toContain('Fair-Oaks')
+    expect(decoded).not.toContain('Fair Oaks')
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Nominatim geocode query prepared',
+      expect.objectContaining({
+        geocodeMode: 'primary',
+        queryStrategy: 'minimal_locality',
+      })
+    )
+  })
+
   it('builds residential query with unit + zip context (does not drop apartment detail)', async () => {
     vi.resetModules()
     const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')

@@ -514,15 +514,23 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
       const normalizedTitle = cleanText(rawSale.title) || `${cityConfig.city} Yard Sale`
       const normalizedDescription = sanitizeUploadDescription(rawSale.description)
 
+      const mergedRawPayload =
+        rawSale.rawPayload && typeof rawSale.rawPayload === 'object' && !Array.isArray(rawSale.rawPayload)
+          ? { ...(rawSale.rawPayload as Record<string, unknown>) }
+          : {}
+      if (processed.ingestionDiagnostics) {
+        mergedRawPayload.ingestionDiagnostics = processed.ingestionDiagnostics
+      }
+
       const basePayload = {
         source_platform: rawSale.sourcePlatform,
         source_url: rawSale.sourceUrl,
         external_id: rawSale.externalId,
         raw_text: normalizedDescription,
-        raw_payload: rawSale.rawPayload,
+        raw_payload: mergedRawPayload,
         title: normalizedTitle,
         description: normalizedDescription,
-        address_raw: rawSale.addressRaw,
+        address_raw: processed.resolvedAddressRaw ?? rawSale.addressRaw,
         normalized_address: processed.normalizedAddress,
         city: processed.city,
         state: processed.state,

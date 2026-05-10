@@ -180,11 +180,14 @@ describe('geocodeIngestedSaleById', () => {
     const result = await geocodeIngestedSaleById('00000000-0000-4000-8000-000000000003')
 
     expect(result.outcome).toBe('success')
-    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
-      address: '10 Oak',
-      city: 'Louisville',
-      state: 'KY',
-    })
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith(
+      {
+        address: '10 Oak',
+        city: 'Louisville',
+        state: 'KY',
+      },
+      { mode: 'primary' }
+    )
     expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000003')
     const readyUpdate = hoisted.updatePayloads.find(
       (u) => u && typeof u === 'object' && 'lat' in (u as Record<string, unknown>)
@@ -232,11 +235,14 @@ describe('geocodeIngestedSaleById', () => {
     const result = await geocodeIngestedSaleById('00000000-0000-4000-8000-000000000004')
 
     expect(result.outcome).toBe('success')
-    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
-      address: '55 Raw St',
-      city: 'Louisville',
-      state: 'KY',
-    })
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith(
+      {
+        address: '55 Raw St',
+        city: 'Louisville',
+        state: 'KY',
+      },
+      { mode: 'primary' }
+    )
     const readyUpdate = hoisted.updatePayloads.find(
       (u) => u && typeof u === 'object' && 'lat' in (u as Record<string, unknown>)
     ) as Record<string, unknown> | undefined
@@ -266,14 +272,47 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     })
   })
 
-  it('batch geocode uses normalized_address when present', async () => {
+  it('batch geocode prefers address_raw when both raw and normalized exist', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b0',
+          normalized_address: '300 norm only',
+          address_raw: '300 Visible Raw Rd',
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push(
+      { data: { failure_details: null }, error: null },
+      { data: { id: '00000000-0000-4000-8000-0000000000b0' }, error: null }
+    )
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.35, lng: -85.05 }, hit429: false })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.succeeded).toBe(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith(
+      {
+        address: '300 Visible Raw Rd',
+        city: 'Louisville',
+        state: 'KY',
+      },
+      { mode: 'primary' }
+    )
+  })
+
+  it('batch geocode uses normalized_address when address_raw is null', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
           ...claimedRowBase,
           id: '00000000-0000-4000-8000-0000000000b1',
           normalized_address: '300 Batch Norm',
-          address_raw: 'ignored raw',
+          address_raw: null,
           geocode_attempts: 1,
         },
       ],
@@ -294,11 +333,14 @@ describe('geocodePendingSales (batch / RPC path)', () => {
 
     expect(summary.claimed).toBe(1)
     expect(summary.succeeded).toBe(1)
-    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
-      address: '300 Batch Norm',
-      city: 'Louisville',
-      state: 'KY',
-    })
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith(
+      {
+        address: '300 Batch Norm',
+        city: 'Louisville',
+        state: 'KY',
+      },
+      { mode: 'primary' }
+    )
     expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledWith('00000000-0000-4000-8000-0000000000b1')
   })
 
@@ -330,11 +372,14 @@ describe('geocodePendingSales (batch / RPC path)', () => {
 
     expect(summary.claimed).toBe(1)
     expect(summary.succeeded).toBe(1)
-    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
-      address: '400 Only Raw Rd',
-      city: 'Louisville',
-      state: 'KY',
-    })
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith(
+      {
+        address: '400 Only Raw Rd',
+        city: 'Louisville',
+        state: 'KY',
+      },
+      { mode: 'primary' }
+    )
   })
 
   it('tracks repeated empty-result retries in batch summary', async () => {
@@ -384,6 +429,8 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(geocode?.providerClassification).toBe('empty_results')
     expect(geocode?.queryFingerprint).toBe('abc123')
     expect(geocode?.attemptCount).toBe(2)
+    expect(geocode?.schema_version).toBe(2)
+    expect(Array.isArray((geocode as { attempts?: unknown }).attempts)).toBe(true)
   })
 
   it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {
@@ -547,11 +594,14 @@ describe('geocodePendingSales (batch / RPC path)', () => {
 
     expect(summary.claimed).toBe(1)
     expect(summary.succeeded).toBe(1)
-    expect(hoisted.geocodeAddress).toHaveBeenCalledWith({
-      address: '742 Evergreen Terrace',
-      city: 'Louisville',
-      state: 'KY',
-    })
+    expect(hoisted.geocodeAddress).toHaveBeenCalledWith(
+      {
+        address: '742 Evergreen Terrace',
+        city: 'Louisville',
+        state: 'KY',
+      },
+      { mode: 'primary' }
+    )
   })
 
   it('surfaces claim RPC errors (no silent empty-claim fallback)', async () => {
@@ -562,6 +612,66 @@ describe('geocodePendingSales (batch / RPC path)', () => {
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await expect(geocodePendingSales()).rejects.toThrow('rpc failed')
+  })
+
+  it('invokes fallback_arbitrated geocode only after primary fails when authority city differs', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000f1',
+          city: 'Orland Park',
+          normalized_address: '123 oak st',
+          address_raw: '123 Oak St, Palos Park, IL 60464',
+          source_url:
+            'https://yardsaletreasuremap.com/US/Illinois/Orland-Park/123-Oak-St/900/listing.html',
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push(
+      { data: { failure_details: null }, error: null },
+      { data: { id: '00000000-0000-4000-8000-0000000000f1' }, error: null }
+    )
+    hoisted.geocodeAddress.mockResolvedValueOnce({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'empty_results',
+      providerClassification: 'empty_results',
+      queryFingerprint: 'fp-primary',
+      geocodeCityRaw: 'Orland Park',
+      geocodeCityNormalized: 'Orland Park',
+      attemptLog: {
+        mode: 'primary',
+        queryStrategy: 'minimal_locality',
+        queryString: 'primary-q',
+        queryFingerprint: 'fp-primary',
+      },
+    })
+    hoisted.geocodeAddress.mockResolvedValueOnce({
+      coords: { lat: 41.62, lng: -87.85 },
+      hit429: false,
+      queryFingerprint: 'fp-fallback',
+      providerClassification: 'ok',
+      geocodeCityRaw: 'Palos Park',
+      geocodeCityNormalized: 'Palos Park',
+      attemptLog: {
+        mode: 'fallback_arbitrated',
+        queryStrategy: 'normalize_locality',
+        queryString: 'fallback-q',
+        queryFingerprint: 'fp-fallback',
+      },
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+    expect(summary.succeeded).toBe(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(2)
+    expect(hoisted.geocodeAddress.mock.calls[0]?.[1]).toEqual({ mode: 'primary' })
+    expect(hoisted.geocodeAddress.mock.calls[1]?.[1]).toEqual({ mode: 'fallback_arbitrated' })
+    expect(hoisted.geocodeAddress.mock.calls[0]?.[0]).toMatchObject({ city: 'Orland Park' })
+    expect(hoisted.geocodeAddress.mock.calls[1]?.[0]).toMatchObject({ city: 'Palos Park' })
   })
 
   it('failed low_confidence attempt persists lowConfidenceReasons on failure_details.geocode', async () => {

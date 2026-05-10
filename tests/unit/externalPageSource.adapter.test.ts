@@ -533,4 +533,57 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].rawPayload.hubSegment).toBe('Chicago.html')
     expect(listings[0].rawPayload.pathCitySlug).toBe('Park-City')
   })
+
+  it('hub Chicago.html then Lindenhurst never persists Chicago.html as city', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago.html/Lindenhurst/100-Main-St/38730012/listing.html">Sale</a>
+    `
+    const { listings, invalid } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Lindenhurst', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(invalid).toBe(0)
+    expect(listings).toHaveLength(1)
+    expect(listings[0].city).toBe('Lindenhurst')
+    expect(listings[0].city).not.toMatch(/\.html$/i)
+    expect(listings[0].addressRaw.toLowerCase()).toContain('lindenhurst')
+    const diag = listings[0].rawPayload.ingestionDiagnostics as {
+      authority?: { urlCity?: string | null; resolvedCity?: string }
+    }
+    expect(diag.authority?.urlCity).toBe('Lindenhurst')
+    expect(diag.authority?.resolvedCity).toBe('Lindenhurst')
+  })
+
+  it('does not apply shared metadata Munster address across different URL municipalities when slug supplies street', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <script>
+        const metadataStr = '{"sales":[
+          {"url":"https://yardsaletreasuremap.com/US/Indiana/Valparaiso/100-Main-St/201/listing.html","address":"900 Shared Rd, Munster, IN 46321","start_date":"2026-06-01","end_date":"2026-06-01"},
+          {"url":"https://yardsaletreasuremap.com/US/Indiana/Hobart/100-Main-St/202/listing.html","address":"900 Shared Rd, Munster, IN 46321","start_date":"2026-06-01","end_date":"2026-06-01"},
+          {"url":"https://yardsaletreasuremap.com/US/Indiana/Schererville/100-Main-St/203/listing.html","address":"900 Shared Rd, Munster, IN 46321","start_date":"2026-06-01","end_date":"2026-06-01"},
+          {"url":"https://yardsaletreasuremap.com/US/Indiana/Hammond/100-Main-St/204/listing.html","address":"900 Shared Rd, Munster, IN 46321","start_date":"2026-06-01","end_date":"2026-06-01"}
+        ]}';
+      </script>
+      <a href="https://yardsaletreasuremap.com/US/Indiana/Valparaiso/100-Main-St/201/listing.html">A</a>
+      <a href="https://yardsaletreasuremap.com/US/Indiana/Hobart/100-Main-St/202/listing.html">B</a>
+      <a href="https://yardsaletreasuremap.com/US/Indiana/Schererville/100-Main-St/203/listing.html">C</a>
+      <a href="https://yardsaletreasuremap.com/US/Indiana/Hammond/100-Main-St/204/listing.html">D</a>
+    `
+    const { listings, invalid } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Valparaiso', state: 'IN', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(invalid).toBe(0)
+    expect(listings).toHaveLength(4)
+    const cities = listings.map((l) => l.city).sort()
+    expect(cities).toEqual(['Hammond', 'Hobart', 'Schererville', 'Valparaiso'])
+    for (const l of listings) {
+      expect(l.addressRaw.toLowerCase()).not.toContain('munster')
+      expect(l.addressRaw.toLowerCase()).toContain(l.city.toLowerCase())
+    }
+  })
 })

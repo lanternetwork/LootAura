@@ -107,6 +107,17 @@ export function normalizeLocalityForGeocodeQuery(value: string | null): string |
   return normalizeIngestionCity(s)
 }
 
+/**
+ * First-pass geocode locality: trim, NFKC, collapse whitespace, strip trailing `.html` only.
+ * No hyphen-to-space expansion (that stays on the fallback / `normalizeLocalityForGeocodeQuery` path).
+ */
+export function minimalNormalizeLocalityForPrimaryGeocode(value: string | null): string {
+  if (value == null) return ''
+  let s = value.normalize('NFKC').replace(/[?#].*$/, '').trim()
+  s = collapseWhitespace(s).replace(/\.html?$/i, '')
+  return collapseWhitespace(s)
+}
+
 /** Trim, collapse whitespace, naive title case per word. */
 export function normalizeIngestionCity(value: string | null): string | null {
   if (value == null) return null

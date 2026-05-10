@@ -53,6 +53,8 @@ export interface RawExternalSale {
  */
 export interface ProcessedIngestedSale {
   normalizedAddress: string | null
+  /** Street line after slug recovery + optional `, City, ST` from URL path (upload path). */
+  resolvedAddressRaw: string | null
   city: string | null
   state: string | null
   lat: number | null
@@ -66,6 +68,8 @@ export interface ProcessedIngestedSale {
   status: IngestionStatus
   failureReasons: FailureReason[]
   parseConfidence: ParseConfidence
+  /** Merged into `raw_payload` on manual upload for observability. */
+  ingestionDiagnostics?: Record<string, unknown>
 }
 
 export interface IngestionRunSummary {

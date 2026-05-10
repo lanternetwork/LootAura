@@ -18,6 +18,7 @@ vi.mock('@/lib/log', () => ({
 function processedBase(overrides: Partial<ProcessedIngestedSale> = {}): ProcessedIngestedSale {
   return {
     normalizedAddress: '123 Main St',
+    resolvedAddressRaw: '123 Main St',
     city: 'Louisville',
     state: 'KY',
     lat: null,

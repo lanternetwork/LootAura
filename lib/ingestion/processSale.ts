@@ -1,7 +1,7 @@
 import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureReason } from '@/lib/ingestion/types'
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
-import { addressLineFromYstmListingUrlSlug } from '@/lib/ingestion/ystmAddressSlug'
+import { addressLineFromYstmListingUrlSlug, enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
 
 function cleanText(value: string | null): string | null {
   if (value == null) return null
@@ -318,7 +318,17 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     !hasStreetNumberAndName(addressRawClean) && rawSale.sourceUrl
       ? cleanText(addressLineFromYstmListingUrlSlug(rawSale.sourceUrl))
       : null
-  const addressRaw = addressRawClean || recoveredFromYstmSlug || null
+  let addressRaw = addressRawClean || recoveredFromYstmSlug || null
+  const addressSources: Array<'slug' | 'metadata' | 'slug_with_url_municipality'> = []
+  if (addressRawClean) addressSources.push('slug')
+  else if (recoveredFromYstmSlug) addressSources.push('slug')
+
+  const enriched = enrichStreetLineWithPathMunicipalityWhenNoTail(addressRaw, rawSale.sourceUrl ?? '')
+  addressRaw = enriched.line
+  if (enriched.appended) {
+    addressSources.push('slug_with_url_municipality')
+  }
+
   const parsedLocation = extractCityStateFromAddressRaw(addressRaw)
   const authority = resolveYstmListingCityAuthority(rawSale.sourceUrl ?? '', addressRaw)
 
@@ -326,7 +336,7 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
   let state: string | null
   if (authority.isYstmPath) {
     city =
-      authority.resolvedCity ??
+      normalizeIngestionCity(authority.resolvedCity) ??
       normalizeIngestionCity(cleanText(rawSale.cityHint)) ??
       normalizeIngestionCity(cleanText(cityConfig.city))
     state =
@@ -343,6 +353,20 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
   }
 
   const normalizedAddress = addressRaw?.toLowerCase().replace(/\s+/g, ' ') || null
+
+  const ingestionDiagnostics: Record<string, unknown> = {
+    addressSource:
+      addressSources.length === 0 ? 'none' : addressSources.length === 1 ? addressSources[0] : 'composite',
+    addressSources,
+    authority: {
+      urlCity: authority.urlMunicipalityNormalized,
+      addressTailCity: authority.addressTailCity,
+      resolvedCity: city,
+      citySource: authority.citySource,
+      cityConflict: authority.cityConflict,
+      streetConcrete: authority.streetConcrete,
+    },
+  }
   if (!hasStreetNumberAndName(addressRaw)) {
     failureReasons.push(addressRaw ? 'invalid_address_format' : 'missing_address')
   }
@@ -419,6 +443,7 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
 
   return {
     normalizedAddress,
+    resolvedAddressRaw: addressRaw,
     city,
     state,
     lat: null,
@@ -432,5 +457,6 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     status,
     failureReasons,
     parseConfidence,
+    ingestionDiagnostics,
   }
 }

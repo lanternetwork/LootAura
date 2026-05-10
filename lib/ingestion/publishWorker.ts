@@ -11,6 +11,7 @@ import type { FailureReason } from '@/lib/ingestion/types'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 import { mergeSanitizedCloudinaryIntoPublishable } from '@/lib/ingestion/sanitizePublishCloudinaryFallback'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+import { isPublishingRowStaleReclaimBlockedByPastEndDateValidation } from '@/lib/ingestion/publishClaimStale'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
@@ -39,6 +40,8 @@ interface ClaimedPublishRow {
   image_source_url?: string | null
   raw_payload?: unknown
   failure_reasons: unknown
+  /** Fetched after claim for stale-reclaim guardrails (not returned by claim RPC). */
+  failure_details?: unknown
 }
 
 /** Batch publish worker: one count set per `publishReadyIngestedSales()` invocation. */
@@ -89,6 +92,12 @@ function toFailureReasons(value: unknown): FailureReason[] {
 function appendFailureReason(reasons: FailureReason[], reason: FailureReason): FailureReason[] {
   if (reasons.includes(reason)) return reasons
   return [...reasons, reason]
+}
+
+/** Aligns with migration 166 / 165: drop publish_error, ensure sale_expired. */
+function mergeFailureReasonsForExpiredCleanup(existingFailureReasons: unknown): FailureReason[] {
+  const withoutPublishError = toFailureReasons(existingFailureReasons).filter((r) => r !== 'publish_error')
+  return appendFailureReason(withoutPublishError, 'sale_expired')
 }
 
 /** Stored on `ingested_sales.failure_details` — no raw addresses, titles, or URLs (ops-safe region only). */
@@ -213,6 +222,60 @@ export async function tryPersistPublishFailedWhilePublishing(
         'tryPersistPublishFailedWhilePublishing failed after guarded retries',
         new Error(error.message),
         { component: 'ingestion/publishWorker', operation: logContext.operation, rowId, phase: logContext.phase }
+      )
+    }
+  }
+  return false
+}
+
+/**
+ * Stuck `publishing` rows that already recorded validation `past_end_date` must become `expired`
+ * without rewriting `failure_details` (historical cleanup: migration 166).
+ */
+async function tryPersistExpiredFromPublishingPreservingFailureDetails(
+  rowId: string,
+  existingFailureReasons: unknown,
+  operation: string
+): Promise<boolean> {
+  const admin = getAdminDb()
+  const failure_reasons = mergeFailureReasonsForExpiredCleanup(existingFailureReasons)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let error: { message: string } | null = null
+    try {
+      const result = await fromBase(admin, 'ingested_sales')
+        .update({ status: 'expired', failure_reasons })
+        .eq('id', rowId)
+        .eq('status', 'publishing')
+      error = result?.error ?? null
+    } catch (thrown) {
+      error = { message: thrown instanceof Error ? thrown.message : String(thrown) }
+      logger.error(
+        'tryPersistExpiredFromPublishingPreservingFailureDetails guarded update threw',
+        thrown instanceof Error ? thrown : new Error(String(thrown)),
+        {
+          component: 'ingestion/publishWorker',
+          operation,
+          rowId,
+          attempt: attempt + 1,
+        }
+      )
+    }
+    if (!error) {
+      logger.info(
+        'ingested_sales expired (legacy publishing validation past_end_date; failure_details preserved)',
+        {
+          component: 'ingestion/publishWorker',
+          operation,
+          rowId,
+        }
+      )
+      return true
+    }
+    if (attempt === 1) {
+      logger.error(
+        'tryPersistExpiredFromPublishingPreservingFailureDetails failed after guarded retries',
+        new Error(error.message),
+        { component: 'ingestion/publishWorker', operation, rowId }
       )
     }
   }
@@ -974,6 +1037,34 @@ async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<
   })
 }
 
+async function attachFailureDetailsToClaimedPublishRows(rows: ClaimedPublishRow[]): Promise<ClaimedPublishRow[]> {
+  if (rows.length === 0) return rows
+  const admin = getAdminDb()
+  const ids = rows.map((r) => r.id)
+  const { data, error } = await fromBase(admin, 'ingested_sales')
+    .select('id, failure_details')
+    .in('id', ids)
+  if (error || !Array.isArray(data)) {
+    logger.warn('Publish worker failure_details attach failed; stale reclaim guard may miss rows', {
+      component: 'ingestion/publishWorker',
+      operation: 'attach_failure_details_claimed_rows',
+      rowCount: rows.length,
+      message: error?.message ?? 'non_array_attach_result',
+    })
+    return rows
+  }
+  const byId = new Map<string, unknown>()
+  for (const row of data as Array<{ id?: string; failure_details?: unknown }>) {
+    if (row?.id) {
+      byId.set(row.id, row.failure_details ?? null)
+    }
+  }
+  return rows.map((row) => ({
+    ...row,
+    failure_details: byId.has(row.id) ? byId.get(row.id) : row.failure_details,
+  }))
+}
+
 function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngestedSale {
   const dateStart = coerceIngestedDateToYyyyMmDd(record.date_start) ?? (record.date_start as string)
   const dateEnd = coerceIngestedDateToYyyyMmDd(record.date_end) ?? (record.date_end as string | null)
@@ -1364,7 +1455,8 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
     throw error
   }
 
-  const claimedRows = await hydrateClaimedRowsRawPayload((Array.isArray(data) ? data : []) as ClaimedPublishRow[])
+  const hydrated = await hydrateClaimedRowsRawPayload((Array.isArray(data) ? data : []) as ClaimedPublishRow[])
+  const claimedRows = await attachFailureDetailsToClaimedPublishRows(hydrated)
   const summary: PublishWorkerBatchSummary = {
     attempted: claimedRows.length,
     succeeded: 0,
@@ -1374,6 +1466,20 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
   }
 
   for (const row of claimedRows) {
+    if (isPublishingRowStaleReclaimBlockedByPastEndDateValidation(row.failure_details)) {
+      const closed = await tryPersistExpiredFromPublishingPreservingFailureDetails(
+        row.id,
+        row.failure_reasons,
+        'legacy_validation_past_end_date_batch'
+      )
+      if (closed) {
+        summary.expired += 1
+      } else {
+        summary.failed += 1
+      }
+      continue
+    }
+
     if (hasPastEndDate(row.date_end)) {
       await markIngestedExpiredPastEndDate(
         row.id,

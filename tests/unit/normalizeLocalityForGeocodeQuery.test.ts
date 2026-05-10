@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
+import {
+  minimalNormalizeLocalityForPrimaryGeocode,
+  normalizeLocalityForGeocodeQuery,
+} from '@/lib/ingestion/normalizeIngestionLocation'
 
 describe('normalizeLocalityForGeocodeQuery', () => {
   it('expands slug-style hyphenated locality names (production pathCitySlug patterns)', () => {
@@ -24,5 +27,15 @@ describe('normalizeLocalityForGeocodeQuery', () => {
     expect(normalizeLocalityForGeocodeQuery(null)).toBeNull()
     expect(normalizeLocalityForGeocodeQuery('')).toBeNull()
     expect(normalizeLocalityForGeocodeQuery('   ')).toBeNull()
+  })
+})
+
+describe('minimalNormalizeLocalityForPrimaryGeocode', () => {
+  it('preserves hyphenated locality tokens (first-pass visible municipality)', () => {
+    expect(minimalNormalizeLocalityForPrimaryGeocode('Fair-Oaks')).toBe('Fair-Oaks')
+  })
+
+  it('strips trailing .html and collapses whitespace', () => {
+    expect(minimalNormalizeLocalityForPrimaryGeocode('  Chicago.html  ')).toBe('Chicago')
   })
 })

@@ -4,8 +4,13 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
-import { parseYstmListingPathParts, resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
-import { slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
+import {
+  getYstmPathMunicipalityPreview,
+  parseYstmListingPathParts,
+  resolveYstmListingCityAuthority,
+} from '@/lib/ingestion/ystmListingCityAuthority'
+import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
+import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v2'
@@ -506,6 +511,50 @@ function extractListingMetadataFromScripts(document: Document, pageUrl: string):
   return out
 }
 
+/**
+ * Metadata sometimes repeats one `address` across many `sales[]` rows whose `url` paths imply
+ * different municipalities. Treat that address string as untrusted for per-row `address_raw`.
+ */
+function collectUntrustedSharedMetadataAddressKeys(document: Document): Set<string> {
+  const addrToMunis = new Map<string, Set<string>>()
+  const scripts = Array.from(document.querySelectorAll('script'))
+
+  for (const script of scripts) {
+    const text = script.textContent || ''
+    const m = text.match(/metadataStr\s*=\s*'([\s\S]*?)';/)
+    if (!m?.[1]) continue
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(decodeJsSingleQuotedJson(m[1]))
+    } catch {
+      continue
+    }
+    if (!parsed || typeof parsed !== 'object') continue
+
+    const sales = (parsed as { sales?: unknown }).sales
+    if (!Array.isArray(sales)) continue
+
+    for (const sale of sales as MetadataSaleShape[]) {
+      const url = typeof sale?.url === 'string' ? normalizeListingUrlForLookup(sale.url) : null
+      const address = typeof sale?.address === 'string' ? sale.address.replace(/\s+/g, ' ').trim() : null
+      if (!url || !address) continue
+      const preview = getYstmPathMunicipalityPreview(url)
+      const muniKey = preview.city ? preview.city.toLowerCase() : ''
+      if (!muniKey) continue
+      const addrKey = address.toLowerCase()
+      if (!addrToMunis.has(addrKey)) addrToMunis.set(addrKey, new Set())
+      addrToMunis.get(addrKey)!.add(muniKey)
+    }
+  }
+
+  const untrusted = new Set<string>()
+  for (const [addrKey, set] of addrToMunis) {
+    if (set.size > 1) untrusted.add(addrKey)
+  }
+  return untrusted
+}
+
 function collectNearbyText(anchor: Element, maxDepth: number): string {
   const parts: string[] = []
   let el: Element | null = anchor
@@ -658,6 +707,7 @@ export function parseExternalPageSourceHtml(
   const { document } = dom.window
   const fullText = document.body?.textContent || ''
   const metadataByListing = extractListingMetadataFromScripts(document, pageUrl)
+  const untrustedMetadataAddresses = collectUntrustedSharedMetadataAddressKeys(document)
   const anchors = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="listing.html"], a[href*="userlisting.html"]'
   )
@@ -681,6 +731,8 @@ export function parseExternalPageSourceHtml(
 
     const addressSlug = pathInfo.addressSlugSegment
     let addressRaw = addressSlug ? slugSegmentToAddressLine(addressSlug) : null
+    const addressSources: Array<'slug' | 'nearby' | 'fallback' | 'metadata' | 'slug_with_url_municipality'> = []
+    if (addressRaw) addressSources.push('slug')
 
     let title = (a.textContent || '').replace(/\s+/g, ' ').trim()
     title = title.replace(/[\u200b\s]+$/g, '').replace(/^[\s\u200b]+/g, '')
@@ -699,9 +751,9 @@ export function parseExternalPageSourceHtml(
     const nearbyAddress = extractAddressFromNearbyText(nearby)
     if (!addressRaw && nearbyAddress) {
       addressRaw = nearbyAddress
+      addressSources.push('nearby')
     }
     let { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
-    const description = cleanDescriptionText(nearby, addressRaw, config.city, config.state)
     let imageUrls = collectImageUrlsForListing(a, document, pageUrl, 3)
 
     // Fallback extraction when critical fields are missing from the primary parse.
@@ -709,6 +761,7 @@ export function parseExternalPageSourceHtml(
       const fallback = extractFallbackAddressAndDates(fullText, config.city, config.state)
       if (!addressRaw && fallback.address) {
         addressRaw = fallback.address
+        addressSources.push('fallback')
       }
       if (!startDate && fallback.start) {
         startDate = fallback.start
@@ -725,7 +778,14 @@ export function parseExternalPageSourceHtml(
       const byUrl = metadataByListing.get(`url:${normalizedHref}`) ?? null
       const meta = byId ?? byUrl
       if (meta) {
-        if (!addressRaw && meta.address) addressRaw = meta.address
+        const metaAddr = meta.address?.replace(/\s+/g, ' ').trim() ?? ''
+        const metaTrusted =
+          Boolean(metaAddr) &&
+          !untrustedMetadataAddresses.has(metaAddr.toLowerCase())
+        if (!addressRaw && meta.address && metaTrusted) {
+          addressRaw = meta.address
+          addressSources.push('metadata')
+        }
         if (!startDate && meta.startDate) startDate = meta.startDate
         if (!endDate && meta.endDate) endDate = meta.endDate
         if (imageUrls.length === 0 && Array.isArray(meta.imageUrls) && meta.imageUrls.length > 0) {
@@ -733,11 +793,26 @@ export function parseExternalPageSourceHtml(
         }
       }
     }
+
+    const enriched = enrichStreetLineWithPathMunicipalityWhenNoTail(addressRaw, href)
+    addressRaw = enriched.line
+    if (enriched.appended) {
+      addressSources.push('slug_with_url_municipality')
+    }
+
     const authority = resolveYstmListingCityAuthority(href, addressRaw)
     if (!authority.resolvedCity || !authority.resolvedState) {
       invalid += 1
       continue
     }
+
+    const resolvedCitySafe = normalizeIngestionCity(authority.resolvedCity) ?? authority.resolvedCity
+    const description = cleanDescriptionText(
+      nearby,
+      addressRaw,
+      resolvedCitySafe,
+      authority.resolvedState
+    )
 
     const rawPayload: Record<string, unknown> = {
       adapter: ADAPTER_ID,
@@ -749,9 +824,21 @@ export function parseExternalPageSourceHtml(
       cityConflict: authority.cityConflict,
       citySource: authority.citySource,
       stateSource: authority.stateSource,
-      resolvedCity: authority.resolvedCity,
+      resolvedCity: resolvedCitySafe,
       resolvedState: authority.resolvedState,
       urlMunicipalityNormalized: authority.urlMunicipalityNormalized,
+      ingestionDiagnostics: {
+        addressSource: addressSources.length === 0 ? 'none' : addressSources.length === 1 ? addressSources[0] : 'composite',
+        addressSources,
+        authority: {
+          urlCity: authority.urlMunicipalityNormalized,
+          addressTailCity: authority.addressTailCity,
+          resolvedCity: resolvedCitySafe,
+          citySource: authority.citySource,
+          cityConflict: authority.cityConflict,
+          streetConcrete: authority.streetConcrete,
+        },
+      },
     }
     if (imageUrls.length > 0) {
       rawPayload.imageUrls = imageUrls
@@ -761,7 +848,7 @@ export function parseExternalPageSourceHtml(
       title,
       description,
       addressRaw,
-      city: authority.resolvedCity,
+      city: resolvedCitySafe,
       state: authority.resolvedState,
       ...(startDate ? { startDate } : {}),
       ...(endDate ? { endDate } : {}),
@@ -806,6 +893,7 @@ function buildRowRawPayload(
     urlMunicipalityNormalized?: unknown
     imageUrls?: unknown
     adapter?: unknown
+    ingestionDiagnostics?: unknown
   }
   const out: Record<string, unknown> = {
     adapter: typeof rp.adapter === 'string' ? rp.adapter : ADAPTER_ID,
@@ -824,6 +912,7 @@ function buildRowRawPayload(
       resolvedCity: rp.resolvedCity ?? null,
       resolvedState: rp.resolvedState ?? null,
       urlMunicipalityNormalized: rp.urlMunicipalityNormalized ?? null,
+      ingestionDiagnostics: rp.ingestionDiagnostics ?? null,
     },
   }
   if (Array.isArray(rp.imageUrls) && rp.imageUrls.length > 0) {
@@ -956,7 +1045,9 @@ export async function persistExternalPageSource(
         title: listing.title,
         description: listing.description,
         address_raw: listing.addressRaw,
-        normalized_address: null,
+        normalized_address: listing.addressRaw
+          ? listing.addressRaw.toLowerCase().replace(/\s+/g, ' ')
+          : null,
         city: listing.city,
         state: listing.state,
         zip_code: null,

@@ -136,6 +136,21 @@ describe('processIngestedSale — city/state normalization', () => {
     expect(processed.state).toBe('IL')
   })
 
+  it('YSTM: Midlothian path vs Palos Heights in address tail uses Palos Heights for concrete street', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl:
+          'https://yardsaletreasuremap.com/US/Illinois/Midlothian/456-Elm-Ave/888/listing.html',
+        addressRaw: '456 Elm Ave, Palos Heights, IL 60463',
+        cityHint: 'Midlothian',
+        stateHint: 'IL',
+      }),
+      config
+    )
+    expect(processed.city).toBe('Palos Heights')
+    expect(processed.state).toBe('IL')
+  })
+
   it('recovers address from YSTM listing slug when addressRaw missing but slug is a concrete street', async () => {
     const processed = await processIngestedSale(
       raw({
@@ -147,9 +162,16 @@ describe('processIngestedSale — city/state normalization', () => {
       }),
       config
     )
-    expect(processed.normalizedAddress).toContain('15200 s 80th ave')
+    expect(processed.resolvedAddressRaw).toMatch(/15200 s 80th ave.*chicago.*il/i)
+    expect(processed.normalizedAddress).toMatch(/15200 s 80th ave.*chicago.*il/i)
     expect(processed.status).toBe('needs_geocode')
     expect(processed.failureReasons).not.toContain('missing_address')
+    const diag = processed.ingestionDiagnostics as {
+      addressSources?: string[]
+      authority?: { streetConcrete?: boolean }
+    }
+    expect(diag.addressSources).toContain('slug_with_url_municipality')
+    expect(diag.authority?.streetConcrete).toBe(true)
   })
 
   it('extension-style rawPayload is optional; sourceUrl + addressRaw drive YSTM authority', async () => {

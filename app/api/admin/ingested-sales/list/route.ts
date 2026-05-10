@@ -113,6 +113,6 @@ async function listIngestedSalesHandler(request: NextRequest) {
 }
 
 export const GET = withRateLimit(listIngestedSalesHandler, [
-  Policies.ADMIN_TOOLS,
-  Policies.ADMIN_HOURLY,
+  Policies.MANUAL_INGESTION_BURST,
+  Policies.MANUAL_INGESTION_HOURLY,
 ])

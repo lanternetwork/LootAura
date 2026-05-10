@@ -33,6 +33,9 @@ export const Policies = {
   RATING_HOURLY:      { name: 'RATING_HOURLY',    limit: 50, windowSec: 3600, scope: 'user' as const },
   ADMIN_TOOLS:       { name: 'ADMIN_TOOLS',       limit: 3,  windowSec: 30, scope: 'ip' as const },
   ADMIN_HOURLY:      { name: 'ADMIN_HOURLY',      limit: 60, windowSec: 3600, scope: 'ip' as const },
+  /** Manual ingestion (extension + admin tools): list + upload only — higher burst for city-scale ops. */
+  MANUAL_INGESTION_BURST:  { name: 'MANUAL_INGESTION_BURST',  limit: 30, windowSec: 30, scope: 'ip' as const },
+  MANUAL_INGESTION_HOURLY: { name: 'MANUAL_INGESTION_HOURLY', limit: 600, windowSec: 3600, scope: 'ip' as const },
   UNSUBSCRIBE_EMAIL: { name: 'UNSUBSCRIBE_EMAIL', limit: 5,  windowSec: 900, scope: 'ip' as const }, // 5 requests per 15 minutes
   REPORT_SALE:       { name: 'REPORT_SALE',       limit: 5,  windowSec: 3600, scope: 'user' as const }, // 5 reports per hour per user
   ACCOUNT_DELETION:  { name: 'ACCOUNT_DELETION',  limit: 2,  windowSec: 3600, scope: 'user' as const }, // 2 requests per hour per user (anti-spam)

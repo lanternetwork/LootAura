@@ -756,5 +756,8 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
   })
 }
 
-export const POST = withRateLimit(uploadHandler, [Policies.ADMIN_TOOLS, Policies.ADMIN_HOURLY])
+export const POST = withRateLimit(uploadHandler, [
+  Policies.MANUAL_INGESTION_BURST,
+  Policies.MANUAL_INGESTION_HOURLY,
+])
 

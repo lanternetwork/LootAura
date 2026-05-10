@@ -101,8 +101,7 @@ export function buildGeocodeAttemptPlan(row: {
       : null
   const resolved =
     normalizeIngestionCity(auth?.resolvedCity ?? null) ??
-    auth?.resolvedCity?.trim() ||
-    null
+    (auth?.resolvedCity?.trim() || null)
   const fallbackCity = (resolved && resolved.length > 0 ? resolved : rowCity) || rowCity
   const fallbackMunicipalitySource: GeocodeMunicipalitySource =
     resolved && resolved.length > 0 ? 'authority_resolved' : 'row_city'

@@ -4,6 +4,7 @@ import {
   type GeocodeAddressOutcome,
   type GeocodeMode,
 } from '@/lib/geocode/geocodeAddress'
+import { stripUnitDesignatorFromAddressLineForGeocode } from '@/lib/geocode/stripUnitDesignatorForGeocode'
 import { logger } from '@/lib/log'
 import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
 import {
@@ -17,8 +18,10 @@ import type { FailureReason } from '@/lib/ingestion/types'
 export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION = 1 as const
 export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_V2 = 2 as const
 
+export type GeocodeAttemptStrategy = GeocodeMode | 'unit_stripped'
+
 export type GeocodeAttemptDiagnostic = {
-  strategy: GeocodeMode
+  strategy: GeocodeAttemptStrategy
   queryStrategy: 'minimal_locality' | 'normalize_locality'
   addressSource: string
   municipalitySource: string
@@ -92,10 +95,11 @@ function toGeocodeAttemptDiagnostic(
   plan: ReturnType<typeof buildGeocodeAttemptPlan>,
   municipalitySource: string,
   mode: GeocodeMode,
-  fallbackArbitrationApplied: boolean
+  fallbackArbitrationApplied: boolean,
+  diagnosticStrategy?: GeocodeAttemptStrategy
 ): GeocodeAttemptDiagnostic {
   return {
-    strategy: mode,
+    strategy: diagnosticStrategy ?? mode,
     queryStrategy:
       geo.attemptLog?.queryStrategy ?? (mode === 'primary' ? 'minimal_locality' : 'normalize_locality'),
     addressSource: plan.addressLineSource,
@@ -674,18 +678,44 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
     city: string,
     mode: GeocodeMode,
     municipalitySource: string,
-    fallbackArbitrationApplied: boolean
+    fallbackArbitrationApplied: boolean,
+    opts?: { addressLine?: string; diagnosticStrategy?: GeocodeAttemptStrategy }
   ): Promise<GeocodeAddressOutcome> => {
-    const out = await geocodeAddress(
-      { address: plan.addressLine, city, state: plan.state },
-      { mode }
+    const address = opts?.addressLine ?? plan.addressLine
+    const out = await geocodeAddress({ address, city, state: plan.state }, { mode })
+    attemptDiagnostics.push(
+      toGeocodeAttemptDiagnostic(
+        out,
+        plan,
+        municipalitySource,
+        mode,
+        fallbackArbitrationApplied,
+        opts?.diagnosticStrategy
+      )
     )
-    attemptDiagnostics.push(toGeocodeAttemptDiagnostic(out, plan, municipalitySource, mode, fallbackArbitrationApplied))
     return out
   }
 
   if (plan.addressLine && plan.primaryCity && plan.state) {
     geo = await runGeocode(plan.primaryCity, 'primary', plan.primaryMunicipalitySource, false)
+  }
+
+  if (
+    geo &&
+    !geo.coords &&
+    !geo.hit429 &&
+    geo.noCoordsReason === 'empty_results' &&
+    plan.addressLine &&
+    plan.primaryCity &&
+    plan.state
+  ) {
+    const stripped = stripUnitDesignatorFromAddressLineForGeocode(plan.addressLine)
+    if (stripped) {
+      geo = await runGeocode(plan.primaryCity, 'primary', plan.primaryMunicipalitySource, false, {
+        addressLine: stripped,
+        diagnosticStrategy: 'unit_stripped',
+      })
+    }
   }
 
   if (

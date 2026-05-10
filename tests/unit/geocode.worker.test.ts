@@ -433,6 +433,216 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(Array.isArray((geocode as { attempts?: unknown }).attempts)).toBe(true)
   })
 
+  it('after primary empty_results, retries with unit stripped and records unit_stripped in v2 attempts', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000u1',
+          city: 'Mokena',
+          state: 'IL',
+          normalized_address: null,
+          address_raw: '11020 Front St Unit A, Mokena, IL',
+          source_url:
+            'https://yardsaletreasuremap.com/US/Illinois/Mokena/11020-Front-St/1/listing.html',
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({ data: { failure_details: null }, error: null })
+    hoisted.geocodeAddress
+      .mockResolvedValueOnce({
+        coords: null,
+        hit429: false,
+        noCoordsReason: 'empty_results',
+        providerClassification: 'empty_results',
+        queryFingerprint: 'fp-primary',
+        geocodeCityRaw: 'Mokena',
+        geocodeCityNormalized: 'Mokena',
+        attemptLog: {
+          mode: 'primary',
+          queryStrategy: 'minimal_locality',
+          queryString: '11020 Front St Unit A, Mokena, IL, USA',
+          queryFingerprint: 'fp-primary',
+        },
+      })
+      .mockResolvedValueOnce({
+        coords: null,
+        hit429: false,
+        noCoordsReason: 'empty_results',
+        providerClassification: 'empty_results',
+        queryFingerprint: 'fp-unit',
+        geocodeCityRaw: 'Mokena',
+        geocodeCityNormalized: 'Mokena',
+        attemptLog: {
+          mode: 'primary',
+          queryStrategy: 'minimal_locality',
+          queryString: '11020 Front St, Mokena, IL, USA',
+          queryFingerprint: 'fp-unit',
+        },
+      })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(2)
+    expect(hoisted.geocodeAddress.mock.calls[0]?.[0].address).toContain('Unit A')
+    expect(hoisted.geocodeAddress.mock.calls[1]?.[0].address).toBe('11020 Front St, Mokena, IL')
+
+    const diagUpdate = hoisted.updatePayloads.find(
+      (u) =>
+        u &&
+        typeof u === 'object' &&
+        (u as Record<string, unknown>).failure_details != null &&
+        typeof (u as Record<string, unknown>).failure_details === 'object' &&
+        'geocode' in ((u as Record<string, unknown>).failure_details as object)
+    ) as Record<string, unknown> | undefined
+    const geocode = (diagUpdate?.failure_details as { geocode?: { attempts?: unknown[] } })?.geocode
+    expect(geocode?.attempts?.[0]).toMatchObject({ strategy: 'primary', resultType: 'empty_results' })
+    expect(geocode?.attempts?.[1]).toMatchObject({
+      strategy: 'unit_stripped',
+      resultType: 'empty_results',
+      queryString: '11020 Front St, Mokena, IL, USA',
+      queryFingerprint: 'fp-unit',
+    })
+  })
+
+  it('does not unit-strip after primary success', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000u2',
+          normalized_address: '9 Oak Unit Z',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push(
+      { data: { failure_details: null }, error: null },
+      { data: { id: '00000000-0000-4000-8000-0000000000u2' }, error: null }
+    )
+    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 1, lng: 2 }, hit429: false })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not unit-strip after primary 429', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000u3',
+          normalized_address: '9 Oak Unit Z',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({ data: { failure_details: null }, error: null })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: true,
+      noCoordsReason: 'rate_limited',
+      providerClassification: 'rate_limited',
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not unit-strip after primary http_not_ok', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000u4',
+          normalized_address: '9 Oak Unit Z',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({ data: { failure_details: null }, error: null })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'http_not_ok',
+      providerClassification: 'http_not_ok',
+      httpStatus: 500,
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not unit-strip after primary fetch_exception', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000u5',
+          normalized_address: '9 Oak Unit Z',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({ data: { failure_details: null }, error: null })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'fetch_exception',
+      providerClassification: 'fetch_exception',
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not unit-strip after primary low_confidence', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000u6',
+          normalized_address: '9 Oak Unit Z',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({ data: { failure_details: null }, error: null })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'low_confidence',
+      providerClassification: 'low_confidence',
+      lowConfidenceReasons: ['broad_match'],
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+  })
+
   it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [

@@ -417,10 +417,24 @@ function utcTodayDateString(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function hasPastEndDate(dateEnd: string | null): boolean {
-  if (!dateEnd) return false
+/** Normalize Postgres `date` / ISO timestamp strings to `YYYY-MM-DD` for calendar compare and Zod publish. */
+function coerceIngestedDateToYyyyMmDd(value: unknown): string | null {
+  if (value == null) return null
+  if (typeof value === 'string') {
+    const m = value.trim().match(/^(\d{4}-\d{2}-\d{2})/)
+    return m?.[1] ?? null
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10)
+  }
+  return null
+}
+
+function hasPastEndDate(dateEnd: unknown): boolean {
+  const d = coerceIngestedDateToYyyyMmDd(dateEnd)
+  if (!d) return false
   const today = utcTodayDateString()
-  return dateEnd < today
+  return d < today
 }
 
 function isIngestedSaleIdUniqueViolation(error: unknown): boolean {
@@ -961,6 +975,8 @@ async function hydrateClaimedRowsRawPayload(rows: ClaimedPublishRow[]): Promise<
 }
 
 function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngestedSale {
+  const dateStart = coerceIngestedDateToYyyyMmDd(record.date_start) ?? (record.date_start as string)
+  const dateEnd = coerceIngestedDateToYyyyMmDd(record.date_end) ?? (record.date_end as string | null)
   return {
     id: record.id,
     owner_id: FIXED_INGEST_OWNER_ID,
@@ -974,8 +990,8 @@ function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngested
     zip_code: record.zip_code,
     lat: Number(record.lat),
     lng: Number(record.lng),
-    date_start: record.date_start,
-    date_end: record.date_end,
+    date_start: dateStart,
+    date_end: dateEnd,
     time_start: record.time_start,
     time_end: record.time_end,
     image_cloudinary_url: record.image_cloudinary_url,
@@ -1101,18 +1117,19 @@ async function markIngestedExpiredPastEndDate(
   operation: string,
   city: string | null,
   state: string | null,
-  dateEnd: string
+  dateEnd: string | null | undefined
 ): Promise<void> {
   const today = utcTodayDateString()
   const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'sale_expired')
+  const dateEndDay = coerceIngestedDateToYyyyMmDd(dateEnd) ?? String(dateEnd)
   const payload = {
     status: 'expired' as const,
     failure_reasons: mergedReasons,
     failure_details: {
       kind: 'ingestion_expired' as const,
       reason: 'past_end_date' as const,
-      message: `listing date_end ${dateEnd} is before ${today} (UTC calendar compare)`,
-      original_date_end: dateEnd,
+      message: `listing date_end ${dateEndDay} is before ${today} (UTC calendar compare)`,
+      original_date_end: dateEndDay,
       reference_today_utc: today,
       operation,
       region: { city: city ?? null, state: state ?? null },
@@ -1123,7 +1140,7 @@ async function markIngestedExpiredPastEndDate(
     component: 'ingestion/publishWorker',
     operation,
     rowId,
-    dateEnd,
+    dateEnd: dateEndDay,
     city: city ?? undefined,
     state: state ?? undefined,
   })
@@ -1135,7 +1152,7 @@ async function markIngestedExpiredPastEndDate(
   if (!persisted) {
     logger.error(
       'markIngestedExpiredPastEndDate could not persist expired (row not in publishing or DB error)',
-      new Error(`past_end_date ${dateEnd}`),
+      new Error(`past_end_date ${dateEndDay}`),
       { component: 'ingestion/publishWorker', operation, rowId, phase: 'sale_window', reason: 'past_end_date' }
     )
   }

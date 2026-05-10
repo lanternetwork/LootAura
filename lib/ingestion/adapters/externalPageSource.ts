@@ -5,6 +5,7 @@ import { logger } from '@/lib/log'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 import { parseYstmListingPathParts, resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
+import { slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v2'
@@ -80,15 +81,6 @@ function hashPageHostname(pageUrl: string): string | null {
   } catch {
     return null
   }
-}
-
-function slugSegmentToAddressRaw(segment: string): string | null {
-  const decoded = decodeURIComponent(segment).trim()
-  if (!decoded) return null
-  if (/^see-source-for-address/i.test(decoded)) {
-    return null
-  }
-  return decoded.replace(/-/g, ' ')
 }
 
 function externalIdFromListingUrl(url: string): string | null {
@@ -688,7 +680,7 @@ export function parseExternalPageSourceHtml(
     if (pathInfo.pathStateSegment?.toLowerCase() !== stateSegment.toLowerCase()) continue
 
     const addressSlug = pathInfo.addressSlugSegment
-    let addressRaw = addressSlug ? slugSegmentToAddressRaw(addressSlug) : null
+    let addressRaw = addressSlug ? slugSegmentToAddressLine(addressSlug) : null
 
     let title = (a.textContent || '').replace(/\s+/g, ' ').trim()
     title = title.replace(/[\u200b\s]+$/g, '').replace(/^[\s\u200b]+/g, '')

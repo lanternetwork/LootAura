@@ -123,4 +123,56 @@ describe('publishReadyIngestedSaleById past date_end', () => {
       expect.objectContaining({ rowId: INGESTED_ID, dateEnd: '2026-05-02' })
     )
   })
+
+  it('treats ISO timestamp date_end as calendar day for past-end expiry (validate_end_date_single)', async () => {
+    const rowIso = { ...claimedRow, date_end: '2026-05-02T00:00:00.000Z' }
+    mockFromBase.mockImplementation((_db: unknown, table: string) => {
+      if (table === 'sales') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                limit: async () => ({ data: [], error: null }),
+              }),
+            }),
+          }),
+        }
+      }
+      if (table !== 'ingested_sales') {
+        return { update: () => ({ eq: async () => ({ error: null }) }) }
+      }
+      let n = 0
+      return {
+        update: (payload: Record<string, unknown>) => {
+          n += 1
+          if (n === 1) {
+            const chain: Record<string, unknown> = {
+              eq: () => chain,
+              not: () => chain,
+              select: () => ({
+                maybeSingle: async () => ({
+                  data: rowIso,
+                  error: null,
+                }),
+              }),
+            }
+            return chain
+          }
+          return {
+            eq: () => ({
+              eq: async () => {
+                expiredUpdatePayload = payload
+                return { error: null }
+              },
+            }),
+          }
+        },
+      }
+    })
+
+    const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
+    await publishReadyIngestedSaleById(INGESTED_ID)
+    const details = expiredUpdatePayload?.failure_details as Record<string, unknown>
+    expect(details?.original_date_end).toBe('2026-05-02')
+  })
 })

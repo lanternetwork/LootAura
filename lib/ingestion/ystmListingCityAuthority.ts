@@ -1,6 +1,10 @@
 /**
  * Single policy for YSTM-style listing URLs: `/US/{State}/{CitySlug-or-Hub}/.../listing.html`.
- * Listing URL municipality wins over trailing `..., City, ST` on address_raw when they disagree.
+ *
+ * Precedence when URL municipality disagrees with trailing `..., City, ST` on the address:
+ * - If the street line before that tail is concrete (leading house number + remainder), prefer the
+ *   address-tail city/state (source-address / hidden-address listings where the path hub is wrong).
+ * - Otherwise prefer the URL municipality (tail missing or low-confidence street).
  */
 
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
@@ -24,6 +28,15 @@ export type YstmListingCityAuthorityResult = {
 }
 
 const ADDRESS_TAIL_RE = /,\s*([^,]+?),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?(?:,\s*USA)?$/i
+
+/** True when text before the trailing `, City, ST` starts with a house number and has street detail. */
+export function hasConcreteStreetLineBeforeAddressTail(addressRaw: string | null): boolean {
+  if (!addressRaw?.trim()) return false
+  const m = addressRaw.match(ADDRESS_TAIL_RE)
+  if (!m || typeof m.index !== 'number' || m.index === 0) return false
+  const streetPart = addressRaw.slice(0, m.index).trim()
+  return /^\s*\d+\s+.+/.test(streetPart)
+}
 
 export function extractAddressTailCityState(addressRaw: string | null): {
   addressTailCity: string | null
@@ -139,16 +152,24 @@ export function resolveYstmListingCityAuthority(
   const addrState = tail.addressTailState
 
   const cityConflict = Boolean(urlCity && addrCity && urlCity !== addrCity)
+  const streetConcrete = hasConcreteStreetLineBeforeAddressTail(addressRaw)
 
-  const resolvedCity = urlCity ?? addrCity ?? null
-  const resolvedState = pathStateNormalized ?? addrState ?? null
+  let resolvedCity: string | null
+  let resolvedState: string | null
+  let citySource: YstmCitySource
+  let stateSource: YstmStateSource
 
-  const citySource: YstmCitySource = urlCity ? 'listing_url' : addrCity ? 'address_tail' : 'none'
-  const stateSource: YstmStateSource = pathStateNormalized
-    ? 'listing_url'
-    : addrState
-      ? 'address_tail'
-      : 'none'
+  if (cityConflict && streetConcrete && addrCity && addrState) {
+    resolvedCity = addrCity
+    resolvedState = addrState
+    citySource = 'address_tail'
+    stateSource = 'address_tail'
+  } else {
+    resolvedCity = urlCity ?? addrCity ?? null
+    resolvedState = pathStateNormalized ?? addrState ?? null
+    citySource = urlCity ? 'listing_url' : addrCity ? 'address_tail' : 'none'
+    stateSource = pathStateNormalized ? 'listing_url' : addrState ? 'address_tail' : 'none'
+  }
 
   return {
     isYstmPath: true,

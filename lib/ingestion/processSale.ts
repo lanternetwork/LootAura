@@ -1,6 +1,7 @@
 import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureReason } from '@/lib/ingestion/types'
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
+import { addressLineFromYstmListingUrlSlug } from '@/lib/ingestion/ystmAddressSlug'
 
 function cleanText(value: string | null): string | null {
   if (value == null) return null
@@ -312,7 +313,12 @@ function extractExtensionCanonicalIsoDates(rawPayload: unknown): { start: string
 
 export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: CityIngestionConfig): Promise<ProcessedIngestedSale> {
   const failureReasons: FailureReason[] = []
-  const addressRaw = cleanText(rawSale.addressRaw)
+  const addressRawClean = cleanText(rawSale.addressRaw)
+  const recoveredFromYstmSlug =
+    !hasStreetNumberAndName(addressRawClean) && rawSale.sourceUrl
+      ? cleanText(addressLineFromYstmListingUrlSlug(rawSale.sourceUrl))
+      : null
+  const addressRaw = addressRawClean || recoveredFromYstmSlug || null
   const parsedLocation = extractCityStateFromAddressRaw(addressRaw)
   const authority = resolveYstmListingCityAuthority(rawSale.sourceUrl ?? '', addressRaw)
 

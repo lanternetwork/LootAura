@@ -91,7 +91,7 @@ describe('processIngestedSale — city/state normalization', () => {
     expect(processed.state).toBe('IL')
   })
 
-  it('YSTM listing URL city wins over conflicting address tail (upload parity with cron)', async () => {
+  it('YSTM: concrete address tail wins over conflicting URL municipality', async () => {
     const processed = await processIngestedSale(
       raw({
         sourceUrl:
@@ -102,11 +102,11 @@ describe('processIngestedSale — city/state normalization', () => {
       }),
       config
     )
-    expect(processed.city).toBe('Fair Oaks')
+    expect(processed.city).toBe('Munster')
     expect(processed.state).toBe('IN')
   })
 
-  it('YSTM hub path: Park City from URL beats Chicago address tail', async () => {
+  it('YSTM hub path: concrete Chicago tail wins over conflicting Park City path slug', async () => {
     const processed = await processIngestedSale(
       raw({
         sourceUrl:
@@ -117,8 +117,39 @@ describe('processIngestedSale — city/state normalization', () => {
       }),
       config
     )
-    expect(processed.city).toBe('Park City')
+    expect(processed.city).toBe('Chicago')
     expect(processed.state).toBe('IL')
+  })
+
+  it('YSTM: Orland Park path vs Palos Park in address tail uses Palos Park for concrete street', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl:
+          'https://yardsaletreasuremap.com/US/Illinois/Orland-Park/123-Oak-St/900/listing.html',
+        addressRaw: '123 Oak St, Palos Park, IL 60464',
+        cityHint: 'Orland Park',
+        stateHint: 'IL',
+      }),
+      config
+    )
+    expect(processed.city).toBe('Palos Park')
+    expect(processed.state).toBe('IL')
+  })
+
+  it('recovers address from YSTM listing slug when addressRaw missing but slug is a concrete street', async () => {
+    const processed = await processIngestedSale(
+      raw({
+        sourceUrl:
+          'https://yardsaletreasuremap.com/US/Illinois/Chicago/15200-S-80th-Ave/161028326/listing.html',
+        addressRaw: null,
+        cityHint: 'Chicago',
+        stateHint: 'IL',
+      }),
+      config
+    )
+    expect(processed.normalizedAddress).toContain('15200 s 80th ave')
+    expect(processed.status).toBe('needs_geocode')
+    expect(processed.failureReasons).not.toContain('missing_address')
   })
 
   it('extension-style rawPayload is optional; sourceUrl + addressRaw drive YSTM authority', async () => {

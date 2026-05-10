@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { Policy } from '@/lib/rateLimit/policies'
-import { Policies } from '@/lib/rateLimit/policies'
+import { type Policy, Policies } from '@/lib/rateLimit/policies'
 
 const { policyCaptures } = vi.hoisted(() => ({
   policyCaptures: [] as Policy[][],

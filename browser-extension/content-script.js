@@ -31,7 +31,9 @@ function sleep(ms) {
 
 function isYstmListPage() {
   const host = String(window.location.hostname || "").toLowerCase();
-  if (!host.includes("yardsaletreasuremap.com")) return false;
+  const isYstmHost =
+    host === "yardsaletreasuremap.com" || host.endsWith(".yardsaletreasuremap.com");
+  if (!isYstmHost) return false;
   const path = String(window.location.pathname || "").toLowerCase();
   return !path.includes("/listing.html") && !path.includes("/userlisting.html");
 }

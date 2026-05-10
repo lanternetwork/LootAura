@@ -1022,27 +1022,55 @@ function extractTrailingZip5FromAddressRaw(addressRaw) {
 /** Requires City, ST ZIP already present in page text (narrow; no ZIP tables). */
 function extractCityStateCommaZipFromPageText(zip5) {
   if (!zip5 || !/^\d{5}$/.test(zip5)) return { city: "", state: "" };
-  const body = document.body?.innerText || "";
   const z = zip5.replace(/\\/g, "\\\\");
+  const inner = document.body?.innerText || "";
+  const raw = document.body?.textContent || "";
+  const bodies = inner === raw ? [inner] : [inner, raw];
 
-  // Embedded tail: "..., City, ST ZIP" (street line or long blob)
-  let re = new RegExp(",\\s*([^,\\n]{2,80}?),\\s*([A-Z]{2})\\s+" + z + "(?:\\D|$)", "im");
-  let m = body.match(re);
-  if (m) {
-    return {
-      city: normalizeCityFromPathSegment(m[1].trim()),
-      state: m[2].toUpperCase(),
-    };
+  for (let bi = 0; bi < bodies.length; bi++) {
+    const body = bodies[bi];
+
+    // Embedded tail: "..., City, ST ZIP" (street line or long blob)
+    let re = new RegExp(",\\s*([^,\\n]{2,80}?),\\s*([A-Z]{2})\\s+" + z + "(?:\\D|$)", "im");
+    let m = body.match(re);
+    if (m) {
+      return {
+        city: normalizeCityFromPathSegment(m[1].trim()),
+        state: m[2].toUpperCase(),
+      };
+    }
+
+    // Standalone line: "City, ST ZIP" (e.g. community header; no leading comma before city name)
+    re = new RegExp("\\b([A-Za-z][^,\\n]{1,78}?),\\s*([A-Z]{2})\\s+" + z + "(?:\\D|$)", "im");
+    m = body.match(re);
+    if (m) {
+      return {
+        city: normalizeCityFromPathSegment(m[1].trim()),
+        state: m[2].toUpperCase(),
+      };
+    }
   }
 
-  // Standalone line: "City, ST ZIP" (e.g. community header; no leading comma before city name)
-  re = new RegExp("\\b([A-Za-z][^,\\n]{1,78}?),\\s*([A-Z]{2})\\s+" + z + "(?:\\D|$)", "im");
-  m = body.match(re);
-  if (!m) return { city: "", state: "" };
-  return {
-    city: normalizeCityFromPathSegment(m[1].trim()),
-    state: m[2].toUpperCase(),
-  };
+  const lineRe = new RegExp("^([A-Za-z][^,]{1,78}?),\\s*([A-Z]{2})\\s+" + z + "(?:\\D|$)");
+  for (let bi = 0; bi < bodies.length; bi++) {
+    const lines = bodies[bi]
+      .split(/\r?\n/)
+      .map(function (l) {
+        return l.trim();
+      })
+      .filter(Boolean);
+    for (let li = 0; li < lines.length; li++) {
+      const m = lines[li].match(lineRe);
+      if (m) {
+        return {
+          city: normalizeCityFromPathSegment(m[1].trim()),
+          state: m[2].toUpperCase(),
+        };
+      }
+    }
+  }
+
+  return { city: "", state: "" };
 }
 
 /**

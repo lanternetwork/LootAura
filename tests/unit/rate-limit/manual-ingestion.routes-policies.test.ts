@@ -18,7 +18,7 @@ const expectedManual: Policy[] = [
   Policies.MANUAL_INGESTION_HOURLY,
 ]
 
-describe('manual ingestion admin routes — rate policy wiring', () => {
+describe('manual ingestion admin routes - rate policy wiring', () => {
   beforeEach(() => {
     vi.resetModules()
     policyCaptures.length = 0

@@ -4,13 +4,12 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
 vi.mock('@/lib/rateLimit/config', () => ({
   shouldBypassRateLimit: () => false,
 }))
-
-import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
-import { Policies } from '@/lib/rateLimit/policies'
 
 const manualIngestionPolicies = [
   Policies.MANUAL_INGESTION_BURST,
@@ -24,13 +23,13 @@ describe('MANUAL_INGESTION burst / hourly (parity with ingested-sales list + upl
       [...manualIngestionPolicies]
     )
     const ip = '203.0.113.10'
-    for (let i = 0; i < 4; i += 1) {
+    for (let _n = 0; _n < 4; _n += 1) {
       const req = new NextRequest('http://localhost/api/admin/ingested-sales/upload', {
         method: 'POST',
         headers: { 'x-forwarded-for': ip },
       })
       const res = await wrapped(req)
-      expect(res.status, `iteration ${i}`).toBe(200)
+      expect(res.status).toBe(200)
     }
   })
 
@@ -40,14 +39,12 @@ describe('MANUAL_INGESTION burst / hourly (parity with ingested-sales list + upl
       [...manualIngestionPolicies]
     )
     const ip = '203.0.113.11'
-    let lastStatus = 0
-    for (let i = 0; i < 30; i += 1) {
+    for (let _n = 0; _n < 30; _n += 1) {
       const req = new NextRequest('http://localhost/api/admin/ingested-sales/upload', {
         method: 'POST',
         headers: { 'x-forwarded-for': ip },
       })
-      lastStatus = (await wrapped(req)).status
-      expect(lastStatus, `iteration ${i}`).toBe(200)
+      expect((await wrapped(req)).status).toBe(200)
     }
     const req31 = new NextRequest('http://localhost/api/admin/ingested-sales/upload', {
       method: 'POST',
@@ -68,12 +65,12 @@ describe('MANUAL_INGESTION burst / hourly (parity with ingested-sales list + upl
       [...manualIngestionPolicies]
     )
     const ip = '203.0.113.12'
-    for (let i = 0; i < 30; i += 1) {
+    for (let _n = 0; _n < 30; _n += 1) {
       const req = new NextRequest('http://localhost/api/admin/ingested-sales/list?limit=1', {
         method: 'GET',
         headers: { 'x-forwarded-for': ip },
       })
-      expect((await wrapped(req)).status, `iteration ${i}`).toBe(200)
+      expect((await wrapped(req)).status).toBe(200)
     }
     const req31 = new NextRequest('http://localhost/api/admin/ingested-sales/list?limit=1', {
       method: 'GET',

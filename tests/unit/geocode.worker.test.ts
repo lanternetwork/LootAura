@@ -603,7 +603,11 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         typeof (u as Record<string, unknown>).failure_details === 'object' &&
         'geocode' in ((u as Record<string, unknown>).failure_details as object)
     ) as Record<string, unknown> | undefined
-    const geocode = (diagUpdate?.failure_details as { geocode?: { lowConfidenceReasons?: string[] } })?.geocode
+    const geocode = (
+      diagUpdate?.failure_details as {
+        geocode?: { lowConfidenceReasons?: string[]; providerClassification?: string }
+      }
+    )?.geocode
     expect(geocode?.lowConfidenceReasons).toEqual(['broad_match', 'city_mismatch'])
     expect(geocode?.providerClassification).toBe('low_confidence')
   })

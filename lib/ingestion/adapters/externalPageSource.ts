@@ -13,7 +13,7 @@ import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLin
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
 
 const ADAPTER_ID = 'external_page_source'
-const PARSER_VERSION_ROW = 'external_page_source_mvp_v2'
+const PARSER_VERSION_ROW = 'external_page_source_mvp_v3'
 
 export interface ExternalPageSourceIngestionConfig {
   city: string
@@ -239,7 +239,8 @@ function cleanDescriptionText(
 function extractFallbackAddressAndDates(
   fullText: string,
   city: string,
-  state: string
+  state: string,
+  rejectionSink?: AddressCandidateRejection[]
 ): { address?: string; start?: string; end?: string } {
   const lines = fullText
     .split('\n')
@@ -307,6 +308,10 @@ function extractFallbackAddressAndDates(
     if (isAddressNoiseLine(line)) continue
     if (isInvalidAddressLikeLine(line)) continue
     if (addressRegex.test(line)) {
+      if (isObviouslyNonAddressLeadToken(line)) {
+        rejectionSink?.push({ candidate: line, rejectionReason: 'non_address_time_lead' })
+        continue
+      }
       addressCandidates.push({ index: i, line, score: scoreAddressCandidate(line) })
     }
   }
@@ -350,14 +355,39 @@ function normalizeListingUrlForLookup(raw: string): string {
   }
 }
 
-function extractAddressFromNearbyText(nearbyText: string): string | null {
+export type AddressCandidateRejection = { candidate: string; rejectionReason: string }
+
+/**
+ * True when the line opens with a time-of-day token (e.g. 10am, 9:30 am, 12:15pm), not a civic number.
+ * Uses first 1–2 whitespace tokens only so values like "123 Main" are not flagged.
+ */
+export function isObviouslyNonAddressLeadToken(line: string): boolean {
+  const s = line.replace(/\s+/g, ' ').trim()
+  if (!s) return false
+  const tokens = s.split(/\s+/).filter(Boolean)
+  const t0 = tokens[0] ?? ''
+  const t1 = tokens[1] ?? ''
+  if (/^\d{1,2}(am|pm)$/i.test(t0)) return true
+  if (/^\d{1,2}:\d{2}(am|pm)$/i.test(t0)) return true
+  if (/^\d{1,2}:\d{2}:\d{2}(am|pm)$/i.test(t0)) return true
+  if (/^\d{1,2}:\d{2}$/i.test(t0) && /^(am|pm)$/i.test(t1)) return true
+  if (/^\d{1,2}:\d{2}:\d{2}$/i.test(t0) && /^(am|pm)$/i.test(t1)) return true
+  if (/^\d{1,2}$/.test(t0) && /^(am|pm)$/i.test(t1)) return true
+  return false
+}
+
+function extractAddressFromNearbyText(
+  nearbyText: string,
+  rejectionSink?: AddressCandidateRejection[]
+): { address: string | null; nearbyCandidateCount: number } {
   const lines = nearbyText
     .split('\n')
     .map((line) => line.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
-  if (lines.length === 0) return null
+  if (lines.length === 0) return { address: null, nearbyCandidateCount: 0 }
 
   const addressLike = /^\d[\dA-Za-z-]{0,8}\s+[A-Za-z0-9.'#\- ]{4,}/
+  let nearbyCandidateCount = 0
   for (const line of lines) {
     const scrubbed = line
       .replace(/\bstreet view\b.*$/i, '')
@@ -366,10 +396,15 @@ function extractAddressFromNearbyText(nearbyText: string): string | null {
       .trim()
     if (!scrubbed) continue
     if (addressLike.test(scrubbed) && !/(https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,})/i.test(scrubbed)) {
-      return scrubbed
+      nearbyCandidateCount += 1
+      if (isObviouslyNonAddressLeadToken(scrubbed)) {
+        rejectionSink?.push({ candidate: scrubbed, rejectionReason: 'non_address_time_lead' })
+        continue
+      }
+      return { address: scrubbed, nearbyCandidateCount }
     }
   }
-  return null
+  return { address: null, nearbyCandidateCount }
 }
 
 function decodeJsSingleQuotedJson(raw: string): string {
@@ -730,7 +765,11 @@ export function parseExternalPageSourceHtml(
     if (pathInfo.pathStateSegment?.toLowerCase() !== stateSegment.toLowerCase()) continue
 
     const addressSlug = pathInfo.addressSlugSegment
-    let addressRaw = addressSlug ? slugSegmentToAddressLine(addressSlug) : null
+    const slugLine = addressSlug ? slugSegmentToAddressLine(addressSlug) : null
+    let addressRaw = slugLine
+    const slugWasPlaceholder = Boolean(addressSlug && !slugLine)
+    let chosenAddressSource: 'slug' | 'nearby' | 'fallback' | 'metadata' | 'none' = slugLine ? 'slug' : 'none'
+    const rejectedAddressCandidates: AddressCandidateRejection[] = []
     const addressSources: Array<'slug' | 'nearby' | 'fallback' | 'metadata' | 'slug_with_url_municipality'> = []
     if (addressRaw) addressSources.push('slug')
 
@@ -748,20 +787,22 @@ export function parseExternalPageSourceHtml(
     }
 
     const nearby = collectNearbyText(a, 4)
-    const nearbyAddress = extractAddressFromNearbyText(nearby)
+    const { address: nearbyAddress, nearbyCandidateCount } = extractAddressFromNearbyText(nearby, rejectedAddressCandidates)
     if (!addressRaw && nearbyAddress) {
       addressRaw = nearbyAddress
       addressSources.push('nearby')
+      chosenAddressSource = 'nearby'
     }
     let { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
     let imageUrls = collectImageUrlsForListing(a, document, pageUrl, 3)
 
     // Fallback extraction when critical fields are missing from the primary parse.
     if (!addressRaw || !startDate) {
-      const fallback = extractFallbackAddressAndDates(fullText, config.city, config.state)
+      const fallback = extractFallbackAddressAndDates(fullText, config.city, config.state, rejectedAddressCandidates)
       if (!addressRaw && fallback.address) {
         addressRaw = fallback.address
         addressSources.push('fallback')
+        chosenAddressSource = 'fallback'
       }
       if (!startDate && fallback.start) {
         startDate = fallback.start
@@ -772,6 +813,7 @@ export function parseExternalPageSourceHtml(
     }
 
     const externalId = externalIdFromListingUrl(href)
+    let metadataAddressSkippedAsUntrusted = false
     if (!addressRaw || !startDate || !endDate) {
       const normalizedHref = normalizeListingUrlForLookup(href)
       const byId = externalId ? metadataByListing.get(`id:${externalId}`) : null
@@ -782,9 +824,11 @@ export function parseExternalPageSourceHtml(
         const metaTrusted =
           Boolean(metaAddr) &&
           !untrustedMetadataAddresses.has(metaAddr.toLowerCase())
+        metadataAddressSkippedAsUntrusted = Boolean(metaAddr && !metaTrusted)
         if (!addressRaw && meta.address && metaTrusted) {
           addressRaw = meta.address
           addressSources.push('metadata')
+          chosenAddressSource = 'metadata'
         }
         if (!startDate && meta.startDate) startDate = meta.startDate
         if (!endDate && meta.endDate) endDate = meta.endDate
@@ -830,6 +874,11 @@ export function parseExternalPageSourceHtml(
       ingestionDiagnostics: {
         addressSource: addressSources.length === 0 ? 'none' : addressSources.length === 1 ? addressSources[0] : 'composite',
         addressSources,
+        chosenAddressSource,
+        rejectedAddressCandidates,
+        nearbyCandidateCount,
+        slugWasPlaceholder,
+        metadataAddressSkippedAsUntrusted,
         authority: {
           urlCity: authority.urlMunicipalityNormalized,
           addressTailCity: authority.addressTailCity,

@@ -1,5 +1,24 @@
 import { describe, it, expect } from 'vitest'
 
+describe('isObviouslyNonAddressLeadToken', () => {
+  it('detects compact and spaced time-of-day lead tokens', async () => {
+    const { isObviouslyNonAddressLeadToken } = await import('@/lib/ingestion/adapters/externalPageSource')
+    expect(isObviouslyNonAddressLeadToken('10am Saturday estate sale')).toBe(true)
+    expect(isObviouslyNonAddressLeadToken('9:30am Multi family sale')).toBe(true)
+    expect(isObviouslyNonAddressLeadToken('9:30 am huge sale')).toBe(true)
+    expect(isObviouslyNonAddressLeadToken('12:15pm Estate sale event')).toBe(true)
+    expect(isObviouslyNonAddressLeadToken('8 pm Friday sale')).toBe(true)
+    expect(isObviouslyNonAddressLeadToken('8:00:15 am start')).toBe(true)
+  })
+
+  it('does not reject valid numbered street lines', async () => {
+    const { isObviouslyNonAddressLeadToken } = await import('@/lib/ingestion/adapters/externalPageSource')
+    expect(isObviouslyNonAddressLeadToken('123 Main St, Chicago, IL')).toBe(false)
+    expect(isObviouslyNonAddressLeadToken('12 Main Street, Downers Grove, IL')).toBe(false)
+    expect(isObviouslyNonAddressLeadToken('15W303 61st Pl, Burr Ridge, IL')).toBe(false)
+  })
+})
+
 describe('normalizeSourcePages', () => {
   it('returns only valid HTTPS URLs from array', async () => {
     const { normalizeSourcePages } = await import('@/lib/ingestion/adapters/externalPageSource')
@@ -40,6 +59,18 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].title).toContain('Sale A')
     expect(listings[0].addressRaw).toBe('3805 N Sacramento Ave, Chicago, IL')
     expect(listings[0].rawPayload.adapter).toBe('external_page_source')
+    const diag = listings[0].rawPayload.ingestionDiagnostics as {
+      chosenAddressSource?: string
+      slugWasPlaceholder?: boolean
+      rejectedAddressCandidates?: unknown[]
+      nearbyCandidateCount?: number
+      metadataAddressSkippedAsUntrusted?: boolean
+    }
+    expect(diag.chosenAddressSource).toBe('slug')
+    expect(diag.slugWasPlaceholder).toBe(false)
+    expect(Array.isArray(diag.rejectedAddressCandidates)).toBe(true)
+    expect(diag.nearbyCandidateCount).toBeGreaterThanOrEqual(0)
+    expect(diag.metadataAddressSkippedAsUntrusted).toBe(false)
   })
 
   it('matches Kentucky when state is KY', async () => {
@@ -202,6 +233,46 @@ describe('parseExternalPageSourceHtml', () => {
     )
     expect(listings).toHaveLength(1)
     expect(listings[0].addressRaw).toBe('1234 W Fullerton Ave, Elmwood Park, IL')
+    const diag = listings[0].rawPayload.ingestionDiagnostics as {
+      chosenAddressSource?: string
+      slugWasPlaceholder?: boolean
+      rejectedAddressCandidates?: { candidate: string; rejectionReason: string }[]
+      nearbyCandidateCount?: number
+      metadataAddressSkippedAsUntrusted?: boolean
+    }
+    expect(diag.chosenAddressSource).toBe('metadata')
+    expect(diag.slugWasPlaceholder).toBe(true)
+    expect(diag.metadataAddressSkippedAsUntrusted).toBe(false)
+    expect(diag.rejectedAddressCandidates).toEqual([])
+    expect(diag.nearbyCandidateCount).toBeGreaterThanOrEqual(0)
+  })
+
+  it('rejects time-first prose as address when a real street line follows on the next text line', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const html = `
+      <div class="listing">
+        <div class="detail">10am Saturday huge sale&#10;5000 Main Street, Downers Grove, IL</div>
+        <div class="row">
+          <a href="https://example.com/US/Illinois/Downers-Grove/See-source-for-address-after-2026-05-08-22%3A00%3A00/777/userlisting.html?s=tl"><img src="https://example.com/listing-thumb.png" alt="" /></a>
+        </div>
+      </div>
+    `
+    const { listings, invalid } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Downers Grove', state: 'IL', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(invalid).toBe(0)
+    expect(listings).toHaveLength(1)
+    expect(listings[0].addressRaw).toBe('5000 Main Street, Downers Grove, IL')
+    const diag = listings[0].rawPayload.ingestionDiagnostics as {
+      chosenAddressSource?: string
+      rejectedAddressCandidates?: { candidate: string; rejectionReason: string }[]
+      nearbyCandidateCount?: number
+    }
+    expect(diag.chosenAddressSource).toBe('nearby')
+    expect(diag.nearbyCandidateCount).toBeGreaterThanOrEqual(2)
+    expect(diag.rejectedAddressCandidates?.some((r) => r.rejectionReason === 'non_address_time_lead')).toBe(true)
   })
 
   it('extracts address from metadataStr by external listing id when query differs', async () => {
@@ -585,5 +656,39 @@ describe('parseExternalPageSourceHtml', () => {
       expect((l.addressRaw ?? '').toLowerCase()).not.toContain('munster')
       expect((l.addressRaw ?? '').toLowerCase()).toContain(l.city.toLowerCase())
     }
+  })
+
+  it('sets metadataAddressSkippedAsUntrusted when shared metadata address is not trusted', async () => {
+    const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const urlV =
+      'https://yardsaletreasuremap.com/US/Indiana/Valparaiso/See-source-for-address-after-2026-06-01-10%3A00%3A00/38740001/userlisting.html?s=tl'
+    const urlH =
+      'https://yardsaletreasuremap.com/US/Indiana/Hobart/See-source-for-address-after-2026-06-01-10%3A00%3A00/38740002/userlisting.html?s=tl'
+    const html = `
+      <script>
+        const metadataStr = '{"sales":[
+          {"url":"${urlV}","address":"900 Shared Rd, Munster, IN 46321","start_date":"2026-06-01","end_date":"2026-06-01"},
+          {"url":"${urlH}","address":"900 Shared Rd, Munster, IN 46321","start_date":"2026-06-01","end_date":"2026-06-01"}
+        ]}';
+      </script>
+      <a href="${urlV}">Valparaiso hidden</a>
+    `
+    const { listings, invalid } = parseExternalPageSourceHtml(
+      html,
+      { city: 'Valparaiso', state: 'IN', source_platform: 'external_page_source', source_pages: [] },
+      LIST
+    )
+    expect(invalid).toBe(0)
+    expect(listings).toHaveLength(1)
+    expect(listings[0].addressRaw).toBeNull()
+    const diag = listings[0].rawPayload.ingestionDiagnostics as {
+      chosenAddressSource?: string
+      metadataAddressSkippedAsUntrusted?: boolean
+      slugWasPlaceholder?: boolean
+    }
+    expect(diag.chosenAddressSource).toBe('none')
+    expect(diag.metadataAddressSkippedAsUntrusted).toBe(true)
+    expect(diag.slugWasPlaceholder).toBe(true)
+    expect(listings[0].startDate).toBe('2026-06-01')
   })
 })

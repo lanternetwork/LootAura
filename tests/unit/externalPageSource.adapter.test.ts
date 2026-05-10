@@ -494,7 +494,7 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].rawPayload.citySource).toBe('listing_url')
   })
 
-  it('prefers URL Fair Oaks when address tail says Munster', async () => {
+  it('prefers Munster from address tail when street is concrete and conflicts with URL Fair Oaks', async () => {
     const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
     // See-source slug: no street from path; metadataStr supplies Munster address (same pattern as live YSTM pages).
     const html = `
@@ -512,10 +512,10 @@ describe('parseExternalPageSourceHtml', () => {
     )
     expect(invalid).toBe(0)
     expect(listings).toHaveLength(1)
-    expect(listings[0].city).toBe('Fair Oaks')
+    expect(listings[0].city).toBe('Munster')
     expect(listings[0].rawPayload.cityConflict).toBe(true)
     expect(listings[0].rawPayload.addressTailCity).toBe('Munster')
-    expect(listings[0].rawPayload.citySource).toBe('listing_url')
+    expect(listings[0].rawPayload.citySource).toBe('address_tail')
   })
 
   it('hub Chicago.html then Park-City yields Park City', async () => {

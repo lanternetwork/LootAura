@@ -141,31 +141,27 @@ describe('publishReadyIngestedSaleById past date_end', () => {
       if (table !== 'ingested_sales') {
         return { update: () => ({ eq: async () => ({ error: null }) }) }
       }
-      let n = 0
       return {
         update: (payload: Record<string, unknown>) => {
-          n += 1
-          if (n === 1) {
-            const chain: Record<string, unknown> = {
-              eq: () => chain,
-              not: () => chain,
-              select: () => ({
-                maybeSingle: async () => ({
-                  data: rowIso,
-                  error: null,
-                }),
+          if (payload.status === 'expired') {
+            expiredUpdatePayload = payload
+            return {
+              eq: () => ({
+                eq: async () => ({ error: null }),
               }),
             }
-            return chain
           }
-          return {
-            eq: () => ({
-              eq: async () => {
-                expiredUpdatePayload = payload
-                return { error: null }
-              },
+          const chain: Record<string, unknown> = {
+            eq: () => chain,
+            not: () => chain,
+            select: () => ({
+              maybeSingle: async () => ({
+                data: rowIso,
+                error: null,
+              }),
             }),
           }
+          return chain
         },
       }
     })

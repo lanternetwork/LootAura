@@ -844,9 +844,7 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
   const cityNormalizedMissing =
     (plan.fallbackCity || row.city?.trim() || '').length > 0
       ? (normalizeLocalityForGeocodeQuery(plan.fallbackCity || row.city?.trim() || '') ??
-        plan.fallbackCity ||
-        row.city?.trim() ||
-        undefined)
+        (plan.fallbackCity || row.city?.trim() || undefined))
       : undefined
   const syntheticMissingLocalityGeo: GeocodeAddressOutcome = {
     coords: null,

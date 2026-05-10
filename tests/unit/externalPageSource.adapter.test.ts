@@ -38,7 +38,7 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings[0].city).toBe('Chicago')
     expect(listings[0].state).toBe('IL')
     expect(listings[0].title).toContain('Sale A')
-    expect(listings[0].addressRaw).toBe('3805 N Sacramento Ave')
+    expect(listings[0].addressRaw).toBe('3805 N Sacramento Ave, Chicago, IL')
     expect(listings[0].rawPayload.adapter).toBe('external_page_source')
   })
 
@@ -548,7 +548,7 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(1)
     expect(listings[0].city).toBe('Lindenhurst')
     expect(listings[0].city).not.toMatch(/\.html$/i)
-    expect(listings[0].addressRaw.toLowerCase()).toContain('lindenhurst')
+    expect((listings[0].addressRaw ?? '').toLowerCase()).toContain('lindenhurst')
     const diag = listings[0].rawPayload.ingestionDiagnostics as {
       authority?: { urlCity?: string | null; resolvedCity?: string }
     }
@@ -582,8 +582,8 @@ describe('parseExternalPageSourceHtml', () => {
     const cities = listings.map((l) => l.city).sort()
     expect(cities).toEqual(['Hammond', 'Hobart', 'Schererville', 'Valparaiso'])
     for (const l of listings) {
-      expect(l.addressRaw.toLowerCase()).not.toContain('munster')
-      expect(l.addressRaw.toLowerCase()).toContain(l.city.toLowerCase())
+      expect((l.addressRaw ?? '').toLowerCase()).not.toContain('munster')
+      expect((l.addressRaw ?? '').toLowerCase()).toContain(l.city.toLowerCase())
     }
   })
 })

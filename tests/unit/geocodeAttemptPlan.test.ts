@@ -39,7 +39,7 @@ describe('geocodeAttemptPlan', () => {
       city: 'Valparaiso',
       state: 'IN',
       source_url: 'https://yardsaletreasuremap.com/US/Indiana/Valparaiso/100-Main-St/201/listing.html',
-      raw_payload,
+      raw_payload: rawPayload,
     })
     expect(plan.primaryMunicipalitySource).toBe('listing_url_metadata_guard')
     expect(plan.primaryCity).toBe('Valparaiso')

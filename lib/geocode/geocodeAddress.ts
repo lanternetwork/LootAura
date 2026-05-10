@@ -334,7 +334,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     if (broadMatch) lowConfidenceReasons.push('broad_match')
     if (cityMismatch) lowConfidenceReasons.push('city_mismatch')
     if (stateMismatch) lowConfidenceReasons.push('state_mismatch')
-    if (lowImportance || broadMatch || cityMismatch || stateMismatch) {
+    if (broadMatch || cityMismatch || stateMismatch) {
       logger.warn('Nominatim returned low-confidence geocode candidate', {
         component: 'geocode/geocodeAddress',
         operation: 'nominatim_classify',
@@ -363,6 +363,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       geocode_city_normalized: cityNormalized,
       queryFingerprint,
       providerClassification: 'ok' as const,
+      ...(lowImportance ? { low_importance_observed: true as const } : {}),
     })
     return {
       coords: { lat, lng },

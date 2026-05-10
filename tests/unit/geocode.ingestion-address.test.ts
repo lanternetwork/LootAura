@@ -226,7 +226,7 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
     expect(result).toMatchObject({ coords: null, hit429: true, noCoordsReason: 'rate_limited_soft' })
   })
 
-  it('classifies broad/low-confidence provider matches as no-coords', async () => {
+  it('classifies broad_match provider matches as no-coords (importance still recorded in reasons)', async () => {
     vi.resetModules()
     vi.stubGlobal(
       'fetch',
@@ -256,6 +256,95 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
     })
 
     expect(result).toMatchObject({ coords: null, hit429: false, noCoordsReason: 'low_confidence' })
+    expect(result.lowConfidenceReasons).toEqual(
+      expect.arrayContaining(['broad_match', 'low_importance'])
+    )
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'Nominatim returned low-confidence geocode candidate',
+      expect.objectContaining({
+        lowConfidenceReasons: expect.arrayContaining(['broad_match', 'low_importance']),
+      })
+    )
+  })
+
+  it('rejects broad_match when importance is high (notability is not a bypass)', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => [
+          {
+            lat: '38.25',
+            lon: '-85.75',
+            importance: 0.95,
+            addresstype: 'city',
+            class: 'place',
+            type: 'city',
+            address: { city: 'Louisville', state: 'Kentucky' },
+          },
+        ],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({ coords: null, hit429: false, noCoordsReason: 'low_confidence' })
+    expect(result.lowConfidenceReasons).toEqual(expect.arrayContaining(['broad_match']))
+    expect(result.lowConfidenceReasons).not.toContain('low_importance')
+  })
+
+  it('accepts residential hit with low Nominatim importance when locality and scale are OK', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => [
+          {
+            lat: '38.252',
+            lon: '-85.751',
+            importance: 0.05,
+            addresstype: 'house_number',
+            class: 'place',
+            type: 'house',
+            address: { city: 'Louisville', state: 'KY' },
+          },
+        ],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({
+      coords: { lat: 38.252, lng: -85.751 },
+      hit429: false,
+      providerClassification: 'ok',
+    })
+    expect(loggerWarn).not.toHaveBeenCalledWith(
+      'Nominatim returned low-confidence geocode candidate',
+      expect.anything()
+    )
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Nominatim geocode succeeded',
+      expect.objectContaining({
+        low_importance_observed: true,
+      })
+    )
   })
 
   it('classifies city/state mismatch as low_confidence with explicit reasons', async () => {

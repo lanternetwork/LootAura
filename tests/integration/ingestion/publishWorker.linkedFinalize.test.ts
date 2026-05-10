@@ -234,7 +234,7 @@ describe('finalizeLinkedPublishedIngestedSales', () => {
       id: 'ing-3',
       status: 'ready',
       published_sale_id: 'sale-3',
-      published_at: null,
+      published_at: '2026-05-01T12:00:00.000Z',
       failure_reasons: [],
       failure_details: null,
       updated_at: '2026-05-09T01:00:00.000Z',
@@ -247,6 +247,13 @@ describe('finalizeLinkedPublishedIngestedSales', () => {
     expect(summary).toMatchObject({ finalized: 0, linkMismatch: 1 })
     expect(ctx.ingestedRows[0].status).toBe('publish_failed')
     expect(ctx.ingestedRows[0].failure_reasons).toEqual(['publish_error'])
+    expect(ctx.ingestedRows[0].published_sale_id).toBeNull()
+    expect(ctx.ingestedRows[0].published_at).toBeNull()
+    expect(ctx.ingestedRows[0].failure_details).toMatchObject({
+      phase: 'linked_finalize_mismatch',
+      operation: 'linked_finalize_link_mismatch',
+      published_sale_id: 'sale-3',
+    })
     expect(ctx.loggerError).toHaveBeenCalledWith(
       'Linked-sale finalization skipped due to mismatched sale linkage',
       expect.any(Error),
@@ -259,7 +266,7 @@ describe('finalizeLinkedPublishedIngestedSales', () => {
       id: 'ing-terminal',
       status: 'ready',
       published_sale_id: 'sale-terminal',
-      published_at: null,
+      published_at: '2026-04-01T00:00:00.000Z',
       failure_reasons: ['invalid_date'],
       failure_details: {
         phase: 'validation',
@@ -276,10 +283,12 @@ describe('finalizeLinkedPublishedIngestedSales', () => {
     expect(summary).toMatchObject({ finalized: 0, linkMismatch: 1 })
     expect(ctx.ingestedRows[0].status).toBe('publish_failed')
     expect(ctx.ingestedRows[0].failure_reasons).toEqual(['invalid_date', 'publish_error'])
-    expect(ctx.ingestedRows[0].failure_details).toEqual({
-      phase: 'validation',
-      operation: 'publish_validation',
-      reason: 'past_end_date',
+    expect(ctx.ingestedRows[0].published_sale_id).toBeNull()
+    expect(ctx.ingestedRows[0].published_at).toBeNull()
+    expect(ctx.ingestedRows[0].failure_details).toMatchObject({
+      phase: 'linked_finalize_mismatch',
+      operation: 'linked_finalize_link_mismatch',
+      published_sale_id: 'sale-terminal',
     })
   })
 

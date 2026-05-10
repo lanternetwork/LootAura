@@ -92,7 +92,7 @@ function appendFailureReason(reasons: FailureReason[], reason: FailureReason): F
 /** Stored on `ingested_sales.failure_details` — no raw addresses, titles, or URLs (ops-safe region only). */
 export type PublishFailureDetails = {
   publish_error: string
-  phase: 'create_sale' | 'finalize_ingested_row' | 'validation'
+  phase: 'create_sale' | 'finalize_ingested_row' | 'validation' | 'linked_finalize_mismatch'
   operation: string
   reason?: 'past_end_date'
   original_date_end?: string
@@ -168,6 +168,53 @@ function isTransientPublishFailureDetails(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
   const phase = (value as { phase?: unknown }).phase
   return phase === 'create_sale' || phase === 'finalize_ingested_row'
+}
+
+/**
+ * Persists `publish_failed` payload only while the row is still `publishing`.
+ * Retries once on transient errors; never updates by `id` alone (avoids clobbering
+ * `ready` / `needs_geocode` / `published` after concurrent transitions).
+ */
+export async function tryPersistPublishFailedWhilePublishing(
+  rowId: string,
+  payload: Record<string, unknown>,
+  logContext: { operation: string; phase: PublishFailureDetails['phase'] }
+): Promise<boolean> {
+  const admin = getAdminDb()
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let error: { message: string } | null = null
+    try {
+      const result = await fromBase(admin, 'ingested_sales')
+        .update(payload)
+        .eq('id', rowId)
+        .eq('status', 'publishing')
+      error = result?.error ?? null
+    } catch (thrown) {
+      error = { message: thrown instanceof Error ? thrown.message : String(thrown) }
+      logger.error(
+        'tryPersistPublishFailedWhilePublishing guarded update threw',
+        thrown instanceof Error ? thrown : new Error(String(thrown)),
+        {
+          component: 'ingestion/publishWorker',
+          operation: logContext.operation,
+          rowId,
+          phase: logContext.phase,
+          attempt: attempt + 1,
+        }
+      )
+    }
+    if (!error) {
+      return true
+    }
+    if (attempt === 1) {
+      logger.error(
+        'tryPersistPublishFailedWhilePublishing failed after guarded retries',
+        new Error(error.message),
+        { component: 'ingestion/publishWorker', operation: logContext.operation, rowId, phase: logContext.phase }
+      )
+    }
+  }
+  return false
 }
 
 function shouldClearFailureDetailsAfterLinkedFinalize(value: unknown): boolean {
@@ -289,16 +336,28 @@ export async function finalizeLinkedPublishedIngestedSales(
         saleId: linkedSaleId,
         reason: 'link_mismatch',
       })
-      if (row.status !== 'publish_failed') {
-        const nextReasons = appendFailureReason(toFailureReasons(row.failure_reasons), 'publish_error')
-        await fromBase(admin, 'ingested_sales')
-          .update({
-            status: 'publish_failed',
-            failure_reasons: nextReasons,
-          })
-          .eq('id', row.id)
-          .neq('status', 'published')
-      }
+      const nextReasons =
+        row.status === 'publish_failed'
+          ? toFailureReasons(row.failure_reasons)
+          : appendFailureReason(toFailureReasons(row.failure_reasons), 'publish_error')
+      const mismatchDetails = buildPublishFailureDetails(
+        'Linked sale ingested_sale_id does not match this ingested row; publish linkage cleared.',
+        {
+          phase: 'linked_finalize_mismatch',
+          operation: 'linked_finalize_link_mismatch',
+          publishedSaleId: linkedSaleId,
+        }
+      )
+      await fromBase(admin, 'ingested_sales')
+        .update({
+          status: 'publish_failed',
+          failure_reasons: nextReasons,
+          published_sale_id: null,
+          published_at: null,
+          failure_details: mismatchDetails,
+        })
+        .eq('id', row.id)
+        .neq('status', 'published')
       continue
     }
 
@@ -994,7 +1053,6 @@ async function markIngestedPublishFailedFromSaleCreateError(
   city: string | null,
   state: string | null
 ): Promise<void> {
-  const admin = getAdminDb()
   const message = error instanceof Error ? error.message : String(error)
   const primaryFailure: FailureReason =
     error instanceof InsufficientAddressForPublishError ? 'invalid_address_format' : 'publish_error'
@@ -1019,35 +1077,14 @@ async function markIngestedPublishFailedFromSaleCreateError(
     state,
   })
 
-  let upErr: { message: string } | null = null
-  try {
-    const result = await fromBase(admin, 'ingested_sales')
-      .update(payload)
-      .eq('id', rowId)
-      .eq('status', 'publishing')
-    upErr = result?.error ?? null
-  } catch (error) {
+  const persisted = await tryPersistPublishFailedWhilePublishing(rowId, payload, {
+    operation,
+    phase: 'create_sale',
+  })
+  if (!persisted) {
     logger.error(
-      'markIngestedPublishFailedFromSaleCreateError guarded update threw; trying fallback',
-      error instanceof Error ? error : new Error(String(error)),
-      { component: 'ingestion/publishWorker', operation, rowId, phase: 'create_sale' }
-    )
-    upErr = { message: error instanceof Error ? error.message : String(error) }
-  }
-
-  if (upErr) {
-    const { error: fallbackError } = await fromBase(admin, 'ingested_sales').update(payload).eq('id', rowId)
-    if (!fallbackError) {
-      logger.error(
-        '[CRITICAL] markIngestedPublishFailedFromSaleCreateError used unguarded fallback to clear publishing',
-        new Error(message),
-        { component: 'ingestion/publishWorker', operation, rowId, phase: 'create_sale', critical: true, usedFallbackWithoutStatusGuard: true }
-      )
-      return
-    }
-    logger.error(
-      'Failed to persist publish_failed after createPublishedSale error',
-      new Error(fallbackError.message),
+      'Failed to persist publish_failed after createPublishedSale error (row not in publishing or DB error)',
+      new Error(message),
       { component: 'ingestion/publishWorker', operation, rowId, phase: 'create_sale' }
     )
   }
@@ -1061,7 +1098,6 @@ async function markIngestedPublishFailedValidation(
   state: string | null,
   dateEnd: string
 ): Promise<void> {
-  const admin = getAdminDb()
   const message = `terminal validation failure: date_end ${dateEnd} is before ${utcTodayDateString()}`
   const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
   const payload = {
@@ -1088,37 +1124,17 @@ async function markIngestedPublishFailedValidation(
     dateEnd,
   })
 
-  const { error: upErr } = await fromBase(admin, 'ingested_sales')
-    .update(payload)
-    .eq('id', rowId)
-    .eq('status', 'publishing')
-
-  if (!upErr) {
-    return
-  }
-
-  logger.error(
-    'markIngestedPublishFailedValidation guarded update failed; triggering fallback',
-    new Error(upErr.message),
-    { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date' }
-  )
-
-  const { error: fallbackError } = await fromBase(admin, 'ingested_sales').update(payload).eq('id', rowId)
-
-  if (fallbackError) {
+  const persisted = await tryPersistPublishFailedWhilePublishing(rowId, payload, {
+    operation,
+    phase: 'validation',
+  })
+  if (!persisted) {
     logger.error(
-      '[CRITICAL] markIngestedPublishFailedValidation fallback update failed — ingested row may still be non-terminal',
-      new Error(fallbackError.message),
-      { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date', critical: true }
+      'markIngestedPublishFailedValidation could not persist publish_failed (row not in publishing or DB error)',
+      new Error(message),
+      { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date' }
     )
-    return
   }
-
-  logger.error(
-    '[CRITICAL] markIngestedPublishFailedValidation used unguarded fallback to clear publishing',
-    new Error(message),
-    { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date', critical: true, usedFallbackWithoutStatusGuard: true }
-  )
 }
 
 /** After a sale row exists, never leave ingested_sales stuck in `publishing`. */
@@ -1131,7 +1147,6 @@ async function markIngestedPublishFailedFromPublishing(
   state: string | null,
   publishedSaleId: string | null = null
 ): Promise<void> {
-  const admin = getAdminDb()
   const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
   const payload = {
     status: 'publish_failed' as const,
@@ -1155,56 +1170,17 @@ async function markIngestedPublishFailedFromPublishing(
     saleId: publishedSaleId,
   })
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let error: { message: string } | null = null
-    try {
-      const result = await fromBase(admin, 'ingested_sales')
-        .update(payload)
-        .eq('id', rowId)
-        .eq('status', 'publishing')
-      error = result?.error ?? null
-    } catch (thrown) {
-      error = { message: thrown instanceof Error ? thrown.message : String(thrown) }
-      logger.error(
-        'markIngestedPublishFailedFromPublishing guarded update threw',
-        thrown instanceof Error ? thrown : new Error(String(thrown)),
-        { component: 'ingestion/publishWorker', operation, rowId, attempt: attempt + 1 }
-      )
-    }
-    if (!error) {
-      return
-    }
-    if (attempt === 1) {
-      logger.error(
-        'markIngestedPublishFailedFromPublishing guarded update failed after 2 attempts',
-        new Error(error.message),
-        { component: 'ingestion/publishWorker', operation, rowId }
-      )
-    } else {
-      logger.error(
-        'markIngestedPublishFailedFromPublishing guarded update failed (will retry)',
-        new Error(error.message),
-        { component: 'ingestion/publishWorker', operation, rowId, attempt: attempt + 1 }
-      )
-    }
-  }
-
-  const { error: fallbackError } = await fromBase(admin, 'ingested_sales').update(payload).eq('id', rowId)
-
-  if (fallbackError) {
+  const persisted = await tryPersistPublishFailedWhilePublishing(rowId, payload, {
+    operation,
+    phase: 'finalize_ingested_row',
+  })
+  if (!persisted) {
     logger.error(
-      '[CRITICAL] markIngestedPublishFailedFromPublishing fallback update failed — ingested row may still be non-terminal',
-      new Error(fallbackError.message),
+      'markIngestedPublishFailedFromPublishing could not persist publish_failed (row not in publishing or DB error)',
+      new Error(errorMessage),
       { component: 'ingestion/publishWorker', operation, rowId, critical: true }
     )
-    return
   }
-
-  logger.error(
-    '[CRITICAL] markIngestedPublishFailedFromPublishing used unguarded fallback to clear publishing',
-    new Error(errorMessage),
-    { component: 'ingestion/publishWorker', operation, rowId, critical: true, usedFallbackWithoutStatusGuard: true }
-  )
 }
 
 /**

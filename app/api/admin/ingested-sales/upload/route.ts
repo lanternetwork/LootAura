@@ -21,6 +21,7 @@ import {
   shouldResetGeocodeRetryAfterUploadUpdate,
   stripGeocodeFailedFromFailureReasons,
 } from '@/lib/ingestion/uploadGeocodeRetryReset'
+import { publishLinkageFieldsToClearOnReopenUpload } from '@/lib/ingestion/uploadPublishLinkageCleanup'
 
 export const dynamic = 'force-dynamic'
 
@@ -591,6 +592,11 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
             priorStatus: priorRow.status,
             priorGeocodeAttempts: priorRow.geocode_attempts,
           })
+        }
+
+        const linkageClear = publishLinkageFieldsToClearOnReopenUpload(status)
+        if (linkageClear) {
+          updatePayload = { ...updatePayload, ...linkageClear }
         }
 
         const { error: updateError } = await fromBase(admin, 'ingested_sales')

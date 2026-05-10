@@ -249,12 +249,12 @@ describe('parseExternalPageSourceHtml', () => {
 
   it('rejects time-first prose as address when a real street line follows on the next text line', async () => {
     const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
-    // Use a real LF in markup (not only &#10;) so JSDOM textContent always splits lines on Linux CI.
+    // LF splits detail into two lines; anchor needs non-empty text because invalidation runs before nearby extraction.
     const html = `
       <div class="listing">
         <div class="detail">10am Saturday huge sale${'\n'}5000 Main Street, Downers Grove, IL</div>
         <div class="row">
-          <a href="https://example.com/US/Illinois/Downers-Grove/See-source-for-address-after-2026-05-08-22%3A00%3A00/777/userlisting.html?s=tl"><img src="https://example.com/listing-thumb.png" alt="" /></a>
+          <a href="https://example.com/US/Illinois/Downers-Grove/See-source-for-address-after-2026-05-08-22%3A00%3A00/777/userlisting.html?s=tl">Community Sale</a>
         </div>
       </div>
     `

@@ -1019,12 +1019,25 @@ function extractTrailingZip5FromAddressRaw(addressRaw) {
   return m ? m[1] : null;
 }
 
-/** Requires a ", City, ST ZIP" fragment already present in page text (narrow; no ZIP tables). */
+/** Requires City, ST ZIP already present in page text (narrow; no ZIP tables). */
 function extractCityStateCommaZipFromPageText(zip5) {
   if (!zip5 || !/^\d{5}$/.test(zip5)) return { city: "", state: "" };
   const body = document.body?.innerText || "";
-  const re = new RegExp(",\\s*([^,\\n]{2,80}?),\\s*([A-Z]{2})\\s+" + zip5 + "(?:\\D|$)", "im");
-  const m = body.match(re);
+  const z = zip5.replace(/\\/g, "\\\\");
+
+  // Embedded tail: "..., City, ST ZIP" (street line or long blob)
+  let re = new RegExp(",\\s*([^,\\n]{2,80}?),\\s*([A-Z]{2})\\s+" + z + "(?:\\D|$)", "im");
+  let m = body.match(re);
+  if (m) {
+    return {
+      city: normalizeCityFromPathSegment(m[1].trim()),
+      state: m[2].toUpperCase(),
+    };
+  }
+
+  // Standalone line: "City, ST ZIP" (e.g. community header; no leading comma before city name)
+  re = new RegExp("\\b([A-Za-z][^,\\n]{1,78}?),\\s*([A-Z]{2})\\s+" + z + "(?:\\D|$)", "im");
+  m = body.match(re);
   if (!m) return { city: "", state: "" };
   return {
     city: normalizeCityFromPathSegment(m[1].trim()),

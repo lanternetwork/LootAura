@@ -93,6 +93,87 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+function usZipBase(zip: string): string {
+  return zip.replace(/-\d{4}$/u, '')
+}
+
+/** Leading house-number style token: first 5 digits at start of a comma segment (not substring). */
+function leadingFiveDigitHouseNumber(segment: string): string | null {
+  const s = normalizeWhitespace(segment)
+  const m = s.match(/^(\d{5})(?:-\d{4})?\b/u)
+  return m?.[1] ?? null
+}
+
+/**
+ * US ZIP/ZIP+4 for Nominatim `q=` assembly. Only values from a trusted
+ * locality/state/postal tail are returned — never the first 5-digit match in the
+ * full string (avoids house numbers like 11020 being used as postal codes).
+ *
+ * Applied in order:
+ * 1. Last comma segment is ZIP/ZIP+4 only and the previous segment normalizes to
+ *    the expected state (e.g. …, IL, 60614).
+ * 2. Last comma segment is "{State} {ZIP}" where the state normalizes to the
+ *    expected state (e.g. …, IL 60614, …, Illinois 60614).
+ * 3. Last comma segment is ZIP/ZIP+4 only and the previous segment is not that
+ *    state — e.g. street/sub-address chunks then a lone postal segment when city
+ *    and state are supplied separately (…, 95628).
+ * 4. Full address ends with `\\b{STATE}\\s+{ZIP}$` for the expected 2-letter
+ *    state code (e.g. … Denver CO 80211) when the postal code is not isolated by
+ *    commas.
+ *
+ * Rejection: if the candidate’s 5-digit base equals the leading house-number
+ * token at the start of the first comma segment, returns null (stops duplicate /
+ * malformed trailing numerics mirroring the street number).
+ */
+export function extractUsPostalCodeForGeocodeQuery(address: string, expectedState: string): string | null {
+  const trimmed = normalizeWhitespace(address)
+  if (!trimmed || !normalizeWhitespace(expectedState)) return null
+
+  const expectedNorm = normalizeIngestionState(expectedState)
+  if (!expectedNorm) return null
+
+  const parts = trimmed.split(',').map((p) => normalizeWhitespace(p)).filter(Boolean)
+
+  let candidate: string | null = null
+
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1]
+    const prev = parts[parts.length - 2]
+    const zipOnly = last.match(/^(\d{5}(?:-\d{4})?)$/u)
+
+    if (zipOnly && normalizeIngestionState(prev) === expectedNorm) {
+      candidate = last
+    } else {
+      const stateZip = last.match(/^(.+?)\s+(\d{5}(?:-\d{4})?)$/u)
+      if (stateZip) {
+        const maybeState = normalizeWhitespace(stateZip[1])
+        if (normalizeIngestionState(maybeState) === expectedNorm) {
+          candidate = stateZip[2]
+        }
+      }
+    }
+
+    if (!candidate && zipOnly && normalizeIngestionState(prev) !== expectedNorm) {
+      candidate = last
+    }
+  }
+
+  if (!candidate) {
+    const m = trimmed.match(new RegExp(`\\b${escapeRegExp(expectedNorm)}\\s+(\\d{5}(?:-\\d{4})?)\\s*$`, 'iu'))
+    if (m) candidate = m[1]
+  }
+
+  if (!candidate) return null
+
+  const firstSeg = parts[0] ?? trimmed
+  const house = leadingFiveDigitHouseNumber(firstSeg)
+  if (house && usZipBase(candidate) === house) {
+    return null
+  }
+
+  return candidate
+}
+
 function isCityToken(token: string, city: string): boolean {
   return normalizeIngestionCity(token) === normalizeIngestionCity(city)
 }
@@ -192,8 +273,7 @@ export async function geocodeAddress(
 
   try {
     const email = getNominatimEmail()
-    const postalCodeMatch = address.match(/\b\d{5}(?:-\d{4})?\b/)
-    const postalCode = postalCodeMatch?.[0] ?? null
+    const postalCode = extractUsPostalCodeForGeocodeQuery(address, state)
     const query = buildResidentialQuery(address, cityNormalized, state, postalCode)
     const queryFingerprint = createHash('sha256').update(query.toLowerCase()).digest('hex').slice(0, 16)
     const attemptLog: GeocodeAttemptLog = {

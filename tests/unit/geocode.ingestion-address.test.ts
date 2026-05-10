@@ -36,6 +36,20 @@ describe('geocodeAddress (ingestion Nominatim)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('does not append house number as ZIP (11020 Front St … Mokena, IL)', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress({
+      address: '11020 Front St Unit A, Mokena, IL',
+      city: 'Mokena',
+      state: 'IL',
+    })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    const decoded = decodeURIComponent(String(fetchCall).split('q=')[1]?.split('&')[0] ?? '')
+    expect(decoded).toBe('11020 Front St Unit A, Mokena, IL, USA')
+    expect(decoded).not.toMatch(/,\s*11020,\s*USA/i)
+  })
+
   it('returns coordinates on success', async () => {
     vi.resetModules()
     const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')

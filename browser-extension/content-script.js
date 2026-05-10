@@ -130,6 +130,51 @@ async function materializeYstmListRows(options = {}) {
 function buildQueueUrls() {
   const scanStart = Date.now();
   const anchors = Array.from(document.querySelectorAll("a[href]"));
+
+  /** Temporary: trace Chicago / Griffith list rows without changing queue logic. */
+  const DEBUG_QUEUE_HREF_MARKERS = ["griffith", "town-wide", "46319"];
+  function debugQueueHrefMatchesMarker(s) {
+    if (s == null || s === "") return false;
+    const lower = String(s).toLowerCase();
+    for (let i = 0; i < DEBUG_QUEUE_HREF_MARKERS.length; i++) {
+      if (lower.includes(DEBUG_QUEUE_HREF_MARKERS[i])) return true;
+    }
+    return false;
+  }
+  for (let di = 0; di < anchors.length; di++) {
+    const a = anchors[di];
+    const rawHref = a.getAttribute("href");
+    let resolvedHref = null;
+    let resolveOk = false;
+    try {
+      resolvedHref = new URL(rawHref, window.location.origin).href;
+      resolveOk = true;
+    } catch {
+      resolvedHref = null;
+      resolveOk = false;
+    }
+    if (!debugQueueHrefMatchesMarker(rawHref) && !debugQueueHrefMatchesMarker(resolvedHref)) {
+      continue;
+    }
+    let passedListingFilter = false;
+    let exclusionReason = null;
+    if (!resolveOk) {
+      exclusionReason = "invalid_href";
+    } else {
+      const u = resolvedHref.toLowerCase();
+      passedListingFilter = u.includes("/listing.html") || u.includes("/userlisting.html");
+      if (!passedListingFilter) {
+        exclusionReason = "not_listing_or_userlisting_href";
+      }
+    }
+    console.log("[LootAura][QueueDebug]", {
+      rawHref,
+      resolvedHref,
+      passedListingFilter,
+      exclusionReason,
+    });
+  }
+
   const resolvedUrls = anchors
     .map((a) => {
       try {

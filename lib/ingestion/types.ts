@@ -11,6 +11,8 @@ export const FAILURE_REASONS = [
   'duplicate_detected',
   'parse_failed',
   'publish_error',
+  /** Past listing window (date_end); not an operational publish failure. */
+  'sale_expired',
 ] as const
 
 export type FailureReason = (typeof FAILURE_REASONS)[number]
@@ -24,6 +26,8 @@ export type IngestionStatus =
   | 'publishing'
   | 'published'
   | 'publish_failed'
+  /** Listing date_end before UTC publish date; terminal, not publish_failed. */
+  | 'expired'
   | 'rejected'
 
 /**

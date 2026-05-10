@@ -9,6 +9,7 @@ export interface IngestionMetricsResponse {
   failureBreakdown: {
     needs_check: number
     publish_failed: number
+    expired: number
     ready: number
     publishing: number
   }
@@ -20,6 +21,7 @@ export interface IngestionMetricsResponse {
     claimedByHour: Array<{ bucket: string; count: number }>
     geocodeSuccessByHour: Array<{ bucket: string; count: number }>
     publishSuccessByHour: Array<{ bucket: string; count: number }>
+    publishExpiredByHour: Array<{ bucket: string; count: number }>
   }
   orchestrationVisibility: {
     lockSkippedRuns48h: number

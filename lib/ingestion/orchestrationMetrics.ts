@@ -126,6 +126,7 @@ const emptyPublish: PublishWorkerBatchSummary = {
   succeeded: 0,
   failed: 0,
   skipped: 0,
+  expired: 0,
 }
 
 export async function recordIngestionOrchestrationRun(params: {
@@ -155,6 +156,7 @@ export async function recordIngestionOrchestrationRun(params: {
       publish_attempted_count: publish.attempted,
       publish_succeeded_count: publish.succeeded,
       publish_failed_count: publish.failed,
+      publish_expired_count: publish.expired,
       publish_skipped_count: publish.skipped,
       duration_ms: params.orchestrationGeoPublishDurationMs,
       rate_429_count: geocode.rate429Count,
@@ -213,6 +215,7 @@ export async function recordGeocodeCronOrchestrationRun(params: {
       publish_attempted_count: 0,
       publish_succeeded_count: 0,
       publish_failed_count: 0,
+      publish_expired_count: 0,
       publish_skipped_count: 0,
       duration_ms: params.durationMs,
       rate_429_count: params.rate429Count ?? 0,

@@ -15,6 +15,7 @@ const AllowedStatusSchema = z.enum([
   'publishing',
   'published',
   'publish_failed',
+  'expired',
   'rejected',
 ])
 
@@ -75,6 +76,7 @@ async function listIngestedSalesHandler(request: NextRequest) {
       ready: 0,
       published: 0,
       publish_failed: 0,
+      expired: 0,
     }
     const failureCounts: Record<string, number> = {}
 

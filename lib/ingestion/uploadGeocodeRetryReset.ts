@@ -21,6 +21,7 @@ export function priorIndicatesTerminalGeocodeFailureForRetryReset(prior: {
 }): boolean {
   if ((prior.geocode_attempts ?? 0) >= 3) return true
   if (prior.status === 'needs_check') return true
+  if (prior.status === 'expired') return true
   return priorFailureReasonsIncludeGeocodeFailed(prior.failure_reasons)
 }
 

@@ -116,6 +116,12 @@ export default function IngestionDashboardClient() {
       count: row.count,
     })) ?? []
 
+  const publishExpiredOrchestrationData =
+    data?.timeseries.publishExpiredByHour.map((row) => ({
+      label: formatHourLabel(row.bucket),
+      count: row.count,
+    })) ?? []
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 text-gray-900">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -256,7 +262,7 @@ export default function IngestionDashboardClient() {
               </ChartCard>
             </div>
 
-            <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
               <ChartCard title="Orchestration: claimed rows / hour">
                 <ChartWrap>
                   <ResponsiveContainer width="100%" height="100%">
@@ -292,6 +298,19 @@ export default function IngestionDashboardClient() {
                       <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                       <Tooltip />
                       <Bar dataKey="count" fill="#4f46e5" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartWrap>
+              </ChartCard>
+              <ChartCard title="Orchestration: publish expired (past date_end) / hour">
+                <ChartWrap>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={publishExpiredOrchestrationData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={4} angle={-35} textAnchor="end" height={60} />
+                      <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#78716c" />
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartWrap>
@@ -338,7 +357,8 @@ export default function IngestionDashboardClient() {
                       {data.oldestStuckRows.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-4 text-gray-500">
-                            No rows in needs_geocode / ready / publishing / publish_failed.
+                            No operational stuck rows (needs_geocode / ready / publishing / publish_failed). Expired
+                            sale windows appear in failure breakdown and publish expired charts, not here.
                           </td>
                         </tr>
                       ) : (

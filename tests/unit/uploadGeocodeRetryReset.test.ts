@@ -68,6 +68,16 @@ describe('priorIndicatesTerminalGeocodeFailureForRetryReset', () => {
       })
     ).toBe(false)
   })
+
+  it('is true for expired (re-upload after fixing dates)', () => {
+    expect(
+      priorIndicatesTerminalGeocodeFailureForRetryReset({
+        status: 'expired',
+        failure_reasons: ['sale_expired'],
+        geocode_attempts: 0,
+      })
+    ).toBe(true)
+  })
 })
 
 describe('shouldResetGeocodeRetryAfterUploadUpdate', () => {
@@ -118,6 +128,19 @@ describe('shouldResetGeocodeRetryAfterUploadUpdate', () => {
           status: 'needs_geocode',
           failure_reasons: [],
           geocode_attempts: 3,
+        },
+      })
+    ).toBe(true)
+  })
+
+  it('resets when prior expired and new needs_geocode', () => {
+    expect(
+      shouldResetGeocodeRetryAfterUploadUpdate({
+        newStatus: 'needs_geocode',
+        prior: {
+          status: 'expired',
+          failure_reasons: ['sale_expired'],
+          geocode_attempts: 0,
         },
       })
     ).toBe(true)

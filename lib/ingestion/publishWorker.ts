@@ -14,7 +14,7 @@ import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisp
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
-  | { ok: true; skipped: true; reason: 'not_eligible' }
+  | { ok: true; skipped: true; reason: 'not_eligible' | 'past_end_date' }
   | { ok: false; error: string }
 
 interface ClaimedPublishRow {
@@ -47,10 +47,12 @@ export interface PublishWorkerBatchSummary {
   attempted: number
   /** Rows finalized as `published` (including idempotent duplicate-key reuse). */
   succeeded: number
-  /** Rows in `publish_failed` or unrecoverable finalize errors after claim. */
+  /** Operational failures only (`publish_failed`); excludes past-date `expired`. */
   failed: number
   /** Claimed rows not published (e.g. not eligible); batch path is usually 0. */
   skipped: number
+  /** Rows closed as `expired` (past `date_end` vs UTC today). */
+  expired: number
 }
 
 export interface LinkedSaleFinalizeSummary {
@@ -178,7 +180,7 @@ function isTransientPublishFailureDetails(value: unknown): boolean {
 export async function tryPersistPublishFailedWhilePublishing(
   rowId: string,
   payload: Record<string, unknown>,
-  logContext: { operation: string; phase: PublishFailureDetails['phase'] }
+  logContext: { operation: string; phase: PublishFailureDetails['phase'] | 'sale_window' }
 ): Promise<boolean> {
   const admin = getAdminDb()
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -242,7 +244,9 @@ type LinkedSaleRow = {
 
 function sanitizeFailureReasonsAfterLinkedFinalize(value: unknown): FailureReason[] | null {
   const reasons = toFailureReasons(value)
-  const next = reasons.filter((reason) => reason !== 'publish_error' && reason !== 'invalid_date')
+  const next = reasons.filter(
+    (reason) => reason !== 'publish_error' && reason !== 'invalid_date' && reason !== 'sale_expired'
+  )
   if (next.length === reasons.length) {
     return null
   }
@@ -337,7 +341,7 @@ export async function finalizeLinkedPublishedIngestedSales(
         reason: 'link_mismatch',
       })
       const nextReasons =
-        row.status === 'publish_failed'
+        row.status === 'publish_failed' || row.status === 'expired'
           ? toFailureReasons(row.failure_reasons)
           : appendFailureReason(toFailureReasons(row.failure_reasons), 'publish_error')
       const mismatchDetails = buildPublishFailureDetails(
@@ -1090,7 +1094,8 @@ async function markIngestedPublishFailedFromSaleCreateError(
   }
 }
 
-async function markIngestedPublishFailedValidation(
+/** Past listing window: terminal `expired`, not operational `publish_failed`. */
+async function markIngestedExpiredPastEndDate(
   rowId: string,
   existingFailureReasons: unknown,
   operation: string,
@@ -1098,41 +1103,40 @@ async function markIngestedPublishFailedValidation(
   state: string | null,
   dateEnd: string
 ): Promise<void> {
-  const message = `terminal validation failure: date_end ${dateEnd} is before ${utcTodayDateString()}`
-  const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'publish_error')
+  const today = utcTodayDateString()
+  const mergedReasons = appendFailureReason(toFailureReasons(existingFailureReasons), 'sale_expired')
   const payload = {
-    status: 'publish_failed' as const,
+    status: 'expired' as const,
     failure_reasons: mergedReasons,
-    failure_details: buildPublishFailureDetails(message, {
-      phase: 'validation',
+    failure_details: {
+      kind: 'ingestion_expired' as const,
+      reason: 'past_end_date' as const,
+      message: `listing date_end ${dateEnd} is before ${today} (UTC calendar compare)`,
+      original_date_end: dateEnd,
+      reference_today_utc: today,
       operation,
-      reason: 'past_end_date',
-      originalDateEnd: dateEnd,
-      city,
-      state,
-    }),
+      region: { city: city ?? null, state: state ?? null },
+    },
   }
 
-  logPublishFailureStructured({
-    rowId,
-    message,
-    phase: 'validation',
+  logger.info('ingested_sales expired (past date_end)', {
+    component: 'ingestion/publishWorker',
     operation,
-    city,
-    state,
-    reason: 'past_end_date',
+    rowId,
     dateEnd,
+    city: city ?? undefined,
+    state: state ?? undefined,
   })
 
   const persisted = await tryPersistPublishFailedWhilePublishing(rowId, payload, {
     operation,
-    phase: 'validation',
+    phase: 'sale_window',
   })
   if (!persisted) {
     logger.error(
-      'markIngestedPublishFailedValidation could not persist publish_failed (row not in publishing or DB error)',
-      new Error(message),
-      { component: 'ingestion/publishWorker', operation, rowId, phase: 'validation', reason: 'past_end_date' }
+      'markIngestedExpiredPastEndDate could not persist expired (row not in publishing or DB error)',
+      new Error(`past_end_date ${dateEnd}`),
+      { component: 'ingestion/publishWorker', operation, rowId, phase: 'sale_window', reason: 'past_end_date' }
     )
   }
 }
@@ -1217,7 +1221,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
 
   const claimed = row as unknown as ClaimedPublishRow
   if (hasPastEndDate(claimed.date_end)) {
-    await markIngestedPublishFailedValidation(
+    await markIngestedExpiredPastEndDate(
       claimed.id,
       claimed.failure_reasons,
       'validate_end_date_single',
@@ -1225,7 +1229,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
       claimed.state,
       claimed.date_end as string
     )
-    return { ok: false, error: `publish blocked: past end date (${claimed.date_end})` }
+    return { ok: true, skipped: true, reason: 'past_end_date' }
   }
 
   let createdSaleId: string | null = null
@@ -1349,11 +1353,12 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
     succeeded: 0,
     failed: 0,
     skipped: 0,
+    expired: 0,
   }
 
   for (const row of claimedRows) {
     if (hasPastEndDate(row.date_end)) {
-      await markIngestedPublishFailedValidation(
+      await markIngestedExpiredPastEndDate(
         row.id,
         row.failure_reasons,
         'validate_end_date_batch',
@@ -1361,7 +1366,7 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
         row.state,
         row.date_end as string
       )
-      summary.failed += 1
+      summary.expired += 1
       continue
     }
 
@@ -1473,6 +1478,7 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
     succeeded: summary.succeeded,
     failed: summary.failed,
     skipped: summary.skipped,
+    expired: summary.expired,
   })
 
   return summary

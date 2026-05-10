@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
       'publishing',
       'published',
       'publish_failed',
+      'expired',
       'rejected',
     ] as const
 
@@ -156,6 +157,7 @@ export async function GET(request: NextRequest) {
       claimed_count: number
       geocode_succeeded_count: number
       publish_succeeded_count: number
+      publish_expired_count: number
       notes: {
         external_ingestion?: {
           budgetExit?: boolean
@@ -163,8 +165,11 @@ export async function GET(request: NextRequest) {
           overlapPrevented?: boolean
         }
       } | null
-    }>(admin, 'ingestion_orchestration_runs', 'created_at, duration_ms, rate_429_count, claimed_count, geocode_succeeded_count, publish_succeeded_count, notes', (q) =>
-      q.gte('created_at', iso48h)
+    }>(
+      admin,
+      'ingestion_orchestration_runs',
+      'created_at, duration_ms, rate_429_count, claimed_count, geocode_succeeded_count, publish_succeeded_count, publish_expired_count, notes',
+      (q) => q.gte('created_at', iso48h)
     )
 
     const [
@@ -210,6 +215,7 @@ export async function GET(request: NextRequest) {
     const failureBreakdown = {
       needs_check: statusMap.needs_check,
       publish_failed: statusMap.publish_failed,
+      expired: statusMap.expired,
       ready: statusMap.ready,
       publishing: statusMap.publishing,
     }
@@ -238,6 +244,7 @@ export async function GET(request: NextRequest) {
     const claimedByHour = buildEmptyHourBuckets(HOURS)
     const geocodeSuccessByHour = buildEmptyHourBuckets(HOURS)
     const publishSuccessByHour = buildEmptyHourBuckets(HOURS)
+    const publishExpiredByHour = buildEmptyHourBuckets(HOURS)
 
     for (const row of orchRows) {
       if (!row.created_at) continue
@@ -249,6 +256,7 @@ export async function GET(request: NextRequest) {
       claimedByHour.set(k, (claimedByHour.get(k) ?? 0) + row.claimed_count)
       geocodeSuccessByHour.set(k, (geocodeSuccessByHour.get(k) ?? 0) + row.geocode_succeeded_count)
       publishSuccessByHour.set(k, (publishSuccessByHour.get(k) ?? 0) + row.publish_succeeded_count)
+      publishExpiredByHour.set(k, (publishExpiredByHour.get(k) ?? 0) + (row.publish_expired_count ?? 0))
     }
 
     let lockSkippedRuns48h = 0
@@ -293,6 +301,7 @@ export async function GET(request: NextRequest) {
         claimedByHour: mapToSortedSeries(claimedByHour),
         geocodeSuccessByHour: mapToSortedSeries(geocodeSuccessByHour),
         publishSuccessByHour: mapToSortedSeries(publishSuccessByHour),
+        publishExpiredByHour: mapToSortedSeries(publishExpiredByHour),
       },
       orchestrationVisibility: {
         lockSkippedRuns48h,

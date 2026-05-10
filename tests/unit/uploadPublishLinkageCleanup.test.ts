@@ -28,8 +28,9 @@ describe('publishLinkageFieldsToClearOnReopenUpload', () => {
     expect(publishLinkageFieldsToClearOnReopenUpload('published')).toBeNull()
   })
 
-  it('returns null for other statuses (e.g. publish_failed)', () => {
+  it('returns null for other statuses (e.g. publish_failed, expired)', () => {
     expect(publishLinkageFieldsToClearOnReopenUpload('publish_failed')).toBeNull()
+    expect(publishLinkageFieldsToClearOnReopenUpload('expired')).toBeNull()
     expect(publishLinkageFieldsToClearOnReopenUpload('rejected')).toBeNull()
   })
 })

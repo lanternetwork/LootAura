@@ -29,6 +29,40 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isYstmRegistrableHost(hostname) {
+  const host = String(hostname || "").toLowerCase();
+  return host === "yardsaletreasuremap.com" || host.endsWith(".yardsaletreasuremap.com");
+}
+
+/** True when href is a YSTM community sale page we queue (sale.php + communitysale + id-ish listing). */
+function isYstmCommunitySalePhpQueueUrl(href) {
+  try {
+    const u = new URL(href);
+    if (!isYstmRegistrableHost(u.hostname)) return false;
+    if (!/\/sale\.php$/i.test(u.pathname)) return false;
+    const cs = u.searchParams.get("communitysale");
+    return Boolean(cs != null && String(cs).trim() !== "");
+  } catch {
+    return false;
+  }
+}
+
+/** Same host/path/query shape as queue URLs; used on the detail page for address + city/state fallbacks. */
+function isYstmCommunitySalePhpPage(href) {
+  return isYstmCommunitySalePhpQueueUrl(href);
+}
+
+function isLegacyListingHtmlUrl(href) {
+  const u = String(href || "").toLowerCase();
+  return u.includes("/listing.html") || u.includes("/userlisting.html");
+}
+
+/** Queue discovery: legacy listing URLs (any host) OR YSTM sale.php?communitysale=… */
+function shouldQueueYstmUrl(href) {
+  if (isLegacyListingHtmlUrl(href)) return true;
+  return isYstmCommunitySalePhpQueueUrl(href);
+}
+
 function isYstmListPage() {
   const host = String(window.location.hostname || "").toLowerCase();
   const isYstmHost =
@@ -161,10 +195,9 @@ function buildQueueUrls() {
     if (!resolveOk) {
       exclusionReason = "invalid_href";
     } else {
-      const u = resolvedHref.toLowerCase();
-      passedListingFilter = u.includes("/listing.html") || u.includes("/userlisting.html");
+      passedListingFilter = shouldQueueYstmUrl(resolvedHref);
       if (!passedListingFilter) {
-        exclusionReason = "not_listing_or_userlisting_href";
+        exclusionReason = "not_queueable_sale_href";
       }
     }
     console.log("[LootAura][QueueDebug]", {
@@ -185,20 +218,17 @@ function buildQueueUrls() {
     })
     .filter(Boolean);
 
-  const listingUrls = resolvedUrls.filter((url) => {
-    const u = url.toLowerCase();
-    return u.includes("/listing.html") || u.includes("/userlisting.html");
-  });
+  const listingUrls = resolvedUrls.filter((url) => shouldQueueYstmUrl(url));
   const userListingHrefCount = resolvedUrls.filter((url) =>
     url.toLowerCase().includes("/userlisting.html")
   ).length;
   const listingHrefCount = resolvedUrls.filter((url) =>
     url.toLowerCase().includes("/listing.html")
   ).length;
-  const skippedNonListingHrefs = resolvedUrls.filter((url) => {
-    const u = url.toLowerCase();
-    return !u.includes("/listing.html") && !u.includes("/userlisting.html");
-  });
+  const salePhpCommunityHrefCount = resolvedUrls.filter((url) =>
+    isYstmCommunitySalePhpQueueUrl(url)
+  ).length;
+  const skippedNonListingHrefs = resolvedUrls.filter((url) => !shouldQueueYstmUrl(url));
 
   const unique = Array.from(new Set(listingUrls));
   const duplicateCount = Math.max(0, listingUrls.length - unique.length);
@@ -206,6 +236,7 @@ function buildQueueUrls() {
     totalAnchors: anchors.length,
     listingHrefCount,
     userListingHrefCount,
+    salePhpCommunityHrefCount,
     queuedCount: unique.length,
     duplicateCount,
     skippedNonListingHrefCount: skippedNonListingHrefs.length,
@@ -937,6 +968,101 @@ function extractYstmMetadataSaleDates(pageUrl) {
   return null;
 }
 
+function parseMetadataStrSalesArrayFromDocument() {
+  const scripts = Array.from(document.querySelectorAll("script"));
+  for (let s = 0; s < scripts.length; s++) {
+    const text = scripts[s].textContent || "";
+    const m = text.match(/metadataStr\s*=\s*'([\s\S]*?)';/);
+    if (!m?.[1]) continue;
+    try {
+      const parsed = JSON.parse(decodeJsSingleQuotedJson(m[1]));
+      if (parsed?.sales && Array.isArray(parsed.sales)) return parsed.sales;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+function metadataSaleRecordMatchesPage(sale, pageUrl) {
+  if (!sale || typeof sale !== "object") return false;
+  const normalizedPage = normalizeListingUrlForLookup(pageUrl);
+  const canonicalPage = canonicalizeUrl(pageUrl);
+  let pageId = null;
+  try {
+    pageId = new URL(pageUrl).searchParams.get("id");
+  } catch {
+    /* ignore */
+  }
+  if (typeof sale.url === "string") {
+    const nu = normalizeListingUrlForLookup(sale.url);
+    if (nu === normalizedPage) return true;
+    if (canonicalizeUrl(sale.url) === canonicalPage) return true;
+    if (normalizeListingUrlForLookup(sale.url) === normalizedPage) return true;
+    if (pageId && sale.url.includes(pageId)) return true;
+  }
+  return false;
+}
+
+function findMetadataSaleRecordForPage(pageUrl) {
+  const sales = parseMetadataStrSalesArrayFromDocument();
+  if (!sales) return null;
+  for (let i = 0; i < sales.length; i++) {
+    if (metadataSaleRecordMatchesPage(sales[i], pageUrl)) return sales[i];
+  }
+  return null;
+}
+
+function extractTrailingZip5FromAddressRaw(addressRaw) {
+  if (!addressRaw) return null;
+  const m = String(addressRaw).match(/\b(\d{5})(?:-\d{4})?\s*$/);
+  return m ? m[1] : null;
+}
+
+/** Requires a ", City, ST ZIP" fragment already present in page text (narrow; no ZIP tables). */
+function extractCityStateCommaZipFromPageText(zip5) {
+  if (!zip5 || !/^\d{5}$/.test(zip5)) return { city: "", state: "" };
+  const body = document.body?.innerText || "";
+  const re = new RegExp(",\\s*([^,\\n]{2,80}?),\\s*([A-Z]{2})\\s+" + zip5 + "(?:\\D|$)", "im");
+  const m = body.match(re);
+  if (!m) return { city: "", state: "" };
+  return {
+    city: normalizeCityFromPathSegment(m[1].trim()),
+    state: m[2].toUpperCase(),
+  };
+}
+
+/**
+ * sale.php community pages only: metadata sale.address tail, else same-page ", City, ST ZIP" near street ZIP.
+ * Does not use hub/session city or unrelated prose.
+ */
+function resolveSalePhpCommunityCityState(pageUrl, addressRaw) {
+  if (!isYstmCommunitySalePhpPage(pageUrl)) return null;
+
+  const sale = findMetadataSaleRecordForPage(pageUrl);
+  if (sale && typeof sale.address === "string") {
+    const normalizedAddr = sale.address.replace(/\s+/g, " ").trim();
+    const tail = extractAddressTailCityStateForAuthority(normalizedAddr);
+    if (tail.addressTailCity && tail.addressTailState) {
+      return {
+        city: tail.addressTailCity,
+        state: tail.addressTailState,
+        source: "metadata_sale_address",
+      };
+    }
+  }
+
+  const zip = extractTrailingZip5FromAddressRaw(addressRaw);
+  if (zip) {
+    const near = extractCityStateCommaZipFromPageText(zip);
+    if (near.city && near.state) {
+      return { city: near.city, state: near.state, source: "page_text_comma_before_zip" };
+    }
+  }
+
+  return null;
+}
+
 function extractDomPrimaryDateRaw() {
   const body = document.body.innerText || "";
   const chunk = body.slice(0, 12000);
@@ -1085,7 +1211,7 @@ function extractDescription() {
   return description;
 }
 
-/** US-style street + city + state on one line; no heuristic fallback. */
+/** US-style street + city + state on one line; on YSTM sale.php community pages also street + ZIP. */
 function extractAddress() {
   const lines = (document.body.innerText || "")
     .split("\n")
@@ -1094,11 +1220,27 @@ function extractAddress() {
 
   const pattern =
     /\d{3,6}\s+[A-Za-z0-9.\-\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?/i;
-  const line = lines.find((l) => pattern.test(l)) ?? null;
+  const fullLine = lines.find((l) => pattern.test(l)) ?? null;
 
-  const addressRaw = line ? line.slice(0, 500) : null;
-  console.log("Address extracted:", addressRaw);
-  return addressRaw;
+  if (fullLine) {
+    const addressRaw = fullLine.slice(0, 500);
+    console.log("Address extracted:", addressRaw);
+    return addressRaw;
+  }
+
+  if (typeof window !== "undefined" && isYstmCommunitySalePhpPage(window.location.href)) {
+    const streetZip =
+      /^\d{3,6}\s+[A-Za-z0-9.'#\-\s]+\s+\d{5}(?:-\d{4})?$/i;
+    const szLine = lines.find((l) => streetZip.test(l.trim()));
+    if (szLine) {
+      const addressRaw = szLine.trim().slice(0, 500);
+      console.log("Address extracted (street+ZIP):", addressRaw);
+      return addressRaw;
+    }
+  }
+
+  console.log("Address extracted:", null);
+  return null;
 }
 
 /** City + 2-letter state at end of line: `City, ST`, `City, ST ZIP`, or `City, ST ZIP, USA`. */
@@ -1192,8 +1334,19 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
     resolvedState = tail.addressTailState || urlDerived.state || legacy.state || "";
   }
 
+  if ((!resolvedCity || !resolvedState) && isYstmCommunitySalePhpPage(currentUrl)) {
+    const fb = resolveSalePhpCommunityCityState(currentUrl, addressRaw);
+    if (fb && fb.city && fb.state) {
+      resolvedCity = fb.city;
+      resolvedState = fb.state;
+    }
+  }
+
   if (!resolvedCity || !resolvedState) {
-    throw new Error("Unable to determine city/state from listing address or URL");
+    const detail = isYstmCommunitySalePhpPage(currentUrl)
+      ? "Unable to determine city/state for this community sale (metadata address with City, ST, or a City, ST ZIP line on this page)."
+      : "Unable to determine city/state from listing address or URL";
+    throw new Error(detail);
   }
   const imageExtract = extractImages();
   const dateRaw = buildCanonicalDateRaw(currentUrl);
@@ -1437,6 +1590,10 @@ if (typeof globalThis !== "undefined") {
     cleanExtractedDescription,
     normalizeCityFromPathSegment,
     deriveCityStateFromUrl,
+    shouldQueueYstmUrl,
+    isYstmCommunitySalePhpPage,
+    resolveSalePhpCommunityCityState,
+    buildSubmissionPayload,
   };
 }
 })();

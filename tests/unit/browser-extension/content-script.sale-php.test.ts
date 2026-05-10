@@ -11,7 +11,8 @@ import { JSDOM } from 'jsdom'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CONTENT_SCRIPT = readFileSync(join(__dirname, '../../../browser-extension/content-script.js'), 'utf8')
 
-type TestWin = Window & {
+/** Narrow jsdom window shape for tests — do not extend global `Window` (avoids DOMWindow vs Window TS2352). */
+type LootAuraDomWindow = {
   chrome?: {
     runtime: { onMessage: { addListener: () => void } }
     storage: {
@@ -37,7 +38,11 @@ type TestWin = Window & {
   }
 }
 
-function installChrome(win: TestWin) {
+function testWindow(dom: JSDOM): LootAuraDomWindow {
+  return dom.window as unknown as LootAuraDomWindow
+}
+
+function installChrome(win: LootAuraDomWindow) {
   win.chrome = {
     runtime: { onMessage: { addListener: () => {} } },
     storage: {
@@ -57,7 +62,7 @@ function installChrome(win: TestWin) {
 }
 
 function loadContentScript(dom: JSDOM) {
-  installChrome(dom.window as TestWin)
+  installChrome(testWindow(dom))
   runInContext(CONTENT_SCRIPT, dom.getInternalVMContext())
 }
 
@@ -71,7 +76,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     expect(t?.shouldQueueYstmUrl('https://yardsaletreasuremap.com/US/Illinois/Antioch/101-Main-St/100/listing.html')).toBe(
       true
     )
@@ -88,7 +93,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     expect(t?.shouldQueueYstmUrl(SALE_PHP_URL)).toBe(true)
   })
 
@@ -98,7 +103,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     expect(t?.shouldQueueYstmUrl('https://yardsaletreasuremap.com/sale.php?id=1')).toBe(false)
   })
 
@@ -108,7 +113,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     expect(t?.shouldQueueYstmUrl('https://evil.example/sale.php?communitysale=1&id=1')).toBe(false)
   })
 
@@ -128,7 +133,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     const out = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1751 N Lafayette St 46319')
     expect(out).toMatchObject({
       city: 'Griffith',
@@ -147,7 +152,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     const out = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1751 N Lafayette St 46319')
     expect(out).toMatchObject({
       city: 'Griffith',
@@ -173,7 +178,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     const payload = t?.buildSubmissionPayload(
       { city: 'Chicago', state: 'IL' },
       SALE_PHP_URL,
@@ -190,7 +195,7 @@ describe('YSTM sale.php community sale (extension)', () => {
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = (dom.window as TestWin).__LootAuraContentScriptTest
+    const t = testWindow(dom).__LootAuraContentScriptTest
     expect(() =>
       t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, SALE_PHP_URL, [])
     ).toThrow(/community sale/)

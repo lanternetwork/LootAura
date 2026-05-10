@@ -25,9 +25,110 @@ function canonicalizeUrl(url) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isYstmListPage() {
+  const host = String(window.location.hostname || "").toLowerCase();
+  if (!host.includes("yardsaletreasuremap.com")) return false;
+  const path = String(window.location.pathname || "").toLowerCase();
+  return !path.includes("/listing.html") && !path.includes("/userlisting.html");
+}
+
+async function waitForDomIdle(idleMs = 500, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    let idleTimer = null;
+    let timeoutTimer = null;
+    let observer = null;
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (idleTimer) clearTimeout(idleTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (observer) observer.disconnect();
+      resolve(Date.now() - start);
+    };
+
+    const scheduleIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(finish, idleMs);
+    };
+
+    timeoutTimer = setTimeout(finish, timeoutMs);
+    scheduleIdle();
+
+    try {
+      observer = new MutationObserver(() => {
+        scheduleIdle();
+      });
+      observer.observe(document.body || document.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: false,
+        characterData: false,
+      });
+    } catch {
+      finish();
+    }
+  });
+}
+
+async function materializeYstmListRows(options = {}) {
+  if (!isYstmListPage()) return { enabled: false, passes: 0, elapsedMs: 0, heightDelta: 0 };
+  const maxPasses = Number.isFinite(options.maxPasses) ? Math.max(1, Math.min(8, options.maxPasses)) : 5;
+  const passDelayMs =
+    Number.isFinite(options.passDelayMs) ? Math.max(80, Math.min(1200, options.passDelayMs)) : 240;
+  const startY = window.scrollY || 0;
+  const startHeight = Math.max(
+    document.body?.scrollHeight || 0,
+    document.documentElement?.scrollHeight || 0
+  );
+  const start = Date.now();
+  let stablePasses = 0;
+  let lastHeight = startHeight;
+  let passes = 0;
+
+  for (let i = 0; i < maxPasses; i++) {
+    passes += 1;
+    const targetHeight = Math.max(
+      document.body?.scrollHeight || 0,
+      document.documentElement?.scrollHeight || 0
+    );
+    window.scrollTo({ top: targetHeight, behavior: "auto" });
+    await sleep(passDelayMs);
+
+    const nextHeight = Math.max(
+      document.body?.scrollHeight || 0,
+      document.documentElement?.scrollHeight || 0
+    );
+    if (nextHeight <= lastHeight) {
+      stablePasses += 1;
+      if (stablePasses >= 2) break;
+    } else {
+      stablePasses = 0;
+    }
+    lastHeight = nextHeight;
+  }
+
+  window.scrollTo({ top: startY, behavior: "auto" });
+  await sleep(80);
+
+  return {
+    enabled: true,
+    passes,
+    elapsedMs: Date.now() - start,
+    heightDelta: Math.max(0, lastHeight - startHeight),
+  };
+}
+
 function buildQueueUrls() {
+  const scanStart = Date.now();
   const anchors = Array.from(document.querySelectorAll("a[href]"));
-  const urls = anchors
+  const resolvedUrls = anchors
     .map((a) => {
       try {
         return new URL(a.getAttribute("href"), window.location.origin).href;
@@ -37,18 +138,38 @@ function buildQueueUrls() {
     })
     .filter(Boolean);
 
-  const listingUrls = urls.filter((url) => {
+  const listingUrls = resolvedUrls.filter((url) => {
     const u = url.toLowerCase();
     return u.includes("/listing.html") || u.includes("/userlisting.html");
   });
+  const userListingHrefCount = resolvedUrls.filter((url) =>
+    url.toLowerCase().includes("/userlisting.html")
+  ).length;
+  const listingHrefCount = resolvedUrls.filter((url) =>
+    url.toLowerCase().includes("/listing.html")
+  ).length;
+  const skippedNonListingHrefs = resolvedUrls.filter((url) => {
+    const u = url.toLowerCase();
+    return !u.includes("/listing.html") && !u.includes("/userlisting.html");
+  });
 
   const unique = Array.from(new Set(listingUrls));
+  const duplicateCount = Math.max(0, listingUrls.length - unique.length);
+  const diagnostics = {
+    totalAnchors: anchors.length,
+    listingHrefCount,
+    userListingHrefCount,
+    queuedCount: unique.length,
+    duplicateCount,
+    skippedNonListingHrefCount: skippedNonListingHrefs.length,
+    sampleSkippedHrefs: Array.from(new Set(skippedNonListingHrefs)).slice(0, 10),
+    scanDurationMs: Date.now() - scanStart,
+  };
 
-  console.log("Total anchors:", anchors.length);
-  console.log("Listing URLs found:", unique.length);
-  console.log("Sample URLs:", unique.slice(0, 5));
+  console.log("[LootAura][QueueDiag] Scan summary:", diagnostics);
+  console.log("[LootAura][QueueDiag] Sample queued URLs:", unique.slice(0, 5));
 
-  return unique;
+  return { urls: unique, diagnostics };
 }
 
 const STATE_NAME_TO_CODE = {
@@ -403,7 +524,19 @@ async function runPreflight() {
 }
 
 async function startSession() {
-  const urls = buildQueueUrls();
+  const domIdleMs = await waitForDomIdle(500, 4000);
+  const materialization = await materializeYstmListRows({
+    maxPasses: 5,
+    passDelayMs: 240,
+  });
+  const postMaterializeIdleMs = await waitForDomIdle(450, 2500);
+  const { urls, diagnostics } = buildQueueUrls();
+  console.log("[LootAura][QueueDiag] Pre-scan timing/materialization:", {
+    domIdleMs,
+    postMaterializeIdleMs,
+    materialization,
+  });
+  console.log("[LootAura][QueueDiag] Queue diagnostics:", diagnostics);
   if (urls.length === 0) {
     alert("No listings found on this page (no listing or userlisting URLs in links).");
     return;

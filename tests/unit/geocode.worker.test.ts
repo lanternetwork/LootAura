@@ -1,7 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { GeocodeAddressOutcome } from '@/lib/geocode/geocodeAddress'
+import {
+  buildIngestedGeocodeFailureDetailsV1,
+  mergeFailureDetailsWithGeocodeAttempt,
+  removeGeocodeSubDocumentFromFailureDetails,
+} from '@/lib/ingestion/geocodeWorker'
 
 const hoisted = vi.hoisted(() => ({
   maybeSingleResults: [] as Array<{ data: unknown; error: Error | null }>,
+  updatePayloads: [] as unknown[],
   geocodeAddress: vi.fn(),
   publishReadyIngestedSaleById: vi.fn(),
   adminRpc: vi.fn(),
@@ -40,6 +47,12 @@ function createQueryBuilder() {
       if (prop === 'rpc') {
         return async () => ({ data: [], error: null })
       }
+      if (prop === 'update') {
+        return (payload: unknown) => {
+          hoisted.updatePayloads.push(payload)
+          return self
+        }
+      }
       return () => self
     },
   })
@@ -55,6 +68,7 @@ describe('geocodeIngestedSaleById', () => {
   beforeEach(async () => {
     vi.resetModules()
     hoisted.maybeSingleResults = []
+    hoisted.updatePayloads = []
     hoisted.geocodeAddress.mockReset()
     hoisted.publishReadyIngestedSaleById.mockReset()
     hoisted.adminRpc.mockReset()
@@ -148,6 +162,10 @@ describe('geocodeIngestedSaleById', () => {
       error: null,
     })
     hoisted.maybeSingleResults.push({
+      data: { failure_details: { geocode: { providerClassification: 'empty_results', attemptCount: 1 } } },
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
       data: { id: '00000000-0000-4000-8000-000000000003' },
       error: null,
     })
@@ -168,6 +186,10 @@ describe('geocodeIngestedSaleById', () => {
       state: 'KY',
     })
     expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000003')
+    const readyUpdate = hoisted.updatePayloads.find(
+      (u) => u && typeof u === 'object' && 'lat' in (u as Record<string, unknown>)
+    ) as Record<string, unknown> | undefined
+    expect(readyUpdate?.failure_details).toBeNull()
   })
 
   it('by-id uses address_raw when normalized_address is empty', async () => {
@@ -192,6 +214,10 @@ describe('geocodeIngestedSaleById', () => {
       error: null,
     })
     hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
       data: { id: '00000000-0000-4000-8000-000000000004' },
       error: null,
     })
@@ -211,6 +237,10 @@ describe('geocodeIngestedSaleById', () => {
       city: 'Louisville',
       state: 'KY',
     })
+    const readyUpdate = hoisted.updatePayloads.find(
+      (u) => u && typeof u === 'object' && 'lat' in (u as Record<string, unknown>)
+    ) as Record<string, unknown> | undefined
+    expect(readyUpdate?.failure_details).toBeNull()
   })
 })
 
@@ -225,6 +255,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
   beforeEach(async () => {
     vi.resetModules()
     hoisted.maybeSingleResults = []
+    hoisted.updatePayloads = []
     hoisted.geocodeAddress.mockReset()
     hoisted.publishReadyIngestedSaleById.mockReset()
     hoisted.adminRpc.mockReset()
@@ -246,6 +277,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
           geocode_attempts: 1,
         },
       ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
       error: null,
     })
     hoisted.maybeSingleResults.push({
@@ -278,6 +313,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
           geocode_attempts: 1,
         },
       ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
       error: null,
     })
     hoisted.maybeSingleResults.push({
@@ -317,6 +356,12 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       noCoordsReason: 'empty_results',
       providerClassification: 'empty_results',
       queryFingerprint: 'abc123',
+      geocodeCityRaw: 'Louisville',
+      geocodeCityNormalized: 'Louisville',
+    })
+    hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
+      error: null,
     })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
@@ -327,6 +372,18 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(summary.repeatedEmptyResultRetries).toBe(1)
     expect(summary.providerNoCoordsSummary).toMatchObject({ empty_results: 1 })
     expect(summary.repeatedEmptyResultQueryFingerprints).toMatchObject({ abc123: 1 })
+    const diagUpdate = hoisted.updatePayloads.find(
+      (u) =>
+        u &&
+        typeof u === 'object' &&
+        (u as Record<string, unknown>).failure_details != null &&
+        typeof (u as Record<string, unknown>).failure_details === 'object' &&
+        'geocode' in ((u as Record<string, unknown>).failure_details as object)
+    ) as Record<string, unknown> | undefined
+    const geocode = (diagUpdate?.failure_details as { geocode?: Record<string, unknown> })?.geocode
+    expect(geocode?.providerClassification).toBe('empty_results')
+    expect(geocode?.queryFingerprint).toBe('abc123')
+    expect(geocode?.attemptCount).toBe(2)
   })
 
   it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {
@@ -342,6 +399,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       ],
       error: null,
     })
+    hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
+      error: null,
+    })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const summary = await geocodePendingSales()
@@ -349,6 +410,22 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(summary.claimed).toBe(1)
     expect(summary.failedTerminal).toBe(1)
     expect(hoisted.geocodeAddress).not.toHaveBeenCalled()
+    const persistDiag = hoisted.updatePayloads.find(
+      (u) =>
+        u &&
+        typeof u === 'object' &&
+        (u as Record<string, unknown>).failure_details != null &&
+        typeof (u as Record<string, unknown>).failure_details === 'object' &&
+        'geocode' in ((u as Record<string, unknown>).failure_details as object)
+    ) as Record<string, unknown> | undefined
+    const geocode = (persistDiag?.failure_details as { geocode?: Record<string, unknown> })?.geocode
+    expect(geocode?.providerClassification).toBe('empty_results')
+    expect(geocode?.noCoordsReason).toBe('empty_input')
+    expect(geocode?.attemptCount).toBe(3)
+    const terminalUpdate = hoisted.updatePayloads.find(
+      (u) => u && typeof u === 'object' && (u as Record<string, unknown>).status === 'needs_check'
+    ) as Record<string, unknown> | undefined
+    expect(terminalUpdate).toBeDefined()
   })
 
   it('batch processes multiple claimed rows under concurrent pool', async () => {
@@ -372,7 +449,9 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       error: null,
     })
     hoisted.maybeSingleResults.push(
+      { data: { failure_details: null }, error: null },
       { data: { id: '00000000-0000-4000-8000-0000000000c1' }, error: null },
+      { data: { failure_details: null }, error: null },
       { data: { id: '00000000-0000-4000-8000-0000000000c2' }, error: null }
     )
     hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.6, lng: -85.3 }, hit429: false })
@@ -406,6 +485,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
           geocode_attempts: 1,
         },
       ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
       error: null,
     })
     hoisted.maybeSingleResults.push({
@@ -450,6 +533,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       error: null,
     })
     hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
       data: { id: '0cf56898-9e83-4172-8779-3da22cada7d2' },
       error: null,
     })
@@ -475,5 +562,143 @@ describe('geocodePendingSales (batch / RPC path)', () => {
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await expect(geocodePendingSales()).rejects.toThrow('rpc failed')
+  })
+
+  it('failed low_confidence attempt persists lowConfidenceReasons on failure_details.geocode', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b5',
+          normalized_address: '800 Low Conf',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
+      error: null,
+    })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'low_confidence',
+      providerClassification: 'low_confidence',
+      queryFingerprint: 'fp-lowconf',
+      lowConfidenceReasons: ['broad_match', 'city_mismatch'],
+      geocodeCityRaw: 'Louisville',
+      geocodeCityNormalized: 'Louisville',
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    const diagUpdate = hoisted.updatePayloads.find(
+      (u) =>
+        u &&
+        typeof u === 'object' &&
+        (u as Record<string, unknown>).failure_details != null &&
+        typeof (u as Record<string, unknown>).failure_details === 'object' &&
+        'geocode' in ((u as Record<string, unknown>).failure_details as object)
+    ) as Record<string, unknown> | undefined
+    const geocode = (diagUpdate?.failure_details as { geocode?: { lowConfidenceReasons?: string[] } })?.geocode
+    expect(geocode?.lowConfidenceReasons).toEqual(['broad_match', 'city_mismatch'])
+    expect(geocode?.providerClassification).toBe('low_confidence')
+  })
+
+  it('failed rate_limited attempt persists providerClassification rate_limited', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b6',
+          normalized_address: '900 Rate St',
+          address_raw: null,
+          geocode_attempts: 1,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({
+      data: { failure_details: null },
+      error: null,
+    })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: true,
+      noCoordsReason: 'rate_limited',
+      providerClassification: 'rate_limited',
+      queryFingerprint: 'fp429',
+      geocodeCityRaw: 'Louisville',
+      geocodeCityNormalized: 'Louisville',
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    await geocodePendingSales()
+
+    const diagUpdate = hoisted.updatePayloads.find(
+      (u) =>
+        u &&
+        typeof u === 'object' &&
+        (u as Record<string, unknown>).failure_details != null &&
+        typeof (u as Record<string, unknown>).failure_details === 'object' &&
+        'geocode' in ((u as Record<string, unknown>).failure_details as object)
+    ) as Record<string, unknown> | undefined
+    const geocode = (diagUpdate?.failure_details as { geocode?: { providerClassification?: string } })?.geocode
+    expect(geocode?.providerClassification).toBe('rate_limited')
+  })
+})
+
+describe('ingested geocode failure_details helpers', () => {
+  it('buildIngestedGeocodeFailureDetailsV1 maps provider fields and fingerprint', () => {
+    const geo = {
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'empty_results',
+      providerClassification: 'empty_results',
+      queryFingerprint: 'abcfpr19',
+      geocodeCityRaw: 'Louisville',
+      geocodeCityNormalized: 'Louisville',
+    } as GeocodeAddressOutcome
+    const d = buildIngestedGeocodeFailureDetailsV1(2, geo, '')
+    expect(d.schema_version).toBe(1)
+    expect(d.attemptCount).toBe(2)
+    expect(d.providerClassification).toBe('empty_results')
+    expect(d.queryFingerprint).toBe('abcfpr19')
+    expect(d.geocode_city_raw).toBe('Louisville')
+    expect(d.geocode_city_normalized).toBe('Louisville')
+  })
+
+  it('mergeFailureDetailsWithGeocodeAttempt preserves publish-shaped keys', () => {
+    const geo = {
+      coords: null,
+      hit429: false,
+      providerClassification: 'empty_results',
+      geocodeCityRaw: 'X',
+      geocodeCityNormalized: 'X',
+    } as GeocodeAddressOutcome
+    const g = buildIngestedGeocodeFailureDetailsV1(1, geo, '')
+    const merged = mergeFailureDetailsWithGeocodeAttempt(
+      { phase: 'create_sale', publish_error: 'timeout' },
+      g
+    )
+    expect(merged.phase).toBe('create_sale')
+    expect(merged.publish_error).toBe('timeout')
+    expect((merged.geocode as { providerClassification?: string }).providerClassification).toBe('empty_results')
+  })
+
+  it('removeGeocodeSubDocumentFromFailureDetails yields null when only geocode remained', () => {
+    const geo = {
+      coords: null,
+      hit429: false,
+      providerClassification: 'ok',
+      geocodeCityRaw: 'Y',
+      geocodeCityNormalized: 'Y',
+    } as GeocodeAddressOutcome
+    const g = buildIngestedGeocodeFailureDetailsV1(1, geo, '')
+    const onlyGeocode = mergeFailureDetailsWithGeocodeAttempt(null, g)
+    expect(removeGeocodeSubDocumentFromFailureDetails(onlyGeocode)).toBeNull()
   })
 })

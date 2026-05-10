@@ -1,8 +1,68 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
-import { geocodeAddress } from '@/lib/geocode/geocodeAddress'
+import { geocodeAddress, type GeocodeAddressOutcome } from '@/lib/geocode/geocodeAddress'
 import { logger } from '@/lib/log'
+import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
 import { publishReadyIngestedSaleById, type PublishReadyByIdResult } from '@/lib/ingestion/publishWorker'
 import type { FailureReason } from '@/lib/ingestion/types'
+
+/** Sub-key on `ingested_sales.failure_details` for last geocode attempt diagnostics (no street/query/PII beyond city). */
+export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION = 1 as const
+
+export type IngestedGeocodeFailureDetailsV1 = {
+  schema_version: typeof INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION
+  recorded_at: string
+  attemptCount: number
+  providerClassification: string
+  noCoordsReason?: string
+  queryFingerprint?: string
+  lowConfidenceReasons?: Array<'low_importance' | 'broad_match' | 'city_mismatch' | 'state_mismatch'>
+  geocode_city_raw: string | null
+  geocode_city_normalized: string | null
+  httpStatus?: number
+}
+
+export function buildIngestedGeocodeFailureDetailsV1(
+  attemptCount: number,
+  geo: GeocodeAddressOutcome,
+  fallbackCityTrimmed: string
+): IngestedGeocodeFailureDetailsV1 {
+  const raw = (geo.geocodeCityRaw ?? fallbackCityTrimmed).trim()
+  const norm = geo.geocodeCityNormalized?.trim()
+  return {
+    schema_version: INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION,
+    recorded_at: new Date().toISOString(),
+    attemptCount,
+    providerClassification: geo.providerClassification ?? 'unknown',
+    noCoordsReason: geo.noCoordsReason,
+    queryFingerprint: geo.queryFingerprint,
+    lowConfidenceReasons: geo.lowConfidenceReasons,
+    geocode_city_raw: raw.length > 0 ? raw : null,
+    geocode_city_normalized: norm && norm.length > 0 ? norm : null,
+    httpStatus: geo.httpStatus,
+  }
+}
+
+export function mergeFailureDetailsWithGeocodeAttempt(
+  existing: unknown,
+  geocode: IngestedGeocodeFailureDetailsV1
+): Record<string, unknown> {
+  const prior =
+    existing && typeof existing === 'object' && !Array.isArray(existing)
+      ? { ...(existing as Record<string, unknown>) }
+      : {}
+  prior.geocode = geocode
+  return prior
+}
+
+/** Removes `geocode` diagnostics; returns `null` when nothing else remains (DB-friendly). */
+export function removeGeocodeSubDocumentFromFailureDetails(existing: unknown): Record<string, unknown> | null {
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+    return null
+  }
+  const o = { ...(existing as Record<string, unknown>) }
+  delete o.geocode
+  return Object.keys(o).length === 0 ? null : o
+}
 
 interface ClaimedGeocodeRow {
   id: string
@@ -253,6 +313,52 @@ function streetLineForGeocode(row: ClaimedGeocodeRow): string {
   return row.address_raw?.trim() || ''
 }
 
+async function persistGeocodeAttemptFailureDetails(
+  admin: AdminDb,
+  rowId: string,
+  attemptCount: number,
+  geo: GeocodeAddressOutcome,
+  fallbackCityTrimmed: string
+): Promise<void> {
+  const details = buildIngestedGeocodeFailureDetailsV1(attemptCount, geo, fallbackCityTrimmed)
+  const { data: prior, error: selErr } = await fromBase(admin, 'ingested_sales')
+    .select('failure_details')
+    .eq('id', rowId)
+    .eq('status', 'needs_geocode')
+    .maybeSingle()
+
+  if (selErr) {
+    logger.warn('Geocode failure diagnostics read failed', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'persist_geocode_failure_details_select',
+      rowId,
+      message: selErr.message,
+    })
+    return
+  }
+  if (!prior) {
+    return
+  }
+
+  const merged = mergeFailureDetailsWithGeocodeAttempt(
+    (prior as { failure_details?: unknown }).failure_details,
+    details
+  )
+  const { error: upErr } = await fromBase(admin, 'ingested_sales')
+    .update({ failure_details: merged })
+    .eq('id', rowId)
+    .eq('status', 'needs_geocode')
+
+  if (upErr) {
+    logger.warn('Geocode failure diagnostics update failed', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'persist_geocode_failure_details_update',
+      rowId,
+      message: upErr.message,
+    })
+  }
+}
+
 async function markGeocodeTerminalNeedsCheck(
   admin: ReturnType<typeof getAdminDb>,
   rowId: string,
@@ -311,8 +417,24 @@ async function applyGeocodeSuccess(
   lat: number,
   lng: number
 ): Promise<{ kind: 'geocoded'; publish: PublishReadyByIdResult } | { kind: 'update_failed' }> {
+  const { data: priorRow, error: priorErr } = await fromBase(admin, 'ingested_sales')
+    .select('failure_details')
+    .eq('id', rowId)
+    .eq('status', 'needs_geocode')
+    .maybeSingle()
+
+  const clearedFailureDetails =
+    !priorErr && priorRow != null
+      ? removeGeocodeSubDocumentFromFailureDetails((priorRow as { failure_details?: unknown }).failure_details)
+      : undefined
+
+  const updatePayload: Record<string, unknown> = { lat, lng, status: 'ready' }
+  if (clearedFailureDetails !== undefined) {
+    updatePayload.failure_details = clearedFailureDetails
+  }
+
   const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
-    .update({ lat, lng, status: 'ready' })
+    .update(updatePayload)
     .eq('id', rowId)
     .eq('status', 'needs_geocode')
     .select('id')
@@ -467,6 +589,7 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
         httpStatus: geo.httpStatus,
       })
     }
+    await persistGeocodeAttemptFailureDetails(admin, rowId, attemptCount, geo, city)
     if (attemptCount >= 3) {
       const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')
       if (ok) {
@@ -534,6 +657,18 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
       attemptCount,
     }
   }
+
+  const cityNormalizedMissing =
+    city.length > 0 ? (normalizeLocalityForGeocodeQuery(city) ?? city) : undefined
+  const syntheticMissingLocalityGeo: GeocodeAddressOutcome = {
+    coords: null,
+    hit429: false,
+    noCoordsReason: 'empty_input',
+    providerClassification: 'empty_results',
+    geocodeCityRaw: city || undefined,
+    geocodeCityNormalized: cityNormalizedMissing,
+  }
+  await persistGeocodeAttemptFailureDetails(admin, rowId, attemptCount, syntheticMissingLocalityGeo, city)
 
   if (attemptCount >= 3) {
     const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')

@@ -60,6 +60,10 @@ export interface GeocodeAddressOutcome {
     | 'fetch_exception'
   /** Optional low-confidence reason flags for operator diagnostics. */
   lowConfidenceReasons?: Array<'low_importance' | 'broad_match' | 'city_mismatch' | 'state_mismatch'>
+  /** Ingestion row city (trimmed); persisted on failed attempts only (ops). */
+  geocodeCityRaw?: string
+  /** City token after `normalizeLocalityForGeocodeQuery`; persisted on failed attempts only. */
+  geocodeCityNormalized?: string
 }
 
 function normalizeWhitespace(value: string): string {
@@ -145,6 +149,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       hit429: false,
       noCoordsReason: 'empty_input',
       providerClassification: 'empty_results',
+      geocodeCityRaw: cityRaw || undefined,
+      geocodeCityNormalized: undefined,
     }
   }
 
@@ -190,6 +196,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         noCoordsReason: 'rate_limited',
         queryFingerprint,
         providerClassification: 'rate_limited',
+        geocodeCityRaw: cityRaw,
+        geocodeCityNormalized: cityNormalized,
       }
     }
 
@@ -210,6 +218,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         httpStatus: response.status,
         queryFingerprint,
         providerClassification: 'http_not_ok',
+        geocodeCityRaw: cityRaw,
+        geocodeCityNormalized: cityNormalized,
       }
     }
 
@@ -244,6 +254,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
           noCoordsReason: 'rate_limited_soft',
           queryFingerprint,
           providerClassification: 'rate_limited_soft',
+          geocodeCityRaw: cityRaw,
+          geocodeCityNormalized: cityNormalized,
         }
       }
       logger.info('Nominatim geocode outcome', {
@@ -260,6 +272,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         noCoordsReason: 'empty_results',
         queryFingerprint,
         providerClassification: 'empty_results',
+        geocodeCityRaw: cityRaw,
+        geocodeCityNormalized: cityNormalized,
       }
     }
 
@@ -280,6 +294,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         noCoordsReason: 'invalid_coordinates',
         queryFingerprint,
         providerClassification: 'invalid_coordinates',
+        geocodeCityRaw: cityRaw,
+        geocodeCityNormalized: cityNormalized,
       }
     }
 
@@ -335,6 +351,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
         queryFingerprint,
         providerClassification: 'low_confidence',
         lowConfidenceReasons,
+        geocodeCityRaw: cityRaw,
+        geocodeCityNormalized: cityNormalized,
       }
     }
 
@@ -346,7 +364,14 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       queryFingerprint,
       providerClassification: 'ok' as const,
     })
-    return { coords: { lat, lng }, hit429: false, queryFingerprint, providerClassification: 'ok' }
+    return {
+      coords: { lat, lng },
+      hit429: false,
+      queryFingerprint,
+      providerClassification: 'ok',
+      geocodeCityRaw: cityRaw,
+      geocodeCityNormalized: cityNormalized,
+    }
   } catch (error) {
     logger.error(
       'Nominatim geocode unexpected error',
@@ -364,6 +389,8 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
       hit429: false,
       noCoordsReason: 'fetch_exception',
       providerClassification: 'fetch_exception',
+      geocodeCityRaw: cityRaw,
+      geocodeCityNormalized: cityNormalized,
     }
   }
 }

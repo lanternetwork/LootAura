@@ -17,6 +17,7 @@ import { geocodeIngestedSaleById } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 import type { RawExternalSale, IngestionRunSummary, CityIngestionConfig, FailureReason } from '@/lib/ingestion/types'
 import { ensureIngestionCityConfigFromListingSource } from '@/lib/ingestion/ensureCityConfigFromListingSource'
+import { ensureIngestionCityConfigForValidatedLocality } from '@/lib/ingestion/ensureIngestionCityConfigForValidatedLocality'
 import {
   shouldResetGeocodeRetryAfterUploadUpdate,
   stripGeocodeFailedFromFailureReasons,
@@ -455,25 +456,52 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
       let hasMissingCityConfig = cityConfig.enabled === false
 
       if (hasMissingCityConfig && lookupCity && lookupState) {
-        const ensured = await ensureIngestionCityConfigFromListingSource(admin, {
+        logger.info('City ingestion config lookup miss (listing URL ensure may run)', {
+          component: 'ingestion/upload',
+          operation: 'lookup_city_config_miss',
+          requestId: opId,
+          ingestionRunId,
+          sourcePlatform: rawSale.sourcePlatform,
+          lookup_city: lookupCity,
+          lookup_state: lookupState,
+        })
+        const ensuredListing = await ensureIngestionCityConfigFromListingSource(admin, {
           city: lookupCity,
           stateCode: normalizeStateToCode(lookupState),
           sourcePlatform: rawSale.sourcePlatform,
           sourceUrl: rawSale.sourceUrl,
         })
-        if (ensured.ok) {
+        if (ensuredListing.ok) {
           lookupResult = await getCityConfig(rawSale.sourcePlatform, lookupCity, lookupState)
           cityConfig = lookupResult.config ?? cityConfig
           hasMissingCityConfig = cityConfig.enabled === false
           logger.info('City ingestion config auto-provisioned from listing URL', {
             component: 'ingestion/upload',
-            operation: 'ensure_city_config',
+            operation: 'ensure_city_config_listing_url',
             requestId: opId,
             ingestionRunId,
-            cityPageUrl: ensured.cityPageUrl,
+            cityPageUrl: ensuredListing.cityPageUrl,
             lookup_city: lookupCity,
             lookup_state: lookupState,
           })
+        }
+      }
+
+      if (hasMissingCityConfig && lookupCity && lookupState) {
+        const ensuredLocality = await ensureIngestionCityConfigForValidatedLocality(admin, {
+          sourcePlatform: rawSale.sourcePlatform,
+          sourceUrl: rawSale.sourceUrl,
+          city: lookupCity,
+          stateCode: normalizeStateToCode(lookupState),
+          resolvedAddressRaw: processed.resolvedAddressRaw ?? rawSale.addressRaw,
+          rawPayload: rawSale.rawPayload,
+          requestId: opId,
+          ingestionRunId,
+        })
+        if (ensuredLocality.ok) {
+          lookupResult = await getCityConfig(rawSale.sourcePlatform, lookupCity, lookupState)
+          cityConfig = lookupResult.config ?? cityConfig
+          hasMissingCityConfig = cityConfig.enabled === false
         }
       }
 

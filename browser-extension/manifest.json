@@ -9,7 +9,7 @@
     "https://*/*",
     "https://lootaura.com/*",
     "https://www.lootaura.com/*",
-    "https://loot-aura-bpn3ac3f4-lanternetworks-projects.vercel.app/*"
+    "https://loot-aura-mvpfhm5wu-lanternetworks-projects.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -17,7 +17,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["listingImageExtraction.js", "content-script.js"]
+      "js": ["listingImageExtraction.js", "zipLocalityResolver.js", "content-script.js"]
     }
   ],
   "action": {

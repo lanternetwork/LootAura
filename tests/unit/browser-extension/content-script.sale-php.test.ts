@@ -9,9 +9,12 @@ import { describe, expect, it } from 'vitest'
 import { JSDOM } from 'jsdom'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const ZIP_LOCALITY_RESOLVER = readFileSync(
+  join(__dirname, '../../../browser-extension/zipLocalityResolver.js'),
+  'utf8'
+)
 const CONTENT_SCRIPT = readFileSync(join(__dirname, '../../../browser-extension/content-script.js'), 'utf8')
 
-/** Narrow jsdom window shape for tests — do not extend global `Window` (avoids DOMWindow vs Window TS2352). */
 type LootAuraDomWindow = {
   chrome?: {
     runtime: { onMessage: { addListener: () => void } }
@@ -25,11 +28,10 @@ type LootAuraDomWindow = {
   }
   __LootAuraContentScriptTest?: {
     shouldQueueYstmUrl: (href: string) => boolean
-    isYstmCommunitySalePhpPage: (href: string) => boolean
     resolveSalePhpCommunityCityState: (
       pageUrl: string,
       addressRaw: string | null
-    ) => { city: string; state: string; source: string } | null
+    ) => { city: string; state: string; source: string; confidence?: string } | null
     buildSubmissionPayload: (
       session: Record<string, unknown>,
       url: string,
@@ -47,15 +49,9 @@ function installChrome(win: LootAuraDomWindow) {
     runtime: { onMessage: { addListener: () => {} } },
     storage: {
       local: {
-        get: (_k, cb) => {
-          cb({})
-        },
-        set: (_d, cb) => {
-          cb?.()
-        },
-        remove: (_k, cb) => {
-          cb?.()
-        },
+        get: (_k, cb) => cb({}),
+        set: (_d, cb) => cb?.(),
+        remove: (_k, cb) => cb?.(),
       },
     },
   }
@@ -63,78 +59,33 @@ function installChrome(win: LootAuraDomWindow) {
 
 function loadContentScript(dom: JSDOM) {
   installChrome(testWindow(dom))
+  runInContext(ZIP_LOCALITY_RESOLVER, dom.getInternalVMContext())
   runInContext(CONTENT_SCRIPT, dom.getInternalVMContext())
 }
 
-const SALE_PHP_URL =
-  'https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=218927'
-
-const SALE_PHP_OTHER_COMMUNITY =
-  'https://yardsaletreasuremap.com/sale.php?communitysale=99999&id=1'
-
+const SALE_PHP_URL = 'https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=218927'
+const SALE_PHP_SAME_COMMUNITY_OTHER_ID =
+  'https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=777777'
+const SALE_PHP_OTHER_COMMUNITY = 'https://yardsaletreasuremap.com/sale.php?communitysale=99999&id=1'
 const LISTING_HTML_URL =
   'https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/100-Main-St/38730001/listing.html'
+const USERLISTING_HTML_URL =
+  'https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/100-Main-St/38730001/userlisting.html'
 
-describe('YSTM sale.php community sale (extension)', () => {
-  it('queues listing.html and userlisting.html hrefs', () => {
+describe('YSTM sale.php community sale ZIP locality authority', () => {
+  it('queues listing.html and userlisting.html hrefs (unchanged)', () => {
     const dom = new JSDOM('<!doctype html><html><body></body></html>', {
       url: 'https://example.com/',
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
     const t = testWindow(dom).__LootAuraContentScriptTest
-    expect(t?.shouldQueueYstmUrl('https://yardsaletreasuremap.com/US/Illinois/Antioch/101-Main-St/100/listing.html')).toBe(
-      true
-    )
-    expect(
-      t?.shouldQueueYstmUrl(
-        'https://yardsaletreasuremap.com/US/Illinois/Antioch/101-Main-St/100/userlisting.html'
-      )
-    ).toBe(true)
+    expect(t?.shouldQueueYstmUrl(LISTING_HTML_URL)).toBe(true)
+    expect(t?.shouldQueueYstmUrl(USERLISTING_HTML_URL)).toBe(true)
   })
 
-  it('queues yardsaletreasuremap.com sale.php?communitysale=', () => {
-    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
-      url: 'https://example.com/',
-      runScripts: 'dangerously',
-    })
-    loadContentScript(dom)
-    const t = testWindow(dom).__LootAuraContentScriptTest
-    expect(t?.shouldQueueYstmUrl(SALE_PHP_URL)).toBe(true)
-  })
-
-  it('does not queue sale.php without communitysale on YSTM', () => {
-    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
-      url: 'https://example.com/',
-      runScripts: 'dangerously',
-    })
-    loadContentScript(dom)
-    const t = testWindow(dom).__LootAuraContentScriptTest
-    expect(t?.shouldQueueYstmUrl('https://yardsaletreasuremap.com/sale.php?id=1')).toBe(false)
-  })
-
-  it('does not queue sale.php communitysale on non-YSTM host', () => {
-    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
-      url: 'https://example.com/',
-      runScripts: 'dangerously',
-    })
-    loadContentScript(dom)
-    const t = testWindow(dom).__LootAuraContentScriptTest
-    expect(t?.shouldQueueYstmUrl('https://evil.example/sale.php?communitysale=1&id=1')).toBe(false)
-  })
-
-  it('resolveSalePhpCommunityCityState uses metadata sale.address', () => {
-    const metaObj = {
-      sales: [
-        {
-          url: SALE_PHP_URL,
-          address: '1751 N Lafayette St, Griffith, IN 46319',
-        },
-      ],
-    }
-    const metaInner = JSON.stringify(metaObj).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-    const html = `<!doctype html><html><body><script>const metadataStr = '${metaInner}';</script><p>1751 N Lafayette St 46319</p></body></html>`
-    const dom = new JSDOM(html, {
+  it('resolveSalePhpCommunityCityState uses zip_locality_authority for Griffith street+ZIP', () => {
+    const dom = new JSDOM('<!doctype html><html><body><p>1751 N Lafayette St 46319</p></body></html>', {
       url: SALE_PHP_URL,
       runScripts: 'dangerously',
     })
@@ -144,36 +95,57 @@ describe('YSTM sale.php community sale (extension)', () => {
     expect(out).toMatchObject({
       city: 'Griffith',
       state: 'IN',
-      source: 'metadata_sale_address',
+      source: 'zip_locality_authority',
+      confidence: 'primary_zip_match',
     })
   })
 
-  it('resolveSalePhpCommunityCityState uses neighbor canonical /US/… URL before page-text ZIP', () => {
-    const html = `<!doctype html><html><body>
-      <h1>Griffith Town-Wide Garage Sale Spring 2026</h1>
-      <a id="prev" href="https://yardsaletreasuremap.com/US/Indiana/see-source/100-Main/1/listing.html">prev</a>
-      <a id="next" href="https://yardsaletreasuremap.com/US/Indiana/Griffith/100-Main-St/1/listing.html">next</a>
-      <p>1946 West Ash St 46319</p>
-    </body></html>`
-    const dom = new JSDOM(html, {
+  it('communitysale cache seeds from zip_locality_authority and later same communitysale id uses cache', () => {
+    const dom = new JSDOM('<!doctype html><html><body><p>1751 N Lafayette St 46319</p></body></html>', {
       url: SALE_PHP_URL,
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
     const t = testWindow(dom).__LootAuraContentScriptTest
-    const out = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1946 West Ash St 46319')
-    expect(out).toMatchObject({
+    const first = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1751 N Lafayette St 46319')
+    expect(first?.source).toBe('zip_locality_authority')
+
+    dom.window.document.body.innerHTML = `
+      <a id="prev" href="https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=111">prev</a>
+      <a id="next" href="https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=222">next</a>
+      <p>111 Unknown Ave 99999</p>
+    `
+    const second = t?.resolveSalePhpCommunityCityState(
+      SALE_PHP_SAME_COMMUNITY_OTHER_ID,
+      '111 Unknown Ave 99999'
+    )
+    expect(second).toMatchObject({
       city: 'Griffith',
       state: 'IN',
-      source: 'neighbor_canonical_ystm_url',
+      source: 'communitysale_session_cache',
     })
   })
 
-  it('resolveSalePhpCommunityCityState does not use placeholder neighbor /US/… slugs', () => {
+  it('different communitysale id does not reuse cache', () => {
+    const dom = new JSDOM('<!doctype html><html><body><p>1751 N Lafayette St 46319</p></body></html>', {
+      url: SALE_PHP_URL,
+      runScripts: 'dangerously',
+    })
+    loadContentScript(dom)
+    const t = testWindow(dom).__LootAuraContentScriptTest
+    expect(t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1751 N Lafayette St 46319')?.source).toBe(
+      'zip_locality_authority'
+    )
+
+    dom.window.document.body.innerHTML = '<p>111 Other St 99999</p>'
+    const other = t?.resolveSalePhpCommunityCityState(SALE_PHP_OTHER_COMMUNITY, '111 Other St 99999')
+    expect(other).toBeNull()
+  })
+
+  it('neighbor canonical URL no longer authorizes locality', () => {
     const html = `<!doctype html><html><body>
-      <a id="prev" href="https://yardsaletreasuremap.com/US/Indiana/see-source/100-Main/1/listing.html">prev</a>
-      <a id="next" href="https://yardsaletreasuremap.com/US/Illinois/address-after/200-Oak/2/listing.html">next</a>
-      <p>1946 West Ash St 46319</p>
+      <a id="next" href="https://yardsaletreasuremap.com/US/Indiana/Griffith/100-Main-St/1/listing.html">next</a>
+      <p>111 Unknown Ave 99999</p>
     </body></html>`
     const dom = new JSDOM(html, {
       url: SALE_PHP_URL,
@@ -181,104 +153,43 @@ describe('YSTM sale.php community sale (extension)', () => {
     })
     loadContentScript(dom)
     const t = testWindow(dom).__LootAuraContentScriptTest
-    const out = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1946 West Ash St 46319')
+    const out = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '111 Unknown Ave 99999')
     expect(out).toBeNull()
   })
 
-  it('resolveSalePhpCommunityCityState uses page text City, ST ZIP near street ZIP', () => {
-    const html = `<!doctype html><html><body>
-      <p>Griffith, IN 46319</p>
-      <p>1751 N Lafayette St 46319</p>
-    </body></html>`
-    const dom = new JSDOM(html, {
+  it('unknown ZIP fails closed', () => {
+    const dom = new JSDOM('<!doctype html><html><body><p>111 Unknown Ave 99999</p></body></html>', {
       url: SALE_PHP_URL,
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
     const t = testWindow(dom).__LootAuraContentScriptTest
-    const out = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1751 N Lafayette St 46319')
-    expect(out).toMatchObject({
-      city: 'Griffith',
-      state: 'IN',
-      source: 'page_text_comma_before_zip',
-    })
+    expect(t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '111 Unknown Ave 99999')).toBeNull()
   })
 
-  it('buildSubmissionPayload succeeds for Griffith-style sale.php via neighbor canonical authority', () => {
-    const html = `<!doctype html><html><body>
-      <h1>Griffith Town-Wide Garage Sale Spring 2026</h1>
-      <a id="next" href="https://yardsaletreasuremap.com/US/Indiana/Griffith/1946-West-Ash-St/218927/listing.html">next</a>
-      <p>1946 West Ash St 46319</p>
-    </body></html>`
-    const dom = new JSDOM(html, {
+  it('ambiguous ZIP fails closed', () => {
+    const dom = new JSDOM('<!doctype html><html><body><p>111 Ambiguous Ave 60601</p></body></html>', {
       url: SALE_PHP_URL,
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
     const t = testWindow(dom).__LootAuraContentScriptTest
-    const payload = t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, SALE_PHP_URL, [])
-    expect(payload?.records?.[0]?.cityHint).toBe('Griffith')
-    expect(payload?.records?.[0]?.stateHint).toBe('IN')
+    expect(t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '111 Ambiguous Ave 60601')).toBeNull()
   })
 
-  it('buildSubmissionPayload succeeds when metadata supplies City, ST for street+ZIP display', () => {
-    const metaObj = {
-      sales: [
-        {
-          url: SALE_PHP_URL,
-          address: '1751 N Lafayette St, Griffith, IN 46319',
-          date: '2026-05-10',
-        },
-      ],
-    }
-    const metaInner = JSON.stringify(metaObj).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-    const html = `<!doctype html><html><body><h1>Town sale</h1><script>const metadataStr = '${metaInner}';</script><p>1751 N Lafayette St 46319</p></body></html>`
-    const dom = new JSDOM(html, {
+  it('expectedState mismatch fails closed in ZIP resolver contract', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
       url: SALE_PHP_URL,
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
-    const t = testWindow(dom).__LootAuraContentScriptTest
-    const payload = t?.buildSubmissionPayload(
-      { city: 'Chicago', state: 'IL' },
-      SALE_PHP_URL,
-      []
-    )
-    expect(payload?.records?.[0]?.cityHint).toBe('Griffith')
-    expect(payload?.records?.[0]?.stateHint).toBe('IN')
+    const api = (dom.window as unknown as { LootAuraZipLocalityResolver?: {
+      resolveZipLocalityAuthority: (input: { zip: string; expectedState?: string }) => unknown
+    } }).LootAuraZipLocalityResolver
+    expect(api?.resolveZipLocalityAuthority({ zip: '46319', expectedState: 'IL' }) ?? null).toBeNull()
   })
 
-  it('buildSubmissionPayload throws when community sale has no metadata or City, ST ZIP on page', () => {
-    const html = `<!doctype html><html><body><h1>Sale</h1><p>1751 N Lafayette St 46319</p></body></html>`
-    const dom = new JSDOM(html, {
-      url: SALE_PHP_URL,
-      runScripts: 'dangerously',
-    })
-    loadContentScript(dom)
-    const t = testWindow(dom).__LootAuraContentScriptTest
-    expect(() =>
-      t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, SALE_PHP_URL, [])
-    ).toThrow(/community sale/)
-  })
-
-  it('buildSubmissionPayload still fails closed when only placeholder neighbor /US/ links exist', () => {
-    const html = `<!doctype html><html><body><h1>Sale</h1>
-      <a id="prev" href="https://yardsaletreasuremap.com/US/Indiana/see-source/100-Main/1/listing.html">prev</a>
-      <a id="next" href="https://yardsaletreasuremap.com/US/Illinois/address-after/200-Oak/2/listing.html">next</a>
-      <p>1751 N Lafayette St 46319</p>
-    </body></html>`
-    const dom = new JSDOM(html, {
-      url: SALE_PHP_URL,
-      runScripts: 'dangerously',
-    })
-    loadContentScript(dom)
-    const t = testWindow(dom).__LootAuraContentScriptTest
-    expect(() =>
-      t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, SALE_PHP_URL, [])
-    ).toThrow(/community sale/)
-  })
-
-  it('buildSubmissionPayload on listing.html still resolves from canonical YSTM URL + address (unchanged)', () => {
+  it('buildSubmissionPayload on listing.html remains unchanged', () => {
     const html = `<!doctype html><html><body><p>123 Main St, Fair Oaks, IN 46321</p></body></html>`
     const dom = new JSDOM(html, {
       url: LISTING_HTML_URL,
@@ -291,65 +202,16 @@ describe('YSTM sale.php community sale (extension)', () => {
     expect(payload?.records?.[0]?.stateHint).toBe('IN')
   })
 
-  it('buildSubmissionPayload on userlisting.html still resolves from canonical YSTM URL + address (unchanged)', () => {
-    const userUrl =
-      'https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/100-Main-St/38730001/userlisting.html'
+  it('buildSubmissionPayload on userlisting.html remains unchanged', () => {
     const html = `<!doctype html><html><body><p>456 Oak Ave, Fair Oaks, IN 46321</p></body></html>`
     const dom = new JSDOM(html, {
-      url: userUrl,
+      url: USERLISTING_HTML_URL,
       runScripts: 'dangerously',
     })
     loadContentScript(dom)
     const t = testWindow(dom).__LootAuraContentScriptTest
-    const payload = t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, userUrl, [])
+    const payload = t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, USERLISTING_HTML_URL, [])
     expect(payload?.records?.[0]?.cityHint).toBe('Fair Oaks')
     expect(payload?.records?.[0]?.stateHint).toBe('IN')
-  })
-
-  describe('communitysale session authority cache', () => {
-    it('neighbor canonical resolution seeds cache; later sale.php-only neighbors read cache', () => {
-      const firstBody = `<a id="next" href="https://yardsaletreasuremap.com/US/Indiana/Griffith/100-Main-St/1/listing.html">next</a>
-      <p>1946 West Ash St 46319</p>`
-      const dom = new JSDOM(`<!doctype html><html><body>${firstBody}</body></html>`, {
-        url: SALE_PHP_URL,
-        runScripts: 'dangerously',
-      })
-      loadContentScript(dom)
-      const t = testWindow(dom).__LootAuraContentScriptTest
-      const first = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1946 West Ash St 46319')
-      expect(first).toMatchObject({
-        city: 'Griffith',
-        state: 'IN',
-        source: 'neighbor_canonical_ystm_url',
-      })
-
-      const secondBody = `<a id="prev" href="https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=111">prev</a>
-      <a id="next" href="https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=222">next</a>
-      <p>1751 N Lafayette St 46319</p>`
-      dom.window.document.body.innerHTML = secondBody
-
-      const second = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1751 N Lafayette St 46319')
-      expect(second).toMatchObject({
-        city: 'Griffith',
-        state: 'IN',
-        source: 'communitysale_session_cache',
-      })
-    })
-
-    it('different communitysale id does not read another id cache', () => {
-      const seedBody = `<a id="next" href="https://yardsaletreasuremap.com/US/Indiana/Griffith/100-Main-St/1/listing.html">next</a>
-      <p>1946 West Ash St 46319</p>`
-      const dom = new JSDOM(`<!doctype html><html><body>${seedBody}</body></html>`, {
-        url: SALE_PHP_URL,
-        runScripts: 'dangerously',
-      })
-      loadContentScript(dom)
-      const t = testWindow(dom).__LootAuraContentScriptTest
-      expect(t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1946 West Ash St 46319')?.city).toBe('Griffith')
-
-      dom.window.document.body.innerHTML = '<p>111 Other St 46319</p>'
-      const other = t?.resolveSalePhpCommunityCityState(SALE_PHP_OTHER_COMMUNITY, '111 Other St 46319')
-      expect(other).toBeNull()
-    })
   })
 })

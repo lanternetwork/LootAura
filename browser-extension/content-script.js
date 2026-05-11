@@ -1089,38 +1089,13 @@ function extractCanonicalYstmUsPathCityStateFromUrl(rawUrl) {
   }
 }
 
-const SALE_PHP_NEIGHBOR_ANCHOR_IDS = ["prev", "next", "prev-ft", "next-ft"];
-
-/** First neighbor anchor with a resolvable canonical YSTM listing `/US/…` path; skips placeholder municipality slugs. */
-function tryNeighborCanonicalYstmUsPathAuthority(pageUrl) {
-  for (let i = 0; i < SALE_PHP_NEIGHBOR_ANCHOR_IDS.length; i++) {
-    const id = SALE_PHP_NEIGHBOR_ANCHOR_IDS[i];
-    const el = document.getElementById(id);
-    if (!el || String(el.tagName || "").toLowerCase() !== "a") continue;
-    const rawHref = el.getAttribute("href");
-    if (!rawHref || !String(rawHref).trim()) continue;
-    let abs;
-    try {
-      abs = new URL(rawHref, pageUrl).href;
-    } catch {
-      continue;
-    }
-    const parsed = parseYstmListingPathForPayload(abs);
-    if (!parsed || !parsed.pathCitySlugRaw || isLikelyNonCityPathSegment(parsed.pathCitySlugRaw)) continue;
-    const city = normalizeCityFromPathSegment(parsed.pathCitySlugRaw);
-    const state = normalizeStateFromName(parsed.pathStateSegment);
-    if (city && state) return { city, state };
-  }
-  return null;
-}
-
 const COMMUNITYSALE_AUTHORITY_CACHE_PREFIX = "__lootauraCommSaleAuth_v1:";
 /** Only these direct-resolution sources may seed the per-tab session cache (no prose, no ZIP DB). */
 const COMMUNITYSALE_AUTHORITY_SEED_SOURCES = {
   page_canonical_ystm_url: true,
   address_full_tail: true,
   metadata_sale_address: true,
-  neighbor_canonical_ystm_url: true,
+  zip_locality_authority: true,
   page_text_comma_before_zip: true,
 };
 
@@ -1188,6 +1163,45 @@ function writeCommunitysaleAuthoritySessionCache(pageUrl, city, state, seedSourc
   }
 }
 
+function resolveSalePhpZipExpectedState(pageUrl, addressRaw, metadataAddrState) {
+  const addrTailState = extractAddressTailCityStateForAuthority(addressRaw || "").addressTailState;
+  if (addrTailState) return addrTailState;
+  const canonical = extractCanonicalYstmUsPathCityStateFromUrl(pageUrl);
+  if (canonical && canonical.state) return canonical.state;
+  if (metadataAddrState) return metadataAddrState;
+  return undefined;
+}
+
+function resolveZipLocalityAuthorityForSalePhp(zip, expectedState) {
+  const api = globalThis.LootAuraZipLocalityResolver;
+  if (!api) return null;
+
+  if (typeof api.resolveZipLocalityAuthorityWithDiagnostics === "function") {
+    const diag = api.resolveZipLocalityAuthorityWithDiagnostics({ zip, expectedState });
+    if (diag) {
+      console.log("[LootAura][ZipAuthority]", {
+        source: "zip_locality_authority",
+        zip: diag.zip,
+        expectedState: diag.expectedState || null,
+        result: diag.result
+          ? {
+              city: diag.result.city,
+              state: diag.result.state,
+              confidence: diag.result.confidence,
+            }
+          : null,
+        rejectionReason: diag.rejectionReason || null,
+      });
+      return diag.result || null;
+    }
+  }
+
+  if (typeof api.resolveZipLocalityAuthority === "function") {
+    return api.resolveZipLocalityAuthority({ zip, expectedState }) || null;
+  }
+  return null;
+}
+
 /**
  * Direct locality only (no session cache read). Same precedence as resolveSalePhpCommunityCityState.
  */
@@ -1209,9 +1223,11 @@ function resolveSalePhpCommunityCityStateDirect(pageUrl, addressRaw) {
   }
 
   const sale = findMetadataSaleRecordForPage(pageUrl);
+  let metadataAddrState = "";
   if (sale && typeof sale.address === "string") {
     const normalizedAddr = sale.address.replace(/\s+/g, " ").trim();
     const tail = extractAddressTailCityStateForAuthority(normalizedAddr);
+    metadataAddrState = tail.addressTailState || "";
     if (tail.addressTailCity && tail.addressTailState) {
       return {
         city: tail.addressTailCity,
@@ -1221,13 +1237,12 @@ function resolveSalePhpCommunityCityStateDirect(pageUrl, addressRaw) {
     }
   }
 
-  const neighbor = tryNeighborCanonicalYstmUsPathAuthority(pageUrl);
-  if (neighbor) {
-    return { city: neighbor.city, state: neighbor.state, source: "neighbor_canonical_ystm_url" };
-  }
-
   const zip = extractTrailingZip5FromAddressRaw(addressRaw);
   if (zip) {
+    const expectedState = resolveSalePhpZipExpectedState(pageUrl, addressRaw, metadataAddrState);
+    const zipResolved = resolveZipLocalityAuthorityForSalePhp(zip, expectedState);
+    if (zipResolved && zipResolved.city && zipResolved.state) return zipResolved;
+
     const near = extractCityStateCommaZipFromPageText(zip);
     if (near.city && near.state) {
       return { city: near.city, state: near.state, source: "page_text_comma_before_zip" };
@@ -1242,7 +1257,7 @@ function resolveSalePhpCommunityCityStateDirect(pageUrl, addressRaw) {
  * 1) Current page canonical `/US/{State}/{City}/…` URL (same parser as listing payloads)
  * 2) Full address tail `…, City, ST` from extracted address line
  * 3) Structured metadata `metadataStr` sale.address tail
- * 4) Neighbor `#prev` / `#next` / `#prev-ft` / `#next-ft` hrefs → canonical YSTM `/US/…` paths only
+ * 4) ZIP locality authority from static resolver (ZIP + optional expected state)
  * 5) Same-page `City, ST ZIP` aligned to street ZIP (existing narrow fallback)
  * 6) Session-scoped cache: same host + same `communitysale` id after a prior seed from (1)–(5)
  * Else null (caller fails closed).

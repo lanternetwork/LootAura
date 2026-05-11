@@ -906,6 +906,7 @@ Indiana,Gary,https://yardsaletreasuremap.com/US/Indiana/Gary.html
 Indiana,Goshen,https://yardsaletreasuremap.com/US/Indiana/Goshen.html
 Indiana,Greenfield,https://yardsaletreasuremap.com/US/Indiana/Greenfield.html
 Indiana,Greenwood,https://yardsaletreasuremap.com/US/Indiana/Greenwood.html
+Indiana,Griffith,https://yardsaletreasuremap.com/US/Indiana/Griffith.html
 Indiana,Hammond,https://yardsaletreasuremap.com/US/Indiana/Hammond.html
 Indiana,Hobart,https://yardsaletreasuremap.com/US/Indiana/Hobart.html
 Indiana,Huntington,https://yardsaletreasuremap.com/US/Indiana/Huntington.html

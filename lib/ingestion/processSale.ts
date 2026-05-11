@@ -313,13 +313,20 @@ function extractParentCommunitySaleEventDates(_raw: RawExternalSale): { start: s
   return null
 }
 
+/** Align with `combinedRaw` / `${dateRaw || ''}` so numeric `dateRaw` matches calendar extraction. */
+function dateRawToScheduleSourceText(dateRaw: string | number | null): string {
+  if (dateRaw == null) return ''
+  if (typeof dateRaw === 'string') return dateRaw
+  return dateRaw ? String(dateRaw) : ''
+}
+
 /** Last matching line wins (dateRaw lines follow description lines in source order). */
-function extractWeekdayScheduleCandidateText(description: string | null, dateRaw: string | null): string | null {
+function extractWeekdayScheduleCandidateText(description: string | null, dateRaw: string | number | null): string | null {
   const descLines = (description ?? '')
     .split('\n')
     .map((l) => normalizeWeekdayScheduleRawLine(l))
     .filter((l) => l.length > 0)
-  const dateLines = (dateRaw ?? '')
+  const dateLines = dateRawToScheduleSourceText(dateRaw)
     .split('\n')
     .map((l) => normalizeWeekdayScheduleRawLine(l))
     .filter((l) => l.length > 0)

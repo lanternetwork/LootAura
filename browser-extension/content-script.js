@@ -1495,7 +1495,9 @@ function extractDescription() {
 
 /** US-style street + city + state on one line; on YSTM sale.php community pages also street + ZIP. */
 function extractAddress() {
-  const lines = (document.body.innerText || "")
+  const body = document.body;
+  const rawText = String((body && (body.innerText || body.textContent)) || "").replace(/\r\n/g, "\n");
+  const lines = rawText
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);

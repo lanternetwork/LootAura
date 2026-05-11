@@ -42,8 +42,8 @@ export function evaluateTrustedLocalityAuthorityForIngestionCityConfig(args: {
 }):
   | { trusted: true; source: IngestionCityConfigLocalityAuthoritySource }
   | { trusted: false; reason: string } {
-  const city = normalizeIngestionCity(args.processedCity)
-  const state = normalizeIngestionState(args.processedState)
+  const city = normalizeIngestionCity(args.processedCity ?? null)
+  const state = normalizeIngestionState(args.processedState ?? null)
   if (!city || !state) {
     return { trusted: false, reason: 'missing_processed_city_or_state' }
   }

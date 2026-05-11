@@ -17,8 +17,9 @@ describe('evaluateTrustedLocalityAuthorityForIngestionCityConfig', () => {
   })
 
   it('trusts YSTM listing path authority when city/state match the resolved path', () => {
+    // Path must satisfy `parseYstmListingPathParts` (≥6 segments under `/US/.../listing.html`).
     const url =
-      'https://www.yardsaletreasuremap.com/US/Illinois/La-Grange/60525/listing.html'
+      'https://www.yardsaletreasuremap.com/US/Illinois/La-Grange/60525/123-main-st/listing.html'
     const r = evaluateTrustedLocalityAuthorityForIngestionCityConfig({
       sourceUrl: url,
       resolvedAddressRaw: '123 Main St, La Grange, IL 60525',

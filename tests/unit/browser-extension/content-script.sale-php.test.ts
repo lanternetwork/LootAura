@@ -36,7 +36,20 @@ type LootAuraDomWindow = {
       session: Record<string, unknown>,
       url: string,
       tags: string[]
-    ) => { records: Array<{ cityHint?: string; stateHint?: string }> }
+    ) => {
+      records: Array<{
+        cityHint?: string
+        stateHint?: string
+        dateRaw?: string | null
+        rawPayload?: {
+          ystmQueueCardDateDiagnostics?: Record<string, unknown>
+          ystmCanonicalDateStart?: string
+          ystmCanonicalDateEnd?: string
+        }
+      }>
+    }
+    canonicalizeUrl: (url: string) => string
+    buildCardContextByUrlFromDom: () => Record<string, { dateText?: string; title?: string; address?: string }>
   }
 }
 
@@ -213,5 +226,133 @@ describe('YSTM sale.php community sale ZIP locality authority', () => {
     const payload = t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, USERLISTING_HTML_URL, [])
     expect(payload?.records?.[0]?.cityHint).toBe('Fair Oaks')
     expect(payload?.records?.[0]?.stateHint).toBe('IN')
+  })
+})
+
+describe('YSTM queue card context carryover', () => {
+  it('buildCardContextByUrlFromDom maps .sale_date and title by canonical listing URL', () => {
+    const listUrl = 'https://yardsaletreasuremap.com/US/Illinois/Griffith/foo'
+    const html = `<!doctype html><html><body>
+      <div class="grid-item">
+        <a href="${SALE_PHP_URL}">Community sale</a>
+        <div class="sale_date">Fri Sat</div>
+        <h3>Town Wide</h3>
+        <div class="address">100 Main St</div>
+      </div>
+    </body></html>`
+    const dom = new JSDOM(html, { url: listUrl, runScripts: 'dangerously' })
+    loadContentScript(dom)
+    const t = testWindow(dom).__LootAuraContentScriptTest
+    const key = t?.canonicalizeUrl?.(SALE_PHP_URL) ?? ''
+    const ctx = t?.buildCardContextByUrlFromDom?.() ?? {}
+    expect(ctx[key]?.dateText).toBe('Fri Sat')
+    expect(ctx[key]?.title).toContain('Town Wide')
+    expect(ctx[key]?.address).toContain('100 Main St')
+  })
+
+  it('sale.php detail with empty date uses queued card Thu Fri Sat in dateRaw', () => {
+    const html = `<!doctype html><html><body><p>1751 N Lafayette St 46319</p></body></html>`
+    const dom = new JSDOM(html, { url: SALE_PHP_URL, runScripts: 'dangerously' })
+    loadContentScript(dom)
+    const t = testWindow(dom).__LootAuraContentScriptTest
+    const canon = t?.canonicalizeUrl?.(SALE_PHP_URL) ?? ''
+    const session = {
+      city: 'Chicago',
+      state: 'IL',
+      version: 2,
+      cardContextByUrl: {
+        [canon]: {
+          title: 'Card',
+          address: '1 Main',
+          dateText: 'Thu Fri Sat',
+          description: '',
+        },
+      },
+    }
+    const payload = t?.buildSubmissionPayload(session, SALE_PHP_URL, [])
+    expect(payload?.records?.[0]?.dateRaw).toBe('Thu Fri Sat')
+    const diag = payload?.records?.[0]?.rawPayload?.ystmQueueCardDateDiagnostics
+    expect(diag?.dateRawFallbackUsed).toBe(true)
+    expect(diag?.dateRawFallbackSource).toBe('queued_card_date')
+    expect(diag?.cardContextHit).toBe(true)
+    expect(diag?.lookupCanonicalUrl).toBe(canon)
+  })
+
+  it('metadata ISO dates still override queued card text', () => {
+    const meta =
+      '{"sales":[{"url":"https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=218927","date":"2026-07-15"}]}'
+    const html = `<!doctype html><html><body>
+      <script>metadataStr = '${meta.replace(/'/g, "\\'")}';</script>
+      <p>1751 N Lafayette St 46319</p>
+    </body></html>`
+    const dom = new JSDOM(html, { url: SALE_PHP_URL, runScripts: 'dangerously' })
+    loadContentScript(dom)
+    const t = testWindow(dom).__LootAuraContentScriptTest
+    const canon = t?.canonicalizeUrl?.(SALE_PHP_URL) ?? ''
+    const session = {
+      city: 'Chicago',
+      state: 'IL',
+      cardContextByUrl: {
+        [canon]: { title: '', address: '', dateText: 'Thu Fri Sat', description: '' },
+      },
+    }
+    const payload = t?.buildSubmissionPayload(session, SALE_PHP_URL, [])
+    expect(payload?.records?.[0]?.dateRaw).toBe('2026-07-15')
+    expect(payload?.records?.[0]?.rawPayload?.ystmQueueCardDateDiagnostics?.dateRawFallbackUsed).toBe(false)
+    expect(payload?.records?.[0]?.rawPayload?.ystmCanonicalDateStart).toBe('2026-07-15')
+  })
+
+  it('explicit detail-page M/D date still overrides queued card text', () => {
+    const html = `<!doctype html><html><body>
+      <p>Opens 5/10/2026</p>
+      <p>1751 N Lafayette St 46319</p>
+    </body></html>`
+    const dom = new JSDOM(html, { url: SALE_PHP_URL, runScripts: 'dangerously' })
+    loadContentScript(dom)
+    const t = testWindow(dom).__LootAuraContentScriptTest
+    const canon = t?.canonicalizeUrl?.(SALE_PHP_URL) ?? ''
+    const session = {
+      city: 'Chicago',
+      state: 'IL',
+      cardContextByUrl: {
+        [canon]: { title: '', address: '', dateText: 'Sat Sun', description: '' },
+      },
+    }
+    const payload = t?.buildSubmissionPayload(session, SALE_PHP_URL, [])
+    expect(payload?.records?.[0]?.dateRaw).toBe('2026-05-10')
+    expect(payload?.records?.[0]?.rawPayload?.ystmQueueCardDateDiagnostics?.dateRawFallbackUsed).toBe(false)
+  })
+
+  it('sessions without cardContextByUrl still build payload (no throw)', () => {
+    const html = `<!doctype html><html><body><p>1751 N Lafayette St 46319</p></body></html>`
+    const dom = new JSDOM(html, { url: SALE_PHP_URL, runScripts: 'dangerously' })
+    loadContentScript(dom)
+    const t = testWindow(dom).__LootAuraContentScriptTest
+    const payload = t?.buildSubmissionPayload(
+      { city: 'Chicago', state: 'IL', version: 1, urls: [SALE_PHP_URL] },
+      SALE_PHP_URL,
+      []
+    )
+    expect(payload?.records?.[0]?.cityHint).toBe('Griffith')
+    expect(payload?.records?.[0]?.rawPayload?.ystmQueueCardDateDiagnostics?.cardContextHit).toBe(false)
+  })
+
+  it('canonical URL lookup survives utm_source on current page URL', () => {
+    const html = `<!doctype html><html><body><p>1751 N Lafayette St 46319</p></body></html>`
+    const withUtm = `${SALE_PHP_URL}&utm_source=testsrc`
+    const dom = new JSDOM(html, { url: withUtm, runScripts: 'dangerously' })
+    loadContentScript(dom)
+    const t = testWindow(dom).__LootAuraContentScriptTest
+    const canon = t?.canonicalizeUrl?.(SALE_PHP_URL) ?? ''
+    const session = {
+      city: 'Chicago',
+      state: 'IL',
+      cardContextByUrl: {
+        [canon]: { title: '', address: '', dateText: 'Sat Sun', description: '' },
+      },
+    }
+    const payload = t?.buildSubmissionPayload(session, withUtm, [])
+    expect(payload?.records?.[0]?.dateRaw).toBe('Sat Sun')
+    expect(payload?.records?.[0]?.rawPayload?.ystmQueueCardDateDiagnostics?.lookupCanonicalUrl).toBe(canon)
   })
 })

@@ -531,7 +531,77 @@ function deriveCityStateFromPage() {
   return { city, state };
 }
 
-function createSession(urls, locationInfo) {
+function normalizeCardContextByUrlMap(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw;
+}
+
+/**
+ * Per-listing card scrape on YSTM grid pages. Keys are `canonicalizeUrl(listingHref)` so
+ * resume/detail lookup matches regardless of queue array order.
+ */
+function buildCardContextByUrlFromDom() {
+  const out = Object.create(null);
+
+  function textFrom(el) {
+    if (!el) return "";
+    return String(el.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  const cards = document.querySelectorAll(".grid-item");
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    if (!card || card.nodeType !== 1) continue;
+
+    let listingHref = null;
+    let listingAnchor = null;
+    const anchors = card.querySelectorAll("a[href]");
+    for (let j = 0; j < anchors.length; j++) {
+      const raw = anchors[j].getAttribute("href");
+      if (!raw) continue;
+      let resolvedHref = null;
+      try {
+        resolvedHref = new URL(raw, window.location.origin).href;
+      } catch {
+        continue;
+      }
+      if (shouldQueueYstmUrl(resolvedHref)) {
+        listingHref = resolvedHref;
+        listingAnchor = anchors[j];
+        break;
+      }
+    }
+    if (!listingHref) continue;
+
+    const key = canonicalizeUrl(listingHref);
+    const dateText = textFrom(card.querySelector(".sale_date"));
+    let titleText = textFrom(
+      card.querySelector("h2, h3, h4, .sale-title, .listing-title, .title")
+    );
+    if (!titleText && listingAnchor) titleText = textFrom(listingAnchor);
+    const addressText = textFrom(
+      card.querySelector('.address, .street, .sale-address, [class*="address"]')
+    );
+    const descriptionText = textFrom(
+      card.querySelector(".description, .notes, .snippet, .summary")
+    );
+
+    if (!titleText && !addressText && !dateText && !descriptionText) continue;
+
+    out[key] = {
+      title: titleText || "",
+      address: addressText || "",
+      dateText: dateText || "",
+      description: descriptionText || "",
+    };
+  }
+  return out;
+}
+
+function createSession(urls, locationInfo, cardContextByUrl) {
+  const ctx = normalizeCardContextByUrlMap(cardContextByUrl);
   return {
     id: Date.now().toString(),
     source: "external_page_source",
@@ -542,7 +612,8 @@ function createSession(urls, locationInfo) {
     processedUrls: [],
     failedUrls: [],
     createdAt: Date.now(),
-    version: 1,
+    version: 2,
+    cardContextByUrl: ctx,
   };
 }
 
@@ -608,6 +679,7 @@ async function startSession() {
     passDelayMs: 240,
   });
   const postMaterializeIdleMs = await waitForDomIdle(450, 2500);
+  const cardContextByUrl = buildCardContextByUrlFromDom();
   const { urls, diagnostics } = buildQueueUrls();
   console.log("[LootAura][QueueDiag] Pre-scan timing/materialization:", {
     domIdleMs,
@@ -663,11 +735,12 @@ async function startSession() {
     return;
   }
 
-  const session = createSession(urls, locationInfo);
+  const session = createSession(urls, locationInfo, cardContextByUrl);
   await saveSession(session);
   console.log("[LootAura] Session created:", {
     id: session.id,
     queueSize: session.urls.length,
+    cardContextKeys: Object.keys(cardContextByUrl || {}).length,
     city: session.city,
     state: session.state,
     currentIndex: session.currentIndex,
@@ -1558,7 +1631,32 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
     throw new Error(detail);
   }
   const imageExtract = extractImages();
-  const dateRaw = buildCanonicalDateRaw(currentUrl);
+
+  const cardMap = normalizeCardContextByUrlMap(session.cardContextByUrl);
+  const lookupCanonicalUrl = canonicalizeUrl(currentUrl);
+  const cardCtx = cardMap[lookupCanonicalUrl];
+  const cardContextHit = Boolean(cardCtx);
+
+  const detailPageDateRaw = buildCanonicalDateRaw(currentUrl);
+  const detailPageDateEmpty = !String(detailPageDateRaw || "").trim();
+
+  const ystmQueueCardDateDiagnostics = {
+    lookupCanonicalUrl,
+    cardContextHit,
+    dateRawFallbackUsed: false,
+    dateRawFallbackSource: null,
+  };
+
+  let dateRaw = detailPageDateRaw;
+  if (detailPageDateEmpty && cardCtx && typeof cardCtx.dateText === "string") {
+    const queued = cardCtx.dateText.trim();
+    if (queued) {
+      dateRaw = queued;
+      ystmQueueCardDateDiagnostics.dateRawFallbackUsed = true;
+      ystmQueueCardDateDiagnostics.dateRawFallbackSource = "queued_card_date";
+    }
+  }
+
   const isoPair = parseIsoPairFromCanonicalDateRaw(dateRaw);
   console.log("City/state extracted:", { city: resolvedCity, state: resolvedState });
   console.log("[LootAura] Canonical dateRaw / ISO:", { dateRaw, isoPair });
@@ -1579,6 +1677,7 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
         rawPayload: {
           tags: selectedTags,
           collectedAt: Date.now(),
+          ystmQueueCardDateDiagnostics,
           ystmListingCityAuthority: {
             pathCitySlug: auth.pathCitySlug,
             hubSegment: auth.hubSegment,
@@ -1803,6 +1902,8 @@ if (typeof globalThis !== "undefined") {
     isYstmCommunitySalePhpPage,
     resolveSalePhpCommunityCityState,
     buildSubmissionPayload,
+    canonicalizeUrl,
+    buildCardContextByUrlFromDom,
   };
 }
 })();

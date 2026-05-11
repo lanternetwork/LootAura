@@ -26,6 +26,15 @@ describe('migration 167 sales duplicate ingested_sale_id repair + unique index',
     expect(sql).toContain('s.id DESC')
   })
 
+  it('uses data-modifying CTE chain (no temp / persistent helper tables)', () => {
+    expect(sql.toLowerCase()).not.toContain('create temp table')
+    expect(sql).not.toContain('_m167_sales_dup_rank')
+    expect(sql).toContain('WITH dup_keys AS')
+    expect(sql).toContain('ranked AS')
+    expect(sql).toContain('upd_ingested AS')
+    expect(sql).toContain('upd_sales_losers AS')
+  })
+
   it('repairs ingested_sales.published_sale_id to canonical sale before archiving losers', () => {
     expect(sql).toMatch(/UPDATE\s+lootaura_v2\.ingested_sales/i)
     expect(sql).toContain('published_sale_id')
@@ -38,7 +47,7 @@ describe('migration 167 sales duplicate ingested_sale_id repair + unique index',
     expect(sql).toContain("status = 'archived'")
     expect(sql).toContain('archived_at = coalesce(s.archived_at, now())')
     expect(sql).toContain('ingested_sale_id = NULL')
-    expect(sql.indexOf('CREATE UNIQUE INDEX')).toBeGreaterThan(sql.indexOf('AND r.rn > 1'))
+    expect(sql.indexOf('CREATE UNIQUE INDEX')).toBeGreaterThan(sql.indexOf('upd_sales_losers'))
   })
 
   it('creates partial unique index idx_sales_ingested_sale_id_unique', () => {
@@ -60,6 +69,8 @@ describe('migration 167 sales duplicate ingested_sale_id repair + unique index',
     expect(sql).toContain('RAISE NOTICE')
     expect(sql).toContain('migration_167_sales_ingested_dup_repair')
     expect(sql).toContain('duplicate_nonnull_groups_before')
+    expect(sql).toContain('published_sale_id_repairs')
+    expect(sql).toContain('sales_rows_archived')
     expect(sql).toContain('idx_sales_ingested_sale_id_unique')
   })
 })

@@ -1346,7 +1346,8 @@ function resolveSalePhpCommunityCityState(pageUrl, addressRaw) {
 }
 
 function extractDomPrimaryDateRaw() {
-  const body = document.body.innerText || "";
+  const el = document.body;
+  const body = String((el && (el.innerText || el.textContent)) || "").replace(/\r\n/g, "\n");
   const chunk = body.slice(0, 12000);
   let r = extractDateRangeFromText(chunk);
   if (r.start) return r.end && r.end !== r.start ? r.start + "\n" + r.end : r.start;

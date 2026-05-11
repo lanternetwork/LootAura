@@ -48,7 +48,7 @@ describe('migration 167 sales duplicate ingested_sale_id repair + unique index',
   })
 
   it('documents FK-safe strategy without blind DELETE of duplicate sales', () => {
-    expect(sql.toLowerCase()).toContain('no blind delete')
+    expect(sql).toContain('no blind DELETE')
     expect(sql).not.toMatch(/DELETE\s+FROM\s+lootaura_v2\.sales/i)
   })
 

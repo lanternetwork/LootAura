@@ -332,4 +332,63 @@ describe('processIngestedSale — external listing date/time (weekday M/D, start
     expect(processed.dateSource).toBe('source_date_raw')
     expect(processed.dateStart).toBe('2026-05-15')
   })
+
+  it('resolves weekday-only dateRaw Fri-Sun when no calendar extractors fire', async () => {
+    const raw = baseRaw({
+      description: 'Village rummage',
+      dateRaw: 'Fri-Sun',
+    })
+    const processed = await processIngestedSale(raw, homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-01')
+    expect(processed.dateEnd).toBe('2026-05-03')
+    expect(processed.dateSource).toBe('relative_weekday_schedule')
+    expect(processed.status).toBe('needs_geocode')
+  })
+
+  it('explicit calendar dates win over weekday-only dateRaw (no double-signal)', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({
+        description: 'May 10 details',
+        dateRaw: 'Sat Sun',
+      }),
+      homewoodConfig
+    )
+    expect(processed.dateSource).toBe('source_date_raw')
+    expect(processed.dateStart).toBe('2026-05-10')
+    expect(processed.dateEnd).toBeNull()
+  })
+
+  it('fails closed when weekday tokens are embedded in prose on one line', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({
+        description: 'Big sale Sat Sun',
+        dateRaw: null,
+      }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).toContain('invalid_date')
+    expect(processed.dateStart).toBeNull()
+  })
+
+  it('uses last standalone weekday line in multiline description', async () => {
+    const processed = await processIngestedSale(
+      baseRaw({
+        description: 'Headline\nSat Sun',
+        dateRaw: null,
+      }),
+      homewoodConfig
+    )
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.dateStart).toBe('2026-05-02')
+    expect(processed.dateEnd).toBe('2026-05-03')
+    expect(processed.dateSource).toBe('relative_weekday_schedule')
+  })
+
+  it('weekday-only resolution keeps default start time when no explicit times', async () => {
+    const processed = await processIngestedSale(baseRaw({ description: null, dateRaw: 'Sat' }), homewoodConfig)
+    expect(processed.failureReasons).not.toContain('invalid_date')
+    expect(processed.timeStart).toBe('09:00:00')
+    expect(processed.timeSource).toBe('default')
+  })
 })

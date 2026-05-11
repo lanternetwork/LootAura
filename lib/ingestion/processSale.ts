@@ -2,6 +2,11 @@ import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureRea
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 import { addressLineFromYstmListingUrlSlug, enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
+import {
+  isRelativeWeekdayScheduleSyntaxOnly,
+  normalizeRelativeWeekdaySchedule,
+  normalizeWeekdayScheduleRawLine,
+} from '@/lib/ingestion/normalizeRelativeWeekdaySchedule'
 
 function cleanText(value: string | null): string | null {
   if (value == null) return null
@@ -300,6 +305,32 @@ function resolveTimes(candidates: ClockPart[]): { timeStart: string; timeEnd: st
   }
 }
 
+/**
+ * Future: parent community-sale event dates (stronger than relative weekday, weaker than extension ISO).
+ * Stub until parent linkage exists on `RawExternalSale`.
+ */
+function extractParentCommunitySaleEventDates(_raw: RawExternalSale): { start: string; end: string } | null {
+  return null
+}
+
+/** Last matching line wins (dateRaw lines follow description lines in source order). */
+function extractWeekdayScheduleCandidateText(description: string | null, dateRaw: string | null): string | null {
+  const descLines = (description ?? '')
+    .split('\n')
+    .map((l) => normalizeWeekdayScheduleRawLine(l))
+    .filter((l) => l.length > 0)
+  const dateLines = (dateRaw ?? '')
+    .split('\n')
+    .map((l) => normalizeWeekdayScheduleRawLine(l))
+    .filter((l) => l.length > 0)
+  const allLines = [...descLines, ...dateLines]
+  for (let i = allLines.length - 1; i >= 0; i--) {
+    const line = allLines[i]!
+    if (isRelativeWeekdayScheduleSyntaxOnly(line)) return line
+  }
+  return null
+}
+
 /** ISO dates from browser extension metadata/DOM pipeline (`content-script.js`). */
 function extractExtensionCanonicalIsoDates(rawPayload: unknown): { start: string; end: string } | null {
   if (!rawPayload || typeof rawPayload !== 'object') return null
@@ -382,6 +413,7 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
   let rawDateCandidates: DateCandidate[] = []
   let dedupedDateCandidates: DateCandidate[] = []
   let dateCandidates: DateCandidate[] = []
+  let resolvedViaRelativeWeekday = false
 
   if (extensionIso) {
     dateStart = extensionIso.start
@@ -405,24 +437,55 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
           })()
         : dedupedDateCandidates
 
-    const resolvedDates = resolveDates(dateCandidates, baseYear)
-    dateStart = resolvedDates.dateStart
-    dateEnd = resolvedDates.dateEnd
-    invalidDate = resolvedDates.invalidDate
-    if (invalidDate) failureReasons.push('invalid_date')
+    if (dateCandidates.length > 0) {
+      const resolvedDates = resolveDates(dateCandidates, baseYear)
+      dateStart = resolvedDates.dateStart
+      dateEnd = resolvedDates.dateEnd
+      invalidDate = resolvedDates.invalidDate
+      if (invalidDate) failureReasons.push('invalid_date')
 
-    // Invariant: if extraction found tokens, resolution must either produce dateStart
-    // or explicitly mark invalid_date. Never silently collapse.
-    if (rawDateCandidates.length >= 1 && !dateStart && !invalidDate) {
-      // eslint-disable-next-line no-console
-      console.error('date_resolution_invariant_failed', {
-        rawCount: rawDateCandidates.length,
-        dedupedCount: dedupedDateCandidates.length,
-        usedCount: dateCandidates.length,
-        raw: rawDateCandidates,
-        deduped: dedupedDateCandidates,
-      })
-      failureReasons.push('invalid_date')
+      // Invariant: if extraction found tokens, resolution must either produce dateStart
+      // or explicitly mark invalid_date. Never silently collapse.
+      if (rawDateCandidates.length >= 1 && !dateStart && !invalidDate) {
+        // eslint-disable-next-line no-console
+        console.error('date_resolution_invariant_failed', {
+          rawCount: rawDateCandidates.length,
+          dedupedCount: dedupedDateCandidates.length,
+          usedCount: dateCandidates.length,
+          raw: rawDateCandidates,
+          deduped: dedupedDateCandidates,
+        })
+        failureReasons.push('invalid_date')
+      }
+    } else {
+      const parentEventIso = extractParentCommunitySaleEventDates(rawSale)
+      if (parentEventIso) {
+        dateStart = parentEventIso.start
+        dateEnd = parentEventIso.end
+      } else {
+        const scheduleLine = extractWeekdayScheduleCandidateText(rawSale.description, rawSale.dateRaw)
+        const weekdayResolved = scheduleLine
+          ? normalizeRelativeWeekdaySchedule({
+              rawText: scheduleLine,
+              anchorDate: new Date(),
+              timezone: cityConfig.timezone,
+            })
+          : null
+
+        if (weekdayResolved) {
+          dateStart = weekdayResolved.dateStart
+          dateEnd = weekdayResolved.dateEnd
+          invalidDate = false
+          resolvedViaRelativeWeekday = true
+          ingestionDiagnostics.relativeWeekdaySchedule = weekdayResolved.diagnostics
+        } else {
+          const resolvedDates = resolveDates(dateCandidates, baseYear)
+          dateStart = resolvedDates.dateStart
+          dateEnd = resolvedDates.dateEnd
+          invalidDate = resolvedDates.invalidDate
+          if (invalidDate) failureReasons.push('invalid_date')
+        }
+      }
     }
   }
 
@@ -437,9 +500,11 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
 
   const dateSource: string | null = extensionIso
     ? 'extension_canonical_iso'
-    : combinedText
-      ? 'source_date_raw'
-      : null
+    : resolvedViaRelativeWeekday
+      ? 'relative_weekday_schedule'
+      : combinedText
+        ? 'source_date_raw'
+        : null
 
   return {
     normalizedAddress,

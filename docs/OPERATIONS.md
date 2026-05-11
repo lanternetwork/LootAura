@@ -293,3 +293,32 @@ Access debug tools at `/admin/tools` when debug mode is enabled:
 - Rate limiting status
 - Environment variable display
 - Health check links
+
+## Ingestion integrity (read-only)
+
+**Endpoint:** `GET /api/admin/ingestion/integrity`  
+**Auth:** Same as other admin APIs — must satisfy `assertAdminOrThrow` (admin session / credentials as configured).
+
+**What it does:** Calls database function `lootaura_v2.ingestion_integrity_report()` (migration `168_ingestion_integrity_report_rpc.sql`). No mutations. Response shape:
+
+- `ok` — `true` only when every **hard** check passes.
+- `hardFailures` — human-readable lines for failed hard checks (expect empty when healthy).
+- `warnings` — investigate-only signals (does **not** set `ok` to false today).
+- `checks` — structured per-check results (`id`, `level`, `ok`, optional `detail`).
+
+**Hard checks (must be clean in production):**
+
+1. **No duplicate non-null `sales.ingested_sale_id`** — duplicate group count must be **0**. Non-zero means publish idempotency is broken (historically when `idx_sales_ingested_sale_id_unique` was missing). The partial unique index `idx_sales_ingested_sale_id_unique` on `lootaura_v2.sales(ingested_sale_id) WHERE ingested_sale_id IS NOT NULL` is required so repeated publish attempts surface as `23505` and the worker can reuse the existing sale row.
+2. **No orphan `ingested_sales.published_sale_id`** — every non-null `published_sale_id` must reference an existing `sales.id`.
+3. **No orphan `sales.ingested_sale_id`** — every non-null `ingested_sale_id` must reference an existing `ingested_sales.id`.
+4. **Critical indexes present** — allowlist includes `idx_sales_ingested_sale_id_unique`, `sales_geom_gist_idx`, `idx_ingested_sales_publish_worker_claim`, `idx_ingested_sales_geocode_claim`. A missing row means **schema drift** (migration not applied or index renamed); fix by aligning DB with repo migrations, not by changing app code.
+
+**Warning check (investigate only):**
+
+- **Duplicate `external_source_url`** among **published** rows classified as imported: `import_source IS NOT NULL OR ingested_sale_id IS NOT NULL`. Non-zero group counts can be legitimate edge cases or bad data; use `checks[].detail.samples` (truncated URLs) to triage. This does **not** fail `ok`.
+
+**Healthy output:** `ok: true`, `hardFailures: []`, `warnings` usually `[]` (warnings non-empty is acceptable while investigating URL duplicates). Optional `?debug=1` adds `raw` DB JSON for operators.
+
+**If duplicates on `ingested_sale_id` reappear:** treat as P0 — verify the unique index exists, run duplicate-repair migration path if needed, and inspect publish worker / ingestion for paths that bypass conflict handling.
+
+**How to run (example):** from a browser or HTTP client where you already have an admin session cookie, `GET` the URL above on your deployment (e.g. production or preview). There is no separate CLI; apply migration `168` before relying on this endpoint.

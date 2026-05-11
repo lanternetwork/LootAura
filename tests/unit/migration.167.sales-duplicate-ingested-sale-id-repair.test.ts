@@ -47,7 +47,9 @@ describe('migration 167 sales duplicate ingested_sale_id repair + unique index',
     expect(sql).toContain("status = 'archived'")
     expect(sql).toContain('archived_at = coalesce(s.archived_at, now())')
     expect(sql).toContain('ingested_sale_id = NULL')
-    expect(sql.indexOf('CREATE UNIQUE INDEX')).toBeGreaterThan(sql.indexOf('upd_sales_losers'))
+    const ddlIndex =
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_ingested_sale_id_unique'
+    expect(sql.lastIndexOf(ddlIndex)).toBeGreaterThan(sql.indexOf('upd_sales_losers'))
   })
 
   it('creates partial unique index idx_sales_ingested_sale_id_unique', () => {

@@ -127,7 +127,7 @@ export function buildIngestionIntegrityResponse(
     })
   }
 
-  const dupUrl = p.duplicate_external_source_url_group_count
+  const dupUrl = asNumber(p.duplicate_external_source_url_group_count)
   const urlWarn = dupUrl > 0
   checks.push({
     id: 'duplicate_external_source_url_published_imported',

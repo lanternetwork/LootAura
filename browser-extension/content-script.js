@@ -1114,16 +1114,84 @@ function tryNeighborCanonicalYstmUsPathAuthority(pageUrl) {
   return null;
 }
 
+const COMMUNITYSALE_AUTHORITY_CACHE_PREFIX = "__lootauraCommSaleAuth_v1:";
+/** Only these direct-resolution sources may seed the per-tab session cache (no prose, no ZIP DB). */
+const COMMUNITYSALE_AUTHORITY_SEED_SOURCES = {
+  page_canonical_ystm_url: true,
+  address_full_tail: true,
+  metadata_sale_address: true,
+  neighbor_canonical_ystm_url: true,
+  page_text_comma_before_zip: true,
+};
+
+function communitysaleIdFromPageUrl(pageUrl) {
+  try {
+    const id = new URL(pageUrl, window.location.origin).searchParams.get("communitysale");
+    return id != null && String(id).trim() !== "" ? String(id).trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function communitysaleAuthorityCacheKey(pageUrl) {
+  let host = "";
+  try {
+    host = String(new URL(pageUrl, window.location.origin).hostname || "").toLowerCase();
+  } catch {
+    return null;
+  }
+  const id = communitysaleIdFromPageUrl(pageUrl);
+  if (!host || !id) return null;
+  return COMMUNITYSALE_AUTHORITY_CACHE_PREFIX + host + ":" + id;
+}
+
+function communitysaleAuthorityHostMatchesPage(pageUrl) {
+  try {
+    const h = String(new URL(pageUrl, window.location.origin).hostname || "").toLowerCase();
+    const cur = String(window.location.hostname || "").toLowerCase();
+    return Boolean(h && cur && h === cur);
+  } catch {
+    return false;
+  }
+}
+
+function readCommunitysaleAuthoritySessionCache(pageUrl) {
+  if (!isYstmCommunitySalePhpPage(pageUrl) || !communitysaleAuthorityHostMatchesPage(pageUrl)) return null;
+  const key = communitysaleAuthorityCacheKey(pageUrl);
+  if (!key || typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || typeof o.city !== "string" || typeof o.state !== "string") return null;
+    const city = String(o.city).trim();
+    const state = String(o.state).trim();
+    if (!city || !state) return null;
+    return { city, state, source: "communitysale_session_cache" };
+  } catch {
+    return null;
+  }
+}
+
+function writeCommunitysaleAuthoritySessionCache(pageUrl, city, state, seedSource) {
+  if (!COMMUNITYSALE_AUTHORITY_SEED_SOURCES[seedSource]) return;
+  if (!isYstmCommunitySalePhpPage(pageUrl) || !communitysaleAuthorityHostMatchesPage(pageUrl)) return;
+  const key = communitysaleAuthorityCacheKey(pageUrl);
+  if (!key || typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ city: String(city || "").trim(), state: String(state || "").trim(), seedSource })
+    );
+  } catch {
+    /* quota or private mode */
+  }
+}
+
 /**
- * sale.php community-sale locality authority (extension-only). Precedence:
- * 1) Current page canonical `/US/{State}/{City}/…` URL (same parser as listing payloads)
- * 2) Full address tail `…, City, ST` from extracted address line
- * 3) Structured metadata `metadataStr` sale.address tail
- * 4) Neighbor `#prev` / `#next` / `#prev-ft` / `#next-ft` hrefs → canonical YSTM `/US/…` paths only
- * 5) Same-page `City, ST ZIP` aligned to street ZIP (existing narrow fallback)
- * Else null (caller fails closed).
+ * Direct locality only (no session cache read). Same precedence as resolveSalePhpCommunityCityState.
  */
-function resolveSalePhpCommunityCityState(pageUrl, addressRaw) {
+function resolveSalePhpCommunityCityStateDirect(pageUrl, addressRaw) {
   if (!isYstmCommunitySalePhpPage(pageUrl)) return null;
 
   const fromPageUrl = extractCanonicalYstmUsPathCityStateFromUrl(pageUrl);
@@ -1167,6 +1235,26 @@ function resolveSalePhpCommunityCityState(pageUrl, addressRaw) {
   }
 
   return null;
+}
+
+/**
+ * sale.php community-sale locality authority (extension-only). Precedence:
+ * 1) Current page canonical `/US/{State}/{City}/…` URL (same parser as listing payloads)
+ * 2) Full address tail `…, City, ST` from extracted address line
+ * 3) Structured metadata `metadataStr` sale.address tail
+ * 4) Neighbor `#prev` / `#next` / `#prev-ft` / `#next-ft` hrefs → canonical YSTM `/US/…` paths only
+ * 5) Same-page `City, ST ZIP` aligned to street ZIP (existing narrow fallback)
+ * 6) Session-scoped cache: same host + same `communitysale` id after a prior seed from (1)–(5)
+ * Else null (caller fails closed).
+ */
+function resolveSalePhpCommunityCityState(pageUrl, addressRaw) {
+  const direct = resolveSalePhpCommunityCityStateDirect(pageUrl, addressRaw);
+  if (direct) {
+    writeCommunitysaleAuthoritySessionCache(pageUrl, direct.city, direct.state, direct.source);
+    return direct;
+  }
+  const cached = readCommunitysaleAuthoritySessionCache(pageUrl);
+  return cached || null;
 }
 
 function extractDomPrimaryDateRaw() {

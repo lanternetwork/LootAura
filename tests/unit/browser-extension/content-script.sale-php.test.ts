@@ -69,6 +69,9 @@ function loadContentScript(dom: JSDOM) {
 const SALE_PHP_URL =
   'https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=218927'
 
+const SALE_PHP_OTHER_COMMUNITY =
+  'https://yardsaletreasuremap.com/sale.php?communitysale=99999&id=1'
+
 const LISTING_HTML_URL =
   'https://yardsaletreasuremap.com/US/Indiana/Fair-Oaks/100-Main-St/38730001/listing.html'
 
@@ -301,5 +304,52 @@ describe('YSTM sale.php community sale (extension)', () => {
     const payload = t?.buildSubmissionPayload({ city: 'Chicago', state: 'IL' }, userUrl, [])
     expect(payload?.records?.[0]?.cityHint).toBe('Fair Oaks')
     expect(payload?.records?.[0]?.stateHint).toBe('IN')
+  })
+
+  describe('communitysale session authority cache', () => {
+    it('neighbor canonical resolution seeds cache; later sale.php-only neighbors read cache', () => {
+      const firstBody = `<a id="next" href="https://yardsaletreasuremap.com/US/Indiana/Griffith/100-Main-St/1/listing.html">next</a>
+      <p>1946 West Ash St 46319</p>`
+      const dom = new JSDOM(`<!doctype html><html><body>${firstBody}</body></html>`, {
+        url: SALE_PHP_URL,
+        runScripts: 'dangerously',
+      })
+      loadContentScript(dom)
+      const t = testWindow(dom).__LootAuraContentScriptTest
+      const first = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1946 West Ash St 46319')
+      expect(first).toMatchObject({
+        city: 'Griffith',
+        state: 'IN',
+        source: 'neighbor_canonical_ystm_url',
+      })
+
+      const secondBody = `<a id="prev" href="https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=111">prev</a>
+      <a id="next" href="https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=222">next</a>
+      <p>1751 N Lafayette St 46319</p>`
+      dom.window.document.body.innerHTML = secondBody
+
+      const second = t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1751 N Lafayette St 46319')
+      expect(second).toMatchObject({
+        city: 'Griffith',
+        state: 'IN',
+        source: 'communitysale_session_cache',
+      })
+    })
+
+    it('different communitysale id does not read another id cache', () => {
+      const seedBody = `<a id="next" href="https://yardsaletreasuremap.com/US/Indiana/Griffith/100-Main-St/1/listing.html">next</a>
+      <p>1946 West Ash St 46319</p>`
+      const dom = new JSDOM(`<!doctype html><html><body>${seedBody}</body></html>`, {
+        url: SALE_PHP_URL,
+        runScripts: 'dangerously',
+      })
+      loadContentScript(dom)
+      const t = testWindow(dom).__LootAuraContentScriptTest
+      expect(t?.resolveSalePhpCommunityCityState(SALE_PHP_URL, '1946 West Ash St 46319')?.city).toBe('Griffith')
+
+      dom.window.document.body.innerHTML = '<p>111 Other St 46319</p>'
+      const other = t?.resolveSalePhpCommunityCityState(SALE_PHP_OTHER_COMMUNITY, '111 Other St 46319')
+      expect(other).toBeNull()
+    })
   })
 })

@@ -1073,12 +1073,72 @@ function extractCityStateCommaZipFromPageText(zip5) {
   return { city: "", state: "" };
 }
 
+/** Canonical `/US/{State}/{City}/…` municipality + state; rejects placeholder path slugs (see-source, digit-led, etc.). */
+function extractCanonicalYstmUsPathCityStateFromUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl, window.location.origin);
+    if (!isYstmRegistrableHost(u.hostname)) return null;
+    const parsed = parseYstmListingPathForPayload(rawUrl);
+    if (!parsed || !parsed.pathCitySlugRaw || isLikelyNonCityPathSegment(parsed.pathCitySlugRaw)) return null;
+    const city = normalizeCityFromPathSegment(parsed.pathCitySlugRaw);
+    const state = normalizeStateFromName(parsed.pathStateSegment);
+    if (!city || !state) return null;
+    return { city, state };
+  } catch {
+    return null;
+  }
+}
+
+const SALE_PHP_NEIGHBOR_ANCHOR_IDS = ["prev", "next", "prev-ft", "next-ft"];
+
+/** First neighbor anchor with a resolvable canonical YSTM listing `/US/…` path; skips placeholder municipality slugs. */
+function tryNeighborCanonicalYstmUsPathAuthority(pageUrl) {
+  for (let i = 0; i < SALE_PHP_NEIGHBOR_ANCHOR_IDS.length; i++) {
+    const id = SALE_PHP_NEIGHBOR_ANCHOR_IDS[i];
+    const el = document.getElementById(id);
+    if (!el || String(el.tagName || "").toLowerCase() !== "a") continue;
+    const rawHref = el.getAttribute("href");
+    if (!rawHref || !String(rawHref).trim()) continue;
+    let abs;
+    try {
+      abs = new URL(rawHref, pageUrl).href;
+    } catch {
+      continue;
+    }
+    const parsed = parseYstmListingPathForPayload(abs);
+    if (!parsed || !parsed.pathCitySlugRaw || isLikelyNonCityPathSegment(parsed.pathCitySlugRaw)) continue;
+    const city = normalizeCityFromPathSegment(parsed.pathCitySlugRaw);
+    const state = normalizeStateFromName(parsed.pathStateSegment);
+    if (city && state) return { city, state };
+  }
+  return null;
+}
+
 /**
- * sale.php community pages only: metadata sale.address tail, else same-page ", City, ST ZIP" near street ZIP.
- * Does not use hub/session city or unrelated prose.
+ * sale.php community-sale locality authority (extension-only). Precedence:
+ * 1) Current page canonical `/US/{State}/{City}/…` URL (same parser as listing payloads)
+ * 2) Full address tail `…, City, ST` from extracted address line
+ * 3) Structured metadata `metadataStr` sale.address tail
+ * 4) Neighbor `#prev` / `#next` / `#prev-ft` / `#next-ft` hrefs → canonical YSTM `/US/…` paths only
+ * 5) Same-page `City, ST ZIP` aligned to street ZIP (existing narrow fallback)
+ * Else null (caller fails closed).
  */
 function resolveSalePhpCommunityCityState(pageUrl, addressRaw) {
   if (!isYstmCommunitySalePhpPage(pageUrl)) return null;
+
+  const fromPageUrl = extractCanonicalYstmUsPathCityStateFromUrl(pageUrl);
+  if (fromPageUrl) {
+    return { city: fromPageUrl.city, state: fromPageUrl.state, source: "page_canonical_ystm_url" };
+  }
+
+  const addrTail = extractAddressTailCityStateForAuthority(addressRaw || "");
+  if (addrTail.addressTailCity && addrTail.addressTailState) {
+    return {
+      city: addrTail.addressTailCity,
+      state: addrTail.addressTailState,
+      source: "address_full_tail",
+    };
+  }
 
   const sale = findMetadataSaleRecordForPage(pageUrl);
   if (sale && typeof sale.address === "string") {
@@ -1091,6 +1151,11 @@ function resolveSalePhpCommunityCityState(pageUrl, addressRaw) {
         source: "metadata_sale_address",
       };
     }
+  }
+
+  const neighbor = tryNeighborCanonicalYstmUsPathAuthority(pageUrl);
+  if (neighbor) {
+    return { city: neighbor.city, state: neighbor.state, source: "neighbor_canonical_ystm_url" };
   }
 
   const zip = extractTrailingZip5FromAddressRaw(addressRaw);
@@ -1385,7 +1450,7 @@ function buildSubmissionPayload(session, currentUrl, selectedTags) {
 
   if (!resolvedCity || !resolvedState) {
     const detail = isYstmCommunitySalePhpPage(currentUrl)
-      ? "Unable to determine city/state for this community sale (metadata address with City, ST, or a City, ST ZIP line on this page)."
+      ? "Unable to determine city/state for this community sale (canonical /US/ URL on this page; street line with City, ST; metadata sale.address; prev/next canonical /US/ links; or City, ST ZIP matching the street ZIP)."
       : "Unable to determine city/state from listing address or URL";
     throw new Error(detail);
   }

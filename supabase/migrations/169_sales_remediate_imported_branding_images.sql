@@ -189,7 +189,7 @@ BEGIN
     cover_image_url = f.new_cover,
     images = f.new_images,
     updated_at = now()
-  FROM lootaura_v2.filter_branding_urls_from_sale_media(s.cover_image_url, s.images) AS f
+  FROM LATERAL lootaura_v2.filter_branding_urls_from_sale_media(s.cover_image_url, s.images) AS f
   WHERE (
       s.ingested_sale_id IS NOT NULL
       OR (s.import_source IS NOT NULL AND btrim(s.import_source) <> '')

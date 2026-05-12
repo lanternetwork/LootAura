@@ -20,6 +20,7 @@ describe('migration 169 imported sales branding image remediation', () => {
   it('updates only when cover or images differ after filter (idempotent guard)', () => {
     expect(sql).toContain('IS DISTINCT FROM f.new_cover')
     expect(sql).toContain('IS DISTINCT FROM f.new_images')
+    expect(sql).toContain('FROM LATERAL lootaura_v2.filter_branding_urls_from_sale_media')
   })
 
   it('references YSTM /pics/ branding path', () => {

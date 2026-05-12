@@ -13,9 +13,41 @@ vi.mock('@/lib/auth/cron', () => ({
   assertCronAuthorized: (...args: any[]) => mockAssertCronAuthorized(...args),
 }))
 
-// Mock admin DB
+// Mock admin DB (archive job uses `rpc`; expire promotions uses `from('promotions')`)
 const mockAdminDb = {
   from: vi.fn(),
+  rpc: vi.fn(),
+}
+
+function promotionsExpireQueryMock() {
+  const chain: any = {}
+  chain.select = vi.fn(() => chain)
+  chain.eq = vi.fn(() => chain)
+  chain.lt = vi.fn(() => Promise.resolve({ data: [], error: null }))
+  return chain
+}
+
+/** Same defaults as `cron.daily` tests: SQL-batched archive RPCs succeed with zero rows. */
+function defaultArchiveAdminRpcImpl() {
+  return async (fn: string, _args?: unknown) => {
+    if (fn === 'count_sales_pending_archive') {
+      return {
+        data: {
+          today_utc_date: '2025-01-15',
+          pending_via_ends_at: 0,
+          pending_via_legacy: 0,
+          published_past_ends_at: 0,
+          active_past_ends_at: 0,
+          suspicious_ends_before_starts: 0,
+        },
+        error: null,
+      }
+    }
+    if (fn === 'archive_sales_ended_batch') {
+      return { data: [{ archived_via_ends_at: 0, archived_via_legacy: 0 }], error: null }
+    }
+    return { data: null, error: null }
+  }
 }
 
 // Mock job processors
@@ -136,6 +168,8 @@ describe('GET /api/cron/daily - Archive task', () => {
 
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
+
+    mockAdminDb.rpc.mockImplementation(defaultArchiveAdminRpcImpl())
   })
 
   it('returns 401 when Authorization header is missing', async () => {
@@ -172,19 +206,35 @@ describe('GET /api/cron/daily - Archive task', () => {
       },
     ]
 
-    const salesNotToArchive = [
-      {
-        id: 'sale-ends-tomorrow',
-        title: 'Sale Ends Tomorrow',
-        date_start: getDateString(-1),
-        date_end: getDateString(1),
-        status: 'published',
-        archived_at: null,
-      },
-    ]
+    let archiveBatchCalls = 0
+    mockAdminDb.rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'count_sales_pending_archive') {
+        return {
+          data: {
+            today_utc_date: '2025-01-15',
+            pending_via_ends_at: 0,
+            pending_via_legacy: 1,
+            published_past_ends_at: 1,
+            active_past_ends_at: 0,
+            suspicious_ends_before_starts: 0,
+          },
+          error: null,
+        }
+      }
+      if (fn === 'archive_sales_ended_batch') {
+        archiveBatchCalls += 1
+        if (archiveBatchCalls === 1) {
+          return { data: [{ archived_via_ends_at: 0, archived_via_legacy: 1 }], error: null }
+        }
+        return { data: [{ archived_via_ends_at: 0, archived_via_legacy: 0 }], error: null }
+      }
+      return { data: null, error: null }
+    })
 
-    let updateCalled = false
     mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'promotions') {
+        return promotionsExpireQueryMock()
+      }
       if (table === 'sales') {
         return {
           select: vi.fn(() => ({
@@ -195,17 +245,14 @@ describe('GET /api/cron/daily - Archive task', () => {
               }),
             })),
           })),
-          update: vi.fn(() => {
-            updateCalled = true
-            return {
-              in: vi.fn(() => ({
-                select: vi.fn().mockResolvedValue({
-                  data: salesToArchive.map((s: any) => ({ id: s.id })),
-                  error: null,
-                }),
-              })),
-            }
-          }),
+          update: vi.fn(() => ({
+            in: vi.fn(() => ({
+              select: vi.fn().mockResolvedValue({
+                data: salesToArchive.map((s: any) => ({ id: s.id })),
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       if (table === 'sale_reports') {
@@ -242,9 +289,11 @@ describe('GET /api/cron/daily - Archive task', () => {
     expect(data.tasks.archiveSales).toBeDefined()
     expect(data.tasks.archiveSales.ok).toBe(true)
     expect(data.tasks.archiveSales.archived).toBe(1)
-    
-    // Verify update was called to archive the sale
-    expect(updateCalled).toBe(true)
+
+    expect(mockAdminDb.rpc).toHaveBeenCalledWith(
+      'archive_sales_ended_batch',
+      expect.objectContaining({ p_batch_limit: expect.any(Number) })
+    )
   })
 
   it('archives single-day sales that started in the past', async () => {
@@ -260,8 +309,35 @@ describe('GET /api/cron/daily - Archive task', () => {
       },
     ]
 
-    let updateCalled = false
+    let archiveBatchCalls = 0
+    mockAdminDb.rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'count_sales_pending_archive') {
+        return {
+          data: {
+            today_utc_date: '2025-01-15',
+            pending_via_ends_at: 0,
+            pending_via_legacy: 1,
+            published_past_ends_at: 1,
+            active_past_ends_at: 0,
+            suspicious_ends_before_starts: 0,
+          },
+          error: null,
+        }
+      }
+      if (fn === 'archive_sales_ended_batch') {
+        archiveBatchCalls += 1
+        if (archiveBatchCalls === 1) {
+          return { data: [{ archived_via_ends_at: 0, archived_via_legacy: 1 }], error: null }
+        }
+        return { data: [{ archived_via_ends_at: 0, archived_via_legacy: 0 }], error: null }
+      }
+      return { data: null, error: null }
+    })
+
     mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'promotions') {
+        return promotionsExpireQueryMock()
+      }
       if (table === 'sales') {
         return {
           select: vi.fn(() => ({
@@ -272,17 +348,14 @@ describe('GET /api/cron/daily - Archive task', () => {
               }),
             })),
           })),
-          update: vi.fn(() => {
-            updateCalled = true
-            return {
-              in: vi.fn(() => ({
-                select: vi.fn().mockResolvedValue({
-                  data: salesToArchive.map((s: any) => ({ id: s.id })),
-                  error: null,
-                }),
-              })),
-            }
-          }),
+          update: vi.fn(() => ({
+            in: vi.fn(() => ({
+              select: vi.fn().mockResolvedValue({
+                data: salesToArchive.map((s: any) => ({ id: s.id })),
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       if (table === 'sale_reports') {
@@ -316,24 +389,17 @@ describe('GET /api/cron/daily - Archive task', () => {
     expect(response.status).toBe(200)
     expect(data.tasks.archiveSales.ok).toBe(true)
     expect(data.tasks.archiveSales.archived).toBe(1)
-    expect(updateCalled).toBe(true)
+    expect(mockAdminDb.rpc).toHaveBeenCalledWith(
+      'archive_sales_ended_batch',
+      expect.objectContaining({ p_batch_limit: expect.any(Number) })
+    )
   })
 
   it('does not archive sales that end tomorrow', async () => {
-    const tomorrow = getDateString(1)
-    const salesNotToArchive = [
-      {
-        id: 'sale-ends-tomorrow',
-        title: 'Sale Ends Tomorrow',
-        date_start: getDateString(-1),
-        date_end: tomorrow,
-        status: 'published',
-        archived_at: null,
-      },
-    ]
-
-    let updateCalled = false
     mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'promotions') {
+        return promotionsExpireQueryMock()
+      }
       if (table === 'sales') {
         return {
           select: vi.fn(() => ({
@@ -344,17 +410,14 @@ describe('GET /api/cron/daily - Archive task', () => {
               }),
             })),
           })),
-          update: vi.fn(() => {
-            updateCalled = true
-            return {
-              in: vi.fn(() => ({
-                select: vi.fn().mockResolvedValue({
-                  data: [], // No sales to archive in this test
-                  error: null,
-                }),
-              })),
-            }
-          }),
+          update: vi.fn(() => ({
+            in: vi.fn(() => ({
+              select: vi.fn().mockResolvedValue({
+                data: [], // No sales to archive in this test
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       if (table === 'sale_reports') {
@@ -388,24 +451,13 @@ describe('GET /api/cron/daily - Archive task', () => {
     expect(response.status).toBe(200)
     expect(data.tasks.archiveSales.ok).toBe(true)
     expect(data.tasks.archiveSales.archived).toBe(0)
-    expect(updateCalled).toBe(false)
   })
 
   it('does not archive already archived sales', async () => {
-    const yesterday = getDateString(-1)
-    const alreadyArchived = [
-      {
-        id: 'already-archived',
-        title: 'Already Archived',
-        date_start: getDateString(-3),
-        date_end: yesterday,
-        status: 'archived',
-        archived_at: yesterday,
-      },
-    ]
-
-    let updateCalled = false
     mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'promotions') {
+        return promotionsExpireQueryMock()
+      }
       if (table === 'sales') {
         return {
           select: vi.fn(() => ({
@@ -416,17 +468,14 @@ describe('GET /api/cron/daily - Archive task', () => {
               }),
             })),
           })),
-          update: vi.fn(() => {
-            updateCalled = true
-            return {
-              in: vi.fn(() => ({
-                select: vi.fn().mockResolvedValue({
-                  data: [], // No sales to archive (already archived)
-                  error: null,
-                }),
-              })),
-            }
-          }),
+          update: vi.fn(() => ({
+            in: vi.fn(() => ({
+              select: vi.fn().mockResolvedValue({
+                data: [], // No sales to archive (already archived)
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       if (table === 'sale_reports') {
@@ -460,7 +509,6 @@ describe('GET /api/cron/daily - Archive task', () => {
     expect(response.status).toBe(200)
     expect(data.tasks.archiveSales.ok).toBe(true)
     expect(data.tasks.archiveSales.archived).toBe(0)
-    expect(updateCalled).toBe(false)
   })
 })
 

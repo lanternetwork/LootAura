@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail, ok } from '@/lib/http/json'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,15 +81,14 @@ async function searchHandler(request: NextRequest) {
     let error: any = null
 
     if (lat && lng) {
-      // Use lat/lng-based distance filtering instead of geometry columns
-      // Try query with moderation_status filter first
-      let { data: salesData, error: salesError } = await supabase
-        .from('sales_v2')
-        .select('*')
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .eq('status', 'published')
-        .neq('moderation_status', 'hidden_by_admin')
+      // Phase 4-aligned query; retry without moderation fragment if column missing
+      let { data: salesData, error: salesError } = await applyPhase4PublicPublishedSaleReadFilters(
+        supabase
+          .from('sales_v2')
+          .select('*')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+      )
         .order('created_at', { ascending: false })
         .limit(Math.min(limit * 3, 500)) // Fetch more to allow for distance filtering
 
@@ -105,12 +105,14 @@ async function searchHandler(request: NextRequest) {
           error: String(salesError)
         })
         
-        const retryResult = await supabase
-          .from('sales_v2')
-          .select('*')
-          .not('lat', 'is', null)
-          .not('lng', 'is', null)
-          .eq('status', 'published')
+        const retryResult = await applyPhase4PublicPublishedSaleReadFilters(
+          supabase
+            .from('sales_v2')
+            .select('*')
+            .not('lat', 'is', null)
+            .not('lng', 'is', null),
+          { includeModeration: false }
+        )
           .order('created_at', { ascending: false })
           .limit(Math.min(limit * 3, 500))
         
@@ -148,11 +150,9 @@ async function searchHandler(request: NextRequest) {
       }
     } else {
       // No location provided, use basic query on sales_v2
-      const { data: basicData, error: basicError } = await supabase
-        .from('sales_v2')
-        .select('*')
-        .eq('status', 'published')
-        .neq('moderation_status', 'hidden_by_admin')
+      const { data: basicData, error: basicError } = await applyPhase4PublicPublishedSaleReadFilters(
+        supabase.from('sales_v2').select('*')
+      )
         .order('created_at', { ascending: false })
         .limit(limit)
 
@@ -164,10 +164,10 @@ async function searchHandler(request: NextRequest) {
           (basicError as any)?.code === 'PGRST204' ||
           (basicError as any)?.message?.includes('moderation_status')
         ) {
-          const retryResult = await supabase
-            .from('sales_v2')
-            .select('*')
-            .eq('status', 'published')
+          const retryResult = await applyPhase4PublicPublishedSaleReadFilters(
+            supabase.from('sales_v2').select('*'),
+            { includeModeration: false }
+          )
             .order('created_at', { ascending: false })
             .limit(limit)
           

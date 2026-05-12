@@ -322,3 +322,22 @@ Access debug tools at `/admin/tools` when debug mode is enabled:
 **If duplicates on `ingested_sale_id` reappear:** treat as P0 — verify the unique index exists, run duplicate-repair migration path if needed, and inspect publish worker / ingestion for paths that bypass conflict handling.
 
 **How to run (example):** from a browser or HTTP client where you already have an admin session cookie, `GET` the URL above on your deployment (e.g. production or preview). There is no separate CLI; apply migration `168` before relying on this endpoint.
+
+## Sale listing public visibility (Phase 4)
+
+**Migration:** `172_sales_phase4_public_visibility_ends_at.sql`
+
+**Database predicate** for anon/authenticated **non-owner** reads on `lootaura_v2.sales` (`sales_public_read`) and for `lootaura_v2.is_sale_publicly_visible` (drives `items_public_read`):
+
+- `status = 'published'`
+- `archived_at IS NULL`
+- `(ends_at IS NULL OR ends_at > now())` — rows with `ends_at <= now()` are not public; strictly future `ends_at` is public.
+- `moderation_status IS DISTINCT FROM 'hidden_by_admin'` — admin-hidden listings stay hidden at the RLS layer (aligned with app filters).
+
+**Transition:** Rows with `ends_at IS NULL` remain **visible** to the public until backlog/backfill is complete; a later phase will fail-close NULL `ends_at` after operators confirm zero backlog (not part of Phase 4).
+
+**App layer:** Public map/search/count/list routes apply the same filters via `applyPhase4PublicPublishedSaleReadFilters` (`lib/sales/phase4PublicPublishedSaleReadFilters.ts`) so service-role or explicit queries stay aligned with RLS. Owner dashboard routes and admin APIs are unchanged.
+
+**Caching:** `GET /api/sales` cache keys include a coarse `phase4LiveBucket` (30s) so short-TTL cached payloads cannot list sales as live for an unbounded time after `ends_at` passes.
+
+**Rollout:** Apply migration `172` to the database before relying on DB-side enforcement; deploy app changes in the same release window. Verify `pending_via_ends_at` / archive jobs as usual; Phase 4 does not remove the legacy archive fallback.

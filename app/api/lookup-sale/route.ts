@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+/** Public lookup: rows respect RLS (Phase 4 sales_public_read on sales_v2 after migration 172). */
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient()

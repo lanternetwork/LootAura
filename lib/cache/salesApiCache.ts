@@ -33,6 +33,11 @@ export interface SalesCacheKeyParams {
   offset: number
   distanceKm: number
   q: string | null
+  /**
+   * Coarse time bucket so cached payloads cannot list sales past ends_at longer than one bucket.
+   * Align with Phase 4 public visibility (migration 172).
+   */
+  phase4LiveBucket: number
 }
 
 /**
@@ -57,6 +62,7 @@ export function buildSalesCacheKey(params: SalesCacheKeyParams): string {
   parts.push('offset:' + params.offset)
   parts.push('dist:' + (params.distanceKm ?? 0))
   parts.push('q:' + (params.q ?? ''))
+  parts.push('p4:' + String(params.phase4LiveBucket))
   return parts.join('|')
 }
 

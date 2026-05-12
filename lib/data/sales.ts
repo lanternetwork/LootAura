@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { Sale } from '@/lib/types'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 // Zod schemas for validation
 const SaleInputSchema = z.object({
@@ -174,20 +175,13 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
     today.setUTCHours(0, 0, 0, 0)
     const todayStr = today.toISOString().split('T')[0]
 
-    // Try query with moderation_status filter first
-    let query = supabase
-      .from('sales_v2')
-      .select('*')
-      .in('status', ['published', 'active'])
-      .is('archived_at', null)
-    
-    // Try to add moderation_status filter (may fail if migrations not run)
+    // Phase 4 public visibility (RLS-aligned); retry without moderation OR if column missing
     let useModerationFilter = true
-    try {
-      query = query.neq('moderation_status', 'hidden_by_admin')
-    } catch (e) {
-      useModerationFilter = false
-    }
+    let query = applyPhase4PublicPublishedSaleReadFilters(
+      supabase
+        .from('sales_v2')
+        .select('*')
+    )
     
     query = query
       .order('created_at', { ascending: false })
@@ -228,11 +222,12 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
       console.warn('moderation_status column not found, retrying without filter:', error)
       
       // Rebuild query without moderation_status filter
-      query = supabase
-        .from('sales_v2')
-        .select('*')
-        .in('status', ['published', 'active'])
-        .is('archived_at', null)
+      query = applyPhase4PublicPublishedSaleReadFilters(
+        supabase
+          .from('sales_v2')
+          .select('*'),
+        { includeModeration: false }
+      )
         .order('created_at', { ascending: false })
         .limit(validatedParams.limit)
         .range(validatedParams.offset, validatedParams.offset + validatedParams.limit - 1)

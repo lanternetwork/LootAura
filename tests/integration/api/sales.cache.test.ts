@@ -73,6 +73,7 @@ describe('GET /api/sales cache behavior', () => {
     mockSupabaseClient.from.mockReturnValue({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       gte: vi.fn().mockReturnThis(),
       lte: vi.fn().mockReturnThis(),
       in: vi.fn().mockReturnThis(),
@@ -105,6 +106,7 @@ describe('GET /api/sales cache behavior', () => {
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
         gte: vi.fn().mockReturnThis(),
         lte: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
@@ -129,6 +131,7 @@ describe('GET /api/sales cache behavior', () => {
       const chain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
         gte: vi.fn().mockReturnThis(),
         lte: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
@@ -138,10 +141,17 @@ describe('GET /api/sales cache behavior', () => {
         range: vi.fn().mockResolvedValue({ data: [], error: null }),
       }
       if (table === 'sales_v2' && fromCallCount === 1) {
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-        }
+        const c: any = {}
+        c.select = vi.fn(() => c)
+        c.eq = vi.fn(() => c)
+        c.is = vi.fn(() => c)
+        let orCalls = 0
+        c.or = vi.fn(() => {
+          orCalls++
+          if (orCalls >= 2) return Promise.resolve({ count: 0, error: null })
+          return c
+        })
+        return c
       }
       return chain
     })

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
@@ -15,11 +16,12 @@ export async function GET(req: Request) {
 
   const from = (page - 1) * limit
   const to = from + limit - 1
-  const q = await supabase
-    .from('sales_v2')
-    .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
-    .eq('owner_id', userId)
-    .eq('status', 'published')
+  const q = await applyPhase4PublicPublishedSaleReadFilters(
+    supabase
+      .from('sales_v2')
+      .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
+      .eq('owner_id', userId)
+  )
     .range(from, to)
 
   const items = q.data || []

@@ -15,6 +15,7 @@ import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -409,6 +410,7 @@ async function salesHandler(request: NextRequest) {
     }
 
     // Short-TTL server cache for public (non-user-scoped) requests only; skip when search query is present so query runs (tests and freshness)
+    const phase4LiveBucket = Math.floor(Date.now() / 30000)
     let salesCacheKey: string | null = null
     if (!favoritesOnly && !q) {
       salesCacheKey = buildSalesCacheKey({
@@ -424,6 +426,7 @@ async function salesHandler(request: NextRequest) {
         offset,
         distanceKm: distanceKm ?? 40,
         q,
+        phase4LiveBucket,
       })
       const cached = await getSalesApiCache(salesCacheKey)
       if (cached != null) {
@@ -447,10 +450,9 @@ async function salesHandler(request: NextRequest) {
       logger.debug('Querying sales_v2 view', { component: 'sales', operation: 'get_sales' })
       
       // First, let's check the total count of sales in the database
-      const { count: totalCount, error: _countError } = await supabase
-        .from('sales_v2')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'published')
+      const { count: totalCount, error: _countError } = await applyPhase4PublicPublishedSaleReadFilters(
+        supabase.from('sales_v2').select('*', { count: 'exact', head: true })
+      )
       
       totalSalesCount = totalCount || 0
       logger.debug('Total published sales count', { component: 'sales', totalCount: totalSalesCount })
@@ -487,17 +489,17 @@ async function salesHandler(request: NextRequest) {
         logger.debug('Calculated bbox from distance', { component: 'sales', minLat, maxLat, minLng, maxLng, distanceKm })
       }
       
-      // Build base query - try with moderation_status filter first
-      // If column doesn't exist (migrations not run), retry without it
-      let query = supabase
-        .from('sales_v2')
-        .select('*')
-        .gte('lat', minLat)
-        .lte('lat', maxLat)
-        .gte('lng', minLng)
-        .lte('lng', maxLng)
-        // Exclude archived sales from public map/list/search
-        .in('status', ['published', 'active'])
+      // Build base query — Phase 4 public visibility (RLS-aligned; migration 172)
+      let useModerationFilter = true
+      let query = applyPhase4PublicPublishedSaleReadFilters(
+        supabase
+          .from('sales_v2')
+          .select('*')
+          .gte('lat', minLat)
+          .lte('lat', maxLat)
+          .gte('lng', minLng)
+          .lte('lng', maxLng)
+      )
       
       // Apply date filtering in database WHERE clause
       // Logic matches client-side filtering: future-only when windowStart but no windowEnd, overlap when both exist
@@ -521,15 +523,7 @@ async function salesHandler(request: NextRequest) {
       }
       // If no windowStart/windowEnd, no date filtering (matches current behavior)
       
-      // Try to add moderation_status filter (may fail if migrations not run)
-      let useModerationFilter = true
-      try {
-        query = query.neq('moderation_status', 'hidden_by_admin')
-      } catch (e) {
-        // If filter fails at build time, we'll catch it at query time
-        useModerationFilter = false
-      }
-      
+      // Moderation filter is included in applyPhase4PublicPublishedSaleReadFilters; if column missing, retry below without it
       // Apply favorites-only filter if requested
       if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
         query = query.in('id', favoriteSaleIds)
@@ -624,15 +618,17 @@ async function salesHandler(request: NextRequest) {
           error: String(salesError)
         })
         
-        // Rebuild query without moderation_status filter (include date filters)
-        query = supabase
-          .from('sales_v2')
-          .select('*')
-          .gte('lat', minLat)
-          .lte('lat', maxLat)
-          .gte('lng', minLng)
-          .lte('lng', maxLng)
-          .in('status', ['published', 'active'])
+        // Rebuild query without moderation fragment (include Phase 4 ends_at + archived + date filters)
+        query = applyPhase4PublicPublishedSaleReadFilters(
+          supabase
+            .from('sales_v2')
+            .select('*')
+            .gte('lat', minLat)
+            .lte('lat', maxLat)
+            .gte('lng', minLng)
+            .lte('lng', maxLng),
+          { includeModeration: false }
+        )
         
         // Re-apply date filters
         if (windowStart && !windowEnd) {

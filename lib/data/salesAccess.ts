@@ -7,6 +7,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { Sale, SaleItem } from '@/lib/types'
 import type { SaleWithOwnerInfo } from '@/lib/data/sales'
 import type { DraftRecord } from '@/lib/drafts/computePublishability'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 export interface SaleListing {
   id: string
@@ -837,14 +838,14 @@ export async function getNearestSalesForSale(
       }
 
       // Fallback: query all published sales and calculate distance client-side
-      const { data: allSales, error: queryError } = await supabase
-        .from('sales_v2')
-        .select('*')
-        .eq('status', 'published')
-        .neq('id', saleId)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .limit(100) // Reasonable limit for fallback
+      const { data: allSales, error: queryError } = await applyPhase4PublicPublishedSaleReadFilters(
+        supabase
+          .from('sales_v2')
+          .select('*')
+          .neq('id', saleId)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+      ).limit(100) // Reasonable limit for fallback
 
       if (queryError || !allSales) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

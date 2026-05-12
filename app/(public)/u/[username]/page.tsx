@@ -12,6 +12,7 @@ import { SellerSignals } from '@/components/profile/SellerSignals'
 import { SellerRatingStars } from '@/components/seller/SellerRatingStars'
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 type PublicProfilePageProps = {
   params: Promise<{ username: string }>
@@ -133,11 +134,12 @@ async function fetchListings(userId: string, page: number) {
   const from = (page - 1) * limit
   const to = from + limit - 1
   
-  const q = await supabase
-    .from('sales_v2')
-    .select('id, title, cover_image_url, images, address, status, owner_id, created_at', { count: 'exact' })
-    .eq('owner_id', userId)
-    .eq('status', 'published')
+  const q = await applyPhase4PublicPublishedSaleReadFilters(
+    supabase
+      .from('sales_v2')
+      .select('id, title, cover_image_url, images, address, status, owner_id, created_at', { count: 'exact' })
+      .eq('owner_id', userId)
+  )
     .order('created_at', { ascending: false })
     .range(from, to)
   

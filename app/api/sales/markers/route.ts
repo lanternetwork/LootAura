@@ -7,6 +7,7 @@ import { toDbSet } from '@/lib/shared/categoryContract'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail } from '@/lib/http/json'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -100,14 +101,15 @@ async function markersHandler(request: NextRequest) {
     }
 
     // Build query with category filtering if categories are provided
-    // Try with moderation_status filter first, retry without if column doesn't exist
-    let query = sb
-      .from('sales_v2')
-      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
-      .not('lat', 'is', null)
-      .not('lng', 'is', null)
-      .in('status', ['published', 'active'])
-      .is('archived_at', null)
+    // Phase 4 public visibility (RLS-aligned); retry without moderation if column missing
+    let query = applyPhase4PublicPublishedSaleReadFilters(
+      sb
+        .from('sales_v2')
+        .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+    )
+    let useModerationFilter = true
     
     // Apply date filtering in database WHERE clause
     // Logic matches client-side filtering: future-only when no dateWindow, overlap when dateWindow exists
@@ -136,14 +138,7 @@ async function markersHandler(request: NextRequest) {
       query = query.or(`date_start.lte.${windowEndStr},date_end.lte.${windowEndStr}`)
     }
     
-    // Try to add moderation_status filter (may fail if migrations not run)
-    let useModerationFilter = true
-    try {
-      query = query.neq('moderation_status', 'hidden_by_admin')
-    } catch (e) {
-      useModerationFilter = false
-    }
-    
+    // Moderation is inside applyPhase4; detect missing column at query time
     // Apply favorites-only filter if requested
     if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
       query = query.in('id', favoriteSaleIds)
@@ -222,14 +217,15 @@ async function markersHandler(request: NextRequest) {
         error: String(error)
       })
       
-      // Rebuild query without moderation_status filter (include date filters)
-      query = sb
-        .from('sales_v2')
-        .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .in('status', ['published', 'active'])
-        .is('archived_at', null)
+      // Rebuild query without moderation fragment
+      query = applyPhase4PublicPublishedSaleReadFilters(
+        sb
+          .from('sales_v2')
+          .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null),
+        { includeModeration: false }
+      )
       
       // Re-apply date filters
       if (!dateWindow) {

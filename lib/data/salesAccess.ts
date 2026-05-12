@@ -801,7 +801,7 @@ export async function getNearestSalesForSale(
       const rpcResult = await rlsDb.rpc('get_sales_within_distance', {
         user_lat: currentSale.lat,
         user_lng: currentSale.lng,
-        distance_meters: maxDistanceMeters,
+        p_distance_meters: maxDistanceMeters,
         limit_count: limit + 1, // Fetch one extra to account for excluding current sale
       })
       nearbySales = rpcResult?.data ?? null
@@ -813,7 +813,7 @@ export async function getNearestSalesForSale(
         const rpcResult = await supabase.rpc('get_sales_within_distance', {
           user_lat: currentSale.lat,
           user_lng: currentSale.lng,
-          distance_meters: maxDistanceMeters,
+          p_distance_meters: maxDistanceMeters,
           limit_count: limit + 1,
         })
         nearbySales = rpcResult?.data ?? null

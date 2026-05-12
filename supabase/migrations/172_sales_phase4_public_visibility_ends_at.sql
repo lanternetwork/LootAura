@@ -86,7 +86,7 @@ COMMENT ON POLICY "items_public_read" ON lootaura_v2.items IS
 CREATE OR REPLACE FUNCTION lootaura_v2.get_sales_within_distance(
     user_lat DECIMAL,
     user_lng DECIMAL,
-    distance_meters INTEGER,
+    p_distance_meters INTEGER,
     limit_count INTEGER DEFAULT 50
 )
 RETURNS TABLE (
@@ -145,7 +145,7 @@ BEGIN
         AND ST_DWithin(
             s.geom,
             ST_SetSRID(ST_MakePoint(user_lng, user_lat), 4326)::geography,
-            distance_meters
+            p_distance_meters
         )
     ORDER BY ST_Distance(s.geom, ST_SetSRID(ST_MakePoint(user_lng, user_lat), 4326)::geography)
     LIMIT limit_count;
@@ -155,7 +155,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION lootaura_v2.search_sales_within_distance(
     user_lat DECIMAL,
     user_lng DECIMAL,
-    distance_meters INTEGER,
+    p_distance_meters INTEGER,
     search_city TEXT DEFAULT NULL,
     search_categories TEXT[] DEFAULT NULL,
     date_start_filter DATE DEFAULT NULL,
@@ -218,7 +218,7 @@ BEGIN
         AND ST_DWithin(
             s.geom,
             ST_SetSRID(ST_MakePoint(user_lng, user_lat), 4326)::geography,
-            distance_meters
+            p_distance_meters
         )
         AND (search_city IS NULL OR s.city ILIKE '%' || search_city || '%')
         AND (search_categories IS NULL OR s.tags && search_categories)

@@ -154,7 +154,7 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
         .rpc('search_sales_within_distance', {
           user_lat: validatedParams.lat,
           user_lng: validatedParams.lng,
-          distance_meters: distanceMeters,
+          p_distance_meters: distanceMeters,
           search_city: validatedParams.city || null,
           search_categories: validatedParams.categories || null,
           date_start_filter: dateConstraints?.start || null,

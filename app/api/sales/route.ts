@@ -1093,6 +1093,7 @@ async function salesHandler(request: NextRequest) {
       error: 'Internal server error' 
     }, { status: 500 })
   }
+}
 
 async function postHandler(request: NextRequest) {
   // CSRF protection check

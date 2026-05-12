@@ -255,6 +255,7 @@ async function searchHandler(request: NextRequest) {
     )
     return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
   }
+}
 
 export const GET = withRateLimit(searchHandler, [
   Policies.SALES_VIEW_30S,

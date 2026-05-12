@@ -397,6 +397,7 @@ async function markersHandler(request: NextRequest) {
     )
     return fail(500, 'INTERNAL_ERROR', 'Internal server error')
   }
+}
 
 export const GET = withRateLimit(markersHandler, [
   Policies.SALES_VIEW_30S,

@@ -35,7 +35,8 @@ export function emitObservabilityRecord(record: TelemetryRecord): void {
     const line = JSON.stringify({
       t: new Date().toISOString(),
       ...record,
-    })    process.stdout.write(`${line}\n`)
+    })
+    process.stdout.write(`${line}\n`)
   } catch {
     // Never throw from telemetry
   }

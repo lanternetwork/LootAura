@@ -184,28 +184,41 @@ BEGIN
 
   RAISE NOTICE 'migration_169_branding_media_remediation: candidate_imported_sales=%', n_before;
 
+  -- UPDATE target alias "s" must not appear in this statement's FROM (not even inside
+  -- LATERAL); use a derived table on sales as s_inner, then join back on id.
   UPDATE lootaura_v2.sales s
   SET
-    cover_image_url = f.new_cover,
-    images = f.new_images,
+    cover_image_url = v.new_cover,
+    images = v.new_images,
     updated_at = now()
-  FROM LATERAL lootaura_v2.filter_branding_urls_from_sale_media(s.cover_image_url, s.images) AS f
-  WHERE (
-      s.ingested_sale_id IS NOT NULL
-      OR (s.import_source IS NOT NULL AND btrim(s.import_source) <> '')
-    )
-    AND (
-      lootaura_v2.url_matches_ingest_branding_asset(s.cover_image_url)
-      OR EXISTS (
-        SELECT 1
-        FROM unnest(coalesce(s.images, '{}'::text[])) u(x)
-        WHERE lootaura_v2.url_matches_ingest_branding_asset(x)
+  FROM (
+    SELECT
+      s_inner.id,
+      f.new_cover,
+      f.new_images
+    FROM lootaura_v2.sales s_inner
+    INNER JOIN LATERAL lootaura_v2.filter_branding_urls_from_sale_media(
+      s_inner.cover_image_url,
+      s_inner.images
+    ) AS f ON true
+    WHERE (
+        s_inner.ingested_sale_id IS NOT NULL
+        OR (s_inner.import_source IS NOT NULL AND btrim(s_inner.import_source) <> '')
       )
-    )
-    AND (
-      s.cover_image_url IS DISTINCT FROM f.new_cover
-      OR s.images IS DISTINCT FROM f.new_images
-    );
+      AND (
+        lootaura_v2.url_matches_ingest_branding_asset(s_inner.cover_image_url)
+        OR EXISTS (
+          SELECT 1
+          FROM unnest(coalesce(s_inner.images, '{}'::text[])) u(x)
+          WHERE lootaura_v2.url_matches_ingest_branding_asset(x)
+        )
+      )
+      AND (
+        s_inner.cover_image_url IS DISTINCT FROM f.new_cover
+        OR s_inner.images IS DISTINCT FROM f.new_images
+      )
+  ) v
+  WHERE s.id = v.id;
 
   GET DIAGNOSTICS n_after = ROW_COUNT;
   RAISE NOTICE 'migration_169_branding_media_remediation: rows_updated=%', n_after;

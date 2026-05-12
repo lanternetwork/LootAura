@@ -69,10 +69,16 @@ describe('GET /api/cron/geocode', () => {
     const data = await res.json()
 
     expect(res.status).toBe(200)
-    expect(processGeocodeQueueBatch).toHaveBeenCalledWith(50)
+    expect(processGeocodeQueueBatch).toHaveBeenCalledWith(
+      50,
+      expect.objectContaining({
+        telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
+      })
+    )
     expect(geocodePendingSales).toHaveBeenCalledWith({
       batchSizeOverride: 25,
       captureClaimedRowIds: true,
+      telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
     expect(data.queue).toEqual({
       processed: 3,
@@ -130,6 +136,7 @@ describe('GET /api/cron/geocode', () => {
     expect(geocodePendingSales).toHaveBeenCalledWith({
       batchSizeOverride: 25,
       captureClaimedRowIds: true,
+      telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
     expect(data.queue.processed).toBe(0)
     expect(data.backlog.claimed).toBe(2)
@@ -175,6 +182,7 @@ describe('GET /api/cron/geocode', () => {
     expect(geocodePendingSales).toHaveBeenCalledWith({
       batchSizeOverride: 100,
       captureClaimedRowIds: true,
+      telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
   })
 

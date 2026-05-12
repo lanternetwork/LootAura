@@ -1055,7 +1055,9 @@ describe('GET /api/cron/daily', () => {
       })
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
-      expect(mockGeocodePendingSales).toHaveBeenCalledWith({ batchSizeOverride: 25 })
+      expect(mockGeocodePendingSales).toHaveBeenCalledWith(
+        expect.objectContaining({ batchSizeOverride: 25, telemetryContext: expect.any(Object) })
+      )
       expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
     })
 
@@ -1070,7 +1072,9 @@ describe('GET /api/cron/daily', () => {
 
       const response = await GET(request)
       expect(response.status).toBe(200)
-      expect(mockGeocodePendingSales).toHaveBeenCalledWith({ batchSizeOverride: 100 })
+      expect(mockGeocodePendingSales).toHaveBeenCalledWith(
+        expect.objectContaining({ batchSizeOverride: 100, telemetryContext: expect.any(Object) })
+      )
     })
 
     it('acquires lease from clean unlocked null state and proceeds with ingestion', async () => {

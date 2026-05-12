@@ -1,6 +1,6 @@
 /**
  * Cloudinary image fallback for publish — kept out of `publish.ts` so modules
- * imported from instrumentation (e.g. ingestedSalesRepair → publish) do not
+ * imported from instrumentation (e.g. ingestedSalesRepair → normalizeAddressForPublish) do not
  * pull Node-only `externalImageValidation` into the Next client bundle.
  */
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'

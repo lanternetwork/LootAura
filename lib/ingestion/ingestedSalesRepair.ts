@@ -1,7 +1,7 @@
 import { logger } from '@/lib/log'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { sanitizeUploadDescription } from '@/lib/ingestion/uploadDescriptionSanitizer'
-import { normalizeAddressForPublish } from '@/lib/ingestion/publish'
+import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
 

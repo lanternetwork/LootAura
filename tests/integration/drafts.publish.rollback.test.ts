@@ -43,7 +43,7 @@ const createChainableMock = () => {
   chain.update = vi.fn().mockReturnValue(chain)
   chain.delete = vi.fn().mockReturnValue(chain)
   chain.single = vi.fn()
-  chain.maybeSingle = vi.fn()
+  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
   chain.limit = vi.fn().mockReturnValue(chain)
   chain.order = vi.fn().mockReturnValue(chain)
   return chain

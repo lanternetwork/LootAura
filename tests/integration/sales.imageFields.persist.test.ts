@@ -40,8 +40,15 @@ const mockRlsDb = {
     if (table === 'profiles') {
       return createQueryChain()
     }
+    if (table === 'zipcodes') {
+      const chain: any = {}
+      chain.select = vi.fn(() => chain)
+      chain.eq = vi.fn(() => chain)
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+      return chain
+    }
     return fromChain
-  })
+  }),
 }
 
 const mockSupabaseClient = {

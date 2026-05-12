@@ -11,7 +11,24 @@ vi.mock('@/lib/sales/resolvePersistableSaleEndsAt', () => ({
 
 const updateEq = vi.fn(() => Promise.resolve({ error: null }))
 const updateMock = vi.fn(() => ({ eq: updateEq }))
-const selectLimit = vi.fn(() => Promise.resolve({ data: [], error: null }))
+
+type BackfillSaleRow = {
+  id: string
+  date_start: string
+  time_start: string | null
+  date_end: string | null
+  time_end: string | null
+  zip_code: string | null
+  state: string | null
+  lat: number
+  lng: number
+  ends_at: string | null
+  listing_timezone: string | null
+}
+
+const selectLimit = vi.fn(() =>
+  Promise.resolve({ data: [] as BackfillSaleRow[], error: null as null })
+)
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => ({}),

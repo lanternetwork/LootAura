@@ -16,6 +16,7 @@ vi.mock('@/lib/auth/cron', () => ({
 // Mock admin DB
 const mockAdminDb = {
   from: vi.fn(),
+  rpc: vi.fn(),
 }
 
 // Mock job processors
@@ -117,6 +118,29 @@ function ingestionCityConfigsDbMock() {
         error: null,
       }),
     })),
+  }
+}
+
+/** Default success mocks for SQL-batched archive job (`runArchiveEndedSalesJob`). */
+function defaultArchiveAdminRpcImpl() {
+  return async (fn: string, _args?: unknown) => {
+    if (fn === 'count_sales_pending_archive') {
+      return {
+        data: {
+          today_utc_date: '2025-01-15',
+          pending_via_ends_at: 0,
+          pending_via_legacy: 0,
+          published_past_ends_at: 0,
+          active_past_ends_at: 0,
+          suspicious_ends_before_starts: 0,
+        },
+        error: null,
+      }
+    }
+    if (fn === 'archive_sales_ended_batch') {
+      return { data: [{ archived_via_ends_at: 0, archived_via_legacy: 0 }], error: null }
+    }
+    return { data: null, error: null }
   }
 }
 
@@ -260,6 +284,8 @@ describe('GET /api/cron/daily', () => {
       errors: 0,
       pagesProcessed: 0,
     })
+
+    mockAdminDb.rpc.mockImplementation(defaultArchiveAdminRpcImpl())
 
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
@@ -473,6 +499,31 @@ describe('GET /api/cron/daily', () => {
           return ingestionCityConfigsDbMock()
         }
         return { from: vi.fn() }
+      })
+
+      let archiveEndedBatchCalls = 0
+      mockAdminDb.rpc.mockImplementation(async (fn: string) => {
+        if (fn === 'count_sales_pending_archive') {
+          return {
+            data: {
+              today_utc_date: '2025-01-15',
+              pending_via_ends_at: 1,
+              pending_via_legacy: 0,
+              published_past_ends_at: 1,
+              active_past_ends_at: 0,
+              suspicious_ends_before_starts: 0,
+            },
+            error: null,
+          }
+        }
+        if (fn === 'archive_sales_ended_batch') {
+          archiveEndedBatchCalls += 1
+          if (archiveEndedBatchCalls === 1) {
+            return { data: [{ archived_via_ends_at: 1, archived_via_legacy: 0 }], error: null }
+          }
+          return { data: [{ archived_via_ends_at: 0, archived_via_legacy: 0 }], error: null }
+        }
+        return { data: null, error: null }
       })
 
       const request = new NextRequest('http://localhost/api/cron/daily', {
@@ -766,13 +817,36 @@ describe('GET /api/cron/daily', () => {
 
         mockGeocodePendingSales.mockRejectedValue(new Error('forced geocode failure for test'))
 
+        mockAdminDb.rpc.mockImplementation(async (fn: string) => {
+          if (fn === 'count_sales_pending_archive') {
+            return {
+              data: {
+                today_utc_date: '2025-01-15',
+                pending_via_ends_at: 0,
+                pending_via_legacy: 0,
+                published_past_ends_at: 0,
+                active_past_ends_at: 0,
+                suspicious_ends_before_starts: 0,
+              },
+              error: null,
+            }
+          }
+          if (fn === 'archive_sales_ended_batch') {
+            return Promise.reject(new Error('Archive query failed'))
+          }
+          return { data: null, error: null }
+        })
+
         // Mock archive sales query to fail (throw error)
         mockAdminDb.from.mockImplementation((table: string) => {
           if (table === 'sales') {
             return {
               select: vi.fn(() => ({
                 in: vi.fn(() => ({
-                  is: vi.fn().mockRejectedValue(new Error('Archive query failed')),
+                  is: vi.fn().mockResolvedValue({
+                    data: [],
+                    error: null,
+                  }),
                 })),
               })),
             }

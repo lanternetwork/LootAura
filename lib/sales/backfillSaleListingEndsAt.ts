@@ -240,7 +240,6 @@ export async function runBackfillSaleListingEnds(
   logger.info('sale_listing_ends_backfill_complete', {
     component: 'sales/backfill',
     operation: logOp,
-    dry_run: dryRun,
     ...metrics,
   })
 

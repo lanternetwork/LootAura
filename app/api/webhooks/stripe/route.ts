@@ -222,12 +222,17 @@ async function finalizeDraftPromotion(
       ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
       : []
 
+  const dateStart = formData.date_start?.trim()
+  if (!dateStart) {
+    throw new Error('Invalid draft payload: missing date_start')
+  }
+
   const { resolvePersistableSaleEndsAt } = await import('@/lib/sales/resolvePersistableSaleEndsAt')
   const listingEnds = await resolvePersistableSaleEndsAt(
     admin,
     {
-      date_start: formData.date_start,
-      time_start: normalizedTimeStart,
+      date_start: dateStart,
+      time_start: normalizedTimeStart ?? null,
       date_end: formData.date_end || null,
       time_end: formData.time_end || null,
       zip_code: formData.zip_code || null,
@@ -249,8 +254,8 @@ async function finalizeDraftPromotion(
     zip_code: formData.zip_code || null,
     lat: parseFloat(String(formData.lat)),
     lng: parseFloat(String(formData.lng)),
-    date_start: formData.date_start,
-    time_start: normalizedTimeStart,
+    date_start: dateStart,
+    time_start: normalizedTimeStart ?? null,
     date_end: formData.date_end || null,
     time_end: formData.time_end || null,
     ends_at: listingEnds.ends_at,

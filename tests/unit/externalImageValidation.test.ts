@@ -83,6 +83,23 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
     fetchSpy.mockRestore()
   })
 
+  it('rejects yardsaletreasuremap.com /pics/ site logo without fetching', async () => {
+    const { sanitizeExternalImageUrls } = await import('@/lib/ingestion/externalImageValidation')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('fetch should not run'))
+    const out = await sanitizeExternalImageUrls(
+      ['https://www.yardsaletreasuremap.com/pics/YSTM_site_logo.png'],
+      {
+        rowId: '11111111-1111-4111-8111-111111111111',
+        city: 'A',
+        state: 'B',
+        max: 3,
+      }
+    )
+    expect(out).toEqual([])
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+
   it('rejects wide banner dimensions from raster probe', async () => {
     const { sanitizeExternalImageUrls, parseRasterImageDimensionsFromBytes } = await import(
       '@/lib/ingestion/externalImageValidation'

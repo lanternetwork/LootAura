@@ -7,6 +7,7 @@ import {
   isNonPublicIpAddress,
   validateExternalHttpsUrlForFetch,
 } from '@/lib/ingestion/adapters/externalPageSafeFetch'
+import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
 
 const PROBE_BYTE_LIMIT = 131_072
 const PROBE_TIMEOUT_MS = 8_000
@@ -106,42 +107,6 @@ export function dimensionsSuggestBrandOrTrackerAsset(dim: { w: number; h: number
   if (ratio >= 3.8 && h <= 120) return true
   if (ratio <= 0.28 && w <= 120) return true
   return false
-}
-
-function urlPathSuggestsNonSalePhoto(u: URL): string | null {
-  const path = `${u.pathname} ${u.search} ${u.hash}`.toLowerCase()
-  if (
-    /\bystm\b/.test(path) ||
-    /\byardsale[_-]?time[_-]?machine\b/.test(path) ||
-    /\bystm[_-]?(?:site|logo|banner|brand|header|hero)\b/.test(path) ||
-    /\b(?:site[_-]?logo|site[_-]?header|provider[_-]?logo|white[_-]?label)\b/.test(path) ||
-    /(?:^|[/_-])(?:logo|logos)(?:[/_-]|\.|$)/.test(path) ||
-    /\blogo\b/.test(path) ||
-    /\b(?:branding|brand-asset|brand_asset)\b/.test(path) ||
-    /(?:^|[/_-])sprite[s]?(?:[/_-]|\.|$)/.test(path) ||
-    /\b(?:favicon|apple-touch-icon|touch-icon|site-icon|mstile)\b/.test(path) ||
-    /\b(?:navbar|nav-icon|nav_icon|header-bg|footer-bg|footer_bg)\b/.test(path) ||
-    /\b(?:hero-banner|hero_banner|banner-ad|banner_ad|ad-banner)\b/.test(path) ||
-    /\b(?:sponsored|sponsor[-_]|affiliate|tracking-pixel|tracking_pixel)\b/.test(path) ||
-    /\b(?:watermark|placeholder|spacer|shim)\b/.test(path)
-  ) {
-    return 'path_branding_ui_or_tracking'
-  }
-  if (/\b(?:pixel|blank|clear|transparent)[_-]?(?:1x1)?\b/.test(path) || /\b1x1\b/.test(path)) {
-    return 'path_likely_tracker_or_spacer'
-  }
-
-  const dimInName = /[_/-](\d{2,4})x(\d{2,4})(?:[^/]*)?\.(?:png|jpe?g|webp|gif)(?:$|[?#])/i.exec(
-    u.pathname
-  )
-  if (dimInName) {
-    const w = Number.parseInt(dimInName[1], 10)
-    const h = Number.parseInt(dimInName[2], 10)
-    if (Number.isFinite(w) && Number.isFinite(h) && dimensionsSuggestBrandOrTrackerAsset({ w, h })) {
-      return 'filename_dimension_hint'
-    }
-  }
-  return null
 }
 
 async function safeReadResponseBodyPrefix(res: Response, maxBytes: number): Promise<Uint8Array> {
@@ -251,7 +216,7 @@ export async function sanitizeExternalImageUrls(
       continue
     }
 
-    const pathReason = urlPathSuggestsNonSalePhoto(validation.url)
+    const pathReason = urlSuggestsNonListingPhoto(trimmed)
     if (pathReason) {
       logger.warn('Publish image candidate rejected', {
         component: 'ingestion/externalImageValidation',

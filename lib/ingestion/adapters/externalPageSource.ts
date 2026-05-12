@@ -11,6 +11,7 @@ import {
 } from '@/lib/ingestion/ystmListingCityAuthority'
 import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
+import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v3'
@@ -614,36 +615,8 @@ function normalizeAbsoluteHttpsUrl(raw: string, baseUrl: string): string | null 
   }
 }
 
-const IMAGE_REJECT_SUBSTRINGS = [
-  'logo',
-  'site_logo',
-  'ystm_site',
-  'icon',
-  'sprite',
-  'favicon',
-  'banner',
-  'avatar',
-  '/nav',
-  '/header',
-  'header_',
-  '_header',
-  'navbar',
-  'tracking',
-  'pixel',
-]
-
 function shouldRejectImageUrl(rawUrl: string): boolean {
-  try {
-    const path = new URL(rawUrl).pathname.toLowerCase()
-    if (!path) return true
-    if (/1x1|blank\.gif|spacer\./i.test(path)) return true
-    for (const token of IMAGE_REJECT_SUBSTRINGS) {
-      if (path.includes(token)) return true
-    }
-    return false
-  } catch {
-    return true
-  }
+  return urlSuggestsNonListingPhoto(rawUrl) != null
 }
 
 function collectImageUrlsNear(anchor: Element, baseUrl: string, max: number): string[] {

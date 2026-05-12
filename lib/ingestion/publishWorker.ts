@@ -12,6 +12,7 @@ import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidati
 import { mergeSanitizedCloudinaryIntoPublishable } from '@/lib/ingestion/sanitizePublishCloudinaryFallback'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 import { isPublishingRowStaleReclaimBlockedByPastEndDateValidation } from '@/lib/ingestion/publishClaimStale'
+import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
@@ -570,6 +571,7 @@ function normalizeTextOrNull(value: string | null | undefined): string | null {
 }
 
 function isLogoLikeImageUrl(value: string): boolean {
+  if (urlSuggestsNonListingPhoto(value)) return true
   const lower = value.toLowerCase()
   return (
     lower.includes('logo') ||

@@ -160,11 +160,16 @@ describe('findIngestedSaleMatch telemetry', () => {
       )
 
     const { findIngestedSaleMatch } = await import('@/lib/ingestion/dedupe')
-    const { match } = await findIngestedSaleMatch('https://private.example/source', processedBase(), {
-      normalizedTitle: 'Distinctive neighborhood tools sale weekend',
-      externalId: '42',
-      sourcePlatform: 'external_page_source',
-    })
+    // Use a long enough normalized address so weak-address scoring does not raise the suppress bar above the fixture score.
+    const { match } = await findIngestedSaleMatch(
+      'https://private.example/source',
+      processedBase({ normalizedAddress: '123 main street louisville ky' }),
+      {
+        normalizedTitle: 'Distinctive neighborhood tools sale weekend',
+        externalId: '42',
+        sourcePlatform: 'external_page_source',
+      }
+    )
 
     expect(match).toEqual({
       id: 'soft-match-id',

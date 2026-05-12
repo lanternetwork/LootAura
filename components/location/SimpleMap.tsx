@@ -549,6 +549,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const map = mapRef.current.getMap()
     if (!map) return
 
+    // Wheel zoom / pan inertia: camera is owned by Mapbox. Reactive easeTo fights the gesture and stalls zoom.
+    if (typeof map.isMoving === 'function' && map.isMoving()) {
+      return
+    }
+
     const currentCenter = map.getCenter()
     const currentZoom = map.getZoom()
     
@@ -557,12 +562,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const zoomDiff = Math.abs(currentZoom - zoom)
     
     if (latDiff > 1e-5 || lngDiff > 1e-5 || zoomDiff > 0.01) {
-      // DIAGNOSTIC LOG - Desktop only
-      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && typeof window !== 'undefined' && window.innerWidth >= 768) {
         console.log('[VIEWPORT_CHANGE: EASE_TO] Trigger: Center/zoom props changed (reactive)', {
           trigger: 'Center/zoom props changed',
           context: { center, zoom, currentCenter, currentZoom, latDiff, lngDiff, zoomDiff },
-          stack: new Error().stack
         })
       }
       

@@ -12,7 +12,16 @@ async function searchHandler(request: NextRequest) {
   const startedAt = Date.now()
   const { logger, generateOperationId } = await import('@/lib/log')
   const opId = generateOperationId()
-  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+  const { createCorrelationBundle } = await import('@/lib/observability/correlation')
+  const { buildTelemetryRecord, emitObservabilityRecord } = await import('@/lib/observability/emit')
+  const { ObservabilityEvents } = await import('@/lib/observability/events')
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId })
+  const withOpId = (context: any = {}) => ({
+    ...context,
+    requestId: correlation.requestId,
+    operationId: correlation.operationId,
+    correlationId: correlation.correlationId,
+  })
 
   try {
     // Create Supabase client with explicit public schema
@@ -191,11 +200,38 @@ async function searchHandler(request: NextRequest) {
         component: 'sales',
         operation: 'search_query'
       }))
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.api.salesSearchLatency, {
+          requestId: correlation.requestId,
+          operationId: correlation.operationId,
+          correlationId: correlation.correlationId,
+          jobType: 'api.sales.search',
+          durationMs: Date.now() - startedAt,
+          cacheHit: false,
+          resultCount: 0,
+          errorCount: 1,
+          degradedMode: false,
+        })
+      )
       return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
     }
 
     // Ensure hidden sales are filtered out (safety check)
     const results = (sales || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
+
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesSearchLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.search',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: results.length,
+        errorCount: 0,
+        degradedMode: false,
+      })
+    )
 
     return ok({ data: results })
   } catch (error: any) {
@@ -204,9 +240,21 @@ async function searchHandler(request: NextRequest) {
       operation: 'search_handler',
       durationMs: Date.now() - startedAt
     }))
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesSearchLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.search',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: 0,
+        errorCount: 1,
+        degradedMode: false,
+      })
+    )
     return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
   }
-}
 
 export const GET = withRateLimit(searchHandler, [
   Policies.SALES_VIEW_30S,

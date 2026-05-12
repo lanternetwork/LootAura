@@ -38,8 +38,17 @@ async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
   const { logger, generateOperationId } = await import('@/lib/log')
   const opId = generateOperationId()
+  const { createCorrelationBundle } = await import('@/lib/observability/correlation')
+  const { buildTelemetryRecord, emitObservabilityRecord } = await import('@/lib/observability/emit')
+  const { ObservabilityEvents } = await import('@/lib/observability/events')
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId })
   // Helper to add opId to log context
-  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+  const withOpId = (context: any = {}) => ({
+    ...context,
+    requestId: correlation.requestId,
+    operationId: correlation.operationId,
+    correlationId: correlation.correlationId,
+  })
   
   try {
     const supabase = await createSupabaseServerClient()
@@ -430,6 +439,25 @@ async function salesHandler(request: NextRequest) {
       })
       const cached = await getSalesApiCache(salesCacheKey)
       if (cached != null) {
+        const resultCount =
+          typeof (cached as { count?: unknown }).count === 'number'
+            ? (cached as { count: number }).count
+            : Array.isArray((cached as { data?: unknown }).data)
+              ? ((cached as { data: unknown[] }).data).length
+              : 0
+        emitObservabilityRecord(
+          buildTelemetryRecord(ObservabilityEvents.api.salesGetLatency, {
+            requestId: correlation.requestId,
+            operationId: correlation.operationId,
+            correlationId: correlation.correlationId,
+            jobType: 'api.sales.get',
+            durationMs: Date.now() - startedAt,
+            cacheHit: true,
+            resultCount,
+            errorCount: 0,
+            degradedMode: false,
+          })
+        )
         const { addCacheHeaders } = await import('@/lib/http/cache')
         return addCacheHeaders(NextResponse.json(cached), {
           maxAge: 30,
@@ -1011,6 +1039,20 @@ async function salesHandler(request: NextRequest) {
       durationMs: Date.now() - startedAt
     }))
 
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesGetLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.get',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: results.length,
+        errorCount: 0,
+        degradedMode: Boolean(degraded),
+      })
+    )
+
     // Populate short-TTL cache for public requests so identical requests hit cache
     if (!favoritesOnly && salesCacheKey) {
       await setSalesApiCache(salesCacheKey, response, 45)
@@ -1027,20 +1069,30 @@ async function salesHandler(request: NextRequest) {
     })
     
   } catch (error: any) {
-    const { logger, generateOperationId } = await import('@/lib/log')
-    const opId = generateOperationId()
-    const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+    const { logger } = await import('@/lib/log')
     logger.error('Sales query failed', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'sales',
       operation: 'get_sales',
       durationMs: Date.now() - startedAt
     }))
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesGetLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.get',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: 0,
+        errorCount: 1,
+        degradedMode: false,
+      })
+    )
     return NextResponse.json({ 
       ok: false, 
       error: 'Internal server error' 
     }, { status: 500 })
   }
-}
 
 async function postHandler(request: NextRequest) {
   // CSRF protection check

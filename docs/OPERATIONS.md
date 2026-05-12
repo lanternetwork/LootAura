@@ -1,6 +1,6 @@
 # Operations Guide
 
-**Last updated: 2025-01-31**
+**Last updated: 2026-05-12**
 
 ## Rate Limiting Operations
 
@@ -341,3 +341,71 @@ Access debug tools at `/admin/tools` when debug mode is enabled:
 **Caching:** `GET /api/sales` cache keys include a coarse `phase4LiveBucket` (30s) so short-TTL cached payloads cannot list sales as live for an unbounded time after `ends_at` passes.
 
 **Rollout:** Apply migration `172` to the database before relying on DB-side enforcement; deploy app changes in the same release window. Verify `pending_via_ends_at` / archive jobs as usual; Phase 4 does not remove the legacy archive fallback.
+
+## Tier 0 observability (structured logs, Phase A)
+
+**Purpose:** One JSON line per telemetry record on stdout when enabled, so Vercel and log drains can alert without changing business behavior. No third-party metrics vendors and no OpenTelemetry in this phase.
+
+### Enabling emission
+
+- **`NODE_ENV === 'test'`:** telemetry JSON is **off** (keeps unit and integration output clean).
+- **Production:** telemetry JSON is **off** unless `LOG_TELEMETRY_JSON=1` is set (avoids surprise stdout volume).
+- **Non-production:** telemetry JSON defaults **on** (unless `NODE_ENV` is `test`).
+
+Records are written by `emitObservabilityRecord` (`lib/observability/emit.ts`) as a single JSON object per line with a leading `t` ISO timestamp field.
+
+### Event taxonomy (summary)
+
+| Area | Example `event` values | Typical fields |
+|------|------------------------|----------------|
+| Ingestion | `ingestion.orchestration.started` / `completed`, `ingestion.external_page_source.*` | `mode`, `durationMs`, counts, `ok` |
+| Geocode | `geocode.worker.batch_*`, `geocode.queue.batch_completed` | `claimed`, `batchSize`, `durationMs`, `queuePressureClass`, Redis depths |
+| Publish | `publish.worker.batch_completed` | `attempted`, `succeeded`, `failed`, `skipped`, `expired`, `durationMs` |
+| Archive | `archive.sales.batch_iteration`, `job_summary`, `stale_pending_after_job`, `max_iterations` | `archived`, `batchesRun`, `stalePendingTotalAfter`, `maxIterationsHit` |
+| Parser / source | `parser.source.*`, `ingestion.external_page_source.persist_summary` | `parserVersion`, `adapter`, `pageHostHash` (no raw HTML), duplicate counts, `parseDurationMsTotal` |
+| Queue | Geocode queue batch events include depth and pressure | `queueDepthBeforeTotal`, `redisStarvationSignal` |
+| API | `api.sales.*.latency`, `api.cron.daily.hit`, `api.cron.geocode.hit`, `api.admin.archive.trigger.hit` | `durationMs`, `cacheHit`, `resultCount`, `errorCount`, `degradedMode`, `phase` |
+
+Canonical names live in `lib/observability/events.ts` (`ObservabilityEvents`).
+
+### Correlation model
+
+`createCorrelationBundle` and `mergeCorrelation` (`lib/observability/correlation.ts`) standardize:
+
+- **`requestId`** — HTTP or synthetic cron id (often equals `operationId` on cron).
+- **`operationId`** — logical run id (`generateOperationId` when not supplied).
+- **`correlationId`** — UUID for cross-service correlation within a run.
+- **`workerId`** — optional (for example region); not required on Vercel.
+- **`jobType`** — semantic label (`ingestion.orchestration`, `cron.geocode`, `archive.sales`, and similar).
+
+Daily cron builds one bundle and passes the same ids into archive, ingestion persist, geocode backlog, and publish so a single filter by `correlationId` reconstructs the run.
+
+### Queue health (geocode)
+
+- **`geocode.queue.batch_completed`:** `dequeued`, `completed`, `requeued`, `queueDepthBeforeTotal` / `queueDepthAfterTotal`, `queuePressureBefore` / `queuePressureAfter`, `redisStarvationSignal` when nothing was available to process.
+- **`geocode.worker.batch_completed`:** DB claim batch; `dbBacklogDepletionSignal` when `claimed === 0`; `queuePressureClass` from claimed versus `batchSize` (a full batch suggests more work may remain).
+
+### Archive telemetry
+
+- **`archive.sales.batch_iteration`:** per RPC batch counts (`batchArchivedViaEndsAt`, `batchArchivedViaLegacyFallback`).
+- **`archive.sales.job_summary`:** totals, `durationMs`, `stalePendingTotalAfter`, `maxIterationsHit`.
+- **`archive.sales.stale_pending_after_job`:** pending rows still match archive criteria after the job; investigate locks, clock skew, or data drift.
+
+### Public API latency
+
+`api.sales.get.latency`, `api.sales.search.latency`, and `api.sales.markers.latency` include **`durationMs`**, **`cacheHit`** (sales list when short-TTL server cache hits), **`resultCount`**, **`errorCount`**, and **`degradedMode`** where applicable. No full query strings or street-level PII are logged.
+
+### Parser and external source troubleshooting
+
+1. **`ingestion.external_page_source.fetch_failed`** — transport or SSRF-safe fetch layer; check `errorCode`, `pageHostHash`, `pageIndex`.
+2. **`ingestion.external_page_source.parse_failed`** — DOM parse or adapter fault; never includes raw HTML.
+3. **`ingestion.external_page_source.zero_listings_page`** — successful parse but no listings (`invalidListingCount` may still be positive).
+4. **`parser.source.duplicate_suppressed`** — URL or unique-constraint dedupe counts.
+5. **`parser.source.normalization_warning`** — aggregated listing-level normalization signals (for example `cityConflict`).
+
+### Operational flow
+
+1. Pick a **`correlationId`** or **`requestId`** from an alert or slow request.
+2. Filter logs for that id across cron, workers, and API latency events.
+3. For backlog stalls: compare **Redis queue** telemetry versus **DB geocode worker** `claimed` and `queuePressureClass`.
+4. For archive backlog: use **`stalePendingTotalAfter`** and **`maxIterationsHit`** on `archive.sales.job_summary`.

@@ -1,3 +1,6 @@
+import { emitObservabilityRecord, buildTelemetryRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
+import { classifyQueuePressure } from '@/lib/observability/metrics'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import {
   geocodeAddress,
@@ -195,6 +198,8 @@ export interface GeocodeWorkerRunOptions {
   batchSizeOverride?: number
   cooldownMinutesOverride?: number
   captureClaimedRowIds?: boolean
+  /** Merged into structured telemetry (requestId, correlationId, jobType, etc.) — no PII. */
+  telemetryContext?: Record<string, unknown>
 }
 
 function parseBatchSize(): number {
@@ -1061,6 +1066,17 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     deploymentEnv,
   })
 
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.geocode.batchStarted, {
+      ...(options?.telemetryContext ?? {}),
+      batchSize,
+      cooldownMinutes,
+      environment,
+      deploymentEnv,
+      jobType: 'geocode.db_claim_batch',
+    })
+  )
+
   const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_geocoding', {
     p_batch_size: batchSize,
     p_cooldown_minutes: cooldownMinutes,
@@ -1110,6 +1126,18 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       deploymentEnv,
       durationMs: Date.now() - batchStarted,
     })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.geocode.claimEmpty, {
+        ...(options?.telemetryContext ?? {}),
+        batchSize,
+        cooldownMinutes,
+        environment,
+        deploymentEnv,
+        durationMs: Date.now() - batchStarted,
+        dbBacklogDepletionSignal: true,
+        queuePressureClass: classifyQueuePressure(0, Math.max(1, batchSize)),
+      })
+    )
   }
 
   const rowResults = await runClaimedRowsWithConcurrency(
@@ -1201,6 +1229,31 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     durationMs,
     concurrency,
   })
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.geocode.batchCompleted, {
+      ...(options?.telemetryContext ?? {}),
+      environment,
+      deploymentEnv,
+      batchSize,
+      claimed: summary.claimed,
+      processed: processedCount,
+      succeeded: summary.succeeded,
+      failedRetriable: summary.failedRetriable,
+      failedTerminal: summary.failedTerminal,
+      skippedRows: 0,
+      rowsProcessed: processedCount,
+      rate429Count: summary.rate429Count,
+      repeatedEmptyResultRetries: summary.repeatedEmptyResultRetries ?? 0,
+      publishTriggered: publishTriggeredCount,
+      publishOk: publishOkCount,
+      publishFailed: publishFailedCount,
+      durationMs,
+      concurrency,
+      queuePressureClass: classifyQueuePressure(summary.claimed, Math.max(1, batchSize)),
+      dbBacklogDepletionSignal: summary.claimed === 0,
+    })
+  )
 
   summary.processed = processedCount
   summary.publishTriggered = publishTriggeredCount

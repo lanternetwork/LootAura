@@ -36,6 +36,9 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
 import { sendModerationDailyDigestEmail } from '@/lib/email/moderationDigest'
 import { logger, generateOperationId } from '@/lib/log'
+import { createCorrelationBundle } from '@/lib/observability/correlation'
+import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import {
   finalizeLinkedPublishedIngestedSales,
@@ -410,7 +413,13 @@ async function handleRequest(request: NextRequest) {
   const deploymentEnv = process.env.VERCEL_ENV || 'unknown'
   const startedAt = Date.now()
   const opId = generateOperationId()
-  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId })
+  const withOpId = (context: any = {}) => ({
+    ...context,
+    requestId: correlation.requestId,
+    operationId: correlation.operationId,
+    correlationId: correlation.correlationId,
+  })
 
   logger.info('Daily cron route hit', withOpId({
     component: 'api/cron/daily',
@@ -438,6 +447,16 @@ async function handleRequest(request: NextRequest) {
           deploymentEnv,
           durationMs: Date.now() - startedAt,
         }))
+        emitObservabilityRecord(
+          buildTelemetryRecord(ObservabilityEvents.api.cronDailyHit, {
+            requestId: correlation.requestId,
+            operationId: correlation.operationId,
+            correlationId: correlation.correlationId,
+            jobType: 'cron.daily',
+            phase: 'auth_failed',
+            durationMs: Date.now() - startedAt,
+          })
+        )
         return error
       }
       // If it's not a NextResponse, rethrow
@@ -447,6 +466,26 @@ async function handleRequest(request: NextRequest) {
     const cronModeParam = request.nextUrl.searchParams.get('mode')
     const isIngestionOnly = cronModeParam === 'ingestion'
     const mode = isIngestionOnly ? 'ingestion' : 'daily'
+    const jobTypeLabel = isIngestionOnly ? 'cron.daily.ingestion_only' : 'cron.daily.full'
+    const orchestrationTelemetry: Record<string, unknown> = {
+      requestId: correlation.requestId,
+      operationId: correlation.operationId,
+      correlationId: correlation.correlationId,
+      jobType: 'ingestion.orchestration',
+      cronMode: mode,
+    }
+
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.cronDailyHit, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: jobTypeLabel,
+        phase: 'authenticated',
+        mode,
+        durationMs: Date.now() - startedAt,
+      })
+    )
 
     logger.info('Daily cron job triggered', withOpId({
       component: 'api/cron/daily',
@@ -467,7 +506,7 @@ async function handleRequest(request: NextRequest) {
     if (isIngestionOnly) {
       results.tasksRan = ['ingestionOrchestration'] as const
       try {
-        const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'ingestion')
+        const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'ingestion', orchestrationTelemetry)
         results.tasks.ingestionOrchestration = ingestionOrchestrationResult
       } catch (error) {
         logger.error('Ingestion orchestration task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
@@ -497,6 +536,19 @@ async function handleRequest(request: NextRequest) {
       results.health = deriveCronHealthFromIngestionTask(results.tasks.ingestionOrchestration, durationMs, env)
       results.duration_ms = durationMs
       results.deployment_environment = deploymentEnv
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.api.cronDailyHit, {
+          requestId: correlation.requestId,
+          operationId: correlation.operationId,
+          correlationId: correlation.correlationId,
+          jobType: jobTypeLabel,
+          phase: 'response',
+          mode,
+          httpStatus: results.ok ? 200 : 500,
+          resultsOk: results.ok,
+          durationMs,
+        })
+      )
       return NextResponse.json(results, { status: results.ok ? 200 : 500 })
     }
 
@@ -504,6 +556,12 @@ async function handleRequest(request: NextRequest) {
     try {
       const archiveResult = await runArchiveEndedSalesJob({
         logBase: withOpId({ task: 'archive-sales' }),
+        telemetryContext: {
+          requestId: correlation.requestId,
+          operationId: correlation.operationId,
+          correlationId: correlation.correlationId,
+          jobType: 'archive.sales',
+        },
       })
       results.tasks.archiveSales = archiveResult
     } catch (error) {
@@ -589,7 +647,7 @@ async function handleRequest(request: NextRequest) {
 
     // Task 5: Ingestion orchestration (ingestion -> geocode -> publish)
     try {
-      const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'daily')
+      const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'daily', orchestrationTelemetry)
       results.tasks.ingestionOrchestration = ingestionOrchestrationResult
     } catch (error) {
       logger.error('Ingestion orchestration task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
@@ -620,6 +678,19 @@ async function handleRequest(request: NextRequest) {
     results.health = deriveCronHealthFromIngestionTask(results.tasks.ingestionOrchestration, durationMs, env)
     results.duration_ms = durationMs
     results.deployment_environment = deploymentEnv
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.cronDailyHit, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: jobTypeLabel,
+        phase: 'response',
+        mode,
+        httpStatus: results.ok ? 200 : 500,
+        resultsOk: results.ok,
+        durationMs,
+      })
+    )
     return NextResponse.json(results, { status: results.ok ? 200 : 500 })
   } catch (error) {
     // Handle auth errors (thrown by assertCronAuthorized)
@@ -634,6 +705,18 @@ async function handleRequest(request: NextRequest) {
       runAt,
       env,
     }))
+
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.cronDailyHit, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'cron.daily',
+        phase: 'unhandled_error',
+        httpStatus: 500,
+        durationMs: Date.now() - startedAt,
+      })
+    )
 
     return NextResponse.json(
       {
@@ -653,9 +736,16 @@ async function handleRequest(request: NextRequest) {
 
 async function runIngestionOrchestration(
   withOpId: (context?: any) => any,
-  mode: 'daily' | 'ingestion'
+  mode: 'daily' | 'ingestion',
+  telemetryContext: Record<string, unknown>
 ): Promise<any> {
   const orchestrationStartedAt = Date.now()
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.ingestion.orchestrationStarted, {
+      ...telemetryContext,
+      mode,
+    })
+  )
   logger.info('Starting ingestion orchestration task', withOpId({
     component: 'api/cron/daily',
     task: 'ingestion-orchestration',
@@ -860,6 +950,7 @@ async function runIngestionOrchestration(
             source_pages: row.source_pages,
           },
           {
+            telemetryContext: telemetryContext,
             beforePageFetch: async ({ pageUrl, pageIndex, city, state }) => {
               let domain = 'unknown-host'
               try {
@@ -1033,7 +1124,10 @@ async function runIngestionOrchestration(
       step: 'geocode',
       backlogBatchSize,
     }))
-    geocodeSummary = await geocodePendingSales({ batchSizeOverride: backlogBatchSize })
+    geocodeSummary = await geocodePendingSales({
+      batchSizeOverride: backlogBatchSize,
+      telemetryContext: telemetryContext,
+    })
     taskResult.steps.geocode = {
       ok: true,
       backlogBatchSize,
@@ -1073,7 +1167,7 @@ async function runIngestionOrchestration(
       task: 'ingestion-orchestration',
       step: 'publish',
     }))
-    publishSummary = await publishReadyIngestedSales()
+    publishSummary = await publishReadyIngestedSales({ telemetryContext: telemetryContext })
     const linkedFinalizeSummary = await finalizeLinkedPublishedIngestedSales()
     taskResult.steps.publish = {
       ok: true,
@@ -1117,6 +1211,17 @@ async function runIngestionOrchestration(
   }))
 
   taskResult.duration_ms = Date.now() - orchestrationStartedAt
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.ingestion.orchestrationCompleted, {
+      ...telemetryContext,
+      mode,
+      ok: taskResult.ok,
+      durationMs: taskResult.duration_ms,
+      geocodeClaimed: geocodeSummary?.claimed ?? null,
+      publishAttempted: publishSummary?.attempted ?? null,
+      externalIngestionSkipped: Boolean(taskResult.steps.ingestion?.skipped),
+    })
+  )
   return taskResult
 }
 

@@ -14,6 +14,9 @@ import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisp
 import { isPublishingRowStaleReclaimBlockedByPastEndDateValidation } from '@/lib/ingestion/publishClaimStale'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
 import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
+import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
+import { classifyQueuePressure } from '@/lib/observability/metrics'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
@@ -1456,9 +1459,12 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
   }
 }
 
-export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSummary> {
+export async function publishReadyIngestedSales(options?: {
+  telemetryContext?: Record<string, unknown>
+}): Promise<PublishWorkerBatchSummary> {
   const admin = getAdminDb()
   const batchSize = parseBatchSize()
+  const publishStartedAt = Date.now()
 
   const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_publish', {
     p_batch_size: batchSize,
@@ -1621,6 +1627,23 @@ export async function publishReadyIngestedSales(): Promise<PublishWorkerBatchSum
     skipped: summary.skipped,
     expired: summary.expired,
   })
+
+  const durationMs = Date.now() - publishStartedAt
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.publish.batchCompleted, {
+      ...(options?.telemetryContext ?? {}),
+      batchSize,
+      attempted: summary.attempted,
+      succeeded: summary.succeeded,
+      failed: summary.failed,
+      skipped: summary.skipped,
+      expired: summary.expired,
+      rowsProcessed: summary.succeeded + summary.failed + summary.skipped + summary.expired,
+      durationMs,
+      queuePressureClass: classifyQueuePressure(summary.attempted, Math.max(1, batchSize)),
+      jobType: 'publish.db_claim_batch',
+    })
+  )
 
   return summary
 }

@@ -12,6 +12,8 @@ import {
 import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
+import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v3'
@@ -59,6 +61,8 @@ export type ExternalPageSourcePersistOptions = {
     city: string
     state: string
   }) => Promise<void> | void
+  /** Merged into structured telemetry (requestId, correlationId, etc.) — no PII. */
+  telemetryContext?: Record<string, unknown>
 }
 
 /** HTTPS-only list URLs for server-side fetch (SSRF-safe layer). */
@@ -956,6 +960,12 @@ export async function persistExternalPageSource(
     pagesProcessed: 0,
   }
 
+  const telemBase = options?.telemetryContext ?? {}
+  let parseDurationMsTotal = 0
+  let duplicateUrlSkipped = 0
+  let duplicateConstraintSkipped = 0
+  let normalizationWarnings = 0
+
   const pages = normalizeSourcePages(config.source_pages)
   if (pages.length === 0) {
     return summary
@@ -1007,12 +1017,24 @@ export async function persistExternalPageSource(
         pageHostHash,
         message: e instanceof Error ? e.message : String(e),
       })
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.ingestion.externalFetchFailed, {
+          ...telemBase,
+          adapter: ADAPTER_ID,
+          parserVersion: PARSER_VERSION_ROW,
+          pageIndex,
+          pageHostHash,
+          errorCode: 'fetch_page',
+        })
+      )
       continue
     }
 
     let parseResult: ParseExternalPageSourceResult
     try {
+      const parseStarted = Date.now()
       parseResult = parseExternalPageSourceHtml(html, config, pageUrl)
+      parseDurationMsTotal += Date.now() - parseStarted
     } catch (e) {
       summary.errors += 1
       logger.warn('External page source: parse failed', {
@@ -1025,13 +1047,39 @@ export async function persistExternalPageSource(
         pageHostHash,
         message: e instanceof Error ? e.message : String(e),
       })
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.ingestion.externalParseFailed, {
+          ...telemBase,
+          adapter: ADAPTER_ID,
+          parserVersion: PARSER_VERSION_ROW,
+          pageIndex,
+          pageHostHash,
+          errorCode: 'parse_page',
+        })
+      )
       continue
     }
 
     summary.invalid += parseResult.invalid
     summary.fetched += parseResult.listings.length
 
+    if (parseResult.listings.length === 0) {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.ingestion.externalZeroListings, {
+          ...telemBase,
+          adapter: ADAPTER_ID,
+          parserVersion: PARSER_VERSION_ROW,
+          pageIndex,
+          pageHostHash,
+          invalidListingCount: parseResult.invalid,
+        })
+      )
+    }
+
     for (const listing of parseResult.listings) {
+      if ((listing.rawPayload as { cityConflict?: boolean }).cityConflict === true) {
+        normalizationWarnings += 1
+      }
       const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
 
       const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
@@ -1053,10 +1101,21 @@ export async function persistExternalPageSource(
             externalId: listing.rawPayload.externalId ?? null,
           }
         )
+        emitObservabilityRecord(
+          buildTelemetryRecord(ObservabilityEvents.parser.extractionFailure, {
+            ...telemBase,
+            adapter: ADAPTER_ID,
+            parserVersion: PARSER_VERSION_ROW,
+            pageIndex,
+            pageHostHash,
+            errorCode: 'dedupe_lookup',
+          })
+        )
         continue
       }
       if (existing?.id) {
         summary.skipped += 1
+        duplicateUrlSkipped += 1
         continue
       }
 
@@ -1095,6 +1154,7 @@ export async function persistExternalPageSource(
       if (insErr) {
         if (/duplicate key|unique constraint|23505/i.test(insErr.message)) {
           summary.skipped += 1
+          duplicateConstraintSkipped += 1
           continue
         }
         summary.errors += 1
@@ -1129,6 +1189,74 @@ export async function persistExternalPageSource(
     errors: summary.errors,
     pagesProcessed: summary.pagesProcessed,
   })
+
+  const duplicateSuppressedTotal = duplicateUrlSkipped + duplicateConstraintSkipped
+  if (duplicateSuppressedTotal > 0) {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.parser.duplicateSuppressed, {
+        ...telemBase,
+        adapter: ADAPTER_ID,
+        parserVersion: PARSER_VERSION_ROW,
+        duplicateUrlSkipped,
+        duplicateConstraintSkipped,
+        duplicateSuppressedTotal,
+      })
+    )
+  }
+
+  if (normalizationWarnings > 0) {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.parser.normalizationWarning, {
+        ...telemBase,
+        adapter: ADAPTER_ID,
+        parserVersion: PARSER_VERSION_ROW,
+        normalizationWarnings,
+      })
+    )
+  }
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.parser.parseTimed, {
+      ...telemBase,
+      adapter: ADAPTER_ID,
+      parserVersion: PARSER_VERSION_ROW,
+      parseDurationMsTotal,
+      pagesProcessed: summary.pagesProcessed,
+    })
+  )
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.parser.persistComplete, {
+      ...telemBase,
+      adapter: ADAPTER_ID,
+      parserVersion: PARSER_VERSION_ROW,
+      pagesProcessed: summary.pagesProcessed,
+      listingsExtracted: summary.fetched,
+      inserted: summary.inserted,
+      skipped: summary.skipped,
+      invalid: summary.invalid,
+      errors: summary.errors,
+    })
+  )
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.ingestion.externalPersistSummary, {
+      ...telemBase,
+      adapter: ADAPTER_ID,
+      parserVersion: PARSER_VERSION_ROW,
+      sourcePlatform: platform,
+      pagesProcessed: summary.pagesProcessed,
+      listingsExtracted: summary.fetched,
+      inserted: summary.inserted,
+      skipped: summary.skipped,
+      invalid: summary.invalid,
+      errors: summary.errors,
+      parseDurationMsTotal,
+      duplicateUrlSkipped,
+      duplicateConstraintSkipped,
+      normalizationWarnings,
+    })
+  )
 
   return summary
 }

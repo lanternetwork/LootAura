@@ -1,5 +1,7 @@
 import { getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
 
 export type AdminDbForArchive = ReturnType<typeof getAdminDb>
 
@@ -91,6 +93,8 @@ export async function runArchiveEndedSalesJob(options: {
   admin?: AdminDbForArchive
   now?: Date
   logBase: Record<string, unknown>
+  /** Merged into structured telemetry records (no PII). */
+  telemetryContext?: Record<string, unknown>
 }): Promise<ArchiveEndedSalesJobResult> {
   const admin = options.admin ?? getAdminDb()
   const now = options.now ?? new Date()
@@ -98,6 +102,7 @@ export async function runArchiveEndedSalesJob(options: {
   const batchLimit = parseEnvInt('ARCHIVE_SALES_BATCH_SIZE', 250, 1, 5000)
   const maxIterations = parseEnvInt('ARCHIVE_SALES_MAX_ITERATIONS', 2000, 1, 50_000)
   const started = Date.now()
+  const telemBase = { ...(options.telemetryContext ?? {}), ...options.logBase }
 
   const pendingBefore = await fetchPendingArchiveCounts(admin, nowIso)
 
@@ -141,6 +146,17 @@ export async function runArchiveEndedSalesJob(options: {
       ...options.logBase,
     })
 
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.archive.batchIteration, {
+        ...telemBase,
+        iteration: i,
+        batchArchivedViaEndsAt: n1,
+        batchArchivedViaLegacyFallback: n2,
+        batchLimit,
+        durationMs: Date.now() - started,
+      })
+    )
+
     if (n2 > 0) {
       logger.info('archive_sales_used_legacy_fallback', {
         component: 'sales/archive_sql',
@@ -164,6 +180,15 @@ export async function runArchiveEndedSalesJob(options: {
         maxIterations,
         ...options.logBase,
       })
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.archive.maxIterations, {
+          ...telemBase,
+          maxIterations,
+          batchesRun,
+          archivedViaEndsAt,
+          archivedViaLegacy,
+        })
+      )
     }
   }
 
@@ -182,6 +207,15 @@ export async function runArchiveEndedSalesJob(options: {
         'Published/active rows remain that match archive criteria (investigate locks, clock skew, or data drift).',
       ...options.logBase,
     })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.archive.stalePending, {
+        ...telemBase,
+        stalePendingTotal: staleTotal,
+        pendingViaEndsAt: pendingAfter?.pending_via_ends_at,
+        pendingViaLegacy: pendingAfter?.pending_via_legacy,
+        suspiciousEndsBeforeStarts: pendingAfter?.suspicious_ends_before_starts,
+      })
+    )
   }
 
   const durationMs = Date.now() - started
@@ -200,6 +234,21 @@ export async function runArchiveEndedSalesJob(options: {
     pending_after: pendingAfter ?? undefined,
     ...options.logBase,
   })
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.archive.jobSummary, {
+      ...telemBase,
+      archived,
+      archivedViaEndsAt,
+      archivedViaLegacyFallback: archivedViaLegacy,
+      batchesRun,
+      durationMs,
+      maxIterationsHit,
+      stalePendingTotalAfter: staleTotal ?? null,
+      pendingBeforeTodayUtc: pendingBefore?.today_utc_date ?? null,
+      pendingAfterTodayUtc: pendingAfter?.today_utc_date ?? null,
+    })
+  )
 
   return {
     ok: true,

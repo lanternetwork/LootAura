@@ -2,6 +2,9 @@ import { randomUUID } from 'crypto'
 import { ENV_SERVER } from '@/lib/env'
 import { geocodeIngestedSaleById, type GeocodeIngestedSaleByIdResult } from '@/lib/ingestion/geocodeWorker'
 import { logger } from '@/lib/log'
+import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
+import { classifyQueuePressure, classifyRetryExhaustion } from '@/lib/observability/metrics'
 
 const QUEUE_HIGH = 'ingestion:geocode:queue:high'
 const QUEUE_NORMAL = 'ingestion:geocode:queue:normal'
@@ -267,7 +270,25 @@ function isTerminalQueueOutcome(result: GeocodeIngestedSaleByIdResult): boolean 
  *
  * Invariant: a dequeued job is either completed (Redis job key removed), requeued onto a list, or restored to a list.
  */
-export async function processGeocodeQueueBatch(limit: number): Promise<ProcessGeocodeQueueBatchSummary> {
+export async function getGeocodeQueueDepths(): Promise<{ high: number; normal: number; total: number } | null> {
+  if (!isGeocodeQueueConfigured()) {
+    return null
+  }
+  try {
+    const rawHigh = await redisCommand('llen', [QUEUE_HIGH])
+    const rawNormal = await redisCommand('llen', [QUEUE_NORMAL])
+    const high = typeof rawHigh === 'number' && Number.isFinite(rawHigh) ? rawHigh : Number(rawHigh) || 0
+    const normal = typeof rawNormal === 'number' && Number.isFinite(rawNormal) ? rawNormal : Number(rawNormal) || 0
+    return { high, normal, total: high + normal }
+  } catch {
+    return null
+  }
+}
+
+export async function processGeocodeQueueBatch(
+  limit: number,
+  options?: { telemetryContext?: Record<string, unknown> }
+): Promise<ProcessGeocodeQueueBatchSummary> {
   const summary: ProcessGeocodeQueueBatchSummary = {
     dequeued: 0,
     completed: 0,
@@ -278,10 +299,17 @@ export async function processGeocodeQueueBatch(limit: number): Promise<ProcessGe
     return summary
   }
 
-  const jobs = await dequeueBatch(limit)
+  const batchStarted = Date.now()
+  const depthBefore = await getGeocodeQueueDepths()
+  const safeLimit = Math.max(0, Math.min(500, Math.floor(limit)))
+  const watermark = Math.max(1, safeLimit)
+
+  const jobs = await dequeueBatch(safeLimit)
   summary.dequeued = jobs.length
 
+  let maxJobAttemptsSeen = 0
   for (const job of jobs) {
+    maxJobAttemptsSeen = Math.max(maxJobAttemptsSeen, Number.isFinite(job.attempts) ? job.attempts : 0)
     try {
       const result = await geocodeIngestedSaleById(job.saleId)
 
@@ -316,6 +344,27 @@ export async function processGeocodeQueueBatch(limit: number): Promise<ProcessGe
       }
     }
   }
+
+  const depthAfter = await getGeocodeQueueDepths()
+  const durationMs = Date.now() - batchStarted
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.geocode.queueBatchCompleted, {
+      ...options?.telemetryContext,
+      limit: safeLimit,
+      durationMs,
+      dequeued: summary.dequeued,
+      completed: summary.completed,
+      requeued: summary.requeued,
+      queueDepthBeforeTotal: depthBefore?.total ?? null,
+      queueDepthAfterTotal: depthAfter?.total ?? null,
+      queuePressureBefore: depthBefore != null ? classifyQueuePressure(depthBefore.total, watermark) : 'unknown',
+      queuePressureAfter: depthAfter != null ? classifyQueuePressure(depthAfter.total, watermark) : 'unknown',
+      redisStarvationSignal:
+        summary.dequeued === 0 && (depthBefore?.total ?? 0) === 0 && (depthAfter?.total ?? 0) === 0,
+      maxJobAttemptsSeen,
+      retryVisibilityClass: classifyRetryExhaustion(maxJobAttemptsSeen, 12),
+    })
+  )
 
   return summary
 }

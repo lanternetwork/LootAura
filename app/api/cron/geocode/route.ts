@@ -21,6 +21,9 @@ import { processGeocodeQueueBatch } from '@/lib/ingestion/geocodeQueue'
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 import { recordGeocodeCronOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
+import { createCorrelationBundle } from '@/lib/observability/correlation'
+import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +61,13 @@ export async function POST(request: NextRequest) {
 async function handleGeocodeCron(request: NextRequest) {
   const startedAt = Date.now()
   const requestId = generateOperationId()
+  const correlation = createCorrelationBundle({ requestId, operationId: requestId, jobType: 'cron.geocode' })
+  const telemetryContext = {
+    requestId: correlation.requestId,
+    operationId: correlation.operationId,
+    correlationId: correlation.correlationId,
+    jobType: 'cron.geocode',
+  }
   const environment = process.env.NODE_ENV || 'development'
   const deploymentEnv = process.env.VERCEL_ENV || 'unknown'
 
@@ -83,6 +93,13 @@ async function handleGeocodeCron(request: NextRequest) {
       deploymentEnv,
       durationMs: Date.now() - startedAt,
     })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
+        ...telemetryContext,
+        phase: 'auth_failed',
+        durationMs: Date.now() - startedAt,
+      })
+    )
     if (error instanceof NextResponse) {
       return error
     }
@@ -104,7 +121,7 @@ async function handleGeocodeCron(request: NextRequest) {
   let backlogRate429Count = 0
 
   try {
-    const batch = await processGeocodeQueueBatch(limit)
+    const batch = await processGeocodeQueueBatch(limit, { telemetryContext })
     processed = batch.dequeued
     requeued = batch.requeued
     completed = batch.completed
@@ -124,6 +141,7 @@ async function handleGeocodeCron(request: NextRequest) {
       const backlog = await geocodePendingSales({
         batchSizeOverride: backlogBatchSize,
         captureClaimedRowIds: true,
+        telemetryContext,
       })
       backlogDurationMs = Date.now() - backlogStartedAt
       backlogRate429Count = Number(backlog.rate429Count ?? 0)
@@ -170,6 +188,18 @@ async function handleGeocodeCron(request: NextRequest) {
         ok: false,
         error: backlogError,
       })
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
+          ...telemetryContext,
+          phase: 'backlog_error',
+          ok: false,
+          environment,
+          deploymentEnv,
+          durationMs,
+          queueProcessed: processed,
+          backlogClaimed,
+        })
+      )
       return NextResponse.json(
         {
           ok: false,
@@ -228,6 +258,16 @@ async function handleGeocodeCron(request: NextRequest) {
       ok: false,
       error: error instanceof Error ? error.message : String(error),
     })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
+        ...telemetryContext,
+        phase: 'queue_error',
+        ok: false,
+        environment,
+        deploymentEnv,
+        durationMs,
+      })
+    )
     return NextResponse.json(
       {
         ok: false,
@@ -291,6 +331,24 @@ async function handleGeocodeCron(request: NextRequest) {
     backlogPublishTriggered,
     backlogDurationMs,
   })
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
+      ...telemetryContext,
+      phase: 'complete',
+      ok: true,
+      environment,
+      deploymentEnv,
+      durationMs,
+      queueProcessed: processed,
+      queueCompleted: completed,
+      queueRequeued: requeued,
+      backlogClaimed,
+      backlogProcessed,
+      backlogFailed,
+      backlogPublishTriggered,
+    })
+  )
 
   return NextResponse.json({
     ok: true,

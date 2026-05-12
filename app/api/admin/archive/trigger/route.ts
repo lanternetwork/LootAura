@@ -5,6 +5,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { logger, generateOperationId } from '@/lib/log'
 import { runArchiveEndedSalesJob } from '@/lib/sales/archiveEndedSalesSqlBatch'
+import { createCorrelationBundle } from '@/lib/observability/correlation'
+import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +23,13 @@ export async function POST(request: NextRequest) {
 
   const runAt = new Date().toISOString()
   const opId = generateOperationId()
-  const withOpId = (context: Record<string, unknown> = {}) => ({ ...context, requestId: opId })
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId, jobType: 'admin.archive.trigger' })
+  const withOpId = (context: Record<string, unknown> = {}) => ({
+    ...context,
+    requestId: correlation.requestId,
+    operationId: correlation.operationId,
+    correlationId: correlation.correlationId,
+  })
 
   try {
     logger.info('Archive system triggered manually by admin', withOpId({
@@ -28,15 +37,46 @@ export async function POST(request: NextRequest) {
       runAt,
     }))
 
+    const started = Date.now()
     const archiveResult = await runArchiveEndedSalesJob({
       logBase: withOpId({ task: 'archive-sales' }),
+      telemetryContext: {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'admin.archive.trigger',
+      },
     })
+
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.adminArchiveTriggerHit, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'admin.archive.trigger',
+        phase: 'complete',
+        ok: true,
+        durationMs: Date.now() - started,
+        archived: archiveResult.archived,
+        batchesRun: archiveResult.batches_run,
+      })
+    )
 
     return NextResponse.json({
       runAt,
       ...archiveResult,
     })
   } catch (error) {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.adminArchiveTriggerHit, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'admin.archive.trigger',
+        phase: 'error',
+        ok: false,
+      })
+    )
     logger.error('Archive system failed', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'api/admin/archive/trigger',
     }))

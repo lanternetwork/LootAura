@@ -17,6 +17,12 @@ export const dynamic = 'force-dynamic'
 // [{ id: string, title: string, lat: number, lng: number }]
 async function markersHandler(request: NextRequest) {
   const startedAt = Date.now()
+  const { generateOperationId } = await import('@/lib/log')
+  const opId = generateOperationId()
+  const { createCorrelationBundle } = await import('@/lib/observability/correlation')
+  const { buildTelemetryRecord, emitObservabilityRecord } = await import('@/lib/observability/emit')
+  const { ObservabilityEvents } = await import('@/lib/observability/events')
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId })
 
   try {
     const url = new URL(request.url)
@@ -35,6 +41,20 @@ async function markersHandler(request: NextRequest) {
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
     const originLng = lngParam !== null ? parseFloat(lngParam) : NaN
     if (!Number.isFinite(originLat) || !Number.isFinite(originLng)) {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.api.salesMarkersLatency, {
+          requestId: correlation.requestId,
+          operationId: correlation.operationId,
+          correlationId: correlation.correlationId,
+          jobType: 'api.sales.markers',
+          durationMs: Date.now() - startedAt,
+          cacheHit: false,
+          resultCount: 0,
+          errorCount: 1,
+          degradedMode: false,
+          errorCode: 'invalid_lat_lng',
+        })
+      )
       return NextResponse.json({ error: 'Missing or invalid lat/lng' }, { status: 400 })
     }
     // Normalize distance (km)
@@ -328,6 +348,19 @@ async function markersHandler(request: NextRequest) {
     }
 
     // Return structured response matching /api/sales format
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesMarkersLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.markers',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: markers.length,
+        errorCount: 0,
+        degradedMode: false,
+      })
+    )
     return NextResponse.json({
       ok: true,
       data: markers,
@@ -349,9 +382,21 @@ async function markersHandler(request: NextRequest) {
       operation: 'markers_handler',
       durationMs: Date.now() - startedAt
     })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesMarkersLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.markers',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: 0,
+        errorCount: 1,
+        degradedMode: false,
+      })
+    )
     return fail(500, 'INTERNAL_ERROR', 'Internal server error')
   }
-}
 
 export const GET = withRateLimit(markersHandler, [
   Policies.SALES_VIEW_30S,

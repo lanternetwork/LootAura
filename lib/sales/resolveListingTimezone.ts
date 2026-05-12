@@ -1,10 +1,11 @@
-import { getAdminDb } from '@/lib/supabase/clients'
+import type { getAdminDb, getRlsDb } from '@/lib/supabase/clients'
 import {
   resolveIanaTimezoneForIngestionZip5,
   resolveIanaTimezoneFromLatLng,
 } from '@/lib/ingestion/resolveIanaTimezoneForIngestionZip5'
 
-export type AdminDbForListingTz = ReturnType<typeof getAdminDb>
+/** Schema client used for ZIP lookups (`fromBase`); RLS or service role. */
+export type AdminDbForListingTz = Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>
 
 export type ResolveListingTimezoneResult =
   | { ok: true; iana: string; source: 'zip5' | 'lat_lng' }

@@ -1,4 +1,4 @@
-import { getAdminDb } from '@/lib/supabase/clients'
+import type { getAdminDb, getRlsDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { computeSaleEndsAt } from '@/lib/sales/computeSaleEndsAt'
 import {
@@ -6,7 +6,7 @@ import {
   type ResolveListingTimezoneResult,
 } from '@/lib/sales/resolveListingTimezone'
 
-export type AdminDbForSaleEnds = ReturnType<typeof getAdminDb>
+export type AdminDbForSaleEnds = Awaited<ReturnType<typeof getRlsDb>> | ReturnType<typeof getAdminDb>
 
 export type PersistableSaleEndsInput = {
   date_start: string

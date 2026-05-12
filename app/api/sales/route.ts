@@ -1288,10 +1288,9 @@ async function postHandler(request: NextRequest) {
     // Allow status from body if provided (for test sales), otherwise default to 'published'
     const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
 
-    const { getAdminDb } = await import('@/lib/supabase/clients')
     const { resolvePersistableSaleEndsAt } = await import('@/lib/sales/resolvePersistableSaleEndsAt')
     const listingEnds = await resolvePersistableSaleEndsAt(
-      getAdminDb(),
+      rls,
       {
         date_start,
         time_start,

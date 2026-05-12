@@ -113,3 +113,42 @@ export function urlSuggestsNonListingPhoto(urlString: string): string | null {
 
   return null
 }
+
+/** Dedupe URLs; trim; first occurrence wins (imported sale media order). */
+export function dedupeImageUrlsPreserveOrder(urls: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const u of urls) {
+    const t = typeof u === 'string' ? u.trim() : ''
+    if (!t || seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+  return out
+}
+
+/**
+ * Remediation helper: merge cover + images (deduped, cover first), drop branding URLs,
+ * set cover to first remaining or null. Keep aligned with migration
+ * `169_sales_remediate_imported_branding_images.sql`.
+ */
+export function filterBrandingFromSaleMediaUrls(params: {
+  coverImageUrl: string | null | undefined
+  images: string[] | null | undefined
+}): { coverImageUrl: string | null; images: string[] } {
+  const merged: string[] = []
+  const c = typeof params.coverImageUrl === 'string' ? params.coverImageUrl.trim() : ''
+  if (c) merged.push(c)
+  if (Array.isArray(params.images)) {
+    for (const x of params.images) {
+      if (typeof x !== 'string') continue
+      const t = x.trim()
+      if (!t) continue
+      merged.push(t)
+    }
+  }
+  const deduped = dedupeImageUrlsPreserveOrder(merged)
+  const kept = deduped.filter((u) => !urlSuggestsNonListingPhoto(u))
+  if (kept.length === 0) return { coverImageUrl: null, images: [] }
+  return { coverImageUrl: kept[0], images: kept }
+}

@@ -57,6 +57,11 @@ import {
 import { createEmptyDedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
 import { runArchiveEndedSalesJob } from '@/lib/sales/archiveEndedSalesSqlBatch'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
+import {
+  isIngestionOrchestrationLeaseActiveAt,
+  isStaleOrchestrationLeaseAt,
+  parseIngestionOrchestrationLeaseSeconds,
+} from '@/lib/operationalResilience/ingestionOrchestrationLeaseGate'
 
 export const dynamic = 'force-dynamic'
 const DEFAULT_BACKLOG_BATCH = 25
@@ -143,7 +148,7 @@ type IngestionOrchestrationLease = {
   owner: string
   staleRecovered: boolean
   cursor: number
-  reason?: 'active_lease' | 'acquire_failed'
+  reason?: 'active_lease' | 'acquire_failed' | 'lost_race'
 }
 
 type IngestionOrchestrationStateRow = {
@@ -226,15 +231,6 @@ function parseIngestionOrchestrationExecutionBudgetMs(): number {
   return Math.min(parsed, 240_000)
 }
 
-function parseIngestionOrchestrationLeaseSeconds(): number {
-  const raw = process.env.INGESTION_ORCHESTRATION_LEASE_SECONDS
-  const defaultSeconds = 120
-  if (raw === undefined || raw === '') return defaultSeconds
-  const parsed = Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed) || parsed < 30) return defaultSeconds
-  return Math.min(parsed, 600)
-}
-
 async function ensureIngestionOrchestrationStateRow(withOpId: (context?: any) => any): Promise<void> {
   const adminDb = getAdminDb()
   const { error } = await fromBase(adminDb, 'ingestion_orchestration_state').upsert(
@@ -255,11 +251,25 @@ async function ensureIngestionOrchestrationStateRow(withOpId: (context?: any) =>
 async function acquireIngestionOrchestrationLease(
   withOpId: (context?: any) => any
 ): Promise<IngestionOrchestrationLease> {
+  const emitLeaseTelemetry = (result: IngestionOrchestrationLease): IngestionOrchestrationLease => {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.ingestion.orchestrationLeaseOutcome, {
+        acquired: result.acquired,
+        staleRecovered: result.staleRecovered,
+        cursor: result.cursor,
+        overlapContention:
+          !result.acquired && (result.reason === 'active_lease' || result.reason === 'lost_race'),
+        reason: result.reason ?? (result.acquired ? 'acquired' : 'none'),
+      })
+    )
+    return result
+  }
+
   await ensureIngestionOrchestrationStateRow(withOpId)
   const adminDb = getAdminDb()
   const owner = generateOperationId()
   const nowMs = Date.now()
-  const leaseSeconds = parseIngestionOrchestrationLeaseSeconds()
+  const leaseSeconds = parseIngestionOrchestrationLeaseSeconds(process.env.INGESTION_ORCHESTRATION_LEASE_SECONDS)
   const leaseExpiresAtIso = new Date(nowMs + leaseSeconds * 1000).toISOString()
 
   const { data: stateRows, error: selectError } = await fromBase(adminDb, 'ingestion_orchestration_state')
@@ -273,22 +283,14 @@ async function acquireIngestionOrchestrationLease(
       step: 'ingestion',
       operation: 'lease_acquire',
     }))
-    return { acquired: false, owner, staleRecovered: false, cursor: 0, reason: 'acquire_failed' }
+    return emitLeaseTelemetry({ acquired: false, owner, staleRecovered: false, cursor: 0, reason: 'acquire_failed' })
   }
 
   const current = stateRows[0] as IngestionOrchestrationStateRow
   const ownerNow = current.lease_owner ?? null
   const expiresNow = current.lease_expires_at ?? null
-  const currentExpiresMs =
-    typeof expiresNow === 'string' && expiresNow.length > 0
-      ? Date.parse(expiresNow)
-      : Number.NaN
-  const leaseActive =
-    !!ownerNow &&
-    Number.isFinite(currentExpiresMs) &&
-    currentExpiresMs > nowMs
 
-  if (leaseActive) {
+  if (isIngestionOrchestrationLeaseActiveAt(nowMs, ownerNow, expiresNow)) {
     logger.info('Ingestion orchestration lease already active; skipping overlapping run', withOpId({
       component: 'api/cron/daily',
       task: 'ingestion-orchestration',
@@ -296,16 +298,16 @@ async function acquireIngestionOrchestrationLease(
       operation: 'lease_acquire',
       overlapPrevented: true,
     }))
-    return {
+    return emitLeaseTelemetry({
       acquired: false,
       owner,
       staleRecovered: false,
       cursor: current.cursor ?? 0,
       reason: 'active_lease',
-    }
+    })
   }
 
-  const staleRecovered = !!ownerNow && Number.isFinite(currentExpiresMs) && currentExpiresMs <= nowMs
+  const staleRecovered = isStaleOrchestrationLeaseAt(nowMs, ownerNow, expiresNow)
   const leaseUpdatePayload = {
     lease_owner: owner,
     lease_expires_at: leaseExpiresAtIso,
@@ -336,7 +338,13 @@ async function acquireIngestionOrchestrationLease(
       overlapPrevented: true,
       message: updateError?.message,
     }))
-    return { acquired: false, owner, staleRecovered: false, cursor: current.cursor ?? 0, reason: 'active_lease' }
+    return emitLeaseTelemetry({
+      acquired: false,
+      owner,
+      staleRecovered: false,
+      cursor: current.cursor ?? 0,
+      reason: 'lost_race',
+    })
   }
 
   logger.info('Ingestion orchestration lease acquired', withOpId({
@@ -346,7 +354,12 @@ async function acquireIngestionOrchestrationLease(
     operation: 'lease_acquire',
     staleRecovered,
   }))
-  return { acquired: true, owner, staleRecovered, cursor: (updatedRows[0]?.cursor as number | null) ?? (current.cursor ?? 0) }
+  return emitLeaseTelemetry({
+    acquired: true,
+    owner,
+    staleRecovered,
+    cursor: (updatedRows[0]?.cursor as number | null) ?? (current.cursor ?? 0),
+  })
 }
 
 async function releaseIngestionOrchestrationLease(

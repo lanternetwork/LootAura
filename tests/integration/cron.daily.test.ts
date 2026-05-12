@@ -1047,6 +1047,7 @@ describe('GET /api/cron/daily', () => {
           source_url: 0,
           exact_address_date: 0,
           soft_date_window: 0,
+          soft_duplicate_rejected: 0,
           no_match: 0,
           duplicateDecisionTrue: 0,
           duplicateDecisionFalse: 0,

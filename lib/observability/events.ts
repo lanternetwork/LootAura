@@ -12,6 +12,8 @@ export const ObservabilityEvents = {
     externalFetchFailed: 'ingestion.external_page_source.fetch_failed',
     externalParseFailed: 'ingestion.external_page_source.parse_failed',
     externalZeroListings: 'ingestion.external_page_source.zero_listings_page',
+    duplicateScoringDecision: 'ingestion.duplicate.scoring_decision',
+    orchestrationLeaseOutcome: 'ingestion.orchestration.lease_outcome',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',
@@ -42,6 +44,8 @@ export const ObservabilityEvents = {
     normalizationWarning: 'parser.source.normalization_warning',
     parseTimed: 'parser.source.parse_timed',
     duplicateSuppressed: 'parser.source.duplicate_suppressed',
+    /** Fixture vs parse mismatch (no PII in payload; use fixture ids only). */
+    regressionMismatch: 'parser.regression.fixture_mismatch',
   },
   api: {
     salesGetLatency: 'api.sales.get.latency',

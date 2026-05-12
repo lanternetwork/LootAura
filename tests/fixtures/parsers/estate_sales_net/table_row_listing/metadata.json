@@ -1,0 +1,9 @@
+{
+  "pageUrl": "https://estatesales.example.org/city/chicago",
+  "config": {
+    "city": "Chicago",
+    "state": "IL",
+    "source_platform": "estate_sales_net",
+    "source_pages": []
+  }
+}

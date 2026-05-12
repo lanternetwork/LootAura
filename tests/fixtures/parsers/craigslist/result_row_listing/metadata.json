@@ -1,0 +1,9 @@
+{
+  "pageUrl": "https://craigslist.example.org/search/garage-sale",
+  "config": {
+    "city": "Chicago",
+    "state": "IL",
+    "source_platform": "craigslist",
+    "source_pages": []
+  }
+}

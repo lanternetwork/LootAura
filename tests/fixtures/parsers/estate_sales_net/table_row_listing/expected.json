@@ -1,0 +1,57 @@
+{
+  "invalid": 0,
+  "listings": [
+    {
+      "addressRaw": "75 Birch Ln, Chicago, IL",
+      "city": "Chicago",
+      "dedupeIdentifiers": {
+        "externalId": "4400",
+        "sourceUrl": "https://example.com/US/Illinois/Chicago/75-Birch-Ln/4400/listing.html"
+      },
+      "description": null,
+      "endDate": null,
+      "extractionConfidence": null,
+      "imageSourceUrl": null,
+      "imageUrls": null,
+      "rawPayload": {
+        "adapter": "external_page_source",
+        "addressSlug": "75-Birch-Ln",
+        "addressTailCity": "Chicago",
+        "cityConflict": false,
+        "citySource": "listing_url",
+        "externalId": "4400",
+        "hubSegment": null,
+        "ingestionDiagnostics": {
+          "addressSource": "composite",
+          "addressSources": ["slug", "slug_with_url_municipality"],
+          "authority": {
+            "addressTailCity": "Chicago",
+            "addressTailState": "IL",
+            "cityConflict": false,
+            "citySource": "listing_url",
+            "resolvedCity": "Chicago",
+            "resolvedState": "IL",
+            "streetConcrete": true,
+            "urlCity": "Chicago"
+          },
+          "chosenAddressSource": "slug",
+          "metadataAddressSkippedAsUntrusted": false,
+          "nearbyCandidateCount": 0,
+          "rejectedAddressCandidates": [],
+          "slugWasPlaceholder": false
+        },
+        "pathCitySlug": "Chicago",
+        "resolvedCity": "Chicago",
+        "resolvedState": "IL",
+        "stateSource": "listing_url",
+        "urlMunicipalityNormalized": "Chicago"
+      },
+      "sourceUrl": "https://example.com/US/Illinois/Chicago/75-Birch-Ln/4400/listing.html",
+      "startDate": null,
+      "state": "IL",
+      "title": "Estate tag sale"
+    }
+  ],
+  "parserAdapter": "external_page_source",
+  "parserStatus": "ok"
+}

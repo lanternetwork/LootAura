@@ -1,0 +1,9 @@
+{
+  "pageUrl": "https://example.com/list",
+  "config": {
+    "city": "Chicago",
+    "state": "IL",
+    "source_platform": "external_page_source",
+    "source_pages": []
+  }
+}

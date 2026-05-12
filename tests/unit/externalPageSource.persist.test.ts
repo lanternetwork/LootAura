@@ -24,6 +24,14 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: (db: { from: typeof mockFrom }, table: string) => db.from(table),
 }))
 
+vi.mock('@/lib/ingestion/dedupe', () => ({
+  evaluateDuplicateSkipForExternalListListing: vi.fn().mockResolvedValue({
+    skip: false,
+    duplicateOfId: null,
+    evaluation: null,
+  }),
+}))
+
 const listHtml =
   '<a href="https://example.com/US/Illinois/Chicago/100-A/1001/listing.html">One</a>'
 

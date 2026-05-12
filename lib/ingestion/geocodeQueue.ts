@@ -4,7 +4,7 @@ import { geocodeIngestedSaleById, type GeocodeIngestedSaleByIdResult } from '@/l
 import { logger } from '@/lib/log'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
-import { classifyQueuePressure, classifyRetryExhaustion } from '@/lib/observability/metrics'
+import { classifyQueuePressure, classifyRetryExhaustion, computeRedisStarvationTelemetrySignal } from '@/lib/observability/metrics'
 
 const QUEUE_HIGH = 'ingestion:geocode:queue:high'
 const QUEUE_NORMAL = 'ingestion:geocode:queue:normal'
@@ -359,8 +359,11 @@ export async function processGeocodeQueueBatch(
       queueDepthAfterTotal: depthAfter?.total ?? null,
       queuePressureBefore: depthBefore != null ? classifyQueuePressure(depthBefore.total, watermark) : 'unknown',
       queuePressureAfter: depthAfter != null ? classifyQueuePressure(depthAfter.total, watermark) : 'unknown',
-      redisStarvationSignal:
-        summary.dequeued === 0 && (depthBefore?.total ?? 0) === 0 && (depthAfter?.total ?? 0) === 0,
+      redisStarvationSignal: computeRedisStarvationTelemetrySignal({
+        dequeued: summary.dequeued,
+        queueDepthBeforeTotal: depthBefore?.total,
+        queueDepthAfterTotal: depthAfter?.total,
+      }),
       maxJobAttemptsSeen,
       retryVisibilityClass: classifyRetryExhaustion(maxJobAttemptsSeen, 12),
     })

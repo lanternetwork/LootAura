@@ -12,6 +12,7 @@ import {
 import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
+import { evaluateDuplicateSkipForExternalListListing } from '@/lib/ingestion/dedupe'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 
@@ -52,6 +53,8 @@ export interface ExternalPageSourcePersistSummary {
   invalid: number
   errors: number
   pagesProcessed: number
+  /** Skipped insert: scored duplicate vs existing ingested row (same address window). */
+  duplicateScoredSkipped: number
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -958,6 +961,7 @@ export async function persistExternalPageSource(
     invalid: 0,
     errors: 0,
     pagesProcessed: 0,
+    duplicateScoredSkipped: 0,
   }
 
   const telemBase = options?.telemetryContext ?? {}
@@ -1119,6 +1123,23 @@ export async function persistExternalPageSource(
         continue
       }
 
+      const scoredDup = await evaluateDuplicateSkipForExternalListListing(admin, platform, {
+        title: listing.title,
+        city: listing.city,
+        state: listing.state,
+        addressRaw: listing.addressRaw,
+        startDate: listing.startDate ?? null,
+        endDate: listing.endDate ?? null,
+        externalId: (listing.rawPayload.externalId as string | null) ?? null,
+        imageSourceUrl: listing.imageSourceUrl,
+        sourceUrl: listing.sourceUrl,
+      })
+      if (scoredDup.skip) {
+        summary.skipped += 1
+        summary.duplicateScoredSkipped += 1
+        continue
+      }
+
       const { error: insErr } = await fromBase(admin, 'ingested_sales').insert({
         source_platform: platform,
         source_url: listing.sourceUrl,
@@ -1188,9 +1209,11 @@ export async function persistExternalPageSource(
     invalid: summary.invalid,
     errors: summary.errors,
     pagesProcessed: summary.pagesProcessed,
+    duplicateScoredSkipped: summary.duplicateScoredSkipped,
   })
 
-  const duplicateSuppressedTotal = duplicateUrlSkipped + duplicateConstraintSkipped
+  const duplicateSuppressedTotal =
+    duplicateUrlSkipped + duplicateConstraintSkipped + summary.duplicateScoredSkipped
   if (duplicateSuppressedTotal > 0) {
     emitObservabilityRecord(
       buildTelemetryRecord(ObservabilityEvents.parser.duplicateSuppressed, {
@@ -1199,6 +1222,7 @@ export async function persistExternalPageSource(
         parserVersion: PARSER_VERSION_ROW,
         duplicateUrlSkipped,
         duplicateConstraintSkipped,
+        duplicateScoredSkipped: summary.duplicateScoredSkipped,
         duplicateSuppressedTotal,
       })
     )
@@ -1254,6 +1278,7 @@ export async function persistExternalPageSource(
       parseDurationMsTotal,
       duplicateUrlSkipped,
       duplicateConstraintSkipped,
+      duplicateScoredSkipped: summary.duplicateScoredSkipped,
       normalizationWarnings,
     })
   )

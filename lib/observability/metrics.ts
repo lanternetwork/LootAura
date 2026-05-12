@@ -39,6 +39,21 @@ export function classifyQueuePressure(depth: number, highWatermark: number, crit
   return 'normal'
 }
 
+/**
+ * Mirrors `geocodeQueue` batch telemetry: true when the batch dequeued nothing and both before/after depths read zero.
+ */
+export function computeRedisStarvationTelemetrySignal(params: {
+  dequeued: number
+  queueDepthBeforeTotal: number | null | undefined
+  queueDepthAfterTotal: number | null | undefined
+}): boolean {
+  return (
+    params.dequeued === 0 &&
+    (params.queueDepthBeforeTotal ?? 0) === 0 &&
+    (params.queueDepthAfterTotal ?? 0) === 0
+  )
+}
+
 export type DurationTimer = { readonly startedAtMs: number; elapsedMs: () => number }
 
 export function createDurationTimer(startedAtMs: number = Date.now()): DurationTimer {

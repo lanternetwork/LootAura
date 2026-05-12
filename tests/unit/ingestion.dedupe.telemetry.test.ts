@@ -15,6 +15,11 @@ vi.mock('@/lib/log', () => ({
   },
 }))
 
+vi.mock('@/lib/observability/emit', () => ({
+  buildTelemetryRecord: (_event: string, fields: Record<string, unknown>) => ({ event: _event, ...fields }),
+  emitObservabilityRecord: vi.fn(),
+}))
+
 function processedBase(overrides: Partial<ProcessedIngestedSale> = {}): ProcessedIngestedSale {
   return {
     normalizedAddress: '123 Main St',
@@ -58,12 +63,38 @@ function exactLookupRow(id: string | null) {
   }
 }
 
-function softLookupRows(rows: Array<{ id: string; date_start: string }>) {
+function softLookupRows(
+  rows: Array<{
+    id: string
+    date_start: string
+    title?: string | null
+    external_id?: string | null
+    source_platform?: string | null
+    image_source_url?: string | null
+  }>
+) {
+  const enriched = rows.map((r) => ({
+    id: r.id,
+    date_start: r.date_start,
+    date_end: null,
+    title: r.title ?? null,
+    source_platform: r.source_platform ?? null,
+    external_id: r.external_id ?? null,
+    lat: null as number | null,
+    lng: null as number | null,
+    image_source_url: r.image_source_url ?? null,
+  }))
   return {
     select: () => ({
       eq: () => ({
         not: () => ({
-          limit: async () => ({ data: rows }),
+          gte: () => ({
+            lte: () => ({
+              order: () => ({
+                limit: async () => ({ data: enriched }),
+              }),
+            }),
+          }),
         }),
       }),
     }),
@@ -76,15 +107,19 @@ describe('findIngestedSaleMatch telemetry', () => {
   })
 
   it('source_url match emits source_url decision', async () => {
-    mockFromBase
-      .mockReturnValueOnce(sourceLookupRow('source-match-id'))
+    mockFromBase.mockReturnValueOnce(sourceLookupRow('source-match-id'))
 
     const { findIngestedSaleMatch } = await import('@/lib/ingestion/dedupe')
-    const result = await findIngestedSaleMatch('https://private.example/source', processedBase(), {
+    const { match } = await findIngestedSaleMatch('https://private.example/source', processedBase(), {
       sourcePlatform: 'external_page_source',
     })
 
-    expect(result).toEqual({ id: 'source-match-id', matchType: 'source_url' })
+    expect(match).toEqual({
+      id: 'source-match-id',
+      matchType: 'source_url',
+      duplicateConfidence: 'exact_duplicate',
+      suppressAsDuplicate: false,
+    })
     expect(loggerInfo).toHaveBeenCalledWith(
       'Ingested sale dedupe decision',
       expect.objectContaining({
@@ -96,14 +131,17 @@ describe('findIngestedSaleMatch telemetry', () => {
   })
 
   it('exact address/date match emits exact decision', async () => {
-    mockFromBase
-      .mockReturnValueOnce(sourceLookupRow(null))
-      .mockReturnValueOnce(exactLookupRow('exact-match-id'))
+    mockFromBase.mockReturnValueOnce(sourceLookupRow(null)).mockReturnValueOnce(exactLookupRow('exact-match-id'))
 
     const { findIngestedSaleMatch } = await import('@/lib/ingestion/dedupe')
-    const result = await findIngestedSaleMatch('https://private.example/source', processedBase())
+    const { match } = await findIngestedSaleMatch('https://private.example/source', processedBase())
 
-    expect(result).toEqual({ id: 'exact-match-id', matchType: 'address_date' })
+    expect(match).toEqual({
+      id: 'exact-match-id',
+      matchType: 'address_date',
+      duplicateConfidence: 'exact_duplicate',
+      suppressAsDuplicate: false,
+    })
     expect(loggerInfo).toHaveBeenCalledWith(
       'Ingested sale dedupe decision',
       expect.objectContaining({
@@ -113,16 +151,27 @@ describe('findIngestedSaleMatch telemetry', () => {
     )
   })
 
-  it('soft ±1 day match emits soft_date_window decision', async () => {
+  it('soft ±1 day match emits soft_date_window decision when score suppresses', async () => {
     mockFromBase
       .mockReturnValueOnce(sourceLookupRow(null))
       .mockReturnValueOnce(exactLookupRow(null))
-      .mockReturnValueOnce(softLookupRows([{ id: 'soft-match-id', date_start: '2026-05-11' }]))
+      .mockReturnValueOnce(
+        softLookupRows([{ id: 'soft-match-id', date_start: '2026-05-11', external_id: '42' }])
+      )
 
     const { findIngestedSaleMatch } = await import('@/lib/ingestion/dedupe')
-    const result = await findIngestedSaleMatch('https://private.example/source', processedBase())
+    const { match } = await findIngestedSaleMatch('https://private.example/source', processedBase(), {
+      normalizedTitle: 'Distinctive neighborhood tools sale weekend',
+      externalId: '42',
+      sourcePlatform: 'external_page_source',
+    })
 
-    expect(result).toEqual({ id: 'soft-match-id', matchType: 'soft_address_date' })
+    expect(match).toEqual({
+      id: 'soft-match-id',
+      matchType: 'soft_address_date',
+      duplicateConfidence: 'recurring_repost',
+      suppressAsDuplicate: true,
+    })
     expect(loggerInfo).toHaveBeenCalledWith(
       'Ingested sale dedupe decision',
       expect.objectContaining({
@@ -140,9 +189,9 @@ describe('findIngestedSaleMatch telemetry', () => {
       .mockReturnValueOnce(softLookupRows([]))
 
     const { findIngestedSaleMatch } = await import('@/lib/ingestion/dedupe')
-    const result = await findIngestedSaleMatch('https://private.example/source', processedBase())
+    const { match } = await findIngestedSaleMatch('https://private.example/source', processedBase())
 
-    expect(result).toBeNull()
+    expect(match).toBeNull()
     expect(loggerInfo).toHaveBeenCalledWith(
       'Ingested sale dedupe decision',
       expect.objectContaining({
@@ -167,7 +216,7 @@ describe('findIngestedSaleMatch telemetry', () => {
       processedBase({
         normalizedAddress: sensitiveAddress,
       }),
-      { sourcePlatform: 'manual_upload' }
+      { sourcePlatform: 'manual_upload', normalizedTitle: sensitiveTitle }
     )
 
     const call = loggerInfo.mock.calls.at(-1)
@@ -193,18 +242,35 @@ describe('dedupe telemetry aggregation', () => {
     } = await import('@/lib/ingestion/dedupe')
     const agg = createEmptyDedupeDecisionAggregate()
 
-    accumulateDedupeDecisionAggregate(agg, { id: '1', matchType: 'source_url' })
-    accumulateDedupeDecisionAggregate(agg, { id: '2', matchType: 'address_date' })
-    accumulateDedupeDecisionAggregate(agg, { id: '3', matchType: 'soft_address_date' })
+    accumulateDedupeDecisionAggregate(agg, {
+      id: '1',
+      matchType: 'source_url',
+      duplicateConfidence: 'exact_duplicate',
+      suppressAsDuplicate: false,
+    })
+    accumulateDedupeDecisionAggregate(agg, {
+      id: '2',
+      matchType: 'address_date',
+      duplicateConfidence: 'exact_duplicate',
+      suppressAsDuplicate: false,
+    })
+    accumulateDedupeDecisionAggregate(agg, {
+      id: '3',
+      matchType: 'soft_address_date',
+      duplicateConfidence: 'probable_duplicate',
+      suppressAsDuplicate: true,
+    })
     accumulateDedupeDecisionAggregate(agg, null)
+    accumulateDedupeDecisionAggregate(agg, null, { softScoringRejected: true })
 
     expect(agg).toEqual({
       source_url: 1,
       exact_address_date: 1,
       soft_date_window: 1,
+      soft_duplicate_rejected: 1,
       no_match: 1,
       duplicateDecisionTrue: 1,
-      duplicateDecisionFalse: 3,
+      duplicateDecisionFalse: 4,
     })
   })
 
@@ -217,8 +283,8 @@ describe('dedupe telemetry aggregation', () => {
       'exact_address_date',
       'no_match',
       'soft_date_window',
+      'soft_duplicate_rejected',
       'source_url',
     ])
   })
 })
-

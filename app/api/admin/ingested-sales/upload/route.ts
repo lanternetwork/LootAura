@@ -525,11 +525,16 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
           closestCandidates: lookupResult.closestCandidates,
         })
       }
-      const match = await findIngestedSaleMatch(rawSale.sourceUrl, processed, {
+      const normalizedTitle = cleanText(rawSale.title) || `${cityConfig.city} Yard Sale`
+      const { match, meta } = await findIngestedSaleMatch(rawSale.sourceUrl, processed, {
         sourcePlatform: rawSale.sourcePlatform,
+        normalizedTitle,
+        externalId: rawSale.externalId,
+        imageSourceUrl: rawSale.imageSourceUrl,
       })
-      accumulateDedupeDecisionAggregate(dedupeDecisionCounts, match)
-      const isDuplicate = match?.matchType === 'soft_address_date'
+      accumulateDedupeDecisionAggregate(dedupeDecisionCounts, match, meta)
+      const isDuplicate =
+        match?.matchType === 'soft_address_date' && match.suppressAsDuplicate === true
       const failureReasons = dedupeFailureReasons([
         ...processed.failureReasons,
         ...(hasMissingCityConfig ? ['missing_city_config'] : []),
@@ -539,7 +544,6 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
         hasMissingCityConfig || failureReasons.includes('missing_city_config')
           ? 'needs_check'
           : processed.status
-      const normalizedTitle = cleanText(rawSale.title) || `${cityConfig.city} Yard Sale`
       const normalizedDescription = sanitizeUploadDescription(rawSale.description)
 
       const mergedRawPayload =

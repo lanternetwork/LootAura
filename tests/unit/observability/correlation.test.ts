@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import * as nodeCrypto from 'crypto'
+import { describe, it, expect, vi } from 'vitest'
 import { createCorrelationBundle, mergeCorrelation } from '@/lib/observability/correlation'
 
 vi.mock('@/lib/log', () => ({
@@ -7,14 +6,6 @@ vi.mock('@/lib/log', () => ({
 }))
 
 describe('correlation helpers', () => {
-  beforeEach(() => {
-    vi.spyOn(nodeCrypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000099' as any)
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it('createCorrelationBundle preserves explicit fields', () => {
     const b = createCorrelationBundle({
       requestId: 'req-1',
@@ -30,9 +21,12 @@ describe('correlation helpers', () => {
 
   it('createCorrelationBundle generates correlationId and uses log operation id', () => {
     const b = createCorrelationBundle({})
-    expect(b.correlationId).toBe('00000000-0000-4000-8000-000000000099')
     expect(b.operationId).toBe('op-from-log')
     expect(b.requestId).toBe('op-from-log')
+    // correlation.ts binds `randomUUID` at import time; do not spy on `crypto` here (often non-configurable / ineffective).
+    expect(b.correlationId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    )
   })
 
   it('mergeCorrelation adds only defined correlation keys', () => {

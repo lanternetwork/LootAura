@@ -45,7 +45,7 @@ describe('phase4PublicPublishedSaleReadFilters', () => {
     }
     applyPhase4PublicPublishedSaleReadFilters(query, { now: new Date('2026-01-01T00:00:00.000Z') })
     expect(calls[0]).toBe('eq:status=published')
-    expect(calls[1]).toBe('is:archived_at.is')
+    expect(calls[1]).toBe('is:archived_at.null')
     expect(calls[2]).toBe('or:ends_at.is.null,ends_at.gt.2026-01-01T00:00:00.000Z')
     expect(calls[3]).toBe('or:moderation_status.is.null,moderation_status.neq.hidden_by_admin')
   })

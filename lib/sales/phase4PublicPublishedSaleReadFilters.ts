@@ -34,8 +34,10 @@ export type Phase4PublicReadFilterOptions = {
 /**
  * Applies AND filters equivalent to public `sales_public_read` for explicit server queries.
  * Chain before bbox / text / category filters. Caller should not also `.in('status', ['published','active'])`.
+ *
+ * Generic is unconstrained so Supabase `PostgrestFilterBuilder` callers type-check; implementation uses a narrow cast.
  */
-export function applyPhase4PublicPublishedSaleReadFilters<T extends Record<string, unknown>>(
+export function applyPhase4PublicPublishedSaleReadFilters<T>(
   query: T,
   options?: Phase4PublicReadFilterOptions
 ): T {

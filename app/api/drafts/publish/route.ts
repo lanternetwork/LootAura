@@ -6,6 +6,7 @@ import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
 import { deleteSaleAndItemsForRollback } from '@/lib/data/draftsPublishRollback'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 export const dynamic = 'force-dynamic'
 
@@ -303,7 +304,7 @@ export async function POST(request: NextRequest) {
       owner_id: user.id,
       title: formData.title,
       description: formData.description || null,
-      address: formData.address || null,
+      address: formatSaleAddressForPersist(formData.address, formData.city, formData.state),
       city: formData.city,
       state: formData.state,
       zip_code: formData.zip_code || null,

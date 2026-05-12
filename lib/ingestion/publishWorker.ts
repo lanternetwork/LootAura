@@ -912,12 +912,7 @@ async function maybeSyncExistingSaleFromLatestIngest(
       saleCity && saleState
         ? normalizeAddressForPublishSafe(row.address, saleCity, saleState)
         : normalizeTextOrNull(row.address)
-    if (
-      existingAddressNormalized &&
-      existingAddressNormalized !== normalizeTextOrNull(row.address) &&
-      saleCity &&
-      saleState
-    ) {
+    if (existingAddressNormalized && saleCity && saleState) {
       try {
         validateResolvedAddressForPublish(existingAddressNormalized, saleCity, saleState)
         patch.address = formatAddressForPublishedSaleDisplay(existingAddressNormalized)

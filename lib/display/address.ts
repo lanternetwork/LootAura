@@ -1,3 +1,5 @@
+import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -25,9 +27,15 @@ export function displayAddress(address?: string | null, city?: string | null, st
   const stateNorm = normalizeWhitespace(state || '')
   const cityState = [cityNorm, stateNorm].filter(Boolean).join(', ')
 
-  if (!base) return cityState
-  if (!cityState) return base
-  if (addressAlreadyContainsCityState(base, cityNorm, stateNorm)) return base
-  return `${base}, ${cityState}`
+  if (!base) {
+    return cityState ? formatAddressForPublishedSaleDisplay(cityState) : ''
+  }
+  if (!cityState) {
+    return formatAddressForPublishedSaleDisplay(base)
+  }
+  if (addressAlreadyContainsCityState(base, cityNorm, stateNorm)) {
+    return formatAddressForPublishedSaleDisplay(base)
+  }
+  return formatAddressForPublishedSaleDisplay(`${base}, ${cityState}`)
 }
 

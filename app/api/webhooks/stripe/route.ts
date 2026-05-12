@@ -11,6 +11,7 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { getStripeClient, getStripeWebhookSecret } from '@/lib/stripe/client'
 import { logger } from '@/lib/log'
 import { fail, ok } from '@/lib/http/json'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 export const dynamic = 'force-dynamic'
 
@@ -248,7 +249,7 @@ async function finalizeDraftPromotion(
     owner_id: userId,
     title: formData.title,
     description: formData.description || null,
-    address: formData.address || null,
+    address: formatSaleAddressForPersist(formData.address, formData.city, formData.state),
     city: formData.city,
     state: formData.state,
     zip_code: formData.zip_code || null,

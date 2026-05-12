@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 import { getRlsDb, fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 // Zod schemas for validation
 const SaleInputSchema = z.object({
@@ -93,7 +94,7 @@ export async function createSale(input: SaleInput): Promise<ActionResult> {
         listing_timezone: listingEnds.listing_timezone,
         lat: validatedInput.latitude,
         lng: validatedInput.longitude,
-        address: validatedInput.address,
+        address: formatSaleAddressForPersist(validatedInput.address, validatedInput.city, validatedInput.state),
         city: validatedInput.city,
         state: validatedInput.state,
         zip_code: validatedInput.zip,
@@ -149,7 +150,7 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
 
     const { data: existing, error: loadErr } = await supabase
       .from(T.sales)
-      .select('date_start,time_start,date_end,time_end,zip_code,state,lat,lng')
+      .select('date_start,time_start,date_end,time_end,zip_code,state,lat,lng,city')
       .eq('id', id)
       .eq('owner_id', user.id)
       .maybeSingle()
@@ -165,6 +166,7 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
       time_end: string | null
       zip_code: string | null
       state: string | null
+      city: string | null
       lat: number | string
       lng: number | string
     }
@@ -205,7 +207,11 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
     if (validatedInput.ends_at !== undefined) updatePayload.date_end = validatedInput.ends_at
     if (validatedInput.latitude !== undefined) updatePayload.lat = validatedInput.latitude
     if (validatedInput.longitude !== undefined) updatePayload.lng = validatedInput.longitude
-    if (validatedInput.address !== undefined) updatePayload.address = validatedInput.address
+    if (validatedInput.address !== undefined) {
+      const mergedCity = validatedInput.city ?? ex.city ?? null
+      const mergedState = validatedInput.state ?? ex.state ?? null
+      updatePayload.address = formatSaleAddressForPersist(validatedInput.address, mergedCity, mergedState)
+    }
     if (validatedInput.city !== undefined) updatePayload.city = validatedInput.city
     if (validatedInput.state !== undefined) updatePayload.state = validatedInput.state
     if (validatedInput.zip !== undefined) updatePayload.zip_code = validatedInput.zip

@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { Sale } from '@/lib/types'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 // Zod schemas for validation
 const SaleInputSchema = z.object({
@@ -404,6 +405,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
       .insert({
         owner_id: user.id,
         ...validatedInput,
+        address: formatSaleAddressForPersist(validatedInput.address, validatedInput.city, validatedInput.state),
         pricing_mode: validatedInput.pricing_mode || 'negotiable',
       })
       .select()
@@ -432,12 +434,32 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
       throw new Error('Unauthorized')
     }
 
+    const updatePayload: Record<string, unknown> = {
+      ...validatedInput,
+      pricing_mode: validatedInput.pricing_mode || 'negotiable',
+    }
+    if (validatedInput.address !== undefined) {
+      const { data: prior, error: priorErr } = await supabase
+        .from('sales')
+        .select('city,state')
+        .eq('id', id)
+        .eq('owner_id', user.id)
+        .maybeSingle()
+      if (priorErr) {
+        console.error('Error loading sale for address format:', priorErr)
+        throw new Error('Failed to update sale')
+      }
+      const p = prior as { city: string | null; state: string | null } | null
+      updatePayload.address = formatSaleAddressForPersist(
+        validatedInput.address,
+        validatedInput.city ?? p?.city ?? null,
+        validatedInput.state ?? p?.state ?? null
+      )
+    }
+
     const { data, error } = await supabase
       .from('sales')
-      .update({
-        ...validatedInput,
-        pricing_mode: validatedInput.pricing_mode || 'negotiable',
-      })
+      .update(updatePayload)
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
       .select()

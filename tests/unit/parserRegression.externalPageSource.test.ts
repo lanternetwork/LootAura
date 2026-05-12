@@ -1,6 +1,8 @@
-import type { ParseExternalPageSourceResult } from '@/lib/ingestion/adapters/externalPageSource'
 import { describe, it, expect } from 'vitest'
-import { parseExternalPageSourceHtml } from '@/lib/ingestion/adapters/externalPageSource'
+import {
+  parseExternalPageSourceHtml,
+  type ParseExternalPageSourceResult,
+} from '@/lib/ingestion/adapters/externalPageSource'
 import {
   assertExternalPageFixtureMatches,
   classifyExternalPageSourceRegressionGap,

@@ -1,14 +1,12 @@
 import type { ProcessedIngestedSale } from '@/lib/ingestion/types'
-import type {
-  DuplicateListingConfidence,
-  DuplicateScoringIncoming,
-  SoftDuplicateCandidateRow,
-  SoftDuplicateEvaluation,
-} from '@/lib/ingestion/duplicateScoring'
 import {
   evaluateSoftDuplicateAgainstCandidates,
   normalizeTitleForDedupe,
   SOFT_CANDIDATE_FETCH_DAY_RADIUS,
+  type DuplicateListingConfidence,
+  type DuplicateScoringIncoming,
+  type SoftDuplicateCandidateRow,
+  type SoftDuplicateEvaluation,
 } from '@/lib/ingestion/duplicateScoring'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'

@@ -301,8 +301,8 @@ function effectiveSuppressThreshold(incoming: DuplicateScoringIncoming): number 
 }
 
 function classifyConfidence(
-  _incoming: DuplicateScoringIncoming,
-  _winner: SoftDuplicateCandidateRow,
+  incoming: DuplicateScoringIncoming,
+  winner: SoftDuplicateCandidateRow,
   breakdown: SoftDuplicateScoreBreakdown
 ): DuplicateListingConfidence {
   const ie = incoming.externalId?.trim()

@@ -3,7 +3,7 @@
  * POST /api/cron/daily
  * 
  * Unified daily cron endpoint that handles multiple daily tasks:
- * 1. Auto-archive sales that have ended
+ * 1. Auto-archive sales that have ended (SQL-batched RPC; transitional legacy when ends_at is null)
  * 2. Expire promotions that have ended
  * 3. Send favorite sales starting soon emails
  * 4. Send weekly moderation digest (Fridays only)
@@ -52,6 +52,7 @@ import {
   persistExternalPageSource,
 } from '@/lib/ingestion/adapters/externalPageSource'
 import { createEmptyDedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
+import { runArchiveEndedSalesJob } from '@/lib/sales/archiveEndedSalesSqlBatch'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
 
 export const dynamic = 'force-dynamic'
@@ -501,7 +502,9 @@ async function handleRequest(request: NextRequest) {
 
     // Task 1: Auto-archive sales that have ended
     try {
-      const archiveResult = await archiveEndedSales(withOpId)
+      const archiveResult = await runArchiveEndedSalesJob({
+        logBase: withOpId({ task: 'archive-sales' }),
+      })
       results.tasks.archiveSales = archiveResult
     } catch (error) {
       logger.error('Archive sales task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
@@ -1115,160 +1118,6 @@ async function runIngestionOrchestration(
 
   taskResult.duration_ms = Date.now() - orchestrationStartedAt
   return taskResult
-}
-
-async function archiveEndedSales(
-  withOpId: (context?: any) => any
-): Promise<any> {
-  logger.info('Starting archive sales task', withOpId({
-    component: 'api/cron/daily',
-    task: 'archive-sales',
-  }))
-
-  // Get admin DB client (bypasses RLS)
-  const db = getAdminDb()
-  const now = new Date()
-  // Use UTC date to avoid timezone issues
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-  const todayStr = today.toISOString().split('T')[0] // YYYY-MM-DD format
-
-  // Find sales that should be archived:
-  // - status is 'published' or 'active'
-  // - (end_date <= today OR (end_date IS NULL AND date_start < today))
-  // - archived_at IS NULL (not already archived)
-  // Note: We need to fetch all published/active sales and filter in memory
-  // because PostgREST doesn't easily support complex OR conditions
-  const { data: allSales, error: queryError } = await fromBase(db, 'sales')
-    .select('id, title, date_start, date_end, status, archived_at')
-    .in('status', ['published', 'active'])
-    .is('archived_at', null)
-
-  if (queryError) {
-    const errorMessage = queryError && typeof queryError === 'object' && 'message' in queryError
-      ? String(queryError.message)
-      : String(queryError)
-    logger.error('Failed to query sales for archiving', new Error(errorMessage), withOpId({
-      component: 'api/cron/daily',
-      task: 'archive-sales',
-      error: queryError,
-    }))
-    throw new Error('Failed to query sales')
-  }
-
-  // Filter sales that have ended:
-  // - Sales with date_end <= today (ended today or before)
-  // - Sales without date_end but with date_start < today (single-day sales that started in the past)
-  const salesToArchive = (allSales || []).filter((sale: any) => {
-    if (sale.date_end) {
-      // Parse date_end and compare properly
-      const endDate = new Date(sale.date_end + 'T00:00:00Z')
-      // Archive if end date is today or in the past
-      return endDate <= today
-    }
-    // If no end_date, check if start_date is in the past (single-day sale)
-    if (sale.date_start) {
-      // Parse date_start and compare properly
-      const startDate = new Date(sale.date_start + 'T00:00:00Z')
-      // Archive if start date is before today (sale already happened)
-      return startDate < today
-    }
-    // If no dates at all, don't archive (shouldn't happen for published sales)
-    return false
-  })
-
-  // Log details about what we found for debugging
-  logger.info('Archive sales filtering details', withOpId({
-    component: 'api/cron/daily',
-    task: 'archive-sales',
-    today: todayStr,
-    totalSales: allSales?.length || 0,
-    salesToArchiveCount: salesToArchive.length,
-    sampleSalesToArchive: salesToArchive.slice(0, 5).map((s: any) => ({
-      id: s.id,
-      title: s.title?.substring(0, 50),
-      date_start: s.date_start,
-      date_end: s.date_end,
-      status: s.status,
-    })),
-    // Also log some sales that weren't archived (for debugging)
-    sampleSalesNotArchived: (allSales || [])
-      .filter((s: any) => !salesToArchive.some((a: any) => a.id === s.id))
-      .slice(0, 5)
-      .map((s: any) => ({
-        id: s.id,
-        title: s.title?.substring(0, 50),
-        date_start: s.date_start,
-        date_end: s.date_end,
-        status: s.status,
-        reason: s.date_end 
-          ? `date_end (${s.date_end}) > today (${todayStr})`
-          : s.date_start
-          ? `date_start (${s.date_start}) >= today (${todayStr})`
-          : 'no dates',
-      })),
-  }))
-
-  const salesToArchiveCount = salesToArchive?.length || 0
-
-  if (salesToArchiveCount === 0) {
-    logger.info('No sales to archive', withOpId({
-      component: 'api/cron/daily',
-      task: 'archive-sales',
-      count: 0,
-    }))
-    return {
-      ok: true,
-      archived: 0,
-      errors: 0,
-    }
-  }
-
-  logger.info(`Found ${salesToArchiveCount} sales to archive`, withOpId({
-    component: 'api/cron/daily',
-    task: 'archive-sales',
-    count: salesToArchiveCount,
-  }))
-
-  // Archive all matching sales by ID
-  const saleIdsToArchive = salesToArchive.map((s: any) => s.id)
-  if (saleIdsToArchive.length === 0) {
-    return {
-      ok: true,
-      archived: 0,
-      errors: 0,
-    }
-  }
-
-  const { data: archivedSales, error: updateError } = await fromBase(db, 'sales')
-    .update({
-      status: 'archived',
-      archived_at: now.toISOString(),
-    })
-    .in('id', saleIdsToArchive)
-    .select('id')
-
-  if (updateError) {
-    logger.error('Failed to archive sales', updateError instanceof Error ? updateError : new Error(String(updateError)), withOpId({
-      component: 'api/cron/daily',
-      task: 'archive-sales',
-      error: updateError,
-    }))
-    throw new Error('Failed to archive sales')
-  }
-
-  const archivedCount = archivedSales?.length || 0
-
-  logger.info('Archive sales task completed', withOpId({
-    component: 'api/cron/daily',
-    task: 'archive-sales',
-    archivedCount,
-  }))
-
-  return {
-    ok: true,
-    archived: archivedCount,
-    errors: 0,
-  }
 }
 
 async function expireEndedPromotions(

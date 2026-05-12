@@ -1273,6 +1273,8 @@ async function postHandler(request: NextRequest) {
         time_start,
         date_end: date_end ?? null,
         time_end: time_end ?? null,
+        ends_at: null,
+        listing_timezone: null,
         cover_image_url: cover_image_url || null,
         images: images || [],
         tags: normalizedTags,
@@ -1285,6 +1287,23 @@ async function postHandler(request: NextRequest) {
 
     // Allow status from body if provided (for test sales), otherwise default to 'published'
     const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
+
+    const { getAdminDb } = await import('@/lib/supabase/clients')
+    const { resolvePersistableSaleEndsAt } = await import('@/lib/sales/resolvePersistableSaleEndsAt')
+    const listingEnds = await resolvePersistableSaleEndsAt(
+      getAdminDb(),
+      {
+        date_start,
+        time_start,
+        date_end: date_end ?? null,
+        time_end: time_end ?? null,
+        zip_code,
+        state,
+        lat,
+        lng,
+      },
+      { operation: 'api_sales_post', owner_id: user!.id }
+    )
     
     // Build insert payload for base table (lootaura_v2.sales)
     // Include all required fields and image fields
@@ -1302,6 +1321,8 @@ async function postHandler(request: NextRequest) {
       time_start, // Required
       date_end,
       time_end,
+      ends_at: listingEnds.ends_at,
+      listing_timezone: listingEnds.listing_timezone,
       pricing_mode: pricing_mode || 'negotiable',
       status: saleStatus,
       privacy_mode: 'exact', // Required (has default but explicit is better)

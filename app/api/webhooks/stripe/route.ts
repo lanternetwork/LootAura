@@ -221,7 +221,23 @@ async function finalizeDraftPromotion(
     : typeof rawTags === 'string'
       ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
       : []
-  
+
+  const { resolvePersistableSaleEndsAt } = await import('@/lib/sales/resolvePersistableSaleEndsAt')
+  const listingEnds = await resolvePersistableSaleEndsAt(
+    admin,
+    {
+      date_start: formData.date_start,
+      time_start: normalizedTimeStart,
+      date_end: formData.date_end || null,
+      time_end: formData.time_end || null,
+      zip_code: formData.zip_code || null,
+      state: formData.state,
+      lat: parseFloat(String(formData.lat)),
+      lng: parseFloat(String(formData.lng)),
+    },
+    { operation: 'stripe_finalize_draft_promotion', draft_key: draftKey }
+  )
+
   // Create sale with promotion
   const salePayload = {
     owner_id: userId,
@@ -237,6 +253,8 @@ async function finalizeDraftPromotion(
     time_start: normalizedTimeStart,
     date_end: formData.date_end || null,
     time_end: formData.time_end || null,
+    ends_at: listingEnds.ends_at,
+    listing_timezone: listingEnds.listing_timezone,
     cover_image_url: photos && photos.length > 0 ? photos[0] : null,
     images: photos && photos.length > 1 ? photos.slice(1) : null,
     pricing_mode: formData.pricing_mode || 'negotiable',

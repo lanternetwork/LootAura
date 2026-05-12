@@ -5,6 +5,7 @@ import { PublishInputSchema } from '@/lib/ingestion/schemas'
 import type { PublishInput } from '@/lib/ingestion/types'
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
 
 export interface PublishableIngestedSale {
   id: string
@@ -120,6 +121,21 @@ export async function createPublishedSale(ingestedSale: PublishableIngestedSale)
   validateResolvedAddressForPublish(validated.address, validated.city, validated.state)
   const displayAddress = formatAddressForPublishedSaleDisplay(validated.address as string)
 
+  const { ends_at, listing_timezone } = await resolvePersistableSaleEndsAt(
+    admin,
+    {
+      date_start: validated.dateStart,
+      time_start: validated.timeStart,
+      date_end: validated.dateEnd,
+      time_end: validated.timeEnd,
+      zip_code: validated.zipCode,
+      state: validated.state,
+      lat: validated.lat,
+      lng: validated.lng,
+    },
+    { operation: 'createPublishedSale', ingested_sale_id: validated.ingestedSaleId }
+  )
+
   const salePayload = {
     owner_id: validated.ownerId,
     title: validated.title,
@@ -134,6 +150,8 @@ export async function createPublishedSale(ingestedSale: PublishableIngestedSale)
     date_end: validated.dateEnd,
     time_start: validated.timeStart,
     time_end: validated.timeEnd,
+    ends_at,
+    listing_timezone,
     cover_image_url: validated.coverImageUrl,
     images: validated.images,
     status: 'published',

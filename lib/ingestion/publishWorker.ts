@@ -13,6 +13,7 @@ import { mergeSanitizedCloudinaryIntoPublishable } from '@/lib/ingestion/sanitiz
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 import { isPublishingRowStaleReclaimBlockedByPastEndDateValidation } from '@/lib/ingestion/publishClaimStale'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
+import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
@@ -780,6 +781,26 @@ async function maybeSyncExistingSaleFromLatestIngest(
   const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
   const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
   const bestEffortPatch: Record<string, unknown> = {}
+
+  if (normalizedDateStart) {
+    const adminForEnds = getAdminDb()
+    const listingEnds = await resolvePersistableSaleEndsAt(
+      adminForEnds,
+      {
+        date_start: normalizedDateStart,
+        time_start: normalizedTimeStart,
+        date_end: normalizedDateEnd,
+        time_end: normalizedTimeEnd,
+        zip_code: record.zip_code,
+        state: record.state,
+        lat: Number(record.lat),
+        lng: Number(record.lng),
+      },
+      { operation: 'maybeSyncExistingSaleFromLatestIngest', rowId: ctx.rowId, saleId }
+    )
+    if (listingEnds.ends_at != null) bestEffortPatch.ends_at = listingEnds.ends_at
+    if (listingEnds.listing_timezone != null) bestEffortPatch.listing_timezone = listingEnds.listing_timezone
+  }
   if (normalizedAddress && city && state) {
     try {
       validateResolvedAddressForPublish(normalizedAddress, city, state)

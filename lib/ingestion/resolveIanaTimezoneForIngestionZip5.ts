@@ -11,13 +11,19 @@ type AdminDb = ReturnType<typeof getAdminDb>
 
 export type IngestionZipCoordinateSource = 'zipcodes_database' | 'zipcodes_npm_package'
 
-function isValidIanaTimeZoneId(zone: string): boolean {
+/** Single Intl-based validator; shared with sale `ends_at` helpers. */
+export function isValidIanaTimeZoneId(zone: string): boolean {
   try {
     Intl.DateTimeFormat('en-US', { timeZone: zone }).format()
     return true
   } catch {
     return false
   }
+}
+
+/** Vendored tz-lookup on coordinates; used by ZIP resolution and sale `listing_timezone` fallback. */
+export function resolveIanaTimezoneFromLatLng(lat: number, lng: number): string | null {
+  return ianaFromLatLng(lat, lng)
 }
 
 function ianaFromLatLng(lat: number, lng: number): string | null {

@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InsufficientAddressForPublishError } from '@/lib/ingestion/publishValidation'
 
-const { dnsLookup } = vi.hoisted(() => ({
+const { dnsLookup, resolvePersistableSaleEndsAtMock } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
+  resolvePersistableSaleEndsAtMock: vi.fn().mockResolvedValue({
+    ends_at: '2099-06-15T04:00:00.000Z',
+    listing_timezone: 'America/Chicago',
+  }),
+}))
+
+vi.mock('@/lib/sales/resolvePersistableSaleEndsAt', () => ({
+  resolvePersistableSaleEndsAt: (...args: unknown[]) => resolvePersistableSaleEndsAtMock(...args),
 }))
 
 vi.mock('node:dns/promises', () => ({
@@ -24,6 +32,10 @@ describe('createPublishedSale image handling', () => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
     insertSingle.mockResolvedValue({ data: { id: 'sale-1' }, error: null })
+    resolvePersistableSaleEndsAtMock.mockResolvedValue({
+      ends_at: '2099-06-15T04:00:00.000Z',
+      listing_timezone: 'America/Chicago',
+    })
   })
 
   afterEach(() => {
@@ -55,9 +67,16 @@ describe('createPublishedSale image handling', () => {
     expect(insert).toHaveBeenCalled()
     const firstCall = insert.mock.calls.at(0)
     expect(firstCall).toBeDefined()
-    const payload = (firstCall as unknown[])[0] as { cover_image_url: string | null; images: string[] }
+    const payload = (firstCall as unknown[])[0] as {
+      cover_image_url: string | null
+      images: string[]
+      ends_at: string | null
+      listing_timezone: string | null
+    }
     expect(payload.cover_image_url).toBe('https://images.example.org/a.jpg')
     expect(payload.images).toEqual(['https://images.example.org/a.jpg', 'https://cdn.example.org/b.jpg'])
+    expect(payload.ends_at).toBe('2099-06-15T04:00:00.000Z')
+    expect(payload.listing_timezone).toBe('America/Chicago')
   })
 
   it('rejects branding image_cloudinary_url via sanitizer (no raw fallback)', async () => {

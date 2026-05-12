@@ -109,7 +109,7 @@ async function markersHandler(request: NextRequest) {
         .not('lat', 'is', null)
         .not('lng', 'is', null)
     )
-    let useModerationFilter = true
+    const useModerationFilter = true
     
     // Apply date filtering in database WHERE clause
     // Logic matches client-side filtering: future-only when no dateWindow, overlap when dateWindow exists

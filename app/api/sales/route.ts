@@ -490,7 +490,7 @@ async function salesHandler(request: NextRequest) {
       }
       
       // Build base query — Phase 4 public visibility (RLS-aligned; migration 172)
-      let useModerationFilter = true
+      const useModerationFilter = true
       let query = applyPhase4PublicPublishedSaleReadFilters(
         supabase
           .from('sales_v2')

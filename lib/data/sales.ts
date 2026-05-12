@@ -176,7 +176,7 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
     const todayStr = today.toISOString().split('T')[0]
 
     // Phase 4 public visibility (RLS-aligned); retry without moderation OR if column missing
-    let useModerationFilter = true
+    const useModerationFilter = true
     let query = applyPhase4PublicPublishedSaleReadFilters(
       supabase
         .from('sales_v2')

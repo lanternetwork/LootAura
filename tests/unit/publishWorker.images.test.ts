@@ -402,7 +402,7 @@ describe('publish worker idempotent sale images', () => {
     expect(result.ok).toBe(true)
     expect(updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        address: '1 Main St, Chicago, IL',
+        address: '5918 Park Ave, Berkeley, IL',
         date_start: '2026-05-06',
         time_start: '09:00:00',
       })

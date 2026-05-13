@@ -8,7 +8,7 @@
         "externalId": "4400",
         "sourceUrl": "https://example.com/US/Illinois/Chicago/75-Birch-Ln/4400/listing.html"
       },
-      "description": null,
+      "description": "Estate tag sale Estate tag sale Estate tag sale Estate tag sale",
       "endDate": null,
       "extractionConfidence": null,
       "imageSourceUrl": null,
@@ -26,11 +26,9 @@
           "addressSources": ["slug", "slug_with_url_municipality"],
           "authority": {
             "addressTailCity": "Chicago",
-            "addressTailState": "IL",
             "cityConflict": false,
             "citySource": "listing_url",
             "resolvedCity": "Chicago",
-            "resolvedState": "IL",
             "streetConcrete": true,
             "urlCity": "Chicago"
           },

@@ -8,7 +8,7 @@
         "externalId": "161028326",
         "sourceUrl": "https://example.com/US/Illinois/Chicago/3805-N-Sacramento-Ave/161028326/listing.html"
       },
-      "description": null,
+      "description": "Sale A Fixture list Sale A",
       "endDate": null,
       "extractionConfidence": null,
       "imageSourceUrl": null,
@@ -26,11 +26,9 @@
           "addressSources": ["slug", "slug_with_url_municipality"],
           "authority": {
             "addressTailCity": "Chicago",
-            "addressTailState": "IL",
             "cityConflict": false,
             "citySource": "listing_url",
             "resolvedCity": "Chicago",
-            "resolvedState": "IL",
             "streetConcrete": true,
             "urlCity": "Chicago"
           },

@@ -706,6 +706,7 @@ export function parseExternalPageSourceHtml(
   config: ExternalPageSourceIngestionConfig,
   pageUrl: string
 ): ParseExternalPageSourceResult {
+  const normalizedHtml = html.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const stateSegment = resolveUsListStatePathSegment(config.state)
   if (!stateSegment) {
     logger.warn('External page source: unknown state for list path filter', {
@@ -718,7 +719,7 @@ export function parseExternalPageSourceHtml(
     return { listings: [], invalid: 0 }
   }
 
-  const dom = new JSDOM(html, { url: pageUrl })
+  const dom = new JSDOM(normalizedHtml, { url: pageUrl })
   const { document } = dom.window
   const fullText = document.body?.textContent || ''
   const metadataByListing = extractListingMetadataFromScripts(document, pageUrl)

@@ -8,7 +8,7 @@
         "externalId": "600",
         "sourceUrl": "https://example.com/US/Illinois/Chicago/10-Elm-St/600/listing.html"
       },
-      "description": null,
+      "description": "Moving sale CL Moving sale CL Moving sale CL Moving sale CL",
       "endDate": null,
       "extractionConfidence": null,
       "imageSourceUrl": null,
@@ -26,11 +26,9 @@
           "addressSources": ["slug", "slug_with_url_municipality"],
           "authority": {
             "addressTailCity": "Chicago",
-            "addressTailState": "IL",
             "cityConflict": false,
             "citySource": "listing_url",
             "resolvedCity": "Chicago",
-            "resolvedState": "IL",
             "streetConcrete": true,
             "urlCity": "Chicago"
           },

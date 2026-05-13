@@ -8,7 +8,7 @@
         "externalId": "500",
         "sourceUrl": "https://example.com/US/Illinois/Chicago/99-ZZ-St/500/listing.html"
       },
-      "description": null,
+      "description": "Shared link Shared link Shared link",
       "endDate": null,
       "extractionConfidence": null,
       "imageSourceUrl": "https://cdn.example.com/p1.jpg",
@@ -27,11 +27,9 @@
           "addressSources": ["slug", "slug_with_url_municipality"],
           "authority": {
             "addressTailCity": "Chicago",
-            "addressTailState": "IL",
             "cityConflict": false,
             "citySource": "listing_url",
             "resolvedCity": "Chicago",
-            "resolvedState": "IL",
             "streetConcrete": true,
             "urlCity": "Chicago"
           },

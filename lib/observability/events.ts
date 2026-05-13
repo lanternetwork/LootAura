@@ -20,6 +20,7 @@ export const ObservabilityEvents = {
     batchCompleted: 'geocode.worker.batch_completed',
     claimEmpty: 'geocode.worker.claim_empty',
     queueBatchCompleted: 'geocode.queue.batch_completed',
+    providerHealthClassified: 'geocode.provider.health_classified',
   },
   publish: {
     batchCompleted: 'publish.worker.batch_completed',

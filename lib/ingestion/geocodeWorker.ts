@@ -7,6 +7,12 @@ import {
   type GeocodeAddressOutcome,
   type GeocodeMode,
 } from '@/lib/geocode/geocodeAddress'
+import {
+  classifyProviderHealth,
+  defaultProviderHealthThresholds,
+  type ProviderHealthDecision,
+  type ProviderHealthSignals,
+} from '@/lib/geocode/providerHealth'
 import { stripUnitDesignatorFromAddressLineForGeocode } from '@/lib/geocode/stripUnitDesignatorForGeocode'
 import { logger } from '@/lib/log'
 import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
@@ -186,6 +192,10 @@ export interface GeocodeWorkerSummary {
   publishOk?: number
   publishFailed?: number
   claimedRowIds?: string[]
+  /** Tier 0 provider degradation decision for this batch (when evaluated). */
+  providerHealth?: ProviderHealthDecision
+  /** Bounded signals passed into the classifier for this batch (for operators / next gate). */
+  providerHealthSignals?: ProviderHealthSignals
 }
 
 export type GeocodeIngestedSaleByIdResult =
@@ -200,6 +210,39 @@ export interface GeocodeWorkerRunOptions {
   captureClaimedRowIds?: boolean
   /** Merged into structured telemetry (requestId, correlationId, jobType, etc.) — no PII. */
   telemetryContext?: Record<string, unknown>
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+let geocodeProviderHealthRuntime: {
+  consecutiveUnhealthyBatches: number
+  lastBatchSignals: ProviderHealthSignals | null
+  residualBackoffMs: number
+} = {
+  consecutiveUnhealthyBatches: 0,
+  lastBatchSignals: null,
+  residualBackoffMs: 0,
+}
+
+/** Test-only reset for provider degradation in-process state. */
+export function resetGeocodeProviderHealthRuntimeForTests(): void {
+  geocodeProviderHealthRuntime = {
+    consecutiveUnhealthyBatches: 0,
+    lastBatchSignals: null,
+    residualBackoffMs: 0,
+  }
+}
+
+async function readGeocodeQueueTotal(): Promise<number | null> {
+  try {
+    const { getGeocodeQueueDepths } = await import('@/lib/ingestion/geocodeQueue')
+    const d = await getGeocodeQueueDepths()
+    return typeof d?.total === 'number' && Number.isFinite(d.total) ? d.total : null
+  } catch {
+    return null
+  }
 }
 
 function parseBatchSize(): number {
@@ -1056,6 +1099,78 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
   const batchStarted = Date.now()
   const environment = process.env.NODE_ENV || 'development'
   const deploymentEnv = process.env.VERCEL_ENV || 'unknown'
+  const providerThresholds = defaultProviderHealthThresholds()
+
+  const ZERO_SIGNALS: ProviderHealthSignals = {
+    recent429Ratio: 0,
+    timeoutRatio: 0,
+    consecutiveFailures: 0,
+    retryExhaustionRate: 0,
+  }
+
+  const queueBeforeTotal = await readGeocodeQueueTotal()
+  const gateBase = geocodeProviderHealthRuntime.lastBatchSignals ?? ZERO_SIGNALS
+  const gateSignals: ProviderHealthSignals = {
+    ...gateBase,
+    consecutiveFailures: geocodeProviderHealthRuntime.consecutiveUnhealthyBatches,
+  }
+  const gateDecision = classifyProviderHealth(gateSignals, providerThresholds)
+
+  if (gateDecision.shouldPauseNewClaims) {
+    logger.warn('Geocode worker skipping claims (provider degradation gate)', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'provider_gate_pause',
+      environment,
+      deploymentEnv,
+      batchSize,
+      providerHealthStatus: gateDecision.status,
+      providerHealthReasons: gateDecision.reasons,
+    })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.geocode.batchStarted, {
+        ...(options?.telemetryContext ?? {}),
+        batchSize,
+        cooldownMinutes,
+        environment,
+        deploymentEnv,
+        jobType: 'geocode.db_claim_batch',
+        claimsPaused: true,
+        providerHealthStatus: gateDecision.status,
+      })
+    )
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.geocode.providerHealthClassified, {
+        ...(options?.telemetryContext ?? {}),
+        phase: 'gate',
+        providerHealthStatus: gateDecision.status,
+        providerHealthReasons: gateDecision.reasons,
+        retryBackoffMs: gateDecision.retryBackoffMs,
+        shouldReduceConcurrency: gateDecision.shouldReduceConcurrency,
+        shouldPauseNewClaims: gateDecision.shouldPauseNewClaims,
+        queueTotalBefore: queueBeforeTotal,
+      })
+    )
+    const pauseBackoff = Math.min(gateDecision.retryBackoffMs, 60_000)
+    if (pauseBackoff > 0) {
+      await sleep(pauseBackoff)
+    }
+    return {
+      claimed: 0,
+      succeeded: 0,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      rate429Count: 0,
+      providerNoCoordsSummary: {},
+      repeatedEmptyResultRetries: 0,
+      repeatedEmptyResultQueryFingerprints: {},
+      processed: 0,
+      publishTriggered: 0,
+      publishOk: 0,
+      publishFailed: 0,
+      providerHealth: gateDecision,
+      providerHealthSignals: gateSignals,
+    }
+  }
 
   logger.info('Geocode worker batch started', {
     component: 'ingestion/geocodeWorker',
@@ -1064,6 +1179,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     cooldownMinutes,
     environment,
     deploymentEnv,
+    providerHealthStatus: gateDecision.status,
   })
 
   emitObservabilityRecord(
@@ -1074,6 +1190,8 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       environment,
       deploymentEnv,
       jobType: 'geocode.db_claim_batch',
+      providerHealthStatus: gateDecision.status,
+      claimsPaused: false,
     })
   )
 
@@ -1093,6 +1211,9 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
 
   const claimedRows = await hydrateGeocodeClaimRows((Array.isArray(data) ? data : []) as ClaimedGeocodeRow[])
   const concurrency = parseGeocodeConcurrency()
+  const effectiveConcurrency = gateDecision.shouldReduceConcurrency
+    ? Math.max(1, Math.floor(concurrency / 2))
+    : concurrency
   const summary: GeocodeWorkerSummary = {
     claimed: claimedRows.length,
     succeeded: 0,
@@ -1142,7 +1263,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
 
   const rowResults = await runClaimedRowsWithConcurrency(
     claimedRows,
-    concurrency,
+    effectiveConcurrency,
     processGeocodeAttempt
   )
 
@@ -1191,6 +1312,68 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     }
   }
 
+  let fetchExceptionFails = 0
+  for (const rowResult of rowResults) {
+    if (rowResult.kind === 'geocode_fail' && rowResult.noCoordsReason === 'fetch_exception') {
+      fetchExceptionFails += 1
+    }
+  }
+
+  const queueAfterTotal = await readGeocodeQueueTotal()
+  const queueGrowth =
+    queueBeforeTotal != null && queueAfterTotal != null ? queueAfterTotal - queueBeforeTotal : undefined
+
+  let maxPoisonFp = 0
+  if (summary.repeatedEmptyResultQueryFingerprints) {
+    for (const v of Object.values(summary.repeatedEmptyResultQueryFingerprints)) {
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        maxPoisonFp = Math.max(maxPoisonFp, v)
+      }
+    }
+  }
+
+  const consecutiveAtStart = geocodeProviderHealthRuntime.consecutiveUnhealthyBatches
+  const denom = Math.max(1, processedCount)
+  const batchSignals: ProviderHealthSignals = {
+    recent429Ratio: summary.rate429Count / denom,
+    timeoutRatio: fetchExceptionFails / denom,
+    consecutiveFailures: consecutiveAtStart,
+    staleQueueGrowth: queueGrowth,
+    retryExhaustionRate: summary.failedTerminal / denom,
+    maxRepeatedEmptyFingerprintCount: maxPoisonFp > 0 ? maxPoisonFp : undefined,
+  }
+  const batchDecision = classifyProviderHealth(batchSignals, providerThresholds)
+  summary.providerHealth = batchDecision
+  summary.providerHealthSignals = batchSignals
+
+  if (batchDecision.status === 'healthy') {
+    geocodeProviderHealthRuntime.consecutiveUnhealthyBatches = 0
+  } else {
+    geocodeProviderHealthRuntime.consecutiveUnhealthyBatches = consecutiveAtStart + 1
+  }
+  geocodeProviderHealthRuntime.lastBatchSignals = {
+    ...batchSignals,
+    consecutiveFailures: geocodeProviderHealthRuntime.consecutiveUnhealthyBatches,
+  }
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.geocode.providerHealthClassified, {
+      ...(options?.telemetryContext ?? {}),
+      phase: 'batch',
+      providerHealthStatus: batchDecision.status,
+      providerHealthReasons: batchDecision.reasons,
+      retryBackoffMs: batchDecision.retryBackoffMs,
+      shouldReduceConcurrency: batchDecision.shouldReduceConcurrency,
+      shouldPauseNewClaims: batchDecision.shouldPauseNewClaims,
+      queueTotalBefore: queueBeforeTotal,
+      queueTotalAfter: queueAfterTotal,
+      queueGrowth,
+      effectiveConcurrency,
+      configuredConcurrency: concurrency,
+      maxPoisonFingerprintCount: maxPoisonFp,
+    })
+  )
+
   if (failureCount > 0) {
     logger.warn('Geocode worker encountered geocode/provider failures', {
       component: 'ingestion/geocodeWorker',
@@ -1204,6 +1387,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       repeatedEmptyResultRetries: summary.repeatedEmptyResultRetries,
       repeatedEmptyResultQueryFingerprints: summary.repeatedEmptyResultQueryFingerprints,
       durationMs,
+      providerHealthStatus: batchDecision.status,
     })
   }
 
@@ -1227,7 +1411,9 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     publishFailed: publishFailedCount,
     failureCount,
     durationMs,
-    concurrency,
+    concurrency: effectiveConcurrency,
+    configuredConcurrency: concurrency,
+    providerHealthStatus: batchDecision.status,
   })
 
   emitObservabilityRecord(
@@ -1249,9 +1435,14 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       publishOk: publishOkCount,
       publishFailed: publishFailedCount,
       durationMs,
-      concurrency,
+      concurrency: effectiveConcurrency,
+      configuredConcurrency: concurrency,
       queuePressureClass: classifyQueuePressure(summary.claimed, Math.max(1, batchSize)),
       dbBacklogDepletionSignal: summary.claimed === 0,
+      providerHealthStatus: batchDecision.status,
+      providerHealthReasons: batchDecision.reasons,
+      queueGrowth,
+      maxPoisonFingerprintCount: maxPoisonFp,
     })
   )
 
@@ -1259,6 +1450,11 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
   summary.publishTriggered = publishTriggeredCount
   summary.publishOk = publishOkCount
   summary.publishFailed = publishFailedCount
+
+  const tailBackoff = Math.min(batchDecision.retryBackoffMs, 60_000)
+  if (tailBackoff > 0) {
+    await sleep(tailBackoff)
+  }
 
   return summary
 }

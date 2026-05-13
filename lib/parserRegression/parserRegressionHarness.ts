@@ -1,6 +1,5 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import { fileURLToPath } from 'url'
 import {
   parseExternalPageSourceHtml,
   type ExternalPageSourceIngestionConfig,
@@ -14,11 +13,12 @@ import {
   type ParserRegressionFailureKind,
 } from '@/lib/parserRegression/parserFailureTaxonomy'
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url))
-
-/** Repo package root (…/LootAura containing `tests/`). */
+/**
+ * Repo package root (directory containing `tests/fixtures/parsers`).
+ * Uses `process.cwd()` so Vitest’s bundled execution (where `import.meta.url` may not be a `file:` URL) still resolves fixtures in CI.
+ */
 export function parserRegressionPackageRoot(): string {
-  return join(__dirname, '..', '..')
+  return process.cwd()
 }
 
 export type ParserFixtureMetadata = {

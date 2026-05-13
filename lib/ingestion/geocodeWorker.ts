@@ -210,20 +210,26 @@ export interface GeocodeWorkerRunOptions {
   captureClaimedRowIds?: boolean
   /** Merged into structured telemetry (requestId, correlationId, jobType, etc.) — no PII. */
   telemetryContext?: Record<string, unknown>
+  /**
+   * Optional Redis queue depth delta (after − before) measured by the caller (e.g. cron).
+   * When omitted, provider health skips queue-growth signals (avoids importing the job queue from this module).
+   */
+  queueDepthDelta?: number | null
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** Caps real sleep so a single cron/worker invocation stays bounded (decision.retryBackoffMs can be higher for telemetry). */
+const MAX_APPLIED_PROVIDER_BACKOFF_MS = 2_000
+
 let geocodeProviderHealthRuntime: {
   consecutiveUnhealthyBatches: number
   lastBatchSignals: ProviderHealthSignals | null
-  residualBackoffMs: number
 } = {
   consecutiveUnhealthyBatches: 0,
   lastBatchSignals: null,
-  residualBackoffMs: 0,
 }
 
 /** Test-only reset for provider degradation in-process state. */
@@ -231,17 +237,6 @@ export function resetGeocodeProviderHealthRuntimeForTests(): void {
   geocodeProviderHealthRuntime = {
     consecutiveUnhealthyBatches: 0,
     lastBatchSignals: null,
-    residualBackoffMs: 0,
-  }
-}
-
-async function readGeocodeQueueTotal(): Promise<number | null> {
-  try {
-    const { getGeocodeQueueDepths } = await import('@/lib/ingestion/geocodeQueue')
-    const d = await getGeocodeQueueDepths()
-    return typeof d?.total === 'number' && Number.isFinite(d.total) ? d.total : null
-  } catch {
-    return null
   }
 }
 
@@ -1108,7 +1103,10 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     retryExhaustionRate: 0,
   }
 
-  const queueBeforeTotal = await readGeocodeQueueTotal()
+  const qd = options?.queueDepthDelta
+  const queueGrowthFromCaller =
+    typeof qd === 'number' && Number.isFinite(qd) ? qd : undefined
+
   const gateBase = geocodeProviderHealthRuntime.lastBatchSignals ?? ZERO_SIGNALS
   const gateSignals: ProviderHealthSignals = {
     ...gateBase,
@@ -1147,10 +1145,10 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
         retryBackoffMs: gateDecision.retryBackoffMs,
         shouldReduceConcurrency: gateDecision.shouldReduceConcurrency,
         shouldPauseNewClaims: gateDecision.shouldPauseNewClaims,
-        queueTotalBefore: queueBeforeTotal,
+        queueDepthDeltaSupplied: queueGrowthFromCaller !== undefined,
       })
     )
-    const pauseBackoff = Math.min(gateDecision.retryBackoffMs, 60_000)
+    const pauseBackoff = Math.min(gateDecision.retryBackoffMs, MAX_APPLIED_PROVIDER_BACKOFF_MS)
     if (pauseBackoff > 0) {
       await sleep(pauseBackoff)
     }
@@ -1319,9 +1317,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     }
   }
 
-  const queueAfterTotal = await readGeocodeQueueTotal()
-  const queueGrowth =
-    queueBeforeTotal != null && queueAfterTotal != null ? queueAfterTotal - queueBeforeTotal : undefined
+  const queueGrowth = queueGrowthFromCaller
 
   let maxPoisonFp = 0
   if (summary.repeatedEmptyResultQueryFingerprints) {
@@ -1365,9 +1361,8 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       retryBackoffMs: batchDecision.retryBackoffMs,
       shouldReduceConcurrency: batchDecision.shouldReduceConcurrency,
       shouldPauseNewClaims: batchDecision.shouldPauseNewClaims,
-      queueTotalBefore: queueBeforeTotal,
-      queueTotalAfter: queueAfterTotal,
       queueGrowth,
+      queueDepthDeltaSupplied: queueGrowthFromCaller !== undefined,
       effectiveConcurrency,
       configuredConcurrency: concurrency,
       maxPoisonFingerprintCount: maxPoisonFp,
@@ -1451,7 +1446,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
   summary.publishOk = publishOkCount
   summary.publishFailed = publishFailedCount
 
-  const tailBackoff = Math.min(batchDecision.retryBackoffMs, 60_000)
+  const tailBackoff = Math.min(batchDecision.retryBackoffMs, MAX_APPLIED_PROVIDER_BACKOFF_MS)
   if (tailBackoff > 0) {
     await sleep(tailBackoff)
   }

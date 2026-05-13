@@ -107,17 +107,17 @@ export async function collectIngestionHealthSignals(options: {
   const admin = options.admin ?? getAdminDb()
   const [depths, pending] = await Promise.all([getGeocodeQueueDepths(), getPendingArchiveCounts(admin)])
 
-  const evaluatedAtIso = options.partial?.evaluatedAtIso ?? new Date(options.nowMs).toISOString()
+  const { evaluatedAtIso: partialEvalIso, ...restPartial } = options.partial ?? {}
+  const evaluatedAtIso = partialEvalIso ?? new Date(options.nowMs).toISOString()
 
   const archivePendingCount =
     pending == null ? undefined : pending.pending_via_ends_at + pending.pending_via_legacy
 
   return {
-    evaluatedAtIso,
     queueDepth: depths?.total,
     archivePendingCount,
-    ...options.partial,
-    evaluatedAtIso: options.partial?.evaluatedAtIso ?? evaluatedAtIso,
+    ...restPartial,
+    evaluatedAtIso,
   }
 }
 

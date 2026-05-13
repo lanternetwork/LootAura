@@ -13,6 +13,14 @@ import {
   type ProviderHealthDecision,
   type ProviderHealthSignals,
 } from '@/lib/geocode/providerHealth'
+import {
+  buildGeocodeDeadLetterEnvelope,
+  classifyGeocodeTerminalDeadLetter,
+  defaultGeocodeDeadLetterThresholds,
+  extractPriorDeadLetterClassificationCount,
+  mergeGeocodeDeadLetterIntoFailureDetails,
+  type GeocodeDeadLetterEnvelope,
+} from '@/lib/geocode/deadLetter'
 import { stripUnitDesignatorFromAddressLineForGeocode } from '@/lib/geocode/stripUnitDesignatorForGeocode'
 import { logger } from '@/lib/log'
 import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
@@ -174,6 +182,8 @@ interface ClaimedGeocodeRow {
   state: string | null
   geocode_attempts: number
   failure_reasons: unknown
+  /** Hydrated for dead-letter replay counting (optional). */
+  failure_details?: unknown
   source_url?: string | null
   raw_payload?: unknown
 }
@@ -483,6 +493,32 @@ async function hydrateGeocodeClaimRows(rows: ClaimedGeocodeRow[]): Promise<Claim
   })
 }
 
+async function hydrateFailureDetailsForClaimRows(admin: AdminDb, rows: ClaimedGeocodeRow[]): Promise<void> {
+  if (rows.length === 0) return
+  const ids = rows.map((r) => r.id)
+  const { data, error } = await fromBase(admin, 'ingested_sales').select('id, failure_details').in('id', ids)
+  if (error || !Array.isArray(data)) {
+    logger.warn('Geocode worker failure_details hydrate failed', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'hydrate_failure_details',
+      rowCount: rows.length,
+      message: error?.message ?? 'non_array_hydration_result',
+    })
+    return
+  }
+  const byId = new Map<string, unknown>()
+  for (const row of data as Array<{ id?: string; failure_details?: unknown }>) {
+    if (row?.id) {
+      byId.set(row.id, row.failure_details ?? undefined)
+    }
+  }
+  for (const row of rows) {
+    if (byId.has(row.id)) {
+      row.failure_details = byId.get(row.id)
+    }
+  }
+}
+
 function shouldRetryGeocodeWithFallback(geo: GeocodeAddressOutcome): boolean {
   if (geo.hit429) return false
   const r = geo.noCoordsReason
@@ -542,6 +578,84 @@ async function persistGeocodeAttemptFailureDetails(
       message: upErr.message,
     })
   }
+}
+
+async function persistGeocodeDeadLetterMetadata(
+  admin: AdminDb,
+  rowId: string,
+  envelope: GeocodeDeadLetterEnvelope
+): Promise<void> {
+  const { data: prior, error: selErr } = await fromBase(admin, 'ingested_sales')
+    .select('failure_details')
+    .eq('id', rowId)
+    .eq('status', 'needs_geocode')
+    .maybeSingle()
+
+  if (selErr || !prior) {
+    logger.warn('Geocode dead-letter: failure_details read skipped', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'dead_letter_select',
+      rowId,
+      message: selErr?.message ?? 'no_row',
+    })
+    return
+  }
+
+  const merged = mergeGeocodeDeadLetterIntoFailureDetails(
+    (prior as { failure_details?: unknown }).failure_details,
+    envelope
+  )
+  const { error: upErr } = await fromBase(admin, 'ingested_sales')
+    .update({ failure_details: merged })
+    .eq('id', rowId)
+    .eq('status', 'needs_geocode')
+
+  if (upErr) {
+    logger.warn('Geocode dead-letter: failure_details update failed', {
+      component: 'ingestion/geocodeWorker',
+      operation: 'dead_letter_update',
+      rowId,
+      message: upErr.message,
+    })
+  }
+}
+
+async function recordTerminalDeadLetterClassification(
+  admin: AdminDb,
+  params: {
+    rowId: string
+    attemptCount: number
+    hit429: boolean
+    noCoordsReason?: string | null
+    providerClassification?: string | null
+    failureDetailsSnapshot: unknown
+    telemetryContext?: Record<string, unknown>
+  }
+): Promise<void> {
+  const thresholds = defaultGeocodeDeadLetterThresholds()
+  const prior = extractPriorDeadLetterClassificationCount(params.failureDetailsSnapshot)
+  const decision = classifyGeocodeTerminalDeadLetter(
+    {
+      geocodeAttemptsAtTerminal: params.attemptCount,
+      hit429: params.hit429,
+      noCoordsReason: params.noCoordsReason,
+      providerClassification: params.providerClassification,
+      priorClassificationCount: prior,
+    },
+    thresholds
+  )
+  const envelope = buildGeocodeDeadLetterEnvelope(decision, prior, Date.now())
+  await persistGeocodeDeadLetterMetadata(admin, params.rowId, envelope)
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.geocode.deadLetterClassified, {
+      ...(params.telemetryContext ?? {}),
+      disposition: decision.disposition,
+      deadLetterReasons: decision.reasons,
+      eligibleReplay: decision.eligibleReplay,
+      classificationCount: envelope.classification_count,
+      replayCooldownMs: envelope.replay_cooldown_ms,
+    })
+  )
 }
 
 async function markGeocodeTerminalNeedsCheck(
@@ -708,7 +822,10 @@ async function runClaimedRowsWithConcurrency(
 /**
  * Shared processor for a row whose `geocode_attempts` has already been incremented (RPC claim or by-id path).
  */
-async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptResult> {
+async function processGeocodeAttempt(
+  row: ClaimedGeocodeRow,
+  telemetryContext?: Record<string, unknown>
+): Promise<AttemptResult> {
   const admin = getAdminDb()
   const rowId = row.id
   const attemptCount = row.geocode_attempts
@@ -847,6 +964,15 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
       attemptDiagnostics
     )
     if (attemptCount >= 3) {
+      await recordTerminalDeadLetterClassification(admin, {
+        rowId,
+        attemptCount,
+        hit429,
+        noCoordsReason: geo.noCoordsReason,
+        providerClassification: geo.providerClassification,
+        failureDetailsSnapshot: row.failure_details,
+        telemetryContext,
+      })
       const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')
       if (ok) {
         logger.warn('Geocode worker row processed', {
@@ -936,6 +1062,15 @@ async function processGeocodeAttempt(row: ClaimedGeocodeRow): Promise<AttemptRes
   )
 
   if (attemptCount >= 3) {
+    await recordTerminalDeadLetterClassification(admin, {
+      rowId,
+      attemptCount,
+      hit429: false,
+      noCoordsReason: syntheticMissingLocalityGeo.noCoordsReason,
+      providerClassification: syntheticMissingLocalityGeo.providerClassification,
+      failureDetailsSnapshot: row.failure_details,
+      telemetryContext,
+    })
     const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')
     if (ok) {
       logger.warn('Geocode worker row processed', {
@@ -979,7 +1114,7 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
 
   const { data: row, error: fetchError } = await fromBase(admin, 'ingested_sales')
     .select(
-      'id, status, normalized_address, address_raw, city, state, lat, lng, geocode_attempts, failure_reasons, published_sale_id, source_url, raw_payload'
+      'id, status, normalized_address, address_raw, city, state, lat, lng, geocode_attempts, failure_reasons, failure_details, published_sale_id, source_url, raw_payload'
     )
     .eq('id', saleId)
     .maybeSingle()
@@ -1006,6 +1141,7 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
     lng: unknown
     geocode_attempts: number
     failure_reasons: unknown
+    failure_details?: unknown
     published_sale_id: string | null
     source_url?: string | null
     raw_payload?: unknown
@@ -1067,6 +1203,7 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
     state: r.state,
     geocode_attempts: nextAttempts,
     failure_reasons: r.failure_reasons,
+    failure_details: r.failure_details,
     source_url: r.source_url ?? null,
     raw_payload: r.raw_payload ?? null,
   }
@@ -1208,6 +1345,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
   }
 
   const claimedRows = await hydrateGeocodeClaimRows((Array.isArray(data) ? data : []) as ClaimedGeocodeRow[])
+  await hydrateFailureDetailsForClaimRows(admin, claimedRows)
   const concurrency = parseGeocodeConcurrency()
   const effectiveConcurrency = gateDecision.shouldReduceConcurrency
     ? Math.max(1, Math.floor(concurrency / 2))
@@ -1262,7 +1400,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
   const rowResults = await runClaimedRowsWithConcurrency(
     claimedRows,
     effectiveConcurrency,
-    processGeocodeAttempt
+    (row) => processGeocodeAttempt(row, options?.telemetryContext)
   )
 
   for (const rowResult of rowResults) {

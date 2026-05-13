@@ -21,6 +21,7 @@ export const ObservabilityEvents = {
     claimEmpty: 'geocode.worker.claim_empty',
     queueBatchCompleted: 'geocode.queue.batch_completed',
     providerHealthClassified: 'geocode.provider.health_classified',
+    deadLetterClassified: 'geocode.dead_letter.classified',
   },
   publish: {
     batchCompleted: 'publish.worker.batch_completed',

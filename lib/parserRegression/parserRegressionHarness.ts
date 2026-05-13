@@ -12,6 +12,7 @@ import {
   classifyExternalPageSourceRegressionGap,
   type ParserRegressionFailureKind,
 } from '@/lib/parserRegression/parserFailureTaxonomy'
+import { validateParserFixtureMetadata } from '@/lib/parserRegression/fixtureFreshness'
 
 /**
  * Repo package root (directory containing `tests/fixtures/parsers`).
@@ -24,6 +25,12 @@ export function parserRegressionPackageRoot(): string {
 export type ParserFixtureMetadata = {
   pageUrl: string
   config: ExternalPageSourceIngestionConfig
+  /** ISO 8601 capture timestamp (required). */
+  captured_at: string
+  /** Normalized hostname for diagnostics aggregation (required). */
+  source_host: string
+  parser_version?: string
+  source_type?: string
 }
 
 export function loadParserFixture(
@@ -39,7 +46,25 @@ export function loadParserFixture(
   if (!existsSync(metaPath)) throw new Error(`Missing fixture metadata: ${metaPath}`)
   const rawHtml = readFileSync(rawPath, 'utf8')
   const expected = JSON.parse(readFileSync(expectedPath, 'utf8')) as unknown
-  const metadata = JSON.parse(readFileSync(metaPath, 'utf8')) as ParserFixtureMetadata
+  const rawMeta = JSON.parse(readFileSync(metaPath, 'utf8')) as unknown
+  const validated = validateParserFixtureMetadata(rawMeta)
+  if (!validated.ok) {
+    throw new Error(`Invalid fixture metadata (${sourceDir}/${caseId}): ${validated.error}`)
+  }
+  const m = validated.metadata
+  const ro = rawMeta as Record<string, unknown>
+  const metadata: ParserFixtureMetadata = {
+    pageUrl: m.pageUrl,
+    config: m.config as unknown as ExternalPageSourceIngestionConfig,
+    captured_at: String(ro.captured_at ?? '').trim(),
+    source_host: m.sourceHost,
+    ...(typeof ro.parser_version === 'string' && ro.parser_version.trim()
+      ? { parser_version: ro.parser_version.trim() }
+      : {}),
+    ...(typeof ro.source_type === 'string' && ro.source_type.trim()
+      ? { source_type: ro.source_type.trim() }
+      : {}),
+  }
   return { rawHtml, expected, metadata }
 }
 

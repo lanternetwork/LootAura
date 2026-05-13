@@ -1,6 +1,6 @@
 # Operations Guide
 
-**Last updated: 2026-05-12**
+**Last updated: 2026-05-09**
 
 ## Rate Limiting Operations
 
@@ -362,7 +362,7 @@ Records are written by `emitObservabilityRecord` (`lib/observability/emit.ts`) a
 | Geocode | `geocode.worker.batch_*`, `geocode.queue.batch_completed` | `claimed`, `batchSize`, `durationMs`, `queuePressureClass`, Redis depths |
 | Publish | `publish.worker.batch_completed` | `attempted`, `succeeded`, `failed`, `skipped`, `expired`, `durationMs` |
 | Archive | `archive.sales.batch_iteration`, `job_summary`, `stale_pending_after_job`, `max_iterations` | `archived`, `batchesRun`, `stalePendingTotalAfter`, `maxIterationsHit` |
-| Parser / source | `parser.source.*`, `ingestion.external_page_source.persist_summary` | `parserVersion`, `adapter`, `pageHostHash` (no raw HTML), duplicate counts, `parseDurationMsTotal` |
+| Parser / source | `parser.source.*`, `parser.regression.fixture_mismatch`, **`parser.source.degraded`**, **`parser.source.failing`**, **`parser.fixture.stale`**, **`parser.source.recovered`**, `ingestion.external_page_source.persist_summary` | Counts, `tMs`, aggregate source counts (no raw HTML); fixture regression ids |
 | Queue | Geocode queue batch events include depth and pressure | `queueDepthBeforeTotal`, `redisStarvationSignal` |
 | API | `api.sales.*.latency`, `api.cron.daily.hit`, `api.cron.geocode.hit`, `api.admin.archive.trigger.hit` | `durationMs`, `cacheHit`, `resultCount`, `errorCount`, `degradedMode`, `phase` |
 
@@ -402,6 +402,18 @@ Daily cron builds one bundle and passes the same ids into archive, ingestion per
 3. **`ingestion.external_page_source.zero_listings_page`** — successful parse but no listings (`invalidListingCount` may still be positive).
 4. **`parser.source.duplicate_suppressed`** — URL or unique-constraint dedupe counts.
 5. **`parser.source.normalization_warning`** — aggregated listing-level normalization signals (for example `cityConflict`).
+6. **`parser.source.degraded` / `parser.source.failing` / `parser.source.recovered`** — aggregate parser-source health transitions (emitted only when the admin parser-health aggregate changes; no per-row spam).
+7. **`parser.fixture.stale`** — aggregate signal when regression fixtures exceed freshness SLA (`captured_at` in `metadata.json`).
+8. **`GET /api/admin/parser-health`** — admin or `CRON_SECRET` bearer; JSON with `sources[]`, `summary`, `recommendedAction`; no page bodies.
+
+### Tier 0 parser health & fixture freshness (reference)
+
+- **Scoring:** `lib/parserRegression/parserHealth.ts` classifies **`healthy` / `degraded` / `failing`** from deterministic rate/duration thresholds; invalid aggregates **fail closed** to `failing` + `invalid_metrics`.
+- **Fixture metadata:** `lib/parserRegression/fixtureFreshness.ts` + harness — every fixture **`metadata.json`** must include **`captured_at`** (ISO 8601) and **`source_host`** (hostname); optional `parser_version`, `source_type`. Malformed files **fail** `loadParserFixture`.
+- **Freshness buckets:** default **90d** `fresh`, **180d** `aging`, older `stale` (deterministic `evaluateFixtureFreshness`).
+- **Degradation tags:** `lib/parserRegression/sourceDegradation.ts` — `likely_selector_drift`, `source_outage`, `unsupported_layout_evolution`, `extraction_collapse` with operator **`recommendedAction`** strings.
+- **Remediation:** refresh golden fixtures, bump `captured_at`, extend `external_page_source` selectors with a new case under `tests/fixtures/parsers/`, then re-run parser regression tests / CI.
+- **Telemetry wiring:** `lib/parserRegression/reportParserHealth.ts` — Sentry uses the same conservative fingerprinting style as ingestion health (no fixture HTML).
 
 ### Operational flow
 

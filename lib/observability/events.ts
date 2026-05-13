@@ -50,6 +50,14 @@ export const ObservabilityEvents = {
     duplicateSuppressed: 'parser.source.duplicate_suppressed',
     /** Fixture vs parse mismatch (no PII in payload; use fixture ids only). */
     regressionMismatch: 'parser.regression.fixture_mismatch',
+    /** Aggregate: one or more parser sources crossed into degraded territory. */
+    sourceDegraded: 'parser.source.degraded',
+    /** Aggregate: one or more parser sources are failing fixture/regression gates. */
+    sourceFailing: 'parser.source.failing',
+    /** Aggregate: regression fixtures are past freshness SLA. */
+    fixtureStale: 'parser.fixture.stale',
+    /** Aggregate: prior parser degradation signals cleared. */
+    sourceRecovered: 'parser.source.recovered',
   },
   api: {
     salesGetLatency: 'api.sales.get.latency',

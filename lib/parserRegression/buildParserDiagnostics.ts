@@ -5,27 +5,35 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
-import { parseExternalPageSourceHtml } from '@/lib/ingestion/adapters/externalPageSource'
-import type { ExternalPageSourceIngestionConfig } from '@/lib/ingestion/adapters/externalPageSource'
+import {
+  parseExternalPageSourceHtml,
+  type ExternalPageSourceIngestionConfig,
+} from '@/lib/ingestion/adapters/externalPageSource'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import {
   defaultFixtureFreshnessThresholds,
   evaluateFixtureFreshness,
   fixtureFreshnessFromValidationFailure,
   validateParserFixtureMetadata,
+  type FixtureFreshnessReason,
+  type FixtureFreshnessStatus,
 } from '@/lib/parserRegression/fixtureFreshness'
 import {
   classifyParserHealthFromCounts,
   defaultParserHealthThresholds,
   type ParserHealthCounts,
+  type ParserHealthReason,
+  type ParserHealthStatus,
 } from '@/lib/parserRegression/parserHealth'
 import { normalizeExternalPageParseResult } from '@/lib/parserRegression/normalizeExternalPageParseResult'
 import {
   classifyExternalPageSourceRegressionGap,
 } from '@/lib/parserRegression/parserFailureTaxonomy'
-import { buildSourceDegradationRow, summarizeSourceDegradation } from '@/lib/parserRegression/sourceDegradation'
-import type { FixtureFreshnessReason, FixtureFreshnessStatus } from '@/lib/parserRegression/fixtureFreshness'
-import type { ParserHealthReason, ParserHealthStatus } from '@/lib/parserRegression/parserHealth'
+import {
+  buildSourceDegradationRow,
+  summarizeSourceDegradation,
+  type SourceDegradationTag,
+} from '@/lib/parserRegression/sourceDegradation'
 
 export type ParserDiagnosticsFixtureSample = {
   sourceDir: string

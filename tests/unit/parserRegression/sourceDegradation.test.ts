@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { buildSourceDegradationRow, summarizeSourceDegradation } from '@/lib/parserRegression/sourceDegradation'
-import type { SourceDegradationTag } from '@/lib/parserRegression/sourceDegradation'
+import {
+  buildSourceDegradationRow,
+  summarizeSourceDegradation,
+  type SourceDegradationTag,
+} from '@/lib/parserRegression/sourceDegradation'
 import { defaultParserHealthThresholds, classifyParserHealthFromCounts } from '@/lib/parserRegression/parserHealth'
 
 const th = defaultParserHealthThresholds()

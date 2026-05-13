@@ -15,6 +15,7 @@ import {
 } from '@/lib/geocode/providerHealth'
 import {
   buildGeocodeDeadLetterEnvelope,
+  carryOverReplayFieldsOntoDeadLetterEnvelope,
   classifyGeocodeTerminalDeadLetter,
   defaultGeocodeDeadLetterThresholds,
   extractPriorDeadLetterClassificationCount,
@@ -644,7 +645,10 @@ async function recordTerminalDeadLetterClassification(
     },
     thresholds
   )
-  const envelope = buildGeocodeDeadLetterEnvelope(decision, prior, Date.now())
+  const envelope = carryOverReplayFieldsOntoDeadLetterEnvelope(
+    buildGeocodeDeadLetterEnvelope(decision, prior, Date.now()),
+    params.failureDetailsSnapshot
+  )
   await persistGeocodeDeadLetterMetadata(admin, params.rowId, envelope)
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.geocode.deadLetterClassified, {

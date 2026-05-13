@@ -55,7 +55,13 @@ export type GeocodeDeadLetterEnvelope = {
   replay_cooldown_ms: number
   eligible_replay: boolean
   reasons: GeocodeDeadLetterReason[]
+  /** Successful bounded replays to `needs_geocode` (admin/cron). */
+  replay_count?: number
+  last_replay_at_ms?: number
 }
+
+/** Bounded replays per row after transient terminal dead-letter (separate from classification_count). */
+export const DEFAULT_MAX_GEOCODE_DEAD_LETTER_REPLAYS = 4 as const
 
 export function defaultGeocodeDeadLetterThresholds(): GeocodeDeadLetterThresholds {
   return {
@@ -218,5 +224,33 @@ export function mergeGeocodeDeadLetterIntoFailureDetails(
   return {
     ...base,
     geocode_dead_letter: envelope as unknown as Record<string, unknown>,
+  }
+}
+
+function readGeocodeDeadLetterObject(failureDetails: unknown): Record<string, unknown> | null {
+  if (!failureDetails || typeof failureDetails !== 'object' || Array.isArray(failureDetails)) return null
+  const dl = (failureDetails as Record<string, unknown>).geocode_dead_letter
+  if (!dl || typeof dl !== 'object' || Array.isArray(dl)) return null
+  return dl as Record<string, unknown>
+}
+
+/** Preserve replay_count / last_replay_at_ms across a new terminal classification envelope write. */
+export function carryOverReplayFieldsOntoDeadLetterEnvelope(
+  envelope: GeocodeDeadLetterEnvelope,
+  failureDetailsSnapshot: unknown
+): GeocodeDeadLetterEnvelope {
+  const prior = readGeocodeDeadLetterObject(failureDetailsSnapshot)
+  if (!prior) return envelope
+  const rc = prior.replay_count
+  const last = prior.last_replay_at_ms
+  const replayCount =
+    typeof rc === 'number' && Number.isFinite(rc) && rc > 0 ? Math.floor(rc) : undefined
+  const lastReplayAt =
+    typeof last === 'number' && Number.isFinite(last) && last > 0 ? Math.floor(last) : undefined
+  if (replayCount === undefined && lastReplayAt === undefined) return envelope
+  return {
+    ...envelope,
+    ...(replayCount !== undefined ? { replay_count: replayCount } : {}),
+    ...(lastReplayAt !== undefined ? { last_replay_at_ms: lastReplayAt } : {}),
   }
 }

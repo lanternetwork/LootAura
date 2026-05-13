@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildGeocodeDeadLetterEnvelope,
+  carryOverReplayFieldsOntoDeadLetterEnvelope,
   classifyGeocodeTerminalDeadLetter,
   defaultGeocodeDeadLetterThresholds,
   extractPriorDeadLetterClassificationCount,
@@ -182,5 +183,22 @@ describe('buildGeocodeDeadLetterEnvelope + merge', () => {
     )
     expect(merged.geocode).toEqual({ schema_version: 2, attemptCount: 3 })
     expect(merged.geocode_dead_letter).toEqual(env)
+  })
+})
+
+describe('carryOverReplayFieldsOntoDeadLetterEnvelope', () => {
+  it('copies replay_count and last_replay_at_ms from prior failure_details', () => {
+    const decision: GeocodeDeadLetterDecision = {
+      disposition: 'retryable',
+      replayCooldownMs: 1000,
+      reasons: ['transient_provider'],
+      eligibleReplay: true,
+    }
+    const fresh = buildGeocodeDeadLetterEnvelope(decision, 1, 50_000)
+    const merged = carryOverReplayFieldsOntoDeadLetterEnvelope(fresh, {
+      geocode_dead_letter: { replay_count: 2, last_replay_at_ms: 40_000 },
+    })
+    expect(merged.replay_count).toBe(2)
+    expect(merged.last_replay_at_ms).toBe(40_000)
   })
 })

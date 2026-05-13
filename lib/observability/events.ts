@@ -22,6 +22,8 @@ export const ObservabilityEvents = {
     queueBatchCompleted: 'geocode.queue.batch_completed',
     providerHealthClassified: 'geocode.provider.health_classified',
     deadLetterClassified: 'geocode.dead_letter.classified',
+    deadLetterReplayed: 'geocode.dead_letter.replayed',
+    replayExhausted: 'geocode.replay.exhausted',
   },
   publish: {
     batchCompleted: 'publish.worker.batch_completed',

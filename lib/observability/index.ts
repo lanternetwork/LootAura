@@ -16,3 +16,25 @@ export {
   shouldEmitTelemetryJson,
   type TelemetryRecord,
 } from './emit'
+export {
+  evaluateIngestionHealth,
+  defaultIngestionHealthThresholds,
+  type IngestionHealthEvaluation,
+  type IngestionHealthReason,
+  type IngestionHealthSignalKey,
+  type IngestionHealthSignals,
+  type IngestionHealthStatus,
+  type IngestionHealthThresholds,
+} from './ingestionHealth'
+export {
+  fingerprintIngestionHealth,
+  reportIngestionHealthEvaluation,
+  resetIngestionHealthReporterForTests,
+} from './reportIngestionHealth'
+export {
+  buildIngestionHealthThresholdsForWiring,
+  collectIngestionHealthSignals,
+  loadIngestionHealthThresholdsFromEnv,
+  runIngestionHealthPipeline,
+  type RunIngestionHealthPipelineResult,
+} from './ingestionHealthWiring'

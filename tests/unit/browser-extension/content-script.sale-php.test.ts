@@ -282,7 +282,7 @@ describe('YSTM queue card context carryover', () => {
     const meta =
       '{"sales":[{"url":"https://yardsaletreasuremap.com/sale.php?communitysale=12871&id=218927","date":"2026-07-15"}]}'
     const html = `<!doctype html><html><body>
-      <script>metadataStr = '${meta.replace(/'/g, "\\'")}';</script>
+      <script>metadataStr = '${meta.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';</script>
       <p>1751 N Lafayette St 46319</p>
     </body></html>`
     const dom = new JSDOM(html, { url: SALE_PHP_URL, runScripts: 'dangerously' })

@@ -65,6 +65,13 @@ export const ObservabilityEvents = {
     cronGeocodeHit: 'api.cron.geocode.hit',
     adminArchiveTriggerHit: 'api.admin.archive.trigger.hit',
   },
+  reconciliation: {
+    started: 'source.reconciliation.started',
+    completed: 'source.reconciliation.completed',
+    changed: 'source.reconciliation.changed',
+    noChange: 'source.reconciliation.no_change',
+    failed: 'source.reconciliation.failed',
+  },
 } as const
 
 export type ObservabilityEventName =
@@ -76,3 +83,4 @@ export type ObservabilityEventName =
   | (typeof ObservabilityEvents.retry)[keyof typeof ObservabilityEvents.retry]
   | (typeof ObservabilityEvents.parser)[keyof typeof ObservabilityEvents.parser]
   | (typeof ObservabilityEvents.api)[keyof typeof ObservabilityEvents.api]
+  | (typeof ObservabilityEvents.reconciliation)[keyof typeof ObservabilityEvents.reconciliation]

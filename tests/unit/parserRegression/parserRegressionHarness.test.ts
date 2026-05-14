@@ -7,11 +7,13 @@ const { existsSyncMock, readFileSyncMock } = vi.hoisted(() => ({
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
-  return {
+  const fsStub = {
     ...actual,
     existsSync: existsSyncMock,
     readFileSync: readFileSyncMock,
   }
+  // Vitest ESM/CJS interop expects a `default` on mocked Node built-ins.
+  return { ...fsStub, default: fsStub }
 })
 
 import { loadParserFixture } from '@/lib/parserRegression/parserRegressionHarness'

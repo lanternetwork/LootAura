@@ -1,6 +1,6 @@
 /**
- * Tier 0 deterministic parser health scoring (pure; no I/O, env, or logging).
- * Invalid or incomplete metrics fail closed toward failing.
+ * Deterministic parser / source health scoring from normalized metrics (pure, no I/O).
+ * Rates are in [0, 1]; durations are non-negative milliseconds. Invalid inputs fail closed.
  */
 
 export type ParserHealthStatus = 'healthy' | 'degraded' | 'failing'
@@ -10,30 +10,20 @@ export type ParserHealthReason =
   | 'high_fixture_mismatch_rate'
   | 'high_zero_listing_rate'
   | 'high_selector_missing_rate'
-  | 'high_malformed_source_data_rate'
+  | 'high_malformed_source_rate'
   | 'high_unsupported_layout_rate'
-  | 'high_extraction_empty_rate'
-  | 'high_normalization_failed_rate'
-  | 'parse_duration_degraded'
+  | 'slow_average_parse_duration'
   | 'duplicate_suppression_anomaly'
 
-/** Aggregate counts over a bounded evaluation window (fixtures, batch, etc.). */
-export type ParserHealthCounts = {
-  total: number
-  fixtureMismatch: number
-  zeroListings: number
-  selectorMissing: number
-  malformedSourceData: number
-  unsupportedLayout: number
-  extractionEmpty: number
-  normalizationFailed: number
-  /** Sum of per-sample parse durations (ms). */
-  parseDurationSumMs: number
-  /** Max single-sample parse duration (ms). */
-  parseDurationMaxMs: number
-  duplicateSuppressed: number
-  /** Expected duplicate suppressions when healthy; used for anomaly detection only. */
-  duplicateSuppressedExpected?: number
+/** Normalized regression / runtime signals (all required; use 0 for “none”). */
+export type ParserHealthMetricsInput = {
+  fixtureMismatchRate: number
+  zeroListingRate: number
+  selectorMissingRate: number
+  malformedSourceRate: number
+  unsupportedLayoutRate: number
+  averageParseDurationMs: number
+  duplicateSuppressionAnomalyRate: number
 }
 
 export type ParserHealthThresholds = {
@@ -47,195 +37,257 @@ export type ParserHealthThresholds = {
   malformedDegraded: number
   unsupportedLayoutFailing: number
   unsupportedLayoutDegraded: number
-  extractionEmptyFailing: number
-  extractionEmptyDegraded: number
-  normalizationFailedFailing: number
-  normalizationFailedDegraded: number
-  parseMeanMsDegraded: number
-  parseMeanMsFailing: number
-  parseMaxMsDegraded: number
-  parseMaxMsFailing: number
-  duplicateSuppressionRatioFailing: number
-  duplicateSuppressionRatioDegraded: number
+  averageParseDurationMsFailing: number
+  averageParseDurationMsDegraded: number
+  duplicateSuppressionAnomalyFailing: number
+  duplicateSuppressionAnomalyDegraded: number
+}
+
+export type ParserHealthResult = {
+  status: ParserHealthStatus
+  score: number
+  reasons: ParserHealthReason[]
+}
+
+/** Explicit defaults (rates in [0,1], durations in ms). */
+export const DEFAULT_PARSER_HEALTH_THRESHOLDS: Readonly<ParserHealthThresholds> = {
+  fixtureMismatchFailing: 0.35,
+  fixtureMismatchDegraded: 0.12,
+  zeroListingFailing: 0.55,
+  zeroListingDegraded: 0.25,
+  selectorMissingFailing: 0.4,
+  selectorMissingDegraded: 0.15,
+  malformedFailing: 0.45,
+  malformedDegraded: 0.18,
+  unsupportedLayoutFailing: 0.35,
+  unsupportedLayoutDegraded: 0.12,
+  averageParseDurationMsFailing: 6000,
+  averageParseDurationMsDegraded: 2000,
+  duplicateSuppressionAnomalyFailing: 0.6,
+  duplicateSuppressionAnomalyDegraded: 0.35,
+} as const
+
+export type ParserHealthCounts = {
+  total: number
+  fixtureMismatch: number
+  zeroListings: number
+  selectorMissing: number
+  malformedSourceData: number
+  unsupportedLayout: number
+  extractionEmpty: number
+  normalizationFailed: number
+  parseDurationSumMs: number
+  parseDurationMaxMs: number
+  duplicateSuppressed: number
+  duplicateSuppressedExpected: number
+}
+
+function isRateValid(r: number): boolean {
+  return Number.isFinite(r) && r >= 0 && r <= 1
+}
+
+function isDurationValid(ms: number): boolean {
+  return Number.isFinite(ms) && ms >= 0
+}
+
+function sortedUniqueReasons(reasons: ParserHealthReason[]): ParserHealthReason[] {
+  const order: ParserHealthReason[] = [
+    'invalid_metrics',
+    'high_fixture_mismatch_rate',
+    'high_zero_listing_rate',
+    'high_selector_missing_rate',
+    'high_malformed_source_rate',
+    'high_unsupported_layout_rate',
+    'slow_average_parse_duration',
+    'duplicate_suppression_anomaly',
+  ]
+  const set = new Set(reasons)
+  return order.filter((x) => set.has(x))
 }
 
 export function defaultParserHealthThresholds(): ParserHealthThresholds {
-  return {
-    fixtureMismatchFailing: 0.35,
-    fixtureMismatchDegraded: 0.12,
-    zeroListingFailing: 0.45,
-    zeroListingDegraded: 0.18,
-    selectorMissingFailing: 0.4,
-    selectorMissingDegraded: 0.15,
-    malformedFailing: 0.35,
-    malformedDegraded: 0.12,
-    unsupportedLayoutFailing: 0.35,
-    unsupportedLayoutDegraded: 0.12,
-    extractionEmptyFailing: 0.4,
-    extractionEmptyDegraded: 0.15,
-    normalizationFailedFailing: 0.3,
-    normalizationFailedDegraded: 0.1,
-    parseMeanMsDegraded: 800,
-    parseMeanMsFailing: 2500,
-    parseMaxMsDegraded: 2000,
-    parseMaxMsFailing: 8000,
-    duplicateSuppressionRatioFailing: 6,
-    duplicateSuppressionRatioDegraded: 3,
-  }
+  return { ...DEFAULT_PARSER_HEALTH_THRESHOLDS }
 }
 
-function clamp01(x: number): number {
-  if (!Number.isFinite(x) || x < 0) return 0
-  return Math.min(1, x)
-}
-
-function isValidCounts(c: ParserHealthCounts): boolean {
-  if (!Number.isFinite(c.total) || c.total <= 0) return false
-  const nonNeg = [
-    c.fixtureMismatch,
-    c.zeroListings,
-    c.selectorMissing,
-    c.malformedSourceData,
-    c.unsupportedLayout,
-    c.extractionEmpty,
-    c.normalizationFailed,
-    c.parseDurationSumMs,
-    c.parseDurationMaxMs,
-    c.duplicateSuppressed,
+function thresholdsWellOrdered(t: ParserHealthThresholds): boolean {
+  const ratePairs: [number, number][] = [
+    [t.fixtureMismatchDegraded, t.fixtureMismatchFailing],
+    [t.zeroListingDegraded, t.zeroListingFailing],
+    [t.selectorMissingDegraded, t.selectorMissingFailing],
+    [t.malformedDegraded, t.malformedFailing],
+    [t.unsupportedLayoutDegraded, t.unsupportedLayoutFailing],
+    [t.duplicateSuppressionAnomalyDegraded, t.duplicateSuppressionAnomalyFailing],
   ]
-  for (const n of nonNeg) {
-    if (!Number.isFinite(n) || n < 0) return false
-  }
-  if (c.duplicateSuppressedExpected != null) {
-    if (!Number.isFinite(c.duplicateSuppressedExpected) || c.duplicateSuppressedExpected < 0) return false
-  }
-  return true
+  if (!ratePairs.every(([d, f]) => Number.isFinite(d) && Number.isFinite(f) && f > d)) return false
+  return (
+    Number.isFinite(t.averageParseDurationMsDegraded) &&
+    Number.isFinite(t.averageParseDurationMsFailing) &&
+    t.averageParseDurationMsFailing > t.averageParseDurationMsDegraded
+  )
 }
 
-/** 0 = healthy, 1 = degraded, 2 = failing */
-function rateTier(rate: number, degradedAt: number, failingAt: number): 0 | 1 | 2 {
-  if (rate >= failingAt) return 2
-  if (rate >= degradedAt) return 1
-  return 0
+function axisState(
+  value: number,
+  degradedAt: number,
+  failingAt: number
+): 'ok' | 'degraded' | 'failing' {
+  if (value >= failingAt) return 'failing'
+  if (value >= degradedAt) return 'degraded'
+  return 'ok'
 }
 
-function durationTier(
-  meanMs: number,
-  maxMs: number,
-  th: ParserHealthThresholds
-): 0 | 1 | 2 {
-  let worst: 0 | 1 | 2 = 0
-  if (Number.isFinite(meanMs)) {
-    if (meanMs >= th.parseMeanMsFailing) worst = 2
-    else if (meanMs >= th.parseMeanMsDegraded) worst = 1
-  }
-  if (Number.isFinite(maxMs)) {
-    if (maxMs >= th.parseMaxMsFailing) worst = 2
-    else if (maxMs >= th.parseMaxMsDegraded && worst < 2) worst = Math.max(worst, 1) as 0 | 1 | 2
-  }
-  return worst
-}
-
-function duplicateTier(counts: ParserHealthCounts, th: ParserHealthThresholds): 0 | 1 | 2 {
-  const expected = counts.duplicateSuppressedExpected ?? 0
-  if (expected <= 0 || counts.duplicateSuppressed <= 0) return 0
-  const ratio = counts.duplicateSuppressed / expected
-  if (!Number.isFinite(ratio)) return 0
-  if (ratio >= th.duplicateSuppressionRatioFailing) return 2
-  if (ratio >= th.duplicateSuppressionRatioDegraded) return 1
-  return 0
-}
-
-const REASON_ORDER: ParserHealthReason[] = [
-  'invalid_metrics',
-  'high_fixture_mismatch_rate',
-  'high_zero_listing_rate',
-  'high_selector_missing_rate',
-  'high_malformed_source_data_rate',
-  'high_unsupported_layout_rate',
-  'high_extraction_empty_rate',
-  'high_normalization_failed_rate',
-  'parse_duration_degraded',
-  'duplicate_suppression_anomaly',
-]
-
-function sortReasons(reasons: ParserHealthReason[]): ParserHealthReason[] {
-  const set = new Set(reasons)
-  return REASON_ORDER.filter((r) => set.has(r))
+function duplicateSuppressionAnomalyRateFromCounts(c: ParserHealthCounts): number {
+  const exp = c.duplicateSuppressedExpected
+  const sup = c.duplicateSuppressed
+  if (!Number.isFinite(exp) || !Number.isFinite(sup) || sup < 0 || exp < 0) return Number.NaN
+  if (exp === 0) return sup === 0 ? 0 : 1
+  return Math.min(1, Math.abs(sup - exp) / exp)
 }
 
 /**
- * Deterministic health from aggregate counts. Fail-closed: invalid inputs → failing + invalid_metrics.
+ * Map fixture-level counters to normalized metrics, then classify health.
+ * Used by on-disk fixture diagnostics (`buildParserDiagnostics`).
  */
 export function classifyParserHealthFromCounts(
   counts: ParserHealthCounts,
-  thresholds: ParserHealthThresholds
-): { status: ParserHealthStatus; score: number; reasons: ParserHealthReason[] } {
-  if (!isValidCounts(counts)) {
-    return { status: 'failing', score: 0, reasons: ['invalid_metrics'] }
-  }
-
+  thresholds: ParserHealthThresholds = defaultParserHealthThresholds()
+): ParserHealthResult {
   const t = counts.total
-  const mismatchR = clamp01(counts.fixtureMismatch / t)
-  const zeroR = clamp01(counts.zeroListings / t)
-  const selR = clamp01(counts.selectorMissing / t)
-  const malR = clamp01(counts.malformedSourceData / t)
-  const unsR = clamp01(counts.unsupportedLayout / t)
-  const extR = clamp01(counts.extractionEmpty / t)
-  const normR = clamp01(counts.normalizationFailed / t)
-  const meanMs = counts.parseDurationSumMs / t
-  const maxMs = counts.parseDurationMaxMs
+  if (!Number.isFinite(t) || t <= 0) {
+    return { status: 'failing', score: 0, reasons: sortedUniqueReasons(['invalid_metrics']) }
+  }
+  const zeroNumerator = counts.zeroListings + counts.extractionEmpty
+  const malformedNumerator = counts.malformedSourceData + counts.normalizationFailed
+  const input: ParserHealthMetricsInput = {
+    fixtureMismatchRate: counts.fixtureMismatch / t,
+    zeroListingRate: zeroNumerator / t,
+    selectorMissingRate: counts.selectorMissing / t,
+    malformedSourceRate: malformedNumerator / t,
+    unsupportedLayoutRate: counts.unsupportedLayout / t,
+    averageParseDurationMs: counts.parseDurationSumMs / t,
+    duplicateSuppressionAnomalyRate: duplicateSuppressionAnomalyRateFromCounts(counts),
+  }
+  return classifyParserHealth(input, thresholds)
+}
 
-  const tiers: Array<{ tier: 0 | 1 | 2; reason: ParserHealthReason }> = [
-    { tier: rateTier(mismatchR, thresholds.fixtureMismatchDegraded, thresholds.fixtureMismatchFailing), reason: 'high_fixture_mismatch_rate' },
-    { tier: rateTier(zeroR, thresholds.zeroListingDegraded, thresholds.zeroListingFailing), reason: 'high_zero_listing_rate' },
-    { tier: rateTier(selR, thresholds.selectorMissingDegraded, thresholds.selectorMissingFailing), reason: 'high_selector_missing_rate' },
-    { tier: rateTier(malR, thresholds.malformedDegraded, thresholds.malformedFailing), reason: 'high_malformed_source_data_rate' },
-    { tier: rateTier(unsR, thresholds.unsupportedLayoutDegraded, thresholds.unsupportedLayoutFailing), reason: 'high_unsupported_layout_rate' },
-    { tier: rateTier(extR, thresholds.extractionEmptyDegraded, thresholds.extractionEmptyFailing), reason: 'high_extraction_empty_rate' },
-    { tier: rateTier(normR, thresholds.normalizationFailedDegraded, thresholds.normalizationFailedFailing), reason: 'high_normalization_failed_rate' },
+/**
+ * Deterministic: invalid metrics → failing score 0.
+ * Otherwise score from 100 minus weighted penalties; status from worst axis + score bands.
+ */
+export function classifyParserHealth(
+  input: ParserHealthMetricsInput,
+  thresholds: ParserHealthThresholds = defaultParserHealthThresholds()
+): ParserHealthResult {
+  const reasons: ParserHealthReason[] = []
+  const rates: number[] = [
+    input.fixtureMismatchRate,
+    input.zeroListingRate,
+    input.selectorMissingRate,
+    input.malformedSourceRate,
+    input.unsupportedLayoutRate,
+    input.duplicateSuppressionAnomalyRate,
   ]
 
-  const durTier = durationTier(meanMs, maxMs, thresholds)
-  if (durTier > 0) {
-    tiers.push({ tier: durTier, reason: 'parse_duration_degraded' })
+  if (rates.some((r) => !isRateValid(r)) || !isDurationValid(input.averageParseDurationMs) || !thresholdsWellOrdered(thresholds)) {
+    reasons.push('invalid_metrics')
+    return { status: 'failing', score: 0, reasons: sortedUniqueReasons(reasons) }
   }
 
-  const dupTier = duplicateTier(counts, thresholds)
-  if (dupTier > 0) {
-    tiers.push({ tier: dupTier, reason: 'duplicate_suppression_anomaly' })
-  }
+  let penalty = 0
+  let worst: 'ok' | 'degraded' | 'failing' = 'ok'
 
-  let worst: 0 | 1 | 2 = 0
-  const reasons: ParserHealthReason[] = []
-  for (const { tier, reason } of tiers) {
-    if (tier > 0) {
-      worst = Math.max(worst, tier) as 0 | 1 | 2
+  const bump = (
+    st: 'ok' | 'degraded' | 'failing',
+    degPen: number,
+    failPen: number,
+    reason: ParserHealthReason
+  ) => {
+    if (st === 'failing') {
+      worst = 'failing'
+      penalty += failPen
+      reasons.push(reason)
+    } else if (st === 'degraded') {
+      if (worst !== 'failing') worst = 'degraded'
+      penalty += degPen
       reasons.push(reason)
     }
   }
 
-  const status: ParserHealthStatus = worst === 2 ? 'failing' : worst === 1 ? 'degraded' : 'healthy'
-  const failingCount = tiers.filter((x) => x.tier === 2).length
-  const adjustedStatus: ParserHealthStatus =
-    failingCount >= 2 && status === 'degraded' ? 'failing' : status
+  bump(
+    axisState(
+      input.fixtureMismatchRate,
+      thresholds.fixtureMismatchDegraded,
+      thresholds.fixtureMismatchFailing
+    ),
+    22,
+    48,
+    'high_fixture_mismatch_rate'
+  )
+  bump(
+    axisState(input.zeroListingRate, thresholds.zeroListingDegraded, thresholds.zeroListingFailing),
+    20,
+    45,
+    'high_zero_listing_rate'
+  )
+  bump(
+    axisState(
+      input.selectorMissingRate,
+      thresholds.selectorMissingDegraded,
+      thresholds.selectorMissingFailing
+    ),
+    18,
+    42,
+    'high_selector_missing_rate'
+  )
+  bump(
+    axisState(input.malformedSourceRate, thresholds.malformedDegraded, thresholds.malformedFailing),
+    16,
+    40,
+    'high_malformed_source_rate'
+  )
+  bump(
+    axisState(
+      input.unsupportedLayoutRate,
+      thresholds.unsupportedLayoutDegraded,
+      thresholds.unsupportedLayoutFailing
+    ),
+    14,
+    38,
+    'high_unsupported_layout_rate'
+  )
 
-  const uniqueReasons = sortReasons([...new Set(reasons)])
-  const degradedOnlySignals = tiers.filter((x) => x.tier === 1).length
-  const failingSignals = tiers.filter((x) => x.tier === 2).length
+  const durMs = input.averageParseDurationMs
+  const durSt =
+    durMs >= thresholds.averageParseDurationMsFailing
+      ? 'failing'
+      : durMs >= thresholds.averageParseDurationMsDegraded
+        ? 'degraded'
+        : 'ok'
+  bump(durSt, 14, 32, 'slow_average_parse_duration')
 
-  let score: number
-  if (adjustedStatus === 'healthy') {
-    score = 100
-  } else if (adjustedStatus === 'degraded') {
-    score = Math.max(35, 78 - degradedOnlySignals * 7 - failingSignals * 4)
-  } else {
-    score = Math.max(5, 32 - failingSignals * 6)
+  bump(
+    axisState(
+      input.duplicateSuppressionAnomalyRate,
+      thresholds.duplicateSuppressionAnomalyDegraded,
+      thresholds.duplicateSuppressionAnomalyFailing
+    ),
+    12,
+    28,
+    'duplicate_suppression_anomaly'
+  )
+
+  const score = Math.max(0, Math.min(100, Math.round(100 - penalty)))
+
+  let status: ParserHealthStatus = 'healthy'
+  if (worst === 'failing' || score < 42) {
+    status = 'failing'
+  } else if (worst === 'degraded' || score < 78 || reasons.length > 0) {
+    status = 'degraded'
   }
 
   return {
-    status: adjustedStatus,
+    status,
     score,
-    reasons: uniqueReasons,
+    reasons: sortedUniqueReasons(reasons),
   }
 }

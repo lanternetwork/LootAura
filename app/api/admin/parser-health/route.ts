@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { assertCronAuthorized, isCronAuthorized } from '@/lib/auth/cron'
-import { buildParserDiagnosticsFromFixtures } from '@/lib/parserRegression/buildParserDiagnostics'
+import {
+  buildParserHealthAdminApiResponse,
+  buildParserHealthDiagnosticsPayload,
+} from '@/lib/parserRegression/parserDiagnosticsAggregate'
+import type { RuntimeParserSignalsByHost } from '@/lib/parserRegression/parserDiagnosticsAggregate'
 import { parserRegressionPackageRoot } from '@/lib/parserRegression/parserRegressionHarness'
-import { reportParserHealthTransition } from '@/lib/parserRegression/reportParserHealth'
+import { scanParserRegressionFixtures } from '@/lib/parserRegression/parserFixtureScan'
+import { reportParserHealthTransitions } from '@/lib/parserRegression/reportParserHealth'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 
@@ -21,38 +26,57 @@ async function assertAdminOrCron(request: NextRequest): Promise<void> {
   await assertAdminOrThrow(request)
 }
 
+type ParserHealthBody = {
+  runtimeByHost?: RuntimeParserSignalsByHost
+}
+
 async function parserHealthHandler(request: NextRequest) {
   try {
     await assertAdminOrCron(request)
   } catch (error) {
     if (error instanceof NextResponse) {
-      const status = error.status
-      if (status === 401) return jsonError(401, 'UNAUTHORIZED', 'Unauthorized')
-      if (status === 403) return jsonError(403, 'FORBIDDEN', 'Admin access required')
-      if (status === 500) return error
-      return jsonError(status, 'AUTH_ERROR', 'Authentication failed')
+      return error
     }
     return jsonError(403, 'FORBIDDEN', 'Admin access required')
   }
 
-  const nowMs = Date.now()
-  let snapshot
-  try {
-    snapshot = buildParserDiagnosticsFromFixtures(parserRegressionPackageRoot(), nowMs)
-  } catch (error) {
-    return jsonError(500, 'DIAGNOSTICS_FAILED', error instanceof Error ? error.message : 'Diagnostics failed')
+  let runtimeByHost: RuntimeParserSignalsByHost | undefined
+  if (request.method === 'POST') {
+    try {
+      const body = (await request.json()) as ParserHealthBody
+      if (body && typeof body === 'object' && body.runtimeByHost && typeof body.runtimeByHost === 'object') {
+        runtimeByHost = body.runtimeByHost
+      }
+    } catch {
+      runtimeByHost = undefined
+    }
   }
 
-  reportParserHealthTransition(snapshot, nowMs)
-
-  return NextResponse.json({
-    ok: true,
-    sources: snapshot.sources,
-    summary: snapshot.summary,
-    degradedSources: snapshot.degradedSources,
-    failingSources: snapshot.failingSources,
-    recommendedAction: snapshot.recommendedAction,
+  const root = parserRegressionPackageRoot()
+  const scanned = scanParserRegressionFixtures(root)
+  const evaluatedAtMs = Date.now()
+  const payload = buildParserHealthDiagnosticsPayload({
+    evaluatedAtMs,
+    fixtures: scanned.ok,
+    invalid: scanned.invalid,
+    runtimeByHost,
   })
+
+  const reportToSentry = request.nextUrl.searchParams.get('report') === '1'
+  reportParserHealthTransitions(
+    payload.sources.map((s) => ({
+      sourceHost: s.sourceHost,
+      combinedHealth: s.healthStatus,
+      fixtureFreshness: s.freshnessStatus,
+      reasons: s.reasonList,
+    })),
+    evaluatedAtMs,
+    { reportToSentry }
+  )
+
+  const body = buildParserHealthAdminApiResponse(payload)
+  return NextResponse.json(body)
 }
 
 export const GET = withRateLimit(parserHealthHandler, [Policies.ADMIN_TOOLS, Policies.ADMIN_HOURLY])
+export const POST = withRateLimit(parserHealthHandler, [Policies.ADMIN_TOOLS, Policies.ADMIN_HOURLY])

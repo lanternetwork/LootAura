@@ -1,6 +1,6 @@
 # Operations Guide
 
-**Last updated: 2026-05-09**
+**Last updated: 2026-05-12**
 
 ## Rate Limiting Operations
 
@@ -362,7 +362,7 @@ Records are written by `emitObservabilityRecord` (`lib/observability/emit.ts`) a
 | Geocode | `geocode.worker.batch_*`, `geocode.queue.batch_completed` | `claimed`, `batchSize`, `durationMs`, `queuePressureClass`, Redis depths |
 | Publish | `publish.worker.batch_completed` | `attempted`, `succeeded`, `failed`, `skipped`, `expired`, `durationMs` |
 | Archive | `archive.sales.batch_iteration`, `job_summary`, `stale_pending_after_job`, `max_iterations` | `archived`, `batchesRun`, `stalePendingTotalAfter`, `maxIterationsHit` |
-| Parser / source | `parser.source.*`, `parser.regression.fixture_mismatch`, **`parser.source.degraded`**, **`parser.source.failing`**, **`parser.fixture.stale`**, **`parser.source.recovered`**, `ingestion.external_page_source.persist_summary` | Counts, `tMs`, aggregate source counts (no raw HTML); fixture regression ids |
+| Parser / source | `parser.source.*`, `parser.fixture.*`, `ingestion.external_page_source.persist_summary` | `parserVersion`, `adapter`, `pageHostHash` (no raw HTML), duplicate counts, `parseDurationMsTotal` |
 | Queue | Geocode queue batch events include depth and pressure | `queueDepthBeforeTotal`, `redisStarvationSignal` |
 | API | `api.sales.*.latency`, `api.cron.daily.hit`, `api.cron.geocode.hit`, `api.admin.archive.trigger.hit` | `durationMs`, `cacheHit`, `resultCount`, `errorCount`, `degradedMode`, `phase` |
 
@@ -402,22 +402,67 @@ Daily cron builds one bundle and passes the same ids into archive, ingestion per
 3. **`ingestion.external_page_source.zero_listings_page`** — successful parse but no listings (`invalidListingCount` may still be positive).
 4. **`parser.source.duplicate_suppressed`** — URL or unique-constraint dedupe counts.
 5. **`parser.source.normalization_warning`** — aggregated listing-level normalization signals (for example `cityConflict`).
-6. **`parser.source.degraded` / `parser.source.failing` / `parser.source.recovered`** — aggregate parser-source health transitions (emitted only when the admin parser-health aggregate changes; no per-row spam).
-7. **`parser.fixture.stale`** — aggregate signal when regression fixtures exceed freshness SLA (`captured_at` in `metadata.json`).
-8. **`GET /api/admin/parser-health`** — admin or `CRON_SECRET` bearer; JSON with `sources[]`, `summary`, `recommendedAction`; no page bodies.
+6. **`parser.source.degraded` / `parser.source.failing` / `parser.source.recovered`** — aggregate parser/source health transitions (hostname hash only; no URLs, no HTML).
+7. **`parser.fixture.stale`** — fixture `captured_at` age crossed the stale threshold (Tier 0 fixture freshness).
 
-### Tier 0 parser health & fixture freshness (reference)
+### Parser health, fixture freshness, and drift (Tier 0)
 
-- **Scoring:** `lib/parserRegression/parserHealth.ts` classifies **`healthy` / `degraded` / `failing`** from deterministic rate/duration thresholds; invalid aggregates **fail closed** to `failing` + `invalid_metrics`.
-- **Fixture metadata:** `lib/parserRegression/fixtureFreshness.ts` + harness — every fixture **`metadata.json`** must include **`captured_at`** (ISO 8601) and **`source_host`** (hostname); optional `parser_version`, `source_type`. Malformed files **fail** `loadParserFixture`.
-- **Freshness buckets:** default **90d** `fresh`, **180d** `aging`, older `stale` (deterministic `evaluateFixtureFreshness`).
-- **Degradation tags:** `lib/parserRegression/sourceDegradation.ts` — `likely_selector_drift`, `source_outage`, `unsupported_layout_evolution`, `extraction_collapse` with operator **`recommendedAction`** strings.
-- **Remediation:** refresh golden fixtures, bump `captured_at`, extend `external_page_source` selectors with a new case under `tests/fixtures/parsers/`, then re-run parser regression tests / CI.
-- **Telemetry wiring:** `lib/parserRegression/reportParserHealth.ts` — Sentry uses the same conservative fingerprinting style as ingestion health (no fixture HTML).
+**Purpose:** Detect extraction drift and stale fixtures *before* silent parser decay. Scoring is **deterministic** (no ML). **Sparse transition reporting** fires only when aggregate health *changes* along allowed edges (see below)—not on every poll, fixture row, or parse.
 
-### Operational flow
+**Semantics**
 
-1. Pick a **`correlationId`** or **`requestId`** from an alert or slow request.
+| Status | Meaning |
+|--------|---------|
+| **healthy** | Parser signals within thresholds; fixtures **fresh** (age below aging threshold). |
+| **degraded** | Elevated parser rates (zero-listings, selector drift, duration, etc.) or **aging** fixtures—investigate before production impact. |
+| **failing** | Invalid metrics, critical parser rates, **stale** fixtures (combined operational view), or invalid fixture metadata—**fail closed**; treat as extraction collapse risk. |
+
+**Combined vs parser-only (admin API)** — `GET/POST /api/admin/parser-health` returns per-host **`parserStatus`** (classifier-only) and **`freshnessStatus`**, plus **`healthStatus`** internally for transitions. **Transition telemetry** uses the **combined** operational status (parser + freshness + invalid metadata), aligned with `combineParserHealthAndFreshness` in diagnostics aggregation.
+
+**Sparse telemetry transitions** (`lib/parserRegression/reportParserHealth.ts`)
+
+| Edge | Telemetry | Sentry (only if `report=1`) |
+|------|-----------|------------------------------|
+| **healthy → degraded** | `parser.source.degraded` | `captureMessage` (warning) |
+| **→ failing** (from any non-failing, e.g. degraded or healthy) | `parser.source.failing` | `captureException` (synthetic error, stable fingerprint) |
+| **degraded / failing → healthy** | `parser.source.recovered` | single `captureMessage` (info) |
+| **Freshness → stale** (first time stale) | `parser.fixture.stale` | none |
+
+- **Deduping:** in-memory cache per normalized host; **fingerprint** = host + combined status + freshness + **sorted reason tokens**. Repeated identical snapshots emit **nothing** (no per-row / per-fixture spam).
+- **Cold start:** first observation **healthy + fresh** seeds the cache **without** emit (avoids noisy green dashboards).
+- **Payloads:** `pageHostHash` and transition labels only—**no** raw HTML, **no** full URLs, **no** fixture bodies, **no** plaintext host in Sentry messages (hash in tags/extra only).
+- **Tests:** `resetParserHealthReporterForTests()` clears the in-memory cache.
+
+**`parser.fixture.stale` meaning** — At least one fixture for that host crossed the **stale** age threshold (`captured_at` vs evaluated time). Operators should refresh `raw.html` / `expected.json` and bump `captured_at` (see fixture refresh below).
+
+**Fixture metadata (`metadata.json`)** — required fields for every parser regression fixture:
+
+- **`captured_at`** — ISO 8601 capture time of the HTML snapshot (drives freshness).
+- **`source_host`** — plain hostname only (no path/query); used for aggregation and diagnostics.
+
+Optional: `parser_version`, `source_type`. Malformed metadata **fails** harness load and CI (no silent acceptance).
+
+**Operator flow**
+
+1. Call **`GET` or `POST /api/admin/parser-health`** (admin session or `CRON_SECRET` bearer). JSON response: **`ok`**, **`evaluatedAtMs`**, **`sources[]`**, **`summary`** (`healthy` / `degraded` / `failing` counts only). Each source includes **`sourceHost`**, **`parserStatus`**, **`freshnessStatus`**, **`score`**, **`reasons`**, **`fixtureCount`**. No raw HTML, no full URLs, no `pageHostHash` in this public JSON (hashes may appear only in structured logs).
+2. For deeper triage, use **repo-local** diagnostics builders or logs—not the slim admin JSON—for invalid fixture paths and degradation hints.
+3. If **`summary.failing`** or sustained **`summary.degraded`** — filter logs by **`pageHostHash`** on `parser.source.*` and `parser.fixture.stale` plus ingestion events (`ingestion.external_page_source.*`).
+4. **`?report=1`** on the admin parser-health URL enables **optional Sentry** for the transitions above (default: structured telemetry only).
+
+**Selector drift troubleshooting**
+
+- Confirm **`parser.regression.fixture_mismatch`** (CI) or **`parser.source.extraction_failure`** / **`zero_listings_page`** in production logs for the same host hash.
+- Re-capture **`raw.html`**, update **`expected.json`**, bump **`captured_at`**, and keep **`source_host`** aligned with the live listing hostname pattern.
+
+**Fixture refresh process**
+
+1. Fetch current page HTML (operator browser or approved tooling); store under `tests/fixtures/parsers/<adapter>/<case>/raw.html`.
+2. Run the parser locally or via CI; update **`expected.json`** to match normalized output.
+3. Set **`captured_at`** to the snapshot time and verify **`source_host`** matches the canonical hostname for aggregation.
+
+Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, `parser.source.failing`, `parser.source.recovered`, `parser.fixture.stale`).
+
+### Cross-service operational flow
 2. Filter logs for that id across cron, workers, and API latency events.
 3. For backlog stalls: compare **Redis queue** telemetry versus **DB geocode worker** `claimed` and `queuePressureClass`.
 4. For archive backlog: use **`stalePendingTotalAfter`** and **`maxIterationsHit`** on `archive.sales.job_summary`.

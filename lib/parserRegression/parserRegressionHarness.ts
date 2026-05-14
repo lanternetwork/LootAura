@@ -7,12 +7,16 @@ import {
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
+import {
+  validateFixtureFreshnessMetadata,
+  validateParserFixtureMetadataJson,
+  type ValidatedParserFixtureMetadata,
+} from '@/lib/parserRegression/fixtureFreshness'
 import { normalizeExternalPageParseResult } from '@/lib/parserRegression/normalizeExternalPageParseResult'
 import {
   classifyExternalPageSourceRegressionGap,
   type ParserRegressionFailureKind,
 } from '@/lib/parserRegression/parserFailureTaxonomy'
-import { validateParserFixtureMetadata } from '@/lib/parserRegression/fixtureFreshness'
 
 /**
  * Repo package root (directory containing `tests/fixtures/parsers`).
@@ -22,16 +26,7 @@ export function parserRegressionPackageRoot(): string {
   return process.cwd()
 }
 
-export type ParserFixtureMetadata = {
-  pageUrl: string
-  config: ExternalPageSourceIngestionConfig
-  /** ISO 8601 capture timestamp (required). */
-  captured_at: string
-  /** Normalized hostname for diagnostics aggregation (required). */
-  source_host: string
-  parser_version?: string
-  source_type?: string
-}
+export type ParserFixtureMetadata = ValidatedParserFixtureMetadata
 
 export function loadParserFixture(
   sourceDir: string,
@@ -47,24 +42,16 @@ export function loadParserFixture(
   const rawHtml = readFileSync(rawPath, 'utf8')
   const expected = JSON.parse(readFileSync(expectedPath, 'utf8')) as unknown
   const rawMeta = JSON.parse(readFileSync(metaPath, 'utf8')) as unknown
-  const validated = validateParserFixtureMetadata(rawMeta)
+  const label = `${sourceDir}/${caseId}`
+  const freshness = validateFixtureFreshnessMetadata(rawMeta)
+  if (!freshness.ok) {
+    throw new Error(`Invalid fixture metadata (${label}): ${freshness.errors.join('; ')}`)
+  }
+  const validated = validateParserFixtureMetadataJson(rawMeta)
   if (!validated.ok) {
-    throw new Error(`Invalid fixture metadata (${sourceDir}/${caseId}): ${validated.error}`)
+    throw new Error(`Invalid fixture metadata (${label}): ${validated.errors.join('; ')}`)
   }
-  const m = validated.metadata
-  const ro = rawMeta as Record<string, unknown>
-  const metadata: ParserFixtureMetadata = {
-    pageUrl: m.pageUrl,
-    config: m.config as unknown as ExternalPageSourceIngestionConfig,
-    captured_at: String(ro.captured_at ?? '').trim(),
-    source_host: m.sourceHost,
-    ...(typeof ro.parser_version === 'string' && ro.parser_version.trim()
-      ? { parser_version: ro.parser_version.trim() }
-      : {}),
-    ...(typeof ro.source_type === 'string' && ro.source_type.trim()
-      ? { source_type: ro.source_type.trim() }
-      : {}),
-  }
+  const metadata = validated.metadata
   return { rawHtml, expected, metadata }
 }
 
@@ -74,7 +61,11 @@ export function runExternalPageSourceFixture(sourceDir: string, caseId: string):
   metadata: ParserFixtureMetadata
 } {
   const { rawHtml, expected, metadata } = loadParserFixture(sourceDir, caseId)
-  const parsed = parseExternalPageSourceHtml(rawHtml, metadata.config, metadata.pageUrl)
+  const parsed = parseExternalPageSourceHtml(
+    rawHtml,
+    metadata.config as ExternalPageSourceIngestionConfig,
+    metadata.pageUrl
+  )
   const actual = normalizeExternalPageParseResult(parsed)
   if (typeof expected !== 'object' || expected === null) {
     throw new Error('expected.json must be a JSON object')
@@ -117,8 +108,14 @@ export function classifyFixtureParseGap(
   caseId: string
 ): ParserRegressionFailureKind | null {
   const { rawHtml, metadata } = loadParserFixture(sourceDir, caseId)
-  const parsed = parseExternalPageSourceHtml(rawHtml, metadata.config, metadata.pageUrl)
-  const stateSeg = resolveUsListStatePathSegment(metadata.config.state)
+  const parsed = parseExternalPageSourceHtml(
+    rawHtml,
+    metadata.config as ExternalPageSourceIngestionConfig,
+    metadata.pageUrl
+  )
+  const stateSeg = resolveUsListStatePathSegment(
+    (metadata.config as ExternalPageSourceIngestionConfig).state
+  )
   return classifyExternalPageSourceRegressionGap(rawHtml, parsed, {
     stateResolved: Boolean(stateSeg),
   })

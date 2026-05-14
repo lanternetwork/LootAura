@@ -1,109 +1,261 @@
 /**
- * Tier 0 deterministic source degradation classification (pure).
+ * Source degradation view: combines parser health + fixture freshness (pure).
  */
 
-import type { ParserHealthCounts, ParserHealthReason, ParserHealthStatus } from '@/lib/parserRegression/parserHealth'
-import type { FixtureFreshnessReason, FixtureFreshnessStatus } from '@/lib/parserRegression/fixtureFreshness'
+import type { FixtureFreshnessStatus } from '@/lib/parserRegression/fixtureFreshness'
+import type {
+  ParserHealthCounts,
+  ParserHealthReason,
+  ParserHealthResult,
+  ParserHealthStatus,
+} from '@/lib/parserRegression/parserHealth'
+
+export type RecommendedParserAction =
+  | 'none'
+  | 'refresh_fixtures'
+  | 'inspect_selectors'
+  | 'verify_source_availability'
+  | 'review_parser_thresholds'
+  | 'investigate_extraction_collapse'
+
+export type SourceParserHealthBundle = {
+  sourceHost: string
+  parserHealth: ParserHealthResult
+  worstFixtureFreshness: FixtureFreshnessStatus
+  /** True when any fixture metadata for this host failed validation. */
+  hasInvalidFixtureMetadata: boolean
+  fixtureCount: number
+}
+
+export type SourceDegradationResult = {
+  degradedSources: string[]
+  failingSources: string[]
+  recommendedAction: RecommendedParserAction
+  likelySelectorDriftHosts: string[]
+  likelySourceOutageHosts: string[]
+  likelyUnsupportedLayoutHosts: string[]
+  likelyExtractionCollapseHosts: string[]
+}
 
 export type SourceDegradationTag =
-  | 'likely_selector_drift'
+  | 'selector_drift'
   | 'source_outage'
-  | 'unsupported_layout_evolution'
+  | 'unsupported_layout'
   | 'extraction_collapse'
+  | 'fixture_freshness'
+  | 'metadata_invalid'
 
-function clamp01(n: number): number {
-  if (!Number.isFinite(n) || n < 0) return 0
-  return Math.min(1, n)
+function rankFreshness(a: FixtureFreshnessStatus, b: FixtureFreshnessStatus): FixtureFreshnessStatus {
+  const order: Record<FixtureFreshnessStatus, number> = { fresh: 0, aging: 1, stale: 2 }
+  return order[a] >= order[b] ? a : b
+}
+
+/**
+ * Combine parser health + worst per-host fixture freshness into operational severity.
+ */
+export function combineParserHealthAndFreshness(
+  parser: ParserHealthResult,
+  freshness: FixtureFreshnessStatus,
+  hasInvalidFixtureMetadata: boolean
+): ParserHealthStatus {
+  if (hasInvalidFixtureMetadata || parser.status === 'failing') return 'failing'
+  if (parser.status === 'degraded' || freshness === 'stale') return 'degraded'
+  if (freshness === 'aging') return 'degraded'
+  return parser.status
+}
+
+function reasonJoin(reasons: ParserHealthReason[]): string {
+  return reasons.join('|')
+}
+
+function tagsForParserReasons(reasons: ParserHealthReason[]): SourceDegradationTag[] {
+  const tags = new Set<SourceDegradationTag>()
+  const rj = reasonJoin(reasons)
+  if (rj.includes('high_selector_missing_rate')) tags.add('selector_drift')
+  if (rj.includes('high_zero_listing_rate')) tags.add('source_outage')
+  if (rj.includes('high_unsupported_layout_rate')) tags.add('unsupported_layout')
+  if (
+    rj.includes('high_fixture_mismatch_rate') ||
+    rj.includes('high_malformed_source_rate') ||
+    rj.includes('duplicate_suppression_anomaly') ||
+    rj.includes('invalid_metrics')
+  ) {
+    tags.add('extraction_collapse')
+  }
+  return [...tags].sort()
+}
+
+function pickRecommendedAction(
+  failing: string[],
+  degraded: string[],
+  selectorDrift: string[],
+  outage: string[],
+  layout: string[],
+  collapse: string[]
+): RecommendedParserAction {
+  if (failing.length > 0) {
+    if (collapse.length > 0 || outage.length > 0) return 'verify_source_availability'
+    if (selectorDrift.length > 0) return 'inspect_selectors'
+    if (layout.length > 0) return 'review_parser_thresholds'
+    return 'investigate_extraction_collapse'
+  }
+  if (degraded.length > 0) {
+    if (selectorDrift.length > 0) return 'inspect_selectors'
+    return 'refresh_fixtures'
+  }
+  return 'none'
+}
+
+/**
+ * Deterministic aggregation across hosts (no side effects).
+ */
+export function detectSourceDegradation(bundles: SourceParserHealthBundle[]): SourceDegradationResult {
+  const degradedSources: string[] = []
+  const failingSources: string[] = []
+  const likelySelectorDriftHosts: string[] = []
+  const likelySourceOutageHosts: string[] = []
+  const likelyUnsupportedLayoutHosts: string[] = []
+  const likelyExtractionCollapseHosts: string[] = []
+
+  for (const b of bundles) {
+    const combined = combineParserHealthAndFreshness(
+      b.parserHealth,
+      b.worstFixtureFreshness,
+      b.hasInvalidFixtureMetadata
+    )
+    if (combined === 'failing') {
+      failingSources.push(b.sourceHost)
+    } else if (combined === 'degraded') {
+      degradedSources.push(b.sourceHost)
+    }
+
+    const rj = reasonJoin(b.parserHealth.reasons)
+    if (rj.includes('high_selector_missing_rate')) {
+      likelySelectorDriftHosts.push(b.sourceHost)
+    }
+    if (rj.includes('high_zero_listing_rate')) {
+      likelySourceOutageHosts.push(b.sourceHost)
+    }
+    if (rj.includes('high_unsupported_layout_rate')) {
+      likelyUnsupportedLayoutHosts.push(b.sourceHost)
+    }
+    if (
+      rj.includes('high_fixture_mismatch_rate') ||
+      rj.includes('high_malformed_source_rate') ||
+      rj.includes('duplicate_suppression_anomaly') ||
+      rj.includes('invalid_metrics')
+    ) {
+      likelyExtractionCollapseHosts.push(b.sourceHost)
+    }
+    if (b.hasInvalidFixtureMetadata) {
+      likelyExtractionCollapseHosts.push(b.sourceHost)
+    }
+  }
+
+  const uniq = (xs: string[]) => [...new Set(xs)].sort()
+
+  return {
+    degradedSources: uniq(degradedSources),
+    failingSources: uniq(failingSources),
+    likelySelectorDriftHosts: uniq(likelySelectorDriftHosts),
+    likelySourceOutageHosts: uniq(likelySourceOutageHosts),
+    likelyUnsupportedLayoutHosts: uniq(likelyUnsupportedLayoutHosts),
+    likelyExtractionCollapseHosts: uniq(likelyExtractionCollapseHosts),
+    recommendedAction: pickRecommendedAction(
+      uniq(failingSources),
+      uniq(degradedSources),
+      uniq(likelySelectorDriftHosts),
+      uniq(likelySourceOutageHosts),
+      uniq(likelyUnsupportedLayoutHosts),
+      uniq(likelyExtractionCollapseHosts)
+    ),
+  }
+}
+
+export function rollupWorstFixtureFreshness(statuses: FixtureFreshnessStatus[]): FixtureFreshnessStatus {
+  return statuses.reduce((acc, s) => rankFreshness(acc, s), 'fresh' as FixtureFreshnessStatus)
 }
 
 export function buildSourceDegradationRow(params: {
   sourceHost: string
-  health: { status: ParserHealthStatus; score: number; reasons: ParserHealthReason[] }
+  health: ParserHealthResult
   freshnessStatus: FixtureFreshnessStatus
-  freshnessReasons: FixtureFreshnessReason[]
+  freshnessReasons: readonly string[]
   counts: ParserHealthCounts
-}): { tags: SourceDegradationTag[]; recommendedAction: string } {
-  const t = Math.max(1, params.counts.total)
-  const mismatchR = clamp01(params.counts.fixtureMismatch / t)
-  const zeroR = clamp01(params.counts.zeroListings / t)
-  const selR = clamp01(params.counts.selectorMissing / t)
-  const unsR = clamp01(params.counts.unsupportedLayout / t)
-  const meanMs = params.counts.parseDurationSumMs / t
-
-  const tags: SourceDegradationTag[] = []
-  const reasons = new Set(params.health.reasons)
-
-  if (selR >= 0.08 && (mismatchR >= 0.08 || reasons.has('high_fixture_mismatch_rate'))) {
-    tags.push('likely_selector_drift')
+}): { tags: SourceDegradationTag[]; recommendedAction: RecommendedParserAction } {
+  const tags = new Set(tagsForParserReasons(params.health.reasons))
+  if (params.freshnessStatus === 'aging' || params.freshnessStatus === 'stale') {
+    tags.add('fixture_freshness')
   }
-  if (zeroR >= 0.25 && (reasons.has('parse_duration_degraded') || meanMs >= 1200)) {
-    tags.push('source_outage')
-  }
-  if (unsR >= 0.08 || reasons.has('high_unsupported_layout_rate')) {
-    tags.push('unsupported_layout_evolution')
-  }
-  if (zeroR >= 0.35 || (reasons.has('high_zero_listing_rate') && reasons.has('high_extraction_empty_rate'))) {
-    tags.push('extraction_collapse')
+  if (params.sourceHost === '__invalid_metadata__') {
+    tags.add('metadata_invalid')
   }
 
-  let recommendedAction = 'monitor_parser_regression_pass_rate'
-  if (params.health.status === 'failing' || params.freshnessStatus === 'stale') {
-    if (tags.includes('likely_selector_drift')) {
-      recommendedAction = 'refresh_fixtures_and_audit_selectors'
-    } else if (tags.includes('extraction_collapse')) {
-      recommendedAction = 'investigate_extraction_pipeline_and_source_availability'
-    } else if (tags.includes('unsupported_layout_evolution')) {
-      recommendedAction = 'add_fixture_for_new_layout_and_update_parser'
-    } else if (tags.includes('source_outage')) {
-      recommendedAction = 'verify_source_reachability_and_fetch_path'
-    } else if (params.freshnessReasons.some((r) => r === 'invalid_captured_at' || r === 'invalid_source_host' || r === 'metadata_shape_invalid')) {
-      recommendedAction = 'repair_fixture_metadata_captured_at_source_host'
-    } else {
-      recommendedAction = 'refresh_stale_fixtures_and_re_run_regression'
-    }
-  } else if (params.health.status === 'degraded' || params.freshnessStatus === 'aging') {
-    recommendedAction = 'schedule_fixture_refresh_and_watch_rates'
+  const bundle: SourceParserHealthBundle = {
+    sourceHost: params.sourceHost,
+    parserHealth: params.health,
+    worstFixtureFreshness: params.freshnessStatus,
+    hasInvalidFixtureMetadata: params.sourceHost === '__invalid_metadata__',
+    fixtureCount: Math.max(1, params.counts.total),
   }
-
-  return { tags: [...new Set(tags)], recommendedAction }
+  const { recommendedAction } = detectSourceDegradation([bundle])
+  return { tags: [...tags].sort(), recommendedAction }
 }
 
-export function summarizeSourceDegradation(
-  rows: Array<{
-    sourceHost: string
-    healthStatus: ParserHealthStatus
-    freshnessStatus: FixtureFreshnessStatus
-    tags: SourceDegradationTag[]
-    recommendedAction: string
-  }>
-): { degradedSources: string[]; failingSources: string[]; recommendedAction: string } {
-  const failingSources = [
-    ...new Set(
-      rows
-        .filter((r) => r.healthStatus === 'failing' || r.freshnessStatus === 'stale')
-        .map((r) => r.sourceHost)
-    ),
-  ].sort()
-  const degradedSources = [
-    ...new Set(
-      rows
-        .filter(
-          (r) =>
-            (r.healthStatus === 'degraded' || r.freshnessStatus === 'aging') &&
-            !failingSources.includes(r.sourceHost)
-        )
-        .map((r) => r.sourceHost)
-    ),
-  ].sort()
+export type SourceDegradationSummaryInput = {
+  sourceHost: string
+  healthStatus: ParserHealthStatus
+  freshnessStatus: FixtureFreshnessStatus
+  tags: SourceDegradationTag[]
+  recommendedAction: RecommendedParserAction
+}
 
-  let recommendedAction = 'monitor_parser_regression_pass_rate'
-  if (failingSources.length > 0) {
-    const first = rows.find((r) => failingSources.includes(r.sourceHost))
-    recommendedAction = first?.recommendedAction ?? recommendedAction
-  } else if (degradedSources.length > 0) {
-    const first = rows.find((r) => degradedSources.includes(r.sourceHost))
-    recommendedAction = first?.recommendedAction ?? 'schedule_fixture_refresh_and_watch_rates'
+function combinedFixtureStatus(
+  healthStatus: ParserHealthStatus,
+  freshnessStatus: FixtureFreshnessStatus
+): ParserHealthStatus {
+  if (healthStatus === 'failing' || freshnessStatus === 'stale') return 'failing'
+  if (healthStatus === 'degraded' || freshnessStatus === 'aging') return 'degraded'
+  return healthStatus
+}
+
+/**
+ * Roll up per-source rows into host lists + a single deterministic recommended action.
+ */
+export function summarizeSourceDegradation(rows: SourceDegradationSummaryInput[]): {
+  degradedSources: string[]
+  failingSources: string[]
+  recommendedAction: RecommendedParserAction
+} {
+  const failingSources: string[] = []
+  const degradedSources: string[] = []
+  const sorted = [...rows].sort((a, b) => a.sourceHost.localeCompare(b.sourceHost))
+
+  for (const r of sorted) {
+    const c = combinedFixtureStatus(r.healthStatus, r.freshnessStatus)
+    if (c === 'failing') failingSources.push(r.sourceHost)
+    else if (c === 'degraded') degradedSources.push(r.sourceHost)
   }
 
-  return { degradedSources, failingSources, recommendedAction }
+  const uniq = (xs: string[]) => [...new Set(xs)].sort()
+  const failingU = uniq(failingSources)
+  const degradedU = uniq(degradedSources)
+
+  const selectorDrift = sorted.filter((r) => r.tags.includes('selector_drift')).map((r) => r.sourceHost)
+  const outage = sorted.filter((r) => r.tags.includes('source_outage')).map((r) => r.sourceHost)
+  const layout = sorted.filter((r) => r.tags.includes('unsupported_layout')).map((r) => r.sourceHost)
+  const collapse = sorted.filter((r) => r.tags.includes('extraction_collapse')).map((r) => r.sourceHost)
+
+  return {
+    failingSources: failingU,
+    degradedSources: degradedU,
+    recommendedAction: pickRecommendedAction(
+      failingU,
+      degradedU,
+      uniq(selectorDrift),
+      uniq(outage),
+      uniq(layout),
+      uniq(collapse)
+    ),
+  }
 }

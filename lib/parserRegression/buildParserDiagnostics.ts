@@ -34,6 +34,7 @@ import {
   summarizeSourceDegradation,
   type SourceDegradationTag,
 } from '@/lib/parserRegression/sourceDegradation'
+import { reportParserHealthTransitions } from '@/lib/parserRegression/reportParserHealth'
 
 export type ParserDiagnosticsFixtureSample = {
   sourceDir: string
@@ -124,11 +125,7 @@ function processFixtureFile(
     freshness = { status: fr.status, reasons: fr.reasons }
   } else {
     sourceHost = validated.metadata.sourceHost
-    freshness = evaluateFixtureFreshness(
-      validated.metadata.capturedAtMs,
-      nowMs,
-      defaultFixtureFreshnessThresholds()
-    )
+    freshness = evaluateFixtureFreshness(validated.metadata.capturedAtIso, nowMs, defaultFixtureFreshnessThresholds())
   }
 
   let agg = hostAggs.get(sourceHost)
@@ -162,7 +159,7 @@ function processFixtureFile(
   }
 
   const meta = validated.metadata
-  const config = meta.config as unknown as ExternalPageSourceIngestionConfig
+  const config = meta.config as ExternalPageSourceIngestionConfig
   const t0 = Date.now()
   const parsed = parseExternalPageSourceHtml(rawHtml, config, meta.pageUrl)
   const parseDurationMs = Math.max(0, Date.now() - t0)
@@ -295,6 +292,26 @@ export function buildParserDiagnosticsFromFixtures(packageRoot: string, nowMs: n
       tags: s.degradationTags,
       recommendedAction: s.recommendedAction,
     }))
+  )
+
+  reportParserHealthTransitions(
+    sources.map((s) => {
+      const combined: ParserHealthStatus =
+        s.healthStatus === 'failing' || s.freshnessStatus === 'stale'
+          ? 'failing'
+          : s.healthStatus === 'degraded' || s.freshnessStatus === 'aging'
+            ? 'degraded'
+            : 'healthy'
+      const reasons = [...s.healthReasons.map(String), ...s.freshnessReasons.map(String)]
+      return {
+        sourceHost: s.sourceHost,
+        combinedHealth: combined,
+        fixtureFreshness: s.freshnessStatus,
+        reasons,
+      }
+    }),
+    nowMs,
+    { reportToSentry: false }
   )
 
   return {

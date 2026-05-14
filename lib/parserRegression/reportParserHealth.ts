@@ -1,124 +1,181 @@
 /**
- * Sparse parser health reporting: aggregate transitions only, in-process dedupe, conservative Sentry.
+ * Sparse parser/source health transition reporting (aggregate hosts only).
+ * Dedupes by deterministic fingerprint; emits telemetry + optional Sentry on allowed edges only.
  */
 
-import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
-import { ObservabilityEvents, type ObservabilityEventName } from '@/lib/observability/events'
-import type { ParserDiagnosticsSnapshot } from '@/lib/parserRegression/buildParserDiagnostics'
 import * as Sentry from '@sentry/nextjs'
+import { emitObservabilityRecord, buildTelemetryRecord } from '@/lib/observability/emit'
+import { ObservabilityEvents } from '@/lib/observability/events'
+import { hashHostForLog } from '@/lib/ingestion/adapters/externalPageSafeFetch'
+import type { FixtureFreshnessStatus } from '@/lib/parserRegression/fixtureFreshness'
+import type { ParserHealthStatus } from '@/lib/parserRegression/parserHealth'
 
-type LastSignature = {
-  failing: number
-  degraded: number
-  healthy: number
-  staleFixtureTotal: number
+export type ParserSourceEmissionSnapshot = {
+  sourceHost: string
+  combinedHealth: ParserHealthStatus
+  fixtureFreshness: FixtureFreshnessStatus
+  /** Classifier + freshness reason tokens; order ignored (sorted for fingerprint). */
+  reasons: readonly string[]
 }
 
-let lastSig: LastSignature | null = null
+type LastEmitted = {
+  combinedHealth: ParserHealthStatus
+  freshness: FixtureFreshnessStatus
+  fingerprint: string
+  emittedAtMs: number
+}
+
+const lastByHost = new Map<string, LastEmitted>()
 
 export function resetParserHealthReporterForTests(): void {
-  lastSig = null
+  lastByHost.clear()
 }
 
-function signatureOf(snapshot: ParserDiagnosticsSnapshot): LastSignature {
-  const staleFixtureTotal = snapshot.sources.reduce((a, s) => a + s.staleFixtureCount, 0)
-  return {
-    failing: snapshot.summary.failing,
-    degraded: snapshot.summary.degraded,
-    healthy: snapshot.summary.healthy,
-    staleFixtureTotal,
+function normalizeHost(sourceHost: string): string {
+  return sourceHost.trim().toLowerCase()
+}
+
+function reasonsKey(reasons: readonly string[]): string {
+  return [...reasons].map((r) => String(r).trim()).filter(Boolean).sort().join('\u001e')
+}
+
+/** Deterministic dedupe key: host + combined status + freshness + sorted reasons. */
+export function parserHealthTransitionFingerprint(
+  sourceHost: string,
+  combinedHealth: ParserHealthStatus,
+  fixtureFreshness: FixtureFreshnessStatus,
+  reasons: readonly string[]
+): string {
+  const host = normalizeHost(sourceHost)
+  return `${host}|${combinedHealth}|${fixtureFreshness}|${reasonsKey(reasons)}`
+}
+
+function maybeEmitSentry(
+  from: ParserHealthStatus,
+  to: ParserHealthStatus,
+  pageHostHash: string,
+  reportToSentry: boolean,
+  kind: 'degraded' | 'failing' | 'recovered'
+): void {
+  if (!reportToSentry) return
+  const tags: Record<string, string> = {
+    parser_health_from: from,
+    parser_health_to: to,
+    page_host_hash: pageHostHash,
   }
-}
+  const extra = { from, to, pageHostHash }
 
-function sameSig(a: LastSignature, b: LastSignature): boolean {
-  return (
-    a.failing === b.failing &&
-    a.degraded === b.degraded &&
-    a.healthy === b.healthy &&
-    a.staleFixtureTotal === b.staleFixtureTotal
-  )
-}
-
-function emit(name: ObservabilityEventName, fields: Record<string, unknown>): void {
-  emitObservabilityRecord(buildTelemetryRecord(name, fields))
-}
-
-function sentryFp(parts: string[]): string[] {
-  return ['parser-health', ...parts]
+  if (kind === 'failing') {
+    const err = new Error('LootAura parser health: failing')
+    Sentry.captureException(err, {
+      level: 'error',
+      fingerprint: ['parser-source-health', pageHostHash, 'failing'],
+      tags,
+      extra,
+    })
+    return
+  }
+  if (kind === 'recovered') {
+    Sentry.captureMessage('LootAura parser health: recovered', {
+      level: 'info',
+      fingerprint: ['parser-source-health', pageHostHash, 'recovered'],
+      tags,
+      extra,
+    })
+    return
+  }
+  Sentry.captureMessage('LootAura parser health: degraded', {
+    level: 'warning',
+    fingerprint: ['parser-source-health', pageHostHash, 'degraded'],
+    tags,
+    extra,
+  })
 }
 
 /**
- * Emits structured telemetry (and sparse Sentry messages) only when aggregate signature changes.
+ * Reports transitions per host (aggregate snapshots only; no per-fixture / per-row loops).
+ * Allowed telemetry edges: healthy→degraded, degraded→failing (and direct healthy→failing),
+ * failing→healthy, degraded→healthy; fixture stale when freshness first becomes stale.
+ * First observation healthy+fresh seeds cache without emit (cold-start anti-spam).
  */
-export function reportParserHealthTransition(snapshot: ParserDiagnosticsSnapshot, nowMs: number): void {
-  const next = signatureOf(snapshot)
-  const prev = lastSig
-  if (prev && sameSig(prev, next)) {
-    return
+export function reportParserHealthTransitions(
+  snapshots: ParserSourceEmissionSnapshot[],
+  nowMs: number,
+  options?: { reportToSentry?: boolean }
+): void {
+  const reportToSentry = options?.reportToSentry === true
+  for (const snap of snapshots) {
+    const host = normalizeHost(snap.sourceHost)
+    if (!host || host.startsWith('_')) continue
+
+    const pageHostHash = hashHostForLog(host)
+    const fp = parserHealthTransitionFingerprint(host, snap.combinedHealth, snap.fixtureFreshness, snap.reasons)
+    const prev = lastByHost.get(host)
+
+    if (prev && prev.fingerprint === fp) {
+      continue
+    }
+
+    const prevCombined: ParserHealthStatus = prev?.combinedHealth ?? 'healthy'
+    const prevFresh: FixtureFreshnessStatus = prev?.freshness ?? 'fresh'
+
+    if (!prev && snap.combinedHealth === 'healthy' && snap.fixtureFreshness === 'fresh') {
+      lastByHost.set(host, {
+        combinedHealth: snap.combinedHealth,
+        freshness: snap.fixtureFreshness,
+        fingerprint: fp,
+        emittedAtMs: nowMs,
+      })
+      continue
+    }
+
+    if (snap.fixtureFreshness === 'stale' && prevFresh !== 'stale') {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.parser.fixtureStale, {
+          pageHostHash,
+          transition: 'into_stale',
+        })
+      )
+    }
+
+    if (snap.combinedHealth === 'degraded' && prevCombined === 'healthy') {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.parser.sourceDegraded, {
+          pageHostHash,
+          transition: 'healthy_to_degraded',
+        })
+      )
+      maybeEmitSentry(prevCombined, 'degraded', pageHostHash, reportToSentry, 'degraded')
+    }
+
+    if (snap.combinedHealth === 'failing' && prevCombined !== 'failing') {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.parser.sourceFailing, {
+          pageHostHash,
+          transition: 'into_failing',
+        })
+      )
+      maybeEmitSentry(prevCombined, 'failing', pageHostHash, reportToSentry, 'failing')
+    }
+
+    if (
+      snap.combinedHealth === 'healthy' &&
+      (prevCombined === 'degraded' || prevCombined === 'failing')
+    ) {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.parser.sourceRecovered, {
+          pageHostHash,
+          transition: 'to_healthy',
+        })
+      )
+      maybeEmitSentry(prevCombined, 'healthy', pageHostHash, reportToSentry, 'recovered')
+    }
+
+    lastByHost.set(host, {
+      combinedHealth: snap.combinedHealth,
+      freshness: snap.fixtureFreshness,
+      fingerprint: fp,
+      emittedAtMs: nowMs,
+    })
   }
-
-  const baseFields = { tMs: nowMs }
-
-  const prevBad =
-    prev && (prev.failing > 0 || prev.degraded > 0 || prev.staleFixtureTotal > 0)
-  const nextGood = next.failing === 0 && next.degraded === 0 && next.staleFixtureTotal === 0
-  if (prevBad && nextGood) {
-    emit(ObservabilityEvents.parser.sourceRecovered, {
-      ...baseFields,
-      healthySourceCount: next.healthy,
-      phase: 'parser_aggregate',
-    })
-    Sentry.captureMessage('LootAura parser health: aggregate recovered', {
-      level: 'info',
-      fingerprint: sentryFp(['recovered', 'aggregate']),
-      tags: { parser_health: 'recovered' },
-      extra: { healthy: next.healthy },
-    })
-  }
-
-  const failingRising = (!prev || prev.failing === 0) && next.failing > 0
-  if (failingRising) {
-    emit(ObservabilityEvents.parser.sourceFailing, {
-      ...baseFields,
-      failingSourceCount: next.failing,
-      degradedSourceCount: next.degraded,
-      healthySourceCount: next.healthy,
-    })
-    Sentry.captureMessage('LootAura parser health: failing sources', {
-      level: 'error',
-      fingerprint: sentryFp(['failing']),
-      tags: { parser_health: 'failing' },
-      extra: { failing: next.failing, degraded: next.degraded },
-    })
-  }
-
-  const degradedRising =
-    (!prev || prev.degraded === 0) &&
-    next.degraded > 0 &&
-    next.failing === 0 &&
-    (!prev || prev.failing === 0)
-  if (degradedRising) {
-    emit(ObservabilityEvents.parser.sourceDegraded, {
-      ...baseFields,
-      degradedSourceCount: next.degraded,
-      healthySourceCount: next.healthy,
-    })
-    Sentry.captureMessage('LootAura parser health: degraded sources', {
-      level: 'warning',
-      fingerprint: sentryFp(['degraded']),
-      tags: { parser_health: 'degraded' },
-      extra: { degraded: next.degraded },
-    })
-  }
-
-  const staleRising = (!prev || prev.staleFixtureTotal === 0) && next.staleFixtureTotal > 0
-  if (staleRising) {
-    emit(ObservabilityEvents.parser.fixtureStale, {
-      ...baseFields,
-      staleFixtureTotal: next.staleFixtureTotal,
-      staleFixtureHostCount: snapshot.sources.filter((s) => s.staleFixtureCount > 0).length,
-    })
-  }
-
-  lastSig = next
 }

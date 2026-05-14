@@ -5,10 +5,14 @@ const { existsSyncMock, readFileSyncMock } = vi.hoisted(() => ({
   readFileSyncMock: vi.fn(),
 }))
 
-vi.mock('fs', () => ({
-  existsSync: existsSyncMock,
-  readFileSync: readFileSyncMock,
-}))
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>()
+  return {
+    ...actual,
+    existsSync: existsSyncMock,
+    readFileSync: readFileSyncMock,
+  }
+})
 
 import { loadParserFixture } from '@/lib/parserRegression/parserRegressionHarness'
 

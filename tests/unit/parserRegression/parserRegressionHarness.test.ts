@@ -1,18 +1,30 @@
-import * as fs from 'fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { existsSyncMock, readFileSyncMock } = vi.hoisted(() => ({
+  existsSyncMock: vi.fn(() => true),
+  readFileSyncMock: vi.fn(),
+}))
+
+vi.mock('fs', () => ({
+  existsSync: existsSyncMock,
+  readFileSync: readFileSyncMock,
+}))
+
 import { loadParserFixture } from '@/lib/parserRegression/parserRegressionHarness'
 
 describe('parserRegressionHarness loadParserFixture', () => {
   beforeEach(() => {
-    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    existsSyncMock.mockReturnValue(true)
+    readFileSyncMock.mockReset()
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    readFileSyncMock.mockReset()
+    existsSyncMock.mockReturnValue(true)
   })
 
   it('throws when captured_at is missing (freshness + harness validation)', () => {
-    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+    readFileSyncMock.mockImplementation((p) => {
       const s = String(p)
       if (s.endsWith('metadata.json')) {
         return JSON.stringify({
@@ -29,7 +41,7 @@ describe('parserRegressionHarness loadParserFixture', () => {
   })
 
   it('throws when source_host is missing', () => {
-    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+    readFileSyncMock.mockImplementation((p) => {
       const s = String(p)
       if (s.endsWith('metadata.json')) {
         return JSON.stringify({
@@ -46,7 +58,7 @@ describe('parserRegressionHarness loadParserFixture', () => {
   })
 
   it('throws when harness-required pageUrl or config is invalid after freshness passes', () => {
-    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+    readFileSyncMock.mockImplementation((p) => {
       const s = String(p)
       if (s.endsWith('metadata.json')) {
         return JSON.stringify({

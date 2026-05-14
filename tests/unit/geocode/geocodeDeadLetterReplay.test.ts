@@ -201,6 +201,8 @@ describe('runBoundedGeocodeDeadLetterReplay', () => {
     expect(result.attempted).toBe(1)
     expect(result.replayed).toBe(1)
     expect(result.skipped).toBe(1)
+    expect(result.updateErrors).toBe(0)
+    expect(result.lostRaces).toBe(0)
     expect(emitObservabilityRecord).toHaveBeenCalledWith(
       expect.objectContaining({ event: ObservabilityEvents.geocode.deadLetterReplayed, replayCount: 1 })
     )
@@ -238,6 +240,8 @@ describe('runBoundedGeocodeDeadLetterReplay', () => {
     const result = await runBoundedGeocodeDeadLetterReplay({ limit: 5, nowMs: now })
     expect(result.eligible).toBe(0)
     expect(result.replayed).toBe(0)
+    expect(result.updateErrors).toBe(0)
+    expect(result.lostRaces).toBe(0)
     expect(emitObservabilityRecord).toHaveBeenCalledWith(
       expect.objectContaining({ event: ObservabilityEvents.geocode.replayExhausted, exhaustedSkips: 1 })
     )
@@ -283,5 +287,66 @@ describe('runBoundedGeocodeDeadLetterReplay', () => {
     expect(result.attempted).toBe(1)
     expect(result.replayed).toBe(0)
     expect(result.skipped).toBe(1)
+    expect(result.updateErrors).toBe(0)
+    expect(result.lostRaces).toBe(1)
+    expect(emitObservabilityRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: ObservabilityEvents.geocode.deadLetterReplayPartialFailures,
+        updateErrors: 0,
+        lostRaces: 1,
+      })
+    )
+  })
+
+  it('counts update errors and emits partial-failure telemetry', async () => {
+    const row = {
+      id: 'd',
+      status: 'needs_check',
+      failure_details: { geocode_dead_letter: { ...pastDl, replay_count: 0 } },
+      failure_reasons: [],
+    }
+    let fromCalls = 0
+    mockFromBase.mockImplementation(() => {
+      fromCalls += 1
+      if (fromCalls === 1) {
+        return {
+          select: () => ({
+            eq: () => ({
+              not: () => ({
+                order: () => ({
+                  limit: async () => ({ data: [row], error: null }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+      return {
+        update: () => ({
+          eq: () => ({
+            eq: () => ({
+              select: () => ({
+                maybeSingle: async () => ({
+                  data: null,
+                  error: { code: '23505', message: 'duplicate key violates moderation_status index' },
+                }),
+              }),
+            }),
+          }),
+        }),
+      }
+    })
+
+    const result = await runBoundedGeocodeDeadLetterReplay({ limit: 1, nowMs: now })
+    expect(result.replayed).toBe(0)
+    expect(result.updateErrors).toBe(1)
+    expect(result.lostRaces).toBe(0)
+    expect(emitObservabilityRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: ObservabilityEvents.geocode.deadLetterReplayPartialFailures,
+        updateErrors: 1,
+        lostRaces: 0,
+      })
+    )
   })
 })

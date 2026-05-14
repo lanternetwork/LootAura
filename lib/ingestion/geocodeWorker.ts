@@ -32,7 +32,7 @@ import {
 import { publishReadyIngestedSaleById, type PublishReadyByIdResult } from '@/lib/ingestion/publishWorker'
 import type { FailureReason } from '@/lib/ingestion/types'
 
-/** Sub-key on `ingested_sales.failure_details` for last geocode attempt diagnostics (no street/query/PII beyond city). */
+/** Sub-key on `ingested_sales.failure_details` for last geocode attempt diagnostics (no raw address / full geocode query). */
 export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION = 1 as const
 export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_V2 = 2 as const
 
@@ -44,7 +44,8 @@ export type GeocodeAttemptDiagnostic = {
   addressSource: string
   municipalitySource: string
   fallbackArbitrationApplied: boolean
-  queryString: string
+  /** Non-PII hint only; full geocode query must never be persisted. */
+  queryCharLength?: number
   queryFingerprint?: string
   resultType:
     | 'success'
@@ -116,6 +117,9 @@ function toGeocodeAttemptDiagnostic(
   fallbackArbitrationApplied: boolean,
   diagnosticStrategy?: GeocodeAttemptStrategy
 ): GeocodeAttemptDiagnostic {
+  const rawQs = geo.attemptLog?.queryString
+  const queryCharLength =
+    typeof rawQs === 'string' && rawQs.length > 0 ? rawQs.length : undefined
   return {
     strategy: diagnosticStrategy ?? mode,
     queryStrategy:
@@ -123,13 +127,13 @@ function toGeocodeAttemptDiagnostic(
     addressSource: plan.addressLineSource,
     municipalitySource,
     fallbackArbitrationApplied,
-    queryString: geo.attemptLog?.queryString ?? '',
+    queryCharLength,
     queryFingerprint: geo.queryFingerprint,
     resultType: mapGeoOutcomeToResultType(geo),
   }
 }
 
-/** Schema v2: per-attempt strategy + query diagnostics (fingerprints safe; full query in server logs). */
+/** Schema v2: per-attempt strategy + safe diagnostics (fingerprints / lengths only; no raw query text). */
 export function buildIngestedGeocodeFailureDetailsV2(
   attemptCount: number,
   geo: GeocodeAddressOutcome,

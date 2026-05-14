@@ -64,6 +64,8 @@ async function replayHandler(request: NextRequest) {
     eligible: result.eligible,
     replayed: result.replayed,
     skipped: result.skipped,
+    updateErrors: result.updateErrors,
+    lostRaces: result.lostRaces,
   })
 }
 

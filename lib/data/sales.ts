@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { Sale } from '@/lib/types'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 // Zod schemas for validation
@@ -213,13 +214,8 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
 
     let { data, error } = await query
 
-    // If query failed due to missing moderation_status column, retry without it
-    if (error && useModerationFilter && (
-      String(error).includes('moderation_status') ||
-      String(error).includes('column') ||
-      (error as any)?.code === 'PGRST204' ||
-      (error as any)?.message?.includes('moderation_status')
-    )) {
+    // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+    if (error && useModerationFilter && isPostgrestMissingModerationStatusColumn(error)) {
       console.warn('moderation_status column not found, retrying without filter:', error)
       
       // Rebuild query without moderation_status filter

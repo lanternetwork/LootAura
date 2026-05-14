@@ -503,9 +503,11 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(geocode?.attempts?.[1]).toMatchObject({
       strategy: 'unit_stripped',
       resultType: 'empty_results',
-      queryString: '11020 Front St, Mokena, IL, USA',
+      queryCharLength: '11020 Front St, Mokena, IL, USA'.length,
       queryFingerprint: 'fp-unit',
     })
+    expect(JSON.stringify(geocode?.attempts)).not.toContain('11020 Front St')
+    expect(JSON.stringify(geocode?.attempts)).not.toContain('Unit A')
   })
 
   it('does not unit-strip after primary success', async () => {

@@ -32,6 +32,10 @@ export type GeocodeDeadLetterReplayRunResult = {
   eligible: number
   replayed: number
   skipped: number
+  /** PostgREST / RPC update returned an error (bounded aggregate; no row ids). */
+  updateErrors: number
+  /** `.eq('status','needs_check')` matched no row (concurrent transition or stale read). */
+  lostRaces: number
 }
 
 function toFailureReasonArray(value: unknown): FailureReason[] {
@@ -192,6 +196,8 @@ export async function runBoundedGeocodeDeadLetterReplay(params: {
   }
 
   let replayed = 0
+  let updateErrors = 0
+  let lostRaces = 0
   for (const row of toReplay) {
     const dl = readDeadLetterSection(row.failure_details)
     if (!dl) continue
@@ -221,9 +227,11 @@ export async function runBoundedGeocodeDeadLetterReplay(params: {
       .maybeSingle()
 
     if (upErr) {
+      updateErrors += 1
       continue
     }
     if (!updated) {
+      lostRaces += 1
       continue
     }
     replayed += 1
@@ -250,10 +258,22 @@ export async function runBoundedGeocodeDeadLetterReplay(params: {
     )
   }
 
+  if (updateErrors + lostRaces > 0) {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.geocode.deadLetterReplayPartialFailures, {
+        ...(params.telemetryContext ?? {}),
+        updateErrors,
+        lostRaces,
+      })
+    )
+  }
+
   return {
     attempted,
     eligible,
     replayed,
     skipped,
+    updateErrors,
+    lostRaces,
   }
 }

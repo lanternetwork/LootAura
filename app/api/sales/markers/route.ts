@@ -8,6 +8,7 @@ import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail } from '@/lib/http/json'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -223,13 +224,8 @@ async function markersHandler(request: NextRequest) {
       .order('id', { ascending: true })
       .limit(Math.min(limit, 1000))
 
-    // If query failed due to missing moderation_status column, retry without it
-    if (error && useModerationFilter && (
-      String(error).includes('moderation_status') ||
-      String(error).includes('column') ||
-      (error as any)?.code === 'PGRST204' ||
-      (error as any)?.message?.includes('moderation_status')
-    )) {
+    // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+    if (error && useModerationFilter && isPostgrestMissingModerationStatusColumn(error)) {
       const { logger } = await import('@/lib/log')
       logger.warn('moderation_status column not found, retrying without filter', {
         component: 'sales',

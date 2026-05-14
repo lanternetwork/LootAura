@@ -42,6 +42,8 @@ describe('POST /api/admin/geocode/replay', () => {
       eligible: 3,
       replayed: 2,
       skipped: 2,
+      updateErrors: 0,
+      lostRaces: 0,
     })
   })
 
@@ -93,6 +95,8 @@ describe('POST /api/admin/geocode/replay', () => {
     expect(body.eligible).toBe(3)
     expect(body.replayed).toBe(2)
     expect(body.skipped).toBe(2)
+    expect(body.updateErrors).toBe(0)
+    expect(body.lostRaces).toBe(0)
     expect(mockRunBounded).toHaveBeenCalledWith(
       expect.objectContaining({
         limit: 50,

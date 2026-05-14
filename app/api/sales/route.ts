@@ -16,6 +16,7 @@ import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -633,13 +634,8 @@ async function salesHandler(request: NextRequest) {
         .order('date_start', { ascending: true, nullsFirst: false })
         .range(0, fetchWindow - 1)
       
-      // If query failed due to missing moderation_status column, retry without it
-      if (salesError && useModerationFilter && (
-        String(salesError).includes('moderation_status') ||
-        String(salesError).includes('column') ||
-        (salesError as any)?.code === 'PGRST204' ||
-        (salesError as any)?.message?.includes('moderation_status')
-      )) {
+      // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+      if (salesError && useModerationFilter && isPostgrestMissingModerationStatusColumn(salesError)) {
         logger.warn('moderation_status column not found, retrying without filter', {
           component: 'sales',
           operation: 'get_sales',

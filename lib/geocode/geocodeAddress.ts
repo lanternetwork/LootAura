@@ -81,7 +81,7 @@ export interface GeocodeAddressOutcome {
   geocodeCityRaw?: string
   /** City token after `normalizeLocalityForGeocodeQuery`; persisted on failed attempts only. */
   geocodeCityNormalized?: string
-  /** Single-attempt diagnostics (query text logged at info; fingerprint safe for DB). */
+  /** Single-attempt diagnostics (operator logs may include query text; DB persists fingerprint + length only). */
   attemptLog?: GeocodeAttemptLog
 }
 

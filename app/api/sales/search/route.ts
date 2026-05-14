@@ -5,6 +5,7 @@ import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail, ok } from '@/lib/http/json'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,13 +102,8 @@ async function searchHandler(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(Math.min(limit * 3, 500)) // Fetch more to allow for distance filtering
 
-      // If query failed due to missing moderation_status column, retry without it
-      if (salesError && (
-        String(salesError).includes('moderation_status') ||
-        String(salesError).includes('column') ||
-        (salesError as any)?.code === 'PGRST204' ||
-        (salesError as any)?.message?.includes('moderation_status')
-      )) {
+      // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+      if (salesError && isPostgrestMissingModerationStatusColumn(salesError)) {
         logger.warn('moderation_status column not found, retrying without filter', {
           component: 'sales',
           operation: 'search',
@@ -166,13 +162,8 @@ async function searchHandler(request: NextRequest) {
         .limit(limit)
 
       if (basicError) {
-        // If moderation_status column doesn't exist, retry without it
-        if (
-          String(basicError).includes('moderation_status') ||
-          String(basicError).includes('column') ||
-          (basicError as any)?.code === 'PGRST204' ||
-          (basicError as any)?.message?.includes('moderation_status')
-        ) {
+        // Missing column only: conclusive PostgREST / Postgres codes (never broad substring / "column")
+        if (isPostgrestMissingModerationStatusColumn(basicError)) {
           const retryResult = await applyPhase4PublicPublishedSaleReadFilters(
             supabase.from('sales_v2').select('*'),
             { includeModeration: false }

@@ -4,8 +4,8 @@ import { assertCronAuthorized, isCronAuthorized } from '@/lib/auth/cron'
 import {
   buildParserHealthAdminApiResponse,
   buildParserHealthDiagnosticsPayload,
+  type RuntimeParserSignalsByHost,
 } from '@/lib/parserRegression/parserDiagnosticsAggregate'
-import type { RuntimeParserSignalsByHost } from '@/lib/parserRegression/parserDiagnosticsAggregate'
 import { parserRegressionPackageRoot } from '@/lib/parserRegression/parserRegressionHarness'
 import { scanParserRegressionFixtures } from '@/lib/parserRegression/parserFixtureScan'
 import { reportParserHealthTransitions } from '@/lib/parserRegression/reportParserHealth'

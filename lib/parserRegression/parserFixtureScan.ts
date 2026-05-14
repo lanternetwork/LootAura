@@ -1,5 +1,5 @@
 /**
- * Read parser regression fixtures from disk (tests/fixtures/parsers/*/*).
+ * Read parser regression fixtures from disk (`tests/fixtures/parsers/<adapter>/<case>`).
  * Read-only; used by admin diagnostics and aggregate builders.
  */
 

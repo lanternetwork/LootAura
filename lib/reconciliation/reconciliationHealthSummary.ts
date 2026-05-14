@@ -1,5 +1,4 @@
-import { fromBase } from '@/lib/supabase/clients'
-import type { getAdminDb } from '@/lib/supabase/clients'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export interface ReconciliationHealthSummary {
   readonly candidateIngestRowsApprox: number

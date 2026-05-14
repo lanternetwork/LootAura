@@ -30,7 +30,7 @@ vi.mock('@/lib/rateLimit/policies', () => ({
 
 describe('GET /api/admin/reconciliation/health', () => {
   beforeEach(() => {
-    vi.resetAllModules()
+    vi.resetModules()
     mockAssertAdmin.mockReset()
     mockSummary.mockReset()
     mockGetAdminDb.mockReturnValue({})

@@ -1,5 +1,7 @@
-import { parseExternalPageSourceHtml } from '@/lib/ingestion/adapters/externalPageSource'
-import type { ExternalPageSourceIngestionConfig } from '@/lib/ingestion/adapters/externalPageSource'
+import {
+  parseExternalPageSourceHtml,
+  type ExternalPageSourceIngestionConfig,
+} from '@/lib/ingestion/adapters/externalPageSource'
 
 export interface ParsedListingSnapshotForReconciliation {
   readonly title: string

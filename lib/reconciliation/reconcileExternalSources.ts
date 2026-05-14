@@ -191,7 +191,7 @@ async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, now
 
   const saleById = new Map(eligible.map((s) => [s.id, s]))
 
-  const linked = (ingestRows as IngestRowDb[]).filter((row) => {
+  const linked = (ingestRows as unknown as IngestRowDb[]).filter((row) => {
     const pub = row.published_sale_id
     if (!pub) return false
     const sale = saleById.get(pub)

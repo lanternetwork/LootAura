@@ -14,7 +14,7 @@ function jsonError(status: number, code: string, message: string) {
 
 async function reconciliationHealthHandler(_request: NextRequest) {
   try {
-    await assertAdminOrThrow(request)
+    await assertAdminOrThrow(_request)
   } catch (error) {
     if (error instanceof NextResponse) {
       return error

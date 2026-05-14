@@ -323,6 +323,14 @@ Access debug tools at `/admin/tools` when debug mode is enabled:
 
 **How to run (example):** from a browser or HTTP client where you already have an admin session cookie, `GET` the URL above on your deployment (e.g. production or preview). There is no separate CLI; apply migration `168` before relying on this endpoint.
 
+## Admin ZIP import (`upsert_zipcodes`) — RPC execute privileges
+
+**Migrations:** `053_insert_zipcodes_rpc.sql` (defines `public.upsert_zipcodes(jsonb)`), `173_restrict_upsert_zipcodes_execute_service_role_only.sql` (locks down `EXECUTE`).
+
+**Security decision:** The function is `SECURITY DEFINER` and bulk-writes `lootaura_v2.zipcodes`. It must **not** be executable by PostgREST `anon` or `authenticated` JWTs (any browser could otherwise call `rpc('upsert_zipcodes', …)` with the public anon key). Only **`service_role`** may execute it.
+
+**App path:** `POST /api/admin/zipcodes/import` uses the server-only admin Supabase client (`SUPABASE_SERVICE_ROLE_KEY`) after `assertAdminOrThrow`. Do not expose a public or user-JWT path to this RPC.
+
 ## Sale listing public visibility (Phase 4)
 
 **Migration:** `172_sales_phase4_public_visibility_ends_at.sql`

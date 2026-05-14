@@ -219,8 +219,11 @@ async function createUpsertZipcodesFunction(client: any) {
     END;
     $$;
 
-    -- Grant execute permission
-    GRANT EXECUTE ON FUNCTION public.upsert_zipcodes(JSONB) TO authenticated, anon;
+    -- Match migration 173: SECURITY DEFINER bulk-write; only service_role may EXECUTE (admin API).
+    REVOKE EXECUTE ON FUNCTION public.upsert_zipcodes(jsonb) FROM PUBLIC;
+    REVOKE EXECUTE ON FUNCTION public.upsert_zipcodes(jsonb) FROM anon;
+    REVOKE EXECUTE ON FUNCTION public.upsert_zipcodes(jsonb) FROM authenticated;
+    GRANT EXECUTE ON FUNCTION public.upsert_zipcodes(jsonb) TO service_role;
   `
 
   try {
@@ -242,7 +245,9 @@ async function createUpsertZipcodesFunction(client: any) {
     throw new Error(`Unable to create function: ${execError?.message || execSqlError?.message || 'No exec RPC available'}`)
   } catch (error: any) {
     console.error('[ZIP_IMPORT] Failed to create function:', error)
-    throw new Error(`Failed to create upsert_zipcodes function. Please apply migration 053_insert_zipcodes_rpc.sql manually. Error: ${error.message}`)
+    throw new Error(
+      `Failed to create upsert_zipcodes function. Apply migrations 053 and 173 (service_role EXECUTE only). Error: ${error.message}`
+    )
   }
 }
 

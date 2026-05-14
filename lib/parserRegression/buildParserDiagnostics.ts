@@ -32,6 +32,7 @@ import {
 import {
   buildSourceDegradationRow,
   summarizeSourceDegradation,
+  type RecommendedParserAction,
   type SourceDegradationTag,
 } from '@/lib/parserRegression/sourceDegradation'
 import { reportParserHealthTransitions } from '@/lib/parserRegression/reportParserHealth'
@@ -52,7 +53,7 @@ export type ParserDiagnosticsSourceEntry = {
   healthReasons: ParserHealthReason[]
   freshnessReasons: FixtureFreshnessReason[]
   degradationTags: SourceDegradationTag[]
-  recommendedAction: string
+  recommendedAction: RecommendedParserAction
   fixtureTotal: number
   staleFixtureCount: number
   agingFixtureCount: number
@@ -71,7 +72,7 @@ export type ParserDiagnosticsSnapshot = {
   }
   degradedSources: string[]
   failingSources: string[]
-  recommendedAction: string
+  recommendedAction: RecommendedParserAction
 }
 
 type HostAgg = {

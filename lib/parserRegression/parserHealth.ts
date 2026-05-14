@@ -194,7 +194,8 @@ export function classifyParserHealth(
   }
 
   let penalty = 0
-  let worst: 'ok' | 'degraded' | 'failing' = 'ok'
+  /** 0 = ok, 1 = degraded, 2 = failing (avoids TS narrowing on `worst` mutated inside nested `bump`). */
+  let worstRank = 0
 
   const bump = (
     st: 'ok' | 'degraded' | 'failing',
@@ -203,11 +204,11 @@ export function classifyParserHealth(
     reason: ParserHealthReason
   ) => {
     if (st === 'failing') {
-      worst = 'failing'
+      worstRank = 2
       penalty += failPen
       reasons.push(reason)
     } else if (st === 'degraded') {
-      if (worst !== 'failing') worst = 'degraded'
+      if (worstRank < 2) worstRank = 1
       penalty += degPen
       reasons.push(reason)
     }
@@ -279,9 +280,9 @@ export function classifyParserHealth(
   const score = Math.max(0, Math.min(100, Math.round(100 - penalty)))
 
   let status: ParserHealthStatus = 'healthy'
-  if (worst === 'failing' || score < 42) {
+  if (worstRank === 2 || score < 42) {
     status = 'failing'
-  } else if (worst === 'degraded' || score < 78 || reasons.length > 0) {
+  } else if (worstRank === 1 || score < 78 || reasons.length > 0) {
     status = 'degraded'
   }
 

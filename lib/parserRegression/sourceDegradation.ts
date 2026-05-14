@@ -17,6 +17,7 @@ export type RecommendedParserAction =
   | 'verify_source_availability'
   | 'review_parser_thresholds'
   | 'investigate_extraction_collapse'
+  | 'no_fixtures_root'
 
 export type SourceParserHealthBundle = {
   sourceHost: string

@@ -15,7 +15,8 @@
       "imageUrls": [
         "https://cdn.example.com/a.jpg",
         "https://cdn.example.com/c.jpg",
-        "https://example.com/gallery/b.jpg"
+        "https://example.com/gallery/b.jpg",
+        "https://example.com/images/og-photo.jpg"
       ],
       "rawPayload": {
         "adapter": "external_page_source",
@@ -28,7 +29,8 @@
         "imageUrls": [
           "https://cdn.example.com/a.jpg",
           "https://cdn.example.com/c.jpg",
-          "https://example.com/gallery/b.jpg"
+          "https://example.com/gallery/b.jpg",
+          "https://example.com/images/og-photo.jpg"
         ],
         "ingestionDiagnostics": {
           "addressSource": "composite",

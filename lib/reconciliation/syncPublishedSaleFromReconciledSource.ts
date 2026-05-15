@@ -11,10 +11,22 @@ import { resolvePersistableSaleEndsAt, type AdminDbForSaleEnds } from '@/lib/sal
 import { fromBase } from '@/lib/supabase/clients'
 import { descriptionHasPlaceholderProse, detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
 import type { ReconciledScheduleBundleResult } from '@/lib/reconciliation/reconciledScheduleBundle'
+import {
+  buildCanonicalLinkedSaleSchedulePatch,
+  saleScheduleDiffersFromCanonicalBundle,
+  type SaleScheduleForBundleCompare,
+} from '@/lib/reconciliation/canonicalLinkedSaleSchedulePatch'
 import type { ParsedListingSnapshotForReconciliation } from '@/lib/reconciliation/reconciliationParseSnapshot'
 import type { IngestFingerprint, ReconciliationChangeClass } from '@/lib/reconciliation/types'
 
 export { inferClosingTimeEndFromDescription, inferOpeningTimeStartFromDescription } from '@/lib/reconciliation/reconciledScheduleBundle'
+export {
+  buildCanonicalLinkedSaleSchedulePatch,
+  normalizeScheduleDateField,
+  normalizeScheduleTimeField,
+  saleScheduleDiffersFromCanonicalBundle,
+  type SaleScheduleForBundleCompare,
+} from '@/lib/reconciliation/canonicalLinkedSaleSchedulePatch'
 
 // ---------------------------------------------------------------------------
 // Heuristics (shared with publish worker — single policy surface)
@@ -442,60 +454,6 @@ export async function mirrorIngestScheduleFieldsFromPublishedSalePhase2A(
   return true
 }
 
-export type SaleScheduleForBundleCompare = {
-  readonly date_start: string | null
-  readonly date_end: string | null
-  readonly time_start: string | null
-  readonly time_end: string | null
-}
-
-/** Normalize schedule date columns for strict equality (null/empty → null). */
-export function normalizeScheduleDateField(value: string | null | undefined): string | null {
-  return normalizeTextOrNull(value)
-}
-
-/** Normalize schedule time columns to `HH:MM:SS` for strict equality. */
-export function normalizeScheduleTimeField(value: string | null | undefined): string | null {
-  const t = normalizeTextOrNull(value)
-  if (!t) return null
-  const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
-  if (!m) return t
-  const hour = Number.parseInt(m[1], 10)
-  const min = Number.parseInt(m[2], 10)
-  const sec = m[3] != null ? Number.parseInt(m[3], 10) : 0
-  if (!Number.isFinite(hour) || !Number.isFinite(min) || !Number.isFinite(sec)) return t
-  return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-}
-
-/**
- * True when persisted `sales` schedule columns differ from a valid canonical reconciliation bundle.
- * Ingest `time_*` are not consulted — only the published sale row vs bundle authority.
- */
-export function saleScheduleDiffersFromCanonicalBundle(
-  sale: SaleScheduleForBundleCompare,
-  bundle: ReconciledScheduleBundleResult
-): boolean {
-  if (!bundle.ok) return false
-  const saleNorm = {
-    date_start: normalizeScheduleDateField(sale.date_start),
-    date_end: normalizeScheduleDateField(sale.date_end),
-    time_start: normalizeScheduleTimeField(sale.time_start),
-    time_end: normalizeScheduleTimeField(sale.time_end),
-  }
-  const bundleNorm = {
-    date_start: normalizeScheduleDateField(bundle.dateStart),
-    date_end: normalizeScheduleDateField(bundle.dateEnd),
-    time_start: normalizeScheduleTimeField(bundle.timeStart),
-    time_end: normalizeScheduleTimeField(bundle.timeEnd),
-  }
-  return (
-    saleNorm.date_start !== bundleNorm.date_start ||
-    saleNorm.date_end !== bundleNorm.date_end ||
-    saleNorm.time_start !== bundleNorm.time_start ||
-    saleNorm.time_end !== bundleNorm.time_end
-  )
-}
-
 export function resolvePhase2aScheduleSyncGate(params: {
   readonly classes: readonly ReconciliationChangeClass[]
   readonly priorFingerprint: IngestFingerprint
@@ -649,41 +607,38 @@ export async function buildSafePublishedSaleSyncPatch(params: {
   let scheduleMutationInhibitedReason: string | undefined
 
   if (scheduleGate && scheduleBundleResult.ok) {
-    const b = scheduleBundleResult
-    const lat = Number(sale.lat ?? ingest.lat ?? NaN)
-    const lng = Number(sale.lng ?? ingest.lng ?? NaN)
-    const zip = normalizeTextOrNull(sale.zip_code) ?? normalizeTextOrNull(ingest.zip_code)
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    const schedulePatchResult = await buildCanonicalLinkedSaleSchedulePatch({
+      admin,
+      refreshedDescription: snapshot.description,
+      ingest: {
+        date_start: ingest.date_start ?? null,
+        date_end: ingest.date_end ?? null,
+        time_start: ingest.time_start,
+        time_end: ingest.time_end,
+        raw_payload: ingest.raw_payload,
+      },
+      sale: {
+        date_start: sale.date_start,
+        date_end: sale.date_end,
+        time_start: sale.time_start,
+        time_end: sale.time_end,
+      },
+      parsed: snapshot,
+      lat: Number(sale.lat ?? ingest.lat ?? NaN),
+      lng: Number(sale.lng ?? ingest.lng ?? NaN),
+      zip_code: normalizeTextOrNull(sale.zip_code) ?? normalizeTextOrNull(ingest.zip_code),
+      state: saleState || null,
+      rowId,
+      saleId,
+      operation: 'reconciliation_phase2a_safe_sync',
+      skipWhenSaleMatchesBundle: false,
+    })
+    if (schedulePatchResult.schedulePatch) {
+      Object.assign(patch, schedulePatchResult.schedulePatch)
+      schedulesUpdated = true
+    } else if (schedulePatchResult.scheduleMutationInhibited) {
       scheduleMutationInhibited = true
-      scheduleMutationInhibitedReason = 'missing_coordinates'
-    } else {
-      const listingEnds = await resolvePersistableSaleEndsAt(
-        admin,
-        {
-          date_start: b.dateStart,
-          time_start: b.timeStart,
-          date_end: b.dateEnd,
-          time_end: b.timeEnd,
-          zip_code: zip,
-          state: saleState || null,
-          lat,
-          lng,
-        },
-        { operation: 'reconciliation_phase2a_safe_sync', rowId, saleId }
-      )
-      if (listingEnds.ends_at != null) {
-        patch.date_start = b.dateStart
-        patch.date_end = b.dateEnd
-        patch.time_start = b.timeStart
-        patch.time_end = b.timeEnd
-        patch.ends_at = listingEnds.ends_at
-        if (listingEnds.listing_timezone != null) patch.listing_timezone = listingEnds.listing_timezone
-        schedulesUpdated = true
-      } else {
-        scheduleMutationInhibited = true
-        scheduleMutationInhibitedReason = 'ends_at_unresolved'
-      }
+      scheduleMutationInhibitedReason = schedulePatchResult.scheduleMutationInhibitedReason
     }
   }
 

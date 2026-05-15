@@ -15,15 +15,16 @@ import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandi
 
 export { extractPublishImageCandidates }
 import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
+import { buildCanonicalLinkedSaleSchedulePatch } from '@/lib/reconciliation/canonicalLinkedSaleSchedulePatch'
 import {
   computeImportedListingImageSyncIntent,
   looksGenericDescription,
   looksGenericTitle,
   looksPollutedDescription,
+  mirrorIngestScheduleFieldsFromPublishedSalePhase2A,
   normalizeAddressForPublishSafe,
   normalizeTextOrNull,
 } from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
-import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 import { classifyQueuePressure } from '@/lib/observability/metrics'
@@ -646,29 +647,9 @@ async function maybeSyncExistingSaleFromLatestIngest(
   const normalizedAddress = normalizeAddressForPublishSafe(record.normalized_address, city ?? '', state ?? '')
   const normalizedDateStart = normalizeTextOrNull(record.date_start)
   const normalizedDateEnd = normalizeTextOrNull(record.date_end)
-  const normalizedTimeStart = normalizeTextOrNull(record.time_start) || '09:00:00'
-  const normalizedTimeEnd = normalizeTextOrNull(record.time_end)
+  const normalizedDescription = normalizeTextOrNull(record.description)
   const bestEffortPatch: Record<string, unknown> = {}
 
-  if (normalizedDateStart) {
-    const adminForEnds = getAdminDb()
-    const listingEnds = await resolvePersistableSaleEndsAt(
-      adminForEnds,
-      {
-        date_start: normalizedDateStart,
-        time_start: normalizedTimeStart,
-        date_end: normalizedDateEnd,
-        time_end: normalizedTimeEnd,
-        zip_code: record.zip_code,
-        state: record.state,
-        lat: Number(record.lat),
-        lng: Number(record.lng),
-      },
-      { operation: 'maybeSyncExistingSaleFromLatestIngest', rowId: ctx.rowId, saleId }
-    )
-    if (listingEnds.ends_at != null) bestEffortPatch.ends_at = listingEnds.ends_at
-    if (listingEnds.listing_timezone != null) bestEffortPatch.listing_timezone = listingEnds.listing_timezone
-  }
   if (normalizedAddress && city && state) {
     try {
       validateResolvedAddressForPublish(normalizedAddress, city, state)
@@ -677,10 +658,6 @@ async function maybeSyncExistingSaleFromLatestIngest(
       /* omit low-quality ingest addresses from best-effort sale sync */
     }
   }
-  if (normalizedDateStart) bestEffortPatch.date_start = normalizedDateStart
-  bestEffortPatch.date_end = normalizedDateEnd
-  bestEffortPatch.time_start = normalizedTimeStart
-  bestEffortPatch.time_end = normalizedTimeEnd
   const attemptBestEffortSync = async (reason: string): Promise<void> => {
     try {
       const payload: Record<string, unknown> = { ...bestEffortPatch }
@@ -722,7 +699,9 @@ async function maybeSyncExistingSaleFromLatestIngest(
   try {
     const admin = getAdminDb()
     const { data, error } = await fromBase(admin, 'sales')
-      .select('ingested_sale_id, title, description, address, city, state, date_start, date_end, time_start, time_end, cover_image_url, images')
+      .select(
+        'ingested_sale_id, title, description, address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, cover_image_url, images, moderation_status'
+      )
       .eq('id', saleId)
       .maybeSingle()
 
@@ -753,8 +732,23 @@ async function maybeSyncExistingSaleFromLatestIngest(
       time_end: string | null
       cover_image_url: string | null
       images: unknown
+      moderation_status: string | null
+      zip_code: string | null
+      lat: number | null
+      lng: number | null
     } | null
     if (!row) {
+      return
+    }
+    if (row.moderation_status === 'hidden_by_admin') {
+      logger.warn('Existing linked sale sync skipped: hidden_by_admin', {
+        component: 'ingestion/publishWorker',
+        operation: 'sync_existing_sale_from_ingest',
+        rowId: ctx.rowId,
+        saleId,
+        city: ctx.city,
+        state: ctx.state,
+      })
       return
     }
     if (row.ingested_sale_id !== ctx.rowId) {
@@ -771,7 +765,6 @@ async function maybeSyncExistingSaleFromLatestIngest(
     }
 
     const normalizedTitle = normalizeTextOrNull(record.title) || `${record.city || 'Unknown'} Yard Sale`
-    const normalizedDescription = normalizeTextOrNull(record.description)
 
     const patch: Record<string, unknown> = { ...bestEffortPatch }
     delete patch.images
@@ -810,6 +803,61 @@ async function maybeSyncExistingSaleFromLatestIngest(
       }
     }
 
+    const parsedForSchedule =
+      normalizedDateStart != null
+        ? {
+            title: normalizedTitle,
+            description: normalizedDescription ?? '',
+            imageUrls: [] as const,
+            dateStart: normalizedDateStart,
+            dateEnd: normalizedDateEnd ?? normalizedDateStart,
+          }
+        : null
+
+    const schedulePatchResult = await buildCanonicalLinkedSaleSchedulePatch({
+      admin,
+      refreshedDescription: normalizedDescription,
+      ingest: {
+        date_start: record.date_start,
+        date_end: record.date_end,
+        time_start: record.time_start,
+        time_end: record.time_end,
+        raw_payload: record.raw_payload,
+      },
+      sale: {
+        date_start: row.date_start,
+        date_end: row.date_end,
+        time_start: row.time_start,
+        time_end: row.time_end,
+      },
+      parsed: parsedForSchedule,
+      lat: Number(record.lat),
+      lng: Number(record.lng),
+      zip_code: row.zip_code ?? record.zip_code,
+      state: row.state ?? record.state,
+      rowId: ctx.rowId,
+      saleId,
+      operation: 'maybeSyncExistingSaleFromLatestIngest',
+      skipWhenSaleMatchesBundle: true,
+    })
+
+    if (schedulePatchResult.scheduleMutationInhibited) {
+      logger.warn('Linked sale schedule sync skipped', {
+        component: 'ingestion/publishWorker',
+        operation: 'sync_existing_sale_from_ingest_schedule',
+        rowId: ctx.rowId,
+        saleId,
+        city: ctx.city,
+        state: ctx.state,
+        schedule_bundle_reason: schedulePatchResult.scheduleBundleReason,
+        schedule_mutation_inhibited_reason: schedulePatchResult.scheduleMutationInhibitedReason,
+      })
+    }
+
+    if (schedulePatchResult.schedulePatch) {
+      Object.assign(patch, schedulePatchResult.schedulePatch)
+    }
+
     if (Object.keys(patch).length === 0) {
       return
     }
@@ -817,6 +865,14 @@ async function maybeSyncExistingSaleFromLatestIngest(
     const { error: upErr } = await fromBase(admin, 'sales')
       .update(patch)
       .eq('id', saleId)
+
+    if (!upErr && schedulePatchResult.schedulesUpdated) {
+      await mirrorIngestScheduleFieldsFromPublishedSalePhase2A(admin, {
+        ingestedSaleId: ctx.rowId,
+        saleId,
+        currentRawPayload: record.raw_payload,
+      })
+    }
 
     if (upErr) {
       logger.warn('Existing linked sale sync failed; continuing publish', {

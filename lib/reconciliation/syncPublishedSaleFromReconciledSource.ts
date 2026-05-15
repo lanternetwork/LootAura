@@ -564,7 +564,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
     return { outcome: 'failed', skipReason: 'load_failed', shadowWouldUpdate: false, manualReviewAddress: false, titlesUpdated: false, descriptionsUpdated: false, imagesUpdated: false, schedulesUpdated: false }
   }
 
-  const sale = data as SaleRowForSync
+  const sale = data as unknown as SaleRowForSync
   if (sale.ingested_sale_id !== ctx.ingestedSaleId) {
     return {
       outcome: 'skipped',

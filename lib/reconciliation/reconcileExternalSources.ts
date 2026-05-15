@@ -690,10 +690,11 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       reconciliationClassesAllowSafeSaleSync(classification.classes as readonly ReconciliationChangeClass[]) &&
       fpDiff
 
-    if (canSalesSync) {
+    if (canSalesSync && row.published_sale_id) {
+      const publishedSaleId = row.published_sale_id
       salesSyncAttempted += 1
       const syncRes = await tryApplySafePublishedSaleSyncFromReconciliation(admin, {
-        saleId: row.published_sale_id,
+        saleId: publishedSaleId,
         ingestedSaleId: row.id,
         rowId: row.id,
         snapshot: parsed,

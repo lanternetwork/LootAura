@@ -91,15 +91,12 @@ vi.mock('@/lib/supabase/clients', () => ({
   }),
 }))
 
-import * as syncPublished from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
+import { tryApplySafePublishedSaleSyncFromReconciliation } from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
 
 describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mirror', () => {
-  const mirrorSpy = vi.spyOn(syncPublished, 'mirrorIngestScheduleFieldsFromPublishedSalePhase2A')
-
   beforeEach(() => {
     tryApplyCtx.ingestedUpdatePayloads.length = 0
     tryApplyCtx.saleMaybeSingleCalls = 0
-    mirrorSpy.mockClear()
     resolveEndsAtMock.mockClear()
     resolveEndsAtMock.mockResolvedValue({
       ends_at: '2026-06-01T21:00:00.000Z',
@@ -174,8 +171,8 @@ describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mi
     scheduleBundleResult,
   }
 
-  it('calls mirror after successful schedule write', async () => {
-    const res = await syncPublished.tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
+  it('mirrors ingest schedule after successful schedule write', async () => {
+    const res = await tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
       ...baseCtx,
       classes: ['schedule_changed'],
       dryRun: false,
@@ -183,7 +180,6 @@ describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mi
     expect(res.outcome).toBe('updated')
     expect(res.schedulesUpdated).toBe(true)
     expect(res.mirroredIngestSchedule).toBe(true)
-    expect(mirrorSpy).toHaveBeenCalledTimes(1)
     expect(tryApplyCtx.ingestedUpdatePayloads).toHaveLength(1)
     expect(tryApplyCtx.ingestedUpdatePayloads[0]).toMatchObject({
       date_start: '2026-06-01',
@@ -194,21 +190,21 @@ describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mi
   })
 
   it('does not mirror on dryRun', async () => {
-    const res = await syncPublished.tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
+    const res = await tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
       ...baseCtx,
       classes: ['schedule_changed'],
       dryRun: true,
     })
     expect(res.skipReason).toBe('dry_run')
     expect(res.schedulesUpdated).toBe(true)
-    expect(mirrorSpy).not.toHaveBeenCalled()
+    expect(res.mirroredIngestSchedule ?? false).toBe(false)
     expect(tryApplyCtx.ingestedUpdatePayloads).toHaveLength(0)
   })
 
   it('does not mirror when schedule mutation is inhibited (ends_at unresolved)', async () => {
     resolveEndsAtMock.mockResolvedValueOnce({ ends_at: null, listing_timezone: null })
     const longerDesc = `${tryApplyCtx.initialSale.description!} MORE_DESC_FOR_CONTENT_CHANGE`
-    const res = await syncPublished.tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
+    const res = await tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
       ...baseCtx,
       snapshot: { ...snapshot, description: longerDesc },
       classes: ['schedule_changed', 'description_changed'],
@@ -220,14 +216,13 @@ describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mi
     expect(res.schedulesUpdated).toBe(false)
     expect(res.scheduleMutationInhibited).toBe(true)
     expect(res.mirroredIngestSchedule).toBe(false)
-    expect(mirrorSpy).not.toHaveBeenCalled()
     expect(tryApplyCtx.ingestedUpdatePayloads).toHaveLength(0)
   })
 
   it('does not mirror when schedulesUpdated is false (description-only Phase 2A)', async () => {
     const longExisting = tryApplyCtx.initialSale.description!
     const longerNext = `${longExisting}NEW_PARAGRAPH_WITH_SUBSTANTIVE_CONTENT_FOR_SAFE_SYNC_POLICY`
-    const res = await syncPublished.tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
+    const res = await tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
       ...baseCtx,
       snapshot: { ...snapshot, description: longerNext },
       classes: ['description_changed'],
@@ -238,6 +233,6 @@ describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mi
     expect(res.outcome).toBe('updated')
     expect(res.schedulesUpdated).toBe(false)
     expect(res.mirroredIngestSchedule).toBe(false)
-    expect(mirrorSpy).not.toHaveBeenCalled()
+    expect(tryApplyCtx.ingestedUpdatePayloads).toHaveLength(0)
   })
 })

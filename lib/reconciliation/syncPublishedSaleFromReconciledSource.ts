@@ -292,6 +292,82 @@ export interface SafePublishedSaleSyncRunResult {
   readonly schedulesUpdated: boolean
   readonly scheduleMutationInhibited?: boolean
   readonly scheduleMutationInhibitedReason?: string
+  /** True after a successful Phase 2A schedule write when ingest row was aligned from `sales`. */
+  readonly mirroredIngestSchedule?: boolean
+}
+
+/**
+ * Merges resolved `listing_timezone` into ingest `raw_payload` for reconciliation bundle alignment.
+ * Does not mutate the input object.
+ */
+export function mergeListingTimezoneIntoIngestRawPayload(
+  rawPayload: unknown,
+  listingTimezone: string | null | undefined
+): unknown {
+  const tz =
+    typeof listingTimezone === 'string' && listingTimezone.trim().length > 0 ? listingTimezone.trim() : null
+  if (tz == null) return rawPayload
+  if (rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)) {
+    return { ...(rawPayload as Record<string, unknown>), listing_timezone: tz }
+  }
+  return { listing_timezone: tz }
+}
+
+type SaleScheduleColumnsRow = {
+  date_start: string | null
+  date_end: string | null
+  time_start: string | null
+  time_end: string | null
+  listing_timezone: string | null
+}
+
+/**
+ * After Phase 2A updates `sales` schedule fields, copy them onto the linked `ingested_sales` row
+ * so future bundles do not prefer stale ingest times. Returns whether the ingest update succeeded.
+ */
+export async function mirrorIngestScheduleFieldsFromPublishedSalePhase2A(
+  admin: AdminDbForSaleEnds,
+  params: { readonly ingestedSaleId: string; readonly saleId: string; readonly currentRawPayload: unknown }
+): Promise<boolean> {
+  const { data, error } = await fromBase(admin, 'sales')
+    .select('date_start, date_end, time_start, time_end, listing_timezone')
+    .eq('id', params.saleId)
+    .maybeSingle()
+
+  if (error || !data) {
+    logger.warn('Phase 2A ingest schedule mirror skipped: sale reload failed', {
+      component: 'reconciliation/syncPublishedSaleFromReconciledSource',
+      operation: 'mirror_ingest_schedule_from_sale',
+      saleId: params.saleId,
+      rowId: params.ingestedSaleId,
+      message: error?.message ?? 'no_row',
+    })
+    return false
+  }
+
+  const row = data as unknown as SaleScheduleColumnsRow
+  const { error: upErr } = await fromBase(admin, 'ingested_sales')
+    .update({
+      date_start: row.date_start ?? null,
+      date_end: row.date_end ?? null,
+      time_start: row.time_start ?? null,
+      time_end: row.time_end ?? null,
+      raw_payload: mergeListingTimezoneIntoIngestRawPayload(params.currentRawPayload, row.listing_timezone),
+    })
+    .eq('id', params.ingestedSaleId)
+
+  if (upErr) {
+    logger.warn('Phase 2A ingest schedule mirror failed', {
+      component: 'reconciliation/syncPublishedSaleFromReconciledSource',
+      operation: 'mirror_ingest_schedule_from_sale',
+      saleId: params.saleId,
+      rowId: params.ingestedSaleId,
+      message: upErr.message,
+    })
+    return false
+  }
+
+  return true
 }
 
 function sortImageUrlsDeterministic(urls: readonly string[]): string[] {
@@ -538,7 +614,17 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       rowId: ctx.rowId,
       message: error?.message ?? 'no_row',
     })
-    return { outcome: 'failed', skipReason: 'load_failed', shadowWouldUpdate: false, manualReviewAddress: false, titlesUpdated: false, descriptionsUpdated: false, imagesUpdated: false, schedulesUpdated: false }
+    return {
+      outcome: 'failed',
+      skipReason: 'load_failed',
+      shadowWouldUpdate: false,
+      manualReviewAddress: false,
+      titlesUpdated: false,
+      descriptionsUpdated: false,
+      imagesUpdated: false,
+      schedulesUpdated: false,
+      mirroredIngestSchedule: false,
+    }
   }
 
   const sale = data as unknown as SaleRowForSync
@@ -552,6 +638,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       descriptionsUpdated: false,
       imagesUpdated: false,
       schedulesUpdated: false,
+      mirroredIngestSchedule: false,
     }
   }
 
@@ -565,6 +652,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       descriptionsUpdated: false,
       imagesUpdated: false,
       schedulesUpdated: false,
+      mirroredIngestSchedule: false,
     }
   }
 
@@ -578,6 +666,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       descriptionsUpdated: false,
       imagesUpdated: false,
       schedulesUpdated: false,
+      mirroredIngestSchedule: false,
     }
   }
 
@@ -591,6 +680,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       descriptionsUpdated: false,
       imagesUpdated: false,
       schedulesUpdated: false,
+      mirroredIngestSchedule: false,
     }
   }
 
@@ -619,6 +709,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       descriptionsUpdated: false,
       imagesUpdated: false,
       schedulesUpdated: false,
+      mirroredIngestSchedule: false,
     }
   }
 
@@ -636,6 +727,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       schedulesUpdated: built.schedulesUpdated,
       scheduleMutationInhibited: built.scheduleMutationInhibited,
       scheduleMutationInhibitedReason: built.scheduleMutationInhibitedReason,
+      mirroredIngestSchedule: false,
     }
   }
 
@@ -658,7 +750,17 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       imagesUpdated: false,
       descriptionsUpdated: false,
       schedulesUpdated: false,
+      mirroredIngestSchedule: false,
     }
+  }
+
+  let mirroredIngestSchedule = false
+  if (built.schedulesUpdated && !built.scheduleMutationInhibited) {
+    mirroredIngestSchedule = await mirrorIngestScheduleFieldsFromPublishedSalePhase2A(admin, {
+      ingestedSaleId: ctx.ingestedSaleId,
+      saleId: ctx.saleId,
+      currentRawPayload: ctx.ingest.raw_payload,
+    })
   }
 
   return {
@@ -671,5 +773,6 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
     schedulesUpdated: built.schedulesUpdated,
     scheduleMutationInhibited: built.scheduleMutationInhibited,
     scheduleMutationInhibitedReason: built.scheduleMutationInhibitedReason,
+    mirroredIngestSchedule,
   }
 }

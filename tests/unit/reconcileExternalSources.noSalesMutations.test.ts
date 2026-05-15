@@ -17,4 +17,10 @@ describe('reconcileExternalSources (static)', () => {
     expect(window).toMatch(/\.select\(/)
     expect(window).not.toMatch(/\.update\s*\(/)
   })
+
+  it('defaults omitted dryRun to read-only persistence (library safety)', () => {
+    const path = join(process.cwd(), 'lib/reconciliation/reconcileExternalSources.ts')
+    const src = readFileSync(path, 'utf8')
+    expect(src).toMatch(/const\s+dryRun\s*=\s*options\?\.dryRun\s*!==\s*false/)
+  })
 })

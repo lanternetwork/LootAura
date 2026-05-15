@@ -345,7 +345,10 @@ export interface ReconcileExternalSourcesOptions {
   readonly limit?: number
   readonly nowMs?: number
   readonly telemetryContext?: Record<string, unknown>
-  /** When true, compute fingerprints/classification but do not write `ingested_sales`. */
+  /**
+   * When false, persist reconciliation metadata (and Phase 2A `sales` updates when `applySafeSync` is true).
+   * Omitted or true: read-only (no `ingested_sales` / `sales` writes). Matches `parseReconciliationRunBody` defaults.
+   */
   readonly dryRun?: boolean
   readonly sourcePlatform?: string
   readonly onlyPlaceholder?: boolean
@@ -356,7 +359,7 @@ export interface ReconcileExternalSourcesOptions {
   readonly aggregateTelemetryOnly?: boolean
   /**
    * Phase 2A: when true with `dryRun: false`, apply gated updates to linked public `sales` rows.
-   * Default false. Never runs when `dryRun` is true.
+   * Default false. Never runs when `dryRun` is omitted or true.
    */
   readonly applySafeSync?: boolean
 }
@@ -368,7 +371,7 @@ export interface ReconcileExternalSourcesOptions {
 export async function reconcileExternalSources(options?: ReconcileExternalSourcesOptions): Promise<ReconcileExternalSourcesResult> {
   const started = Date.now()
   const nowMs = options?.nowMs ?? Date.now()
-  const dryRun = options?.dryRun === true
+  const dryRun = options?.dryRun !== false
   const aggregateOnly = options?.aggregateTelemetryOnly === true
   const applySafeSyncRequested = options?.applySafeSync === true
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_BATCH_LIMIT, 1), RECONCILIATION_HARD_LIMIT_CAP)
@@ -782,6 +785,9 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         if (syncRes.imagesUpdated) imagesUpdated += 1
         if (syncRes.schedulesUpdated) schedulesUpdated += 1
         if (syncRes.titlesUpdated) titlesUpdated += 1
+        if (syncRes.mirroredIngestSchedule && !dryRun) {
+          persistenceWrites += 1
+        }
       } else {
         salesSyncSkipped += 1
       }

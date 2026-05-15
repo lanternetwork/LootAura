@@ -18,10 +18,10 @@ import {
   hashHostForReconciliationTelemetry,
 } from '@/lib/reconciliation/reconciliationTelemetry'
 import { detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
-import type { ReconciledScheduleBundleResult } from '@/lib/reconciliation/reconciledScheduleBundle'
 import {
   RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH,
   buildReconciliationIngestFingerprint,
+  type ReconciledScheduleBundleResult,
 } from '@/lib/reconciliation/reconciledScheduleBundle'
 import {
   computeIngestVsSaleAddressManualReview,

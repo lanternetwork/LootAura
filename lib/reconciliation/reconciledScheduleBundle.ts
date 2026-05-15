@@ -7,6 +7,8 @@ import {
   computeImageHash,
 } from '@/lib/reconciliation/sourceHashing'
 
+export { RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH }
+
 export type ScheduleBundleProvenance =
   | 'parsed_snapshot'
   | 'prose_window'

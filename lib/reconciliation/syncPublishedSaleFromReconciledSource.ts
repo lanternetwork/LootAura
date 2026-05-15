@@ -363,6 +363,9 @@ export interface SafePublishedSaleSyncRunResult {
   readonly scheduleMutationInhibitedReason?: string
   /** True after a successful Phase 2A schedule write when ingest row was aligned from `sales`. */
   readonly mirroredIngestSchedule?: boolean
+  /** Sale row differed from canonical bundle while `schedule_changed` was absent. */
+  readonly scheduleDriftFromBundle?: boolean
+  readonly scheduleBundleReason?: string | null
 }
 
 /**
@@ -439,6 +442,83 @@ export async function mirrorIngestScheduleFieldsFromPublishedSalePhase2A(
   return true
 }
 
+export type SaleScheduleForBundleCompare = {
+  readonly date_start: string | null
+  readonly date_end: string | null
+  readonly time_start: string | null
+  readonly time_end: string | null
+}
+
+/** Normalize schedule date columns for strict equality (null/empty → null). */
+export function normalizeScheduleDateField(value: string | null | undefined): string | null {
+  return normalizeTextOrNull(value)
+}
+
+/** Normalize schedule time columns to `HH:MM:SS` for strict equality. */
+export function normalizeScheduleTimeField(value: string | null | undefined): string | null {
+  const t = normalizeTextOrNull(value)
+  if (!t) return null
+  const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
+  if (!m) return t
+  const hour = Number.parseInt(m[1], 10)
+  const min = Number.parseInt(m[2], 10)
+  const sec = m[3] != null ? Number.parseInt(m[3], 10) : 0
+  if (!Number.isFinite(hour) || !Number.isFinite(min) || !Number.isFinite(sec)) return t
+  return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+}
+
+/**
+ * True when persisted `sales` schedule columns differ from a valid canonical reconciliation bundle.
+ * Ingest `time_*` are not consulted — only the published sale row vs bundle authority.
+ */
+export function saleScheduleDiffersFromCanonicalBundle(
+  sale: SaleScheduleForBundleCompare,
+  bundle: ReconciledScheduleBundleResult
+): boolean {
+  if (!bundle.ok) return false
+  const saleNorm = {
+    date_start: normalizeScheduleDateField(sale.date_start),
+    date_end: normalizeScheduleDateField(sale.date_end),
+    time_start: normalizeScheduleTimeField(sale.time_start),
+    time_end: normalizeScheduleTimeField(sale.time_end),
+  }
+  const bundleNorm = {
+    date_start: normalizeScheduleDateField(bundle.dateStart),
+    date_end: normalizeScheduleDateField(bundle.dateEnd),
+    time_start: normalizeScheduleTimeField(bundle.timeStart),
+    time_end: normalizeScheduleTimeField(bundle.timeEnd),
+  }
+  return (
+    saleNorm.date_start !== bundleNorm.date_start ||
+    saleNorm.date_end !== bundleNorm.date_end ||
+    saleNorm.time_start !== bundleNorm.time_start ||
+    saleNorm.time_end !== bundleNorm.time_end
+  )
+}
+
+export function resolvePhase2aScheduleSyncGate(params: {
+  readonly classes: readonly ReconciliationChangeClass[]
+  readonly priorFingerprint: IngestFingerprint
+  readonly nextFingerprint: IngestFingerprint
+  readonly sale: SaleScheduleForBundleCompare
+  readonly scheduleBundleResult: ReconciledScheduleBundleResult
+}): {
+  readonly scheduleGate: boolean
+  readonly scheduleDriftFromBundle: boolean
+  readonly scheduleBundleReason: string | null
+} {
+  const { classes, priorFingerprint, nextFingerprint, sale, scheduleBundleResult } = params
+  const scheduleBundleReason = scheduleBundleResult.ok ? scheduleBundleResult.schedule_bundle_reason : null
+  if (!scheduleBundleResult.ok) {
+    return { scheduleGate: false, scheduleDriftFromBundle: false, scheduleBundleReason }
+  }
+  const hashScheduleChanged =
+    classes.includes('schedule_changed') && priorFingerprint.scheduleHash !== nextFingerprint.scheduleHash
+  const scheduleDriftFromBundle = saleScheduleDiffersFromCanonicalBundle(sale, scheduleBundleResult)
+  const scheduleGate = hashScheduleChanged || scheduleDriftFromBundle
+  return { scheduleGate, scheduleDriftFromBundle, scheduleBundleReason }
+}
+
 export async function buildSafePublishedSaleSyncPatch(params: {
   readonly admin: AdminDbForSaleEnds
   readonly sale: SaleRowForSync
@@ -470,6 +550,8 @@ export async function buildSafePublishedSaleSyncPatch(params: {
   schedulesUpdated: boolean
   scheduleMutationInhibited?: boolean
   scheduleMutationInhibitedReason?: string
+  scheduleDriftFromBundle: boolean
+  scheduleBundleReason: string | null
 }> {
   const { sale, snapshot, ingest, classes, priorFingerprint, nextFingerprint, city, state, admin, rowId, saleId, scheduleBundleResult } =
     params
@@ -550,13 +632,23 @@ export async function buildSafePublishedSaleSyncPatch(params: {
     }
   }
 
-  const scheduleGate =
-    classes.includes('schedule_changed') && priorFingerprint.scheduleHash !== nextFingerprint.scheduleHash
+  const { scheduleGate, scheduleDriftFromBundle, scheduleBundleReason } = resolvePhase2aScheduleSyncGate({
+    classes,
+    priorFingerprint,
+    nextFingerprint,
+    sale: {
+      date_start: sale.date_start,
+      date_end: sale.date_end,
+      time_start: sale.time_start,
+      time_end: sale.time_end,
+    },
+    scheduleBundleResult,
+  })
 
   let scheduleMutationInhibited: boolean | undefined
   let scheduleMutationInhibitedReason: string | undefined
 
-  if (scheduleGate && scheduleBundleResult.ok) {
+  if (scheduleGate) {
     const b = scheduleBundleResult
     const lat = Number(sale.lat ?? ingest.lat ?? NaN)
     const lng = Number(sale.lng ?? ingest.lng ?? NaN)
@@ -604,6 +696,8 @@ export async function buildSafePublishedSaleSyncPatch(params: {
     schedulesUpdated,
     scheduleMutationInhibited,
     scheduleMutationInhibitedReason,
+    scheduleDriftFromBundle,
+    scheduleBundleReason,
   }
 }
 
@@ -683,6 +777,8 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       imagesUpdated: false,
       schedulesUpdated: false,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: false,
+      scheduleBundleReason: null,
     }
   }
 
@@ -698,6 +794,8 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       imagesUpdated: false,
       schedulesUpdated: false,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: false,
+      scheduleBundleReason: null,
     }
   }
 
@@ -712,10 +810,26 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       imagesUpdated: false,
       schedulesUpdated: false,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: false,
+      scheduleBundleReason: null,
     }
   }
 
-  if (!reconciliationClassesAllowSafeSaleSync(ctx.classes)) {
+  const phase2aScheduleGate = resolvePhase2aScheduleSyncGate({
+    classes: ctx.classes,
+    priorFingerprint: ctx.priorFingerprint,
+    nextFingerprint: ctx.nextFingerprint,
+    sale: {
+      date_start: sale.date_start,
+      date_end: sale.date_end,
+      time_start: sale.time_start,
+      time_end: sale.time_end,
+    },
+    scheduleBundleResult: ctx.scheduleBundleResult,
+  })
+  const allowScheduleDriftOnly = phase2aScheduleGate.scheduleDriftFromBundle
+
+  if (!reconciliationClassesAllowSafeSaleSync(ctx.classes) && !allowScheduleDriftOnly) {
     return {
       outcome: 'skipped',
       skipReason: 'no_safe_class',
@@ -726,10 +840,15 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       imagesUpdated: false,
       schedulesUpdated: false,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: false,
+      scheduleBundleReason: phase2aScheduleGate.scheduleBundleReason,
     }
   }
 
-  if (!fingerprintsDifferMaterially(ctx.priorFingerprint, ctx.nextFingerprint)) {
+  if (
+    !fingerprintsDifferMaterially(ctx.priorFingerprint, ctx.nextFingerprint) &&
+    !allowScheduleDriftOnly
+  ) {
     return {
       outcome: 'skipped',
       skipReason: 'no_hash_delta',
@@ -740,6 +859,8 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       imagesUpdated: false,
       schedulesUpdated: false,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: false,
+      scheduleBundleReason: phase2aScheduleGate.scheduleBundleReason,
     }
   }
 
@@ -769,6 +890,8 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       imagesUpdated: false,
       schedulesUpdated: false,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: built.scheduleDriftFromBundle,
+      scheduleBundleReason: built.scheduleBundleReason,
     }
   }
 
@@ -787,6 +910,8 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       scheduleMutationInhibited: built.scheduleMutationInhibited,
       scheduleMutationInhibitedReason: built.scheduleMutationInhibitedReason,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: built.scheduleDriftFromBundle,
+      scheduleBundleReason: built.scheduleBundleReason,
     }
   }
 
@@ -810,6 +935,8 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       descriptionsUpdated: false,
       schedulesUpdated: false,
       mirroredIngestSchedule: false,
+      scheduleDriftFromBundle: built.scheduleDriftFromBundle,
+      scheduleBundleReason: built.scheduleBundleReason,
     }
   }
 
@@ -833,5 +960,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
     scheduleMutationInhibited: built.scheduleMutationInhibited,
     scheduleMutationInhibitedReason: built.scheduleMutationInhibitedReason,
     mirroredIngestSchedule,
+    scheduleDriftFromBundle: built.scheduleDriftFromBundle,
+    scheduleBundleReason: built.scheduleBundleReason,
   }
 }

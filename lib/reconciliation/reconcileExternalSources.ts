@@ -27,6 +27,7 @@ import {
   computeIngestVsSaleAddressManualReview,
   fingerprintsDifferMaterially,
   reconciliationClassesAllowSafeSaleSync,
+  saleScheduleDiffersFromCanonicalBundle,
   tryApplySafePublishedSaleSyncFromReconciliation,
 } from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
 import type {
@@ -743,14 +744,28 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     }
 
     const fpDiff = fingerprintsDifferMaterially(priorFp, nextFingerprint)
+    const scheduleDriftFromBundle =
+      !parseFailed &&
+      nextScheduleBundle?.ok === true &&
+      salePeekSched != null &&
+      saleScheduleDiffersFromCanonicalBundle(
+        {
+          date_start: salePeekSched.date_start,
+          date_end: salePeekSched.date_end,
+          time_start: salePeekSched.time_start,
+          time_end: salePeekSched.time_end,
+        },
+        nextScheduleBundle
+      )
     const canSalesSync =
       applySafeSyncRequested &&
       !parseFailed &&
       parsed &&
       row.published_sale_id &&
       refreshCapability === 'server_refetch_supported' &&
-      reconciliationClassesAllowSafeSaleSync(classification.classes as readonly ReconciliationChangeClass[]) &&
-      fpDiff
+      (reconciliationClassesAllowSafeSaleSync(classification.classes as readonly ReconciliationChangeClass[]) ||
+        scheduleDriftFromBundle) &&
+      (fpDiff || scheduleDriftFromBundle)
 
     if (canSalesSync && row.published_sale_id && nextScheduleBundle) {
       const publishedSaleId = row.published_sale_id
@@ -806,6 +821,24 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         if (!detErr) {
           persistenceWrites += 1
           manualReviewRequired += 1
+        }
+      }
+
+      if (
+        !dryRun &&
+        (syncRes.schedulesUpdated || syncRes.scheduleDriftFromBundle === true) &&
+        syncRes.scheduleBundleReason
+      ) {
+        const mergedDetails: Record<string, unknown> = {
+          ...details,
+          schedule_drift_from_bundle: syncRes.scheduleDriftFromBundle === true,
+          schedule_bundle_reason: syncRes.scheduleBundleReason,
+        }
+        const { error: detErr } = await fromBase(admin, 'ingested_sales')
+          .update({ source_reconciliation_details: mergedDetails })
+          .eq('id', row.id)
+        if (!detErr) {
+          persistenceWrites += 1
         }
       }
     }

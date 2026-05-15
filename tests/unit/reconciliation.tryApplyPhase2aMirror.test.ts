@@ -220,6 +220,10 @@ describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mi
   })
 
   it('does not mirror when schedulesUpdated is false (description-only Phase 2A)', async () => {
+    const prevTimeStart = tryApplyCtx.initialSale.time_start
+    const prevTimeEnd = tryApplyCtx.initialSale.time_end
+    tryApplyCtx.initialSale.time_start = '09:00:00'
+    tryApplyCtx.initialSale.time_end = '15:00:00'
     const longExisting = tryApplyCtx.initialSale.description!
     const longerNext = `${longExisting}NEW_PARAGRAPH_WITH_SUBSTANTIVE_CONTENT_FOR_SAFE_SYNC_POLICY`
     const res = await tryApplySafePublishedSaleSyncFromReconciliation({} as never, {
@@ -234,5 +238,7 @@ describe('tryApplySafePublishedSaleSyncFromReconciliation — ingest schedule mi
     expect(res.schedulesUpdated).toBe(false)
     expect(res.mirroredIngestSchedule).toBe(false)
     expect(tryApplyCtx.ingestedUpdatePayloads).toHaveLength(0)
+    tryApplyCtx.initialSale.time_start = prevTimeStart
+    tryApplyCtx.initialSale.time_end = prevTimeEnd
   })
 })

@@ -88,3 +88,46 @@ export function emitReconciliationRowFailed(fields: {
     })
   )
 }
+
+/** Single aggregate line per operator/cron run (no row ids, no URLs). */
+export function emitReconciliationRunSummary(fields: {
+  readonly runMode: 'dry_run' | 'persist_metadata'
+  readonly dryRun: boolean
+  readonly persistenceApplied: boolean
+  readonly attempted: number
+  readonly processed: number
+  readonly changed: number
+  readonly unchanged: number
+  readonly failed: number
+  readonly parseFailed: number
+  readonly sourceMissingSoft: number
+  readonly placeholderResolved: number
+  readonly unsupportedSource: number
+  readonly refreshCapabilityServer: number
+  readonly refreshCapabilityExtension: number
+  readonly refreshCapabilityUnsupported: number
+  readonly durationMs: number
+  readonly telemetryContext?: Record<string, unknown>
+}): void {
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.reconciliation.runSummary, {
+      ...(fields.telemetryContext ?? {}),
+      runMode: fields.runMode,
+      dryRun: fields.dryRun,
+      persistenceApplied: fields.persistenceApplied,
+      attempted: fields.attempted,
+      processed: fields.processed,
+      changed: fields.changed,
+      unchanged: fields.unchanged,
+      failed: fields.failed,
+      parseFailed: fields.parseFailed,
+      sourceMissingSoft: fields.sourceMissingSoft,
+      placeholderResolved: fields.placeholderResolved,
+      unsupportedSource: fields.unsupportedSource,
+      refreshCapabilityServer: fields.refreshCapabilityServer,
+      refreshCapabilityExtension: fields.refreshCapabilityExtension,
+      refreshCapabilityUnsupported: fields.refreshCapabilityUnsupported,
+      durationMs: fields.durationMs,
+    })
+  )
+}

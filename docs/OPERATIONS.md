@@ -1,6 +1,6 @@
 # Operations Guide
 
-**Last updated: 2026-05-12**
+**Last updated: 2026-05-13**
 
 ## Rate Limiting Operations
 
@@ -470,7 +470,71 @@ Optional: `parser_version`, `source_type`. Malformed metadata **fails** harness 
 
 Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, `parser.source.failing`, `parser.source.recovered`, `parser.fixture.stale`).
 
+### External source reconciliation — Phase 1B (detection-only runner)
+
+**Purpose:** Run **bounded**, **detection-only** reconciliation in production so operators can inspect aggregate signals before any **Phase 2** work that would synchronize public `sales` rows. Phase 1B **never** updates `sales` (titles, descriptions, images, schedules, archive, or cancellation).
+
+**Related:** `GET /api/admin/reconciliation/health` (ingest-side health snapshot). Phase 1B **runner** is `POST /api/admin/reconciliation/run`.
+
+#### Authentication and limits
+
+- **Admin session** or **`Authorization: Bearer <CRON_SECRET>`** (optional cron-style invocation; no new schedules are required for Phase 1B).
+- Rate limiting matches other admin tooling: `ADMIN_TOOLS` and `ADMIN_HOURLY` (see `lib/rateLimit/policies.ts`).
+
+#### Request body (JSON)
+
+| Field | Default | Notes |
+|--------|---------|--------|
+| `limit` | `25` | Hard-capped at **100** per request. |
+| `dryRun` | **`true`** | Must send **`"dryRun": false`** explicitly to allow metadata writes. |
+| `sourcePlatform` | omitted | If set, only ingest rows whose `source_platform` matches (trimmed string). |
+| `onlyPlaceholder` | `false` | If **`true`**, only candidates that are placeholder-flagged or detectable as placeholders. |
+
+Candidate ordering stays **deterministic** (same selection ordering as the worker; the run applies `limit` to the head of that ordered list).
+
+#### Dry run vs metadata persistence
+
+- **`dryRun: true` (default):** Fetches and parses where the source is **server refetch supported**; computes fingerprints, classification, and all aggregate counters. **Does not persist** reconciliation metadata on `ingested_sales` (no side effects on stored reconciliation fields from this mode).
+- **`dryRun: false`:** May **persist only** `ingested_sales` reconciliation / sync metadata (same ingest-only columns as Phase 1A-style reconciliation). **Does not** write to public **`sales`**.
+
+The JSON response includes **`persistenceApplied`**: `true` only when the run was not a dry run and at least one ingest row received a successful metadata write.
+
+#### Response counters (aggregate only)
+
+Responses and Phase 1B telemetry intentionally omit raw URLs, raw descriptions, and raw HTML.
+
+- **`attempted`** — Rows matching filters after linked ingest load (full candidate set for this run’s filter).
+- **`processed`** — Rows actually evaluated in this request: `min(attempted, limit)`.
+- **`changed` / `unchanged` / `failed`** — Outcome buckets for the processed batch.
+- **`parseFailed`** — Reconciliation parse did not yield a usable listing snapshot (investigate parser health and source DOM drift; use fixture and parser ops above—not raw page dumps in logs).
+- **`sourceMissingSoft`** — Fetch layer reported missing or empty HTML (transport, blocking, or treat-as-missing policy).
+- **`placeholderResolved`** — Classifier recorded a placeholder-resolution class where applicable (aggregate count).
+- **`unsupportedSource`** — Count of rows that are **not** server-refetch-supported for reconciliation (overlaps with capability tallies; see below).
+- **`refreshCapability`** — Three counts, **per processed row**, by source capability:
+  - **`serverRefetchSupported`** — Server-side refetch allowed for this row’s source; fetch/parse path may run.
+  - **`extensionAssistedRequired`** — Known source pattern that needs extension-assisted capture (no server refetch in this phase).
+  - **`unsupportedForReconciliation`** — Not reconcilable via the current server path.
+
+Not every host or `source_platform` is server-refreshable; use these three counts to see how much of the backlog is actionable in Phase 1B without the extension.
+
+#### Telemetry
+
+Each runner invocation emits a **single** aggregate record: **`source.reconciliation.run_summary`** (`ObservabilityEvents.reconciliation.runSummary` in `lib/observability/events.ts`), including **`runMode`**: `dry_run` or `persist_metadata`, plus the same aggregate counters as the HTTP response. Per-row reconciliation telemetry is **not** emitted on this route (avoids log noise).
+
+#### Operator runbook
+
+1. **Dry reconciliation (recommended first):** `POST` with `{}` or `{ "limit": 20 }`. Defaults **`dryRun: true`**. Review `changed`, `parseFailed`, `sourceMissingSoft`, and `refreshCapability`.
+2. **Metadata persistence:** `POST` with `{ "dryRun": false, "limit": <N> }` only after dry runs look acceptable. Confirm **`persistenceApplied`** in the response.
+3. **Targeted runs:** Use `sourcePlatform` and/or `onlyPlaceholder` to narrow cohorts.
+4. **Interpretation:** High **`parseFailed`** → parser regression and adapter health (Tier 0). High **`extensionAssistedRequired`** or **`unsupportedForReconciliation`** → expect limited server-only coverage until extension-assisted or Phase 2 designs exist.
+
+#### When Phase 2 may be considered
+
+Phase 2 would introduce **controlled synchronization** from reconciled source truth into **public `sales`** (copy, scheduling, media, etc.), with its own safety review. Do **not** enable public-sale mutation from Phase 1B; ingestion metadata and health signals must be stable and trusted first.
+
 ### Cross-service operational flow
+
+1. Start from a **correlation key** in the report or alert (`requestId`, `jobId`, `saleId`, or a tight time window) so the same unit of work can be traced across services.
 2. Filter logs for that id across cron, workers, and API latency events.
 3. For backlog stalls: compare **Redis queue** telemetry versus **DB geocode worker** `claimed` and `queuePressureClass`.
 4. For archive backlog: use **`stalePendingTotalAfter`** and **`maxIterationsHit`** on `archive.sales.job_summary`.

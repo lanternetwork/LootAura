@@ -11,14 +11,17 @@ import {
   emitReconciliationRowChanged,
   emitReconciliationRowFailed,
   emitReconciliationRowNoChange,
+  emitReconciliationRunSummary,
   emitReconciliationStarted,
   hashHostForReconciliationTelemetry,
 } from '@/lib/reconciliation/reconciliationTelemetry'
 import { detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
 import { fingerprintFromParts } from '@/lib/reconciliation/sourceHashing'
-import type { IngestFingerprint, ReconciliationCandidateRow, SourceSyncStatus } from '@/lib/reconciliation/types'
+import type { IngestFingerprint, ReconciliationCandidateRow, SourceRefreshCapability, SourceSyncStatus } from '@/lib/reconciliation/types'
 
 const DEFAULT_BATCH_LIMIT = 25
+/** Global hard cap for reconciliation batch size (Phase 1B admin runner). */
+export const RECONCILIATION_HARD_LIMIT_CAP = 100
 const SALES_PREFETCH_CAP = 500
 
 type IngestRowDb = {
@@ -114,6 +117,25 @@ function toCandidate(row: IngestRowDb): ReconciliationCandidateRow {
   }
 }
 
+function applyCandidateFilters(
+  rows: readonly IngestRowDb[],
+  opts: { readonly sourcePlatform?: string; readonly onlyPlaceholder?: boolean }
+): IngestRowDb[] {
+  let out = [...rows]
+  if (opts.sourcePlatform && opts.sourcePlatform.trim()) {
+    const p = opts.sourcePlatform.trim()
+    out = out.filter((r) => r.source_platform === p)
+  }
+  if (opts.onlyPlaceholder) {
+    out = out.filter((r) => {
+      if (r.source_placeholder_detected) return true
+      const imgs = extractPublishImageCandidates(r.raw_payload, r.image_source_url)
+      return detectPlaceholderListing({ description: r.description, imageUrls: imgs }).isPlaceholder
+    })
+  }
+  return out
+}
+
 async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, nowMs: number): Promise<IngestRowDb[]> {
   const isoNow = new Date(nowMs).toISOString()
   const { data: saleRows, error: saleErr } = await fromBase(admin, 'sales')
@@ -133,7 +155,9 @@ async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, now
     return []
   }
 
-  const eligible = (saleRows as Array<{ id: string; ingested_sale_id: string | null; moderation_status: string | null }>).filter(
+  const eligible = (
+    saleRows as Array<{ id: string; ingested_sale_id: string | null; moderation_status: string | null }>
+  ).filter(
     (s) =>
       s.ingested_sale_id &&
       (s.moderation_status == null || s.moderation_status.trim() === '' || s.moderation_status !== 'hidden_by_admin')
@@ -216,46 +240,93 @@ function resolveSyncStatus(params: {
   return 'unchanged'
 }
 
+function bumpCapability(cap: SourceRefreshCapability, tallies: Record<SourceRefreshCapability, number>): void {
+  tallies[cap] += 1
+}
+
 export interface ReconcileExternalSourcesResult {
+  readonly attempted: number
   readonly processed: number
   readonly changed: number
   readonly unchanged: number
   readonly failed: number
+  readonly parseFailed: number
+  readonly sourceMissingSoft: number
+  readonly placeholderResolved: number
+  readonly unsupportedSource: number
+  readonly refreshCapability: {
+    readonly serverRefetchSupported: number
+    readonly extensionAssistedRequired: number
+    readonly unsupportedForReconciliation: number
+  }
+  readonly persistenceApplied: boolean
+  readonly dryRun: boolean
 }
 
 export interface ReconcileExternalSourcesOptions {
   readonly limit?: number
   readonly nowMs?: number
   readonly telemetryContext?: Record<string, unknown>
+  /** When true, compute fingerprints/classification but do not write `ingested_sales`. */
+  readonly dryRun?: boolean
+  readonly sourcePlatform?: string
+  readonly onlyPlaceholder?: boolean
+  /**
+   * When true, emit only `source.reconciliation.run_summary` (no per-row telemetry).
+   * Phase 1B admin runner sets this; leave false for granular diagnostics.
+   */
+  readonly aggregateTelemetryOnly?: boolean
 }
 
 /**
- * Phase 1A detection-only reconciliation: refetch, parse, hash, classify, persist metadata on ingested_sales only.
+ * Phase 1A/1B detection-only reconciliation: refetch (when server-supported), parse, hash, classify;
+ * optionally persist metadata on `ingested_sales` only. Never mutates `sales`.
  */
 export async function reconcileExternalSources(options?: ReconcileExternalSourcesOptions): Promise<ReconcileExternalSourcesResult> {
   const started = Date.now()
   const nowMs = options?.nowMs ?? Date.now()
-  const limit = Math.min(Math.max(options?.limit ?? DEFAULT_BATCH_LIMIT, 1), 200)
+  const dryRun = options?.dryRun === true
+  const aggregateOnly = options?.aggregateTelemetryOnly === true
+  const limit = Math.min(Math.max(options?.limit ?? DEFAULT_BATCH_LIMIT, 1), RECONCILIATION_HARD_LIMIT_CAP)
   const admin = getAdminDb()
 
   const rawRows = await loadCandidateIngestRows(admin, nowMs)
+  const filtered = applyCandidateFilters(rawRows, {
+    sourcePlatform: options?.sourcePlatform,
+    onlyPlaceholder: options?.onlyPlaceholder,
+  })
   const ordered = orderReconciliationCandidates(
-    rawRows.map(toCandidate),
+    filtered.map(toCandidate),
     nowMs
   )
   const idOrder = new Map(ordered.map((r, i) => [r.id, i]))
-  const sortedRows = [...rawRows].sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0))
+  const sortedRows = [...filtered].sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0))
+  const attempted = sortedRows.length
   const batch = sortedRows.slice(0, limit)
+  const processed = batch.length
 
-  emitReconciliationStarted({
-    batchLimit: limit,
-    candidateCount: batch.length,
-    telemetryContext: options?.telemetryContext,
-  })
+  let persistenceWrites = 0
+
+  if (!aggregateOnly) {
+    emitReconciliationStarted({
+      batchLimit: limit,
+      candidateCount: batch.length,
+      telemetryContext: options?.telemetryContext,
+    })
+  }
 
   let changed = 0
   let unchanged = 0
   let failed = 0
+  let parseFailedCount = 0
+  let sourceMissingSoftCount = 0
+  let placeholderResolvedCount = 0
+  let unsupportedSourceCount = 0
+  const capTallies: Record<SourceRefreshCapability, number> = {
+    server_refetch_supported: 0,
+    extension_assisted_required: 0,
+    unsupported_for_reconciliation: 0,
+  }
 
   for (const row of batch) {
     const rowStarted = Date.now()
@@ -265,6 +336,77 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       hostHash = hashHostForReconciliationTelemetry(host)
     } catch {
       hostHash = null
+    }
+
+    const refreshHost = (() => {
+      try {
+        return new URL(row.source_url).hostname
+      } catch {
+        return ''
+      }
+    })()
+    const refreshCapability = resolveSourceRefreshCapability({
+      sourcePlatform: row.source_platform,
+      sourceHost: refreshHost,
+    })
+    bumpCapability(refreshCapability, capTallies)
+    if (refreshCapability !== 'server_refetch_supported') {
+      unsupportedSourceCount += 1
+    }
+
+    if (refreshCapability !== 'server_refetch_supported') {
+      const priorFp = priorFingerprintFromRow(row)
+      const priorImages = extractPublishImageCandidates(row.raw_payload, row.image_source_url)
+      const priorPlaceholder = detectPlaceholderListing({
+        description: row.description,
+        imageUrls: priorImages,
+      }).isPlaceholder
+      const classification = classifyReconciliationChange({
+        priorFingerprint: priorFp,
+        nextFingerprint: priorFp,
+        priorPlaceholder,
+        nextPlaceholder: priorPlaceholder,
+      })
+      const details = {
+        refreshCapability,
+        changeClasses: classification.classes,
+        primaryChange: classification.primary,
+        parseMatched: false,
+        skipReason: 'refresh_capability_not_server' as const,
+      }
+      const status = resolveSyncStatus({ parseFailed: false, fetchFailed: false, classes: classification.classes })
+      if (!dryRun) {
+        const { error: upErr } = await fromBase(admin, 'ingested_sales')
+          .update({
+            last_source_sync_at: new Date(nowMs).toISOString(),
+            source_reconciliation_details: details,
+            source_sync_status: status,
+            source_cancelled_detected: false,
+          })
+          .eq('id', row.id)
+        if (upErr) {
+          failed += 1
+          if (!aggregateOnly) {
+            emitReconciliationRowFailed({
+              hostHash,
+              reason: 'db_update_failed',
+              durationMs: Date.now() - rowStarted,
+              telemetryContext: options?.telemetryContext,
+            })
+          }
+          continue
+        }
+        persistenceWrites += 1
+      }
+      unchanged += 1
+      if (!aggregateOnly) {
+        emitReconciliationRowNoChange({
+          hostHash: hostHash ?? 'unknown',
+          durationMs: Date.now() - rowStarted,
+          telemetryContext: options?.telemetryContext,
+        })
+      }
+      continue
     }
 
     const attempts = (row.source_sync_attempt_count ?? 0) + 1
@@ -292,6 +434,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     const failureCount = fetchFailed ? (row.source_sync_failure_count ?? 0) + 1 : row.source_sync_failure_count ?? 0
 
     if (fetchFailed || html == null) {
+      sourceMissingSoftCount += 1
       const classification = classifyReconciliationChange({
         priorFingerprint: priorFp,
         nextFingerprint: priorFp,
@@ -304,52 +447,48 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         fetchFailed: true,
         classes: classification.classes,
       })
-      const refreshHost = (() => {
-        try {
-          return new URL(row.source_url).hostname
-        } catch {
-          return ''
-        }
-      })()
-      const refreshCapability = resolveSourceRefreshCapability({
-        sourcePlatform: row.source_platform,
-        sourceHost: refreshHost,
-      })
       const details = {
         refreshCapability,
         changeClasses: classification.classes,
         primaryChange: classification.primary,
         parseMatched: false,
       }
-      const { error: upErr } = await fromBase(admin, 'ingested_sales')
-        .update({
-          last_source_sync_at: new Date(nowMs).toISOString(),
-          source_sync_attempt_count: attempts,
-          source_sync_failure_count: failureCount,
-          source_missing_count: missingCount,
-          source_sync_status: status,
-          source_reconciliation_details: details,
-          source_cancelled_detected: false,
-        })
-        .eq('id', row.id)
+      if (!dryRun) {
+        const { error: upErr } = await fromBase(admin, 'ingested_sales')
+          .update({
+            last_source_sync_at: new Date(nowMs).toISOString(),
+            source_sync_attempt_count: attempts,
+            source_sync_failure_count: failureCount,
+            source_missing_count: missingCount,
+            source_sync_status: status,
+            source_reconciliation_details: details,
+            source_cancelled_detected: false,
+          })
+          .eq('id', row.id)
 
-      if (upErr) {
-        failed += 1
-        emitReconciliationRowFailed({
-          hostHash,
-          reason: 'db_update_failed',
-          durationMs: Date.now() - rowStarted,
-          telemetryContext: options?.telemetryContext,
-        })
-        continue
+        if (upErr) {
+          failed += 1
+          if (!aggregateOnly) {
+            emitReconciliationRowFailed({
+              hostHash,
+              reason: 'db_update_failed',
+              durationMs: Date.now() - rowStarted,
+              telemetryContext: options?.telemetryContext,
+            })
+          }
+          continue
+        }
+        persistenceWrites += 1
       }
 
       unchanged += 1
-      emitReconciliationRowNoChange({
-        hostHash: hostHash ?? 'unknown',
-        durationMs: Date.now() - rowStarted,
-        telemetryContext: options?.telemetryContext,
-      })
+      if (!aggregateOnly) {
+        emitReconciliationRowNoChange({
+          hostHash: hostHash ?? 'unknown',
+          durationMs: Date.now() - rowStarted,
+          telemetryContext: options?.telemetryContext,
+        })
+      }
       continue
     }
 
@@ -362,6 +501,9 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     })
 
     const parseFailed = parsed == null
+    if (parseFailed) {
+      parseFailedCount += 1
+    }
     const nextFingerprint = parseFailed
       ? priorFp
       : fingerprintFromParts({
@@ -391,22 +533,14 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       sourceMissingSoft: false,
     })
 
+    if (classification.classes.includes('placeholder_resolved')) {
+      placeholderResolvedCount += 1
+    }
+
     const status = resolveSyncStatus({
       parseFailed,
       fetchFailed: false,
       classes: classification.classes,
-    })
-
-    const refreshHost = (() => {
-      try {
-        return new URL(row.source_url).hostname
-      } catch {
-        return ''
-      }
-    })()
-    const refreshCapability = resolveSourceRefreshCapability({
-      sourcePlatform: row.source_platform,
-      sourceHost: refreshHost,
     })
 
     const details = {
@@ -425,32 +559,37 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
 
     const nextFailureCount = parseFailed ? (row.source_sync_failure_count ?? 0) + 1 : 0
 
-    const { error: upErr } = await fromBase(admin, 'ingested_sales')
-      .update({
-        last_source_sync_at: new Date(nowMs).toISOString(),
-        last_source_change_at: nextLastChangeAt,
-        source_sync_attempt_count: attempts,
-        source_sync_failure_count: nextFailureCount,
-        source_missing_count: 0,
-        source_content_hash: nextFingerprint.contentHash,
-        source_schedule_hash: nextFingerprint.scheduleHash,
-        source_image_hash: nextFingerprint.imageHash,
-        source_placeholder_detected: nextPlaceholder,
-        source_sync_status: status,
-        source_reconciliation_details: details,
-        source_cancelled_detected: false,
-      })
-      .eq('id', row.id)
+    if (!dryRun) {
+      const { error: upErr } = await fromBase(admin, 'ingested_sales')
+        .update({
+          last_source_sync_at: new Date(nowMs).toISOString(),
+          last_source_change_at: nextLastChangeAt,
+          source_sync_attempt_count: attempts,
+          source_sync_failure_count: nextFailureCount,
+          source_missing_count: 0,
+          source_content_hash: nextFingerprint.contentHash,
+          source_schedule_hash: nextFingerprint.scheduleHash,
+          source_image_hash: nextFingerprint.imageHash,
+          source_placeholder_detected: nextPlaceholder,
+          source_sync_status: status,
+          source_reconciliation_details: details,
+          source_cancelled_detected: false,
+        })
+        .eq('id', row.id)
 
-    if (upErr) {
-      failed += 1
-      emitReconciliationRowFailed({
-        hostHash,
-        reason: 'db_update_failed',
-        durationMs: Date.now() - rowStarted,
-        telemetryContext: options?.telemetryContext,
-      })
-      continue
+      if (upErr) {
+        failed += 1
+        if (!aggregateOnly) {
+          emitReconciliationRowFailed({
+            hostHash,
+            reason: 'db_update_failed',
+            durationMs: Date.now() - rowStarted,
+            telemetryContext: options?.telemetryContext,
+          })
+        }
+        continue
+      }
+      persistenceWrites += 1
     }
 
     const isChanged =
@@ -466,31 +605,77 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
 
     if (isChanged) {
       changed += 1
-      emitReconciliationRowChanged({
-        hostHash: hostHash ?? 'unknown',
-        primary: classification.primary,
-        classCount: classification.classes.length,
-        durationMs: Date.now() - rowStarted,
-        telemetryContext: options?.telemetryContext,
-      })
+      if (!aggregateOnly) {
+        emitReconciliationRowChanged({
+          hostHash: hostHash ?? 'unknown',
+          primary: classification.primary,
+          classCount: classification.classes.length,
+          durationMs: Date.now() - rowStarted,
+          telemetryContext: options?.telemetryContext,
+        })
+      }
     } else {
       unchanged += 1
-      emitReconciliationRowNoChange({
-        hostHash: hostHash ?? 'unknown',
-        durationMs: Date.now() - rowStarted,
-        telemetryContext: options?.telemetryContext,
-      })
+      if (!aggregateOnly) {
+        emitReconciliationRowNoChange({
+          hostHash: hostHash ?? 'unknown',
+          durationMs: Date.now() - rowStarted,
+          telemetryContext: options?.telemetryContext,
+        })
+      }
     }
   }
 
-  emitReconciliationCompleted({
-    processed: batch.length,
+  const persistenceApplied = !dryRun && persistenceWrites > 0
+  const durationMs = Date.now() - started
+
+  if (aggregateOnly) {
+    emitReconciliationRunSummary({
+      runMode: dryRun ? 'dry_run' : 'persist_metadata',
+      dryRun,
+      persistenceApplied,
+      attempted,
+      processed,
+      changed,
+      unchanged,
+      failed,
+      parseFailed: parseFailedCount,
+      sourceMissingSoft: sourceMissingSoftCount,
+      placeholderResolved: placeholderResolvedCount,
+      unsupportedSource: unsupportedSourceCount,
+      refreshCapabilityServer: capTallies.server_refetch_supported,
+      refreshCapabilityExtension: capTallies.extension_assisted_required,
+      refreshCapabilityUnsupported: capTallies.unsupported_for_reconciliation,
+      durationMs,
+      telemetryContext: options?.telemetryContext,
+    })
+  } else {
+    emitReconciliationCompleted({
+      processed: batch.length,
+      changed,
+      unchanged,
+      failed,
+      durationMs,
+      telemetryContext: options?.telemetryContext,
+    })
+  }
+
+  return {
+    attempted,
+    processed,
     changed,
     unchanged,
     failed,
-    durationMs: Date.now() - started,
-    telemetryContext: options?.telemetryContext,
-  })
-
-  return { processed: batch.length, changed, unchanged, failed }
+    parseFailed: parseFailedCount,
+    sourceMissingSoft: sourceMissingSoftCount,
+    placeholderResolved: placeholderResolvedCount,
+    unsupportedSource: unsupportedSourceCount,
+    refreshCapability: {
+      serverRefetchSupported: capTallies.server_refetch_supported,
+      extensionAssistedRequired: capTallies.extension_assisted_required,
+      unsupportedForReconciliation: capTallies.unsupported_for_reconciliation,
+    },
+    persistenceApplied,
+    dryRun,
+  }
 }

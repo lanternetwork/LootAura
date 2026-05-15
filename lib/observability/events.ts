@@ -71,6 +71,8 @@ export const ObservabilityEvents = {
     changed: 'source.reconciliation.changed',
     noChange: 'source.reconciliation.no_change',
     failed: 'source.reconciliation.failed',
+    /** Aggregate-only run summary (Phase 1B runner; no per-row payloads). */
+    runSummary: 'source.reconciliation.run_summary',
   },
 } as const
 

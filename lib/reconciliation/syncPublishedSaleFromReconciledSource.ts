@@ -648,7 +648,7 @@ export async function buildSafePublishedSaleSyncPatch(params: {
   let scheduleMutationInhibited: boolean | undefined
   let scheduleMutationInhibitedReason: string | undefined
 
-  if (scheduleGate) {
+  if (scheduleGate && scheduleBundleResult.ok) {
     const b = scheduleBundleResult
     const lat = Number(sale.lat ?? ingest.lat ?? NaN)
     const lng = Number(sale.lng ?? ingest.lng ?? NaN)

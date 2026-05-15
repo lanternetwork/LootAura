@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
 
 const { dnsLookup } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
@@ -55,7 +56,7 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
       rowId: '11111111-1111-4111-8111-111111111111',
       city: 'A',
       state: 'B',
-      max: 3,
+      max: MAX_IMPORTED_LISTING_IMAGES,
     })
     expect(out).toEqual([])
     expect(fetchSpy).not.toHaveBeenCalled()
@@ -75,7 +76,7 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
         rowId: '11111111-1111-4111-8111-111111111111',
         city: 'A',
         state: 'B',
-        max: 3,
+        max: MAX_IMPORTED_LISTING_IMAGES,
       })
       expect(out).toEqual([])
     }
@@ -92,7 +93,7 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
         rowId: '11111111-1111-4111-8111-111111111111',
         city: 'A',
         state: 'B',
-        max: 3,
+        max: MAX_IMPORTED_LISTING_IMAGES,
       }
     )
     expect(out).toEqual([])
@@ -127,7 +128,7 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
       rowId: '22222222-2222-4222-8222-222222222222',
       city: 'A',
       state: 'B',
-      max: 3,
+      max: MAX_IMPORTED_LISTING_IMAGES,
     })
     expect(out).toEqual([])
   })

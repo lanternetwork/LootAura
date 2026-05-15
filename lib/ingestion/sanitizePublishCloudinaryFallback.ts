@@ -3,6 +3,7 @@
  * imported from instrumentation (e.g. ingestedSalesRepair → normalizeAddressForPublish) do not
  * pull Node-only `externalImageValidation` into the Next client bundle.
  */
+import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 import type { PublishableIngestedSale } from '@/lib/ingestion/publish'
 
@@ -16,7 +17,7 @@ export async function mergeSanitizedCloudinaryIntoPublishable(sale: PublishableI
     rowId: sale.id,
     city: sale.city,
     state: sale.state,
-    max: 3,
+    max: MAX_IMPORTED_LISTING_IMAGES,
   })
   if (sanitized.length > 0) {
     sale.image_urls = sanitized

@@ -113,17 +113,19 @@ describe('parseExternalPageSourceHtml', () => {
     expect(listings).toHaveLength(1)
   })
 
-  it('extracts image candidates as normalized HTTPS with max 3 and sets imageSourceUrl', async () => {
+  it('extracts up to 10 image candidates in DOM order and sets imageSourceUrl', async () => {
     const { parseExternalPageSourceHtml } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const imgTags = Array.from(
+      { length: 10 },
+      (_, i) => `<img src="https://cdn.example.com/img-${i + 1}.jpg" />`
+    ).join('\n')
     const html = `
       <meta property="og:image" content="/images/og-photo.jpg" />
       <a href="https://example.com/US/Illinois/Chicago/1-A/99/listing.html">One</a>
       <div>
-        <img src="https://cdn.example.com/a.jpg" />
-        <img src="/gallery/b.jpg" />
+        ${imgTags}
+        <img src="https://cdn.example.com/img-1.jpg" />
         <img src="http://cdn.example.com/insecure.jpg" />
-        <img src="https://cdn.example.com/a.jpg" />
-        <img src="https://cdn.example.com/c.jpg" />
       </div>
     `
     const { listings } = parseExternalPageSourceHtml(
@@ -133,11 +135,18 @@ describe('parseExternalPageSourceHtml', () => {
     )
     expect(listings).toHaveLength(1)
     expect(listings[0].rawPayload.imageUrls).toEqual([
-      'https://cdn.example.com/a.jpg',
-      'https://example.com/gallery/b.jpg',
-      'https://cdn.example.com/c.jpg',
+      'https://cdn.example.com/img-1.jpg',
+      'https://cdn.example.com/img-2.jpg',
+      'https://cdn.example.com/img-3.jpg',
+      'https://cdn.example.com/img-4.jpg',
+      'https://cdn.example.com/img-5.jpg',
+      'https://cdn.example.com/img-6.jpg',
+      'https://cdn.example.com/img-7.jpg',
+      'https://cdn.example.com/img-8.jpg',
+      'https://cdn.example.com/img-9.jpg',
+      'https://cdn.example.com/img-10.jpg',
     ])
-    expect(listings[0].imageSourceUrl).toBe('https://cdn.example.com/a.jpg')
+    expect(listings[0].imageSourceUrl).toBe('https://cdn.example.com/img-1.jpg')
   })
 
   it('extracts lazy image attributes and srcset near listing anchors', async () => {

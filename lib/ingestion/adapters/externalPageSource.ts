@@ -1,6 +1,7 @@
 import { createHash } from 'crypto'
 import { JSDOM } from 'jsdom'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
 import { logger } from '@/lib/log'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
@@ -775,7 +776,7 @@ export function parseExternalPageSourceHtml(
       chosenAddressSource = 'nearby'
     }
     let { start: startDate, end: endDate } = extractDateRangeFromText(nearby)
-    let imageUrls = collectImageUrlsForListing(a, document, pageUrl, 3)
+    let imageUrls = collectImageUrlsForListing(a, document, pageUrl, MAX_IMPORTED_LISTING_IMAGES)
 
     // Fallback extraction when critical fields are missing from the primary parse.
     if (!addressRaw || !startDate) {
@@ -814,7 +815,7 @@ export function parseExternalPageSourceHtml(
         if (!startDate && meta.startDate) startDate = meta.startDate
         if (!endDate && meta.endDate) endDate = meta.endDate
         if (imageUrls.length === 0 && Array.isArray(meta.imageUrls) && meta.imageUrls.length > 0) {
-          imageUrls = meta.imageUrls.slice(0, 3)
+          imageUrls = meta.imageUrls.slice(0, MAX_IMPORTED_LISTING_IMAGES)
         }
       }
     }

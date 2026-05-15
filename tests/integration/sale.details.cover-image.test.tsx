@@ -186,4 +186,23 @@ describe('SaleDetailClient cover image rendering', () => {
       'https://res.cloudinary.com/demo/image/upload/v1/3.jpg'
     )
   })
+
+  it('renders up to 10 gallery thumbnails for trusted hosts', () => {
+    const images = Array.from({ length: 10 }, (_, i) => `https://res.cloudinary.com/demo/image/upload/v1/t${i + 1}.jpg`)
+    mockGetSaleCoverUrl.mockReturnValue({
+      url: images[0],
+      alt: 'Trusted image',
+    })
+    const saleWithTen = {
+      ...mockSale,
+      cover_image_url: images[0],
+      images,
+    }
+
+    render(<SaleDetailClient sale={saleWithTen as any} displayCategories={[]} items={[]} />)
+
+    for (let i = 0; i < 10; i += 1) {
+      expect(screen.getAllByLabelText(`Show sale image ${i + 1}`).length).toBeGreaterThan(0)
+    }
+  })
 })

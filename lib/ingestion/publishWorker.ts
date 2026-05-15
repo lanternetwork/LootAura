@@ -14,13 +14,13 @@ import { isPublishingRowStaleReclaimBlockedByPastEndDateValidation } from '@/lib
 import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandidates'
 
 export { extractPublishImageCandidates }
+import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
 import {
-  existingSaleImagesReplaceable,
+  computeImportedListingImageSyncIntent,
   looksGenericDescription,
   looksGenericTitle,
   looksPollutedDescription,
   normalizeAddressForPublishSafe,
-  normalizeImageArray,
   normalizeTextOrNull,
 } from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
 import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
@@ -604,7 +604,7 @@ async function sanitizePublishImagesForRecord(record: ClaimedPublishRow): Promis
       rowId: record.id,
       city: record.city,
       state: record.state,
-      max: 3,
+      max: MAX_IMPORTED_LISTING_IMAGES,
     })
     if (candidates.length > 0 && sanitized.length === 0) {
       logger.warn('Publish image candidates rejected by sanitizer; continuing without images', {
@@ -681,17 +681,17 @@ async function maybeSyncExistingSaleFromLatestIngest(
   bestEffortPatch.date_end = normalizedDateEnd
   bestEffortPatch.time_start = normalizedTimeStart
   bestEffortPatch.time_end = normalizedTimeEnd
-  if (sanitizedImages.length > 0) {
-    bestEffortPatch.cover_image_url = sanitizedImages[0]
-    bestEffortPatch.images = sanitizedImages
-  }
-
   const attemptBestEffortSync = async (reason: string): Promise<void> => {
     try {
-      if (Object.keys(bestEffortPatch).length === 0) return
+      const payload: Record<string, unknown> = { ...bestEffortPatch }
+      if (sanitizedImages.length > 0) {
+        payload.cover_image_url = sanitizedImages[0]
+        payload.images = sanitizedImages
+      }
+      if (Object.keys(payload).length === 0) return
       const admin = getAdminDb()
       const { error: fallbackErr } = await fromBase(admin, 'sales')
-        .update(bestEffortPatch)
+        .update(payload)
         .eq('id', saleId)
       if (fallbackErr) {
         logger.warn('Existing linked sale best-effort sync failed; continuing publish', {
@@ -774,6 +774,8 @@ async function maybeSyncExistingSaleFromLatestIngest(
     const normalizedDescription = normalizeTextOrNull(record.description)
 
     const patch: Record<string, unknown> = { ...bestEffortPatch }
+    delete patch.images
+    delete patch.cover_image_url
     const saleCity = normalizeTextOrNull(row.city) || city
     const saleState = normalizeTextOrNull(row.state) || state
     const existingAddressNormalized =
@@ -799,20 +801,12 @@ async function maybeSyncExistingSaleFromLatestIngest(
     }
 
     if (sanitizedImages.length > 0) {
-      const existingImages = normalizeImageArray(row.images)
-      const shouldReplaceMedia = existingSaleImagesReplaceable(row)
-      const shouldExpandMedia = !shouldReplaceMedia && sanitizedImages.length > existingImages.length
-      if (shouldReplaceMedia || shouldExpandMedia) {
-        patch.images = sanitizedImages
-        const existingCover = normalizeTextOrNull(row.cover_image_url)
-        if (existingCover && sanitizedImages.includes(existingCover)) {
-          patch.cover_image_url = existingCover
-        } else {
-          patch.cover_image_url = sanitizedImages[0]
-        }
-      } else {
-        delete patch.cover_image_url
-        delete patch.images
+      const intent = computeImportedListingImageSyncIntent({ sale: row, sanitizedImages })
+      if (intent.kind === 'full') {
+        patch.images = intent.images
+        patch.cover_image_url = intent.cover_image_url
+      } else if (intent.kind === 'cover_only') {
+        patch.cover_image_url = intent.cover_image_url
       }
     }
 

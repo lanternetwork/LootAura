@@ -1,4 +1,5 @@
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
 import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandidates'
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
@@ -8,7 +9,7 @@ import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristi
 import { logger } from '@/lib/log'
 import { resolvePersistableSaleEndsAt, type AdminDbForSaleEnds } from '@/lib/sales/resolvePersistableSaleEndsAt'
 import { fromBase } from '@/lib/supabase/clients'
-import { descriptionHasPlaceholderProse } from '@/lib/reconciliation/placeholderDetection'
+import { descriptionHasPlaceholderProse, detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
 import type { ReconciledScheduleBundleResult } from '@/lib/reconciliation/reconciledScheduleBundle'
 import type { ParsedListingSnapshotForReconciliation } from '@/lib/reconciliation/reconciliationParseSnapshot'
 import type { IngestFingerprint, ReconciliationChangeClass } from '@/lib/reconciliation/types'
@@ -73,6 +74,74 @@ export function existingSaleImagesReplaceable(row: {
   if (!cover) return true
   if (isLogoLikeImageUrl(cover)) return true
   return false
+}
+
+/** Imported sale gallery is "healthy" when it has multiple real photos and is not a placeholder listing. */
+export function saleGalleryIsHealthyForShrinkProtection(row: {
+  images: unknown
+  description: string | null | undefined
+}): boolean {
+  const existingImages = normalizeImageArray(row.images)
+  const validPhotoCount = existingImages.filter((u) => !isLogoLikeImageUrl(u)).length
+  if (validPhotoCount < 2) return false
+  return !detectPlaceholderListing({ description: row.description ?? null, imageUrls: existingImages }).isPlaceholder
+}
+
+export type ImportedListingImageSyncIntent =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'full'; readonly images: string[]; readonly cover_image_url: string }
+  | { readonly kind: 'cover_only'; readonly cover_image_url: string }
+
+function pickCoverForSyncedGallery(existingCover: string | null, sanitized: readonly string[]): string {
+  const ec = normalizeTextOrNull(existingCover)
+  if (ec && sanitized.includes(ec)) return ec
+  return sanitized[0]!
+}
+
+export function computeImportedListingImageSyncIntent(params: {
+  sale: { cover_image_url: string | null; images: unknown; description: string | null | undefined }
+  sanitizedImages: readonly string[]
+}): ImportedListingImageSyncIntent {
+  const sanitized = [...params.sanitizedImages]
+  if (sanitized.length === 0) return { kind: 'none' }
+
+  const existingImages = normalizeImageArray(params.sale.images)
+  const healthy = saleGalleryIsHealthyForShrinkProtection(params.sale)
+
+  if (healthy) {
+    if (sanitized.length < existingImages.length) {
+      const cover = normalizeTextOrNull(params.sale.cover_image_url)
+      const firstGood = existingImages.find((u) => !isLogoLikeImageUrl(u)) ?? null
+      if (cover && isLogoLikeImageUrl(cover) && firstGood) {
+        return { kind: 'cover_only', cover_image_url: firstGood }
+      }
+      return { kind: 'none' }
+    }
+    return {
+      kind: 'full',
+      images: sanitized,
+      cover_image_url: pickCoverForSyncedGallery(params.sale.cover_image_url, sanitized),
+    }
+  }
+
+  const shouldReplaceMedia = existingSaleImagesReplaceable(params.sale)
+  const existingAllNonBranding =
+    existingImages.length > 0 && existingImages.every((u) => !isLogoLikeImageUrl(u))
+  const sourceClearlyInferior =
+    !shouldReplaceMedia &&
+    sanitized.length < existingImages.length &&
+    existingAllNonBranding
+  const shouldExpandMedia =
+    !shouldReplaceMedia && !sourceClearlyInferior && sanitized.length > existingImages.length
+
+  if (shouldReplaceMedia || shouldExpandMedia) {
+    return {
+      kind: 'full',
+      images: sanitized,
+      cover_image_url: pickCoverForSyncedGallery(params.sale.cover_image_url, sanitized),
+    }
+  }
+  return { kind: 'none' }
 }
 
 export function looksGenericTitle(value: string | null | undefined, city: string | null): boolean {
@@ -370,10 +439,6 @@ export async function mirrorIngestScheduleFieldsFromPublishedSalePhase2A(
   return true
 }
 
-function sortImageUrlsDeterministic(urls: readonly string[]): string[] {
-  return [...urls].map((u) => u.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b))
-}
-
 export async function buildSafePublishedSaleSyncPatch(params: {
   readonly admin: AdminDbForSaleEnds
   readonly sale: SaleRowForSync
@@ -436,31 +501,25 @@ export async function buildSafePublishedSaleSyncPatch(params: {
     rowId,
     city,
     state,
-    max: 10,
+    max: MAX_IMPORTED_LISTING_IMAGES,
   })
-  const sanitizedImages = sortImageUrlsDeterministic(sanitizedRaw)
+  const sanitizedImages = sanitizedRaw
 
   if (classes.some((c) => c === 'images_changed' || c === 'placeholder_resolved') && sanitizedImages.length > 0) {
-    const existingImages = normalizeImageArray(sale.images)
-    const shouldReplaceMedia = existingSaleImagesReplaceable(sale)
-    const existingAllNonBranding =
-      existingImages.length > 0 && existingImages.every((u) => !isLogoLikeImageUrl(u))
-    const sourceClearlyInferior =
-      !shouldReplaceMedia &&
-      sanitizedImages.length < existingImages.length &&
-      existingAllNonBranding
-
-    const shouldExpandMedia =
-      !shouldReplaceMedia && !sourceClearlyInferior && sanitizedImages.length > existingImages.length
-
-    if (shouldReplaceMedia || shouldExpandMedia) {
-      patch.images = sanitizedImages
-      const existingCover = normalizeTextOrNull(sale.cover_image_url)
-      if (existingCover && sanitizedImages.includes(existingCover)) {
-        patch.cover_image_url = existingCover
-      } else {
-        patch.cover_image_url = sanitizedImages[0]
-      }
+    const intent = computeImportedListingImageSyncIntent({
+      sale: {
+        cover_image_url: sale.cover_image_url,
+        images: sale.images,
+        description: sale.description,
+      },
+      sanitizedImages,
+    })
+    if (intent.kind === 'full') {
+      patch.images = intent.images
+      patch.cover_image_url = intent.cover_image_url
+      imagesUpdated = true
+    } else if (intent.kind === 'cover_only') {
+      patch.cover_image_url = intent.cover_image_url
       imagesUpdated = true
     }
   }

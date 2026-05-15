@@ -154,11 +154,10 @@ describe('Phase 2A Tinley Park safe sync patch', () => {
 
     expect(built.patch.address).toBeUndefined()
     expect(String(built.patch.description)).toContain('Full estate')
-    expect(built.patch.images).toEqual(
-      ['https://cdn.example.com/lot-lamp.jpg', 'https://cdn.example.com/lot-table.jpg'].sort((a, b) =>
-        a.localeCompare(b)
-      )
-    )
+    expect(built.patch.images).toEqual([
+      'https://cdn.example.com/lot-table.jpg',
+      'https://cdn.example.com/lot-lamp.jpg',
+    ])
     expect(built.patch.time_end).toBe('15:00:00')
     expect(built.patch.ends_at).toBe('2026-05-17T20:00:00.000Z')
     expect(built.descriptionsUpdated).toBe(true)

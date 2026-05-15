@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
 
 const { dnsLookup, loggerWarn, loggerInfo, loggerError, rpcMock, adminDb } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
@@ -209,13 +210,8 @@ describe('publish worker image consumption', () => {
     expect(body.image_urls).toEqual(['https://images.example.org/ok.jpg'])
   })
 
-  it('enforces max 3 images after validation', async () => {
-    const urls = [
-      'https://a.example.org/1.jpg',
-      'https://b.example.org/2.jpg',
-      'https://c.example.org/3.jpg',
-      'https://d.example.org/4.jpg',
-    ]
+  it(`enforces max ${MAX_IMPORTED_LISTING_IMAGES} images after validation`, async () => {
+    const urls = Array.from({ length: MAX_IMPORTED_LISTING_IMAGES + 2 }, (_, i) => `https://x.example.org/p${i + 1}.jpg`)
     mockIngestedSalesClaimSequence(
       baseRow({
         raw_payload: { imageUrls: urls },
@@ -226,8 +222,8 @@ describe('publish worker image consumption', () => {
     const { publishReadyIngestedSaleById } = await import('@/lib/ingestion/publishWorker')
     await publishReadyIngestedSaleById('33333333-3333-4333-8333-333333333333')
     const body = createPublishedSaleMock.mock.calls[0][0]
-    expect(body.image_urls?.length).toBe(3)
-    expect(body.image_urls).toEqual(urls.slice(0, 3))
+    expect(body.image_urls?.length).toBe(MAX_IMPORTED_LISTING_IMAGES)
+    expect(body.image_urls).toEqual(urls.slice(0, MAX_IMPORTED_LISTING_IMAGES))
   })
 })
 

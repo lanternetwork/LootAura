@@ -11,6 +11,7 @@ const EXT_ROOT = join(__dirname, '../../../browser-extension')
 /** Set after loading extension script in jsdom (globalThis on `window`). */
 interface WindowWithListingImage extends Window {
   LootAuraListingImage: {
+    MAX_IMPORTED_LISTING_IMAGES: number
     extractListingPrimaryImageUrl: (doc: Document, pageUrl: string) => string | null
     extractListingImageUrls: (doc: Document, pageUrl: string, max?: number) => string[]
   }
@@ -30,6 +31,79 @@ function listingWindow(dom: JSDOM): WindowWithListingImage {
 }
 
 describe('listingImageExtraction (browser extension)', () => {
+  it('exports MAX_IMPORTED_LISTING_IMAGES aligned with backend cap (10)', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+      url: 'https://yardsaletreasuremap.com/x/listing.html',
+      ...JSDOM_SCRIPT_OPTIONS,
+    })
+    const win = listingWindow(dom)
+    expect(win.LootAuraListingImage.MAX_IMPORTED_LISTING_IMAGES).toBe(10)
+  })
+
+  it('returns up to 10 distinct ranked listing images when many are present', () => {
+    const rows = Array.from({ length: 12 }, (_, i) => {
+      const id = String(i + 1).padStart(2, '0')
+      return `<img src="https://yardsaletreasuremap.com/uploads/listing/img${id}.jpg" width="600" height="400" alt="p${id}"/>`
+    }).join('\n')
+    const dom = new JSDOM(
+      `<!doctype html><html><body>
+        <main class="content"><h1>Yard sale</h1>${rows}</main>
+      </body></html>`,
+      {
+        url: 'https://yardsaletreasuremap.com/US/Illinois/Oak-Lawn/x/1/listing.html',
+        ...JSDOM_SCRIPT_OPTIONS,
+      }
+    )
+    const win = listingWindow(dom)
+    const { extractListingImageUrls, MAX_IMPORTED_LISTING_IMAGES } = win.LootAuraListingImage
+    const urls = extractListingImageUrls(dom.window.document, dom.window.location.href, MAX_IMPORTED_LISTING_IMAGES)
+    expect(urls).toHaveLength(10)
+    expect(new Set(urls).size).toBe(10)
+    expect(extractListingImageUrls(dom.window.document, dom.window.location.href, MAX_IMPORTED_LISTING_IMAGES)).toEqual(
+      urls
+    )
+  })
+
+  it('still caps at caller max when below 10', () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>
+        <main class="content">
+          <h1>Sale</h1>
+          ${[1, 2, 3, 4, 5]
+            .map(
+              (n) =>
+                `<img src="https://yardsaletreasuremap.com/uploads/a${n}.jpg" width="600" height="400"/>`
+            )
+            .join('')}
+        </main>
+      </body></html>`,
+      { url: 'https://yardsaletreasuremap.com/x/listing.html', ...JSDOM_SCRIPT_OPTIONS }
+    )
+    const win = listingWindow(dom)
+    const urls = win.LootAuraListingImage.extractListingImageUrls(dom.window.document, dom.window.location.href, 3)
+    expect(urls).toHaveLength(3)
+  })
+
+  it('dedupes identical image URLs across multiple img elements', () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>
+        <main class="content">
+          <h1>Sale</h1>
+          <img src="https://yardsaletreasuremap.com/uploads/same.jpg" width="600" height="400"/>
+          <img src="https://yardsaletreasuremap.com/uploads/same.jpg" width="500" height="400"/>
+          <img src="https://yardsaletreasuremap.com/uploads/other.jpg" width="600" height="400"/>
+        </main>
+      </body></html>`,
+      { url: 'https://yardsaletreasuremap.com/x/listing.html', ...JSDOM_SCRIPT_OPTIONS }
+    )
+    const win = listingWindow(dom)
+    const urls = win.LootAuraListingImage.extractListingImageUrls(dom.window.document, dom.window.location.href, 10)
+    expect(urls).toEqual([
+      'https://yardsaletreasuremap.com/uploads/same.jpg',
+      'https://yardsaletreasuremap.com/uploads/other.jpg',
+    ])
+  })
+
   it('rejects YSTM site logo and prefers listing content image', () => {
     const dom = new JSDOM(
       `<!doctype html><html><body>

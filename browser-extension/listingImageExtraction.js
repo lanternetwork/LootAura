@@ -11,6 +11,9 @@
 (function (global) {
   "use strict";
 
+  /** Must match backend `MAX_IMPORTED_LISTING_IMAGES`; extension upload sends at most this many URLs. */
+  const MAX_IMPORTED_LISTING_IMAGES = 10;
+
   const REJECT_SUBSTRINGS = [
     "logo",
     "site_logo",
@@ -353,11 +356,13 @@
     }
 
     collectImagesUnder(doc.body, 20, pageUrl, bucket);
-    const cap = Number.isFinite(max) && max > 0 ? Math.min(max, 6) : 3;
+    const cap =
+      Number.isFinite(max) && max > 0 ? Math.min(max, MAX_IMPORTED_LISTING_IMAGES) : 3;
     return rankCandidates(bucket, cap);
   }
 
   global.LootAuraListingImage = {
+    MAX_IMPORTED_LISTING_IMAGES: MAX_IMPORTED_LISTING_IMAGES,
     extractListingPrimaryImageUrl: extractListingPrimaryImageUrl,
     extractListingImageUrls: extractListingImageUrls,
   };

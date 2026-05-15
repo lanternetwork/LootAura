@@ -1557,9 +1557,13 @@ function extractCityState(address) {
 function extractImages() {
   try {
     const imageApi = globalThis.LootAuraListingImage;
+    const maxImages =
+      imageApi && typeof imageApi.MAX_IMPORTED_LISTING_IMAGES === "number"
+        ? imageApi.MAX_IMPORTED_LISTING_IMAGES
+        : 10;
     const listFn = imageApi?.extractListingImageUrls;
     if (typeof listFn === "function") {
-      const urls = listFn(document, window.location.href, 3);
+      const urls = listFn(document, window.location.href, maxImages);
       if (Array.isArray(urls) && urls.length > 0) {
         return {
           primary: urls[0],
@@ -1916,6 +1920,7 @@ if (typeof globalThis !== "undefined") {
     isYstmCommunitySalePhpPage,
     resolveSalePhpCommunityCityState,
     buildSubmissionPayload,
+    extractImages,
     canonicalizeUrl,
     buildCardContextByUrlFromDom,
   };

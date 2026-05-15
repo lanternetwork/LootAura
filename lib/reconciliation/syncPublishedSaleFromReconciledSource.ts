@@ -7,7 +7,7 @@ import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateLi
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
 import { logger } from '@/lib/log'
-import { resolvePersistableSaleEndsAt, type AdminDbForSaleEnds } from '@/lib/sales/resolvePersistableSaleEndsAt'
+import type { AdminDbForSaleEnds } from '@/lib/sales/resolvePersistableSaleEndsAt'
 import { fromBase } from '@/lib/supabase/clients'
 import { descriptionHasPlaceholderProse, detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
 import type { ReconciledScheduleBundleResult } from '@/lib/reconciliation/reconciledScheduleBundle'
@@ -611,8 +611,8 @@ export async function buildSafePublishedSaleSyncPatch(params: {
       admin,
       refreshedDescription: snapshot.description,
       ingest: {
-        date_start: ingest.date_start ?? null,
-        date_end: ingest.date_end ?? null,
+        date_start: sale.date_start ?? snapshot.dateStart ?? null,
+        date_end: sale.date_end ?? snapshot.dateEnd ?? sale.date_start ?? snapshot.dateStart ?? null,
         time_start: ingest.time_start,
         time_end: ingest.time_end,
         raw_payload: ingest.raw_payload,

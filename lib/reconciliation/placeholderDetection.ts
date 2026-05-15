@@ -26,6 +26,12 @@ function hasPlaceholderPhrase(text: string): boolean {
   return DESCRIPTION_PHRASES.some((p) => n.includes(p))
 }
 
+/** True when description text matches known placeholder prose (ignores images). */
+export function descriptionHasPlaceholderProse(description: string | null | undefined): boolean {
+  const desc = typeof description === 'string' ? description : ''
+  return hasPlaceholderPhrase(desc)
+}
+
 function isLogoOnlyImages(imageUrls: readonly string[]): boolean {
   if (imageUrls.length === 0) return true
   const reasons = imageUrls.map((u) => urlSuggestsNonListingPhoto(u))
@@ -47,8 +53,6 @@ export function detectPlaceholderListing(input: {
   const urls = input.imageUrls.filter((u) => typeof u === 'string' && u.trim().length > 0)
   if (urls.length === 0) {
     reasons.push('no_images')
-  } else if (urls.length === 1) {
-    reasons.push('single_image')
   }
   if (urls.length > 0 && isLogoOnlyImages(urls)) {
     reasons.push('branding_or_non_listing_images_only')

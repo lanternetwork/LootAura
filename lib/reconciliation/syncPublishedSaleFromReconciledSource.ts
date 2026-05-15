@@ -6,10 +6,9 @@ import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateLi
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
 import { logger } from '@/lib/log'
-import type { AdminDbForSaleEnds } from '@/lib/sales/resolvePersistableSaleEndsAt'
-import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
+import { resolvePersistableSaleEndsAt, type AdminDbForSaleEnds } from '@/lib/sales/resolvePersistableSaleEndsAt'
 import { fromBase } from '@/lib/supabase/clients'
-import { detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
+import { descriptionHasPlaceholderProse } from '@/lib/reconciliation/placeholderDetection'
 import type { ParsedListingSnapshotForReconciliation } from '@/lib/reconciliation/reconciliationParseSnapshot'
 import type { IngestFingerprint, ReconciliationChangeClass } from '@/lib/reconciliation/types'
 
@@ -168,7 +167,7 @@ export function normalizeAddressForPublishSafe(
 function parseUs12hFragmentToDbTime(fragment: string): string | null {
   const m = fragment.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
   if (!m) return null
-  let h = Number(m[1])
+  const h = Number(m[1])
   const min = Number(m[2])
   const ap = m[3].toUpperCase()
   if (!Number.isFinite(h) || !Number.isFinite(min) || min < 0 || min > 59 || h < 1 || h > 12) return null
@@ -258,7 +257,7 @@ function shouldApplyDescriptionUpdate(params: {
 }): boolean {
   const n = normalizeTextOrNull(params.next)
   if (!n) return false
-  if (detectPlaceholderListing({ description: n, imageUrls: [] }).isPlaceholder) return false
+  if (descriptionHasPlaceholderProse(n)) return false
   const e = normalizeTextOrNull(params.existing)
 
   if (params.classes.includes('placeholder_resolved')) return true
@@ -359,7 +358,7 @@ export async function buildSafePublishedSaleSyncPatch(params: {
   const { sale, snapshot, ingest, classes, priorFingerprint, nextFingerprint, city, state, admin, rowId, saleId } =
     params
 
-  let manualReviewAddress = computeIngestVsSaleAddressManualReview({
+  const manualReviewAddress = computeIngestVsSaleAddressManualReview({
     ingestNormalizedAddress: ingest.normalized_address,
     ingestCity: city,
     ingestState: state,

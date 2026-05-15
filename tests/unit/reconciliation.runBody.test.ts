@@ -31,3 +31,9 @@ describe('parseReconciliationRunBody', () => {
     expect(parseReconciliationRunBody({ applySafeSync: false }).applySafeSync).toBe(false)
     expect(parseReconciliationRunBody({ applySafeSync: true }).applySafeSync).toBe(true)
   })
+
+  it('defaults limit to 25 when invalid', () => {
+    expect(parseReconciliationRunBody({ limit: 'x' }).limit).toBe(25)
+    expect(parseReconciliationRunBody({ limit: 0 }).limit).toBe(25)
+  })
+})

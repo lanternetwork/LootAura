@@ -38,6 +38,12 @@ const DEFAULT_BATCH_LIMIT = 25
 export const RECONCILIATION_HARD_LIMIT_CAP = 100
 const SALES_PREFETCH_CAP = 500
 
+type SalePeekForReconciliation = {
+  readonly address: string | null
+  readonly city: string | null
+  readonly state: string | null
+}
+
 type IngestRowDb = {
   id: string
   source_url: string
@@ -154,10 +160,13 @@ function applyCandidateFilters(
   return out
 }
 
-async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, nowMs: number): Promise<IngestRowDb[]> {
+async function loadCandidateIngestRows(
+  admin: ReturnType<typeof getAdminDb>,
+  nowMs: number
+): Promise<{ rows: IngestRowDb[]; salePeekBySaleId: ReadonlyMap<string, SalePeekForReconciliation> }> {
   const isoNow = new Date(nowMs).toISOString()
   const { data: saleRows, error: saleErr } = await fromBase(admin, 'sales')
-    .select('id, ends_at, ingested_sale_id, moderation_status')
+    .select('id, ends_at, ingested_sale_id, moderation_status, address, city, state')
     .eq('status', 'published')
     .is('archived_at', null)
     .not('ingested_sale_id', 'is', null)
@@ -170,11 +179,18 @@ async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, now
       operation: 'load_sales',
       message: saleErr?.message ?? 'no_rows',
     })
-    return []
+    return { rows: [], salePeekBySaleId: new Map() }
   }
 
   const eligible = (
-    saleRows as Array<{ id: string; ingested_sale_id: string | null; moderation_status: string | null }>
+    saleRows as Array<{
+      id: string
+      ingested_sale_id: string | null
+      moderation_status: string | null
+      address: string | null
+      city: string | null
+      state: string | null
+    }>
   ).filter(
     (s) =>
       s.ingested_sale_id &&
@@ -183,7 +199,14 @@ async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, now
 
   const ingestIds = [...new Set(eligible.map((s) => s.ingested_sale_id).filter((x): x is string => Boolean(x)))]
 
-  if (ingestIds.length === 0) return []
+  if (ingestIds.length === 0) return { rows: [], salePeekBySaleId: new Map() }
+
+  const salePeekBySaleId = new Map<string, SalePeekForReconciliation>(
+    eligible.map((s) => [
+      s.id,
+      { address: s.address ?? null, city: s.city ?? null, state: s.state ?? null },
+    ])
+  )
 
   const { data: ingestRows, error: ingestErr } = await fromBase(admin, 'ingested_sales')
     .select(
@@ -232,7 +255,7 @@ async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, now
       operation: 'load_ingested',
       message: ingestErr?.message ?? 'no_rows',
     })
-    return []
+    return { rows: [], salePeekBySaleId }
   }
 
   const saleById = new Map(eligible.map((s) => [s.id, s]))
@@ -245,7 +268,7 @@ async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, now
     return true
   })
 
-  return linked
+  return { rows: linked, salePeekBySaleId }
 }
 
 function resolveSyncStatus(params: {
@@ -327,7 +350,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_BATCH_LIMIT, 1), RECONCILIATION_HARD_LIMIT_CAP)
   const admin = getAdminDb()
 
-  const rawRows = await loadCandidateIngestRows(admin, nowMs)
+  const { rows: rawRows, salePeekBySaleId } = await loadCandidateIngestRows(admin, nowMs)
   const filtered = applyCandidateFilters(rawRows, {
     sourcePlatform: options?.sourcePlatform,
     onlyPlaceholder: options?.onlyPlaceholder,
@@ -590,19 +613,15 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
 
     let manualReviewAddr = false
     if (applySafeSyncRequested && !parseFailed && parsed && row.published_sale_id) {
-      const { data: peek } = await fromBase(admin, 'sales')
-        .select('address,city,state')
-        .eq('id', row.published_sale_id)
-        .maybeSingle()
-      if (peek && typeof peek === 'object') {
-        const p = peek as { address: string | null; city: string | null; state: string | null }
+      const peek = salePeekBySaleId.get(row.published_sale_id)
+      if (peek) {
         manualReviewAddr = computeIngestVsSaleAddressManualReview({
           ingestNormalizedAddress: row.normalized_address,
           ingestCity: row.city,
           ingestState: row.state,
-          saleAddress: p.address,
-          saleCity: p.city,
-          saleState: p.state,
+          saleAddress: peek.address,
+          saleCity: peek.city,
+          saleState: peek.state,
         })
       }
     }

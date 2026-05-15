@@ -49,7 +49,7 @@ function installChrome(win: WindowWithImageHarness) {
 }
 
 function loadScripts(dom: JSDOM) {
-  installChrome(dom.window as WindowWithImageHarness)
+  installChrome(dom.window as unknown as WindowWithImageHarness)
   runInContext(LISTING_IMAGE_SCRIPT, dom.getInternalVMContext())
   runInContext(CONTENT_SCRIPT, dom.getInternalVMContext())
 }

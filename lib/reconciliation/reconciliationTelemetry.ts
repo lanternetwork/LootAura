@@ -91,8 +91,9 @@ export function emitReconciliationRowFailed(fields: {
 
 /** Single aggregate line per operator/cron run (no row ids, no URLs). */
 export function emitReconciliationRunSummary(fields: {
-  readonly runMode: 'dry_run' | 'persist_metadata'
+  readonly runMode: 'dry_run' | 'persist_metadata' | 'persist_metadata_sales_sync'
   readonly dryRun: boolean
+  readonly applySafeSync: boolean
   readonly persistenceApplied: boolean
   readonly attempted: number
   readonly processed: number
@@ -106,6 +107,14 @@ export function emitReconciliationRunSummary(fields: {
   readonly refreshCapabilityServer: number
   readonly refreshCapabilityExtension: number
   readonly refreshCapabilityUnsupported: number
+  readonly salesSyncAttempted: number
+  readonly salesSyncUpdated: number
+  readonly salesSyncSkipped: number
+  readonly descriptionsUpdated: number
+  readonly imagesUpdated: number
+  readonly schedulesUpdated: number
+  readonly titlesUpdated: number
+  readonly manualReviewRequired: number
   readonly durationMs: number
   readonly telemetryContext?: Record<string, unknown>
 }): void {
@@ -114,6 +123,7 @@ export function emitReconciliationRunSummary(fields: {
       ...(fields.telemetryContext ?? {}),
       runMode: fields.runMode,
       dryRun: fields.dryRun,
+      applySafeSync: fields.applySafeSync,
       persistenceApplied: fields.persistenceApplied,
       attempted: fields.attempted,
       processed: fields.processed,
@@ -127,7 +137,49 @@ export function emitReconciliationRunSummary(fields: {
       refreshCapabilityServer: fields.refreshCapabilityServer,
       refreshCapabilityExtension: fields.refreshCapabilityExtension,
       refreshCapabilityUnsupported: fields.refreshCapabilityUnsupported,
+      salesSyncAttempted: fields.salesSyncAttempted,
+      salesSyncUpdated: fields.salesSyncUpdated,
+      salesSyncSkipped: fields.salesSyncSkipped,
+      descriptionsUpdated: fields.descriptionsUpdated,
+      imagesUpdated: fields.imagesUpdated,
+      schedulesUpdated: fields.schedulesUpdated,
+      titlesUpdated: fields.titlesUpdated,
+      manualReviewRequired: fields.manualReviewRequired,
       durationMs: fields.durationMs,
+    })
+  )
+}
+
+export function emitReconciliationSalesSyncApplied(fields: {
+  readonly salesSyncUpdated: number
+  readonly descriptionsUpdated: number
+  readonly imagesUpdated: number
+  readonly schedulesUpdated: number
+  readonly titlesUpdated: number
+  readonly telemetryContext?: Record<string, unknown>
+}): void {
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.reconciliation.salesSyncApplied, {
+      ...(fields.telemetryContext ?? {}),
+      salesSyncUpdated: fields.salesSyncUpdated,
+      descriptionsUpdated: fields.descriptionsUpdated,
+      imagesUpdated: fields.imagesUpdated,
+      schedulesUpdated: fields.schedulesUpdated,
+      titlesUpdated: fields.titlesUpdated,
+    })
+  )
+}
+
+export function emitReconciliationSalesSyncSkipped(fields: {
+  readonly salesSyncSkipped: number
+  readonly salesSyncAttempted: number
+  readonly telemetryContext?: Record<string, unknown>
+}): void {
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.reconciliation.salesSyncSkipped, {
+      ...(fields.telemetryContext ?? {}),
+      salesSyncSkipped: fields.salesSyncSkipped,
+      salesSyncAttempted: fields.salesSyncAttempted,
     })
   )
 }

@@ -472,7 +472,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 ### External source reconciliation — Phase 1B (detection-only runner)
 
-**Purpose:** Run **bounded**, **detection-only** reconciliation in production so operators can inspect aggregate signals before any **Phase 2** work that would synchronize public `sales` rows. Phase 1B **never** updates `sales` (titles, descriptions, images, schedules, archive, or cancellation).
+**Purpose:** Run **bounded** reconciliation in production. By default the runner is **detection-only** (Phase 1B): it refreshes server-supported sources, classifies drift, and can persist metadata on **`ingested_sales`** without touching public **`sales`**. Optional **Phase 2A** (`applySafeSync: true` with `dryRun: false`) applies **gated** updates to **existing linked published sales** only (see Phase 2A runbook below). Neither phase performs cancellation, archive-on-source-removal, or address relocation.
 
 **Related:** `GET /api/admin/reconciliation/health` (ingest-side health snapshot). Phase 1B **runner** is `POST /api/admin/reconciliation/run`.
 
@@ -519,18 +519,26 @@ Not every host or `source_platform` is server-refreshable; use these three count
 
 #### Telemetry
 
-Each runner invocation emits a **single** aggregate record: **`source.reconciliation.run_summary`** (`ObservabilityEvents.reconciliation.runSummary` in `lib/observability/events.ts`), including **`runMode`**: `dry_run` or `persist_metadata`, plus the same aggregate counters as the HTTP response. Per-row reconciliation telemetry is **not** emitted on this route (avoids log noise).
+Each runner invocation emits a **single** aggregate record: **`source.reconciliation.run_summary`**, including **`runMode`**: `dry_run`, `persist_metadata`, or `persist_metadata_sales_sync` (when `applySafeSync` was requested and `dryRun` is false), plus aggregate counters aligned with the HTTP response. Optional sparse companions when safe sync is enabled: **`source.reconciliation.sales_sync_applied`** and **`source.reconciliation.sales_sync_skipped`** (counts only; no URLs, addresses, or descriptions). Per-row reconciliation telemetry is **not** emitted on this route.
 
 #### Operator runbook
 
 1. **Dry reconciliation (recommended first):** `POST` with `{}` or `{ "limit": 20 }`. Defaults **`dryRun: true`**. Review `changed`, `parseFailed`, `sourceMissingSoft`, and `refreshCapability`.
 2. **Metadata persistence:** `POST` with `{ "dryRun": false, "limit": <N> }` only after dry runs look acceptable. Confirm **`persistenceApplied`** in the response.
-3. **Targeted runs:** Use `sourcePlatform` and/or `onlyPlaceholder` to narrow cohorts.
-4. **Interpretation:** High **`parseFailed`** → parser regression and adapter health (Tier 0). High **`extensionAssistedRequired`** or **`unsupportedForReconciliation`** → expect limited server-only coverage until extension-assisted or Phase 2 designs exist.
+3. **Phase 2A — safe public sale sync (optional):** `POST` with `{ "dryRun": false, "applySafeSync": true, "limit": <N> }` only after ingest metadata persistence looks good. This path may update **existing linked published `sales`** rows (title/description/images/cover/schedule/`ends_at`/`listing_timezone`/`updated_at` only) when reconciliation classifies **material** changes (`description_changed`, `images_changed`, `schedule_changed`, `placeholder_resolved`) and fingerprints differ. **`applySafeSync` defaults to false** and must be sent explicitly as **`true`**. **`dryRun: true` never mutates `sales`** (or ingest). Response includes **`publicSalesUpdated`** (boolean) and counters: **`salesSyncAttempted`**, **`salesSyncUpdated`**, **`salesSyncSkipped`**, **`descriptionsUpdated`**, **`imagesUpdated`**, **`schedulesUpdated`**, **`titlesUpdated`**, **`manualReviewRequired`** (address drift vs published display line — **no relocation** in Phase 2A).
+4. **Targeted runs:** Use `sourcePlatform` and/or `onlyPlaceholder` to narrow cohorts.
+5. **Interpretation:** High **`parseFailed`** → parser regression and adapter health (Tier 0). High **`extensionAssistedRequired`** or **`unsupportedForReconciliation`** → limited server-only coverage. **`manualReviewRequired`** → normalized ingest address line disagrees with the sale’s display address; operators reconcile manually (Phase 2A does **not** move pins or geocode).
 
-#### When Phase 2 may be considered
+**Out of scope for Phase 2A:** cancellation, source removal, archive, **address/coordinate relocation**, destructive deletes, and broad parser rewrites. **`ends_at` in the past** does not trigger archive here; existing visibility and archive jobs continue to apply.
 
-Phase 2 would introduce **controlled synchronization** from reconciled source truth into **public `sales`** (copy, scheduling, media, etc.), with its own safety review. Do **not** enable public-sale mutation from Phase 1B; ingestion metadata and health signals must be stable and trusted first.
+#### Rollback
+
+- Disable safe sync by omitting **`applySafeSync`** or setting **`dryRun: true`**.
+- If a bad sync slipped through, remediate affected **`sales`** rows manually (restore copy/media/schedule from backups or re-run ingestion); keep **`ingested_sale_id`** linkage intact.
+
+#### Later Phase 2+
+
+Broader synchronization (promotions, pricing modes, automated archive on source removal, etc.) remains future work with its own review — Phase 2A is intentionally narrow.
 
 ### Cross-service operational flow
 

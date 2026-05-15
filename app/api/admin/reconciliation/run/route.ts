@@ -49,9 +49,10 @@ async function reconciliationRunHandler(request: NextRequest) {
       dryRun: parsed.dryRun,
       sourcePlatform: parsed.sourcePlatform,
       onlyPlaceholder: parsed.onlyPlaceholder,
+      applySafeSync: parsed.applySafeSync,
       aggregateTelemetryOnly: true,
       telemetryContext: {
-        jobType: 'reconciliation.phase1b.run',
+        jobType: parsed.applySafeSync ? 'reconciliation.phase2a.run' : 'reconciliation.phase1b.run',
         authMode: cronAuth ? 'cron' : 'admin',
       },
     })
@@ -59,7 +60,9 @@ async function reconciliationRunHandler(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       dryRun: result.dryRun,
+      applySafeSync: result.applySafeSync,
       persistenceApplied: result.persistenceApplied,
+      publicSalesUpdated: !result.dryRun && result.salesSyncUpdated > 0,
       attempted: result.attempted,
       processed: result.processed,
       changed: result.changed,
@@ -70,6 +73,14 @@ async function reconciliationRunHandler(request: NextRequest) {
       placeholderResolved: result.placeholderResolved,
       unsupportedSource: result.unsupportedSource,
       refreshCapability: result.refreshCapability,
+      salesSyncAttempted: result.salesSyncAttempted,
+      salesSyncUpdated: result.salesSyncUpdated,
+      salesSyncSkipped: result.salesSyncSkipped,
+      descriptionsUpdated: result.descriptionsUpdated,
+      imagesUpdated: result.imagesUpdated,
+      schedulesUpdated: result.schedulesUpdated,
+      titlesUpdated: result.titlesUpdated,
+      manualReviewRequired: result.manualReviewRequired,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

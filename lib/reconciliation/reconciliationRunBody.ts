@@ -6,6 +6,8 @@ export interface ReconciliationRunBodyParsed {
   readonly dryRun: boolean
   readonly sourcePlatform: string | undefined
   readonly onlyPlaceholder: boolean
+  /** Phase 2A: explicit true only; never defaulted on. */
+  readonly applySafeSync: boolean
 }
 
 /**
@@ -29,5 +31,6 @@ export function parseReconciliationRunBody(body: unknown): ReconciliationRunBody
   const sp = o.sourcePlatform
   const sourcePlatform = typeof sp === 'string' && sp.trim() ? sp.trim() : undefined
   const onlyPlaceholder = o.onlyPlaceholder === true
-  return { limit, dryRun, sourcePlatform, onlyPlaceholder }
+  const applySafeSync = o.applySafeSync === true
+  return { limit, dryRun, sourcePlatform, onlyPlaceholder, applySafeSync }
 }

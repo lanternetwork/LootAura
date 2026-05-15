@@ -5,14 +5,24 @@ import {
   validateResolvedAddressForPublish,
 } from '@/lib/ingestion/publishValidation'
 import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
-import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { logger, type LogContext } from '@/lib/log'
 import type { FailureReason } from '@/lib/ingestion/types'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 import { mergeSanitizedCloudinaryIntoPublishable } from '@/lib/ingestion/sanitizePublishCloudinaryFallback'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 import { isPublishingRowStaleReclaimBlockedByPastEndDateValidation } from '@/lib/ingestion/publishClaimStale'
-import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
+import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandidates'
+
+export { extractPublishImageCandidates }
+import {
+  existingSaleImagesReplaceable,
+  looksGenericDescription,
+  looksGenericTitle,
+  looksPollutedDescription,
+  normalizeAddressForPublishSafe,
+  normalizeImageArray,
+  normalizeTextOrNull,
+} from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
 import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
@@ -557,151 +567,6 @@ async function linkedSaleIdForRow(record: ClaimedPublishRow): Promise<string | n
   return linkedId
 }
 
-function saleRowImageFieldsEmpty(row: {
-  cover_image_url: string | null
-  images: unknown
-}): boolean {
-  const coverEmpty =
-    row.cover_image_url == null || String(row.cover_image_url).trim() === ''
-  const imgs = row.images
-  const imagesEmpty = imgs == null || (Array.isArray(imgs) && imgs.length === 0)
-  return coverEmpty && imagesEmpty
-}
-
-function normalizeTextOrNull(value: string | null | undefined): string | null {
-  if (typeof value !== 'string') return null
-  const out = value.trim()
-  return out.length > 0 ? out : null
-}
-
-function isLogoLikeImageUrl(value: string): boolean {
-  if (urlSuggestsNonListingPhoto(value)) return true
-  const lower = value.toLowerCase()
-  return (
-    lower.includes('logo') ||
-    lower.includes('site_logo') ||
-    lower.includes('ystm_site') ||
-    lower.includes('icon') ||
-    lower.includes('sprite') ||
-    lower.includes('favicon') ||
-    lower.includes('banner') ||
-    lower.includes('avatar') ||
-    lower.includes('tracking') ||
-    lower.includes('pixel') ||
-    lower.includes('placeholder') ||
-    lower.includes('default') ||
-    lower.includes('blank') ||
-    lower.includes('spacer')
-  )
-}
-
-function existingSaleImagesReplaceable(row: {
-  cover_image_url: string | null
-  images: unknown
-}): boolean {
-  if (saleRowImageFieldsEmpty(row)) return true
-  const cover = normalizeTextOrNull(row.cover_image_url)
-  if (!cover) return true
-  if (isLogoLikeImageUrl(cover)) return true
-  return false
-}
-
-function normalizeImageArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-function looksGenericTitle(value: string | null | undefined, city: string | null): boolean {
-  const t = normalizeTextOrNull(value)
-  if (!t) return true
-  if (/^yard sale$/i.test(t) || /^garage sale$/i.test(t) || /^estate sale$/i.test(t)) return true
-  if (/^listing$/i.test(t)) return true
-  const cityNorm = normalizeTextOrNull(city)
-  if (cityNorm && t.toLowerCase() === `${cityNorm.toLowerCase()} yard sale`) return true
-  return false
-}
-
-function looksGenericDescription(value: string | null | undefined): boolean {
-  const t = normalizeTextOrNull(value)
-  if (!t) return true
-  return /^yard sale\b/i.test(t) || /^garage sale\b/i.test(t) || /^estate sale\b/i.test(t) || /^listing\b/i.test(t)
-}
-
-function looksPollutedDescription(value: string | null | undefined): boolean {
-  const t = normalizeTextOrNull(value)
-  if (!t) return false
-  const lower = t.toLowerCase()
-  if (lower.includes('street view')) return true
-  if (lower.includes('directions')) return true
-  if (lower.includes('source:')) return true
-  if (lower.includes('for more information')) return true
-  if (lower.includes('please visit us at')) return true
-  if (lower.includes('click here')) return true
-  if (lower.includes('see listing')) return true
-  if (/(garagesalefinder\.com|yardsaletreasuremap\.com|craigslist\.org|estatesales\.net)/i.test(lower)) return true
-  if (/\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\.?\s+\d{1,2}\/\d{1,2}/i.test(lower)) return true
-  if (/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}/i.test(lower)) return true
-  if (/\bstart(?:s)?\s*time\s*:\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/i.test(lower)) return true
-  if (/\bstarts?\s+at\s+\d{1,2}(?::\d{2})?\s*(am|pm)\b/i.test(lower)) return true
-  if (/\b\d{5}(?:-\d{4})?\s*,?\s*usa\b/i.test(lower)) return true
-  if (/\b\d{3,6}\s+[a-z0-9.\-'\s]+,\s*[a-z.\-\s]+,\s*[a-z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b/i.test(lower)) return true
-  return false
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function addressAlreadyContainsCityState(address: string, city: string, state: string): boolean {
-  const cityNorm = city.replace(/\s+/g, ' ').trim()
-  const stateNorm = state.replace(/\s+/g, ' ').trim()
-  if (!cityNorm || !stateNorm) return false
-
-  const cityEsc = escapeRegExp(cityNorm)
-  const optionalZip = '(?:\\s+\\d{5}(?:-\\d{4})?)?'
-  const statePatterns = [escapeRegExp(stateNorm)]
-  if (stateNorm.length === 2) {
-    const full = uspsCodeToFullNameForAddress(stateNorm)
-    if (full) statePatterns.push(escapeRegExp(full))
-  }
-
-  for (const stateEsc of statePatterns) {
-    if (new RegExp(`${cityEsc}\\s*,\\s*${stateEsc}${optionalZip}`, 'i').test(address)) {
-      return true
-    }
-  }
-  return false
-}
-
-function normalizeAddressForPublishLocal(
-  normalizedAddress: string | null,
-  city: string,
-  state: string
-): string | null {
-  const base = (normalizedAddress || '').replace(/\s+/g, ' ').trim()
-  if (!base) return null
-  const cityState = [city, state].map((v) => v.trim()).filter(Boolean).join(', ')
-  if (!cityState) return base
-  const suffixPattern = new RegExp(`(?:,\\s*${escapeRegExp(cityState)})+$`, 'i')
-  const withoutDuplicateSuffix = base.replace(suffixPattern, '').replace(/\s*,\s*$/g, '').trim()
-  if (!withoutDuplicateSuffix) return cityState
-  if (addressAlreadyContainsCityState(withoutDuplicateSuffix, city, state)) {
-    return withoutDuplicateSuffix
-  }
-  return `${withoutDuplicateSuffix}, ${cityState}`
-}
-
-function normalizeAddressForPublishSafe(
-  normalizedAddress: string | null,
-  city: string,
-  state: string
-): string | null {
-  return normalizeAddressForPublishLocal(normalizedAddress, city, state)
-}
-
 /** Same resolved line + checks as `createPublishedSale`; required for pre-linked idempotent rows. */
 function validateClaimedRowResolvedAddress(record: ClaimedPublishRow): void {
   const city = normalizeTextOrNull(record.city) ?? ''
@@ -1109,37 +974,6 @@ function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngested
     image_cloudinary_url: record.image_cloudinary_url,
     image_urls: [],
   }
-}
-
-function extractRawPayloadImageCandidates(rawPayload: unknown): string[] {
-  if (!rawPayload || typeof rawPayload !== 'object') return []
-  const imageUrls = (rawPayload as { imageUrls?: unknown }).imageUrls
-  if (!Array.isArray(imageUrls)) return []
-  return imageUrls.filter((value): value is string => typeof value === 'string')
-}
-
-/** Image URLs for publish: `raw_payload.imageUrls` first, then `image_source_url`, deduped in order. */
-export function extractPublishImageCandidates(
-  rawPayload: unknown,
-  imageSourceUrl: string | null | undefined
-): string[] {
-  const fromPayload = extractRawPayloadImageCandidates(rawPayload)
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const u of fromPayload) {
-    const t = u.trim()
-    if (!t || seen.has(t)) continue
-    seen.add(t)
-    out.push(t)
-  }
-  if (typeof imageSourceUrl === 'string') {
-    const t = imageSourceUrl.trim()
-    if (t && !seen.has(t)) {
-      seen.add(t)
-      out.push(t)
-    }
-  }
-  return out
 }
 
 /** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */

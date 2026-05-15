@@ -46,6 +46,15 @@ const fullResult = {
   },
   persistenceApplied: false,
   dryRun: true,
+  applySafeSync: false,
+  salesSyncAttempted: 0,
+  salesSyncUpdated: 0,
+  salesSyncSkipped: 0,
+  descriptionsUpdated: 0,
+  imagesUpdated: 0,
+  schedulesUpdated: 0,
+  titlesUpdated: 0,
+  manualReviewRequired: 0,
 }
 
 describe('POST /api/admin/reconciliation/run', () => {
@@ -84,6 +93,7 @@ describe('POST /api/admin/reconciliation/run', () => {
     expect(mockReconcile.mock.calls[0][0]).toMatchObject({
       dryRun: true,
       aggregateTelemetryOnly: true,
+      applySafeSync: false,
     })
   })
 
@@ -109,6 +119,7 @@ describe('POST /api/admin/reconciliation/run', () => {
       sourcePlatform: 'external_page_source',
       onlyPlaceholder: true,
       aggregateTelemetryOnly: true,
+      applySafeSync: false,
     })
     const json = (await res.json()) as Record<string, unknown>
     expect(json.ok).toBe(true)
@@ -134,6 +145,26 @@ describe('POST /api/admin/reconciliation/run', () => {
     const json = (await res.json()) as { persistenceApplied: boolean; dryRun: boolean }
     expect(json.persistenceApplied).toBe(true)
     expect(json.dryRun).toBe(false)
+  })
+
+  it('passes applySafeSync true when explicitly requested with dryRun false', async () => {
+    mockIsCron.mockReturnValue(false)
+    mockAssertAdmin.mockResolvedValue({ user: { id: 'u1' } })
+    mockReconcile.mockResolvedValue({ ...fullResult, dryRun: false, applySafeSync: true, salesSyncUpdated: 1 })
+    const { POST } = await import('@/app/api/admin/reconciliation/run/route')
+    const res = await POST(
+      new NextRequest('http://localhost/api/admin/reconciliation/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: false, applySafeSync: true }),
+      })
+    )
+    expect(res.status).toBe(200)
+    expect(mockReconcile.mock.calls[0][0]).toMatchObject({ dryRun: false, applySafeSync: true })
+    const json = (await res.json()) as { applySafeSync: boolean; publicSalesUpdated: boolean; salesSyncUpdated: number }
+    expect(json.applySafeSync).toBe(true)
+    expect(json.publicSalesUpdated).toBe(true)
+    expect(json.salesSyncUpdated).toBe(1)
   })
 
   it('enforces limit cap via parse before worker', async () => {

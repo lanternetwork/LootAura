@@ -1,5 +1,5 @@
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
-import { extractPublishImageCandidates } from '@/lib/ingestion/publishWorker'
+import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandidates'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { classifyReconciliationChange } from '@/lib/reconciliation/reconciliationClassifier'
@@ -12,12 +12,26 @@ import {
   emitReconciliationRowFailed,
   emitReconciliationRowNoChange,
   emitReconciliationRunSummary,
+  emitReconciliationSalesSyncApplied,
+  emitReconciliationSalesSyncSkipped,
   emitReconciliationStarted,
   hashHostForReconciliationTelemetry,
 } from '@/lib/reconciliation/reconciliationTelemetry'
 import { detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
 import { fingerprintFromParts } from '@/lib/reconciliation/sourceHashing'
-import type { IngestFingerprint, ReconciliationCandidateRow, SourceRefreshCapability, SourceSyncStatus } from '@/lib/reconciliation/types'
+import {
+  computeIngestVsSaleAddressManualReview,
+  fingerprintsDifferMaterially,
+  reconciliationClassesAllowSafeSaleSync,
+  tryApplySafePublishedSaleSyncFromReconciliation,
+} from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
+import type {
+  IngestFingerprint,
+  ReconciliationCandidateRow,
+  ReconciliationChangeClass,
+  SourceRefreshCapability,
+  SourceSyncStatus,
+} from '@/lib/reconciliation/types'
 
 const DEFAULT_BATCH_LIMIT = 25
 /** Global hard cap for reconciliation batch size (Phase 1B admin runner). */
@@ -30,6 +44,10 @@ type IngestRowDb = {
   source_platform: string
   city: string | null
   state: string | null
+  normalized_address: string | null
+  zip_code: string | null
+  lat: number | null
+  lng: number | null
   title: string | null
   description: string | null
   date_start: string | null
@@ -175,6 +193,10 @@ async function loadCandidateIngestRows(admin: ReturnType<typeof getAdminDb>, now
         'source_platform',
         'city',
         'state',
+        'normalized_address',
+        'zip_code',
+        'lat',
+        'lng',
         'title',
         'description',
         'date_start',
@@ -261,6 +283,15 @@ export interface ReconcileExternalSourcesResult {
   }
   readonly persistenceApplied: boolean
   readonly dryRun: boolean
+  readonly applySafeSync: boolean
+  readonly salesSyncAttempted: number
+  readonly salesSyncUpdated: number
+  readonly salesSyncSkipped: number
+  readonly descriptionsUpdated: number
+  readonly imagesUpdated: number
+  readonly schedulesUpdated: number
+  readonly titlesUpdated: number
+  readonly manualReviewRequired: number
 }
 
 export interface ReconcileExternalSourcesOptions {
@@ -276,17 +307,23 @@ export interface ReconcileExternalSourcesOptions {
    * Phase 1B admin runner sets this; leave false for granular diagnostics.
    */
   readonly aggregateTelemetryOnly?: boolean
+  /**
+   * Phase 2A: when true with `dryRun: false`, apply gated updates to linked public `sales` rows.
+   * Default false. Never runs when `dryRun` is true.
+   */
+  readonly applySafeSync?: boolean
 }
 
 /**
- * Phase 1A/1B detection-only reconciliation: refetch (when server-supported), parse, hash, classify;
- * optionally persist metadata on `ingested_sales` only. Never mutates `sales`.
+ * Phase 1A–2A external source reconciliation: refetch when server-supported, parse, classify;
+ * persist metadata on `ingested_sales`; optional Phase 2A gated updates on linked public `sales`.
  */
 export async function reconcileExternalSources(options?: ReconcileExternalSourcesOptions): Promise<ReconcileExternalSourcesResult> {
   const started = Date.now()
   const nowMs = options?.nowMs ?? Date.now()
   const dryRun = options?.dryRun === true
   const aggregateOnly = options?.aggregateTelemetryOnly === true
+  const applySafeSyncRequested = options?.applySafeSync === true
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_BATCH_LIMIT, 1), RECONCILIATION_HARD_LIMIT_CAP)
   const admin = getAdminDb()
 
@@ -322,6 +359,14 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
   let sourceMissingSoftCount = 0
   let placeholderResolvedCount = 0
   let unsupportedSourceCount = 0
+  let salesSyncAttempted = 0
+  let salesSyncUpdated = 0
+  let salesSyncSkipped = 0
+  let descriptionsUpdated = 0
+  let imagesUpdated = 0
+  let schedulesUpdated = 0
+  let titlesUpdated = 0
+  let manualReviewRequired = 0
   const capTallies: Record<SourceRefreshCapability, number> = {
     server_refetch_supported: 0,
     extension_assisted_required: 0,
@@ -543,11 +588,35 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       classes: classification.classes,
     })
 
-    const details = {
+    let manualReviewAddr = false
+    if (applySafeSyncRequested && !parseFailed && parsed && row.published_sale_id) {
+      const { data: peek } = await fromBase(admin, 'sales')
+        .select('address,city,state')
+        .eq('id', row.published_sale_id)
+        .maybeSingle()
+      if (peek && typeof peek === 'object') {
+        const p = peek as { address: string | null; city: string | null; state: string | null }
+        manualReviewAddr = computeIngestVsSaleAddressManualReview({
+          ingestNormalizedAddress: row.normalized_address,
+          ingestCity: row.city,
+          ingestState: row.state,
+          saleAddress: p.address,
+          saleCity: p.city,
+          saleState: p.state,
+        })
+      }
+    }
+
+    const details: Record<string, unknown> = {
       refreshCapability,
       changeClasses: classification.classes,
       primaryChange: classification.primary,
       parseMatched: !parseFailed,
+    }
+    if (manualReviewAddr) {
+      details.manual_review_required = true
+      details.manual_review_reason = 'address_drift'
+      manualReviewRequired += 1
     }
 
     const fingerprintChanged =
@@ -592,6 +661,52 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       persistenceWrites += 1
     }
 
+    const fpDiff = fingerprintsDifferMaterially(priorFp, nextFingerprint)
+    const canSalesSync =
+      applySafeSyncRequested &&
+      !parseFailed &&
+      parsed &&
+      row.published_sale_id &&
+      refreshCapability === 'server_refetch_supported' &&
+      reconciliationClassesAllowSafeSaleSync(classification.classes as readonly ReconciliationChangeClass[]) &&
+      fpDiff
+
+    if (canSalesSync) {
+      salesSyncAttempted += 1
+      const syncRes = await tryApplySafePublishedSaleSyncFromReconciliation(admin, {
+        saleId: row.published_sale_id,
+        ingestedSaleId: row.id,
+        rowId: row.id,
+        snapshot: parsed,
+        ingest: {
+          normalized_address: row.normalized_address,
+          zip_code: row.zip_code,
+          lat: row.lat,
+          lng: row.lng,
+          time_start: row.time_start,
+          time_end: row.time_end,
+          raw_payload: row.raw_payload,
+          image_source_url: row.image_source_url,
+        },
+        classes: classification.classes as readonly ReconciliationChangeClass[],
+        priorFingerprint: priorFp,
+        nextFingerprint,
+        city: row.city,
+        state: row.state,
+        dryRun,
+        nowMs,
+      })
+      if (syncRes.outcome === 'updated') {
+        salesSyncUpdated += 1
+        if (syncRes.descriptionsUpdated) descriptionsUpdated += 1
+        if (syncRes.imagesUpdated) imagesUpdated += 1
+        if (syncRes.schedulesUpdated) schedulesUpdated += 1
+        if (syncRes.titlesUpdated) titlesUpdated += 1
+      } else {
+        salesSyncSkipped += 1
+      }
+    }
+
     const isChanged =
       status === 'changed' ||
       classification.classes.some(
@@ -630,9 +745,12 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
   const durationMs = Date.now() - started
 
   if (aggregateOnly) {
+    const runMode =
+      dryRun ? 'dry_run' : applySafeSyncRequested ? 'persist_metadata_sales_sync' : 'persist_metadata'
     emitReconciliationRunSummary({
-      runMode: dryRun ? 'dry_run' : 'persist_metadata',
+      runMode,
       dryRun,
+      applySafeSync: applySafeSyncRequested,
       persistenceApplied,
       attempted,
       processed,
@@ -646,9 +764,36 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       refreshCapabilityServer: capTallies.server_refetch_supported,
       refreshCapabilityExtension: capTallies.extension_assisted_required,
       refreshCapabilityUnsupported: capTallies.unsupported_for_reconciliation,
+      salesSyncAttempted,
+      salesSyncUpdated,
+      salesSyncSkipped,
+      descriptionsUpdated,
+      imagesUpdated,
+      schedulesUpdated,
+      titlesUpdated,
+      manualReviewRequired,
       durationMs,
       telemetryContext: options?.telemetryContext,
     })
+    if (applySafeSyncRequested) {
+      if (salesSyncUpdated > 0) {
+        emitReconciliationSalesSyncApplied({
+          salesSyncUpdated,
+          descriptionsUpdated,
+          imagesUpdated,
+          schedulesUpdated,
+          titlesUpdated,
+          telemetryContext: options?.telemetryContext,
+        })
+      }
+      if (salesSyncSkipped > 0) {
+        emitReconciliationSalesSyncSkipped({
+          salesSyncSkipped,
+          salesSyncAttempted,
+          telemetryContext: options?.telemetryContext,
+        })
+      }
+    }
   } else {
     emitReconciliationCompleted({
       processed: batch.length,
@@ -677,5 +822,14 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     },
     persistenceApplied,
     dryRun,
+    applySafeSync: applySafeSyncRequested,
+    salesSyncAttempted,
+    salesSyncUpdated,
+    salesSyncSkipped,
+    descriptionsUpdated,
+    imagesUpdated,
+    schedulesUpdated,
+    titlesUpdated,
+    manualReviewRequired,
   }
 }

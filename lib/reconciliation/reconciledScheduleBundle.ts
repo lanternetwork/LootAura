@@ -1,3 +1,4 @@
+import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
 import type { ParsedListingSnapshotForReconciliation } from '@/lib/reconciliation/reconciliationParseSnapshot'
 import type { IngestFingerprint } from '@/lib/reconciliation/types'
 import {
@@ -59,33 +60,16 @@ function listingTimezoneFromRaw(raw: unknown): string | null {
 // Prose window inference (canonical with Phase 2A safe sync)
 // ---------------------------------------------------------------------------
 
-function parseUs12hFragmentToDbTime(fragment: string): string | null {
-  const m = fragment.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
-  if (!m) return null
-  const h = Number(m[1])
-  const min = Number(m[2])
-  const ap = m[3].toUpperCase()
-  if (!Number.isFinite(h) || !Number.isFinite(min) || min < 0 || min > 59 || h < 1 || h > 12) return null
-  let hour24 = h % 12
-  if (ap.startsWith('P')) hour24 += 12
-  if (ap.startsWith('A') && h === 12) hour24 = 0
-  return `${String(hour24).padStart(2, '0')}:${String(min).padStart(2, '0')}:00`
-}
-
 export function inferOpeningTimeStartFromDescription(description: string | null | undefined): string | null {
   const t = normalizeTextOrNull(description)
   if (!t) return null
-  const m = t.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:to|-|through)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i)
-  if (!m) return null
-  return parseUs12hFragmentToDbTime(m[1])
+  return extractAuthoritativeSaleHourRangeFromText(t)?.timeStart ?? null
 }
 
 export function inferClosingTimeEndFromDescription(description: string | null | undefined): string | null {
   const t = normalizeTextOrNull(description)
   if (!t) return null
-  const m = t.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:to|-|through)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i)
-  if (!m) return null
-  return parseUs12hFragmentToDbTime(m[2])
+  return extractAuthoritativeSaleHourRangeFromText(t)?.timeEnd ?? null
 }
 
 export type BuildReconciledScheduleBundleInput = {

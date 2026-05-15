@@ -1395,17 +1395,31 @@ function extractTitle() {
   return heading?.textContent?.trim() || document.title || "";
 }
 
+const SALE_HOUR_TIME_FRAGMENT =
+  "(\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)|\\d{1,2}(?::\\d{2})?(?:am|pm))";
+const SALE_HOUR_RANGE_RE = new RegExp(
+  `${SALE_HOUR_TIME_FRAGMENT}\\s*(?:to|[-–—])\\s*${SALE_HOUR_TIME_FRAGMENT}`,
+  "i"
+);
+
+function isStandaloneSaleHourRangeLine(line) {
+  const normalized = String(line || "").replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  SALE_HOUR_RANGE_RE.lastIndex = 0;
+  const m = SALE_HOUR_RANGE_RE.exec(normalized);
+  return Boolean(m && m[0].trim().length === normalized.length);
+}
+
 function isDescriptionNoiseLine(line) {
   const normalized = String(line || "").replace(/\s+/g, " ").trim();
   if (!normalized) return true;
+  if (isStandaloneSaleHourRangeLine(normalized)) return false;
   const lower = normalized.toLowerCase().trim();
   // Only treat as "noise line" if the line is essentially just a label/link.
   if (/^(street view|directions|view on map|report listing|share listing)$/i.test(lower)) return true;
   if (/^source:\s*/i.test(lower)) return true;
   if (/^(https?:\/\/|www\.)/i.test(lower)) return true;
   if (/^\s*\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i.test(normalized)) return true;
-  if (/^\s*(\d{1,2}:\d{2}\s*(am|pm)?\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)?)\s*$/i.test(normalized)) return true;
-  if (/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i.test(normalized)) return true;
   if (/^\s*\d{1,2}\/\d{1,2}\s*[-–—]\s*\d{1,2}\/\d{1,2}\s*$/i.test(normalized)) return true;
   if (normalized.length < 8) return true;
   return false;
@@ -1434,10 +1448,6 @@ function cleanExtractedDescription(rawText) {
     );
     text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\s*,?\s*USA\b/gi, " ");
     text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\b(?=\s*$)/gi, " ");
-    text = text.replace(
-      /\b\d{1,2}(?::\d{2})?\s*(am|pm)\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,
-      ""
-    );
     text = text.replace(/\b\d{1,2}\/\d{1,2}\s*[-–—]\s*\d{1,2}\/\d{1,2}\b/gi, "");
     text = text.replace(
       /\b(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)\.?\s+\d{1,2}\/\d{1,2}\b/gi,
@@ -1897,6 +1907,7 @@ resumeSessionIfActive();
 // Expose cleaner for test harnesses only.
 if (typeof globalThis !== "undefined") {
   globalThis.__LootAuraContentScriptTest = {
+    isStandaloneSaleHourRangeLine,
     isDescriptionNoiseLine,
     cleanExtractedDescription,
     normalizeCityFromPathSegment,

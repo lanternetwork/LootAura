@@ -55,6 +55,29 @@ describe('reconciledScheduleBundle', () => {
     }
   })
 
+  it('parses compact 9am - 3pm prose window', () => {
+    const b = buildReconciledScheduleBundle({
+      refreshedDescription: 'front door at 8am. Sale hours 9am - 3pm.',
+      parsed: null,
+      ingest: {
+        date_start: '2026-06-01',
+        date_end: '2026-06-01',
+        time_start: '08:00:00',
+        time_end: '14:00:00',
+        raw_payload: {},
+      },
+      sale: null,
+      lat: 41.72,
+      lng: -87.75,
+    })
+    expect(b.ok).toBe(true)
+    if (b.ok) {
+      expect(b.timeStart).toBe('09:00:00')
+      expect(b.timeEnd).toBe('15:00:00')
+      expect(b.provenance).toBe('prose_window')
+    }
+  })
+
   it('uses ingest when refreshed prose has no time window', () => {
     const b = buildReconciledScheduleBundle({
       refreshedDescription: 'No hours here, just items.',

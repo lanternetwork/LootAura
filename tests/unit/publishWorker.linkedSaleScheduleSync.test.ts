@@ -58,7 +58,8 @@ function oakLawnRow(overrides: Record<string, unknown> = {}) {
     source_platform: 'external_page_source',
     source_url: 'https://example.com/oak-lawn',
     title: 'Oak Lawn Sale',
-    description: 'Estate sale in Oak Lawn. Hours 9:00 am - 3:00 pm.',
+    description:
+      'front door at 8am each sale day. Estate sale in Oak Lawn. 9:00 am - 3:00 pm.',
     normalized_address: '1 Main St',
     city: 'Oak Lawn',
     state: 'IL',

@@ -1,3 +1,5 @@
+import { isStandaloneSaleHourRangeLine } from '@/lib/ingestion/saleHourRangeFromText'
+
 export function sanitizeUploadDescription(value: string | null): string | null {
   if (value == null) return null
 
@@ -39,10 +41,9 @@ export function sanitizeUploadDescription(value: string | null): string | null {
     // ZIP/country tails.
     text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\s*,?\s*USA\b/gi, ' ')
     text = text.replace(/(?:^|[\s,;])\d{5}(?:-\d{4})?\b(?=\s*$)/gi, ' ')
-    // Date ranges.
+    // Date ranges (dates belong in dateRaw / structured fields, not description prose).
     text = text.replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi, '')
-    // Time ranges.
-    text = text.replace(/\b\d{1,2}(?::\d{2})?\s*(am|pm)\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi, '')
+    // Sale-hour ranges are preserved (not stripped).
 
     text = text.replace(/\s+/g, ' ').trim()
     // Clean up leftover punctuation spacing.
@@ -58,8 +59,8 @@ export function sanitizeUploadDescription(value: string | null): string | null {
     .filter(Boolean)
     // Drop lines that are still "pure noise" after stripping.
     .filter((line) => {
+      if (isStandaloneSaleHourRangeLine(line)) return true
       if (/^\s*\d{3,6}\s+[A-Za-z0-9.\-'\s]+,\s*[A-Za-z.\-\s]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i.test(line)) return false
-      if (/^\s*(\d{1,2}:\d{2}\s*(am|pm)?\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)?)\s*$/i.test(line)) return false
       if (/^\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*(?:[-–—]\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)?\s*$/i.test(line)) return false
       if (/^(street view|directions|view on map|report listing|share listing)$/i.test(line)) return false
       if (/^(for more information|please visit us at|click here|see listing)$/i.test(line)) return false

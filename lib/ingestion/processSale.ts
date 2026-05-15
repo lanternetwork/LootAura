@@ -2,6 +2,7 @@ import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureRea
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 import { addressLineFromYstmListingUrlSlug, enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
+import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
 import {
   isRelativeWeekdayScheduleSyntaxOnly,
   normalizeRelativeWeekdaySchedule,
@@ -283,6 +284,20 @@ function resolveDates(
   return { dateStart, dateEnd, invalidDate: false }
 }
 
+function resolveTimesFromCombinedText(
+  combinedText: string
+): { timeStart: string; timeEnd: string; timeSource: 'explicit' | 'default' } {
+  const authoritativeRange = extractAuthoritativeSaleHourRangeFromText(combinedText)
+  if (authoritativeRange) {
+    return {
+      timeStart: snapToThirtyMinutes(authoritativeRange.timeStart),
+      timeEnd: snapToThirtyMinutes(authoritativeRange.timeEnd),
+      timeSource: 'explicit',
+    }
+  }
+  return resolveTimes(extractTimeCandidates(combinedText))
+}
+
 function resolveTimes(candidates: ClockPart[]): { timeStart: string; timeEnd: string; timeSource: 'explicit' | 'default' } {
   let timeStartStr = '09:00:00'
   let timeEndStr = '14:00:00'
@@ -496,8 +511,7 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     }
   }
 
-  const timeCandidates = extractTimeCandidates(combinedText)
-  const resolvedTimes = resolveTimes(timeCandidates)
+  const resolvedTimes = resolveTimesFromCombinedText(combinedText)
 
   const hasAddressError = failureReasons.includes('missing_address') || failureReasons.includes('invalid_address_format')
   const hasDateError = failureReasons.includes('missing_date') || failureReasons.includes('invalid_date')

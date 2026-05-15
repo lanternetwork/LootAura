@@ -55,6 +55,26 @@ export function computeScheduleHash(input: {
   return sha256Hex(JSON.stringify(payload))
 }
 
+/** Reconciliation-only: structured schedule fields only (no prose aux) for hash/patch alignment. */
+export function computeCanonicalReconciliationScheduleHash(input: {
+  readonly dateStart: string | null | undefined
+  readonly dateEnd: string | null | undefined
+  readonly timeStart: string | null | undefined
+  readonly timeEnd: string | null | undefined
+  readonly listingTimezone: string | null | undefined
+}): string {
+  return computeScheduleHash({ ...input, descriptionScheduleAux: '' })
+}
+
+/** Stable schedule hash when no canonical bundle exists (fingerprint baseline only). */
+export const RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH = computeCanonicalReconciliationScheduleHash({
+  dateStart: '',
+  dateEnd: '',
+  timeStart: '',
+  timeEnd: '',
+  listingTimezone: null,
+})
+
 export function computeImageHash(imageUrls: readonly string[]): string {
   const normalized = normalizeImageUrlsForHash(imageUrls)
   return sha256Hex(JSON.stringify(normalized))

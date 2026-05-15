@@ -18,7 +18,11 @@ import {
   hashHostForReconciliationTelemetry,
 } from '@/lib/reconciliation/reconciliationTelemetry'
 import { detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
-import { fingerprintFromParts } from '@/lib/reconciliation/sourceHashing'
+import type { ReconciledScheduleBundleResult } from '@/lib/reconciliation/reconciledScheduleBundle'
+import {
+  RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH,
+  buildReconciliationIngestFingerprint,
+} from '@/lib/reconciliation/reconciledScheduleBundle'
 import {
   computeIngestVsSaleAddressManualReview,
   fingerprintsDifferMaterially,
@@ -42,6 +46,10 @@ type SalePeekForReconciliation = {
   readonly address: string | null
   readonly city: string | null
   readonly state: string | null
+  readonly date_start: string | null
+  readonly date_end: string | null
+  readonly time_start: string | null
+  readonly time_end: string | null
 }
 
 type IngestRowDb = {
@@ -77,24 +85,26 @@ type IngestRowDb = {
   last_source_change_at: string | null
 }
 
-function listingTimezoneFromRaw(raw: unknown): string | null {
-  if (!raw || typeof raw !== 'object') return null
-  const z = (raw as { listing_timezone?: unknown }).listing_timezone
-  return typeof z === 'string' && z.trim() ? z.trim() : null
-}
-
 function fingerprintFromIngestRow(row: IngestRowDb): IngestFingerprint {
   const images = extractPublishImageCandidates(row.raw_payload, row.image_source_url)
-  return fingerprintFromParts({
+  return buildReconciliationIngestFingerprint({
     title: row.title,
     description: row.description,
-    dateStart: row.date_start,
-    dateEnd: row.date_end,
-    timeStart: row.time_start,
-    timeEnd: row.time_end,
-    listingTimezone: listingTimezoneFromRaw(row.raw_payload),
     imageUrls: images,
-  })
+    ingest: {
+      date_start: row.date_start,
+      date_end: row.date_end,
+      time_start: row.time_start,
+      time_end: row.time_end,
+      raw_payload: row.raw_payload,
+    },
+    parsed: null,
+    sale: null,
+    refreshedDescription: row.description,
+    priorScheduleHashForFallback: RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH,
+    lat: row.lat,
+    lng: row.lng,
+  }).fingerprint
 }
 
 function priorFingerprintFromRow(row: IngestRowDb): IngestFingerprint {
@@ -166,7 +176,9 @@ async function loadCandidateIngestRows(
 ): Promise<{ rows: IngestRowDb[]; salePeekBySaleId: ReadonlyMap<string, SalePeekForReconciliation> }> {
   const isoNow = new Date(nowMs).toISOString()
   const { data: saleRows, error: saleErr } = await fromBase(admin, 'sales')
-    .select('id, ends_at, ingested_sale_id, moderation_status, address, city, state')
+    .select(
+      'id, ends_at, ingested_sale_id, moderation_status, address, city, state, date_start, date_end, time_start, time_end'
+    )
     .eq('status', 'published')
     .is('archived_at', null)
     .not('ingested_sale_id', 'is', null)
@@ -190,6 +202,10 @@ async function loadCandidateIngestRows(
       address: string | null
       city: string | null
       state: string | null
+      date_start: string | null
+      date_end: string | null
+      time_start: string | null
+      time_end: string | null
     }>
   ).filter(
     (s) =>
@@ -204,7 +220,15 @@ async function loadCandidateIngestRows(
   const salePeekBySaleId = new Map<string, SalePeekForReconciliation>(
     eligible.map((s) => [
       s.id,
-      { address: s.address ?? null, city: s.city ?? null, state: s.state ?? null },
+      {
+        address: s.address ?? null,
+        city: s.city ?? null,
+        state: s.state ?? null,
+        date_start: s.date_start ?? null,
+        date_end: s.date_end ?? null,
+        time_start: s.time_start ?? null,
+        time_end: s.time_end ?? null,
+      },
     ])
   )
 
@@ -572,18 +596,45 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     if (parseFailed) {
       parseFailedCount += 1
     }
-    const nextFingerprint = parseFailed
-      ? priorFp
-      : fingerprintFromParts({
-          title: parsed.title,
-          description: parsed.description,
-          dateStart: parsed.dateStart ?? row.date_start,
-          dateEnd: parsed.dateEnd ?? row.date_end,
-          timeStart: row.time_start,
-          timeEnd: row.time_end,
-          listingTimezone: listingTimezoneFromRaw(row.raw_payload),
-          imageUrls: parsed.imageUrls,
-        })
+
+    const salePeekSched =
+      row.published_sale_id != null ? salePeekBySaleId.get(row.published_sale_id) : undefined
+    const saleScheduleForFingerprint =
+      salePeekSched != null
+        ? {
+            date_start: salePeekSched.date_start,
+            date_end: salePeekSched.date_end,
+            time_start: salePeekSched.time_start,
+            time_end: salePeekSched.time_end,
+          }
+        : null
+
+    let nextScheduleBundle: ReconciledScheduleBundleResult | null = null
+    let nextFingerprint: IngestFingerprint
+    if (parseFailed) {
+      nextFingerprint = priorFp
+    } else {
+      const fpOut = buildReconciliationIngestFingerprint({
+        title: parsed.title,
+        description: parsed.description,
+        imageUrls: parsed.imageUrls,
+        ingest: {
+          date_start: row.date_start,
+          date_end: row.date_end,
+          time_start: row.time_start,
+          time_end: row.time_end,
+          raw_payload: row.raw_payload,
+        },
+        parsed,
+        sale: saleScheduleForFingerprint,
+        refreshedDescription: parsed.description,
+        priorScheduleHashForFallback: priorFp.scheduleHash,
+        lat: row.lat,
+        lng: row.lng,
+      })
+      nextFingerprint = fpOut.fingerprint
+      nextScheduleBundle = fpOut.bundle
+    }
 
     const nextPlaceholder = parseFailed
       ? priorPlaceholder
@@ -635,6 +686,14 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     if (manualReviewAddr) {
       details.manual_review_required = true
       details.manual_review_reason = 'address_drift'
+      manualReviewRequired += 1
+    }
+    if (!parseFailed && nextScheduleBundle && !nextScheduleBundle.ok) {
+      details.manual_review_required = true
+      if (!manualReviewAddr) {
+        details.manual_review_reason = 'schedule_conflict'
+      }
+      details.schedule_bundle_reason = nextScheduleBundle.schedule_bundle_reason
       manualReviewRequired += 1
     }
 
@@ -690,7 +749,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       reconciliationClassesAllowSafeSaleSync(classification.classes as readonly ReconciliationChangeClass[]) &&
       fpDiff
 
-    if (canSalesSync && row.published_sale_id) {
+    if (canSalesSync && row.published_sale_id && nextScheduleBundle) {
       const publishedSaleId = row.published_sale_id
       salesSyncAttempted += 1
       const syncRes = await tryApplySafePublishedSaleSyncFromReconciliation(admin, {
@@ -715,6 +774,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         state: row.state,
         dryRun,
         nowMs,
+        scheduleBundleResult: nextScheduleBundle,
       })
       if (syncRes.outcome === 'updated') {
         salesSyncUpdated += 1
@@ -724,6 +784,23 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         if (syncRes.titlesUpdated) titlesUpdated += 1
       } else {
         salesSyncSkipped += 1
+      }
+
+      if (syncRes.scheduleMutationInhibited && !dryRun) {
+        const mergedDetails: Record<string, unknown> = {
+          ...details,
+          manual_review_required: true,
+          manual_review_reason:
+            typeof details.manual_review_reason === 'string' ? details.manual_review_reason : 'schedule_conflict',
+          schedule_mutation_inhibited_reason: syncRes.scheduleMutationInhibitedReason ?? 'unknown',
+        }
+        const { error: detErr } = await fromBase(admin, 'ingested_sales')
+          .update({ source_reconciliation_details: mergedDetails })
+          .eq('id', row.id)
+        if (!detErr) {
+          persistenceWrites += 1
+          manualReviewRequired += 1
+        }
       }
     }
 

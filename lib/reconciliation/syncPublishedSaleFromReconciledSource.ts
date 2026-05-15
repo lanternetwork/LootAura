@@ -9,8 +9,11 @@ import { logger } from '@/lib/log'
 import { resolvePersistableSaleEndsAt, type AdminDbForSaleEnds } from '@/lib/sales/resolvePersistableSaleEndsAt'
 import { fromBase } from '@/lib/supabase/clients'
 import { descriptionHasPlaceholderProse } from '@/lib/reconciliation/placeholderDetection'
+import type { ReconciledScheduleBundleResult } from '@/lib/reconciliation/reconciledScheduleBundle'
 import type { ParsedListingSnapshotForReconciliation } from '@/lib/reconciliation/reconciliationParseSnapshot'
 import type { IngestFingerprint, ReconciliationChangeClass } from '@/lib/reconciliation/types'
+
+export { inferClosingTimeEndFromDescription, inferOpeningTimeStartFromDescription } from '@/lib/reconciliation/reconciledScheduleBundle'
 
 // ---------------------------------------------------------------------------
 // Heuristics (shared with publish worker — single policy surface)
@@ -160,39 +163,6 @@ export function normalizeAddressForPublishSafe(
   return normalizeAddressForPublishLocal(normalizedAddress, city, state)
 }
 
-// ---------------------------------------------------------------------------
-// Schedule inference from prose (aligns with schedule hash aux)
-// ---------------------------------------------------------------------------
-
-function parseUs12hFragmentToDbTime(fragment: string): string | null {
-  const m = fragment.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
-  if (!m) return null
-  const h = Number(m[1])
-  const min = Number(m[2])
-  const ap = m[3].toUpperCase()
-  if (!Number.isFinite(h) || !Number.isFinite(min) || min < 0 || min > 59 || h < 1 || h > 12) return null
-  let hour24 = h % 12
-  if (ap.startsWith('P')) hour24 += 12
-  if (ap.startsWith('A') && h === 12) hour24 = 0
-  return `${String(hour24).padStart(2, '0')}:${String(min).padStart(2, '0')}:00`
-}
-
-export function inferOpeningTimeStartFromDescription(description: string | null | undefined): string | null {
-  const t = normalizeTextOrNull(description)
-  if (!t) return null
-  const m = t.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:to|-|through)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i)
-  if (!m) return null
-  return parseUs12hFragmentToDbTime(m[1])
-}
-
-export function inferClosingTimeEndFromDescription(description: string | null | undefined): string | null {
-  const t = normalizeTextOrNull(description)
-  if (!t) return null
-  const m = t.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:to|-|through)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i)
-  if (!m) return null
-  return parseUs12hFragmentToDbTime(m[2])
-}
-
 function displayAddressFingerprint(
   address: string | null,
   city: string | null,
@@ -320,6 +290,8 @@ export interface SafePublishedSaleSyncRunResult {
   readonly descriptionsUpdated: boolean
   readonly imagesUpdated: boolean
   readonly schedulesUpdated: boolean
+  readonly scheduleMutationInhibited?: boolean
+  readonly scheduleMutationInhibitedReason?: string
 }
 
 function sortImageUrlsDeterministic(urls: readonly string[]): string[] {
@@ -347,6 +319,7 @@ export async function buildSafePublishedSaleSyncPatch(params: {
   readonly state: string | null
   readonly rowId: string
   readonly saleId: string
+  readonly scheduleBundleResult: ReconciledScheduleBundleResult
 }): Promise<{
   patch: Record<string, unknown>
   manualReviewAddress: boolean
@@ -354,8 +327,10 @@ export async function buildSafePublishedSaleSyncPatch(params: {
   descriptionsUpdated: boolean
   imagesUpdated: boolean
   schedulesUpdated: boolean
+  scheduleMutationInhibited?: boolean
+  scheduleMutationInhibitedReason?: string
 }> {
-  const { sale, snapshot, ingest, classes, priorFingerprint, nextFingerprint, city, state, admin, rowId, saleId } =
+  const { sale, snapshot, ingest, classes, priorFingerprint, nextFingerprint, city, state, admin, rowId, saleId, scheduleBundleResult } =
     params
 
   const manualReviewAddress = computeIngestVsSaleAddressManualReview({
@@ -443,57 +418,58 @@ export async function buildSafePublishedSaleSyncPatch(params: {
   const scheduleGate =
     classes.includes('schedule_changed') && priorFingerprint.scheduleHash !== nextFingerprint.scheduleHash
 
-  if (scheduleGate) {
-    const nextDateStart = normalizeTextOrNull(snapshot.dateStart) ?? sale.date_start
-    const nextDateEnd = normalizeTextOrNull(snapshot.dateEnd) ?? sale.date_end
-    const nextTimeStart =
-      normalizeTextOrNull(ingest.time_start) ??
-      inferOpeningTimeStartFromDescription(snapshot.description) ??
-      normalizeTextOrNull(sale.time_start) ??
-      '09:00:00'
-    const nextTimeEnd =
-      normalizeTextOrNull(ingest.time_end) ??
-      inferClosingTimeEndFromDescription(snapshot.description) ??
-      normalizeTextOrNull(sale.time_end)
+  let scheduleMutationInhibited: boolean | undefined
+  let scheduleMutationInhibitedReason: string | undefined
 
-    if (nextDateStart) {
-      const lat = Number(sale.lat ?? ingest.lat ?? NaN)
-      const lng = Number(sale.lng ?? ingest.lng ?? NaN)
-      const zip = normalizeTextOrNull(sale.zip_code) ?? normalizeTextOrNull(ingest.zip_code)
+  if (scheduleGate && scheduleBundleResult.ok) {
+    const b = scheduleBundleResult
+    const lat = Number(sale.lat ?? ingest.lat ?? NaN)
+    const lng = Number(sale.lng ?? ingest.lng ?? NaN)
+    const zip = normalizeTextOrNull(sale.zip_code) ?? normalizeTextOrNull(ingest.zip_code)
 
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        /* fail closed: do not touch schedule columns without coordinates */
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      scheduleMutationInhibited = true
+      scheduleMutationInhibitedReason = 'missing_coordinates'
+    } else {
+      const listingEnds = await resolvePersistableSaleEndsAt(
+        admin,
+        {
+          date_start: b.dateStart,
+          time_start: b.timeStart,
+          date_end: b.dateEnd,
+          time_end: b.timeEnd,
+          zip_code: zip,
+          state: saleState || null,
+          lat,
+          lng,
+        },
+        { operation: 'reconciliation_phase2a_safe_sync', rowId, saleId }
+      )
+      if (listingEnds.ends_at != null) {
+        patch.date_start = b.dateStart
+        patch.date_end = b.dateEnd
+        patch.time_start = b.timeStart
+        patch.time_end = b.timeEnd
+        patch.ends_at = listingEnds.ends_at
+        if (listingEnds.listing_timezone != null) patch.listing_timezone = listingEnds.listing_timezone
+        schedulesUpdated = true
       } else {
-        const listingEnds = await resolvePersistableSaleEndsAt(
-          admin,
-          {
-            date_start: nextDateStart,
-            time_start: nextTimeStart,
-            date_end: nextDateEnd,
-            time_end: nextTimeEnd,
-            zip_code: zip,
-            state: saleState || null,
-            lat,
-            lng,
-          },
-          { operation: 'reconciliation_phase2a_safe_sync', rowId, saleId }
-        )
-        if (listingEnds.ends_at != null) {
-          patch.date_start = nextDateStart
-          patch.date_end = nextDateEnd
-          patch.time_start = nextTimeStart
-          if (nextTimeEnd) {
-            patch.time_end = nextTimeEnd
-          }
-          patch.ends_at = listingEnds.ends_at
-          if (listingEnds.listing_timezone != null) patch.listing_timezone = listingEnds.listing_timezone
-          schedulesUpdated = true
-        }
+        scheduleMutationInhibited = true
+        scheduleMutationInhibitedReason = 'ends_at_unresolved'
       }
     }
   }
 
-  return { patch, manualReviewAddress, titlesUpdated, descriptionsUpdated, imagesUpdated, schedulesUpdated }
+  return {
+    patch,
+    manualReviewAddress,
+    titlesUpdated,
+    descriptionsUpdated,
+    imagesUpdated,
+    schedulesUpdated,
+    scheduleMutationInhibited,
+    scheduleMutationInhibitedReason,
+  }
 }
 
 /**
@@ -524,6 +500,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
     readonly state: string | null
     readonly dryRun: boolean
     readonly nowMs: number
+    readonly scheduleBundleResult: ReconciledScheduleBundleResult
   }
 ): Promise<SafePublishedSaleSyncRunResult> {
   const { data, error } = await fromBase(admin, 'sales')
@@ -629,6 +606,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
     state: ctx.state,
     rowId: ctx.rowId,
     saleId: ctx.saleId,
+    scheduleBundleResult: ctx.scheduleBundleResult,
   })
 
   if (Object.keys(built.patch).length === 0) {
@@ -656,6 +634,8 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
       descriptionsUpdated: built.descriptionsUpdated,
       imagesUpdated: built.imagesUpdated,
       schedulesUpdated: built.schedulesUpdated,
+      scheduleMutationInhibited: built.scheduleMutationInhibited,
+      scheduleMutationInhibitedReason: built.scheduleMutationInhibitedReason,
     }
   }
 
@@ -689,5 +669,7 @@ export async function tryApplySafePublishedSaleSyncFromReconciliation(
     descriptionsUpdated: built.descriptionsUpdated,
     imagesUpdated: built.imagesUpdated,
     schedulesUpdated: built.schedulesUpdated,
+    scheduleMutationInhibited: built.scheduleMutationInhibited,
+    scheduleMutationInhibitedReason: built.scheduleMutationInhibitedReason,
   }
 }

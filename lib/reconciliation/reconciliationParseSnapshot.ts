@@ -9,6 +9,9 @@ export interface ParsedListingSnapshotForReconciliation {
   readonly imageUrls: readonly string[]
   readonly dateStart: string | null
   readonly dateEnd: string | null
+  /** Optional structured times from source parser (win over prose when both present). */
+  readonly timeStart?: string | null
+  readonly timeEnd?: string | null
 }
 
 export function normalizeListingUrlForReconciliation(url: string): string {

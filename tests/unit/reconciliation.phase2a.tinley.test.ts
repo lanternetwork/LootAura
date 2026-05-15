@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { classifyReconciliationChange } from '@/lib/reconciliation/reconciliationClassifier'
 import { detectPlaceholderListing } from '@/lib/reconciliation/placeholderDetection'
-import { fingerprintFromParts } from '@/lib/reconciliation/sourceHashing'
+import {
+  RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH,
+  buildReconciledScheduleBundle,
+  buildReconciliationIngestFingerprint,
+} from '@/lib/reconciliation/reconciledScheduleBundle'
 import { buildSafePublishedSaleSyncPatch } from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
 
 vi.mock('@/lib/ingestion/externalImageValidation', () => ({
@@ -18,49 +22,49 @@ vi.mock('@/lib/sales/resolvePersistableSaleEndsAt', () => ({
   }),
 }))
 
+const tinleyIngest = {
+  date_start: '2026-05-15' as string | null,
+  date_end: '2026-05-16' as string | null,
+  time_start: null as string | null,
+  time_end: null as string | null,
+  raw_payload: {},
+}
+
 describe('Phase 2A Tinley Park safe sync patch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('upgrades placeholder description, images, inferred closing time, and ends_at without touching address', async () => {
-    const initial = fingerprintFromParts({
+    const placeholderDesc =
+      'MORE INFORMATION AND PICTURES COMING SOON. Hours 9:00 AM to 2:00 PM. Address 16713 Ridgeland Ave, Tinley Park, IL.'
+    const initial = buildReconciliationIngestFingerprint({
       title: "CAIT'S® Tinley Park Estate Sale",
-      description:
-        'MORE INFORMATION AND PICTURES COMING SOON. Hours 9:00 AM to 2:00 PM. Address 16713 Ridgeland Ave, Tinley Park, IL.',
-      dateStart: '2026-05-15',
-      dateEnd: '2026-05-16',
-      timeStart: null,
-      timeEnd: null,
-      listingTimezone: null,
+      description: placeholderDesc,
       imageUrls: ['https://yardsaletreasuremap.com/pics/YSTM_site_logo.png'],
-    })
+      ingest: tinleyIngest,
+      parsed: null,
+      sale: null,
+      refreshedDescription: placeholderDesc,
+      priorScheduleHashForFallback: RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH,
+      lat: 41.57,
+      lng: -87.79,
+    }).fingerprint
 
-    const updated = fingerprintFromParts({
+    const snapshot = {
       title: "CAIT'S® Tinley Park Estate Sale",
       description:
         'Full estate with furniture, jewelry, and tools. Hours 9:00 AM to 3:00 PM. 16713 Ridgeland Ave, Tinley Park, IL.',
+      imageUrls: ['https://cdn.example.com/lot-table.jpg', 'https://cdn.example.com/lot-lamp.jpg'] as const,
       dateStart: '2026-05-15',
       dateEnd: '2026-05-16',
-      timeStart: null,
-      timeEnd: null,
-      listingTimezone: null,
-      imageUrls: ['https://cdn.example.com/lot-table.jpg', 'https://cdn.example.com/lot-lamp.jpg'],
-    })
-
-    const classification = classifyReconciliationChange({
-      priorFingerprint: initial,
-      nextFingerprint: updated,
-      priorPlaceholder: true,
-      nextPlaceholder: false,
-    })
+    }
 
     const sale = {
       id: 'sale-1',
       ingested_sale_id: 'ingest-1',
       title: "CAIT'S® Tinley Park Estate Sale",
-      description:
-        'MORE INFORMATION AND PICTURES COMING SOON. Hours 9:00 AM to 2:00 PM. Address 16713 Ridgeland Ave, Tinley Park, IL.',
+      description: placeholderDesc,
       address: '16713 Ridgeland Ave, Tinley Park, IL 60477',
       city: 'Tinley Park',
       state: 'IL',
@@ -78,14 +82,51 @@ describe('Phase 2A Tinley Park safe sync patch', () => {
       moderation_status: null as string | null,
     }
 
-    const snapshot = {
-      title: "CAIT'S® Tinley Park Estate Sale",
-      description:
-        'Full estate with furniture, jewelry, and tools. Hours 9:00 AM to 3:00 PM. 16713 Ridgeland Ave, Tinley Park, IL.',
-      imageUrls: ['https://cdn.example.com/lot-table.jpg', 'https://cdn.example.com/lot-lamp.jpg'] as const,
-      dateStart: '2026-05-15',
-      dateEnd: '2026-05-16',
-    }
+    const updated = buildReconciliationIngestFingerprint({
+      title: snapshot.title,
+      description: snapshot.description,
+      imageUrls: snapshot.imageUrls,
+      ingest: tinleyIngest,
+      parsed: snapshot,
+      sale: {
+        date_start: sale.date_start,
+        date_end: sale.date_end,
+        time_start: sale.time_start,
+        time_end: sale.time_end,
+      },
+      refreshedDescription: snapshot.description,
+      priorScheduleHashForFallback: initial.scheduleHash,
+      lat: 41.57,
+      lng: -87.79,
+    }).fingerprint
+
+    const classification = classifyReconciliationChange({
+      priorFingerprint: initial,
+      nextFingerprint: updated,
+      priorPlaceholder: true,
+      nextPlaceholder: false,
+    })
+
+    const scheduleBundleResult = buildReconciledScheduleBundle({
+      refreshedDescription: snapshot.description,
+      parsed: snapshot,
+      ingest: {
+        date_start: tinleyIngest.date_start,
+        date_end: tinleyIngest.date_end,
+        time_start: tinleyIngest.time_start,
+        time_end: tinleyIngest.time_end,
+        raw_payload: tinleyIngest.raw_payload,
+      },
+      sale: {
+        date_start: sale.date_start,
+        date_end: sale.date_end,
+        time_start: sale.time_start,
+        time_end: sale.time_end,
+      },
+      lat: 41.57,
+      lng: -87.79,
+    })
+    expect(scheduleBundleResult.ok).toBe(true)
 
     const built = await buildSafePublishedSaleSyncPatch({
       admin: {} as never,
@@ -108,6 +149,7 @@ describe('Phase 2A Tinley Park safe sync patch', () => {
       state: 'IL',
       rowId: 'ingest-1',
       saleId: 'sale-1',
+      scheduleBundleResult,
     })
 
     expect(built.patch.address).toBeUndefined()
@@ -125,32 +167,33 @@ describe('Phase 2A Tinley Park safe sync patch', () => {
   })
 
   it('does not replace strong existing image sets with fewer source images', async () => {
-    const prior = fingerprintFromParts({
+    const ingestImg = {
+      date_start: '2026-06-01' as string | null,
+      date_end: '2026-06-01' as string | null,
+      time_start: '09:00:00' as string | null,
+      time_end: '15:00:00' as string | null,
+      raw_payload: { listing_timezone: 'America/Chicago' },
+    }
+    const desc = 'Many items.'
+    const prior = buildReconciliationIngestFingerprint({
       title: 'Estate Sale',
-      description: 'Many items.',
-      dateStart: '2026-06-01',
-      dateEnd: '2026-06-01',
-      timeStart: '09:00:00',
-      timeEnd: '15:00:00',
-      listingTimezone: 'America/Chicago',
+      description: desc,
       imageUrls: ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg', 'https://cdn.example.com/c.jpg'],
-    })
-    const next = fingerprintFromParts({
+      ingest: ingestImg,
+      parsed: null,
+      sale: null,
+      refreshedDescription: desc,
+      priorScheduleHashForFallback: RECONCILIATION_FAILED_BUNDLE_SCHEDULE_HASH,
+      lat: 40,
+      lng: -74,
+    }).fingerprint
+    const snapshot = {
       title: 'Estate Sale',
       description: 'Many items and more.',
+      imageUrls: ['https://cdn.example.com/a.jpg'] as const,
       dateStart: '2026-06-01',
       dateEnd: '2026-06-01',
-      timeStart: '09:00:00',
-      timeEnd: '15:00:00',
-      listingTimezone: 'America/Chicago',
-      imageUrls: ['https://cdn.example.com/a.jpg'],
-    })
-    const classification = classifyReconciliationChange({
-      priorFingerprint: prior,
-      nextFingerprint: next,
-      priorPlaceholder: false,
-      nextPlaceholder: false,
-    })
+    }
     const sale = {
       id: 's',
       ingested_sale_id: 'i',
@@ -172,16 +215,54 @@ describe('Phase 2A Tinley Park safe sync patch', () => {
       images: ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg', 'https://cdn.example.com/c.jpg'],
       moderation_status: null as string | null,
     }
+    const next = buildReconciliationIngestFingerprint({
+      title: snapshot.title,
+      description: snapshot.description,
+      imageUrls: snapshot.imageUrls,
+      ingest: ingestImg,
+      parsed: snapshot,
+      sale: {
+        date_start: sale.date_start,
+        date_end: sale.date_end,
+        time_start: sale.time_start,
+        time_end: sale.time_end,
+      },
+      refreshedDescription: snapshot.description,
+      priorScheduleHashForFallback: prior.scheduleHash,
+      lat: 40,
+      lng: -74,
+    }).fingerprint
+    const classification = classifyReconciliationChange({
+      priorFingerprint: prior,
+      nextFingerprint: next,
+      priorPlaceholder: false,
+      nextPlaceholder: false,
+    })
+    const scheduleBundleResult = buildReconciledScheduleBundle({
+      refreshedDescription: snapshot.description,
+      parsed: snapshot,
+      ingest: {
+        date_start: ingestImg.date_start,
+        date_end: ingestImg.date_end,
+        time_start: ingestImg.time_start,
+        time_end: ingestImg.time_end,
+        raw_payload: ingestImg.raw_payload,
+      },
+      sale: {
+        date_start: sale.date_start,
+        date_end: sale.date_end,
+        time_start: sale.time_start,
+        time_end: sale.time_end,
+      },
+      lat: 40,
+      lng: -74,
+    })
+    expect(scheduleBundleResult.ok).toBe(true)
+
     const built = await buildSafePublishedSaleSyncPatch({
       admin: {} as never,
       sale,
-      snapshot: {
-        title: 'Estate Sale',
-        description: 'Many items and more.',
-        imageUrls: ['https://cdn.example.com/a.jpg'],
-        dateStart: '2026-06-01',
-        dateEnd: '2026-06-01',
-      },
+      snapshot,
       ingest: {
         normalized_address: '1 Main St',
         zip_code: '12345',
@@ -199,6 +280,7 @@ describe('Phase 2A Tinley Park safe sync patch', () => {
       state: 'ST',
       rowId: 'i',
       saleId: 's',
+      scheduleBundleResult,
     })
     expect(built.patch.images).toBeUndefined()
     expect(built.imagesUpdated).toBe(false)

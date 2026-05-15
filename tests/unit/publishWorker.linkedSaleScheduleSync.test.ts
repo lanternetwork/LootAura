@@ -134,6 +134,7 @@ describe('publishWorker linked sale schedule sync (reingest)', () => {
 
   function wireLinkedMocks(saleRow: Record<string, unknown>) {
     let ingestedCalls = 0
+    let salesCalls = 0
     mockFromBase.mockImplementation((_db: unknown, table: string) => {
       if (table === 'ingested_sales') {
         ingestedCalls += 1
@@ -148,36 +149,39 @@ describe('publishWorker linked sale schedule sync (reingest)', () => {
         }
       }
       if (table === 'sales') {
-        return {
-          select: (fields: string) => {
-            if (fields === 'id') {
-              return {
+        salesCalls += 1
+        if (salesCalls === 1) {
+          return {
+            select: () => ({
+              eq: () => ({
                 eq: () => ({
                   limit: async () => ({ data: [{ id: LINKED_SALE_ID }], error: null }),
                 }),
-              }
-            }
-            return {
-              eq: () => ({
-                maybeSingle: async () => {
-                  ctx.saleSelectCalls += 1
-                  if (ctx.saleSelectCalls === 1) {
-                    return { data: saleRow, error: null }
-                  }
-                  return {
-                    data: {
-                      date_start: '2026-06-01',
-                      date_end: '2026-06-01',
-                      time_start: '09:00:00',
-                      time_end: '15:00:00',
-                      listing_timezone: 'America/Chicago',
-                    },
-                    error: null,
-                  }
-                },
               }),
-            }
-          },
+            }),
+          }
+        }
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => {
+                ctx.saleSelectCalls += 1
+                if (ctx.saleSelectCalls === 1) {
+                  return { data: saleRow, error: null }
+                }
+                return {
+                  data: {
+                    date_start: '2026-06-01',
+                    date_end: '2026-06-01',
+                    time_start: '09:00:00',
+                    time_end: '15:00:00',
+                    listing_timezone: 'America/Chicago',
+                  },
+                  error: null,
+                }
+              },
+            }),
+          }),
           update: (payload: unknown) => {
             ctx.saleUpdatePayloads.push(payload)
             return { eq: async () => ({ error: null }) }
@@ -255,8 +259,8 @@ describe('publishWorker linked sale schedule sync (reingest)', () => {
   })
 
   it('skips schedule when bundle fails (invalid dates)', async () => {
-    wireLinkedMocks(linkedSaleRow())
     let ingestedCalls = 0
+    let salesCalls = 0
     mockFromBase.mockImplementation((_db: unknown, table: string) => {
       if (table === 'ingested_sales') {
         ingestedCalls += 1
@@ -271,21 +275,24 @@ describe('publishWorker linked sale schedule sync (reingest)', () => {
         }
       }
       if (table === 'sales') {
-        return {
-          select: (fields: string) => {
-            if (fields === 'id') {
-              return {
+        salesCalls += 1
+        if (salesCalls === 1) {
+          return {
+            select: () => ({
+              eq: () => ({
                 eq: () => ({
                   limit: async () => ({ data: [{ id: LINKED_SALE_ID }], error: null }),
                 }),
-              }
-            }
-            return {
-              eq: () => ({
-                maybeSingle: async () => ({ data: linkedSaleRow(), error: null }),
               }),
-            }
-          },
+            }),
+          }
+        }
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: linkedSaleRow(), error: null }),
+            }),
+          }),
           update: (payload: unknown) => {
             ctx.saleUpdatePayloads.push(payload)
             return { eq: async () => ({ error: null }) }

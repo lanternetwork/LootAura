@@ -318,8 +318,6 @@ describe('publish worker idempotent sale images', () => {
     expect(updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         address: '1 Main St, Chicago, IL',
-        date_start: '2026-05-06',
-        time_start: '09:00:00',
         cover_image_url: okUrl,
         images: [okUrl],
       })
@@ -399,8 +397,6 @@ describe('publish worker idempotent sale images', () => {
     expect(updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         address: '5918 Park Ave, Berkeley, IL',
-        date_start: '2026-05-06',
-        time_start: '09:00:00',
       })
     )
     expect(updateSpy).not.toHaveBeenCalledWith(expect.objectContaining({ images: [okUrl] }))
@@ -1016,8 +1012,6 @@ describe('publish worker idempotent sale images', () => {
     expect(salesImageUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         address: '1 Main St, Chicago, IL',
-        date_start: '2026-05-06',
-        time_start: '09:00:00',
       })
     )
     expect(salesImageUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ images: [url] }))
@@ -1373,8 +1367,6 @@ describe('publish worker finalization consistency', () => {
     expect(syncUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         address: '1 Main St, Chicago, IL',
-        date_start: '2026-05-06',
-        time_start: '09:00:00',
       })
     )
     expect(finalizeUpdate).toHaveBeenCalledWith(

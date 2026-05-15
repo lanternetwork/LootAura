@@ -16,9 +16,9 @@
       "schedule": "*/2 * * * *"
     },
     {
-      "path": "/api/cron/seller-weekly-analytics",
-      "schedule": "0 9 * * 1"
-    }
+      "path": "/api/cron/reconciliation",
+      "schedule": "30 * * * *"
+    },
   ]
 }
 

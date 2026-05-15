@@ -476,6 +476,8 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 **Related:** `GET /api/admin/reconciliation/health` (ingest-side health snapshot). Phase 1B **runner** is `POST /api/admin/reconciliation/run`.
 
+**Scheduled production runner (repo-owned):** `GET` or `POST` **`/api/cron/reconciliation`** — **`Authorization: Bearer <CRON_SECRET>`** only. Each invocation runs bounded reconciliation with **`dryRun: false`**, **`applySafeSync: true`**, and **`aggregateTelemetryOnly: true`** (aggregate counters only in JSON and telemetry; no raw URLs, descriptions, or HTML). Default batch size is **20** per run (hard-capped at **100**; override with `CRON_RECONCILIATION_BATCH_LIMIT`). Declared in **`vercel.json`** (default **hourly at :30 UTC** as minute `30 * * * *` — not more frequent than ingestion crons; adjust if needed). Candidate selection uses deterministic SQL ordering + persisted keyset cursor (see migration `175_reconciliation_candidate_coverage.sql` and `RECONCILIATION_CANDIDATE_POOL_MAX`).
+
 #### Authentication and limits
 
 - **Admin session** or **`Authorization: Bearer <CRON_SECRET>`** (optional cron-style invocation; no new schedules are required for Phase 1B).

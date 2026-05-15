@@ -3,7 +3,19 @@ import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandi
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { classifyReconciliationChange } from '@/lib/reconciliation/reconciliationClassifier'
-import { orderReconciliationCandidates } from '@/lib/reconciliation/reconciliationSelection'
+import {
+  computeReconciliationSortKey,
+  orderReconciliationCandidates,
+} from '@/lib/reconciliation/reconciliationSelection'
+import {
+  fetchReconciliationCandidatePageRpc,
+  parseReconciliationCandidatePoolMax,
+  readReconciliationCoverageCursor,
+  reconciliationCoverageStateKey,
+  type RpcIngestRow,
+  type SalePeekRow,
+  writeReconciliationCoverageCursor,
+} from '@/lib/reconciliation/reconciliationCandidateLoad'
 import { tryParseExternalPageListingForReconciliation } from '@/lib/reconciliation/reconciliationParseSnapshot'
 import { resolveSourceRefreshCapability } from '@/lib/reconciliation/reconciliationRefreshCapability'
 import {
@@ -41,7 +53,6 @@ import type {
 const DEFAULT_BATCH_LIMIT = 25
 /** Global hard cap for reconciliation batch size (Phase 1B admin runner). */
 export const RECONCILIATION_HARD_LIMIT_CAP = 100
-const SALES_PREFETCH_CAP = 500
 
 type SalePeekForReconciliation = {
   readonly address: string | null
@@ -171,129 +182,149 @@ function applyCandidateFilters(
   return out
 }
 
+function dedupeIngestRowsById(rows: readonly IngestRowDb[]): IngestRowDb[] {
+  const seen = new Set<string>()
+  const out: IngestRowDb[] = []
+  for (const r of rows) {
+    if (seen.has(r.id)) continue
+    seen.add(r.id)
+    out.push(r)
+  }
+  return out
+}
+
+function mapRpcIngestRowToIngestRowDb(r: RpcIngestRow): IngestRowDb | null {
+  if (typeof r.id !== 'string' || !r.id.trim()) return null
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null
+  const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
+  return {
+    id: r.id,
+    source_url: strOrNull(r.source_url) ?? '',
+    source_platform: strOrNull(r.source_platform) ?? '',
+    city: strOrNull(r.city),
+    state: strOrNull(r.state),
+    normalized_address: strOrNull(r.normalized_address),
+    zip_code: strOrNull(r.zip_code),
+    lat: numOrNull(r.lat),
+    lng: numOrNull(r.lng),
+    title: strOrNull(r.title),
+    description: strOrNull(r.description),
+    date_start: strOrNull(r.date_start),
+    date_end: strOrNull(r.date_end),
+    time_start: strOrNull(r.time_start),
+    time_end: strOrNull(r.time_end),
+    raw_payload: r.raw_payload,
+    image_source_url: strOrNull(r.image_source_url),
+    published_sale_id: strOrNull(r.published_sale_id),
+    last_source_sync_at:
+      r.last_source_sync_at == null
+        ? null
+        : typeof r.last_source_sync_at === 'string'
+          ? r.last_source_sync_at
+          : null,
+    source_sync_status: strOrNull(r.source_sync_status),
+    source_sync_attempt_count: numOrNull(r.source_sync_attempt_count),
+    source_sync_failure_count: numOrNull(r.source_sync_failure_count),
+    source_missing_count: numOrNull(r.source_missing_count),
+    source_placeholder_detected: Boolean(r.source_placeholder_detected),
+    source_content_hash: strOrNull(r.source_content_hash),
+    source_schedule_hash: strOrNull(r.source_schedule_hash),
+    source_image_hash: strOrNull(r.source_image_hash),
+    status: strOrNull(r.status) ?? '',
+    is_duplicate: r.is_duplicate === true,
+    last_source_change_at:
+      r.last_source_change_at == null
+        ? null
+        : typeof r.last_source_change_at === 'string'
+          ? r.last_source_change_at
+          : null,
+  }
+}
+
+function mapPeekRows(
+  m: ReadonlyMap<string, SalePeekRow>
+): ReadonlyMap<string, SalePeekForReconciliation> {
+  const out = new Map<string, SalePeekForReconciliation>()
+  for (const [id, v] of m) {
+    out.set(id, {
+      address: v.address,
+      city: v.city,
+      state: v.state,
+      date_start: v.date_start,
+      date_end: v.date_end,
+      time_start: v.time_start,
+      time_end: v.time_end,
+    })
+  }
+  return out
+}
+
 async function loadCandidateIngestRows(
   admin: ReturnType<typeof getAdminDb>,
-  nowMs: number
-): Promise<{ rows: IngestRowDb[]; salePeekBySaleId: ReadonlyMap<string, SalePeekForReconciliation> }> {
-  const isoNow = new Date(nowMs).toISOString()
-  const { data: saleRows, error: saleErr } = await fromBase(admin, 'sales')
-    .select(
-      'id, ends_at, ingested_sale_id, moderation_status, address, city, state, date_start, date_end, time_start, time_end'
-    )
-    .eq('status', 'published')
-    .is('archived_at', null)
-    .not('ingested_sale_id', 'is', null)
-    .or(`ends_at.is.null,ends_at.gt.${isoNow}`)
-    .limit(SALES_PREFETCH_CAP)
+  nowMs: number,
+  opts: {
+    readonly sourcePlatform?: string
+    readonly onlyPlaceholder?: boolean
+    readonly skipCoverageCursor?: boolean
+  }
+): Promise<{
+  readonly rows: IngestRowDb[]
+  readonly salePeekBySaleId: ReadonlyMap<string, SalePeekForReconciliation>
+  readonly coverageStateKey: string | null
+}> {
+  const poolMax = parseReconciliationCandidatePoolMax()
+  const onlyPlaceholder = opts.onlyPlaceholder === true
+  const skipCoverageCursor = opts.skipCoverageCursor === true
+  const platformTrim = typeof opts.sourcePlatform === 'string' ? opts.sourcePlatform.trim() : ''
+  const sqlPlatform = platformTrim || undefined
 
-  if (saleErr || !Array.isArray(saleRows)) {
-    logger.warn('reconciliation: failed to load sales for candidate selection', {
-      component: 'reconciliation/reconcileExternalSources',
-      operation: 'load_sales',
-      message: saleErr?.message ?? 'no_rows',
+  /**
+   * Full priority-ordered pool from DB root (no keyset) — placeholder cohort (JS filter after)
+   * or tests / manual runs that opt out of cursor persistence.
+   */
+  const useEphemeralRootPool = onlyPlaceholder || skipCoverageCursor
+  if (useEphemeralRootPool) {
+    const page = await fetchReconciliationCandidatePageRpc(admin, {
+      nowMs,
+      poolLimit: poolMax,
+      cursor: null,
+      sourcePlatform: sqlPlatform,
     })
-    return { rows: [], salePeekBySaleId: new Map() }
+    const rows = page.rows.map(mapRpcIngestRowToIngestRowDb).filter((x): x is IngestRowDb => x != null)
+    return {
+      rows: dedupeIngestRowsById(rows),
+      salePeekBySaleId: mapPeekRows(page.salePeekBySaleId),
+      coverageStateKey: null,
+    }
   }
 
-  const eligible = (
-    saleRows as Array<{
-      id: string
-      ingested_sale_id: string | null
-      moderation_status: string | null
-      address: string | null
-      city: string | null
-      state: string | null
-      date_start: string | null
-      date_end: string | null
-      time_start: string | null
-      time_end: string | null
-    }>
-  ).filter(
-    (s) =>
-      s.ingested_sale_id &&
-      (s.moderation_status == null || s.moderation_status.trim() === '' || s.moderation_status !== 'hidden_by_admin')
-  )
+  const coverageStateKey = reconciliationCoverageStateKey({
+    sourcePlatform: sqlPlatform,
+    onlyPlaceholder: false,
+  })!
 
-  const ingestIds = [...new Set(eligible.map((s) => s.ingested_sale_id).filter((x): x is string => Boolean(x)))]
-
-  if (ingestIds.length === 0) return { rows: [], salePeekBySaleId: new Map() }
-
-  const salePeekBySaleId = new Map<string, SalePeekForReconciliation>(
-    eligible.map((s) => [
-      s.id,
-      {
-        address: s.address ?? null,
-        city: s.city ?? null,
-        state: s.state ?? null,
-        date_start: s.date_start ?? null,
-        date_end: s.date_end ?? null,
-        time_start: s.time_start ?? null,
-        time_end: s.time_end ?? null,
-      },
-    ])
-  )
-
-  const { data: ingestRows, error: ingestErr } = await fromBase(admin, 'ingested_sales')
-    .select(
-      [
-        'id',
-        'source_url',
-        'source_platform',
-        'city',
-        'state',
-        'normalized_address',
-        'zip_code',
-        'lat',
-        'lng',
-        'title',
-        'description',
-        'date_start',
-        'date_end',
-        'time_start',
-        'time_end',
-        'raw_payload',
-        'image_source_url',
-        'published_sale_id',
-        'last_source_sync_at',
-        'source_sync_status',
-        'source_sync_attempt_count',
-        'source_sync_failure_count',
-        'source_missing_count',
-        'source_placeholder_detected',
-        'source_content_hash',
-        'source_schedule_hash',
-        'source_image_hash',
-        'status',
-        'is_duplicate',
-        'last_source_change_at',
-      ].join(', ')
-    )
-    .in('id', ingestIds)
-    .eq('status', 'published')
-    .eq('is_duplicate', false)
-    .not('source_url', 'is', null)
-    .not('published_sale_id', 'is', null)
-
-  if (ingestErr || !Array.isArray(ingestRows)) {
-    logger.warn('reconciliation: failed to load ingested_sales candidates', {
-      component: 'reconciliation/reconcileExternalSources',
-      operation: 'load_ingested',
-      message: ingestErr?.message ?? 'no_rows',
-    })
-    return { rows: [], salePeekBySaleId }
-  }
-
-  const saleById = new Map(eligible.map((s) => [s.id, s]))
-
-  const linked = (ingestRows as unknown as IngestRowDb[]).filter((row) => {
-    const pub = row.published_sale_id
-    if (!pub) return false
-    const sale = saleById.get(pub)
-    if (!sale || sale.ingested_sale_id !== row.id) return false
-    return true
+  let cursor = await readReconciliationCoverageCursor(admin, coverageStateKey)
+  let page = await fetchReconciliationCandidatePageRpc(admin, {
+    nowMs,
+    poolLimit: poolMax,
+    cursor,
+    sourcePlatform: sqlPlatform,
   })
 
-  return { rows: linked, salePeekBySaleId }
+  if (page.rows.length === 0 && cursor) {
+    await writeReconciliationCoverageCursor(admin, coverageStateKey, null)
+    cursor = null
+    page = await fetchReconciliationCandidatePageRpc(admin, {
+      nowMs,
+      poolLimit: poolMax,
+      cursor: null,
+      sourcePlatform: sqlPlatform,
+    })
+  }
+
+  const rows = page.rows.map(mapRpcIngestRowToIngestRowDb).filter((x): x is IngestRowDb => x != null)
+  return { rows: dedupeIngestRowsById(rows), salePeekBySaleId: mapPeekRows(page.salePeekBySaleId), coverageStateKey }
 }
 
 function resolveSyncStatus(params: {
@@ -363,6 +394,11 @@ export interface ReconcileExternalSourcesOptions {
    * Default false. Never runs when `dryRun` is omitted or true.
    */
   readonly applySafeSync?: boolean
+  /**
+   * Tests / isolated runs: load a priority-ordered pool without reading or writing the
+   * persisted reconciliation coverage cursor.
+   */
+  readonly skipCoverageCursorPersistence?: boolean
 }
 
 /**
@@ -378,9 +414,18 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_BATCH_LIMIT, 1), RECONCILIATION_HARD_LIMIT_CAP)
   const admin = getAdminDb()
 
-  const { rows: rawRows, salePeekBySaleId } = await loadCandidateIngestRows(admin, nowMs)
-  const filtered = applyCandidateFilters(rawRows, {
+  const { rows: rawRows, salePeekBySaleId, coverageStateKey } = await loadCandidateIngestRows(admin, nowMs, {
     sourcePlatform: options?.sourcePlatform,
+    onlyPlaceholder: options?.onlyPlaceholder,
+    skipCoverageCursor: options?.skipCoverageCursorPersistence === true,
+  })
+  const platformTrimForFilter =
+    typeof options?.sourcePlatform === 'string' ? options.sourcePlatform.trim() : ''
+  /** RPC applies `p_source_platform` whenever non-empty (both cursor + ephemeral pools). */
+  const sourcePlatformAppliedInRpc = platformTrimForFilter.length > 0
+
+  const filtered = applyCandidateFilters(rawRows, {
+    sourcePlatform: sourcePlatformAppliedInRpc ? undefined : options?.sourcePlatform,
     onlyPlaceholder: options?.onlyPlaceholder,
   })
   const ordered = orderReconciliationCandidates(
@@ -875,6 +920,22 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         })
       }
     }
+  }
+
+  if (
+    !dryRun &&
+    options?.skipCoverageCursorPersistence !== true &&
+    coverageStateKey &&
+    batch.length > 0
+  ) {
+    const lastRow = batch[batch.length - 1]!
+    const sk = computeReconciliationSortKey(toCandidate(lastRow), nowMs)
+    await writeReconciliationCoverageCursor(admin, coverageStateKey, {
+      tier: sk[0],
+      placeholder: sk[1],
+      never: sk[2],
+      ingestId: sk[3],
+    })
   }
 
   const persistenceApplied = !dryRun && persistenceWrites > 0

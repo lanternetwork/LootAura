@@ -3,19 +3,14 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Phase 1B guard: reconciliation must not write public `sales`.
- * Execution path uses `sales` only for candidate discovery (SELECT).
+ * Phase 1B guard: reconciliation must not write public `sales` from `reconcileExternalSources`.
+ * Candidate discovery uses SQL RPC + ingested_sales updates only.
  */
 describe('reconcileExternalSources (static)', () => {
-  it('uses fromBase(admin, sales) only as a single select chain', () => {
+  it('does not call fromBase(admin, sales) — linked candidates come from reconciliation_candidate_rows_page RPC', () => {
     const path = join(process.cwd(), 'lib/reconciliation/reconcileExternalSources.ts')
     const src = readFileSync(path, 'utf8')
-    const matches = [...src.matchAll(/fromBase\(admin, 'sales'\)/g)]
-    expect(matches.length).toBe(1)
-    const idx = matches[0]!.index!
-    const window = src.slice(idx, idx + 400)
-    expect(window).toMatch(/\.select\(/)
-    expect(window).not.toMatch(/\.update\s*\(/)
+    expect(src).not.toMatch(/fromBase\(admin, ['"]sales['"]\)/)
   })
 
   it('defaults omitted dryRun to read-only persistence (library safety)', () => {

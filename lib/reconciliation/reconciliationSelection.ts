@@ -21,7 +21,17 @@ function hasFailures(row: ReconciliationCandidateRow): boolean {
   return row.source_sync_failure_count > 0 || row.source_sync_status === 'source_missing_soft'
 }
 
-function scoreCandidate(row: ReconciliationCandidateRow, nowMs: number): ScoredReconciliationCandidate {
+/**
+ * Deterministic sort key for reconciliation candidate ordering (must stay aligned with
+ * `reconciliation_candidate_rows_page` in `175_reconciliation_candidate_coverage.sql`).
+ */
+export function computeReconciliationSortKey(
+  row: Pick<
+    ReconciliationCandidateRow,
+    'id' | 'source_placeholder_detected' | 'last_source_sync_at' | 'source_sync_failure_count' | 'source_sync_status'
+  >,
+  nowMs: number
+): readonly [number, number, number, string] {
   let tier: SelectionTier = 'normal'
   if (row.source_placeholder_detected || neverSynced(row) || hasFailures(row)) {
     tier = 'high'
@@ -38,8 +48,11 @@ function scoreCandidate(row: ReconciliationCandidateRow, nowMs: number): ScoredR
   const tierN = tierRank(tier)
   const placeholderN = row.source_placeholder_detected ? 0 : 1
   const neverN = neverSynced(row) ? 0 : 1
-  const sortKey: readonly [number, number, number, string] = [tierN, placeholderN, neverN, row.id]
+  return [tierN, placeholderN, neverN, row.id]
+}
 
+function scoreCandidate(row: ReconciliationCandidateRow, nowMs: number): ScoredReconciliationCandidate {
+  const sortKey = computeReconciliationSortKey(row, nowMs)
   return { row, sortKey }
 }
 

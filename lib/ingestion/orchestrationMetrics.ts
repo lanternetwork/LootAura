@@ -52,6 +52,8 @@ export type ExternalIngestionOrchestrationNote = {
   configsSkippedNoSourcePages?: number
   /** Enabled external configs skipped at load time (source_pages present but no valid HTTPS URL). */
   configsSkippedInvalidUrls?: number
+  /** Enabled external configs excluded from crawl rotation (discovery placeholder remediation). */
+  configsSkippedCrawlExcluded?: number
   /** Config slots advanced this run (cursor); crawlable configs only. */
   configsConsumed?: number
   /** Processing-time skip when normalizeSourcePages returns empty despite load-time crawlable filter. */

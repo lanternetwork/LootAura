@@ -70,7 +70,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
   
-  // 0.2. Allow social media crawlers (Facebook, Twitter, LinkedIn, etc.) to access all pages
+  // 0.2. Cron API routes: skip session/CSRF; handlers enforce CRON_SECRET
+  if (pathname.startsWith('/api/cron/')) {
+    return NextResponse.next()
+  }
+
+  // 0.3. Allow social media crawlers (Facebook, Twitter, LinkedIn, etc.) to access all pages
   // This is critical for Open Graph and Twitter Card metadata to work
   const isSocialMediaCrawler = 
     userAgent.includes('facebookexternalhit') ||

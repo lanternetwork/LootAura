@@ -13,6 +13,7 @@ import { runSourceDiscoveryCron } from '@/lib/ingestion/discovery/runSourceDisco
 import { getAdminDb } from '@/lib/supabase/clients'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 function discoveryCronJsonBody(result: Awaited<ReturnType<typeof runSourceDiscoveryCron>>) {
   const t = result.telemetry

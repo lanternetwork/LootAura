@@ -5,14 +5,14 @@ import { describe, expect, it } from 'vitest'
 const DISCOVERY_DIR = join(process.cwd(), 'lib/ingestion/discovery')
 
 describe('ystm discovery subsystem', () => {
-  it('does not reference ingestion_city_configs or Supabase clients', () => {
-    const files = [
+  it('dry-run modules do not reference ingestion_city_configs or Supabase clients', () => {
+    const dryRunOnlyFiles = [
       'ystmDiscovery.ts',
       'ystmDiscoveryValidator.ts',
       'ystmStateIndexCatalog.ts',
       'ystmDiscoveryTelemetry.ts',
     ]
-    for (const file of files) {
+    for (const file of dryRunOnlyFiles) {
       const src = readFileSync(join(DISCOVERY_DIR, file), 'utf8')
       expect(src).not.toMatch(/ingestion_city_configs/)
       expect(src).not.toMatch(/getAdminDb|fromBase\(/)

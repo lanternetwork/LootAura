@@ -205,7 +205,7 @@ function buildFetchContext(
 
 /**
  * Dry-run discovery: fetch state indexes, extract city pages, validate, emit aggregate telemetry.
- * Never writes to `ingestion_city_configs`.
+ * Dry-run only: never persists candidates to the ingestion registry.
  */
 export async function runYstmDiscoveryDryRun(
   options: RunYstmDiscoveryDryRunOptions = {}

@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom'
 import { deriveYardsaleTreasureMapCityPageUrl } from '@/lib/ingestion/ensureCityConfigFromListingSource'
 import { normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSource'
 import {
+  EXTERNAL_FETCH_REASON,
   fetchSafeExternalPageHtml,
   hashHostForLog,
   type ExternalFetchLogContext,
@@ -197,6 +198,7 @@ function buildFetchContext(
     state: stateCode,
     pageIndex: index,
     hostHash: hashHostForLog('yardsaletreasuremap.com'),
+    reason: EXTERNAL_FETCH_REASON.OK,
     ...telemetryContext,
   }
 }

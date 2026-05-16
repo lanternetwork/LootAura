@@ -1,0 +1,100 @@
+<html>
+<head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+    <title>Illinois.html Yard Sales</title>
+    <meta name="description" content="An app for posting garage sales and finding the best garage sales near you. Plan, organize, and navigate your yard sale route!"/>
+    <link rel="canonical" href="https://yardsaletreasuremap.com/US/Illinois.html/">
+
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/jquery/css/bootstrap/bootstrap.min.css">
+    <script src="/extlib/jquery/jquery-3.6.1.min.js"></script>
+    <script src="/extlib/jquery/jquery-ui-1.13.2/jquery-ui.min.js"></script>
+</head>
+<body>
+ 
+    <div class="container-fluid d-flex h-100 flex-column">
+        <div class="row header" style="background:#27b1f4; align-items: center; padding: 10px;">
+            <div class="col-6">
+                <a href="/">
+                    <img src="/pics/YSTM_site_logo.png" width="250"/>
+                </a>
+            </div>
+
+            <!-- put menu on newline on small screens -->
+            <div class="w-100 d-xs-block d-md-none"></div>
+
+            <div class="col-4 col-sm-2">
+                <h5>
+                    <a href="/create-listing.html" style="color:darkblue;">Advertise</a>
+                </h5>
+            </div>
+            <div class="col-4 col-sm-2">
+                <h5>
+                    <a href="/tools.html" style="color:darkblue">Tools</a>
+                </h5>
+            </div>
+            <div class="col-4 col-sm-2">
+                <h5>
+                    <a href="/blogit" style="color:darkblue">Blog</a>
+                </h5>
+            </div>
+        </div>
+
+        <div class="row content">
+            <div class="col-sm-12" style="background:#27b1f4; text-align: left;">
+                <h1 class="title">The Garage Sale App for Finding Sales Near You</h1>
+            </div>
+        </div>
+
+        <div class="row content">
+            <div class="col-10">
+                <a href='/'>Home</a> / <a href='/US/'>US</a> / Illinois.html                <ul>
+</ul>
+            </div>
+        </div>
+
+        <div class="row text-center" style="background:#27b1f4; padding: 30px;">
+            <div class="col-3 col-sm-2 offset-1 offset-sm-3">
+                <a href="/blogit/?page_id=242" style="color:white">Contact</a>
+            </div>
+            <div class="col-3 col-sm-2">
+                <a href="/blogit/?page_id=366" style="color:white">Privacy</a>
+            </div>
+            <div class="col-3 col-sm-2">
+                <a href="/blogit/?page_id=2" style="color:white">About</a>
+            </div>
+        </div>
+        <div class="row text-center" style="background:#27b1f4; padding: 30px;">
+            <div class="col-12">
+                <div style="color:white; font-weight:lighter">© Kolodgie Enterprises LLC</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Analytics -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js'
+        import { getAnalytics, logEvent } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-analytics.js'
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAtKYkPUfB7IIMnSLu0DhIQd6_dWnT_Llg",
+            authDomain: "api-project-193311867004.firebaseapp.com",
+            databaseURL: "https://api-project-193311867004.firebaseio.com",
+            projectId: "api-project-193311867004",
+            storageBucket: "api-project-193311867004.appspot.com",
+            messagingSenderId: "193311867004",
+            appId: "1:193311867004:web:31ae3c71c302f22a3749f9",
+            measurementId: "G-G53VNBF024"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+
+        window.logEventAnalytics = function (eventName, value) {
+            logEvent(analytics, eventName, { value: value});
+        }
+    </script>
+
+</body>
+</html>

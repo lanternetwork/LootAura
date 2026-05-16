@@ -6,7 +6,7 @@ describe('parseDiscoveryCronBudgets', () => {
     const budgets = parseDiscoveryCronBudgets({
       CRON_DISCOVERY_MAX_STATES_PER_RUN: '99',
       CRON_DISCOVERY_MAX_VALIDATION_FETCHES: '999',
-    } as NodeJS.ProcessEnv)
+    } as unknown as NodeJS.ProcessEnv)
     expect(budgets.maxStatesPerRun).toBe(15)
     expect(budgets.maxValidationFetchesPerRun).toBe(200)
   })

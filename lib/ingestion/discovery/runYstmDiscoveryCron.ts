@@ -44,7 +44,7 @@ async function loadRegistryAggregateCounts(admin: AdminDb): Promise<{
   crawlExcludedConfigCount: number
 }> {
   const { data, error } = await fromBase(admin, 'ingestion_city_configs')
-    .select('source_platform, source_pages, source_discovery_status, source_crawl_excluded_at')
+    .select('city, state, source_platform, source_pages, source_discovery_status, source_crawl_excluded_at')
     .eq('enabled', true)
     .eq('source_platform', 'external_page_source')
 
@@ -53,6 +53,8 @@ async function loadRegistryAggregateCounts(admin: AdminDb): Promise<{
   }
 
   const rows = data as Array<{
+    city: string
+    state: string
     source_platform: string
     source_pages: unknown
     source_discovery_status: string

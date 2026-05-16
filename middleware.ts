@@ -32,7 +32,6 @@ export async function middleware(req: NextRequest) {
       pathname.startsWith('/assets/') ||
       pathname.startsWith('/images/') ||
       pathname.startsWith('/icons/') ||
-      pathname === '/manifest.json' ||
       pathname === '/manifest.webmanifest' ||
       pathname === '/robots.txt' ||
       pathname === '/sitemap.xml' ||
@@ -51,7 +50,6 @@ export async function middleware(req: NextRequest) {
   
   // 0. Immediately bypass static PWA files and manifest (before any other checks)
   if (
-    pathname === '/manifest.json' ||
     pathname === '/manifest.webmanifest' ||
     pathname === '/favicon.ico' ||
     pathname === '/robots.txt' ||
@@ -205,7 +203,6 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/static/') ||
     pathname.startsWith('/public/') ||
     pathname.match(/\.[a-z0-9]+$/i) || // files with extensions
-    pathname === '/manifest.json' ||
     pathname === '/manifest.webmanifest' ||
     pathname === '/favicon.ico' ||
     pathname === '/apple-touch-icon.png' ||
@@ -392,7 +389,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // Match all app routes except static assets, health endpoints, and auth callback
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|ads.txt|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|robots.txt|sitemap.xml|ads.txt|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback).*)',
     // Match API routes except health endpoints
     '/api/((?!health/).)*'
   ],

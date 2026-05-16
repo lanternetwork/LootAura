@@ -27,7 +27,9 @@ export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
-const defaultOgImage = `${siteUrl}/og-default.png`
+/** Bumped when PWA/tab icon assets change (cache bust for metadata.icons). */
+const BRAND_ICON_VERSION = '3'
+const defaultOgImage = `${siteUrl}/og-default.png?v=${BRAND_ICON_VERSION}`
 
 // Safely construct metadataBase URL
 let metadataBaseUrl: URL | undefined
@@ -45,6 +47,28 @@ export const metadata: Metadata = {
   title: 'LootAura · Yard Sales Near You',
   description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
   keywords: 'yard sale, garage sale, estate sale, local sales, treasure hunting',
+  manifest: '/manifest.webmanifest',
+  themeColor: '#0b3d2e',
+  icons: {
+    icon: [
+      {
+        url: `/icons/icon-192-v2.png?v=${BRAND_ICON_VERSION}`,
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        url: `/icons/icon-512-v2.png?v=${BRAND_ICON_VERSION}`,
+        sizes: '512x512',
+        type: 'image/png',
+      },
+    ],
+    shortcut: `/icons/icon-192-v2.png?v=${BRAND_ICON_VERSION}`,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'LootAura',
+  },
   openGraph: {
     title: 'LootAura · Yard Sales Near You',
     description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
@@ -89,12 +113,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="dns-prefetch" href="https://api.mapbox.com" />
         <link rel="preconnect" href="https://events.mapbox.com" />
         <link rel="dns-prefetch" href="https://events.mapbox.com" />
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="LootAura" />
-        <meta name="theme-color" content="#0b3d2e" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         {ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && (
           <meta name="google-site-verification" content={ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION} />

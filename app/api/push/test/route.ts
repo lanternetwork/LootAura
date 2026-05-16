@@ -66,8 +66,8 @@ export async function POST(_request: NextRequest) {
     const payload = JSON.stringify({
       title: 'LootAura Test',
       body: 'This is a test notification from LootAura!',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      icon: '/icons/icon-192-v2.png',
+      badge: '/icons/icon-192-v2.png',
       url: '/explore',
       tag: 'test-notification'
     })

@@ -239,6 +239,6 @@ describe('createOrganizationStructuredData', () => {
     expect(data['@type']).toBe('Organization')
     expect(data.name).toBe('Loot Aura')
     expect(data.url).toBe('https://lootaura.app')
-    expect(data.logo).toBe('https://lootaura.app/icons/icon-512.png')
+    expect(data.logo).toBe('https://lootaura.app/icons/icon-512-v2.png')
   })
 })

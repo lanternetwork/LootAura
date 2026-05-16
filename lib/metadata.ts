@@ -22,7 +22,7 @@ export function createPageMetadata({
   const fullTitle = `${title} | ${siteName}`
   const fullDescription = pageDescription || description
   const url = `${baseUrl}${path}`
-  const imageUrl = image ? (image.startsWith('http') ? image : `${baseUrl}${image}`) : `${baseUrl}/og-image.jpg`
+  const imageUrl = image ? (image.startsWith('http') ? image : `${baseUrl}${image}`) : `${baseUrl}/og-default.png`
 
   return {
     title: fullTitle,
@@ -278,7 +278,7 @@ export function createHomepageStructuredData() {
       url: baseUrl,
       logo: {
         '@type': 'ImageObject',
-        url: `${baseUrl}/icons/icon-512.png`
+        url: `${baseUrl}/icons/icon-512-v2.png`
       }
     }
   }
@@ -291,7 +291,7 @@ export function createOrganizationStructuredData() {
     '@type': 'Organization',
     name: siteName,
     url: baseUrl,
-    logo: `${baseUrl}/icons/icon-512.png`,
+    logo: `${baseUrl}/icons/icon-512-v2.png`,
     description,
     sameAs: [
       // Add social media URLs here when available

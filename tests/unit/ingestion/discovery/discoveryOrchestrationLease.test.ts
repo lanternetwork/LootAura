@@ -14,8 +14,35 @@ type StateRow = {
 
 let state: StateRow
 
-function emptySelect() {
-  return Promise.resolve({ data: [] as { state_cursor: number }[], error: null })
+function matches(col: string, expected: unknown): boolean {
+  const actual = (state as Record<string, unknown>)[col]
+  if (expected === null) return actual == null
+  return actual === expected
+}
+
+function buildUpdateChain(patch: Partial<StateRow>) {
+  const applySelect = () => {
+    Object.assign(state, patch)
+    return Promise.resolve({ data: [{ state_cursor: state.state_cursor }], error: null })
+  }
+  const emptySelect = () => Promise.resolve({ data: [] as { state_cursor: number }[], error: null })
+
+  const chain = {
+    eq(col: string, val: unknown) {
+      if (!matches(col, val)) {
+        return { eq: () => chain, is: () => chain, select: emptySelect }
+      }
+      return chain
+    },
+    is(col: string, val: null) {
+      if (!matches(col, val)) {
+        return { eq: () => chain, is: () => chain, select: emptySelect }
+      }
+      return chain
+    },
+    select: applySelect,
+  }
+  return chain
 }
 
 function createDiscoveryStateApi() {
@@ -30,33 +57,14 @@ function createDiscoveryStateApi() {
           }),
       }),
     }),
-    update: (patch: Partial<StateRow>) => {
-      const apply = () => {
-        Object.assign(state, patch)
-        return Promise.resolve({ data: [{ state_cursor: state.state_cursor }], error: null })
-      }
-      return {
-        eq: (col: string, val: unknown) => {
-          if (col === 'key' && val !== state.key) {
-            return { eq: () => ({ select: emptySelect }), is: () => ({ select: emptySelect }) }
-          }
-          return {
-            eq: (col2: string, val2: unknown) => {
-              if ((state as Record<string, unknown>)[col2] !== val2) {
-                return { select: emptySelect }
-              }
-              return { select: apply }
-            },
-            is: (col2: string, val2: null) => {
-              if ((state as Record<string, unknown>)[col2] !== val2) {
-                return { select: emptySelect }
-              }
-              return { select: apply }
-            },
-          }
-        },
-      }
-    },
+    update: (patch: Partial<StateRow>) => ({
+      eq: (col: string, val: unknown) => {
+        if (col === 'key' && val !== state.key) {
+          return buildUpdateChain(patch)
+        }
+        return buildUpdateChain(patch)
+      },
+    }),
   }
 }
 

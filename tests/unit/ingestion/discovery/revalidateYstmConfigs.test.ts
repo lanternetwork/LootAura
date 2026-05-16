@@ -53,6 +53,8 @@ function row(partial: Partial<IngestionCityConfigDiscoveryRow> & Pick<IngestionC
     source_last_validated_at: null,
     source_last_failed_at: null,
     source_discovery_failure_reason: null,
+    source_discovery_failure_count: 0,
+    source_crawl_excluded_at: null,
     ...partial,
   }
 }
@@ -70,7 +72,11 @@ function createTableApi(store: Store) {
       return selectChain
     },
     is: (col: string, val: null) => {
-      filters.push((r) => (r as Record<string, unknown>)[col] === val)
+      filters.push((r) => {
+        const v = (r as Record<string, unknown>)[col]
+        if (val === null) return v == null || v === ''
+        return v === val
+      })
       return selectChain
     },
     then: (resolve: (v: { data: unknown; error: null }) => void) => {

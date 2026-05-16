@@ -6,7 +6,6 @@ import {
   hashHostForLog,
   type ExternalFetchLogContext,
 } from '@/lib/ingestion/adapters/externalPageSafeFetch'
-import { deriveYardsaleTreasureMapCityPageUrl } from '@/lib/ingestion/ensureCityConfigFromListingSource'
 import {
   normalizeIngestionCity,
   normalizeIngestionState,
@@ -22,9 +21,9 @@ import {
   type YstmDiscoveredCityPageCandidate,
   type YstmDiscoveryFetchHtml,
 } from '@/lib/ingestion/discovery/ystmDiscovery'
-import { promoteYstmDiscoveryResults } from '@/lib/ingestion/discovery/promoteYstmDiscoveryResults'
 import {
   isMalformedIngestionCityName,
+  promoteYstmDiscoveryResults,
   type IngestionCityConfigDiscoveryRow,
 } from '@/lib/ingestion/discovery/promoteYstmDiscoveryResults'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'

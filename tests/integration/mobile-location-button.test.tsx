@@ -10,6 +10,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { checkGeolocationPermission } from '@/lib/location/client'
 import { isPointInsideBounds } from '@/lib/map/bounds'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 
 // Mock the permission check
 vi.mock('@/lib/location/client', () => ({
@@ -93,14 +95,10 @@ describe('Mobile Location Button Visibility', () => {
 
   describe('No Recenter Map Text', () => {
     it('should never render "Recenter Map" text on mobile', () => {
-      // This test verifies that MobileRecenterButton component has been removed
-      // The component file should not exist
-      // This is verified by the fact that we're not importing or using MobileRecenterButton
-      // in MobileSalesShell.tsx anymore
-      
-      // If MobileRecenterButton were still being used, we would see it in the imports
-      // Since we've removed it, this test passes by ensuring the component doesn't exist
-      expect(true).toBe(true) // Placeholder - actual verification is in code removal
+      const sourcePath = path.resolve(process.cwd(), 'app/sales/MobileSalesShell.tsx')
+      const source = readFileSync(sourcePath, 'utf-8')
+      expect(source.includes('Recenter Map')).toBe(false)
+      expect(source.includes('MobileRecenterButton')).toBe(false)
     })
   })
 })

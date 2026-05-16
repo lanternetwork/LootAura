@@ -1,0 +1,55 @@
+{
+  "invalid": 0,
+  "listings": [
+    {
+      "addressRaw": "10 Elm St, Chicago, IL",
+      "city": "Chicago",
+      "dedupeIdentifiers": {
+        "externalId": "600",
+        "sourceUrl": "https://example.com/US/Illinois/Chicago/10-Elm-St/600/listing.html"
+      },
+      "description": "Moving sale CL Moving sale CL Moving sale CL Moving sale CL",
+      "endDate": null,
+      "extractionConfidence": null,
+      "imageSourceUrl": null,
+      "imageUrls": null,
+      "rawPayload": {
+        "adapter": "external_page_source",
+        "addressSlug": "10-Elm-St",
+        "addressTailCity": "Chicago",
+        "cityConflict": false,
+        "citySource": "listing_url",
+        "externalId": "600",
+        "hubSegment": null,
+        "ingestionDiagnostics": {
+          "addressSource": "composite",
+          "addressSources": ["slug", "slug_with_url_municipality"],
+          "authority": {
+            "addressTailCity": "Chicago",
+            "cityConflict": false,
+            "citySource": "listing_url",
+            "resolvedCity": "Chicago",
+            "streetConcrete": true,
+            "urlCity": "Chicago"
+          },
+          "chosenAddressSource": "slug",
+          "metadataAddressSkippedAsUntrusted": false,
+          "nearbyCandidateCount": 0,
+          "rejectedAddressCandidates": [],
+          "slugWasPlaceholder": false
+        },
+        "pathCitySlug": "Chicago",
+        "resolvedCity": "Chicago",
+        "resolvedState": "IL",
+        "stateSource": "listing_url",
+        "urlMunicipalityNormalized": "Chicago"
+      },
+      "sourceUrl": "https://example.com/US/Illinois/Chicago/10-Elm-St/600/listing.html",
+      "startDate": null,
+      "state": "IL",
+      "title": "Moving sale CL"
+    }
+  ],
+  "parserAdapter": "external_page_source",
+  "parserStatus": "ok"
+}

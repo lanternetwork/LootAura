@@ -71,6 +71,7 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
       const hasToken = !!mapboxToken && mapboxToken.length > 0
       addStep('Mapbox Token Validation', hasToken, { 
         hasToken, 
+        tokenSource: hasToken ? 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN' : 'none',
         tokenLength: mapboxToken?.length || 0,
         tokenPrefix: mapboxToken?.substring(0, 10) + '...' || 'none'
       }, hasToken ? undefined : 'Missing or invalid Mapbox token', 'initialization', tokenTestStart)

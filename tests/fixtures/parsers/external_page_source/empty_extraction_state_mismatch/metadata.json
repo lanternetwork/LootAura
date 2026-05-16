@@ -1,0 +1,11 @@
+{
+  "captured_at": "2026-04-15T12:00:00.000Z",
+  "source_host": "example.com",
+  "pageUrl": "https://example.com/list",
+  "config": {
+    "city": "Louisville",
+    "state": "KY",
+    "source_platform": "external_page_source",
+    "source_pages": []
+  }
+}

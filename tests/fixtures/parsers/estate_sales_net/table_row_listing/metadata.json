@@ -1,0 +1,11 @@
+{
+  "captured_at": "2026-04-15T12:00:00.000Z",
+  "source_host": "estatesales.example.org",
+  "pageUrl": "https://estatesales.example.org/city/chicago",
+  "config": {
+    "city": "Chicago",
+    "state": "IL",
+    "source_platform": "estate_sales_net",
+    "source_pages": []
+  }
+}

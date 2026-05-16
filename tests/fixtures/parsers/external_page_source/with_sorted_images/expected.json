@@ -1,0 +1,66 @@
+{
+  "invalid": 0,
+  "listings": [
+    {
+      "addressRaw": "1 A, Chicago, IL",
+      "city": "Chicago",
+      "dedupeIdentifiers": {
+        "externalId": "99",
+        "sourceUrl": "https://example.com/US/Illinois/Chicago/1-A/99/listing.html"
+      },
+      "description": "One One",
+      "endDate": null,
+      "extractionConfidence": null,
+      "imageSourceUrl": "https://cdn.example.com/a.jpg",
+      "imageUrls": [
+        "https://cdn.example.com/a.jpg",
+        "https://cdn.example.com/c.jpg",
+        "https://example.com/gallery/b.jpg",
+        "https://example.com/images/og-photo.jpg"
+      ],
+      "rawPayload": {
+        "adapter": "external_page_source",
+        "addressSlug": "1-A",
+        "addressTailCity": "Chicago",
+        "cityConflict": false,
+        "citySource": "listing_url",
+        "externalId": "99",
+        "hubSegment": null,
+        "imageUrls": [
+          "https://cdn.example.com/a.jpg",
+          "https://cdn.example.com/c.jpg",
+          "https://example.com/gallery/b.jpg",
+          "https://example.com/images/og-photo.jpg"
+        ],
+        "ingestionDiagnostics": {
+          "addressSource": "composite",
+          "addressSources": ["slug", "slug_with_url_municipality"],
+          "authority": {
+            "addressTailCity": "Chicago",
+            "cityConflict": false,
+            "citySource": "listing_url",
+            "resolvedCity": "Chicago",
+            "streetConcrete": true,
+            "urlCity": "Chicago"
+          },
+          "chosenAddressSource": "slug",
+          "metadataAddressSkippedAsUntrusted": false,
+          "nearbyCandidateCount": 0,
+          "rejectedAddressCandidates": [],
+          "slugWasPlaceholder": false
+        },
+        "pathCitySlug": "Chicago",
+        "resolvedCity": "Chicago",
+        "resolvedState": "IL",
+        "stateSource": "listing_url",
+        "urlMunicipalityNormalized": "Chicago"
+      },
+      "sourceUrl": "https://example.com/US/Illinois/Chicago/1-A/99/listing.html",
+      "startDate": null,
+      "state": "IL",
+      "title": "One"
+    }
+  ],
+  "parserAdapter": "external_page_source",
+  "parserStatus": "ok"
+}

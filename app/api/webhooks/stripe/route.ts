@@ -11,6 +11,7 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { getStripeClient, getStripeWebhookSecret } from '@/lib/stripe/client'
 import { logger } from '@/lib/log'
 import { fail, ok } from '@/lib/http/json'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 export const dynamic = 'force-dynamic'
 
@@ -221,22 +222,45 @@ async function finalizeDraftPromotion(
     : typeof rawTags === 'string'
       ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
       : []
-  
+
+  const dateStart = formData.date_start?.trim()
+  if (!dateStart) {
+    throw new Error('Invalid draft payload: missing date_start')
+  }
+
+  const { resolvePersistableSaleEndsAt } = await import('@/lib/sales/resolvePersistableSaleEndsAt')
+  const listingEnds = await resolvePersistableSaleEndsAt(
+    admin,
+    {
+      date_start: dateStart,
+      time_start: normalizedTimeStart ?? null,
+      date_end: formData.date_end || null,
+      time_end: formData.time_end || null,
+      zip_code: formData.zip_code || null,
+      state: formData.state,
+      lat: parseFloat(String(formData.lat)),
+      lng: parseFloat(String(formData.lng)),
+    },
+    { operation: 'stripe_finalize_draft_promotion', draft_key: draftKey }
+  )
+
   // Create sale with promotion
   const salePayload = {
     owner_id: userId,
     title: formData.title,
     description: formData.description || null,
-    address: formData.address || null,
+    address: formatSaleAddressForPersist(formData.address, formData.city, formData.state),
     city: formData.city,
     state: formData.state,
     zip_code: formData.zip_code || null,
     lat: parseFloat(String(formData.lat)),
     lng: parseFloat(String(formData.lng)),
-    date_start: formData.date_start,
-    time_start: normalizedTimeStart,
+    date_start: dateStart,
+    time_start: normalizedTimeStart ?? null,
     date_end: formData.date_end || null,
     time_end: formData.time_end || null,
+    ends_at: listingEnds.ends_at,
+    listing_timezone: listingEnds.listing_timezone,
     cover_image_url: photos && photos.length > 0 ? photos[0] : null,
     images: photos && photos.length > 1 ? photos.slice(1) : null,
     pricing_mode: formData.pricing_mode || 'negotiable',
@@ -327,7 +351,7 @@ async function finalizeDraftPromotion(
     try {
       // Get user email using Admin API
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY
       
       if (!url || !key) {
         // Skip email if env vars not available

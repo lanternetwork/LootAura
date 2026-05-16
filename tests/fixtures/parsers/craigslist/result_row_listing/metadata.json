@@ -1,0 +1,11 @@
+{
+  "captured_at": "2026-04-15T12:00:00.000Z",
+  "source_host": "craigslist.example.org",
+  "pageUrl": "https://craigslist.example.org/search/garage-sale",
+  "config": {
+    "city": "Chicago",
+    "state": "IL",
+    "source_platform": "craigslist",
+    "source_pages": []
+  }
+}

@@ -11,6 +11,8 @@ import { getSaleCoverUrl } from '@/lib/images/cover'
 import { FaEdit, FaTrash } from 'react-icons/fa'
 import AddressLink from '@/components/common/AddressLink'
 import { getCsrfHeaders } from '@/lib/csrf-client'
+import { displayAddress } from '@/lib/display/address'
+import { formatDateOnly } from '@/lib/display/date'
 
 interface DashboardSaleCardProps {
   sale: Sale
@@ -38,6 +40,7 @@ export default function DashboardSaleCard({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const cover = getSaleCoverUrl(sale)
+  const saleAddressDisplay = displayAddress(sale.address, sale.city, sale.state)
 
   const isPromotionActive = promotionStatus?.is_active && !!promotionStatus.ends_at
 
@@ -170,24 +173,18 @@ export default function DashboardSaleCard({
                 <AddressLink
                   lat={sale.lat ?? undefined}
                   lng={sale.lng ?? undefined}
-                  address={sale.address && sale.city && sale.state 
-                    ? `${sale.address}, ${sale.city}, ${sale.state}`
-                    : sale.address
-                  }
+                  address={saleAddressDisplay}
                 >
-                  {sale.address}
+                  {saleAddressDisplay}
                 </AddressLink>
               </div>
             )}
-            {sale.city && sale.state && (
+            {!sale.address && sale.city && sale.state && (
               <div>
                 <AddressLink
                   lat={sale.lat ?? undefined}
                   lng={sale.lng ?? undefined}
-                  address={sale.address && sale.city && sale.state 
-                    ? `${sale.address}, ${sale.city}, ${sale.state}`
-                    : `${sale.city}, ${sale.state}`
-                  }
+                  address={saleAddressDisplay}
                 >
                   {sale.city}, {sale.state}
                 </AddressLink>
@@ -199,8 +196,8 @@ export default function DashboardSaleCard({
               {sale.date_end && sale.date_end !== sale.date_start ? (
                 // Multi-day sale: show date range with start time
                 (() => {
-                  const startDate = new Date(sale.date_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  const endDate = new Date(sale.date_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  const startDate = formatDateOnly(sale.date_start, { month: 'short', day: 'numeric' })
+                  const endDate = formatDateOnly(sale.date_end, { month: 'short', day: 'numeric' })
                   if (sale.time_start) {
                     const [hours, minutes] = sale.time_start.split(':')
                     const hour = parseInt(hours, 10)
@@ -212,7 +209,7 @@ export default function DashboardSaleCard({
                 })()
               ) : (
                 // Single-day sale: show date and time
-                new Date(`${sale.date_start}T${sale.time_start || '00:00'}`).toLocaleString()
+                `${formatDateOnly(sale.date_start, { month: 'short', day: 'numeric' })}${sale.time_start ? ` • ${sale.time_start}` : ''}`
               )}
             </div>
           )}

@@ -1,0 +1,11 @@
+{
+  "captured_at": "2026-04-15T12:00:00.000Z",
+  "source_host": "www.facebook.com",
+  "pageUrl": "https://www.facebook.com/groups/example-group/posts/123456/",
+  "config": {
+    "city": "Chicago",
+    "state": "IL",
+    "source_platform": "facebook_external",
+    "source_pages": []
+  }
+}

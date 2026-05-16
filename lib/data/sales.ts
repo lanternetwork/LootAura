@@ -1,6 +1,9 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { Sale } from '@/lib/types'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 // Zod schemas for validation
 const SaleInputSchema = z.object({
@@ -153,7 +156,7 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
         .rpc('search_sales_within_distance', {
           user_lat: validatedParams.lat,
           user_lng: validatedParams.lng,
-          distance_meters: distanceMeters,
+          p_distance_meters: distanceMeters,
           search_city: validatedParams.city || null,
           search_categories: validatedParams.categories || null,
           date_start_filter: dateConstraints?.start || null,
@@ -174,20 +177,13 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
     today.setUTCHours(0, 0, 0, 0)
     const todayStr = today.toISOString().split('T')[0]
 
-    // Try query with moderation_status filter first
-    let query = supabase
-      .from('sales_v2')
-      .select('*')
-      .in('status', ['published', 'active'])
-      .is('archived_at', null)
-    
-    // Try to add moderation_status filter (may fail if migrations not run)
-    let useModerationFilter = true
-    try {
-      query = query.neq('moderation_status', 'hidden_by_admin')
-    } catch (e) {
-      useModerationFilter = false
-    }
+    // Phase 4 public visibility (RLS-aligned); retry without moderation OR if column missing
+    const useModerationFilter = true
+    let query = applyPhase4PublicPublishedSaleReadFilters(
+      supabase
+        .from('sales_v2')
+        .select('*')
+    )
     
     query = query
       .order('created_at', { ascending: false })
@@ -218,21 +214,17 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
 
     let { data, error } = await query
 
-    // If query failed due to missing moderation_status column, retry without it
-    if (error && useModerationFilter && (
-      String(error).includes('moderation_status') ||
-      String(error).includes('column') ||
-      (error as any)?.code === 'PGRST204' ||
-      (error as any)?.message?.includes('moderation_status')
-    )) {
+    // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+    if (error && useModerationFilter && isPostgrestMissingModerationStatusColumn(error)) {
       console.warn('moderation_status column not found, retrying without filter:', error)
       
       // Rebuild query without moderation_status filter
-      query = supabase
-        .from('sales_v2')
-        .select('*')
-        .in('status', ['published', 'active'])
-        .is('archived_at', null)
+      query = applyPhase4PublicPublishedSaleReadFilters(
+        supabase
+          .from('sales_v2')
+          .select('*'),
+        { includeModeration: false }
+      )
         .order('created_at', { ascending: false })
         .limit(validatedParams.limit)
         .range(validatedParams.offset, validatedParams.offset + validatedParams.limit - 1)
@@ -409,6 +401,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
       .insert({
         owner_id: user.id,
         ...validatedInput,
+        address: formatSaleAddressForPersist(validatedInput.address, validatedInput.city, validatedInput.state),
         pricing_mode: validatedInput.pricing_mode || 'negotiable',
       })
       .select()
@@ -437,12 +430,32 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
       throw new Error('Unauthorized')
     }
 
+    const updatePayload: Record<string, unknown> = {
+      ...validatedInput,
+      pricing_mode: validatedInput.pricing_mode || 'negotiable',
+    }
+    if (validatedInput.address !== undefined) {
+      const { data: prior, error: priorErr } = await supabase
+        .from('sales')
+        .select('city,state')
+        .eq('id', id)
+        .eq('owner_id', user.id)
+        .maybeSingle()
+      if (priorErr) {
+        console.error('Error loading sale for address format:', priorErr)
+        throw new Error('Failed to update sale')
+      }
+      const p = prior as { city: string | null; state: string | null } | null
+      updatePayload.address = formatSaleAddressForPersist(
+        validatedInput.address,
+        validatedInput.city ?? p?.city ?? null,
+        validatedInput.state ?? p?.state ?? null
+      )
+    }
+
     const { data, error } = await supabase
       .from('sales')
-      .update({
-        ...validatedInput,
-        pricing_mode: validatedInput.pricing_mode || 'negotiable',
-      })
+      .update(updatePayload)
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
       .select()

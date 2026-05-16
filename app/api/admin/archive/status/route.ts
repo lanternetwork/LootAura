@@ -5,78 +5,95 @@ import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import { getPendingArchiveCounts } from '@/lib/sales/archiveEndedSalesSqlBatch'
 
 export const dynamic = 'force-dynamic'
 
-async function getArchiveStatusHandler(request: NextRequest) {
+function isPendingArchiveRow(
+  sale: { date_end?: string | null; date_start?: string | null; ends_at?: string | null },
+  nowIso: string,
+  todayStr: string
+): boolean {
+  if (sale.ends_at != null && String(sale.ends_at).trim() !== '' && sale.ends_at < nowIso) {
+    return true
+  }
+  if (sale.ends_at == null || String(sale.ends_at).trim() === '') {
+    if (sale.date_end && sale.date_end <= todayStr) return true
+    if (!sale.date_end && sale.date_start && sale.date_start < todayStr) return true
+  }
+  return false
+}
+
+export async function GET(request: NextRequest) {
   try {
-    // Require admin access
     await assertAdminOrThrow(request)
   } catch (error) {
     if (error instanceof NextResponse) {
       return error
     }
-    return NextResponse.json(
-      { error: 'Forbidden: Admin access required' },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
   }
 
   try {
     const adminDb = getAdminDb()
     const now = new Date()
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-    const todayStr = today.toISOString().split('T')[0]
+    const todayStr = today.toISOString().split('T')[0]!
+    const nowIso = now.toISOString()
 
-    // Get statistics
-    const [totalArchived, recentlyArchived, pendingArchive, totalActive] = await Promise.all([
-      // Total archived sales
+    const [totalArchived, recentlyArchived, totalActive, pendingRpc, pendingRows] = await Promise.all([
       fromBase(adminDb, 'sales')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: true })
         .eq('status', 'archived')
         .not('archived_at', 'is', null),
-      
-      // Sales archived in last 24 hours
+
       fromBase(adminDb, 'sales')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: true })
         .eq('status', 'archived')
         .not('archived_at', 'is', null)
         .gte('archived_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-      
-      // Sales that should be archived (pending)
+
       fromBase(adminDb, 'sales')
-        .select('id, title, date_end, date_start')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['published', 'active']),
+
+      getPendingArchiveCounts(adminDb),
+
+      fromBase(adminDb, 'sales')
+        .select('id, title, date_end, date_start, ends_at, status')
         .in('status', ['published', 'active'])
         .is('archived_at', null)
-        .limit(50),
-      
-      // Total active/published sales
-      fromBase(adminDb, 'sales')
-        .select('id', { count: 'exact' })
-        .in('status', ['published', 'active']),
+        .limit(120),
     ])
 
-    // Filter pending sales that have ended
-    const pendingSales = (pendingArchive.data || []).filter((sale: any) => {
-      return (
-        (sale.date_end && sale.date_end <= todayStr) ||
-        (!sale.date_end && sale.date_start && sale.date_start < todayStr)
-      )
-    })
+    const pendingSales = (pendingRows.data || []).filter((sale: any) =>
+      isPendingArchiveRow(sale, nowIso, todayStr)
+    )
+
+    const pendingTotal =
+      pendingRpc != null
+        ? pendingRpc.pending_via_ends_at + pendingRpc.pending_via_legacy
+        : pendingSales.length
 
     return NextResponse.json({
       ok: true,
       statistics: {
-        totalArchived: totalArchived.count || 0,
-        recentlyArchived: recentlyArchived.count || 0,
-        pendingArchive: pendingSales.length,
-        totalActive: totalActive.count || 0,
+        totalArchived: totalArchived.count ?? 0,
+        recentlyArchived: recentlyArchived.count ?? 0,
+        pendingArchive: pendingTotal,
+        totalActive: totalActive.count ?? 0,
+        pending_via_ends_at: pendingRpc?.pending_via_ends_at ?? null,
+        pending_via_legacy: pendingRpc?.pending_via_legacy ?? null,
+        published_past_ends_at: pendingRpc?.published_past_ends_at ?? null,
+        suspicious_ends_before_starts: pendingRpc?.suspicious_ends_before_starts ?? null,
       },
       pendingSales: pendingSales.slice(0, 10).map((sale: any) => ({
         id: sale.id,
         title: sale.title || 'Untitled',
         date_end: sale.date_end,
         date_start: sale.date_start,
+        ends_at: sale.ends_at ?? null,
+        status: sale.status,
       })),
     })
   } catch (error) {
@@ -92,8 +109,3 @@ async function getArchiveStatusHandler(request: NextRequest) {
     )
   }
 }
-
-export async function GET(request: NextRequest) {
-  return getArchiveStatusHandler(request)
-}
-

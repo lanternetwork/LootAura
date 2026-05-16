@@ -1,0 +1,32 @@
+name: One-Time Seed City Configs
+
+on:
+  workflow_dispatch:
+    inputs:
+      csv_path:
+        description: 'Repository-relative path to city CSV/txt input file'
+        required: true
+        default: 'scripts/data/external-city-page-links.txt'
+
+jobs:
+  seed-city-configs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed ingestion_city_configs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/seedCityConfigs.ts "${{ github.event.inputs.csv_path }}"

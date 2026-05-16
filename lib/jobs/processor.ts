@@ -166,7 +166,7 @@ export async function processWeeklyFeaturedSalesJob(
 
     // Get user emails using Admin API
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     
     if (!url || !key) {
       return { success: false, error: 'Missing required environment variables (NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)' }
@@ -768,7 +768,7 @@ export async function processFavoriteSalesStartingSoonJob(
     // Note: We use the admin client's auth.admin.listUsers() method
     // which is the proper way to access user emails with service role
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE!
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const { createClient } = await import('@supabase/supabase-js')
     const adminBase = createClient(url, key, { 
       auth: { persistSession: false },
@@ -1064,7 +1064,7 @@ export async function processSellerWeeklyAnalyticsJob(
 
     // Get user emails using Admin API
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE!
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const { createClient } = await import('@supabase/supabase-js')
     const adminBase = createClient(url, key, { 
       auth: { persistSession: false },

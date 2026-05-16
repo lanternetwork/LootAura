@@ -1206,62 +1206,104 @@ export default function SalesClient({
   // Track when we're programmatically centering to a pin to prevent clearing selection
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
 
+  /** Debounce localStorage persistence so wheel zoom does not sync-write on every `move` tick. */
+  const persistViewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const PERSIST_VIEWPORT_DEBOUNCE_MS = 400
+
+  /** Coalesce `setMapView` during `move` to at most one React commit per animation frame. */
+  const viewportMoveRafRef = useRef<number | null>(null)
+  const pendingViewportMoveRef = useRef<{
+    center: { lat: number; lng: number }
+    zoom: number
+    bounds: { west: number; south: number; east: number; north: number }
+  } | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (viewportMoveRafRef.current != null) {
+        cancelAnimationFrame(viewportMoveRafRef.current)
+        viewportMoveRafRef.current = null
+      }
+      pendingViewportMoveRef.current = null
+    }
+  }, [])
+
   // Handle live viewport updates during map drag (onMove) - updates rendering only, no fetch
   // NOTE: Do NOT clear selection here - it blocks map dragging. Clear only on moveEnd.
   const handleViewportMove = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
     // Mark user interaction on any map movement and flip authority to user
     userInteractedRef.current = true
     flipToUserAuthority()
-    
-    // Update map view state immediately for live rendering
-    // This triggers viewportBounds and visibleSales recomputation via useMemo
-    // Do NOT clear selection here - it causes blocking during drag
-    setMapView(prev => {
-      // DIAGNOSTIC LOG - Desktop only
-      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-        console.log('[VIEWPORT_CHANGE: VIEWPORT_MOVE] Trigger: Map drag/move (live update)', {
-          trigger: 'Map drag/move',
-          context: { center, zoom, bounds },
-          stack: new Error().stack
-        })
-      }
-      
-      if (!prev) {
-        const radiusKm = 16.09 // 10 miles
-        const latRange = radiusKm / 111.0
-        const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
-        return {
-          center,
-          bounds: {
-            west: center.lng - lngRange,
-            south: center.lat - latRange,
-            east: center.lng + lngRange,
-            north: center.lat + latRange
-          },
-          zoom
+
+    pendingViewportMoveRef.current = { center, zoom, bounds }
+    if (viewportMoveRafRef.current != null) return
+
+    viewportMoveRafRef.current = requestAnimationFrame(() => {
+      viewportMoveRafRef.current = null
+      const latest = pendingViewportMoveRef.current
+      if (!latest) return
+      const { center: c, zoom: z, bounds: b } = latest
+
+      setMapView((prev) => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' && typeof window !== 'undefined' && window.innerWidth >= 768) {
+          console.log('[VIEWPORT_CHANGE: VIEWPORT_MOVE] Trigger: Map drag/move (live update, rAF)', {
+            trigger: 'Map drag/move',
+            context: { center: c, zoom: z, bounds: b },
+          })
         }
-      }
-      return {
-        ...prev,
-        center,
-        zoom,
-        bounds
-      }
+
+        if (!prev) {
+          const radiusKm = 16.09 // 10 miles
+          const latRange = radiusKm / 111.0
+          const lngRange = radiusKm / (111.0 * Math.cos(c.lat * Math.PI / 180))
+          return {
+            center: c,
+            bounds: {
+              west: c.lng - lngRange,
+              south: c.lat - latRange,
+              east: c.lng + lngRange,
+              north: c.lat + latRange,
+            },
+            zoom: z,
+          }
+        }
+        return {
+          ...prev,
+          center: c,
+          zoom: z,
+          bounds: b,
+        }
+      })
     })
   }, [])
 
-  // Persist map view to localStorage whenever it changes (for browser back button)
-  // Don't update URL params here to avoid conflicts with URL param restoration
+  // Persist map view to localStorage (debounced). Per-tick writes during wheel zoom caused main-thread stalls.
+  // handleViewportChange also persists after pan/zoom settles (separate debounce); this path covers filter-only
+  // changes and ensures a final write without synchronous localStorage on every `move`.
   useEffect(() => {
-    if (mapView) {
+    if (persistViewportDebounceRef.current) {
+      clearTimeout(persistViewportDebounceRef.current)
+      persistViewportDebounceRef.current = null
+    }
+    if (!mapView) return
+
+    persistViewportDebounceRef.current = setTimeout(() => {
+      persistViewportDebounceRef.current = null
       saveViewportState(
         { lat: mapView.center.lat, lng: mapView.center.lng, zoom: mapView.zoom },
         {
           dateRange: filters.dateRange || 'any',
           categories: filters.categories || [],
-          radius: filters.distance || 10
+          radius: filters.distance || 10,
         }
       )
+    }, PERSIST_VIEWPORT_DEBOUNCE_MS)
+
+    return () => {
+      if (persistViewportDebounceRef.current) {
+        clearTimeout(persistViewportDebounceRef.current)
+        persistViewportDebounceRef.current = null
+      }
     }
   }, [mapView, filters.dateRange, filters.categories, filters.distance])
 

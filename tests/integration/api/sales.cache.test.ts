@@ -73,6 +73,7 @@ describe('GET /api/sales cache behavior', () => {
     mockSupabaseClient.from.mockReturnValue({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       gte: vi.fn().mockReturnThis(),
       lte: vi.fn().mockReturnThis(),
       in: vi.fn().mockReturnThis(),
@@ -105,6 +106,7 @@ describe('GET /api/sales cache behavior', () => {
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
         gte: vi.fn().mockReturnThis(),
         lte: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
@@ -123,28 +125,18 @@ describe('GET /api/sales cache behavior', () => {
   })
 
   it('public requests use cache (get then set on miss)', async () => {
-    let fromCallCount = 0
-    mockSupabaseClient.from.mockImplementation((table: string) => {
-      fromCallCount++
-      const chain = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        gte: vi.fn().mockReturnThis(),
-        lte: vi.fn().mockReturnThis(),
-        in: vi.fn().mockReturnThis(),
-        or: vi.fn().mockReturnThis(),
-        neq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        range: vi.fn().mockResolvedValue({ data: [], error: null }),
-      }
-      if (table === 'sales_v2' && fromCallCount === 1) {
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
-        }
-      }
-      return chain
-    })
+    mockSupabaseClient.from.mockImplementation(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }))
 
     const url = 'http://localhost/api/sales?north=38.1&south=38.0&east=-85.0&west=-85.1'
     const request = new NextRequest(url, { method: 'GET' })

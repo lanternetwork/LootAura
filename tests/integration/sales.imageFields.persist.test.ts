@@ -40,8 +40,15 @@ const mockRlsDb = {
     if (table === 'profiles') {
       return createQueryChain()
     }
+    if (table === 'zipcodes') {
+      const chain: any = {}
+      chain.select = vi.fn(() => chain)
+      chain.eq = vi.fn(() => chain)
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+      return chain
+    }
     return fromChain
-  })
+  }),
 }
 
 const mockSupabaseClient = {
@@ -150,6 +157,13 @@ describe('Sales API - Image Support', () => {
 			if (table === 'profiles') {
 				return createQueryChain()
 			}
+			if (table === 'zipcodes') {
+				const chain: any = {}
+				chain.select = vi.fn(() => chain)
+				chain.eq = vi.fn(() => chain)
+				chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+				return chain
+			}
 			return fromChain
 		})
 		mockSupabaseClient.from.mockImplementation((table: string) => {
@@ -211,6 +225,9 @@ describe('Sales API - Image Support', () => {
 		expect(mockIsAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
 		// Assert persisted cover_image_url was included in the insert payload
 		expect(lastInsertedPayload?.cover_image_url).toBe('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
+		expect(lastInsertedPayload?.ends_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+		expect(typeof lastInsertedPayload?.listing_timezone).toBe('string')
+		expect(String(lastInsertedPayload?.listing_timezone).length).toBeGreaterThan(0)
 	})
 
 	it('should accept and validate images array', async () => {

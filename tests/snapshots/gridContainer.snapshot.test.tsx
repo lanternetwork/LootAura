@@ -46,7 +46,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe.skip('Grid Container Snapshot', () => {
+describe('Grid Container Snapshot', () => {
   // NOTE: Snapshots need regeneration after grid system changes
   // Developer: Run `npm run test -- -u tests/snapshots/gridContainer.snapshot.test.tsx`
   // to update snapshots, then remove .skip

@@ -1,0 +1,56 @@
+{
+  "invalid": 0,
+  "listings": [
+    {
+      "addressRaw": "99 ZZ St, Chicago, IL",
+      "city": "Chicago",
+      "dedupeIdentifiers": {
+        "externalId": "500",
+        "sourceUrl": "https://example.com/US/Illinois/Chicago/99-ZZ-St/500/listing.html"
+      },
+      "description": "Shared link Shared link Shared link",
+      "endDate": null,
+      "extractionConfidence": null,
+      "imageSourceUrl": "https://cdn.example.com/p1.jpg",
+      "imageUrls": ["https://cdn.example.com/fb-og.jpg", "https://cdn.example.com/p1.jpg"],
+      "rawPayload": {
+        "adapter": "external_page_source",
+        "addressSlug": "99-ZZ-St",
+        "addressTailCity": "Chicago",
+        "cityConflict": false,
+        "citySource": "listing_url",
+        "externalId": "500",
+        "hubSegment": null,
+        "imageUrls": ["https://cdn.example.com/fb-og.jpg", "https://cdn.example.com/p1.jpg"],
+        "ingestionDiagnostics": {
+          "addressSource": "composite",
+          "addressSources": ["slug", "slug_with_url_municipality"],
+          "authority": {
+            "addressTailCity": "Chicago",
+            "cityConflict": false,
+            "citySource": "listing_url",
+            "resolvedCity": "Chicago",
+            "streetConcrete": true,
+            "urlCity": "Chicago"
+          },
+          "chosenAddressSource": "slug",
+          "metadataAddressSkippedAsUntrusted": false,
+          "nearbyCandidateCount": 0,
+          "rejectedAddressCandidates": [],
+          "slugWasPlaceholder": false
+        },
+        "pathCitySlug": "Chicago",
+        "resolvedCity": "Chicago",
+        "resolvedState": "IL",
+        "stateSource": "listing_url",
+        "urlMunicipalityNormalized": "Chicago"
+      },
+      "sourceUrl": "https://example.com/US/Illinois/Chicago/99-ZZ-St/500/listing.html",
+      "startDate": null,
+      "state": "IL",
+      "title": "Shared link"
+    }
+  ],
+  "parserAdapter": "external_page_source",
+  "parserStatus": "ok"
+}

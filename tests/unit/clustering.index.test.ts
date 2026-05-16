@@ -116,31 +116,23 @@ describe('Clustering Index', () => {
       const bounds: [number, number, number, number] = [-180, -90, 180, 90]
       const clusters = getClustersForViewport(index, bounds, currentZoom)
       const cluster = clusters.find(c => c.count > 1)
-      
-      if (cluster) {
-        const expansionZoom = expandZoomForCluster(index, cluster.id, currentZoom)
-        expect(expansionZoom).toBeGreaterThan(currentZoom)
-        expect(expansionZoom).toBeLessThanOrEqual(16) // Should be capped at 16
-      } else {
-        // Skip test if no clusters found
-        expect(true).toBe(true)
-      }
+
+      expect(cluster).toBeDefined()
+      const expansionZoom = expandZoomForCluster(index, cluster!.id, currentZoom)
+      expect(expansionZoom).toBeGreaterThan(currentZoom)
+      expect(expansionZoom).toBeLessThanOrEqual(16) // Should be capped at 16
     })
 
     it('should cap expansion zoom at 16', () => {
-      const currentZoom = 15
-      // Get a valid cluster first
+      const currentZoom = 5
+      // Get a valid cluster first (world view at high zoom often has no multi-point clusters)
       const bounds: [number, number, number, number] = [-180, -90, 180, 90]
       const clusters = getClustersForViewport(index, bounds, currentZoom)
       const cluster = clusters.find(c => c.count > 1)
-      
-      if (cluster) {
-        const expansionZoom = expandZoomForCluster(index, cluster.id, currentZoom)
-        expect(expansionZoom).toBeLessThanOrEqual(16)
-      } else {
-        // Skip test if no clusters found
-        expect(true).toBe(true)
-      }
+
+      expect(cluster).toBeDefined()
+      const expansionZoom = expandZoomForCluster(index, cluster!.id, currentZoom)
+      expect(expansionZoom).toBeLessThanOrEqual(16)
     })
 
     it('should handle invalid cluster ID', () => {

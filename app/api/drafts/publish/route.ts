@@ -6,6 +6,7 @@ import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
 import { deleteSaleAndItemsForRollback } from '@/lib/data/draftsPublishRollback'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 export const dynamic = 'force-dynamic'
 
@@ -268,6 +269,22 @@ export async function POST(request: NextRequest) {
     // Write sale/items with admin (or RLS if policies allow)
     const admin = getAdminDb()
 
+    const { resolvePersistableSaleEndsAt } = await import('@/lib/sales/resolvePersistableSaleEndsAt')
+    const listingEnds = await resolvePersistableSaleEndsAt(
+      admin,
+      {
+        date_start: formData.date_start,
+        time_start: normalizedTimeStart,
+        date_end: finalDateEnd,
+        time_end: finalTimeEnd,
+        zip_code: formData.zip_code || null,
+        state: formData.state,
+        lat: parseFloat(String(lat)),
+        lng: parseFloat(String(lng)),
+      },
+      { operation: 'drafts_publish', draft_id: draft.id, user_id: user.id }
+    )
+
     // Normalize tags from draft formData. Accepts either string[] or comma-separated string; trims and deduplicates.
     const rawTags = (formData as any)?.tags
     const normalizedTags: string[] = Array.isArray(rawTags)
@@ -287,7 +304,7 @@ export async function POST(request: NextRequest) {
       owner_id: user.id,
       title: formData.title,
       description: formData.description || null,
-      address: formData.address || null,
+      address: formatSaleAddressForPersist(formData.address, formData.city, formData.state),
       city: formData.city,
       state: formData.state,
       zip_code: formData.zip_code || null,
@@ -297,6 +314,8 @@ export async function POST(request: NextRequest) {
       time_start: normalizedTimeStart,
       date_end: finalDateEnd,
       time_end: finalTimeEnd,
+      ends_at: listingEnds.ends_at,
+      listing_timezone: listingEnds.listing_timezone,
       cover_image_url: photos && photos.length > 0 ? photos[0] : null,
       images: photos && photos.length > 1 ? photos.slice(1) : null,
       pricing_mode: formData.pricing_mode || 'negotiable',

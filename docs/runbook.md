@@ -292,7 +292,7 @@ Access at `/admin/tools` when debug mode enabled:
 
 2. **Verify Connection:**
    - Check `NEXT_PUBLIC_SUPABASE_URL` is correct
-   - Verify `SUPABASE_SERVICE_ROLE` is valid
+   - Verify `SUPABASE_SERVICE_ROLE_KEY` is valid
 
 3. **Check RLS Policies:**
    - Verify policies are active

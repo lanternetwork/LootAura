@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "preview:invoke-deployment-geocode-cron": "tsx scripts/invoke-preview-deployment-geocode-cron.ts",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
@@ -37,7 +38,15 @@
     "load:local": "tsx scripts/load/local-test.ts",
     "load:local:burst": "tsx scripts/load/local-test.ts --scenario sales-burst",
     "import:zipcodes": "tsx scripts/import-zipcodes.ts",
-    "generate:hardcoded-zips": "tsx scripts/generate-hardcoded-zips.ts"
+    "seed:cities": "tsx scripts/seedCityConfigs.ts",
+    "backfill:city-source-pages": "tsx scripts/backfillCityConfigSourcePages.ts",
+    "generate:hardcoded-zips": "tsx scripts/generate-hardcoded-zips.ts",
+    "repair:ingested-sales:dry": "tsx scripts/repair-ingested-sales.ts --dry-run",
+    "repair:ingested-sales": "tsx scripts/repair-ingested-sales.ts",
+    "remediate:ingested-location-casing:dry": "tsx scripts/remediate-ingested-location-casing.ts --dry-run",
+    "remediate:ingested-location-casing": "tsx scripts/remediate-ingested-location-casing.ts --execute",
+    "backfill:sale-listing-ends:dry": "tsx scripts/backfill-sale-listing-ends.ts --dry-run",
+    "backfill:sale-listing-ends": "tsx scripts/backfill-sale-listing-ends.ts --execute"
   },
   "dependencies": {
     "@react-email/components": "^0.0.19",
@@ -55,8 +64,6 @@
     "jsdom": "^25.0.0",
     "lucide-react": "^0.263.1",
     "mapbox-gl": "^3.5.1",
-    "mongodb": "^6.8.0",
-    "mongoose": "^8.5.0",
     "nanoid": "^5.0.4",
     "next": "^15.5.14",
     "next-auth": "4.24.12",

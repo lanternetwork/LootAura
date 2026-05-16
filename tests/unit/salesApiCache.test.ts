@@ -30,6 +30,7 @@ describe('salesApiCache', () => {
         offset: 0,
         distanceKm: 40,
         q: null as string | null,
+        phase4LiveBucket: 0,
       }
       const key1 = buildSalesCacheKey({ ...base, actualBbox: { north: 38.1, south: 38.0, east: -85.0, west: -85.1 } })
       const key2 = buildSalesCacheKey({ ...base, actualBbox: { north: 38.2, south: 38.0, east: -85.0, west: -85.1 } })
@@ -50,6 +51,7 @@ describe('salesApiCache', () => {
         offset: 0,
         distanceKm: 40,
         q: null as string | null,
+        phase4LiveBucket: 0,
       }
       const key1 = buildSalesCacheKey({ ...base, categories: [] })
       const key2 = buildSalesCacheKey({ ...base, categories: ['furniture'] })
@@ -70,6 +72,7 @@ describe('salesApiCache', () => {
         offset: 0,
         distanceKm: 40,
         q: null as string | null,
+        phase4LiveBucket: 0,
       }
       const keyA = buildSalesCacheKey({ ...base, dateRange: 'any' })
       const keyB = buildSalesCacheKey({ ...base, dateRange: 'this_week' })
@@ -78,6 +81,23 @@ describe('salesApiCache', () => {
       expect(keyA).not.toBe(keyB)
       expect(keyA).not.toBe(keyC)
       expect(keyA).not.toBe(keyD)
+    })
+
+    it('produces different keys for different phase4 live buckets', () => {
+      const base = {
+        actualBbox: { north: 38.1, south: 38.0, east: -85.0, west: -85.1 },
+        dateRange: 'any',
+        startDateParam: null as string | null,
+        endDateParam: null as string | null,
+        categories: [] as string[],
+        limit: 24,
+        offset: 0,
+        distanceKm: 40,
+        q: null as string | null,
+      }
+      expect(buildSalesCacheKey({ ...base, phase4LiveBucket: 0 })).not.toBe(
+        buildSalesCacheKey({ ...base, phase4LiveBucket: 1 })
+      )
     })
 
     it('produces same key for same normalized params', () => {
@@ -91,6 +111,7 @@ describe('salesApiCache', () => {
         offset: 0,
         distanceKm: 40,
         q: null as string | null,
+        phase4LiveBucket: 0,
       }
       expect(buildSalesCacheKey(params)).toBe(buildSalesCacheKey(params))
     })
@@ -117,6 +138,7 @@ describe('salesApiCache', () => {
         offset: 0,
         distanceKm: 40,
         q: null,
+        phase4LiveBucket: 0,
       })
       expect(await getSalesApiCache(key)).toBeNull()
       const response = { ok: true, data: [{ id: '1' }], count: 1 }

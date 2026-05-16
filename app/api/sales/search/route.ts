@@ -4,6 +4,8 @@ import { cookies } from 'next/headers'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail, ok } from '@/lib/http/json'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +13,16 @@ async function searchHandler(request: NextRequest) {
   const startedAt = Date.now()
   const { logger, generateOperationId } = await import('@/lib/log')
   const opId = generateOperationId()
-  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+  const { createCorrelationBundle } = await import('@/lib/observability/correlation')
+  const { buildTelemetryRecord, emitObservabilityRecord } = await import('@/lib/observability/emit')
+  const { ObservabilityEvents } = await import('@/lib/observability/events')
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId })
+  const withOpId = (context: any = {}) => ({
+    ...context,
+    requestId: correlation.requestId,
+    operationId: correlation.operationId,
+    correlationId: correlation.correlationId,
+  })
 
   try {
     // Create Supabase client with explicit public schema
@@ -80,37 +91,33 @@ async function searchHandler(request: NextRequest) {
     let error: any = null
 
     if (lat && lng) {
-      // Use lat/lng-based distance filtering instead of geometry columns
-      // Try query with moderation_status filter first
-      let { data: salesData, error: salesError } = await supabase
-        .from('sales_v2')
-        .select('*')
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .eq('status', 'published')
-        .neq('moderation_status', 'hidden_by_admin')
+      // Phase 4-aligned query; retry without moderation fragment if column missing
+      let { data: salesData, error: salesError } = await applyPhase4PublicPublishedSaleReadFilters(
+        supabase
+          .from('sales_v2')
+          .select('*')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+      )
         .order('created_at', { ascending: false })
         .limit(Math.min(limit * 3, 500)) // Fetch more to allow for distance filtering
 
-      // If query failed due to missing moderation_status column, retry without it
-      if (salesError && (
-        String(salesError).includes('moderation_status') ||
-        String(salesError).includes('column') ||
-        (salesError as any)?.code === 'PGRST204' ||
-        (salesError as any)?.message?.includes('moderation_status')
-      )) {
+      // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+      if (salesError && isPostgrestMissingModerationStatusColumn(salesError)) {
         logger.warn('moderation_status column not found, retrying without filter', {
           component: 'sales',
           operation: 'search',
           error: String(salesError)
         })
         
-        const retryResult = await supabase
-          .from('sales_v2')
-          .select('*')
-          .not('lat', 'is', null)
-          .not('lng', 'is', null)
-          .eq('status', 'published')
+        const retryResult = await applyPhase4PublicPublishedSaleReadFilters(
+          supabase
+            .from('sales_v2')
+            .select('*')
+            .not('lat', 'is', null)
+            .not('lng', 'is', null),
+          { includeModeration: false }
+        )
           .order('created_at', { ascending: false })
           .limit(Math.min(limit * 3, 500))
         
@@ -148,26 +155,19 @@ async function searchHandler(request: NextRequest) {
       }
     } else {
       // No location provided, use basic query on sales_v2
-      const { data: basicData, error: basicError } = await supabase
-        .from('sales_v2')
-        .select('*')
-        .eq('status', 'published')
-        .neq('moderation_status', 'hidden_by_admin')
+      const { data: basicData, error: basicError } = await applyPhase4PublicPublishedSaleReadFilters(
+        supabase.from('sales_v2').select('*')
+      )
         .order('created_at', { ascending: false })
         .limit(limit)
 
       if (basicError) {
-        // If moderation_status column doesn't exist, retry without it
-        if (
-          String(basicError).includes('moderation_status') ||
-          String(basicError).includes('column') ||
-          (basicError as any)?.code === 'PGRST204' ||
-          (basicError as any)?.message?.includes('moderation_status')
-        ) {
-          const retryResult = await supabase
-            .from('sales_v2')
-            .select('*')
-            .eq('status', 'published')
+        // Missing column only: conclusive PostgREST / Postgres codes (never broad substring / "column")
+        if (isPostgrestMissingModerationStatusColumn(basicError)) {
+          const retryResult = await applyPhase4PublicPublishedSaleReadFilters(
+            supabase.from('sales_v2').select('*'),
+            { includeModeration: false }
+          )
             .order('created_at', { ascending: false })
             .limit(limit)
           
@@ -191,11 +191,38 @@ async function searchHandler(request: NextRequest) {
         component: 'sales',
         operation: 'search_query'
       }))
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.api.salesSearchLatency, {
+          requestId: correlation.requestId,
+          operationId: correlation.operationId,
+          correlationId: correlation.correlationId,
+          jobType: 'api.sales.search',
+          durationMs: Date.now() - startedAt,
+          cacheHit: false,
+          resultCount: 0,
+          errorCount: 1,
+          degradedMode: false,
+        })
+      )
       return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
     }
 
     // Ensure hidden sales are filtered out (safety check)
     const results = (sales || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
+
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesSearchLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.search',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: results.length,
+        errorCount: 0,
+        degradedMode: false,
+      })
+    )
 
     return ok({ data: results })
   } catch (error: any) {
@@ -204,6 +231,19 @@ async function searchHandler(request: NextRequest) {
       operation: 'search_handler',
       durationMs: Date.now() - startedAt
     }))
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesSearchLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.search',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: 0,
+        errorCount: 1,
+        degradedMode: false,
+      })
+    )
     return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
   }
 }

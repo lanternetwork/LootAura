@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/log'
 
 /**
  * Assert that the request is authorized with a valid CRON_SECRET Bearer token
@@ -21,9 +22,23 @@ import { NextRequest, NextResponse } from 'next/server'
 export function assertCronAuthorized(request: NextRequest): void {
   const authHeader = request.headers.get('authorization')
   const expectedSecret = process.env.CRON_SECRET
+  const component = 'auth/cron'
+  const operation = 'assert_cron_authorized'
+  const route = request.nextUrl.pathname
+  const method = request.method
+  const environment = process.env.NODE_ENV || 'development'
+  const deploymentEnv = process.env.VERCEL_ENV || 'unknown'
 
   // If no secret is configured, reject all requests (fail secure)
   if (!expectedSecret) {
+    logger.error('Cron authentication misconfigured: missing CRON_SECRET', undefined, {
+      component,
+      operation,
+      route,
+      method,
+      environment,
+      deploymentEnv,
+    })
     throw NextResponse.json(
       {
         ok: false,
@@ -37,14 +52,17 @@ export function assertCronAuthorized(request: NextRequest): void {
   // Check for Bearer token: Authorization: Bearer ${CRON_SECRET}
   const expectedAuthHeader = `Bearer ${expectedSecret}`
   if (!authHeader || authHeader !== expectedAuthHeader) {
-    // Log warning without exposing the secret
-    if (process.env.NODE_ENV !== 'test') {
-      console.warn('[CRON_AUTH] Unauthorized cron request attempt', {
-        hasHeader: !!authHeader,
-        headerLength: authHeader?.length || 0,
-        expectedLength: expectedAuthHeader.length,
-      })
-    }
+    logger.warn('Cron authentication failed: header mismatch', {
+      component,
+      operation,
+      route,
+      method,
+      environment,
+      deploymentEnv,
+      hasAuthorizationHeader: !!authHeader,
+      headerLength: authHeader?.length || 0,
+      expectedLength: expectedAuthHeader.length,
+    })
     throw NextResponse.json(
       {
         ok: false,
@@ -54,6 +72,16 @@ export function assertCronAuthorized(request: NextRequest): void {
       { status: 401 }
     )
   }
+
+  logger.info('Cron authentication succeeded', {
+    component,
+    operation,
+    route,
+    method,
+    environment,
+    deploymentEnv,
+    hasAuthorizationHeader: true,
+  })
 }
 
 /**

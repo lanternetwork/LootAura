@@ -8,6 +8,8 @@ import { getSaleCoverUrl } from '@/lib/images/cover'
 import AddressLink from '@/components/common/AddressLink'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import { isDebugEnabled } from '@/lib/debug'
+import { displayAddress } from '@/lib/display/address'
+import { formatDateOnly } from '@/lib/display/date'
 
 interface SaleCardProps {
   sale: Sale
@@ -15,9 +17,26 @@ interface SaleCardProps {
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
 }
 
+function isTrustedNextImageHost(urlString: string): boolean {
+  try {
+    const u = new URL(urlString)
+    if (u.protocol !== 'https:') return false
+    const host = u.hostname.toLowerCase()
+    if (host === 'res.cloudinary.com') return true
+    if (host === 'storage.googleapis.com') return true
+    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
+      return u.pathname.startsWith('/storage/v1/object/public/')
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   if (!sale) return null
   const cover = getSaleCoverUrl(sale)
+  const saleAddressDisplay = displayAddress(sale.address, sale.city, sale.state)
   
   // Debug: log cover image resolution
   if (!cover && isDebugEnabled) {
@@ -46,14 +65,26 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
     >
       <div className="relative bg-gray-100 h-36 sm:h-[158px] md:h-[144px] overflow-hidden">
         {cover ? (
-          <Image
-            src={cover.url}
-            alt={cover.alt}
-            fill
-            sizes="(min-width:1024px) 33vw, (min-width:768px) 50vw, 100vw"
-            className="object-cover transform-gpu scale-[1.3]"
-            priority={false}
-          />
+          isTrustedNextImageHost(cover.url) ? (
+            <Image
+              src={cover.url}
+              alt={cover.alt}
+              data-testid="sale-card-next-image"
+              fill
+              sizes="(min-width:1024px) 33vw, (min-width:768px) 50vw, 100vw"
+              className="object-cover transform-gpu scale-[1.3]"
+              priority={false}
+            />
+          ) : (
+            <img
+              src={cover.url}
+              alt={cover.alt}
+              data-testid="sale-card-external-img"
+              className="h-full w-full object-cover transform-gpu scale-[1.3]"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
             <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.69]" />
@@ -92,25 +123,19 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address && sale.city && sale.state 
-                      ? `${sale.address}, ${sale.city}, ${sale.state}`
-                      : sale.address
-                    }
+                    address={saleAddressDisplay}
                     className="no-underline"
                   >
-                    {sale.address}
+                    {saleAddressDisplay}
                   </AddressLink>
                 </div>
               )}
-              {sale?.city && sale?.state && (
+              {!sale?.address && sale?.city && sale?.state && (
                 <div className="group-hover:underline">
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address && sale.city && sale.state 
-                      ? `${sale.address}, ${sale.city}, ${sale.state}`
-                      : `${sale.city}, ${sale.state}`
-                    }
+                    address={saleAddressDisplay}
                     className="no-underline"
                   >
                     {sale.city}, {sale.state}
@@ -125,8 +150,8 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
             {sale.date_end && sale.date_end !== sale.date_start ? (
               // Multi-day sale: show date range with start time
               (() => {
-                const startDate = new Date(sale.date_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                const endDate = new Date(sale.date_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                const startDate = formatDateOnly(sale.date_start, { month: 'short', day: 'numeric' })
+                const endDate = formatDateOnly(sale.date_end, { month: 'short', day: 'numeric' })
                 if (sale.time_start) {
                   const [hours, minutes] = sale.time_start.split(':')
                   const hour = parseInt(hours, 10)
@@ -138,7 +163,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
               })()
             ) : (
               // Single-day sale: show date and time
-              new Date(`${sale.date_start}T${sale.time_start}`).toLocaleString()
+              `${formatDateOnly(sale.date_start, { month: 'short', day: 'numeric' })}${sale.time_start ? ` • ${sale.time_start}` : ''}`
             )}
           </div>
         )}

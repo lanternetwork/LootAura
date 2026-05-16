@@ -105,5 +105,15 @@ describe('NearbySalesCard', () => {
     // Should still render the sale, just without an image
     expect(screen.getByText('Test Sale 1')).toBeDefined()
   })
+
+  it('renders native img fallback for external non-trusted hosts', () => {
+    const externalHostSale: Sale & { distance_m: number } = {
+      ...mockSale1,
+      cover_image_url: 'https://images.yardsaletreasuremap.com/uploads/a.jpg',
+    }
+    const { container } = render(<NearbySalesCard nearbySales={[externalHostSale]} />)
+    const nativeImg = container.querySelector('img[src="https://images.yardsaletreasuremap.com/uploads/a.jpg"]')
+    expect(nativeImg).toBeTruthy()
+  })
 })
 

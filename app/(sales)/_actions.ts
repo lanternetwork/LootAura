@@ -5,7 +5,9 @@ import { T } from '@/lib/supabase/tables'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase, getAdminDb } from '@/lib/supabase/clients'
+import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
+import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
 
 // Zod schemas for validation
 const SaleInputSchema = z.object({
@@ -61,6 +63,22 @@ export async function createSale(input: SaleInput): Promise<ActionResult> {
     
     // Validate input
     const validatedInput = SaleInputSchema.parse(input)
+
+    const admin = getAdminDb()
+    const listingEnds = await resolvePersistableSaleEndsAt(
+      admin,
+      {
+        date_start: validatedInput.starts_at,
+        time_start: '09:00:00',
+        date_end: validatedInput.ends_at ?? null,
+        time_end: null,
+        zip_code: validatedInput.zip ?? null,
+        state: validatedInput.state ?? null,
+        lat: validatedInput.latitude,
+        lng: validatedInput.longitude,
+      },
+      { operation: 'actions_createSale', owner_id: user.id }
+    )
     
     const { data, error } = await supabase
       .from(T.sales)
@@ -70,9 +88,13 @@ export async function createSale(input: SaleInput): Promise<ActionResult> {
         description: validatedInput.description,
         date_start: validatedInput.starts_at,
         date_end: validatedInput.ends_at,
+        time_start: '09:00:00',
+        time_end: null,
+        ends_at: listingEnds.ends_at,
+        listing_timezone: listingEnds.listing_timezone,
         lat: validatedInput.latitude,
         lng: validatedInput.longitude,
-        address: validatedInput.address,
+        address: formatSaleAddressForPersist(validatedInput.address, validatedInput.city, validatedInput.state),
         city: validatedInput.city,
         state: validatedInput.state,
         zip_code: validatedInput.zip,
@@ -125,28 +147,78 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
     
     // Validate input
     const validatedInput = SaleInputSchema.partial().parse(input)
-    
-    const { data, error } = await supabase
+
+    const { data: existing, error: loadErr } = await supabase
       .from(T.sales)
-      .update({
-        title: validatedInput.title,
-        description: validatedInput.description,
-        date_start: validatedInput.starts_at,
-        date_end: validatedInput.ends_at,
-        lat: validatedInput.latitude,
-        lng: validatedInput.longitude,
-        address: validatedInput.address,
-        city: validatedInput.city,
-        state: validatedInput.state,
-        zip_code: validatedInput.zip,
-        tags: validatedInput.categories,
-        pricing_mode: validatedInput.pricing_mode || 'negotiable',
-        updated_at: new Date().toISOString(),
-      })
+      .select('date_start,time_start,date_end,time_end,zip_code,state,lat,lng,city')
       .eq('id', id)
-      .eq('owner_id', user.id) // Ensure user owns the sale
-      .select()
-      .single()
+      .eq('owner_id', user.id)
+      .maybeSingle()
+
+    if (loadErr || !existing) {
+      return { success: false, error: 'Sale not found or access denied' }
+    }
+
+    const ex = existing as {
+      date_start: string
+      time_start: string | null
+      date_end: string | null
+      time_end: string | null
+      zip_code: string | null
+      state: string | null
+      city: string | null
+      lat: number | string
+      lng: number | string
+    }
+
+    const mergedDateStart = validatedInput.starts_at ?? ex.date_start
+    const mergedDateEnd = validatedInput.ends_at ?? ex.date_end ?? null
+    const mergedTimeStart = (typeof ex.time_start === 'string' && ex.time_start.trim() !== '' ? ex.time_start : null) ?? '09:00:00'
+    const mergedTimeEnd = ex.time_end ?? null
+    const mergedLat = validatedInput.latitude ?? Number(ex.lat)
+    const mergedLng = validatedInput.longitude ?? Number(ex.lng)
+    const mergedZip = validatedInput.zip ?? ex.zip_code
+    const mergedState = validatedInput.state ?? ex.state
+
+    const admin = getAdminDb()
+    const listingEnds = await resolvePersistableSaleEndsAt(
+      admin,
+      {
+        date_start: mergedDateStart,
+        time_start: mergedTimeStart,
+        date_end: mergedDateEnd,
+        time_end: mergedTimeEnd,
+        zip_code: mergedZip,
+        state: mergedState,
+        lat: mergedLat,
+        lng: mergedLng,
+      },
+      { operation: 'actions_updateSale', sale_id: id, owner_id: user.id }
+    )
+
+    const updatePayload: Record<string, unknown> = {
+      ends_at: listingEnds.ends_at,
+      listing_timezone: listingEnds.listing_timezone,
+      updated_at: new Date().toISOString(),
+    }
+    if (validatedInput.title !== undefined) updatePayload.title = validatedInput.title
+    if (validatedInput.description !== undefined) updatePayload.description = validatedInput.description
+    if (validatedInput.starts_at !== undefined) updatePayload.date_start = validatedInput.starts_at
+    if (validatedInput.ends_at !== undefined) updatePayload.date_end = validatedInput.ends_at
+    if (validatedInput.latitude !== undefined) updatePayload.lat = validatedInput.latitude
+    if (validatedInput.longitude !== undefined) updatePayload.lng = validatedInput.longitude
+    if (validatedInput.address !== undefined) {
+      const mergedCity = validatedInput.city ?? ex.city ?? null
+      const mergedState = validatedInput.state ?? ex.state ?? null
+      updatePayload.address = formatSaleAddressForPersist(validatedInput.address, mergedCity, mergedState)
+    }
+    if (validatedInput.city !== undefined) updatePayload.city = validatedInput.city
+    if (validatedInput.state !== undefined) updatePayload.state = validatedInput.state
+    if (validatedInput.zip !== undefined) updatePayload.zip_code = validatedInput.zip
+    if (validatedInput.categories !== undefined) updatePayload.tags = validatedInput.categories
+    if (validatedInput.pricing_mode !== undefined) updatePayload.pricing_mode = validatedInput.pricing_mode
+
+    const { data, error } = await supabase.from(T.sales).update(updatePayload).eq('id', id).eq('owner_id', user.id).select().single()
 
     if (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

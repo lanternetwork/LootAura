@@ -13,6 +13,8 @@ export type Sale = {
   time_start: string
   date_end?: string
   time_end?: string
+  ends_at?: string | null
+  listing_timezone?: string | null
   price?: number
   tags?: string[]
   cover_image_url?: string | null

@@ -7,7 +7,8 @@ describe('Environment Validation', () => {
     vi.resetModules()
     process.env = { ...originalEnv }
     // Ensure required server env is present for tests that import lib/env
-    process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-service-role-1234567890'
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || 'test-mapbox-token-1234567890'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role-1234567890'
   })
 
   afterEach(() => {
@@ -19,6 +20,7 @@ describe('Environment Validation', () => {
     // Set up valid environment
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'test-mapbox-token-1234567890'
 
     const { ENV_PUBLIC } = await import('@/lib/env')
 
@@ -30,11 +32,12 @@ describe('Environment Validation', () => {
     // Set up valid environment
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'test-mapbox-token-1234567890'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-1234567890'
 
     const { ENV_SERVER } = await import('@/lib/env')
 
-    expect(ENV_SERVER.SUPABASE_SERVICE_ROLE).toBe('test-service-role-1234567890')
+    expect(ENV_SERVER.SUPABASE_SERVICE_ROLE_KEY).toBe('test-service-role-1234567890')
   })
 
   it('should throw error for missing required public variables', async () => {
@@ -55,6 +58,7 @@ describe('Environment Validation', () => {
     // Restore env vars immediately to prevent unhandled rejections
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'test-mapbox-token-1234567890'
     vi.resetModules()
     
     // Verify that an error was thrown
@@ -78,6 +82,7 @@ describe('Environment Validation', () => {
     // Restore env vars immediately to prevent unhandled rejections
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'test-mapbox-token-1234567890'
     vi.resetModules()
     
     // Verify that an error was thrown
@@ -101,6 +106,7 @@ describe('Environment Validation', () => {
     // Restore env vars immediately to prevent unhandled rejections
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'test-mapbox-token-1234567890'
     vi.resetModules()
     
     // Verify that an error was thrown with the expected message
@@ -125,7 +131,7 @@ describe('Environment Validation', () => {
   it('should handle missing optional variables', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-1234567890'
 
     const { ENV_PUBLIC } = await import('@/lib/env')
 
@@ -137,7 +143,7 @@ describe('Environment Validation', () => {
   it('should validate email format for NOMINATIM_APP_EMAIL', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-1234567890'
     process.env.NOMINATIM_APP_EMAIL = 'invalid-email'
 
     // ENV_SERVER validation is lazy - access ENV_SERVER to trigger validation
@@ -154,7 +160,7 @@ describe('Environment Validation', () => {
   it('should accept valid email for NOMINATIM_APP_EMAIL', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-1234567890'
     process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
 
     const { ENV_SERVER } = await import('@/lib/env')

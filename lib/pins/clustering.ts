@@ -115,10 +115,17 @@ export function getClusterMemberIds(
 export function expandZoomForCluster(
   index: SuperclusterIndex,
   clusterId: number,
-  _currentZoom: number
+  currentZoom: number
 ): number {
-  const expansionZoom = index.getClusterExpansionZoom(clusterId)
-  return Math.min(expansionZoom, 16) // Cap at zoom 16
+  try {
+    const raw = index.getClusterExpansionZoom(clusterId)
+    const expansionZoom = Number(raw)
+    const safe = Number.isFinite(expansionZoom) ? expansionZoom : currentZoom + 1
+    return Math.min(safe, 16)
+  } catch {
+    // Supercluster throws for unknown cluster ids (invalid origin zoom / no children).
+    return Math.min(16, currentZoom + 1)
+  }
 }
 
 /**

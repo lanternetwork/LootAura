@@ -7,6 +7,8 @@ import { toDbSet } from '@/lib/shared/categoryContract'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { fail } from '@/lib/http/json'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -16,7 +18,13 @@ export const dynamic = 'force-dynamic'
 // [{ id: string, title: string, lat: number, lng: number }]
 async function markersHandler(request: NextRequest) {
   const startedAt = Date.now()
-  
+  const { generateOperationId } = await import('@/lib/log')
+  const opId = generateOperationId()
+  const { createCorrelationBundle } = await import('@/lib/observability/correlation')
+  const { buildTelemetryRecord, emitObservabilityRecord } = await import('@/lib/observability/emit')
+  const { ObservabilityEvents } = await import('@/lib/observability/events')
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId })
+
   try {
     const url = new URL(request.url)
     const q = url.searchParams
@@ -34,6 +42,20 @@ async function markersHandler(request: NextRequest) {
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
     const originLng = lngParam !== null ? parseFloat(lngParam) : NaN
     if (!Number.isFinite(originLat) || !Number.isFinite(originLng)) {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.api.salesMarkersLatency, {
+          requestId: correlation.requestId,
+          operationId: correlation.operationId,
+          correlationId: correlation.correlationId,
+          jobType: 'api.sales.markers',
+          durationMs: Date.now() - startedAt,
+          cacheHit: false,
+          resultCount: 0,
+          errorCount: 1,
+          degradedMode: false,
+          errorCode: 'invalid_lat_lng',
+        })
+      )
       return NextResponse.json({ error: 'Missing or invalid lat/lng' }, { status: 400 })
     }
     // Normalize distance (km)
@@ -100,14 +122,15 @@ async function markersHandler(request: NextRequest) {
     }
 
     // Build query with category filtering if categories are provided
-    // Try with moderation_status filter first, retry without if column doesn't exist
-    let query = sb
-      .from('sales_v2')
-      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
-      .not('lat', 'is', null)
-      .not('lng', 'is', null)
-      .in('status', ['published', 'active'])
-      .is('archived_at', null)
+    // Phase 4 public visibility (RLS-aligned); retry without moderation if column missing
+    let query = applyPhase4PublicPublishedSaleReadFilters(
+      sb
+        .from('sales_v2')
+        .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+    )
+    const useModerationFilter = true
     
     // Apply date filtering in database WHERE clause
     // Logic matches client-side filtering: future-only when no dateWindow, overlap when dateWindow exists
@@ -136,14 +159,7 @@ async function markersHandler(request: NextRequest) {
       query = query.or(`date_start.lte.${windowEndStr},date_end.lte.${windowEndStr}`)
     }
     
-    // Try to add moderation_status filter (may fail if migrations not run)
-    let useModerationFilter = true
-    try {
-      query = query.neq('moderation_status', 'hidden_by_admin')
-    } catch (e) {
-      useModerationFilter = false
-    }
-    
+    // Moderation is inside applyPhase4; detect missing column at query time
     // Apply favorites-only filter if requested
     if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
       query = query.in('id', favoriteSaleIds)
@@ -208,13 +224,8 @@ async function markersHandler(request: NextRequest) {
       .order('id', { ascending: true })
       .limit(Math.min(limit, 1000))
 
-    // If query failed due to missing moderation_status column, retry without it
-    if (error && useModerationFilter && (
-      String(error).includes('moderation_status') ||
-      String(error).includes('column') ||
-      (error as any)?.code === 'PGRST204' ||
-      (error as any)?.message?.includes('moderation_status')
-    )) {
+    // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+    if (error && useModerationFilter && isPostgrestMissingModerationStatusColumn(error)) {
       const { logger } = await import('@/lib/log')
       logger.warn('moderation_status column not found, retrying without filter', {
         component: 'sales',
@@ -222,14 +233,15 @@ async function markersHandler(request: NextRequest) {
         error: String(error)
       })
       
-      // Rebuild query without moderation_status filter (include date filters)
-      query = sb
-        .from('sales_v2')
-        .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .in('status', ['published', 'active'])
-        .is('archived_at', null)
+      // Rebuild query without moderation fragment
+      query = applyPhase4PublicPublishedSaleReadFilters(
+        sb
+          .from('sales_v2')
+          .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null),
+        { includeModeration: false }
+      )
       
       // Re-apply date filters
       if (!dateWindow) {
@@ -332,6 +344,19 @@ async function markersHandler(request: NextRequest) {
     }
 
     // Return structured response matching /api/sales format
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesMarkersLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.markers',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: markers.length,
+        errorCount: 0,
+        degradedMode: false,
+      })
+    )
     return NextResponse.json({
       ok: true,
       data: markers,
@@ -353,6 +378,19 @@ async function markersHandler(request: NextRequest) {
       operation: 'markers_handler',
       durationMs: Date.now() - startedAt
     })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesMarkersLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.markers',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: 0,
+        errorCount: 1,
+        degradedMode: false,
+      })
+    )
     return fail(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }

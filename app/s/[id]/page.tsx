@@ -4,8 +4,13 @@
  */
 
 import { notFound, redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { serializeState } from '@/lib/url/state'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getAdminDb } from '@/lib/supabase/clients'
+import { Policies } from '@/lib/rateLimit/policies'
+import { shouldBypassRateLimit } from '@/lib/rateLimit/config'
+import { deriveKey } from '@/lib/rateLimit/keys'
+import { check } from '@/lib/rateLimit/limiter'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -19,15 +24,23 @@ export default async function ShortlinkPage({ params }: PageProps) {
   }
 
   try {
-    const supabase = await createSupabaseServerClient()
-
-    if (!supabase) {
-      console.error('Failed to create Supabase client')
-      notFound()
+    if (!shouldBypassRateLimit()) {
+      const headerStore = await headers()
+      const req = new Request(`http://localhost/s/${encodeURIComponent(id)}`, {
+        method: 'GET',
+        headers: headerStore,
+      })
+      const policies = [Policies.SALES_VIEW_30S, Policies.SALES_VIEW_HOURLY]
+      for (const policy of policies) {
+        const key = await deriveKey(req, policy.scope)
+        const result = await check(policy, key)
+        if (!result.allowed) {
+          return notFound()
+        }
+      }
     }
 
-    // Retrieve shared state from database
-    const { data, error } = await supabase
+    const { data, error } = await getAdminDb()
       .from('shared_states')
       .select('state_json')
       .eq('id', id)

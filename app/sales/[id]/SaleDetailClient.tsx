@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { isDebugEnabled } from '@/lib/debug'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
@@ -27,28 +26,89 @@ import { BadgeCheck } from 'lucide-react'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 import { isNativeApp } from '@/lib/runtime/isNativeApp'
 import { queryClient } from '@/lib/queryClient'
+import { displayAddress } from '@/lib/display/address'
+import { formatDateOnly } from '@/lib/display/date'
+
+function isTrustedNextImageHost(urlString: string): boolean {
+  try {
+    const u = new URL(urlString)
+    if (u.protocol !== 'https:') return false
+    const host = u.hostname.toLowerCase()
+    if (host === 'res.cloudinary.com') return true
+    if (host === 'storage.googleapis.com') return true
+    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
+      return u.pathname.startsWith('/storage/v1/object/public/')
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+/** "Show more" only when line-clamp actually hides text; re-measures on layout, fonts, resize. */
+function ExpandableDescription({
+  text,
+  paragraphClassName,
+  buttonClassName,
+}: {
+  text: string
+  paragraphClassName: string
+  buttonClassName: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [showToggle, setShowToggle] = useState(false)
+  const pRef = useRef<HTMLParagraphElement>(null)
+
+  useLayoutEffect(() => {
+    const el = pRef.current
+    if (!el) return
+
+    const measure = () => {
+      if (expanded) return
+      setShowToggle(el.scrollHeight - el.clientHeight > 1)
+    }
+
+    measure()
+    const ro = new ResizeObserver(() => measure())
+    ro.observe(el)
+
+    let cancelled = false
+    if (document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (!cancelled) measure()
+      })
+    }
+
+    return () => {
+      cancelled = true
+      ro.disconnect()
+    }
+  }, [text, expanded])
+
+  return (
+    <>
+      <p ref={pRef} className={`${paragraphClassName} ${expanded ? '' : 'line-clamp-3'}`}>
+        {text}
+      </p>
+      {(showToggle || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={buttonClassName}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </>
+  )
+}
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
   const [useFallback, setUseFallback] = useState(false)
-  
-  // Debug logging (only in debug mode)
-  useEffect(() => {
-    if (isDebugEnabled) {
-      console.debug('[ItemImage] Rendering image', { 
-        src: src ? `${src.substring(0, 50)}...` : null, 
-        srcType: typeof src,
-        srcLength: src?.length || 0,
-        alt, 
-        imageError, 
-        isLoading: imageLoading, 
-        useFallback 
-      })
-    }
-  }, [src, alt, imageError, imageLoading, useFallback])
-  
+
   if (imageError) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-200" role="img" aria-label={`${alt} - no image available`}>
@@ -66,16 +126,10 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
         className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
         onLoad={() => {
           setImageLoading(false)
-          if (isDebugEnabled) {
-            console.debug('[ItemImage] Fallback image loaded successfully', { src: src?.substring(0, 50) + '...' })
-          }
         }}
-        onError={(e) => {
+        onError={() => {
           setImageError(true)
           setImageLoading(false)
-          if (isDebugEnabled) {
-            console.error('[ItemImage] Fallback image failed to load', { src: src?.substring(0, 50) + '...', error: e })
-          }
         }}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />
@@ -97,24 +151,15 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
       unoptimized={shouldUnoptimize}
       onLoad={() => {
         setImageLoading(false)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.debug('[ItemImage] Image loaded successfully', { src: src?.substring(0, 50) + '...' })
-        }
       }}
-      onError={(e) => {
+      onError={() => {
         // Try fallback to regular img tag before giving up
         if (!useFallback) {
-          if (isDebugEnabled) {
-            console.warn('[ItemImage] Next.js Image failed, trying fallback img tag', { src: src?.substring(0, 50) + '...' })
-          }
           setUseFallback(true)
           setImageLoading(true)
         } else {
           setImageError(true)
           setImageLoading(false)
-          if (isDebugEnabled) {
-            console.error('[ItemImage] Image failed to load after fallback', { src: src?.substring(0, 50) + '...', error: e })
-          }
         }
       }}
     />
@@ -140,36 +185,6 @@ export default function SaleDetailClient({
   promotionsEnabled = false,
   paymentsEnabled = false,
 }: SaleDetailClientProps) {
-  // Debug logging to diagnose items visibility issue (only in debug mode)
-  if (isDebugEnabled) {
-    console.log('[SALE_DETAIL_CLIENT] Items received', {
-      itemsCount: items.length,
-      items: items.map(i => ({ id: i.id, name: i.name, hasPhoto: !!i.photo })),
-      saleId: sale.id,
-      saleStatus: sale.status,
-    })
-    
-    // Also log the raw items array to see if it's actually empty
-    console.log('[SALE_DETAIL_CLIENT] Raw items array:', items)
-    console.log('[SALE_DETAIL_CLIENT] Items length:', items.length)
-    console.log('[SALE_DETAIL_CLIENT] Items.length === 0?', items.length === 0)
-    
-    // Log each item individually
-    if (items.length > 0) {
-      console.log('[SALE_DETAIL_CLIENT] Items found:', items.length)
-      items.forEach((item, index) => {
-        console.log(`[SALE_DETAIL_CLIENT] Item ${index}:`, {
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          photo: item.photo,
-          hasPhoto: !!item.photo,
-        })
-      })
-    } else {
-      console.warn('[SALE_DETAIL_CLIENT] ⚠️ NO ITEMS RECEIVED - items array is empty!')
-    }
-  }
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
   
@@ -248,9 +263,26 @@ export default function SaleDetailClient({
   const { data: currentUser } = useAuth()
   const { data: favoriteSales = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
-  const [showFullDescription, setShowFullDescription] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)
+  const galleryImages = useMemo(() => {
+    const base = Array.isArray(sale.images)
+      ? sale.images.filter((value): value is string => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
+      : []
+    const coverUrl = typeof sale.cover_image_url === 'string' ? sale.cover_image_url.trim() : ''
+    if (coverUrl && !base.includes(coverUrl)) {
+      return [coverUrl, ...base]
+    }
+    return base
+  }, [sale.images, sale.cover_image_url])
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  useEffect(() => {
+    setSelectedImageIndex(0)
+  }, [sale.id, galleryImages.length])
+  const selectedImageUrl = galleryImages[selectedImageIndex] ?? cover?.url ?? null
+  const selectedImageAlt = `${sale.title || 'Sale'} image ${selectedImageIndex + 1}`
+  const canStepGallery = galleryImages.length > 1
+  const saleAddressDisplay = displayAddress(sale.address, sale.city, sale.state)
   const viewTrackedRef = useRef(false)
   const isOptimisticRef = useRef(false)
   const [promotionStatus, setPromotionStatus] = useState<{
@@ -324,10 +356,7 @@ export default function SaleDetailClient({
       const message = {
         type: 'favoriteState',
         isFavorited: isFavorited
-      }
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALE_DETAIL] Sending initial favoriteState to native:', message)
-      }
+      };
       (window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
     }
   }, [isFavorited, sale.id])
@@ -336,9 +365,7 @@ export default function SaleDetailClient({
   useEffect(() => {
     const handleNavigate = () => {
       // Use sale location data to build maps URL
-      const address = sale.address 
-        ? `${sale.address}, ${sale.city}, ${sale.state}` 
-        : `${sale.city}, ${sale.state}`
+      const address = saleAddressDisplay
       
       // Detect platform (same logic as AddressLink)
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
@@ -379,19 +406,11 @@ export default function SaleDetailClient({
         // Handle both window and document event formats
         const eventData = event.data || (event as any).data || (event as any).message
         const message = typeof eventData === 'string' ? JSON.parse(eventData) : eventData
-        
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALE_DETAIL] Received message from native:', message)
-        }
-        
+
         if (message && message.type === 'navigate') {
           handleNavigate()
         } else if (message && message.type === 'toggleFavorite') {
           // Handle favorite toggle from native footer
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALE_DETAIL] Processing toggleFavorite request')
-          }
-          
           // Reuse existing handleFavoriteToggle which has auth gating
           handleFavoriteToggle().then((newFavorited) => {
             // If newFavorited is undefined, user was redirected (not logged in)
@@ -400,34 +419,18 @@ export default function SaleDetailClient({
               const responseMessage = { 
                 type: 'favoriteState', 
                 isFavorited: newFavorited 
-              }
-              
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[SALE_DETAIL] Sending favoriteState to native:', responseMessage)
-              }
-              
+              };
+
               (window as any).ReactNativeWebView.postMessage(
                 JSON.stringify(responseMessage)
               )
-            } else if (newFavorited === undefined) {
-              // User was redirected to sign-in
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[SALE_DETAIL] User not logged in, redirecting to sign-in (no favoriteState sent)')
-              }
             }
-          }).catch((error) => {
-            // If toggle fails, don't send message
-            // Error handling is done in handleFavoriteToggle (alert shown)
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.warn('[SALE_DETAIL] Favorite toggle failed:', error)
-            }
+          }).catch(() => {
+            // If toggle fails, don't send message — error handling is in handleFavoriteToggle
           })
         }
-      } catch (error) {
+      } catch {
         // Ignore invalid messages or parse errors
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.warn('[SALE_DETAIL] Failed to process postMessage:', error)
-        }
       }
     }
 
@@ -451,8 +454,7 @@ export default function SaleDetailClient({
   }, [sale.lat, sale.lng, sale.address, sale.city, sale.state, sale.id])
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return formatDateOnly(dateString, {
       weekday: 'long',
       month: 'long', 
       day: 'numeric',
@@ -470,8 +472,7 @@ export default function SaleDetailClient({
 
   // Format date/time for meta chips (mobile)
   const formatDateShort = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return formatDateOnly(dateString, {
       weekday: 'short',
       month: 'short', 
       day: 'numeric'
@@ -677,12 +678,12 @@ export default function SaleDetailClient({
     shareTextParts.push(`${sale.city}, ${sale.state}`)
   }
   if (sale.date_start) {
-    const startDate = new Date(sale.date_start)
+    const startDate = formatDateOnly(sale.date_start, { weekday: 'short', month: 'short', day: 'numeric' })
     if (sale.date_end && sale.date_end !== sale.date_start) {
-      const endDate = new Date(sale.date_end)
-      shareTextParts.push(`${startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`)
+      const endDate = formatDateOnly(sale.date_end, { weekday: 'short', month: 'short', day: 'numeric' })
+      shareTextParts.push(`${startDate} - ${endDate}`)
     } else {
-      shareTextParts.push(startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
+      shareTextParts.push(startDate)
     }
   }
   const shareText = shareTextParts.length > 0 ? shareTextParts.join(' — ') : undefined
@@ -769,11 +770,11 @@ export default function SaleDetailClient({
               <AddressLink
                 lat={sale.lat ?? undefined}
                 lng={sale.lng ?? undefined}
-                address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+                address={saleAddressDisplay}
                 className="text-gray-900 font-medium break-words"
                 onClick={handleNavigationClick}
               >
-                {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
+                {saleAddressDisplay}
               </AddressLink>
             </div>
           </div>
@@ -781,37 +782,82 @@ export default function SaleDetailClient({
 
         {/* Primary Photo */}
         <div className="relative w-full overflow-hidden rounded-2xl bg-gray-100 aspect-[4/3]">
-          {cover ? (
-            <Image
-              src={cover.url}
-              alt={cover.alt}
-              fill
-              className="object-contain"
-              sizes="100vw"
-            />
+          {selectedImageUrl ? (
+            isTrustedNextImageHost(selectedImageUrl) ? (
+              <Image
+                src={selectedImageUrl}
+                alt={selectedImageAlt}
+                data-testid="sale-detail-cover-next-image"
+                fill
+                className="object-contain"
+                sizes="100vw"
+              />
+            ) : (
+              <img
+                src={selectedImageUrl}
+                alt={selectedImageAlt}
+                data-testid="sale-detail-cover-external-img"
+                className="h-full w-full object-contain"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            )
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
               <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
             </div>
           )}
+          {canStepGallery && (
+            <>
+              <button
+                type="button"
+                aria-label="Previous sale image"
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                onClick={() => setSelectedImageIndex((idx) => (idx === 0 ? galleryImages.length - 1 : idx - 1))}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                aria-label="Next sale image"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                onClick={() => setSelectedImageIndex((idx) => (idx + 1) % galleryImages.length)}
+              >
+                Next
+              </button>
+            </>
+          )}
         </div>
+        {galleryImages.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto">
+            {galleryImages.map((url, idx) => (
+              <button
+                key={`${url}-${idx}`}
+                type="button"
+                aria-label={`Show sale image ${idx + 1}`}
+                onClick={() => setSelectedImageIndex(idx)}
+                className={`h-16 w-16 overflow-hidden rounded border ${idx === selectedImageIndex ? 'border-purple-600' : 'border-gray-200'}`}
+              >
+                {isTrustedNextImageHost(url) ? (
+                  <Image src={url} alt={`Sale thumbnail ${idx + 1}`} width={64} height={64} className="h-full w-full object-cover" />
+                ) : (
+                  <img src={url} alt={`Sale thumbnail ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Description & Key Details */}
         {sale.description && (
           <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
             <h2 className="text-lg font-semibold text-gray-900">Sale details</h2>
             <div className="prose prose-gray max-w-none">
-              <p className={`text-gray-700 text-sm leading-relaxed ${!showFullDescription && 'line-clamp-3'}`}>
-                {sale.description}
-              </p>
-              {sale.description.length > 200 && (
-                <button
-                  onClick={() => setShowFullDescription(!showFullDescription)}
-                  className="mt-2 text-sm text-purple-600 font-medium hover:text-purple-700"
-                >
-                  {showFullDescription ? 'Show less' : 'Show more'}
-                </button>
-              )}
+              <ExpandableDescription
+                text={sale.description}
+                paragraphClassName="text-gray-700 text-sm leading-relaxed"
+                buttonClassName="mt-2 text-sm text-purple-600 font-medium hover:text-purple-700"
+              />
             </div>
             
             {/* Date & Time Details */}
@@ -906,14 +952,14 @@ export default function SaleDetailClient({
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address}
+                    address={saleAddressDisplay}
                     onClick={handleNavigationClick}
                   >
-                    {sale.address}
+                    {saleAddressDisplay}
                   </AddressLink>
                 </p>
               )}
-              <p>
+              {!sale.address && <p>
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
@@ -922,7 +968,7 @@ export default function SaleDetailClient({
                   >
                   {sale.city}, {sale.state} {sale.zip_code}
                 </AddressLink>
-              </p>
+              </p>}
               {sale.address && (
                 <div className="mt-2">
                   <OSMAttribution showGeocoding={true} />
@@ -962,20 +1008,71 @@ export default function SaleDetailClient({
           {/* Sale Header */}
           <div className="bg-white rounded-lg shadow-sm">
             <div className="relative w-full overflow-hidden rounded-t-lg bg-gray-100 aspect-[16/9] md:aspect-[4/3]">
-              {cover ? (
-                <Image
-                  src={cover.url}
-                  alt={cover.alt}
-                  fill
-                  className="object-contain"
-                  sizes="(min-width:1024px) 66vw, 100vw"
-                />
+              {selectedImageUrl ? (
+                isTrustedNextImageHost(selectedImageUrl) ? (
+                  <Image
+                    src={selectedImageUrl}
+                    alt={selectedImageAlt}
+                    data-testid="sale-detail-cover-next-image"
+                    fill
+                    className="object-contain"
+                    sizes="(min-width:1024px) 66vw, 100vw"
+                  />
+                ) : (
+                  <img
+                    src={selectedImageUrl}
+                    alt={selectedImageAlt}
+                    data-testid="sale-detail-cover-external-img"
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                )
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
                   <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
                 </div>
               )}
+              {canStepGallery && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Previous sale image"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                    onClick={() => setSelectedImageIndex((idx) => (idx === 0 ? galleryImages.length - 1 : idx - 1))}
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next sale image"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                    onClick={() => setSelectedImageIndex((idx) => (idx + 1) % galleryImages.length)}
+                  >
+                    Next
+                  </button>
+                </>
+              )}
             </div>
+            {galleryImages.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto p-3">
+                {galleryImages.map((url, idx) => (
+                  <button
+                    key={`desktop-${url}-${idx}`}
+                    type="button"
+                    aria-label={`Show sale image ${idx + 1}`}
+                    onClick={() => setSelectedImageIndex(idx)}
+                    className={`h-16 w-16 overflow-hidden rounded border ${idx === selectedImageIndex ? 'border-purple-600' : 'border-gray-200'}`}
+                  >
+                    {isTrustedNextImageHost(url) ? (
+                      <Image src={url} alt={`Sale thumbnail ${idx + 1}`} width={64} height={64} className="h-full w-full object-cover" />
+                    ) : (
+                      <img src={url} alt={`Sale thumbnail ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
@@ -996,11 +1093,11 @@ export default function SaleDetailClient({
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+                    address={saleAddressDisplay}
                     onClick={handleNavigationClick}
                     className="underline hover:no-underline"
                   >
-                    {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
+                    {saleAddressDisplay}
                   </AddressLink>
                 </div>
               </div>
@@ -1092,17 +1189,11 @@ export default function SaleDetailClient({
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
               <div className="prose prose-gray max-w-none">
-                <p className={`text-gray-700 ${!showFullDescription && 'line-clamp-3'}`}>
-                  {sale.description}
-                </p>
-                {sale.description.length > 200 && (
-                  <button
-                    onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="mt-2 link-accent font-medium"
-                  >
-                    {showFullDescription ? 'Show less' : 'Show more'}
-                  </button>
-                )}
+                <ExpandableDescription
+                  text={sale.description}
+                  paragraphClassName="text-gray-700"
+                  buttonClassName="mt-2 link-accent font-medium"
+                />
               </div>
             </div>
           )}
@@ -1117,20 +1208,6 @@ export default function SaleDetailClient({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map((item) => {
-                  // Debug logging (only in debug mode)
-                  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                    console.debug('[SaleDetailClient] Item card rendering', {
-                      itemId: item.id,
-                      itemName: item.name,
-                      hasPhoto: !!item.photo,
-                      photoType: typeof item.photo,
-                      photoValue: item.photo ? `${item.photo.substring(0, 50)}...` : null,
-                      photoLength: item.photo?.length || 0,
-                      photoTrimmedLength: item.photo?.trim().length || 0,
-                      willRenderImage: !!(item.photo && item.photo.trim().length > 0),
-                    })
-                  }
-                  
                   return (
                     <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
@@ -1198,14 +1275,14 @@ export default function SaleDetailClient({
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
-                    address={sale.address}
+                    address={saleAddressDisplay}
                     onClick={handleNavigationClick}
                   >
-                    {sale.address}
+                    {saleAddressDisplay}
                   </AddressLink>
                 </p>
               )}
-              <p>
+              {!sale.address && <p>
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
@@ -1214,7 +1291,7 @@ export default function SaleDetailClient({
                   >
                   {sale.city}, {sale.state} {sale.zip_code}
                 </AddressLink>
-              </p>
+              </p>}
               {/* OSM Attribution - show when address exists (addresses are geocoded via Nominatim/OSM) */}
               {sale.address && (
                 <div className="mt-2">
@@ -1356,7 +1433,7 @@ export default function SaleDetailClient({
             <AddressLink
               lat={sale.lat ?? undefined}
               lng={sale.lng ?? undefined}
-              address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+              address={saleAddressDisplay}
               className="flex-1 inline-flex items-center justify-center px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] whitespace-nowrap"
               onClick={handleNavigationClick}
             >

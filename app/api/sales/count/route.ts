@@ -7,6 +7,7 @@ import { toDbSet } from '@/lib/shared/categoryContract'
 import { validateDateRange } from '@/lib/shared/dateBounds'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,15 +112,16 @@ async function countHandler(request: NextRequest) {
     const minLng = longitude - lngRange
     const maxLng = longitude + lngRange
     
-    // Build count query
-    let query = supabase
-      .from('sales_v2')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'published')
-      .gte('lat', minLat)
-      .lte('lat', maxLat)
-      .gte('lng', minLng)
-      .lte('lng', maxLng)
+    // Build count query (Phase 4 public visibility, RLS-aligned)
+    let query = applyPhase4PublicPublishedSaleReadFilters(
+      supabase
+        .from('sales_v2')
+        .select('id', { count: 'exact', head: true })
+        .gte('lat', minLat)
+        .lte('lat', maxLat)
+        .gte('lng', minLng)
+        .lte('lng', maxLng)
+    )
     
     // Apply date filters
     if (startDateParam) {

@@ -1,0 +1,55 @@
+{
+  "invalid": 0,
+  "listings": [
+    {
+      "addressRaw": "3805 N Sacramento Ave, Chicago, IL",
+      "city": "Chicago",
+      "dedupeIdentifiers": {
+        "externalId": "161028326",
+        "sourceUrl": "https://example.com/US/Illinois/Chicago/3805-N-Sacramento-Ave/161028326/listing.html"
+      },
+      "description": "Sale A Fixture list Sale A",
+      "endDate": null,
+      "extractionConfidence": null,
+      "imageSourceUrl": null,
+      "imageUrls": null,
+      "rawPayload": {
+        "adapter": "external_page_source",
+        "addressSlug": "3805-N-Sacramento-Ave",
+        "addressTailCity": "Chicago",
+        "cityConflict": false,
+        "citySource": "listing_url",
+        "externalId": "161028326",
+        "hubSegment": null,
+        "ingestionDiagnostics": {
+          "addressSource": "composite",
+          "addressSources": ["slug", "slug_with_url_municipality"],
+          "authority": {
+            "addressTailCity": "Chicago",
+            "cityConflict": false,
+            "citySource": "listing_url",
+            "resolvedCity": "Chicago",
+            "streetConcrete": true,
+            "urlCity": "Chicago"
+          },
+          "chosenAddressSource": "slug",
+          "metadataAddressSkippedAsUntrusted": false,
+          "nearbyCandidateCount": 0,
+          "rejectedAddressCandidates": [],
+          "slugWasPlaceholder": false
+        },
+        "pathCitySlug": "Chicago",
+        "resolvedCity": "Chicago",
+        "resolvedState": "IL",
+        "stateSource": "listing_url",
+        "urlMunicipalityNormalized": "Chicago"
+      },
+      "sourceUrl": "https://example.com/US/Illinois/Chicago/3805-N-Sacramento-Ave/161028326/listing.html",
+      "startDate": null,
+      "state": "IL",
+      "title": "Sale A"
+    }
+  ],
+  "parserAdapter": "external_page_source",
+  "parserStatus": "ok"
+}

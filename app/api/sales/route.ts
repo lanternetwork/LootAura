@@ -15,6 +15,8 @@ import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
+import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
+import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -37,9 +39,17 @@ async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
   const { logger, generateOperationId } = await import('@/lib/log')
   const opId = generateOperationId()
-  
+  const { createCorrelationBundle } = await import('@/lib/observability/correlation')
+  const { buildTelemetryRecord, emitObservabilityRecord } = await import('@/lib/observability/emit')
+  const { ObservabilityEvents } = await import('@/lib/observability/events')
+  const correlation = createCorrelationBundle({ requestId: opId, operationId: opId })
   // Helper to add opId to log context
-  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+  const withOpId = (context: any = {}) => ({
+    ...context,
+    requestId: correlation.requestId,
+    operationId: correlation.operationId,
+    correlationId: correlation.correlationId,
+  })
   
   try {
     const supabase = await createSupabaseServerClient()
@@ -410,6 +420,7 @@ async function salesHandler(request: NextRequest) {
     }
 
     // Short-TTL server cache for public (non-user-scoped) requests only; skip when search query is present so query runs (tests and freshness)
+    const phase4LiveBucket = Math.floor(Date.now() / 30000)
     let salesCacheKey: string | null = null
     if (!favoritesOnly && !q) {
       salesCacheKey = buildSalesCacheKey({
@@ -425,9 +436,29 @@ async function salesHandler(request: NextRequest) {
         offset,
         distanceKm: distanceKm ?? 40,
         q,
+        phase4LiveBucket,
       })
       const cached = await getSalesApiCache(salesCacheKey)
       if (cached != null) {
+        const resultCount =
+          typeof (cached as { count?: unknown }).count === 'number'
+            ? (cached as { count: number }).count
+            : Array.isArray((cached as { data?: unknown }).data)
+              ? ((cached as { data: unknown[] }).data).length
+              : 0
+        emitObservabilityRecord(
+          buildTelemetryRecord(ObservabilityEvents.api.salesGetLatency, {
+            requestId: correlation.requestId,
+            operationId: correlation.operationId,
+            correlationId: correlation.correlationId,
+            jobType: 'api.sales.get',
+            durationMs: Date.now() - startedAt,
+            cacheHit: true,
+            resultCount,
+            errorCount: 0,
+            degradedMode: false,
+          })
+        )
         const { addCacheHeaders } = await import('@/lib/http/cache')
         return addCacheHeaders(NextResponse.json(cached), {
           maxAge: 30,
@@ -440,21 +471,29 @@ async function salesHandler(request: NextRequest) {
     
     let results: PublicSale[] = []
     let degraded = false
-    let totalSalesCount = 0
-    let totalFilteredCount = 0 // Track total filtered count for pagination
-    
+    /** Nationwide exact count (removed from hot path). Only set when gated opt-in matches. */
+    let nationwideSaleCountExact: number | null = null
+    let totalFilteredCount = 0 // Track total filtered count for pagination (bounded window heuristic)
+
+    const allowNationwideExactCount =
+      process.env.SALES_ALLOW_NATIONWIDE_EXACT_COUNT === 'true' &&
+      searchParams.get('includeNationwideCount') === '1'
+
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
     try {
       logger.debug('Querying sales_v2 view', { component: 'sales', operation: 'get_sales' })
-      
-      // First, let's check the total count of sales in the database
-      const { count: totalCount, error: _countError } = await supabase
-        .from('sales_v2')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'published')
-      
-      totalSalesCount = totalCount || 0
-      logger.debug('Total published sales count', { component: 'sales', totalCount: totalSalesCount })
+
+      if (allowNationwideExactCount) {
+        const { count: exactNationwide } = await applyPhase4PublicPublishedSaleReadFilters(
+          supabase.from('sales_v2').select('*', { count: 'exact', head: true })
+        )
+        nationwideSaleCountExact = typeof exactNationwide === 'number' ? exactNationwide : null
+        logger.debug('Nationwide sale count (gated)', {
+          component: 'sales',
+          operation: 'nationwide_count_opt_in',
+          totalCount: nationwideSaleCountExact ?? 0,
+        })
+      }
       
       // Use actual bbox if provided, otherwise calculate from distance
       let minLat, maxLat, minLng, maxLng
@@ -488,17 +527,17 @@ async function salesHandler(request: NextRequest) {
         logger.debug('Calculated bbox from distance', { component: 'sales', minLat, maxLat, minLng, maxLng, distanceKm })
       }
       
-      // Build base query - try with moderation_status filter first
-      // If column doesn't exist (migrations not run), retry without it
-      let query = supabase
-        .from('sales_v2')
-        .select('*')
-        .gte('lat', minLat)
-        .lte('lat', maxLat)
-        .gte('lng', minLng)
-        .lte('lng', maxLng)
-        // Exclude archived sales from public map/list/search
-        .in('status', ['published', 'active'])
+      // Build base query — Phase 4 public visibility (RLS-aligned; migration 172)
+      const useModerationFilter = true
+      let query = applyPhase4PublicPublishedSaleReadFilters(
+        supabase
+          .from('sales_v2')
+          .select('*')
+          .gte('lat', minLat)
+          .lte('lat', maxLat)
+          .gte('lng', minLng)
+          .lte('lng', maxLng)
+      )
       
       // Apply date filtering in database WHERE clause
       // Logic matches client-side filtering: future-only when windowStart but no windowEnd, overlap when both exist
@@ -522,15 +561,7 @@ async function salesHandler(request: NextRequest) {
       }
       // If no windowStart/windowEnd, no date filtering (matches current behavior)
       
-      // Try to add moderation_status filter (may fail if migrations not run)
-      let useModerationFilter = true
-      try {
-        query = query.neq('moderation_status', 'hidden_by_admin')
-      } catch (e) {
-        // If filter fails at build time, we'll catch it at query time
-        useModerationFilter = false
-      }
-      
+      // Moderation filter is included in applyPhase4PublicPublishedSaleReadFilters; if column missing, retry below without it
       // Apply favorites-only filter if requested
       if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
         query = query.in('id', favoriteSaleIds)
@@ -602,36 +633,35 @@ async function salesHandler(request: NextRequest) {
         query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
       }
       
-      // Fetch a wider slice to allow client-side distance filtering
-      // Account for offset: we need to fetch enough items to cover offset + limit after filtering
-      // Use a multiplier to account for filtering (distance, date) that may reduce results
-      const fetchWindow = Math.min(1000, Math.max((offset + limit) * 3, 200))
+      // Fetch a wider slice to allow client-side distance filtering.
+      // We intentionally avoid id-based ordering here because id order is arbitrary for spatial relevance
+      // and can exclude nearby rows in dense areas before distance filtering runs.
+      // Inflate window size to reduce false exclusions under Supabase/PostgREST non-spatial ordering limits.
+      // True fix: server-side spatial ordering (future PostGIS migration).
+      const fetchWindow = Math.min(1000, Math.max((offset + limit) * 5, 200))
       let { data: salesData, error: salesError } = await query
-        .order('id', { ascending: true })
+        .order('date_start', { ascending: true, nullsFirst: false })
         .range(0, fetchWindow - 1)
       
-      // If query failed due to missing moderation_status column, retry without it
-      if (salesError && useModerationFilter && (
-        String(salesError).includes('moderation_status') ||
-        String(salesError).includes('column') ||
-        (salesError as any)?.code === 'PGRST204' ||
-        (salesError as any)?.message?.includes('moderation_status')
-      )) {
+      // If query failed due to missing moderation_status column, retry without it (conclusive PostgREST/PG codes only)
+      if (salesError && useModerationFilter && isPostgrestMissingModerationStatusColumn(salesError)) {
         logger.warn('moderation_status column not found, retrying without filter', {
           component: 'sales',
           operation: 'get_sales',
           error: String(salesError)
         })
         
-        // Rebuild query without moderation_status filter (include date filters)
-        query = supabase
-          .from('sales_v2')
-          .select('*')
-          .gte('lat', minLat)
-          .lte('lat', maxLat)
-          .gte('lng', minLng)
-          .lte('lng', maxLng)
-          .in('status', ['published', 'active'])
+        // Rebuild query without moderation fragment (include Phase 4 ends_at + archived + date filters)
+        query = applyPhase4PublicPublishedSaleReadFilters(
+          supabase
+            .from('sales_v2')
+            .select('*')
+            .gte('lat', minLat)
+            .lte('lat', maxLat)
+            .gte('lng', minLng)
+            .lte('lng', maxLng),
+          { includeModeration: false }
+        )
         
         // Re-apply date filters
         if (windowStart && !windowEnd) {
@@ -674,7 +704,7 @@ async function salesHandler(request: NextRequest) {
         }
         
         const retryResult = await query
-          .order('id', { ascending: true })
+          .order('date_start', { ascending: true, nullsFirst: false })
           .range(0, fetchWindow - 1)
         
         salesData = retryResult.data
@@ -996,9 +1026,12 @@ async function salesHandler(request: NextRequest) {
         limit,
         offset,
         hasMore,
-        // Note: totalCount is database count before filtering; actual filtered count may be lower
+        /** Rows matching bbox + filters within the heuristic fetch-window pass (approximate vs full corpus). */
+        filteredApproxInFetchWindow: totalFilteredCount,
       },
-      totalCount: totalSalesCount || 0, // Total database count (before filtering)
+      /** Deprecated nationwide exact tally; omit from hot path (null unless `includeNationwideCount=1` + env). */
+      totalCount:
+        allowNationwideExactCount && nationwideSaleCountExact !== null ? nationwideSaleCountExact : null,
       durationMs: Date.now() - startedAt
     }
     
@@ -1013,6 +1046,20 @@ async function salesHandler(request: NextRequest) {
       degraded,
       durationMs: Date.now() - startedAt
     }))
+
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesGetLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.get',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: results.length,
+        errorCount: 0,
+        degradedMode: Boolean(degraded),
+      })
+    )
 
     // Populate short-TTL cache for public requests so identical requests hit cache
     if (!favoritesOnly && salesCacheKey) {
@@ -1030,14 +1077,25 @@ async function salesHandler(request: NextRequest) {
     })
     
   } catch (error: any) {
-    const { logger, generateOperationId } = await import('@/lib/log')
-    const opId = generateOperationId()
-    const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+    const { logger } = await import('@/lib/log')
     logger.error('Sales query failed', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'sales',
       operation: 'get_sales',
       durationMs: Date.now() - startedAt
     }))
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.salesGetLatency, {
+        requestId: correlation.requestId,
+        operationId: correlation.operationId,
+        correlationId: correlation.correlationId,
+        jobType: 'api.sales.get',
+        durationMs: Date.now() - startedAt,
+        cacheHit: false,
+        resultCount: 0,
+        errorCount: 1,
+        degradedMode: false,
+      })
+    )
     return NextResponse.json({ 
       ok: false, 
       error: 'Internal server error' 
@@ -1272,6 +1330,8 @@ async function postHandler(request: NextRequest) {
         time_start,
         date_end: date_end ?? null,
         time_end: time_end ?? null,
+        ends_at: null,
+        listing_timezone: null,
         cover_image_url: cover_image_url || null,
         images: images || [],
         tags: normalizedTags,
@@ -1284,6 +1344,22 @@ async function postHandler(request: NextRequest) {
 
     // Allow status from body if provided (for test sales), otherwise default to 'published'
     const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
+
+    const { resolvePersistableSaleEndsAt } = await import('@/lib/sales/resolvePersistableSaleEndsAt')
+    const listingEnds = await resolvePersistableSaleEndsAt(
+      rls,
+      {
+        date_start,
+        time_start,
+        date_end: date_end ?? null,
+        time_end: time_end ?? null,
+        zip_code,
+        state,
+        lat,
+        lng,
+      },
+      { operation: 'api_sales_post', owner_id: user!.id }
+    )
     
     // Build insert payload for base table (lootaura_v2.sales)
     // Include all required fields and image fields
@@ -1301,6 +1377,8 @@ async function postHandler(request: NextRequest) {
       time_start, // Required
       date_end,
       time_end,
+      ends_at: listingEnds.ends_at,
+      listing_timezone: listingEnds.listing_timezone,
       pricing_mode: pricing_mode || 'negotiable',
       status: saleStatus,
       privacy_mode: 'exact', // Required (has default but explicit is better)

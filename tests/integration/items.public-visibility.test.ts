@@ -2,11 +2,12 @@
  * Integration tests for items public visibility
  * Tests that items appear on sale detail pages for published sales
  * Regression test for migration 115 fix
- * 
- * NOTE: The function is_sale_publicly_visible() matches sales_public_read policy exactly:
- * - Only checks status = 'published' (does NOT check moderation_status or archived_at)
- * - If sales_public_read is updated to include moderation/archived checks, this function
- *   must be updated in a separate migration to match.
+ *
+ * Phase 4 (migration 172): `lootaura_v2.is_sale_publicly_visible` and `sales_public_read` use the same predicate:
+ * - status = 'published'
+ * - archived_at IS NULL
+ * - (ends_at IS NULL OR ends_at > now()) — NULL ends_at stays visible during transition
+ * - moderation_status IS DISTINCT FROM 'hidden_by_admin'
  */
 
 import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'

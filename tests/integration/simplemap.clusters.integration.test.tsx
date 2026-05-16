@@ -9,7 +9,41 @@ import { PinPoint } from '@/lib/pins/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onClick, ...props }: any) => {
+  default: ((() => {
+    const React = require('react') as typeof import('react')
+    return React.forwardRef(function MockMap(
+      { children, onLoad, onMoveEnd, onClick, ...props }: any,
+      ref: React.Ref<any>
+    ) {
+      React.useImperativeHandle(
+        ref,
+        () => ({
+          getMap: () => ({
+            getZoom: () => 10,
+            flyTo: () => {},
+            resize: () => {},
+            isStyleLoaded: () => true,
+            getBounds: () => ({
+              getWest: () => -86,
+              getSouth: () => 37,
+              getEast: () => -85,
+              getNorth: () => 39,
+            }),
+            getCenter: () => ({ lat: 38.2527, lng: -85.7585 }),
+            on: () => {},
+            once: (_event: string, cb?: () => void) => {
+              cb?.()
+            },
+            off: () => {},
+          }),
+        }),
+        []
+      )
+
+      React.useEffect(() => {
+        onLoad?.({ type: 'load' })
+      }, [onLoad])
+
     const handleClick = (e: any) => {
       // Provide a mock event structure that matches react-map-gl's MapLayerMouseEvent
       // Ensure originalEvent and target are always present
@@ -26,18 +60,19 @@ vi.mock('react-map-gl', () => ({
       onClick?.(mockEvent)
     }
     
-    return (
-      <div 
-        data-testid="map" 
-        data-center-lat={props.initialViewState?.latitude}
-        data-center-lng={props.initialViewState?.longitude}
-        data-zoom={props.initialViewState?.zoom}
-        onClick={handleClick}
-      >
-        {children}
-      </div>
-    )
-  },
+      return (
+        <div 
+          data-testid="map" 
+          data-center-lat={props.initialViewState?.latitude}
+          data-center-lng={props.initialViewState?.longitude}
+          data-zoom={props.initialViewState?.zoom}
+          onClick={handleClick}
+        >
+          {children}
+        </div>
+      )
+    })
+  })()) as any,
   Marker: ({ children, ...props }: any) => (
     <div data-testid="marker" {...props}>
       {children}
@@ -95,6 +130,19 @@ vi.mock('@/components/location/PinMarker', () => ({
       </div>
     )
   }
+}))
+
+vi.mock('@/components/location/HybridPinsOverlay', () => ({
+  default: function MockHybridPinsOverlay({ onClusterClick }: any) {
+    return (
+      <button
+        data-testid="hybrid-cluster"
+        onClick={() => onClusterClick?.({ id: 9, lat: 38.25, lng: -85.75, expandToZoom: 14 })}
+      >
+        Hybrid Cluster
+      </button>
+    )
+  },
 }))
 
 describe('SimpleMap Clusters Integration', () => {
@@ -202,6 +250,27 @@ describe('SimpleMap Clusters Integration', () => {
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
+    })
+
+    it('should forward cluster clicks from hybrid pins callback', async () => {
+      const onClusterClick = vi.fn()
+      const { getByTestId, unmount } = render(
+        <SimpleMap
+          {...defaultProps}
+          pins={undefined}
+          hybridPins={{
+            sales: testSales,
+            selectedId: null,
+            onLocationClick: vi.fn(),
+            onClusterClick,
+            viewport: { bounds: [-86, 37, -85, 39], zoom: 10 },
+          }}
+        />
+      )
+
+      fireEvent.click(getByTestId('hybrid-cluster'))
+      expect(onClusterClick).toHaveBeenCalledWith({ id: 9, lat: 38.25, lng: -85.75, expandToZoom: 14 })
+      unmount()
     })
   })
 

@@ -1,0 +1,458 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+vi.mock('@/lib/env', () => ({
+  getNominatimEmail: () => 'test-nominatim@example.com',
+}))
+
+const loggerError = vi.fn()
+const loggerWarn = vi.fn()
+const loggerInfo = vi.fn()
+
+vi.mock('@/lib/log', () => ({
+  logger: {
+    error: (...args: unknown[]) => loggerError(...args),
+    warn: (...args: unknown[]) => loggerWarn(...args),
+    info: (...args: unknown[]) => loggerInfo(...args),
+    debug: vi.fn(),
+  },
+}))
+
+describe('geocodeAddress (ingestion Nominatim)', () => {
+  beforeEach(() => {
+    loggerError.mockClear()
+    loggerWarn.mockClear()
+    loggerInfo.mockClear()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [{ lat: '38.25', lon: '-85.75' }],
+      })
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does not append house number as ZIP (11020 Front St … Mokena, IL)', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress({
+      address: '11020 Front St Unit A, Mokena, IL',
+      city: 'Mokena',
+      state: 'IL',
+    })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    const decoded = decodeURIComponent(String(fetchCall).split('q=')[1]?.split('&')[0] ?? '')
+    expect(decoded).toBe('11020 Front St Unit A, Mokena, IL, USA')
+    expect(decoded).not.toMatch(/,\s*11020,\s*USA/i)
+  })
+
+  it('returns coordinates on success', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+    expect(result).toMatchObject({ coords: { lat: 38.25, lng: -85.75 }, hit429: false })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    expect(String(fetchCall)).toContain('countrycodes=us')
+    expect(String(fetchCall)).toContain('addressdetails=1')
+    expect(String(fetchCall)).toContain('limit=3')
+    expect(String(fetchCall)).toContain('100%20Main%20St%2C%20Louisville%2C%20KY%2C%20USA')
+    expect(loggerWarn).not.toHaveBeenCalled()
+  })
+
+  it('normalizes hyphenated locality for Nominatim q= without touching street hyphens', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress({
+      address: '100 North-Walk Rd, 95628',
+      city: 'Fair-Oaks',
+      state: 'CA',
+    })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    const decoded = decodeURIComponent(String(fetchCall).split('q=')[1]?.split('&')[0] ?? '')
+    expect(decoded).toContain('North-Walk')
+    expect(decoded).toContain('Fair Oaks')
+    expect(decoded).not.toContain('Fair-Oaks')
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Nominatim geocode query prepared',
+      expect.objectContaining({
+        geocode_city_raw: 'Fair-Oaks',
+        geocode_city_normalized: 'Fair Oaks',
+        queryFingerprint: expect.any(String),
+      })
+    )
+  })
+
+  it('primary mode keeps hyphenated locality visible (fallback path expands)', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress(
+      {
+        address: '100 North-Walk Rd, 95628',
+        city: 'Fair-Oaks',
+        state: 'CA',
+      },
+      { mode: 'primary' }
+    )
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    const decoded = decodeURIComponent(String(fetchCall).split('q=')[1]?.split('&')[0] ?? '')
+    expect(decoded).toContain('North-Walk')
+    expect(decoded).toContain('Fair-Oaks')
+    expect(decoded).not.toContain('Fair Oaks')
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Nominatim geocode query prepared',
+      expect.objectContaining({
+        geocodeMode: 'primary',
+        queryStrategy: 'minimal_locality',
+      })
+    )
+  })
+
+  it('builds residential query with unit + zip context (does not drop apartment detail)', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress({
+      address: '742 Evergreen Terrace, Apt 2B, 62704',
+      city: 'Springfield',
+      state: 'IL',
+    })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    expect(String(fetchCall)).toContain(
+      '742%20Evergreen%20Terrace%2C%20Apt%202B%2C%20Springfield%2C%20IL%2C%2062704%2C%20USA'
+    )
+  })
+
+  it('strips trailing city/state/zip context duplicated in the street token', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress({
+      address: '1234 Maple Hill Dr Denver CO 80211',
+      city: 'Denver',
+      state: 'CO',
+    })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    expect(String(fetchCall)).toContain('1234%20Maple%20Hill%20Dr%2C%20Denver%2C%20CO%2C%2080211%2C%20USA')
+    expect(String(fetchCall)).not.toContain('Denver%20CO%2080211%2C%20Denver%2C%20CO%2C%2080211')
+  })
+
+  it('strips trailing comma-delimited city/state context from address_raw-like inputs', async () => {
+    vi.resetModules()
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    await geocodeAddress({
+      address: '55 Oak Ln, Springfield, IL 62704',
+      city: 'Springfield',
+      state: 'IL',
+    })
+    const fetchCall = vi.mocked(fetch).mock.calls[0]?.[0]
+    expect(String(fetchCall)).toContain('55%20Oak%20Ln%2C%20Springfield%2C%20IL%2C%2062704%2C%20USA')
+    expect(String(fetchCall)).not.toContain('Springfield%2C%20IL%2062704%2C%20Springfield')
+  })
+
+  it('returns null on HTTP 429, logs rate limit, and applies backoff', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.resetModules()
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+      const promise = geocodeAddress({
+        address: '100 Main St',
+        city: 'Louisville',
+        state: 'KY',
+      })
+
+      await vi.advanceTimersByTimeAsync(300)
+      const result = await promise
+
+      expect(result).toMatchObject({ coords: null, hit429: true, noCoordsReason: 'rate_limited' })
+      expect(loggerWarn).toHaveBeenCalledWith(
+        'Nominatim rate limited (HTTP 429); treating as retriable geocode failure',
+        expect.objectContaining({
+          component: 'geocode/geocodeAddress',
+          operation: 'nominatim_fetch',
+          status: 429,
+        })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('returns null on other non-OK responses and logs status', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'http_not_ok',
+      httpStatus: 503,
+    })
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'Nominatim geocode request failed (non-OK response)',
+      expect.objectContaining({
+        status: 503,
+      })
+    )
+  })
+
+  it('returns empty_results when Nominatim returns no matches', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({ coords: null, hit429: false, noCoordsReason: 'empty_results' })
+  })
+
+  it('classifies soft rate limiting when empty results include retry headers', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => (name.toLowerCase() === 'retry-after' ? '2' : null),
+        },
+        json: async () => [],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({ coords: null, hit429: true, noCoordsReason: 'rate_limited_soft' })
+  })
+
+  it('classifies broad_match provider matches as no-coords (importance still recorded in reasons)', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => [
+          {
+            lat: '38.25',
+            lon: '-85.75',
+            importance: 0.05,
+            addresstype: 'city',
+            class: 'boundary',
+            type: 'administrative',
+            address: { city: 'Louisville', state: 'Kentucky' },
+          },
+        ],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({ coords: null, hit429: false, noCoordsReason: 'low_confidence' })
+    expect(result.lowConfidenceReasons).toEqual(
+      expect.arrayContaining(['broad_match', 'low_importance'])
+    )
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'Nominatim returned low-confidence geocode candidate',
+      expect.objectContaining({
+        lowConfidenceReasons: expect.arrayContaining(['broad_match', 'low_importance']),
+      })
+    )
+  })
+
+  it('rejects broad_match when importance is high (notability is not a bypass)', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => [
+          {
+            lat: '38.25',
+            lon: '-85.75',
+            importance: 0.95,
+            addresstype: 'city',
+            class: 'place',
+            type: 'city',
+            address: { city: 'Louisville', state: 'Kentucky' },
+          },
+        ],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({ coords: null, hit429: false, noCoordsReason: 'low_confidence' })
+    expect(result.lowConfidenceReasons).toEqual(expect.arrayContaining(['broad_match']))
+    expect(result.lowConfidenceReasons).not.toContain('low_importance')
+  })
+
+  it('accepts residential hit with low Nominatim importance when locality and scale are OK', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => [
+          {
+            lat: '38.252',
+            lon: '-85.751',
+            importance: 0.05,
+            addresstype: 'house_number',
+            class: 'place',
+            type: 'house',
+            address: { city: 'Louisville', state: 'KY' },
+          },
+        ],
+      })
+    )
+
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '100 Main St',
+      city: 'Louisville',
+      state: 'KY',
+    })
+
+    expect(result).toMatchObject({
+      coords: { lat: 38.252, lng: -85.751 },
+      hit429: false,
+      providerClassification: 'ok',
+    })
+    expect(loggerWarn).not.toHaveBeenCalledWith(
+      'Nominatim returned low-confidence geocode candidate',
+      expect.anything()
+    )
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Nominatim geocode succeeded',
+      expect.objectContaining({
+        low_importance_observed: true,
+      })
+    )
+  })
+
+  it('classifies city/state mismatch as low_confidence with explicit reasons', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => [
+          {
+            lat: '40.7128',
+            lon: '-74.0060',
+            importance: 0.7,
+            addresstype: 'house',
+            class: 'building',
+            type: 'house',
+            address: { city: 'Jersey City', state: 'New Jersey' },
+          },
+        ],
+      })
+    )
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const result = await geocodeAddress({
+      address: '123 Example St',
+      city: 'New York',
+      state: 'NY',
+    })
+    expect(result).toMatchObject({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'low_confidence',
+      lowConfidenceReasons: expect.arrayContaining(['city_mismatch', 'state_mismatch']),
+    })
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'Nominatim returned low-confidence geocode candidate',
+      expect.objectContaining({
+        component: 'geocode/geocodeAddress',
+        operation: 'nominatim_classify',
+      })
+    )
+  })
+
+  it('retries replay identical failing query fingerprints for identical input', async () => {
+    vi.resetModules()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => [],
+      })
+    )
+    const { geocodeAddress } = await import('@/lib/geocode/geocodeAddress')
+    const one = await geocodeAddress({
+      address: '11 Oak Ridge Ct, Unit 5, 98052',
+      city: 'Redmond',
+      state: 'WA',
+    })
+    const two = await geocodeAddress({
+      address: '11 Oak Ridge Ct, Unit 5, 98052',
+      city: 'Redmond',
+      state: 'WA',
+    })
+    expect(one.noCoordsReason).toBe('empty_results')
+    expect(two.noCoordsReason).toBe('empty_results')
+    expect(one.queryFingerprint).toBeTruthy()
+    expect(one.queryFingerprint).toBe(two.queryFingerprint)
+  })
+})

@@ -1,0 +1,226 @@
+# Invokes authenticated GET /api/cron/geocode on the live preview URL after deploy succeeds.
+#
+# Root cause fix: Vercel for GitHub does not reliably emit GitHub `deployment_status` for
+# preview deployments (and the event may be disabled in project settings). Vercel now
+# sends `repository_dispatch` with enriched `client_payload` — see:
+# https://vercel.com/docs/git/vercel-for-github#repository-dispatch-events
+#
+# We still subscribe to `deployment_status` for backwards compatibility / non-Vercel flows.
+#
+# workflow_dispatch: validate the workflow + invoke path before merging to default branch,
+# using a preview URL you control (no automatic production deploy trigger).
+name: Preview post-deploy geocode cron
+
+on:
+  deployment_status:
+  repository_dispatch:
+    types:
+      - vercel.deployment.ready
+      - vercel.deployment.success
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: 'HTTPS preview base URL only (e.g. https://your-app-git-branch-team.vercel.app)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  invoke-geocode-cron:
+    runs-on: ubuntu-latest
+    if: |
+      (
+        github.event_name == 'deployment_status' &&
+        github.event.deployment_status.state == 'success'
+      ) || (
+        github.event_name == 'repository_dispatch' &&
+        (github.event.action == 'vercel.deployment.ready' || github.event.action == 'vercel.deployment.success')
+      )
+    steps:
+      - name: Gate non-production deployment
+        id: gate
+        run: |
+          set -euo pipefail
+          ENV_RAW=""
+          if [ "${{ github.event_name }}" = "deployment_status" ]; then
+            ENV_RAW="${{ github.event.deployment.environment }}"
+          else
+            ENV_RAW="${{ github.event.client_payload.environment }}"
+          fi
+          ENV_LOW=$(printf '%s' "$ENV_RAW" | tr '[:upper:]' '[:lower:]')
+          if [ "$ENV_LOW" = "production" ]; then
+            echo "::notice::Skipping geocode invoke (deployment environment is production)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve deployment URL
+        id: resolve
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          URL=""
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            URL="${{ github.event.client_payload.url }}"
+          else
+            URL="${{ github.event.deployment_status.environment_url }}"
+            if [ -z "$URL" ]; then
+              URL="${{ github.event.deployment_status.target_url }}"
+            fi
+          fi
+          # Trim; GitHub expression output should be stable but guard whitespace
+          URL="$(printf '%s' "$URL" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if [ -z "$URL" ]; then
+            echo "::error::No deployment URL (check Vercel repository_dispatch client_payload.url or deployment_status URLs)"
+            exit 1
+          fi
+          case "$URL" in
+            http://*|https://*) ;;
+            *) URL="https://$URL" ;;
+          esac
+          echo "deployment_url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Invoke /api/cron/geocode (bounded batch)
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          PREVIEW_DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: npm run preview:invoke-deployment-geocode-cron
+
+      - name: Invoke /api/cron/daily?mode=ingestion (bounded orchestration)
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="${DEPLOYMENT_URL%/}/api/cron/daily?mode=ingestion"
+          echo "::notice::Invoking bounded ingestion orchestration at ${URL}"
+          STATUS="$(curl -sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL}")"
+          echo "::notice::Ingestion orchestration HTTP status: ${STATUS}"
+          if [ "${STATUS}" -lt 200 ] || [ "${STATUS}" -ge 300 ]; then
+            echo "::error::Ingestion orchestration invocation failed with status ${STATUS}"
+            echo "::error::Response body follows:"
+            cat /tmp/ingestion-orchestration-response.json
+            exit 1
+          fi
+          echo "::notice::Ingestion orchestration invocation succeeded"
+
+  invoke-geocode-cron-manual:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Require CRON_SECRET
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Repository secret CRON_SECRET is missing or empty (required for manual preview geocode)"
+            exit 1
+          fi
+
+      - name: Validate preview_url and write deployment_url
+        id: resolve
+        env:
+          PREVIEW_URL: ${{ inputs.preview_url }}
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import os
+          import sys
+          import urllib.parse
+
+          raw = (os.environ.get("PREVIEW_URL") or "").strip()
+          if not raw:
+              print("::error::preview_url is empty")
+              sys.exit(1)
+
+          p = urllib.parse.urlsplit(raw)
+          if p.scheme.lower() != "https":
+              print("::error::preview_url must use https (production-style http is rejected)")
+              sys.exit(1)
+
+          host = (p.hostname or "").lower()
+          if not host:
+              print("::error::preview_url must include a hostname")
+              sys.exit(1)
+
+          # Production / public site — never invoke cron against these from this workflow.
+          if host == "lootaura.com" or host.endswith(".lootaura.com"):
+              print("::error::lootaura.com hosts are not allowed for manual preview geocode")
+              sys.exit(1)
+
+          # Manual runs: only Vercel *.vercel.app hosts (no arbitrary production origins).
+          # Confirm the URL is your preview deployment before running; Vercel cannot distinguish
+          # production vs preview by hostname alone for all projects.
+          if not host.endswith(".vercel.app") or host == "vercel.app":
+              print("::error::manual preview_url must be a *.vercel.app host (got %r)" % (host,))
+              sys.exit(1)
+
+          origin = urllib.parse.urlunsplit(("https", host, "", "", ""))
+
+          out = os.environ["GITHUB_OUTPUT"]
+          with open(out, "a", encoding="utf-8") as f:
+              f.write("deployment_url<<EOF\n")
+              f.write(origin + "\n")
+              f.write("EOF\n")
+          PY
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Invoke /api/cron/geocode (bounded batch)
+        env:
+          PREVIEW_DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: npm run preview:invoke-deployment-geocode-cron
+
+      - name: Invoke /api/cron/daily?mode=ingestion (bounded orchestration)
+        env:
+          DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="${DEPLOYMENT_URL%/}/api/cron/daily?mode=ingestion"
+          echo "::notice::Invoking bounded ingestion orchestration at ${URL}"
+          STATUS="$(curl -sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL}")"
+          echo "::notice::Ingestion orchestration HTTP status: ${STATUS}"
+          if [ "${STATUS}" -lt 200 ] || [ "${STATUS}" -ge 300 ]; then
+            echo "::error::Ingestion orchestration invocation failed with status ${STATUS}"
+            echo "::error::Response body follows:"
+            cat /tmp/ingestion-orchestration-response.json
+            exit 1
+          fi
+          echo "::notice::Ingestion orchestration invocation succeeded"

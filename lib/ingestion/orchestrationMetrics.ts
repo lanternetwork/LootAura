@@ -46,8 +46,15 @@ export type ExternalIngestionOrchestrationNote = {
   minIntervalMinutes?: number
   lastSuccessfulExternalIngestionAt?: string
   configsProcessed?: number
-  /** Config slots advanced this run (cursor); includes invalid/empty configs examined. */
+  /** Crawlable configs (enabled external_page_source with ≥1 HTTPS source page). */
+  configsCrawlable?: number
+  /** Enabled external configs skipped at load time (empty source_pages). */
+  configsSkippedNoSourcePages?: number
+  /** Enabled external configs skipped at load time (source_pages present but no valid HTTPS URL). */
+  configsSkippedInvalidUrls?: number
+  /** Config slots advanced this run (cursor); crawlable configs only. */
   configsConsumed?: number
+  /** Processing-time skip when normalizeSourcePages returns empty despite load-time crawlable filter. */
   configsSkippedInvalidPages?: number
   /** Unexamined slots remaining in the bounded slice for this invocation (e.g. budget exit). */
   configsRemaining?: number

@@ -54,6 +54,7 @@ import {
   normalizeSourcePages,
   persistExternalPageSource,
 } from '@/lib/ingestion/adapters/externalPageSource'
+import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 import { createEmptyDedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
 import { runArchiveEndedSalesJob } from '@/lib/sales/archiveEndedSalesSqlBatch'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
@@ -880,11 +881,15 @@ async function runIngestionOrchestration(
         pagesProcessed: 0,
       }
 
-      const rows = sortExternalConfigsDeterministic(
-        ((enabledCities || []) as ExternalConfigRow[]).filter(
-          (row) => row.source_platform === 'external_page_source'
-        )
+      const externalRows = ((enabledCities || []) as ExternalConfigRow[]).filter(
+        (row) => row.source_platform === 'external_page_source'
       )
+      const crawlablePartition = partitionCrawlableExternalCityConfigs(externalRows)
+      const configsCrawlable = crawlablePartition.configsCrawlable
+      const configsSkippedNoSourcePages = crawlablePartition.configsSkippedNoSourcePages
+      const configsSkippedInvalidUrls = crawlablePartition.configsSkippedInvalidUrls
+
+      const rows = sortExternalConfigsDeterministic(crawlablePartition.crawlable)
       const plannedRows = interleaveConfigsByDomain(rows)
       const totalConfigs = plannedRows.length
       const batchSize = parseIngestionOrchestrationConfigBatchSize()
@@ -920,6 +925,9 @@ async function runIngestionOrchestration(
         jitterMaxMs: jitterRangeMs.maxMs,
         jitterSeedHash: hashStringShort(jitterSeedString),
         totalConfigs,
+        configsCrawlable,
+        configsSkippedNoSourcePages,
+        configsSkippedInvalidUrls,
         batchSize,
         baseCursor,
         boundedConfigs: boundedRows.length,
@@ -944,7 +952,7 @@ async function runIngestionOrchestration(
         const pages = normalizeSourcePages(row.source_pages)
         if (pages.length === 0) {
           configsSkippedInvalidPages += 1
-          logger.warn('External page source: skipping config — no valid source_pages URLs', {
+          logger.warn('External page source: skipping config — crawlable filter bypass (invalid URLs at processing time)', {
             component: 'api/cron/daily',
             task: 'ingestion-orchestration',
             step: 'ingestion',
@@ -1021,6 +1029,9 @@ async function runIngestionOrchestration(
         ok: true,
         adapter: 'external_page_source',
         totalConfigs,
+        configsCrawlable,
+        configsSkippedNoSourcePages,
+        configsSkippedInvalidUrls,
         batchSize,
         configsConsumed,
         configsSkippedInvalidPages,
@@ -1045,6 +1056,9 @@ async function runIngestionOrchestration(
         completedAt,
         configsProcessed: totals.configsProcessed,
         configsConsumed,
+        configsCrawlable,
+        configsSkippedNoSourcePages,
+        configsSkippedInvalidUrls,
         configsSkippedInvalidPages,
         configsRemaining,
         budgetExit: budgetExited,
@@ -1059,6 +1073,9 @@ async function runIngestionOrchestration(
         adapter: 'external_page_source',
         configsProcessed: totals.configsProcessed,
         configsConsumed,
+        configsCrawlable,
+        configsSkippedNoSourcePages,
+        configsSkippedInvalidUrls,
         configsSkippedInvalidPages,
         pagesProcessed: totals.pagesProcessed,
         fetched: totals.fetched,

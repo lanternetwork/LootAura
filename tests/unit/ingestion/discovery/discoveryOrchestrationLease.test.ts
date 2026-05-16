@@ -53,6 +53,20 @@ function buildUpdateChain(row: StateRow, patch: Partial<StateRow>) {
   return chain
 }
 
+/** Supports await update().eq() (merge) and update().eq().is()….select() (lease acquire). */
+function buildThenableUpdateChain(row: StateRow, patch: Partial<StateRow>) {
+  const apply = () => {
+    Object.assign(row, patch)
+    return { data: [{ state_cursor: row.state_cursor }], error: null }
+  }
+  const chain = buildUpdateChain(row, patch)
+  return Object.assign(chain, {
+    then(onFulfilled?: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) {
+      return Promise.resolve(apply()).then(onFulfilled, onRejected)
+    },
+  })
+}
+
 function createDiscoveryStateApi() {
   return {
     upsert: (payload: { key: string; state_cursor: number }) => {
@@ -90,9 +104,9 @@ function createDiscoveryStateApi() {
             rows.set(patch.key, next)
             return Promise.resolve({ data: [{ state_cursor: next.state_cursor }], error: null })
           }
-          return buildUpdateChain(row, patch)
+          return buildThenableUpdateChain(row, patch)
         }
-        return buildUpdateChain(
+        return buildThenableUpdateChain(
           { key: '', state_cursor: 0, lease_owner: null, lease_expires_at: null },
           patch
         )

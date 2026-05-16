@@ -18,7 +18,7 @@
     {
       "path": "/api/cron/reconciliation",
       "schedule": "30 * * * *"
-    },
+    }
   ]
 }
 

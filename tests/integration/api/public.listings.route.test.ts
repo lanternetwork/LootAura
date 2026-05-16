@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { GET, parsePublicListingsUserParam } from '@/app/api/public/listings/route'
+import { GET } from '@/app/api/public/listings/route'
+import { parsePublicListingsUserParam } from '@/lib/public/parsePublicListingsUserParam'
 
 const USER_ID = '11111111-1111-4111-8111-111111111111'
 const USERNAME = 'seller_jane'
@@ -16,7 +17,6 @@ type ProfileChain = {
 type SalesChain = {
   select: ReturnType<typeof vi.fn>
   eq: ReturnType<typeof vi.fn>
-  or: ReturnType<typeof vi.fn>
   range: ReturnType<typeof vi.fn>
 }
 
@@ -44,7 +44,6 @@ function buildSalesChain(result: { data: unknown[]; count: number }) {
   const chain: SalesChain = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
-    or: vi.fn(() => chain),
     range: vi.fn().mockResolvedValue(result),
   }
   return chain
@@ -78,8 +77,12 @@ describe('GET /api/public/listings', () => {
       count: 1,
     })
     mockSupabase.from.mockImplementation((table: string) => {
-      if (table === 'profiles_v2') return profileChain
-      if (table === 'sales_v2') return salesChain
+      if (table === 'profiles_v2') {
+        return { select: vi.fn(() => profileChain) }
+      }
+      if (table === 'sales_v2') {
+        return salesChain
+      }
       throw new Error(`unexpected table ${table}`)
     })
   })
@@ -92,7 +95,6 @@ describe('GET /api/public/listings', () => {
     expect(body.items).toHaveLength(1)
     expect(profileChain.eq).toHaveBeenCalledWith('id', USER_ID)
     expect(profileChain.eq).not.toHaveBeenCalledWith('username', expect.anything())
-    expect(profileChain.or).toBeUndefined()
     expect(salesChain.eq).toHaveBeenCalledWith('owner_id', USER_ID)
   })
 
@@ -115,7 +117,9 @@ describe('GET /api/public/listings', () => {
   it('returns 404 when profile is not found', async () => {
     profileChain = buildProfileChain({ data: null })
     mockSupabase.from.mockImplementation((table: string) => {
-      if (table === 'profiles_v2') return profileChain
+      if (table === 'profiles_v2') {
+        return { select: vi.fn(() => profileChain) }
+      }
       return salesChain
     })
     const res = await GET(new Request(`http://localhost/api/public/listings?user=${USERNAME}`))

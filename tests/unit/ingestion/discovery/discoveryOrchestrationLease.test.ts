@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   acquireDiscoveryOrchestrationLease,
+  migrateLegacyDiscoveryStateKeys,
   releaseDiscoveryOrchestrationLease,
   SOURCE_DISCOVERY_STATE_KEY,
 } from '@/lib/ingestion/discovery/discoveryOrchestrationLease'
@@ -10,32 +11,39 @@ type StateRow = {
   state_cursor: number
   lease_owner: string | null
   lease_expires_at: string | null
+  last_started_at?: string | null
+  last_completed_at?: string | null
+  updated_at?: string | null
 }
 
-let state: StateRow
+const rows = new Map<string, StateRow>()
 
-function matches(col: string, expected: unknown): boolean {
-  const actual = (state as Record<string, unknown>)[col]
+function getRow(key: string): StateRow | undefined {
+  return rows.get(key)
+}
+
+function matches(row: StateRow, col: string, expected: unknown): boolean {
+  const actual = (row as Record<string, unknown>)[col]
   if (expected === null) return actual == null
   return actual === expected
 }
 
-function buildUpdateChain(patch: Partial<StateRow>) {
+function buildUpdateChain(row: StateRow, patch: Partial<StateRow>) {
   const applySelect = () => {
-    Object.assign(state, patch)
-    return Promise.resolve({ data: [{ state_cursor: state.state_cursor }], error: null })
+    Object.assign(row, patch)
+    return Promise.resolve({ data: [{ state_cursor: row.state_cursor }], error: null })
   }
   const emptySelect = () => Promise.resolve({ data: [] as { state_cursor: number }[], error: null })
 
   const chain = {
     eq(col: string, val: unknown) {
-      if (!matches(col, val)) {
+      if (!matches(row, col, val)) {
         return { eq: () => chain, is: () => chain, select: emptySelect }
       }
       return chain
     },
     is(col: string, val: null) {
-      if (!matches(col, val)) {
+      if (!matches(row, col, val)) {
         return { eq: () => chain, is: () => chain, select: emptySelect }
       }
       return chain
@@ -47,22 +55,53 @@ function buildUpdateChain(patch: Partial<StateRow>) {
 
 function createDiscoveryStateApi() {
   return {
-    upsert: () => Promise.resolve({ error: null }),
-    select: () => ({
+    upsert: (payload: { key: string; state_cursor: number }) => {
+      if (!rows.has(payload.key)) {
+        rows.set(payload.key, {
+          key: payload.key,
+          state_cursor: payload.state_cursor,
+          lease_owner: null,
+          lease_expires_at: null,
+        })
+      }
+      return Promise.resolve({ error: null })
+    },
+    select: (_cols?: string) => ({
       eq: (_col: string, key: string) => ({
-        limit: () =>
-          Promise.resolve({
-            data: key === state.key ? [state] : [],
+        limit: () => {
+          const row = getRow(key)
+          return Promise.resolve({
+            data: row ? [row] : [],
             error: null,
-          }),
+          })
+        },
       }),
     }),
     update: (patch: Partial<StateRow>) => ({
       eq: (col: string, val: unknown) => {
-        if (col === 'key' && val !== state.key) {
-          return buildUpdateChain(patch)
+        if (col === 'key') {
+          const row = getRow(String(val))
+          if (!row) {
+            return buildUpdateChain({ key: String(val), state_cursor: 0, lease_owner: null, lease_expires_at: null }, patch)
+          }
+          if (patch.key && patch.key !== row.key) {
+            rows.delete(row.key)
+            const next: StateRow = { ...row, ...patch, key: patch.key }
+            rows.set(patch.key, next)
+            return Promise.resolve({ data: [{ state_cursor: next.state_cursor }], error: null })
+          }
+          return buildUpdateChain(row, patch)
         }
-        return buildUpdateChain(patch)
+        return buildUpdateChain(
+          { key: '', state_cursor: 0, lease_owner: null, lease_expires_at: null },
+          patch
+        )
+      },
+    }),
+    delete: () => ({
+      eq: (_col: string, key: string) => {
+        rows.delete(key)
+        return Promise.resolve({ error: null })
       },
     }),
   }
@@ -81,45 +120,91 @@ vi.mock('@/lib/log', () => ({
 
 describe('discoveryOrchestrationLease', () => {
   beforeEach(() => {
-    state = {
+    rows.clear()
+    rows.set(SOURCE_DISCOVERY_STATE_KEY, {
       key: SOURCE_DISCOVERY_STATE_KEY,
       state_cursor: 4,
       lease_owner: null,
       lease_expires_at: null,
-    }
+    })
   })
 
   it('acquires lease when idle', async () => {
     const result = await acquireDiscoveryOrchestrationLease({} as never, 'owner-a', 120)
     expect(result.acquired).toBe(true)
     expect(result.stateCursor).toBe(4)
-    expect(state.lease_owner).toBe('owner-a')
+    expect(getRow(SOURCE_DISCOVERY_STATE_KEY)?.lease_owner).toBe('owner-a')
+    expect(getRow(SOURCE_DISCOVERY_STATE_KEY)?.last_started_at).toBeTruthy()
   })
 
   it('prevents overlap when lease is active', async () => {
-    state.lease_owner = 'other'
-    state.lease_expires_at = new Date(Date.now() + 60_000).toISOString()
+    const row = getRow(SOURCE_DISCOVERY_STATE_KEY)!
+    row.lease_owner = 'other'
+    row.lease_expires_at = new Date(Date.now() + 60_000).toISOString()
     const result = await acquireDiscoveryOrchestrationLease({} as never, 'owner-b', 120)
     expect(result.acquired).toBe(false)
     expect(result.reason).toBe('active_lease')
   })
 
   it('recovers stale lease and allows acquire', async () => {
-    state.lease_owner = 'stale-owner'
-    state.lease_expires_at = new Date(Date.now() - 60_000).toISOString()
+    const row = getRow(SOURCE_DISCOVERY_STATE_KEY)!
+    row.lease_owner = 'stale-owner'
+    row.lease_expires_at = new Date(Date.now() - 60_000).toISOString()
     const result = await acquireDiscoveryOrchestrationLease({} as never, 'owner-c', 120)
     expect(result.acquired).toBe(true)
     expect(result.staleRecovered).toBe(true)
   })
 
   it('releases lease and advances state cursor', async () => {
-    state.lease_owner = 'owner-d'
+    const row = getRow(SOURCE_DISCOVERY_STATE_KEY)!
+    row.lease_owner = 'owner-d'
     await releaseDiscoveryOrchestrationLease({} as never, {
       owner: 'owner-d',
       nextStateCursor: 7,
       markCompleted: true,
     })
-    expect(state.state_cursor).toBe(7)
-    expect(state.lease_owner).toBeNull()
+    expect(row.state_cursor).toBe(7)
+    expect(row.lease_owner).toBeNull()
+    expect(row.last_completed_at).toBeTruthy()
+  })
+})
+
+describe('migrateLegacyDiscoveryStateKeys', () => {
+  beforeEach(() => {
+    rows.clear()
+  })
+
+  it('renames ystm_nationwide when canonical row is absent', async () => {
+    rows.set('ystm_nationwide', {
+      key: 'ystm_nationwide',
+      state_cursor: 3,
+      lease_owner: null,
+      lease_expires_at: null,
+    })
+    await migrateLegacyDiscoveryStateKeys({} as never)
+    expect(rows.has('ystm_nationwide')).toBe(false)
+    expect(rows.get(SOURCE_DISCOVERY_STATE_KEY)?.state_cursor).toBe(3)
+  })
+
+  it('merges cursor and deletes legacy when both keys exist', async () => {
+    rows.set('ystm_nationwide', {
+      key: 'ystm_nationwide',
+      state_cursor: 5,
+      lease_owner: null,
+      lease_expires_at: null,
+      last_started_at: '2026-01-01T00:00:00.000Z',
+    })
+    rows.set(SOURCE_DISCOVERY_STATE_KEY, {
+      key: SOURCE_DISCOVERY_STATE_KEY,
+      state_cursor: 2,
+      lease_owner: null,
+      lease_expires_at: null,
+      last_started_at: '2026-06-01T00:00:00.000Z',
+    })
+    await migrateLegacyDiscoveryStateKeys({} as never)
+    expect(rows.has('ystm_nationwide')).toBe(false)
+    const canonical = rows.get(SOURCE_DISCOVERY_STATE_KEY)
+    expect(canonical?.state_cursor).toBe(5)
+    expect(canonical?.last_started_at).toBe('2026-06-01T00:00:00.000Z')
   })
 })

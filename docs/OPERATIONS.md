@@ -520,7 +520,7 @@ Event: **`source.discovery.cron_completed`**. JSON fields include `statesScanned
 - **Degraded run:** `degraded: true` when a phase fails or runtime budget exits early; inspect logs under `ingestion/discovery/runSourceDiscoveryCron` (aggregate fields only).
 - **Manual cities:** Always protected; use `source_discovery_status = manual` for operator URLs.
 
-Schema: migration **`177_ingestion_discovery_state_and_crawl_exclusion.sql`**, discovery status columns from **`176_ingestion_city_configs_source_discovery.sql`**.
+Schema: migration **`177_ingestion_discovery_state_and_crawl_exclusion.sql`**, discovery status columns from **`176_ingestion_city_configs_source_discovery.sql`**. Apply **`178_discovery_state_key_rename.sql`** in production if `ingestion_discovery_state` still has legacy key `ystm_nationwide` (renames to `source_discovery_nationwide`; runtime also migrates on first cron acquire).
 
 ### External source reconciliation — Phase 1B (detection-only runner)
 

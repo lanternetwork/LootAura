@@ -5,6 +5,7 @@ export type ExternalCityConfigRow = {
   state: string
   source_platform: string
   source_pages: unknown
+  source_crawl_excluded_at?: string | null
 }
 
 export type PartitionCrawlableExternalConfigsResult = {
@@ -12,6 +13,7 @@ export type PartitionCrawlableExternalConfigsResult = {
   configsCrawlable: number
   configsSkippedNoSourcePages: number
   configsSkippedInvalidUrls: number
+  configsSkippedCrawlExcluded: number
 }
 
 /**
@@ -24,9 +26,14 @@ export function partitionCrawlableExternalCityConfigs(
   const crawlable: ExternalCityConfigRow[] = []
   let configsSkippedNoSourcePages = 0
   let configsSkippedInvalidUrls = 0
+  let configsSkippedCrawlExcluded = 0
 
   for (const row of rows) {
     if (row.source_platform !== 'external_page_source') {
+      continue
+    }
+    if (row.source_crawl_excluded_at != null && row.source_crawl_excluded_at !== '') {
+      configsSkippedCrawlExcluded += 1
       continue
     }
     const normalizedPages = normalizeSourcePages(row.source_pages)
@@ -46,5 +53,6 @@ export function partitionCrawlableExternalCityConfigs(
     configsCrawlable: crawlable.length,
     configsSkippedNoSourcePages,
     configsSkippedInvalidUrls,
+    configsSkippedCrawlExcluded,
   }
 }

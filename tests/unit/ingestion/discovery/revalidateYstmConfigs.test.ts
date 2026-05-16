@@ -69,6 +69,10 @@ function createTableApi(store: Store) {
       filters.push((r) => vals.includes(String((r as Record<string, unknown>)[col])))
       return selectChain
     },
+    is: (col: string, val: null) => {
+      filters.push((r) => (r as Record<string, unknown>)[col] === val)
+      return selectChain
+    },
     then: (resolve: (v: { data: unknown; error: null }) => void) => {
       resolve({ data: store.rows.filter((r) => filters.every((f) => f(r))), error: null })
     },
@@ -178,6 +182,27 @@ describe('revalidateYstmConfigs', () => {
     expect(result.telemetry.configsRevalidated).toBe(1)
     expect(currentStore.rows[0]?.source_last_validated_at).toBeTruthy()
     expect(result.records[0]?.action).toBe('validated')
+  })
+
+  it('skips crawl-excluded rows', async () => {
+    currentStore.rows = [
+      row({
+        id: 'excluded',
+        city: 'Ghost',
+        state: 'IN',
+        source_pages: [],
+        source_discovery_status: SOURCE_DISCOVERY_STATUS.failed,
+        source_crawl_excluded_at: '2026-05-16T00:00:00.000Z',
+      }),
+    ]
+
+    const result = await revalidateYstmConfigs({} as never, {
+      states: ['IN'],
+      fetchHtml: async (url) => fixtureFetch(url),
+    })
+
+    expect(result.records).toHaveLength(0)
+    expect(currentStore.updates).toHaveLength(0)
   })
 
   it('does not mutate manual configs', async () => {

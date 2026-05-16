@@ -15,6 +15,7 @@ describe('partitionCrawlableExternalCityConfigs', () => {
     expect(result.crawlable).toHaveLength(1)
     expect(result.configsSkippedNoSourcePages).toBe(0)
     expect(result.configsSkippedInvalidUrls).toBe(0)
+    expect(result.configsSkippedCrawlExcluded).toBe(0)
   })
 
   it('excludes enabled configs with empty source_pages', () => {
@@ -30,6 +31,21 @@ describe('partitionCrawlableExternalCityConfigs', () => {
     expect(result.crawlable).toHaveLength(0)
     expect(result.configsSkippedNoSourcePages).toBe(1)
     expect(result.configsSkippedInvalidUrls).toBe(0)
+    expect(result.configsSkippedCrawlExcluded).toBe(0)
+  })
+
+  it('skips crawl-excluded configs even when pages exist', () => {
+    const result = partitionCrawlableExternalCityConfigs([
+      {
+        city: 'Dead',
+        state: 'AL',
+        source_platform: 'external_page_source',
+        source_pages: ['https://example.com/list.html'],
+        source_crawl_excluded_at: '2026-05-16T00:00:00.000Z',
+      },
+    ])
+    expect(result.configsCrawlable).toBe(0)
+    expect(result.configsSkippedCrawlExcluded).toBe(1)
   })
 
   it('counts non-HTTPS-only source_pages as invalid URLs', () => {
@@ -44,6 +60,7 @@ describe('partitionCrawlableExternalCityConfigs', () => {
     expect(result.configsCrawlable).toBe(0)
     expect(result.configsSkippedNoSourcePages).toBe(0)
     expect(result.configsSkippedInvalidUrls).toBe(1)
+    expect(result.configsSkippedCrawlExcluded).toBe(0)
   })
 
   it('ignores non-external_page_source rows', () => {
@@ -85,5 +102,6 @@ describe('partitionCrawlableExternalCityConfigs', () => {
     expect(result.crawlable.map((r) => r.city)).toEqual(['Good'])
     expect(result.configsSkippedNoSourcePages).toBe(1)
     expect(result.configsSkippedInvalidUrls).toBe(1)
+    expect(result.configsSkippedCrawlExcluded).toBe(0)
   })
 })

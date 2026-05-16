@@ -34,6 +34,8 @@ export type IngestionCityConfigDiscoveryRow = {
   source_last_validated_at: string | null
   source_last_failed_at: string | null
   source_discovery_failure_reason: string | null
+  source_discovery_failure_count?: number
+  source_crawl_excluded_at?: string | null
 }
 
 export type PromotedConfigRecord = {

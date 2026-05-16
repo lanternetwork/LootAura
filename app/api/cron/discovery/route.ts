@@ -1,0 +1,76 @@
+/**
+ * GET/POST /api/cron/discovery
+ *
+ * Scheduled YSTM source discovery + promotion + registry self-healing.
+ * Auth: CRON_SECRET Bearer only. Aggregate JSON response (no raw URLs/HTML).
+ *
+ * Schedule: vercel.json (default daily 04:00 UTC). Tune CRON_DISCOVERY_* env vars.
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { assertCronAuthorized, isCronAuthorized } from '@/lib/auth/cron'
+import { runYstmDiscoveryCron } from '@/lib/ingestion/discovery/runYstmDiscoveryCron'
+import { getAdminDb } from '@/lib/supabase/clients'
+
+export const dynamic = 'force-dynamic'
+
+function discoveryCronJsonBody(result: Awaited<ReturnType<typeof runYstmDiscoveryCron>>) {
+  const t = result.telemetry
+  return {
+    ok: result.ok,
+    job: 'discovery_cron' as const,
+    skipped: result.skipped,
+    skipReason: result.skipReason ?? null,
+    statesScanned: t.statesScanned,
+    stateCursorBefore: t.stateCursorBefore,
+    stateCursorAfter: t.stateCursorAfter,
+    catalogSize: t.catalogSize,
+    candidatePagesDiscovered: t.candidatePagesDiscovered,
+    candidatePagesValid: t.candidatePagesValid,
+    candidatePagesInvalid: t.candidatePagesInvalid,
+    configsPromoted: t.configsPromoted,
+    configsRepaired: t.configsRepaired,
+    configsRevalidated: t.configsRevalidated,
+    configsFailed: t.configsFailed,
+    placeholdersUnresolved: t.placeholdersUnresolved,
+    crawlableConfigCount: t.crawlableConfigCount,
+    failedConfigCount: t.failedConfigCount,
+    crawlExcludedConfigCount: t.crawlExcludedConfigCount,
+    discoveryLatencyMs: t.discoveryLatencyMs,
+    repairRate: t.repairRate,
+    overlapPrevented: t.overlapPrevented,
+    staleLockRecovered: t.staleLockRecovered,
+    degraded: t.degraded,
+    phasesCompleted: t.phasesCompleted,
+  }
+}
+
+export async function GET(request: NextRequest) {
+  return runDiscoveryCron(request)
+}
+
+export async function POST(request: NextRequest) {
+  return runDiscoveryCron(request)
+}
+
+async function runDiscoveryCron(request: NextRequest) {
+  const cronAuth = isCronAuthorized(request)
+  try {
+    assertCronAuthorized(request)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    return NextResponse.json({ ok: false, code: 'UNAUTHORIZED', message: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const result = await runYstmDiscoveryCron(getAdminDb(), {
+      telemetryContext: {
+        authMode: cronAuth ? 'cron' : 'unknown',
+      },
+    })
+    const status = result.ok ? 200 : 500
+    return NextResponse.json(discoveryCronJsonBody(result), { status })
+  } catch (_err) {
+    return NextResponse.json({ ok: false, code: 'DISCOVERY_CRON_FAILED' }, { status: 500 })
+  }
+}

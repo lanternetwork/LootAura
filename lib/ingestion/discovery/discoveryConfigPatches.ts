@@ -33,3 +33,17 @@ export function buildDiscoveryAttemptPatch(now: string) {
     source_last_discovered_at: now,
   }
 }
+
+export function buildCrawlExcludedPatch(now: string, failureCount: number) {
+  return {
+    source_crawl_excluded_at: now,
+    source_discovery_failure_count: failureCount,
+  }
+}
+
+export function buildFailedDiscoveryWithCountPatch(now: string, reason: string, failureCount: number) {
+  return {
+    ...buildFailedDiscoveryPatch(now, reason),
+    source_discovery_failure_count: failureCount,
+  }
+}

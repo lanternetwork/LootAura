@@ -142,6 +142,7 @@ type ExternalConfigRow = {
   state: string
   source_platform: string
   source_pages: unknown
+  source_crawl_excluded_at?: string | null
 }
 
 type IngestionOrchestrationLease = {
@@ -864,7 +865,7 @@ async function runIngestionOrchestration(
 
       const adminDb = getAdminDb()
       const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
-        .select('city, state, source_platform, source_pages')
+        .select('city, state, source_platform, source_pages, source_crawl_excluded_at')
         .eq('enabled', true)
 
       if (cityError) {
@@ -888,6 +889,7 @@ async function runIngestionOrchestration(
       const configsCrawlable = crawlablePartition.configsCrawlable
       const configsSkippedNoSourcePages = crawlablePartition.configsSkippedNoSourcePages
       const configsSkippedInvalidUrls = crawlablePartition.configsSkippedInvalidUrls
+      const configsSkippedCrawlExcluded = crawlablePartition.configsSkippedCrawlExcluded
 
       const rows = sortExternalConfigsDeterministic(crawlablePartition.crawlable)
       const plannedRows = interleaveConfigsByDomain(rows)
@@ -928,6 +930,7 @@ async function runIngestionOrchestration(
         configsCrawlable,
         configsSkippedNoSourcePages,
         configsSkippedInvalidUrls,
+        configsSkippedCrawlExcluded,
         batchSize,
         baseCursor,
         boundedConfigs: boundedRows.length,
@@ -1032,6 +1035,7 @@ async function runIngestionOrchestration(
         configsCrawlable,
         configsSkippedNoSourcePages,
         configsSkippedInvalidUrls,
+        configsSkippedCrawlExcluded,
         batchSize,
         configsConsumed,
         configsSkippedInvalidPages,
@@ -1059,6 +1063,7 @@ async function runIngestionOrchestration(
         configsCrawlable,
         configsSkippedNoSourcePages,
         configsSkippedInvalidUrls,
+        configsSkippedCrawlExcluded,
         configsSkippedInvalidPages,
         configsRemaining,
         budgetExit: budgetExited,
@@ -1076,6 +1081,7 @@ async function runIngestionOrchestration(
         configsCrawlable,
         configsSkippedNoSourcePages,
         configsSkippedInvalidUrls,
+        configsSkippedCrawlExcluded,
         configsSkippedInvalidPages,
         pagesProcessed: totals.pagesProcessed,
         fetched: totals.fetched,

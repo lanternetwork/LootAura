@@ -11,11 +11,18 @@ import {
   normalizeIngestionState,
 } from '@/lib/ingestion/normalizeIngestionLocation'
 import {
+  buildCrawlExcludedPatch,
   buildDiscoveryAttemptPatch,
   buildFailedDiscoveryPatch,
+  buildFailedDiscoveryWithCountPatch,
   buildRevalidatedTimestampsPatch,
   buildValidatedSourcePagesPatch,
 } from '@/lib/ingestion/discovery/discoveryConfigPatches'
+import {
+  isCrawlExcludedDiscoveryRow,
+  PLACEHOLDER_UNRESOLVED_REASON,
+  shouldExcludePlaceholderFromCrawl,
+} from '@/lib/ingestion/discovery/discoveryPlaceholderPolicy'
 import {
   extractCityPageCandidatesFromStateIndexHtml,
   type YstmDiscoveredCityPageCandidate,
@@ -57,6 +64,7 @@ export type RevalidateYstmConfigsArgs = {
   fetchConcurrency?: number
   fetchHtml?: YstmDiscoveryFetchHtml
   telemetryContext?: Record<string, unknown>
+  placeholderFailureExcludeThreshold?: number
 }
 
 export type RevalidationRecordAction =
@@ -319,9 +327,10 @@ export async function revalidateYstmConfigs(
 
   let query = fromBase(admin, 'ingestion_city_configs')
     .select(
-      'id, city, state, timezone, enabled, source_platform, source_pages, source_discovery_status, source_last_discovered_at, source_last_validated_at, source_last_failed_at, source_discovery_failure_reason'
+      'id, city, state, timezone, enabled, source_platform, source_pages, source_discovery_status, source_last_discovered_at, source_last_validated_at, source_last_failed_at, source_discovery_failure_reason, source_discovery_failure_count, source_crawl_excluded_at'
     )
     .eq('source_platform', EXTERNAL_PAGE_SOURCE)
+    .is('source_crawl_excluded_at', null)
 
   if (stateFilter && stateFilter.length > 0) {
     query = query.in('state', stateFilter)
@@ -356,6 +365,11 @@ export async function revalidateYstmConfigs(
     const loc = normalizedConfigCityState(row)
     if (!loc) {
       records.push({ city: row.city, state: row.state, action: 'skipped', reason: 'invalid_city_or_state' })
+      return
+    }
+
+    if (isCrawlExcludedDiscoveryRow(row)) {
+      records.push({ city: loc.city, state: loc.state, action: 'skipped', reason: 'crawl_excluded' })
       return
     }
 
@@ -428,15 +442,29 @@ export async function revalidateYstmConfigs(
           }
         }
 
+        const nextFailureCount = (row.source_discovery_failure_count ?? 0) + 1
+        const excludeThreshold = args.placeholderFailureExcludeThreshold ?? 1
+        const failurePatch = buildFailedDiscoveryWithCountPatch(
+          now,
+          PLACEHOLDER_UNRESOLVED_REASON,
+          nextFailureCount
+        )
+        const crawlExcludePatch = shouldExcludePlaceholderFromCrawl(
+          PLACEHOLDER_UNRESOLVED_REASON,
+          nextFailureCount,
+          excludeThreshold
+        )
+          ? buildCrawlExcludedPatch(now, nextFailureCount)
+          : {}
         await applyConfigUpdate(
           admin,
           row.id,
-          { ...buildFailedDiscoveryPatch(now, 'placeholder_unresolved'), ...buildDiscoveryAttemptPatch(now) },
+          { ...failurePatch, ...buildDiscoveryAttemptPatch(now), ...crawlExcludePatch },
           dryRun
         )
         telemetry.placeholdersUnresolved += 1
         telemetry.configsFailed += 1
-        records.push({ ...recordBase, action: 'failed', reason: 'placeholder_unresolved' })
+        records.push({ ...recordBase, action: 'failed', reason: PLACEHOLDER_UNRESOLVED_REASON })
         return
       }
 
@@ -564,6 +592,7 @@ export async function revalidateYstmConfigs(
 export function isPlaceholderAwaitingRemediation(row: IngestionCityConfigDiscoveryRow): boolean {
   if (isManualRow(row)) return false
   if (row.source_discovery_status === SOURCE_DISCOVERY_STATUS.manual) return false
+  if (isCrawlExcludedDiscoveryRow(row)) return false
   if (normalizeSourcePages(row.source_pages).length > 0) return false
   return hasDiscoveryAttempt(row)
 }

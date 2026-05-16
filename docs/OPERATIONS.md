@@ -470,6 +470,58 @@ Optional: `parser_version`, `source_type`. Malformed metadata **fails** harness 
 
 Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, `parser.source.failing`, `parser.source.recovered`, `parser.fixture.stale`).
 
+### YSTM source discovery — nationwide registry automation (Phase 4)
+
+**Purpose:** Keep `ingestion_city_configs` for `external_page_source` self-maintaining: discover new YSTM city list pages, validate, promote crawlable URLs, revalidate/repair stale rows, and mark unresolved placeholders failed without deleting rows or touching manual configs.
+
+**Scheduled production runner:** `GET` or `POST` **`/api/cron/discovery`** — **`Authorization: Bearer <CRON_SECRET>`** only. Declared in **`vercel.json`** (default **daily at 04:00 UTC**, `0 4 * * *`). Response and telemetry are **aggregate-only** (no raw URLs, HTML, or city page payloads).
+
+#### Lifecycle per run
+
+1. **Lease acquire** — `ingestion_discovery_state` key `ystm_nationwide` (overlap prevention + stale lock recovery).
+2. **Discover** — bounded batch of USPS states from persisted `state_cursor` (round-robin; does not rescan all states each run).
+3. **Validate** — Phase 1 validator + SSRF-safe fetch (`fetchSafeExternalPageHtml`).
+4. **Promote** — writes validated candidates to `ingestion_city_configs` (never overwrites `manual`).
+5. **Revalidate/heal** — repairs stale URLs, normalizes malformed city names, marks unresolved placeholders `failed`.
+6. **Cursor advance** — `state_cursor` moves forward for fair nationwide progression.
+
+#### Remediation semantics
+
+| Status / field | Meaning |
+|----------------|---------|
+| `pending` | Empty placeholder awaiting discovery |
+| `validated` | Promoted/healed crawl target |
+| `failed` | Automated discovery/healing could not resolve |
+| `manual` | Operator-owned; cron never mutates |
+| `source_crawl_excluded_at` | Excluded from crawlable ingestion rotation (row stays enabled; not deleted) |
+
+Placeholder policy: after discovery attempt, unresolved placeholders become `failed` with `placeholder_unresolved`; when failure count meets threshold (default **1**), `source_crawl_excluded_at` is set so daily ingestion cursor skips them.
+
+#### Environment tuning
+
+| Variable | Default | Cap | Role |
+|----------|---------|-----|------|
+| `CRON_DISCOVERY_MAX_STATES_PER_RUN` | 3 | 15 | State index batch size |
+| `CRON_DISCOVERY_MAX_DISCOVERED_PAGES` | 80 | 500 | City link cap per run |
+| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | 40 | 200 | Page validation fetch budget |
+| `CRON_DISCOVERY_MAX_REVALIDATION_CONFIGS` | 40 | 200 | Healing row budget |
+| `CRON_DISCOVERY_LEASE_SECONDS` | 300 | 900 | Overlap lock TTL |
+| `CRON_DISCOVERY_MAX_RUNTIME_MS` | 240000 | 300000 | Wall-clock cap (graceful degradation) |
+| `CRON_DISCOVERY_PLACEHOLDER_EXCLUDE_AFTER_FAILURES` | 1 | 5 | Failures before crawl exclusion |
+
+#### Telemetry
+
+Event: **`source.discovery.cron_completed`**. JSON fields include `statesScanned`, `configsPromoted`, `configsRepaired`, `configsFailed`, `placeholdersUnresolved`, `crawlableConfigCount`, `failedConfigCount`, `discoveryLatencyMs`, `repairRate`, `overlapPrevented`, `phasesCompleted`.
+
+#### Operational recovery
+
+- **Overlapping runs:** Response `skipped: true`, `overlapPrevented: true` — expected; wait for lease expiry or investigate stuck lease.
+- **Stuck lease:** Stale lease recovery runs automatically when `lease_expires_at` is in the past; confirm `CRON_DISCOVERY_LEASE_SECONDS` and clock skew.
+- **Degraded run:** `degraded: true` when a phase fails or runtime budget exits early; inspect logs under `ingestion/discovery/runYstmDiscoveryCron` (aggregate fields only).
+- **Manual cities:** Always protected; use `source_discovery_status = manual` for operator URLs.
+
+Schema: migration **`177_ingestion_discovery_state_and_crawl_exclusion.sql`**, discovery status columns from **`176_ingestion_city_configs_source_discovery.sql`**.
+
 ### External source reconciliation — Phase 1B (detection-only runner)
 
 **Purpose:** Run **bounded** reconciliation in production. By default the runner is **detection-only** (Phase 1B): it refreshes server-supported sources, classifies drift, and can persist metadata on **`ingested_sales`** without touching public **`sales`**. Optional **Phase 2A** (`applySafeSync: true` with `dryRun: false`) applies **gated** updates to **existing linked published sales** only (see Phase 2A runbook below). Neither phase performs cancellation, archive-on-source-removal, or address relocation.

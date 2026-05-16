@@ -327,7 +327,7 @@ async function loadCandidateIngestRows(
     onlyPlaceholder: false,
   })!
 
-  let cursor = await readReconciliationCoverageCursor(admin, coverageStateKey)
+  const cursor = await readReconciliationCoverageCursor(admin, coverageStateKey)
   let page = await fetchReconciliationCandidatePageRpc(admin, {
     nowMs,
     poolLimit: poolMax,

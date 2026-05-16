@@ -104,7 +104,7 @@ describe('reconcileExternalSources candidate RPC + coverage cursor', () => {
         }
       }
       return {}
-    } as never)
+    })
   })
 
   it('does not clear or advance persisted cursor when the first RPC call fails', async () => {

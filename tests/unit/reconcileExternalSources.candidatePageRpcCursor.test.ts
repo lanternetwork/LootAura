@@ -95,16 +95,19 @@ describe('reconcileExternalSources candidate RPC + coverage cursor', () => {
     readCursor.mockReset()
     writeCursor.mockReset()
     vi.mocked(fromBase).mockReset()
-    vi.mocked(fromBase).mockImplementation((_admin: unknown, table: string) => {
-      if (table === 'ingested_sales') {
-        return {
-          update: () => ({
-            eq: () => Promise.resolve({ error: null }),
-          }),
+    vi.mocked(fromBase).mockImplementation(
+      ((...args: Parameters<typeof fromBase>) => {
+        const [, table] = args
+        if (table === 'ingested_sales') {
+          return {
+            update: () => ({
+              eq: () => Promise.resolve({ error: null }),
+            }),
+          }
         }
-      }
-      return {}
-    })
+        return {}
+      }) as typeof fromBase,
+    )
   })
 
   it('does not clear or advance persisted cursor when the first RPC call fails', async () => {

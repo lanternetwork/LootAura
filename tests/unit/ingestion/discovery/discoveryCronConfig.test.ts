@@ -12,7 +12,7 @@ describe('parseDiscoveryCronBudgets', () => {
   })
 
   it('defaults to bounded nationwide budgets', () => {
-    const budgets = parseDiscoveryCronBudgets({} as NodeJS.ProcessEnv)
+    const budgets = parseDiscoveryCronBudgets({} as unknown as NodeJS.ProcessEnv)
     expect(budgets.maxStatesPerRun).toBe(3)
     expect(budgets.maxDiscoveredPagesPerRun).toBe(80)
     expect(budgets.maxRuntimeMs).toBe(240_000)

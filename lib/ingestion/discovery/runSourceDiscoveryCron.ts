@@ -12,21 +12,21 @@ import {
   emitDiscoveryCronCompleted,
   type DiscoveryCronTelemetry,
 } from '@/lib/ingestion/discovery/discoveryCronTelemetry'
-import { promoteYstmDiscoveryResults } from '@/lib/ingestion/discovery/promoteYstmDiscoveryResults'
-import { revalidateYstmConfigs } from '@/lib/ingestion/discovery/revalidateYstmConfigs'
+import { promoteSourceDiscoveryResults } from '@/lib/ingestion/discovery/promoteSourceDiscoveryResults'
+import { revalidateSourceDiscoveryConfigs } from '@/lib/ingestion/discovery/revalidateSourceDiscoveryConfigs'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
-import { runYstmDiscoveryDryRun } from '@/lib/ingestion/discovery/ystmDiscovery'
+import { runSourceDiscoveryDryRun } from '@/lib/ingestion/discovery/sourceDiscovery'
 import { generateOperationId, logger } from '@/lib/log'
 
 type AdminDb = ReturnType<typeof getAdminDb>
 
-export type RunYstmDiscoveryCronArgs = {
+export type RunSourceDiscoveryCronArgs = {
   budgets?: ReturnType<typeof parseDiscoveryCronBudgets>
   telemetryContext?: Record<string, unknown>
   leaseOwner?: string
 }
 
-export type RunYstmDiscoveryCronResult = {
+export type RunSourceDiscoveryCronResult = {
   ok: boolean
   skipped: boolean
   skipReason?: string
@@ -80,16 +80,16 @@ async function loadRegistryAggregateCounts(admin: AdminDb): Promise<{
  * Nationwide discovery cron: bounded discovery → promotion → revalidation/healing.
  * Uses persisted state cursor + lease overlap prevention.
  */
-export async function runYstmDiscoveryCron(
+export async function runSourceDiscoveryCron(
   admin: AdminDb,
-  args: RunYstmDiscoveryCronArgs = {}
-): Promise<RunYstmDiscoveryCronResult> {
+  args: RunSourceDiscoveryCronArgs = {}
+): Promise<RunSourceDiscoveryCronResult> {
   const startedAtMs = Date.now()
   const budgets = args.budgets ?? parseDiscoveryCronBudgets()
   const telemetry = createDiscoveryCronTelemetry()
   const owner = args.leaseOwner ?? generateOperationId()
   const telemetryContext = {
-    jobType: 'cron.discovery.ystm',
+    jobType: 'cron.discovery.external_source',
     ...args.telemetryContext,
   }
 
@@ -115,7 +115,7 @@ export async function runYstmDiscoveryCron(
 
   try {
     if (batch.states.length > 0 && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-      const discovery = await runYstmDiscoveryDryRun({
+      const discovery = await runSourceDiscoveryDryRun({
         dryRun: true,
         states: batch.states,
         maxStatesPerRun: budgets.maxStatesPerRun,
@@ -132,7 +132,7 @@ export async function runYstmDiscoveryCron(
 
       if (discovery.ok && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
         const promotable = discovery.candidates.filter((c) => c.validation.ok === true)
-        const promotion = await promoteYstmDiscoveryResults(admin, {
+        const promotion = await promoteSourceDiscoveryResults(admin, {
           dryRun: false,
           candidates: promotable,
           telemetryContext,
@@ -143,8 +143,8 @@ export async function runYstmDiscoveryCron(
           telemetry.phasesCompleted.push('promote')
         } else {
           telemetry.degraded = true
-          logger.warn('ystm discovery cron promotion degraded', {
-            component: 'ingestion/discovery/runYstmDiscoveryCron',
+          logger.warn('source discovery cron promotion degraded', {
+            component: 'ingestion/discovery/runSourceDiscoveryCron',
             operation: 'promote',
             message: promotion.error,
             ...telemetryContext,
@@ -157,7 +157,7 @@ export async function runYstmDiscoveryCron(
 
     if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
       const revalidationStates = batch.states.length > 0 ? batch.states : undefined
-      const revalidation = await revalidateYstmConfigs(admin, {
+      const revalidation = await revalidateSourceDiscoveryConfigs(admin, {
         dryRun: false,
         states: revalidationStates,
         maxConfigsPerRun: budgets.maxRevalidationConfigsPerRun,
@@ -196,8 +196,8 @@ export async function runYstmDiscoveryCron(
     telemetry.degraded = true
     telemetry.discoveryLatencyMs = Date.now() - startedAtMs
     const message = e instanceof Error ? e.message : String(e)
-    logger.error('ystm discovery cron failed', e instanceof Error ? e : new Error(message), {
-      component: 'ingestion/discovery/runYstmDiscoveryCron',
+    logger.error('source discovery cron failed', e instanceof Error ? e : new Error(message), {
+      component: 'ingestion/discovery/runSourceDiscoveryCron',
       operation: 'run',
       ...telemetryContext,
     })

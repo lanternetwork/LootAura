@@ -50,7 +50,3 @@ export function parseDiscoveryCronBudgets(env: NodeJS.ProcessEnv = process.env):
     ),
   }
 }
-
-export function parseDiscoveryCronRevalidationStatesCap(env: NodeJS.ProcessEnv = process.env): number {
-  return parsePositiveInt(env.CRON_DISCOVERY_REVALIDATION_STATE_CAP, 10, 51)
-}

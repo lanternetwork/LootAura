@@ -21,11 +21,11 @@ CREATE POLICY ingestion_discovery_state_service_role_all ON lootaura_v2.ingestio
 GRANT ALL ON lootaura_v2.ingestion_discovery_state TO service_role;
 
 INSERT INTO lootaura_v2.ingestion_discovery_state (key, state_cursor)
-VALUES ('ystm_nationwide', 0)
+VALUES ('source_discovery_nationwide', 0)
 ON CONFLICT (key) DO NOTHING;
 
 COMMENT ON TABLE lootaura_v2.ingestion_discovery_state IS
-  'Singleton lease + resumable state cursor for YSTM nationwide discovery cron.';
+  'Singleton lease + resumable state cursor for nationwide external source discovery cron.';
 
 ALTER TABLE lootaura_v2.ingestion_city_configs
   ADD COLUMN IF NOT EXISTS source_discovery_failure_count integer NOT NULL DEFAULT 0,

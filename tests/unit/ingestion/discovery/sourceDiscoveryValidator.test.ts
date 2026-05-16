@@ -3,8 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   isSharedMetroHubSlug,
-  validateDiscoveredYstmCityPage,
-} from '@/lib/ingestion/discovery/ystmDiscoveryValidator'
+  validateDiscoveredCityPage,
+} from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 
 const FIXTURES = join(process.cwd(), 'tests/fixtures/ingestion/discovery')
 
@@ -12,10 +12,10 @@ function loadFixture(name: string): string {
   return readFileSync(join(FIXTURES, name), 'utf8')
 }
 
-describe('validateDiscoveredYstmCityPage', () => {
+describe('validateDiscoveredCityPage', () => {
   it('accepts city page with listing anchors', () => {
     const html = loadFixture('city_page_with_listings.html')
-    const result = validateDiscoveredYstmCityPage({
+    const result = validateDiscoveredCityPage({
       html,
       pageUrl: 'https://yardsaletreasuremap.com/US/Indiana/Munster.html',
       city: 'Munster',
@@ -26,7 +26,7 @@ describe('validateDiscoveredYstmCityPage', () => {
 
   it('accepts valid empty city page with explicit empty signals', () => {
     const html = loadFixture('city_page_valid_empty.html')
-    const result = validateDiscoveredYstmCityPage({
+    const result = validateDiscoveredCityPage({
       html,
       pageUrl: 'https://yardsaletreasuremap.com/US/Illinois/Oak-Brook.html',
       city: 'Oak Brook',
@@ -35,12 +35,12 @@ describe('validateDiscoveredYstmCityPage', () => {
     expect(result).toEqual({ ok: true, kind: 'valid_empty_city_page' })
   })
 
-  it('rejects page with YSTM markers but no listings and no empty-valid signals', () => {
+  it('rejects page with city page markers but no listings and no empty-valid signals', () => {
     const html = `<!DOCTYPE html><html><body>
       <p class="tagline">Your guide to local garage sales, community sales, and hidden treasures</p>
       <h1>Garage Sales & Yard Sales in Testville, Illinois</h1>
     </body></html>`
-    const result = validateDiscoveredYstmCityPage({
+    const result = validateDiscoveredCityPage({
       html,
       pageUrl: 'https://yardsaletreasuremap.com/US/Illinois/Testville.html',
       city: 'Testville',
@@ -49,9 +49,9 @@ describe('validateDiscoveredYstmCityPage', () => {
     expect(result).toEqual({ ok: false, reason: 'empty_page_missing_valid_empty_signals' })
   })
 
-  it('rejects malformed non-YSTM page', () => {
+  it('rejects malformed non-source city page', () => {
     const html = loadFixture('malformed_page.html')
-    const result = validateDiscoveredYstmCityPage({
+    const result = validateDiscoveredCityPage({
       html,
       pageUrl: 'https://yardsaletreasuremap.com/US/Illinois/Testville.html',
       city: 'Testville',
@@ -62,7 +62,7 @@ describe('validateDiscoveredYstmCityPage', () => {
 
   it('rejects non-HTTPS page URL', () => {
     const html = loadFixture('city_page_with_listings.html')
-    const result = validateDiscoveredYstmCityPage({
+    const result = validateDiscoveredCityPage({
       html,
       pageUrl: 'http://yardsaletreasuremap.com/US/Indiana/Munster.html',
       city: 'Munster',

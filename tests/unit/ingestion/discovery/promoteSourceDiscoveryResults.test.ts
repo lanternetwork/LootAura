@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { YstmDiscoveryValidatedCandidate } from '@/lib/ingestion/discovery/ystmDiscovery'
+import type { ValidatedDiscoveryCandidate } from '@/lib/ingestion/discovery/sourceDiscovery'
 import {
   isMalformedIngestionCityName,
-  promoteYstmDiscoveryResults,
+  promoteSourceDiscoveryResults,
   type IngestionCityConfigDiscoveryRow,
-} from '@/lib/ingestion/discovery/promoteYstmDiscoveryResults'
+} from '@/lib/ingestion/discovery/promoteSourceDiscoveryResults'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 
 const emitMock = vi.fn()
@@ -26,8 +26,8 @@ type Store = {
 }
 
 function candidate(
-  partial: Partial<YstmDiscoveryValidatedCandidate> & Pick<YstmDiscoveryValidatedCandidate, 'city' | 'state' | 'canonicalUrl'>
-): YstmDiscoveryValidatedCandidate {
+  partial: Partial<ValidatedDiscoveryCandidate> & Pick<ValidatedDiscoveryCandidate, 'city' | 'state' | 'canonicalUrl'>
+): ValidatedDiscoveryCandidate {
   return {
     statePathSegment: partial.state === 'IN' ? 'Indiana' : 'Illinois',
     cityPathSegment: `${partial.city}.html`,
@@ -104,7 +104,7 @@ vi.mock('@/lib/supabase/clients', () => ({
 
 let currentStore: Store
 
-describe('promoteYstmDiscoveryResults', () => {
+describe('promoteSourceDiscoveryResults', () => {
   beforeEach(() => {
     emitMock.mockClear()
     currentStore = createStore([])
@@ -128,7 +128,7 @@ describe('promoteYstmDiscoveryResults', () => {
       },
     ])
 
-    const result = await promoteYstmDiscoveryResults({} as never, {
+    const result = await promoteSourceDiscoveryResults({} as never, {
       candidates: [
         candidate({
           city: 'Oak Lawn',
@@ -165,7 +165,7 @@ describe('promoteYstmDiscoveryResults', () => {
       },
     ])
 
-    const result = await promoteYstmDiscoveryResults({} as never, {
+    const result = await promoteSourceDiscoveryResults({} as never, {
       candidates: [
         candidate({
           city: 'Oak Park',
@@ -183,7 +183,7 @@ describe('promoteYstmDiscoveryResults', () => {
   })
 
   it('allows shared hub mapping for new municipality rows', async () => {
-    const result = await promoteYstmDiscoveryResults({} as never, {
+    const result = await promoteSourceDiscoveryResults({} as never, {
       candidates: [
         candidate({
           city: 'Evergreen Park',
@@ -222,7 +222,7 @@ describe('promoteYstmDiscoveryResults', () => {
       },
     ])
 
-    const result = await promoteYstmDiscoveryResults({} as never, {
+    const result = await promoteSourceDiscoveryResults({} as never, {
       candidates: [
         candidate({
           city: 'Chicago',
@@ -255,7 +255,7 @@ describe('promoteYstmDiscoveryResults', () => {
       },
     ])
 
-    const result = await promoteYstmDiscoveryResults({} as never, {
+    const result = await promoteSourceDiscoveryResults({} as never, {
       candidates: [
         candidate({
           city: 'Munster',
@@ -272,13 +272,13 @@ describe('promoteYstmDiscoveryResults', () => {
   })
 
   it('skips failed validation candidates', async () => {
-    const result = await promoteYstmDiscoveryResults({} as never, {
+    const result = await promoteSourceDiscoveryResults({} as never, {
       candidates: [
         candidate({
           city: 'Alton',
           state: 'IL',
           canonicalUrl: 'https://yardsaletreasuremap.com/US/Illinois/Alton.html',
-          validation: { ok: false, reason: 'missing_ystm_city_page_markers' },
+          validation: { ok: false, reason: 'missing_city_page_markers' },
         }),
       ],
     })
@@ -305,7 +305,7 @@ describe('promoteYstmDiscoveryResults', () => {
       },
     ])
 
-    await promoteYstmDiscoveryResults({} as never, {
+    await promoteSourceDiscoveryResults({} as never, {
       dryRun: true,
       candidates: [
         candidate({
@@ -321,7 +321,7 @@ describe('promoteYstmDiscoveryResults', () => {
   })
 
   it('fail closed when timezone cannot be resolved for new row', async () => {
-    const result = await promoteYstmDiscoveryResults({} as never, {
+    const result = await promoteSourceDiscoveryResults({} as never, {
       candidates: [
         candidate({
           city: 'Nowhere',

@@ -13,15 +13,15 @@ import {
 } from '@/lib/ingestion/normalizeIngestionLocation'
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import {
-  getVerifiedYstmStateIndexEntries,
-  YSTM_ORIGIN,
-  type YstmStateIndexEntry,
-} from '@/lib/ingestion/discovery/ystmStateIndexCatalog'
+  getVerifiedStateIndexEntries,
+  EXTERNAL_SOURCE_LIST_ORIGIN,
+  type SourceStateIndexEntry,
+} from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 import {
   isSharedMetroHubSlug,
-  validateDiscoveredYstmCityPage,
+  validateDiscoveredCityPage,
   type DiscoveryValidationResult,
-} from '@/lib/ingestion/discovery/ystmDiscoveryValidator'
+} from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 import {
   createDiscoveryTelemetry,
   emitDiscoveryPageValidated,
@@ -29,16 +29,16 @@ import {
   emitDiscoveryRunStarted,
   hashDiscoveryUrl,
   type DiscoveryTelemetrySnapshot,
-} from '@/lib/ingestion/discovery/ystmDiscoveryTelemetry'
+} from '@/lib/ingestion/discovery/sourceDiscoveryTelemetry'
 
-const ADAPTER_ID = 'ystm_source_discovery'
+const ADAPTER_ID = 'external_source_discovery'
 const DEFAULT_MAX_STATES_PER_RUN = 5
 const DEFAULT_MAX_DISCOVERED_PAGES_PER_RUN = 250
 const DEFAULT_MAX_VALIDATION_FETCHES_PER_RUN = 100
 const DEFAULT_INDEX_FETCH_CONCURRENCY = 2
 const DEFAULT_VALIDATION_FETCH_CONCURRENCY = 3
 
-export type YstmDiscoveredCityPageCandidate = {
+export type DiscoveredCityPageCandidate = {
   city: string
   state: string
   statePathSegment: string
@@ -47,11 +47,11 @@ export type YstmDiscoveredCityPageCandidate = {
   cityPathSegment: string
 }
 
-export type YstmDiscoveryValidatedCandidate = YstmDiscoveredCityPageCandidate & {
+export type ValidatedDiscoveryCandidate = DiscoveredCityPageCandidate & {
   validation: DiscoveryValidationResult
 }
 
-export type YstmDiscoveryRunResult = {
+export type SourceDiscoveryDryRunResult = {
   ok: boolean
   dryRun: true
   statesScanned: number
@@ -60,17 +60,17 @@ export type YstmDiscoveryRunResult = {
   candidatePagesInvalid: number
   duplicatePages: number
   sharedHubPages: number
-  candidates: YstmDiscoveryValidatedCandidate[]
+  candidates: ValidatedDiscoveryCandidate[]
   telemetry: DiscoveryTelemetrySnapshot
   error?: string
 }
 
-export type YstmDiscoveryFetchHtml = (
+export type SourceDiscoveryFetchHtml = (
   pageUrl: string,
   context: ExternalFetchLogContext
 ) => Promise<string>
 
-export type RunYstmDiscoveryDryRunOptions = {
+export type RunSourceDiscoveryDryRunOptions = {
   dryRun?: boolean
   states?: string[]
   maxStatesPerRun?: number
@@ -78,7 +78,7 @@ export type RunYstmDiscoveryDryRunOptions = {
   maxValidationFetchesPerRun?: number
   indexFetchConcurrency?: number
   validationFetchConcurrency?: number
-  fetchHtml?: YstmDiscoveryFetchHtml
+  fetchHtml?: SourceDiscoveryFetchHtml
   telemetryContext?: Record<string, unknown>
 }
 
@@ -94,7 +94,7 @@ function citySlugFromPathSegment(segment: string): string {
 function isCityListPageHref(href: string, statePathSegment: string): boolean {
   let u: URL
   try {
-    u = new URL(href, YSTM_ORIGIN)
+    u = new URL(href, EXTERNAL_SOURCE_LIST_ORIGIN)
   } catch {
     return false
   }
@@ -116,19 +116,19 @@ function isCityListPageHref(href: string, statePathSegment: string): boolean {
  */
 export function extractCityPageCandidatesFromStateIndexHtml(
   html: string,
-  indexEntry: YstmStateIndexEntry
-): YstmDiscoveredCityPageCandidate[] {
+  indexEntry: SourceStateIndexEntry
+): DiscoveredCityPageCandidate[] {
   const dom = new JSDOM(html, { url: indexEntry.indexUrl })
   const { document } = dom.window
   const anchors = document.querySelectorAll<HTMLAnchorElement>('a[href]')
   const seen = new Set<string>()
-  const out: YstmDiscoveredCityPageCandidate[] = []
+  const out: DiscoveredCityPageCandidate[] = []
 
   for (const anchor of anchors) {
     const href = anchor.getAttribute('href')?.trim()
     if (!href || !isCityListPageHref(href, indexEntry.statePathSegment)) continue
 
-    const canonicalUrl = deriveYardsaleTreasureMapCityPageUrl(new URL(href, YSTM_ORIGIN).href)
+    const canonicalUrl = deriveYardsaleTreasureMapCityPageUrl(new URL(href, EXTERNAL_SOURCE_LIST_ORIGIN).href)
     if (!canonicalUrl || normalizeSourcePages([canonicalUrl]).length === 0) continue
     if (seen.has(canonicalUrl)) continue
     seen.add(canonicalUrl)
@@ -191,7 +191,7 @@ function buildFetchContext(
   telemetryContext?: Record<string, unknown>
 ): ExternalFetchLogContext & Record<string, unknown> {
   return {
-    component: 'ingestion/discovery/ystmDiscovery',
+    component: 'ingestion/discovery/sourceDiscovery',
     operation: 'fetch_page',
     adapter: ADAPTER_ID,
     city: 'discovery',
@@ -207,9 +207,9 @@ function buildFetchContext(
  * Dry-run discovery: fetch state indexes, extract city pages, validate, emit aggregate telemetry.
  * Dry-run only: never persists candidates to the ingestion registry.
  */
-export async function runYstmDiscoveryDryRun(
-  options: RunYstmDiscoveryDryRunOptions = {}
-): Promise<YstmDiscoveryRunResult> {
+export async function runSourceDiscoveryDryRun(
+  options: RunSourceDiscoveryDryRunOptions = {}
+): Promise<SourceDiscoveryDryRunResult> {
   const dryRun = options.dryRun !== false
   const telemetry = createDiscoveryTelemetry()
   const maxStates = parseMax(options.maxStatesPerRun, DEFAULT_MAX_STATES_PER_RUN, 50)
@@ -231,7 +231,7 @@ export async function runYstmDiscoveryDryRun(
   )
   const fetchHtml = options.fetchHtml ?? fetchSafeExternalPageHtml
 
-  const stateEntries = getVerifiedYstmStateIndexEntries(options.states).slice(0, maxStates)
+  const stateEntries = getVerifiedStateIndexEntries(options.states).slice(0, maxStates)
 
   emitDiscoveryRunStarted({
     dryRun,
@@ -258,7 +258,7 @@ export async function runYstmDiscoveryDryRun(
   }
 
   const globalSeen = new Set<string>()
-  const discovered: YstmDiscoveredCityPageCandidate[] = []
+  const discovered: DiscoveredCityPageCandidate[] = []
 
   try {
     const indexHtmlByState = await mapPool(stateEntries, indexConcurrency, async (entry, idx) => {
@@ -295,7 +295,7 @@ export async function runYstmDiscoveryDryRun(
         buildFetchContext(idx, candidate.state, options.telemetryContext)
       )
       telemetry.validationFetchCount += 1
-      const validation = validateDiscoveredYstmCityPage({
+      const validation = validateDiscoveredCityPage({
         html,
         pageUrl: candidate.canonicalUrl,
         city: candidate.city,
@@ -317,7 +317,7 @@ export async function runYstmDiscoveryDryRun(
       return { ...candidate, validation }
     })
 
-    const result: YstmDiscoveryRunResult = {
+    const result: SourceDiscoveryDryRunResult = {
       ok: true,
       dryRun: true,
       statesScanned: telemetry.statesScanned,
@@ -362,7 +362,7 @@ export function statePathSegmentFromIndexUrl(indexUrl: string): string | null {
   }
 }
 
-/** Resolve USPS code from YSTM state path segment when known. */
+/** Resolve USPS code from external source state path segment when known. */
 export function stateCodeFromPathSegment(statePathSegment: string): string | null {
   const fromName = normalizeIngestionState(statePathSegment.replace(/-/g, ' '))
   if (fromName && fromName.length === 2) return fromName

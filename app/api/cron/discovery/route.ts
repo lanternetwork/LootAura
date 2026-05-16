@@ -1,7 +1,7 @@
 /**
  * GET/POST /api/cron/discovery
  *
- * Scheduled YSTM source discovery + promotion + registry self-healing.
+ * Scheduled external source discovery, promotion, and registry self-healing.
  * Auth: CRON_SECRET Bearer only. Aggregate JSON response (no raw URLs/HTML).
  *
  * Schedule: vercel.json (default daily 04:00 UTC). Tune CRON_DISCOVERY_* env vars.
@@ -9,12 +9,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized, isCronAuthorized } from '@/lib/auth/cron'
-import { runYstmDiscoveryCron } from '@/lib/ingestion/discovery/runYstmDiscoveryCron'
+import { runSourceDiscoveryCron } from '@/lib/ingestion/discovery/runSourceDiscoveryCron'
 import { getAdminDb } from '@/lib/supabase/clients'
 
 export const dynamic = 'force-dynamic'
 
-function discoveryCronJsonBody(result: Awaited<ReturnType<typeof runYstmDiscoveryCron>>) {
+function discoveryCronJsonBody(result: Awaited<ReturnType<typeof runSourceDiscoveryCron>>) {
   const t = result.telemetry
   return {
     ok: result.ok,
@@ -63,7 +63,7 @@ async function runDiscoveryCron(request: NextRequest) {
   }
 
   try {
-    const result = await runYstmDiscoveryCron(getAdminDb(), {
+    const result = await runSourceDiscoveryCron(getAdminDb(), {
       telemetryContext: {
         authMode: cronAuth ? 'cron' : 'unknown',
       },

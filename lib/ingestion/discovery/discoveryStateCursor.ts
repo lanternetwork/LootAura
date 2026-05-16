@@ -1,8 +1,8 @@
-import { getVerifiedYstmStateIndexEntries } from '@/lib/ingestion/discovery/ystmStateIndexCatalog'
+import { getVerifiedStateIndexEntries } from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 
 /** Sorted USPS codes for fair nationwide progression. */
 export function listNationwideDiscoveryStateCodes(): string[] {
-  return getVerifiedYstmStateIndexEntries()
+  return getVerifiedStateIndexEntries()
     .map((e) => e.stateCode)
     .sort((a, b) => a.localeCompare(b))
 }

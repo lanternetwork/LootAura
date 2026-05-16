@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   detectHubDrift,
   isPlaceholderAwaitingRemediation,
-  revalidateYstmConfigs,
+  revalidateSourceDiscoveryConfigs,
   validateConfigSourcePage,
-  type RevalidateYstmConfigsResult,
-} from '@/lib/ingestion/discovery/revalidateYstmConfigs'
+  type revalidateSourceDiscoveryConfigsResult,
+} from '@/lib/ingestion/discovery/revalidateSourceDiscoveryConfigs'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
-import type { IngestionCityConfigDiscoveryRow } from '@/lib/ingestion/discovery/promoteYstmDiscoveryResults'
+import type { IngestionCityConfigDiscoveryRow } from '@/lib/ingestion/discovery/promoteSourceDiscoveryResults'
 
 const emitMock = vi.fn()
 const promoteMock = vi.fn()
@@ -24,11 +24,11 @@ vi.mock('@/lib/log', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('@/lib/ingestion/discovery/promoteYstmDiscoveryResults', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@/lib/ingestion/discovery/promoteYstmDiscoveryResults')>()
+vi.mock('@/lib/ingestion/discovery/promoteSourceDiscoveryResults', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/ingestion/discovery/promoteSourceDiscoveryResults')>()
   return {
     ...mod,
-    promoteYstmDiscoveryResults: (...args: unknown[]) => promoteMock(...args),
+    promoteSourceDiscoveryResults: (...args: unknown[]) => promoteMock(...args),
   }
 })
 
@@ -156,7 +156,7 @@ describe('validateConfigSourcePage', () => {
   })
 })
 
-describe('revalidateYstmConfigs', () => {
+describe('revalidateSourceDiscoveryConfigs', () => {
   beforeEach(() => {
     emitMock.mockClear()
     promoteMock.mockReset()
@@ -180,7 +180,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    const result = await revalidateYstmConfigs({} as never, {
+    const result = await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -202,7 +202,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    const result = await revalidateYstmConfigs({} as never, {
+    const result = await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -224,7 +224,7 @@ describe('revalidateYstmConfigs', () => {
     ]
 
     const before = JSON.stringify(currentStore.rows[0])
-    const result = await revalidateYstmConfigs({} as never, {
+    const result = await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IL'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -245,7 +245,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    const result = await revalidateYstmConfigs({} as never, {
+    const result = await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -267,7 +267,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    const result = await revalidateYstmConfigs({} as never, {
+    const result = await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IL'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -288,7 +288,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    const result = await revalidateYstmConfigs({} as never, {
+    const result = await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -308,7 +308,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    await revalidateYstmConfigs({} as never, {
+    await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IL'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -327,7 +327,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    await revalidateYstmConfigs({} as never, {
+    await revalidateSourceDiscoveryConfigs({} as never, {
       dryRun: true,
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
@@ -347,7 +347,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    await revalidateYstmConfigs({} as never, {
+    await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -368,7 +368,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    const result = await revalidateYstmConfigs({} as never, {
+    const result = await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
     })
@@ -390,7 +390,7 @@ describe('revalidateYstmConfigs', () => {
       }),
     ]
 
-    await revalidateYstmConfigs({} as never, {
+    await revalidateSourceDiscoveryConfigs({} as never, {
       states: ['IN'],
       fetchHtml: async (url) => fixtureFetch(url),
     })

@@ -5,8 +5,8 @@ import {
   normalizeIngestionCity,
   normalizeIngestionState,
 } from '@/lib/ingestion/normalizeIngestionLocation'
-import type { YstmDiscoveryValidatedCandidate } from '@/lib/ingestion/discovery/ystmDiscovery'
-import type { DiscoveryValidationResult } from '@/lib/ingestion/discovery/ystmDiscoveryValidator'
+import type { ValidatedDiscoveryCandidate } from '@/lib/ingestion/discovery/sourceDiscovery'
+import type { DiscoveryValidationResult } from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 import { resolveTimezoneForIngestionState } from '@/lib/ingestion/discovery/stateTimezoneMap'
 import { buildValidatedSourcePagesPatch } from '@/lib/ingestion/discovery/discoveryConfigPatches'
 import { SOURCE_DISCOVERY_STATUS, type SourceDiscoveryStatus } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
@@ -14,7 +14,7 @@ import {
   emitDiscoveryPromotionCompleted,
   hashDiscoveryUrl,
   type DiscoveryPromotionTelemetry,
-} from '@/lib/ingestion/discovery/ystmDiscoveryTelemetry'
+} from '@/lib/ingestion/discovery/sourceDiscoveryTelemetry'
 import { logger } from '@/lib/log'
 
 const EXTERNAL_PAGE_SOURCE = 'external_page_source'
@@ -47,13 +47,13 @@ export type PromotedConfigRecord = {
   canonicalUrlHash: string
 }
 
-export type PromoteYstmDiscoveryResultsArgs = {
-  candidates: YstmDiscoveryValidatedCandidate[]
+export type promoteSourceDiscoveryResultsArgs = {
+  candidates: ValidatedDiscoveryCandidate[]
   dryRun?: boolean
   telemetryContext?: Record<string, unknown>
 }
 
-export type PromoteYstmDiscoveryResultsResult = {
+export type promoteSourceDiscoveryResultsResult = {
   ok: boolean
   dryRun: boolean
   records: PromotedConfigRecord[]
@@ -81,7 +81,7 @@ export function isMalformedIngestionCityName(city: string): boolean {
   return city.trim() !== normalized
 }
 
-export function normalizedPromotionCityState(candidate: YstmDiscoveryValidatedCandidate): {
+export function normalizedPromotionCityState(candidate: ValidatedDiscoveryCandidate): {
   city: string
   state: string
 } | null {
@@ -125,13 +125,13 @@ function findExistingRow(
 }
 
 /**
- * Promotes validated YSTM discovery candidates into `ingestion_city_configs`.
+ * Promotes validated discovery candidates into `ingestion_city_configs`.
  * Never overwrites `manual` rows. Never disables configs. Fail closed on timezone gaps.
  */
-export async function promoteYstmDiscoveryResults(
+export async function promoteSourceDiscoveryResults(
   admin: AdminDb,
-  args: PromoteYstmDiscoveryResultsArgs
-): Promise<PromoteYstmDiscoveryResultsResult> {
+  args: promoteSourceDiscoveryResultsArgs
+): Promise<promoteSourceDiscoveryResultsResult> {
   const dryRun = args.dryRun === true
   const telemetry: DiscoveryPromotionTelemetry = {
     configsPromoted: 0,
@@ -404,8 +404,8 @@ export async function promoteYstmDiscoveryResults(
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
-      logger.warn('ystm discovery promotion row failed', {
-        component: 'ingestion/discovery/promoteYstmDiscoveryResults',
+      logger.warn('source discovery promotion row failed', {
+        component: 'ingestion/discovery/promoteSourceDiscoveryResults',
         operation: 'promote_row',
         city: loc.city,
         state: loc.state,

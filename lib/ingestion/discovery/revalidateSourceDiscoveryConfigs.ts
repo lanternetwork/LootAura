@@ -25,44 +25,44 @@ import {
 } from '@/lib/ingestion/discovery/discoveryPlaceholderPolicy'
 import {
   extractCityPageCandidatesFromStateIndexHtml,
-  type YstmDiscoveredCityPageCandidate,
-  type YstmDiscoveryFetchHtml,
-} from '@/lib/ingestion/discovery/ystmDiscovery'
+  type DiscoveredCityPageCandidate,
+  type SourceDiscoveryFetchHtml,
+} from '@/lib/ingestion/discovery/sourceDiscovery'
 import {
   isMalformedIngestionCityName,
-  promoteYstmDiscoveryResults,
+  promoteSourceDiscoveryResults,
   type IngestionCityConfigDiscoveryRow,
-} from '@/lib/ingestion/discovery/promoteYstmDiscoveryResults'
+} from '@/lib/ingestion/discovery/promoteSourceDiscoveryResults'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import {
-  getVerifiedYstmStateIndexEntries,
-  type YstmStateIndexEntry,
-} from '@/lib/ingestion/discovery/ystmStateIndexCatalog'
+  getVerifiedStateIndexEntries,
+  type SourceStateIndexEntry,
+} from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 import {
   isSharedMetroHubSlug,
-  validateDiscoveredYstmCityPage,
+  validateDiscoveredCityPage,
   type DiscoveryValidationResult,
-} from '@/lib/ingestion/discovery/ystmDiscoveryValidator'
+} from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 import {
   emitDiscoveryRevalidationCompleted,
   hashDiscoveryUrl,
   type DiscoveryRevalidationTelemetry,
-} from '@/lib/ingestion/discovery/ystmDiscoveryTelemetry'
+} from '@/lib/ingestion/discovery/sourceDiscoveryTelemetry'
 import { logger } from '@/lib/log'
 
 const EXTERNAL_PAGE_SOURCE = 'external_page_source'
-const ADAPTER_ID = 'ystm_source_revalidation'
+const ADAPTER_ID = 'external_source_revalidation'
 const DEFAULT_MAX_CONFIGS_PER_RUN = 100
 const DEFAULT_FETCH_CONCURRENCY = 3
 
 type AdminDb = ReturnType<typeof getAdminDb>
 
-export type RevalidateYstmConfigsArgs = {
+export type revalidateSourceDiscoveryConfigsArgs = {
   states?: string[]
   dryRun?: boolean
   maxConfigsPerRun?: number
   fetchConcurrency?: number
-  fetchHtml?: YstmDiscoveryFetchHtml
+  fetchHtml?: SourceDiscoveryFetchHtml
   telemetryContext?: Record<string, unknown>
   placeholderFailureExcludeThreshold?: number
 }
@@ -83,7 +83,7 @@ export type RevalidationRecord = {
   hubDrift?: boolean
 }
 
-export type RevalidateYstmConfigsResult = {
+export type revalidateSourceDiscoveryConfigsResult = {
   ok: boolean
   dryRun: boolean
   records: RevalidationRecord[]
@@ -102,7 +102,7 @@ function buildFetchContext(
   telemetryContext?: Record<string, unknown>
 ): ExternalFetchLogContext {
   return {
-    component: 'ingestion/discovery/revalidateYstmConfigs',
+    component: 'ingestion/discovery/revalidateSourceDiscoveryConfigs',
     operation: 'fetch_page',
     adapter: ADAPTER_ID,
     city: 'revalidation',
@@ -164,7 +164,7 @@ export type ValidateConfigSourcePageResult = {
  */
 export async function validateConfigSourcePage(
   row: IngestionCityConfigDiscoveryRow,
-  fetchHtml: YstmDiscoveryFetchHtml,
+  fetchHtml: SourceDiscoveryFetchHtml,
   fetchIndex: number,
   telemetryContext?: Record<string, unknown>
 ): Promise<ValidateConfigSourcePageResult | { error: string }> {
@@ -190,7 +190,7 @@ export async function validateConfigSourcePage(
     return { error: message }
   }
 
-  const validation = validateDiscoveredYstmCityPage({
+  const validation = validateDiscoveredCityPage({
     html,
     pageUrl: canonicalUrl,
     city: loc.city,
@@ -206,8 +206,8 @@ export async function validateConfigSourcePage(
 
 function pickRediscoveryCandidate(
   row: IngestionCityConfigDiscoveryRow,
-  candidates: YstmDiscoveredCityPageCandidate[]
-): YstmDiscoveredCityPageCandidate | null {
+  candidates: DiscoveredCityPageCandidate[]
+): DiscoveredCityPageCandidate | null {
   const loc = normalizedConfigCityState(row)
   if (!loc) return null
 
@@ -234,12 +234,12 @@ function pickRediscoveryCandidate(
 
 async function rediscoverValidatedCandidate(
   row: IngestionCityConfigDiscoveryRow,
-  indexEntry: YstmStateIndexEntry,
+  indexEntry: SourceStateIndexEntry,
   indexHtml: string,
-  fetchHtml: YstmDiscoveryFetchHtml,
+  fetchHtml: SourceDiscoveryFetchHtml,
   fetchIndex: number,
   telemetryContext?: Record<string, unknown>
-): Promise<YstmDiscoveredCityPageCandidate & { validation: DiscoveryValidationResult } | null> {
+): Promise<DiscoveredCityPageCandidate & { validation: DiscoveryValidationResult } | null> {
   const candidates = extractCityPageCandidatesFromStateIndexHtml(indexHtml, indexEntry)
   const match = pickRediscoveryCandidate(row, candidates)
   if (!match) return null
@@ -254,7 +254,7 @@ async function rediscoverValidatedCandidate(
     return null
   }
 
-  const validation = validateDiscoveredYstmCityPage({
+  const validation = validateDiscoveredCityPage({
     html,
     pageUrl: match.canonicalUrl,
     city: loc.city,
@@ -302,10 +302,10 @@ async function applyConfigUpdate(
  * Revalidate registry rows, rediscover on failure, repair when validated, mark failed when unresolved.
  * Never mutates manual configs (telemetry-only validation when pages exist).
  */
-export async function revalidateYstmConfigs(
+export async function revalidateSourceDiscoveryConfigs(
   admin: AdminDb,
-  args: RevalidateYstmConfigsArgs = {}
-): Promise<RevalidateYstmConfigsResult> {
+  args: revalidateSourceDiscoveryConfigsArgs = {}
+): Promise<revalidateSourceDiscoveryConfigsResult> {
   const dryRun = args.dryRun === true
   const maxConfigs = parseMax(args.maxConfigsPerRun, DEFAULT_MAX_CONFIGS_PER_RUN, 500)
   const concurrency = parseMax(args.fetchConcurrency, DEFAULT_FETCH_CONCURRENCY, 10)
@@ -344,7 +344,7 @@ export async function revalidateYstmConfigs(
 
   const allRows = ((rows ?? []) as IngestionCityConfigDiscoveryRow[]).slice(0, maxConfigs)
   const indexEntryByState = new Map(
-    getVerifiedYstmStateIndexEntries(stateFilter).map((e) => [e.stateCode, e])
+    getVerifiedStateIndexEntries(stateFilter).map((e) => [e.stateCode, e])
   )
   const indexHtmlCache = new Map<string, string>()
 
@@ -412,7 +412,7 @@ export async function revalidateYstmConfigs(
             if (rediscovered) {
               telemetry.configsRediscovered += 1
               if (!dryRun) {
-                const promotion = await promoteYstmDiscoveryResults(admin, {
+                const promotion = await promoteSourceDiscoveryResults(admin, {
                   dryRun: false,
                   candidates: [rediscovered],
                   telemetryContext: args.telemetryContext,
@@ -535,7 +535,7 @@ export async function revalidateYstmConfigs(
         )
         if (rediscovered) {
           telemetry.configsRediscovered += 1
-          const promotion = await promoteYstmDiscoveryResults(admin, {
+          const promotion = await promoteSourceDiscoveryResults(admin, {
             dryRun,
             candidates: [rediscovered],
             telemetryContext: args.telemetryContext,
@@ -571,8 +571,8 @@ export async function revalidateYstmConfigs(
       })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
-      logger.warn('ystm config revalidation row failed', {
-        component: 'ingestion/discovery/revalidateYstmConfigs',
+      logger.warn('source config revalidation row failed', {
+        component: 'ingestion/discovery/revalidateSourceDiscoveryConfigs',
         operation: 'revalidate_row',
         city: loc.city,
         state: loc.state,

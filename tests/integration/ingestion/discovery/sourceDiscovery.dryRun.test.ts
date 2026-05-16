@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { runYstmDiscoveryDryRun } from '@/lib/ingestion/discovery/ystmDiscovery'
+import { runSourceDiscoveryDryRun } from '@/lib/ingestion/discovery/sourceDiscovery'
 
 const emitMock = vi.fn()
 
@@ -30,13 +30,13 @@ function fixtureFetch(url: string): string {
   throw new Error(`unexpected_fetch:${path}`)
 }
 
-describe('runYstmDiscoveryDryRun', () => {
+describe('runSourceDiscoveryDryRun', () => {
   beforeEach(() => {
     emitMock.mockClear()
   })
 
   it('dry-run discovers and validates without DB access', async () => {
-    const result = await runYstmDiscoveryDryRun({
+    const result = await runSourceDiscoveryDryRun({
       dryRun: true,
       states: ['IN'],
       maxStatesPerRun: 1,
@@ -61,7 +61,7 @@ describe('runYstmDiscoveryDryRun', () => {
   })
 
   it('does not include raw URLs in telemetry payloads', async () => {
-    await runYstmDiscoveryDryRun({
+    await runSourceDiscoveryDryRun({
       states: ['IN'],
       maxStatesPerRun: 1,
       maxDiscoveredPagesPerRun: 2,
@@ -75,7 +75,7 @@ describe('runYstmDiscoveryDryRun', () => {
   })
 
   it('counts invalid validation separately', async () => {
-    const result = await runYstmDiscoveryDryRun({
+    const result = await runSourceDiscoveryDryRun({
       states: ['IL'],
       maxStatesPerRun: 1,
       maxDiscoveredPagesPerRun: 5,
@@ -89,7 +89,7 @@ describe('runYstmDiscoveryDryRun', () => {
   })
 
   it('fail closed when fetch throws', async () => {
-    const result = await runYstmDiscoveryDryRun({
+    const result = await runSourceDiscoveryDryRun({
       states: ['IL'],
       fetchHtml: async () => {
         throw new Error('fetch_failed')

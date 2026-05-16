@@ -1,5 +1,6 @@
 export const SOURCE_DISCOVERY_STATUS = {
   pending: 'pending',
+  /** Reserved for future intermediate state; automated discovery does not write this today. */
   discovered: 'discovered',
   validated: 'validated',
   failed: 'failed',

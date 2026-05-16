@@ -12,15 +12,15 @@ const CITY_PAGE_H1_RE =
   /garage sales\s*&\s*yard sales\s+in\s+.+,\s*.+/i
 
 /** Regional list pages referenced by multiple municipality configs in production. */
-export const YSTM_SHARED_METRO_HUB_SLUGS = new Set(['Chicago', 'Midlothian'])
+export const SHARED_METRO_HUB_SLUGS = new Set(['Chicago', 'Midlothian'])
 
 export function isSharedMetroHubSlug(cityPathSegment: string): boolean {
   const base = cityPathSegment.replace(/\.html?$/i, '')
   const normalized = normalizeIngestionCity(base)
-  return normalized != null && YSTM_SHARED_METRO_HUB_SLUGS.has(normalized)
+  return normalized != null && SHARED_METRO_HUB_SLUGS.has(normalized)
 }
 
-function countYstmListingAnchors(document: Document): number {
+function countExternalListingAnchors(document: Document): number {
   const anchors = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="listing.html"], a[href*="userlisting.html"]'
   )
@@ -44,7 +44,7 @@ function hasValidEmptyCityPageSignals(document: Document): boolean {
   return false
 }
 
-function hasYstmCityPageStructure(document: Document): boolean {
+function hasExternalCityPageStructure(document: Document): boolean {
   const tagline = document.querySelector('p.tagline, .tagline')
   const h1 = document.querySelector('h1')
   if (!tagline?.textContent?.trim()) return false
@@ -61,15 +61,15 @@ export type ValidateDiscoveredCityPageArgs = {
 }
 
 /**
- * Validates a discovered YSTM city list page. Listing count alone is not sufficient:
+ * Validates a discovered external source city list list page. Listing count alone is not sufficient:
  * empty pages require explicit empty-valid structure markers.
  */
-export function validateDiscoveredYstmCityPage(
+export function validateDiscoveredCityPage(
   args: ValidateDiscoveredCityPageArgs
 ): DiscoveryValidationResult {
   const canonical = deriveYardsaleTreasureMapCityPageUrl(args.pageUrl)
   if (!canonical) {
-    return { ok: false, reason: 'not_canonical_ystm_city_page_url' }
+    return { ok: false, reason: 'not_canonical_city_page_url' }
   }
   if (normalizeSourcePages([args.pageUrl]).length === 0) {
     return { ok: false, reason: 'source_page_not_https' }
@@ -81,11 +81,11 @@ export function validateDiscoveredYstmCityPage(
   const dom = new JSDOM(args.html, { url: args.pageUrl })
   const { document } = dom.window
 
-  if (!hasYstmCityPageStructure(document)) {
-    return { ok: false, reason: 'missing_ystm_city_page_markers' }
+  if (!hasExternalCityPageStructure(document)) {
+    return { ok: false, reason: 'missing_city_page_markers' }
   }
 
-  const listingAnchorCount = countYstmListingAnchors(document)
+  const listingAnchorCount = countExternalListingAnchors(document)
   if (listingAnchorCount > 0) {
     return { ok: true, kind: 'valid_city_page' }
   }

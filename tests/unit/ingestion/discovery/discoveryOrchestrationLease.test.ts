@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   acquireDiscoveryOrchestrationLease,
   releaseDiscoveryOrchestrationLease,
-  YSTM_DISCOVERY_STATE_KEY,
+  SOURCE_DISCOVERY_STATE_KEY,
 } from '@/lib/ingestion/discovery/discoveryOrchestrationLease'
 
 type StateRow = {
@@ -82,7 +82,7 @@ vi.mock('@/lib/log', () => ({
 describe('discoveryOrchestrationLease', () => {
   beforeEach(() => {
     state = {
-      key: YSTM_DISCOVERY_STATE_KEY,
+      key: SOURCE_DISCOVERY_STATE_KEY,
       state_cursor: 4,
       lease_owner: null,
       lease_expires_at: null,

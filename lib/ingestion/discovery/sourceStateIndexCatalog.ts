@@ -1,9 +1,9 @@
 import { resolveUsListStatePathSegment } from '@/lib/ingestion/adapters/usStateListPathSegment'
 import { normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 
-export const YSTM_ORIGIN = 'https://yardsaletreasuremap.com'
+export const EXTERNAL_SOURCE_LIST_ORIGIN = 'https://yardsaletreasuremap.com'
 
-export type YstmStateIndexEntry = {
+export type SourceStateIndexEntry = {
   stateCode: string
   statePathSegment: string
   /** Verified crawl entrypoint: directory index with city `.html` links (not `{State}.html` shell). */
@@ -14,25 +14,25 @@ export type YstmStateIndexEntry = {
  * Verified from live probes (2026-05): `/US/{State}/` lists `Yard Sales near {City}` links;
  * `/US/{State}.html` is an empty shell with no city links.
  */
-export function buildYstmStateDirectoryIndexUrl(statePathSegment: string): string {
+export function buildStateDirectoryIndexUrl(statePathSegment: string): string {
   const seg = statePathSegment.replace(/^\/+|\/+$/g, '')
-  return `${YSTM_ORIGIN}/US/${seg}/`
+  return `${EXTERNAL_SOURCE_LIST_ORIGIN}/US/${seg}/`
 }
 
-export function getVerifiedYstmStateIndexEntries(stateCodes?: string[]): YstmStateIndexEntry[] {
+export function getVerifiedStateIndexEntries(stateCodes?: string[]): SourceStateIndexEntry[] {
   const codes =
     stateCodes && stateCodes.length > 0
       ? stateCodes.map((s) => normalizeIngestionState(s)).filter((s): s is string => Boolean(s))
       : Object.keys(USPS_CODES_FOR_CATALOG)
 
-  const out: YstmStateIndexEntry[] = []
+  const out: SourceStateIndexEntry[] = []
   for (const stateCode of codes) {
     const statePathSegment = resolveUsListStatePathSegment(stateCode)
     if (!statePathSegment) continue
     out.push({
       stateCode,
       statePathSegment,
-      indexUrl: buildYstmStateDirectoryIndexUrl(statePathSegment),
+      indexUrl: buildStateDirectoryIndexUrl(statePathSegment),
     })
   }
   return out.sort((a, b) => a.stateCode.localeCompare(b.stateCode))

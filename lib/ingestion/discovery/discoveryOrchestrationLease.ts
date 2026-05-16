@@ -5,7 +5,7 @@ import {
 } from '@/lib/operationalResilience/ingestionOrchestrationLeaseGate'
 import { logger } from '@/lib/log'
 
-export const YSTM_DISCOVERY_STATE_KEY = 'ystm_nationwide'
+export const SOURCE_DISCOVERY_STATE_KEY = 'source_discovery_nationwide'
 
 type AdminDb = ReturnType<typeof getAdminDb>
 
@@ -25,7 +25,7 @@ export type DiscoveryLeaseAcquireResult = {
 
 export async function ensureDiscoveryStateRow(admin: AdminDb): Promise<void> {
   const { error } = await fromBase(admin, 'ingestion_discovery_state').upsert(
-    { key: YSTM_DISCOVERY_STATE_KEY, state_cursor: 0 },
+    { key: SOURCE_DISCOVERY_STATE_KEY, state_cursor: 0 },
     { onConflict: 'key', ignoreDuplicates: true }
   )
   if (error) {
@@ -44,7 +44,7 @@ export async function acquireDiscoveryOrchestrationLease(
 
   const { data: stateRows, error: selectError } = await fromBase(admin, 'ingestion_discovery_state')
     .select('state_cursor, lease_owner, lease_expires_at')
-    .eq('key', YSTM_DISCOVERY_STATE_KEY)
+    .eq('key', SOURCE_DISCOVERY_STATE_KEY)
     .limit(1)
 
   if (selectError || !Array.isArray(stateRows) || stateRows.length === 0) {
@@ -81,7 +81,7 @@ export async function acquireDiscoveryOrchestrationLease(
 
   let leaseUpdateQuery = fromBase(admin, 'ingestion_discovery_state')
     .update(leaseUpdatePayload)
-    .eq('key', YSTM_DISCOVERY_STATE_KEY)
+    .eq('key', SOURCE_DISCOVERY_STATE_KEY)
 
   leaseUpdateQuery =
     ownerNow === null
@@ -104,7 +104,7 @@ export async function acquireDiscoveryOrchestrationLease(
     }
   }
 
-  logger.info('ystm discovery lease acquired', {
+  logger.info('source discovery lease acquired', {
     component: 'ingestion/discovery/discoveryOrchestrationLease',
     operation: 'lease_acquire',
     staleRecovered,
@@ -134,12 +134,12 @@ export async function releaseDiscoveryOrchestrationLease(
 
   const { data, error } = await fromBase(admin, 'ingestion_discovery_state')
     .update(payload)
-    .eq('key', YSTM_DISCOVERY_STATE_KEY)
+    .eq('key', SOURCE_DISCOVERY_STATE_KEY)
     .eq('lease_owner', params.owner)
     .select('key')
 
   if (error || !Array.isArray(data) || data.length === 0) {
-    logger.warn('ystm discovery lease release incomplete', {
+    logger.warn('source discovery lease release incomplete', {
       component: 'ingestion/discovery/discoveryOrchestrationLease',
       operation: 'lease_release',
       message: error?.message,

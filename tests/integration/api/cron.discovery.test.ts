@@ -31,8 +31,8 @@ const mockRun = vi.hoisted(() =>
   })
 )
 
-vi.mock('@/lib/ingestion/discovery/runYstmDiscoveryCron', () => ({
-  runYstmDiscoveryCron: mockRun,
+vi.mock('@/lib/ingestion/discovery/runSourceDiscoveryCron', () => ({
+  runSourceDiscoveryCron: mockRun,
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({

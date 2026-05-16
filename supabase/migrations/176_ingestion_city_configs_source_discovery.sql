@@ -52,4 +52,4 @@ CREATE INDEX IF NOT EXISTS idx_ingestion_city_configs_discovery_status
   WHERE source_platform = 'external_page_source';
 
 COMMENT ON COLUMN lootaura_v2.ingestion_city_configs.source_discovery_status IS
-  'Discovery lifecycle: pending (empty placeholder), manual (protected), validated (promoted crawl target), discovered/failed (intermediate).';
+  'Discovery lifecycle: pending (empty placeholder), manual (protected), validated (promoted crawl target), discovered (reserved), failed (unresolved).';

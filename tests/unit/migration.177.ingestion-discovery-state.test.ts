@@ -12,7 +12,7 @@ describe('migration 177 ingestion discovery state', () => {
     expect(sql).toContain('ingestion_discovery_state')
     expect(sql).toContain('state_cursor')
     expect(sql).toContain('lease_owner')
-    expect(sql).toContain('ystm_nationwide')
+    expect(sql).toContain('source_discovery_nationwide')
   })
 
   it('adds crawl exclusion and failure count columns', () => {

@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import {
   extractCityPageCandidatesFromStateIndexHtml,
   isEmptyStateHtmlShellIndex,
-} from '@/lib/ingestion/discovery/ystmDiscovery'
-import { getVerifiedYstmStateIndexEntries } from '@/lib/ingestion/discovery/ystmStateIndexCatalog'
+} from '@/lib/ingestion/discovery/sourceDiscovery'
+import { getVerifiedStateIndexEntries } from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 
 const FIXTURES = join(process.cwd(), 'tests/fixtures/ingestion/discovery')
 
@@ -16,7 +16,7 @@ function loadFixture(name: string): string {
 describe('extractCityPageCandidatesFromStateIndexHtml', () => {
   it('extracts HTTPS city .html links from Illinois directory index', () => {
     const html = loadFixture('state_index_illinois_dir.html')
-    const [entry] = getVerifiedYstmStateIndexEntries(['IL'])
+    const [entry] = getVerifiedStateIndexEntries(['IL'])
     const candidates = extractCityPageCandidatesFromStateIndexHtml(html, entry)
     expect(candidates.length).toBeGreaterThan(50)
     const chicago = candidates.find((c) => c.city === 'Chicago')
@@ -30,7 +30,7 @@ describe('extractCityPageCandidatesFromStateIndexHtml', () => {
 
   it('extracts Indiana cities from snippet fixture', () => {
     const html = loadFixture('state_index_indiana_dir_snippet.html')
-    const [entry] = getVerifiedYstmStateIndexEntries(['IN'])
+    const [entry] = getVerifiedStateIndexEntries(['IN'])
     const candidates = extractCityPageCandidatesFromStateIndexHtml(html, entry)
     expect(candidates.map((c) => c.city).sort()).toEqual(['Griffith', 'Munster', 'Saint John'])
     expect(candidates.every((c) => c.canonicalUrl.startsWith('https://'))).toBe(true)
@@ -41,7 +41,7 @@ describe('extractCityPageCandidatesFromStateIndexHtml', () => {
       <li><a href='/US/Indiana/Munster.html'>A</a></li>
       <li><a href='/US/Indiana/Munster.html'>B</a></li>
     </ul>`
-    const [entry] = getVerifiedYstmStateIndexEntries(['IN'])
+    const [entry] = getVerifiedStateIndexEntries(['IN'])
     const candidates = extractCityPageCandidatesFromStateIndexHtml(html, entry)
     expect(candidates).toHaveLength(1)
   })
@@ -51,7 +51,7 @@ describe('extractCityPageCandidatesFromStateIndexHtml', () => {
       <li><a href='/US/Illinois/Chicago/123-Main-St/1/listing.html'>bad</a></li>
       <li><a href='/US/Illinois/Oak-Lawn.html'>good</a></li>
     </ul>`
-    const [entry] = getVerifiedYstmStateIndexEntries(['IL'])
+    const [entry] = getVerifiedStateIndexEntries(['IL'])
     const candidates = extractCityPageCandidatesFromStateIndexHtml(html, entry)
     expect(candidates).toHaveLength(1)
     expect(candidates[0]?.city).toBe('Oak Lawn')
@@ -70,9 +70,9 @@ describe('isEmptyStateHtmlShellIndex', () => {
   })
 })
 
-describe('getVerifiedYstmStateIndexEntries', () => {
+describe('getVerifiedStateIndexEntries', () => {
   it('uses directory index URLs not .html shells', () => {
-    const [il] = getVerifiedYstmStateIndexEntries(['IL'])
+    const [il] = getVerifiedStateIndexEntries(['IL'])
     expect(il.indexUrl).toBe('https://yardsaletreasuremap.com/US/Illinois/')
     expect(il.indexUrl).not.toMatch(/Illinois\.html\/?$/)
   })

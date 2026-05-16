@@ -7,16 +7,16 @@ const acquireMock = vi.fn()
 const releaseMock = vi.fn()
 const emitMock = vi.fn()
 
-vi.mock('@/lib/ingestion/discovery/ystmDiscovery', () => ({
-  runYstmDiscoveryDryRun: (...args: unknown[]) => discoveryMock(...args),
+vi.mock('@/lib/ingestion/discovery/sourceDiscovery', () => ({
+  runSourceDiscoveryDryRun: (...args: unknown[]) => discoveryMock(...args),
 }))
 
-vi.mock('@/lib/ingestion/discovery/promoteYstmDiscoveryResults', () => ({
-  promoteYstmDiscoveryResults: (...args: unknown[]) => promoteMock(...args),
+vi.mock('@/lib/ingestion/discovery/promoteSourceDiscoveryResults', () => ({
+  promoteSourceDiscoveryResults: (...args: unknown[]) => promoteMock(...args),
 }))
 
-vi.mock('@/lib/ingestion/discovery/revalidateYstmConfigs', () => ({
-  revalidateYstmConfigs: (...args: unknown[]) => revalidateMock(...args),
+vi.mock('@/lib/ingestion/discovery/revalidateSourceDiscoveryConfigs', () => ({
+  revalidateSourceDiscoveryConfigs: (...args: unknown[]) => revalidateMock(...args),
 }))
 
 vi.mock('@/lib/ingestion/discovery/discoveryOrchestrationLease', () => ({
@@ -56,7 +56,7 @@ vi.mock('@/lib/log', () => ({
   generateOperationId: () => 'op-test',
 }))
 
-describe('runYstmDiscoveryCron', () => {
+describe('runSourceDiscoveryCron', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     acquireMock.mockResolvedValue({
@@ -90,8 +90,8 @@ describe('runYstmDiscoveryCron', () => {
   })
 
   it('runs discover → promote → revalidate and advances cursor', async () => {
-    const { runYstmDiscoveryCron } = await import('@/lib/ingestion/discovery/runYstmDiscoveryCron')
-    const result = await runYstmDiscoveryCron({} as never, {
+    const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
+    const result = await runSourceDiscoveryCron({} as never, {
       budgets: {
         maxStatesPerRun: 2,
         maxDiscoveredPagesPerRun: 10,
@@ -125,8 +125,8 @@ describe('runYstmDiscoveryCron', () => {
       stateCursor: 2,
       reason: 'active_lease',
     })
-    const { runYstmDiscoveryCron } = await import('@/lib/ingestion/discovery/runYstmDiscoveryCron')
-    const result = await runYstmDiscoveryCron({} as never, {})
+    const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
+    const result = await runSourceDiscoveryCron({} as never, {})
     expect(result.skipped).toBe(true)
     expect(result.telemetry.overlapPrevented).toBe(true)
     expect(discoveryMock).not.toHaveBeenCalled()
@@ -134,8 +134,8 @@ describe('runYstmDiscoveryCron', () => {
   })
 
   it('bounds discovery to configured state batch size', async () => {
-    const { runYstmDiscoveryCron } = await import('@/lib/ingestion/discovery/runYstmDiscoveryCron')
-    await runYstmDiscoveryCron({} as never, {
+    const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
+    await runSourceDiscoveryCron({} as never, {
       budgets: {
         maxStatesPerRun: 2,
         maxDiscoveredPagesPerRun: 10,

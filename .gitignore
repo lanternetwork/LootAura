@@ -27,6 +27,7 @@ build/
 .vercel/
 
 # Testing
+.ci-load.json
 *.tsbuildinfo
 coverage/
 .nyc_output/

@@ -1,7 +1,11 @@
 // Conservative Service Worker for LootAura.
 // Dynamic/authenticated marketplace data is intentionally NOT cached.
-const STATIC_CACHE = 'lootaura-static-v1'
-const STATIC_ASSETS = ['/manifest.webmanifest', '/manifest.json', '/icons/icon.svg']
+const STATIC_CACHE = 'lootaura-static-v3'
+const STATIC_ASSETS = [
+  '/manifest.webmanifest',
+  '/icons/icon-192-v2.png',
+  '/icons/icon-512-v2.png',
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -29,7 +33,7 @@ self.addEventListener('activate', (event) => {
 
 function isStaticAssetRequest(url, request) {
   if (url.origin !== self.location.origin) return false
-  if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') return true
+  if (url.pathname === '/manifest.webmanifest') return true
   if (url.pathname.startsWith('/icons/')) return true
   return ['image', 'style', 'script', 'font'].includes(request.destination)
 }

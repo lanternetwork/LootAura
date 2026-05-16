@@ -3,13 +3,12 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 
 /**
- * Serve manifest.json with proper Content-Type header
- * This ensures the manifest is served as application/manifest+json
- * Some browsers require this MIME type for PWA installation
+ * Serve manifest.webmanifest with proper Content-Type header.
+ * Static file lives in public/; this route guarantees application/manifest+json.
  */
 export async function GET() {
   try {
-    const manifestPath = join(process.cwd(), 'public', 'manifest.json')
+    const manifestPath = join(process.cwd(), 'public', 'manifest.webmanifest')
     const manifestContent = readFileSync(manifestPath, 'utf-8')
     const manifest = JSON.parse(manifestContent)
     

@@ -1,0 +1,21 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+const DISCOVERY_DIR = join(process.cwd(), 'lib/ingestion/discovery')
+
+describe('source discovery subsystem', () => {
+  it('dry-run modules do not reference ingestion_city_configs or Supabase clients', () => {
+    const dryRunOnlyFiles = [
+      'sourceDiscovery.ts',
+      'sourceDiscoveryValidator.ts',
+      'sourceStateIndexCatalog.ts',
+      'sourceDiscoveryTelemetry.ts',
+    ]
+    for (const file of dryRunOnlyFiles) {
+      const src = readFileSync(join(DISCOVERY_DIR, file), 'utf8')
+      expect(src).not.toMatch(/ingestion_city_configs/)
+      expect(src).not.toMatch(/getAdminDb|fromBase\(/)
+    }
+  })
+})

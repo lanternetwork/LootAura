@@ -65,6 +65,16 @@ export const ObservabilityEvents = {
     cronGeocodeHit: 'api.cron.geocode.hit',
     adminArchiveTriggerHit: 'api.admin.archive.trigger.hit',
   },
+  discovery: {
+    runStarted: 'source.discovery.run_started',
+    runCompleted: 'source.discovery.run_completed',
+    pageDiscovered: 'source.discovery.page_discovered',
+    pageValidated: 'source.discovery.page_validated',
+    pageValidationFailed: 'source.discovery.page_validation_failed',
+    promotionCompleted: 'source.discovery.promotion_completed',
+    revalidationCompleted: 'source.discovery.revalidation_completed',
+    cronCompleted: 'source.discovery.cron_completed',
+  },
   reconciliation: {
     started: 'source.reconciliation.started',
     completed: 'source.reconciliation.completed',
@@ -91,4 +101,5 @@ export type ObservabilityEventName =
   | (typeof ObservabilityEvents.retry)[keyof typeof ObservabilityEvents.retry]
   | (typeof ObservabilityEvents.parser)[keyof typeof ObservabilityEvents.parser]
   | (typeof ObservabilityEvents.api)[keyof typeof ObservabilityEvents.api]
+  | (typeof ObservabilityEvents.discovery)[keyof typeof ObservabilityEvents.discovery]
   | (typeof ObservabilityEvents.reconciliation)[keyof typeof ObservabilityEvents.reconciliation]

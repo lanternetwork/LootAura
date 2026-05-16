@@ -58,6 +58,29 @@ export type DiscoveryPromotionTelemetry = {
   skipped: number
 }
 
+export type DiscoveryRevalidationTelemetry = {
+  configsRevalidated: number
+  configsRepaired: number
+  configsFailed: number
+  configsRediscovered: number
+  placeholdersUnresolved: number
+  manualRowsSkipped: number
+  validationDriftDetected: number
+  manualTelemetryOnly: number
+}
+
+export function emitDiscoveryRevalidationCompleted(
+  telemetry: DiscoveryRevalidationTelemetry,
+  fields: Record<string, unknown> = {}
+): void {
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.discovery.revalidationCompleted, {
+      ...telemetry,
+      ...fields,
+    })
+  )
+}
+
 export function emitDiscoveryPromotionCompleted(
   telemetry: DiscoveryPromotionTelemetry,
   fields: Record<string, unknown> = {}

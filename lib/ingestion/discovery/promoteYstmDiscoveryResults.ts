@@ -8,6 +8,7 @@ import {
 import type { YstmDiscoveryValidatedCandidate } from '@/lib/ingestion/discovery/ystmDiscovery'
 import type { DiscoveryValidationResult } from '@/lib/ingestion/discovery/ystmDiscoveryValidator'
 import { resolveTimezoneForIngestionState } from '@/lib/ingestion/discovery/stateTimezoneMap'
+import { buildValidatedSourcePagesPatch } from '@/lib/ingestion/discovery/discoveryConfigPatches'
 import { SOURCE_DISCOVERY_STATUS, type SourceDiscoveryStatus } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import {
   emitDiscoveryPromotionCompleted,
@@ -107,14 +108,7 @@ function resolvePromotionTimezone(
 }
 
 function buildValidatedPromotionPatch(now: string, canonicalUrl: string) {
-  return {
-    source_pages: [canonicalUrl],
-    source_discovery_status: SOURCE_DISCOVERY_STATUS.validated,
-    source_last_discovered_at: now,
-    source_last_validated_at: now,
-    source_last_failed_at: null,
-    source_discovery_failure_reason: null,
-  }
+  return buildValidatedSourcePagesPatch(now, canonicalUrl)
 }
 
 function findExistingRow(

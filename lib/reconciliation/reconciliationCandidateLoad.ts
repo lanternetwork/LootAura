@@ -45,6 +45,7 @@ export type SalePeekRow = {
   readonly time_end: string | null
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
   return v != null && typeof v === 'object' && !Array.isArray(v)
 }
 

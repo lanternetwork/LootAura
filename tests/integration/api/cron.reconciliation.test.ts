@@ -33,6 +33,7 @@ const mockReconcile = vi.hoisted(() =>
 
 vi.mock('@/lib/reconciliation/reconcileExternalSources', () => ({
   reconcileExternalSources: mockReconcile,
+  RECONCILIATION_HARD_LIMIT_CAP: 100,
 }))
 
 vi.mock('@/lib/auth/cron', () => ({

@@ -13,11 +13,13 @@ function tierRank(tier: SelectionTier): number {
   return 2
 }
 
-function neverSynced(row: ReconciliationCandidateRow): boolean {
+function neverSynced(row: Pick<ReconciliationCandidateRow, 'last_source_sync_at'>): boolean {
   return row.last_source_sync_at == null || row.last_source_sync_at.trim() === ''
 }
 
-function hasFailures(row: ReconciliationCandidateRow): boolean {
+function hasFailures(
+  row: Pick<ReconciliationCandidateRow, 'source_sync_failure_count' | 'source_sync_status'>
+): boolean {
   return row.source_sync_failure_count > 0 || row.source_sync_status === 'source_missing_soft'
 }
 

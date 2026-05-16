@@ -1,7 +1,6 @@
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandidates'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
-import { logger } from '@/lib/log'
 import { classifyReconciliationChange } from '@/lib/reconciliation/reconciliationClassifier'
 import {
   computeReconciliationSortKey,

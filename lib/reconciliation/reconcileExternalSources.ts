@@ -18,6 +18,7 @@ import {
 import { tryParseExternalPageListingForReconciliation } from '@/lib/reconciliation/reconciliationParseSnapshot'
 import { resolveSourceRefreshCapability } from '@/lib/reconciliation/reconciliationRefreshCapability'
 import {
+  emitReconciliationCandidatePageRpcFailure,
   emitReconciliationCompleted,
   emitReconciliationRowChanged,
   emitReconciliationRowFailed,
@@ -271,12 +272,29 @@ async function loadCandidateIngestRows(
   readonly rows: IngestRowDb[]
   readonly salePeekBySaleId: ReadonlyMap<string, SalePeekForReconciliation>
   readonly coverageStateKey: string | null
+  readonly candidatePageRpcFailed: boolean
+  readonly candidatePageRpcErrorCode: string | null
 }> {
   const poolMax = parseReconciliationCandidatePoolMax()
   const onlyPlaceholder = opts.onlyPlaceholder === true
   const skipCoverageCursor = opts.skipCoverageCursor === true
   const platformTrim = typeof opts.sourcePlatform === 'string' ? opts.sourcePlatform.trim() : ''
   const sqlPlatform = platformTrim || undefined
+
+  const mapReturned = (
+    rowsSrc: readonly RpcIngestRow[],
+    salePeek: Map<string, SalePeekRow>,
+    extras: { coverageStateKey: string | null; rpcFailed: boolean; rpcErrorCode: string | null }
+  ) => {
+    const rows = rowsSrc.map(mapRpcIngestRowToIngestRowDb).filter((x): x is IngestRowDb => x != null)
+    return {
+      rows: dedupeIngestRowsById(rows),
+      salePeekBySaleId: mapPeekRows(salePeek),
+      coverageStateKey: extras.coverageStateKey,
+      candidatePageRpcFailed: extras.rpcFailed,
+      candidatePageRpcErrorCode: extras.rpcErrorCode,
+    }
+  }
 
   /**
    * Full priority-ordered pool from DB root (no keyset) — placeholder cohort (JS filter after)
@@ -290,12 +308,18 @@ async function loadCandidateIngestRows(
       cursor: null,
       sourcePlatform: sqlPlatform,
     })
-    const rows = page.rows.map(mapRpcIngestRowToIngestRowDb).filter((x): x is IngestRowDb => x != null)
-    return {
-      rows: dedupeIngestRowsById(rows),
-      salePeekBySaleId: mapPeekRows(page.salePeekBySaleId),
-      coverageStateKey: null,
+    if (!page.ok) {
+      return mapReturned([], page.salePeekBySaleId, {
+        coverageStateKey: null,
+        rpcFailed: true,
+        rpcErrorCode: page.errorCode,
+      })
     }
+    return mapReturned(page.rows, page.salePeekBySaleId, {
+      coverageStateKey: null,
+      rpcFailed: false,
+      rpcErrorCode: null,
+    })
   }
 
   const coverageStateKey = reconciliationCoverageStateKey({
@@ -311,19 +335,37 @@ async function loadCandidateIngestRows(
     sourcePlatform: sqlPlatform,
   })
 
+  if (!page.ok) {
+    return mapReturned([], page.salePeekBySaleId, {
+      coverageStateKey,
+      rpcFailed: true,
+      rpcErrorCode: page.errorCode,
+    })
+  }
+
   if (page.rows.length === 0 && cursor) {
-    await writeReconciliationCoverageCursor(admin, coverageStateKey, null)
-    cursor = null
-    page = await fetchReconciliationCandidatePageRpc(admin, {
+    const pageWrap = await fetchReconciliationCandidatePageRpc(admin, {
       nowMs,
       poolLimit: poolMax,
       cursor: null,
       sourcePlatform: sqlPlatform,
     })
+    if (!pageWrap.ok) {
+      return mapReturned([], pageWrap.salePeekBySaleId, {
+        coverageStateKey,
+        rpcFailed: true,
+        rpcErrorCode: pageWrap.errorCode,
+      })
+    }
+    await writeReconciliationCoverageCursor(admin, coverageStateKey, null)
+    page = pageWrap
   }
 
-  const rows = page.rows.map(mapRpcIngestRowToIngestRowDb).filter((x): x is IngestRowDb => x != null)
-  return { rows: dedupeIngestRowsById(rows), salePeekBySaleId: mapPeekRows(page.salePeekBySaleId), coverageStateKey }
+  return mapReturned(page.rows, page.salePeekBySaleId, {
+    coverageStateKey,
+    rpcFailed: false,
+    rpcErrorCode: null,
+  })
 }
 
 function resolveSyncStatus(params: {
@@ -370,6 +412,9 @@ export interface ReconcileExternalSourcesResult {
   readonly schedulesUpdated: number
   readonly titlesUpdated: number
   readonly manualReviewRequired: number
+  /** False when reconciliation candidate RPC failed; cursor unchanged in DB for that scenario. */
+  readonly candidatePageRpcOk: boolean
+  readonly candidatePageRpcErrorCode: string | null
 }
 
 export interface ReconcileExternalSourcesOptions {
@@ -413,7 +458,13 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_BATCH_LIMIT, 1), RECONCILIATION_HARD_LIMIT_CAP)
   const admin = getAdminDb()
 
-  const { rows: rawRows, salePeekBySaleId, coverageStateKey } = await loadCandidateIngestRows(admin, nowMs, {
+  const {
+    rows: rawRows,
+    salePeekBySaleId,
+    coverageStateKey,
+    candidatePageRpcFailed,
+    candidatePageRpcErrorCode,
+  } = await loadCandidateIngestRows(admin, nowMs, {
     sourcePlatform: options?.sourcePlatform,
     onlyPlaceholder: options?.onlyPlaceholder,
     skipCoverageCursor: options?.skipCoverageCursorPersistence === true,
@@ -436,6 +487,13 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
   const attempted = sortedRows.length
   const batch = sortedRows.slice(0, limit)
   const processed = batch.length
+
+  if (aggregateOnly && candidatePageRpcFailed) {
+    emitReconciliationCandidatePageRpcFailure({
+      errorCode: candidatePageRpcErrorCode ?? 'rpc_error',
+      telemetryContext: options?.telemetryContext,
+    })
+  }
 
   let persistenceWrites = 0
 
@@ -969,6 +1027,8 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       titlesUpdated,
       manualReviewRequired,
       durationMs,
+      candidatePageRpcOk: !candidatePageRpcFailed,
+      candidatePageRpcErrorCode: candidatePageRpcFailed ? candidatePageRpcErrorCode : null,
       telemetryContext: options?.telemetryContext,
     })
     if (applySafeSyncRequested) {
@@ -1027,5 +1087,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     schedulesUpdated,
     titlesUpdated,
     manualReviewRequired,
+    candidatePageRpcOk: !candidatePageRpcFailed,
+    candidatePageRpcErrorCode: candidatePageRpcFailed ? candidatePageRpcErrorCode : null,
   }
 }

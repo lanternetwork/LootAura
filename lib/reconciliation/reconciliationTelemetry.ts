@@ -116,6 +116,9 @@ export function emitReconciliationRunSummary(fields: {
   readonly titlesUpdated: number
   readonly manualReviewRequired: number
   readonly durationMs: number
+  /** False when reconciliation_candidate_rows_page failed (cursor not advanced remotely). */
+  readonly candidatePageRpcOk?: boolean
+  readonly candidatePageRpcErrorCode?: string | null
   readonly telemetryContext?: Record<string, unknown>
 }): void {
   emitObservabilityRecord(
@@ -146,6 +149,21 @@ export function emitReconciliationRunSummary(fields: {
       titlesUpdated: fields.titlesUpdated,
       manualReviewRequired: fields.manualReviewRequired,
       durationMs: fields.durationMs,
+      candidatePageRpcOk: fields.candidatePageRpcOk ?? true,
+      candidatePageRpcErrorCode: fields.candidatePageRpcErrorCode ?? null,
+    })
+  )
+}
+
+/** Companion aggregate when candidate RPC fails (explicit alert hook; no payloads). */
+export function emitReconciliationCandidatePageRpcFailure(fields: {
+  readonly errorCode: string
+  readonly telemetryContext?: Record<string, unknown>
+}): void {
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.reconciliation.candidatePageRpcFailure, {
+      ...(fields.telemetryContext ?? {}),
+      errorCode: fields.errorCode,
     })
   )
 }

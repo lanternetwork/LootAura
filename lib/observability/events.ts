@@ -73,6 +73,8 @@ export const ObservabilityEvents = {
     failed: 'source.reconciliation.failed',
     /** Aggregate-only run summary (Phase 1B runner; no per-row payloads). */
     runSummary: 'source.reconciliation.run_summary',
+    /** Candidate page RPC failure (aggregate; errorCode only, no row ids). */
+    candidatePageRpcFailure: 'source.reconciliation.candidate_page.rpc_failure',
     /** Phase 2A aggregate: public sale rows updated (counts only). */
     salesSyncApplied: 'source.reconciliation.sales_sync_applied',
     /** Phase 2A aggregate: sale sync attempts that did not persist (counts only). */

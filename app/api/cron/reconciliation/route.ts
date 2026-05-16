@@ -41,6 +41,8 @@ function cronReconciliationJsonBody(result: Awaited<ReturnType<typeof reconcileE
     schedulesUpdated: result.schedulesUpdated,
     titlesUpdated: result.titlesUpdated,
     manualReviewRequired: result.manualReviewRequired,
+    candidatePageRpcOk: result.candidatePageRpcOk,
+    candidatePageRpcErrorCode: result.candidatePageRpcErrorCode,
   }
 }
 

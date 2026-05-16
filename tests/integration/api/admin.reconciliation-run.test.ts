@@ -55,6 +55,8 @@ const fullResult = {
   schedulesUpdated: 0,
   titlesUpdated: 0,
   manualReviewRequired: 0,
+  candidatePageRpcOk: true,
+  candidatePageRpcErrorCode: null,
 }
 
 describe('POST /api/admin/reconciliation/run', () => {

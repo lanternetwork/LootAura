@@ -81,6 +81,8 @@ async function reconciliationRunHandler(request: NextRequest) {
       schedulesUpdated: result.schedulesUpdated,
       titlesUpdated: result.titlesUpdated,
       manualReviewRequired: result.manualReviewRequired,
+      candidatePageRpcOk: result.candidatePageRpcOk,
+      candidatePageRpcErrorCode: result.candidatePageRpcErrorCode,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

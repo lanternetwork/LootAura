@@ -471,20 +471,29 @@ async function salesHandler(request: NextRequest) {
     
     let results: PublicSale[] = []
     let degraded = false
-    let totalSalesCount = 0
-    let totalFilteredCount = 0 // Track total filtered count for pagination
-    
+    /** Nationwide exact count (removed from hot path). Only set when gated opt-in matches. */
+    let nationwideSaleCountExact: number | null = null
+    let totalFilteredCount = 0 // Track total filtered count for pagination (bounded window heuristic)
+
+    const allowNationwideExactCount =
+      process.env.SALES_ALLOW_NATIONWIDE_EXACT_COUNT === 'true' &&
+      searchParams.get('includeNationwideCount') === '1'
+
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
     try {
       logger.debug('Querying sales_v2 view', { component: 'sales', operation: 'get_sales' })
-      
-      // First, let's check the total count of sales in the database
-      const { count: totalCount, error: _countError } = await applyPhase4PublicPublishedSaleReadFilters(
-        supabase.from('sales_v2').select('*', { count: 'exact', head: true })
-      )
-      
-      totalSalesCount = totalCount || 0
-      logger.debug('Total published sales count', { component: 'sales', totalCount: totalSalesCount })
+
+      if (allowNationwideExactCount) {
+        const { count: exactNationwide } = await applyPhase4PublicPublishedSaleReadFilters(
+          supabase.from('sales_v2').select('*', { count: 'exact', head: true })
+        )
+        nationwideSaleCountExact = typeof exactNationwide === 'number' ? exactNationwide : null
+        logger.debug('Nationwide sale count (gated)', {
+          component: 'sales',
+          operation: 'nationwide_count_opt_in',
+          totalCount: nationwideSaleCountExact ?? 0,
+        })
+      }
       
       // Use actual bbox if provided, otherwise calculate from distance
       let minLat, maxLat, minLng, maxLng
@@ -1017,9 +1026,12 @@ async function salesHandler(request: NextRequest) {
         limit,
         offset,
         hasMore,
-        // Note: totalCount is database count before filtering; actual filtered count may be lower
+        /** Rows matching bbox + filters within the heuristic fetch-window pass (approximate vs full corpus). */
+        filteredApproxInFetchWindow: totalFilteredCount,
       },
-      totalCount: totalSalesCount || 0, // Total database count (before filtering)
+      /** Deprecated nationwide exact tally; omit from hot path (null unless `includeNationwideCount=1` + env). */
+      totalCount:
+        allowNationwideExactCount && nationwideSaleCountExact !== null ? nationwideSaleCountExact : null,
       durationMs: Date.now() - startedAt
     }
     

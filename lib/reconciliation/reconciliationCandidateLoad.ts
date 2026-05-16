@@ -79,6 +79,20 @@ export function parseReconciliationCandidateRpcPayload(data: unknown): {
 
 export type RpcIngestRow = Record<string, unknown>
 
+/** Result of a single `reconciliation_candidate_rows_page` fetch; `ok: false` preserves cursor semantics upstream. */
+export type ReconciliationCandidatePageResult = {
+  readonly ok: boolean
+  readonly rows: RpcIngestRow[]
+  readonly salePeekBySaleId: Map<string, SalePeekRow>
+  /** PostgREST/Postgres code or `rpc_error`; null on success. Safe for logs (no payloads). */
+  readonly errorCode: string | null
+}
+
+function safeReconciliationRpcErrorCode(error: { code?: string | null }): string {
+  const c = typeof error.code === 'string' && error.code.trim() ? error.code.trim().slice(0, 80) : ''
+  return c || 'rpc_error'
+}
+
 export async function fetchReconciliationCandidatePageRpc(
   admin: ReturnType<typeof getAdminDb>,
   params: {
@@ -87,7 +101,7 @@ export async function fetchReconciliationCandidatePageRpc(
     readonly cursor: ReconciliationCoverageCursor | null
     readonly sourcePlatform: string | undefined
   }
-): Promise<{ readonly rows: RpcIngestRow[]; readonly salePeekBySaleId: Map<string, SalePeekRow> }> {
+): Promise<ReconciliationCandidatePageResult> {
   const iso = new Date(params.nowMs).toISOString()
   const { data, error } = await admin.rpc('reconciliation_candidate_rows_page', {
     p_now_utc: iso,
@@ -99,14 +113,21 @@ export async function fetchReconciliationCandidatePageRpc(
     p_source_platform: params.sourcePlatform?.trim() || null,
   })
   if (error) {
+    const errorCode = safeReconciliationRpcErrorCode(error)
     logger.warn('reconciliation: reconciliation_candidate_rows_page RPC failed', {
       component: 'reconciliation/reconciliationCandidateLoad',
       operation: 'rpc_page',
-      message: error.message,
+      errorCode,
     })
-    return { rows: [], salePeekBySaleId: new Map() }
+    return { ok: false, rows: [], salePeekBySaleId: new Map(), errorCode }
   }
-  return parseReconciliationCandidateRpcPayload(data)
+  const parsed = parseReconciliationCandidateRpcPayload(data)
+  return {
+    ok: true,
+    rows: parsed.rows,
+    salePeekBySaleId: parsed.salePeekBySaleId,
+    errorCode: null,
+  }
 }
 
 export async function readReconciliationCoverageCursor(

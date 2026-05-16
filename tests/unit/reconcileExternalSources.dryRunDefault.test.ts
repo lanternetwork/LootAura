@@ -53,6 +53,7 @@ const reconCtx = vi.hoisted(() => ({
 vi.mock('@/lib/reconciliation/reconciliationCandidateLoad', () => ({
   fetchReconciliationCandidatePageRpc: vi.fn().mockImplementation(() =>
     Promise.resolve({
+      ok: true as const,
       rows: reconCtx.rpcPageRows.map((r) => r.ingest as Record<string, unknown>),
       salePeekBySaleId: new Map([
         [
@@ -68,6 +69,7 @@ vi.mock('@/lib/reconciliation/reconciliationCandidateLoad', () => ({
           },
         ],
       ]),
+      errorCode: null as string | null,
     })
   ),
   parseReconciliationCandidatePoolMax: () => 10_000,

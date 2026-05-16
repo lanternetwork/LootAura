@@ -28,6 +28,8 @@ const mockReconcile = vi.hoisted(() =>
     schedulesUpdated: 0,
     titlesUpdated: 0,
     manualReviewRequired: 0,
+    candidatePageRpcOk: true,
+    candidatePageRpcErrorCode: null,
   })
 )
 

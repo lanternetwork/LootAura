@@ -106,7 +106,7 @@ describe('reconcileExternalSources candidate RPC + coverage cursor', () => {
           }
         }
         return {}
-      }) as typeof fromBase,
+      }) as unknown as typeof fromBase,
     )
   })
 

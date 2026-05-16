@@ -71,6 +71,7 @@ export const ObservabilityEvents = {
     pageDiscovered: 'source.discovery.page_discovered',
     pageValidated: 'source.discovery.page_validated',
     pageValidationFailed: 'source.discovery.page_validation_failed',
+    promotionCompleted: 'source.discovery.promotion_completed',
   },
   reconciliation: {
     started: 'source.reconciliation.started',

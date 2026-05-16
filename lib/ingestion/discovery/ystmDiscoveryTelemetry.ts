@@ -45,6 +45,31 @@ export function emitDiscoveryRunCompleted(snapshot: DiscoveryTelemetrySnapshot, 
   )
 }
 
+export type DiscoveryPromotionTelemetry = {
+  configsPromoted: number
+  configsRepaired: number
+  malformedCityNamesNormalized: number
+  validationsFailed: number
+  manualConfigsSkipped: number
+  sharedHubMappingsCreated: number
+  timezoneUnresolved: number
+  inserts: number
+  updates: number
+  skipped: number
+}
+
+export function emitDiscoveryPromotionCompleted(
+  telemetry: DiscoveryPromotionTelemetry,
+  fields: Record<string, unknown> = {}
+): void {
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.discovery.promotionCompleted, {
+      ...telemetry,
+      ...fields,
+    })
+  )
+}
+
 export function emitDiscoveryPageValidated(fields: {
   stateCode: string
   ok: boolean

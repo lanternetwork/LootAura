@@ -97,7 +97,7 @@ describe('syncPublishedSaleMediaFromIngestedRow', () => {
 
   it('preserves existing healthy gallery (intent none)', async () => {
     const { fromBase } = await import('@/lib/supabase/clients')
-    vi.mocked(fromBase).mockImplementation((_admin: unknown, table: string) => {
+    vi.mocked(fromBase).mockImplementation(((_admin: unknown, table: string) => {
       if (table === 'ingested_sales') {
         return {
           select: () => ({
@@ -138,7 +138,7 @@ describe('syncPublishedSaleMediaFromIngestedRow', () => {
         }
       }
       throw new Error(`unexpected table ${table}`)
-    })
+    }) as never)
 
     hoisted.sanitizeExternalImageUrls.mockResolvedValue([GOOD_A, GOOD_B])
 
@@ -173,7 +173,7 @@ describe('syncPublishedSaleMediaFromIngestedRow', () => {
 
   it('skips unpublished rows without touching sales', async () => {
     const { fromBase } = await import('@/lib/supabase/clients')
-    vi.mocked(fromBase).mockImplementation((_admin: unknown, table: string) => {
+    vi.mocked(fromBase).mockImplementation(((_admin: unknown, table: string) => {
       if (table === 'ingested_sales') {
         return {
           select: () => ({
@@ -199,7 +199,7 @@ describe('syncPublishedSaleMediaFromIngestedRow', () => {
         }
       }
       throw new Error(`unexpected table ${table}`)
-    })
+    }) as never)
 
     const { syncPublishedSaleMediaFromIngestedRow } = await import(
       '@/lib/ingestion/images/syncPublishedSaleMediaFromIngest'
@@ -217,7 +217,7 @@ describe('syncPublishedSaleMediaFromIngestedRow', () => {
   it('does not update ingested_sales status (sales-only patch)', async () => {
     const ingestUpdates: unknown[] = []
     const { fromBase } = await import('@/lib/supabase/clients')
-    vi.mocked(fromBase).mockImplementation((_admin: unknown, table: string) => {
+    vi.mocked(fromBase).mockImplementation(((_admin: unknown, table: string) => {
       if (table === 'ingested_sales') {
         return {
           select: () => ({
@@ -262,7 +262,7 @@ describe('syncPublishedSaleMediaFromIngestedRow', () => {
         }
       }
       throw new Error(`unexpected table ${table}`)
-    })
+    }) as never)
 
     const { syncPublishedSaleMediaFromIngestedRow } = await import(
       '@/lib/ingestion/images/syncPublishedSaleMediaFromIngest'

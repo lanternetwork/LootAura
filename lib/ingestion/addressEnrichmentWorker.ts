@@ -203,6 +203,8 @@ async function processAddressEnrichmentRow(
     attemptCount,
     detailAttemptSource: 'address_enrichment',
     telemetryContext,
+    city: row.city,
+    state: row.state,
   })
 
   const extracted = extractDetailPageAddressFromHtml({

@@ -259,7 +259,7 @@ describe('GET /api/cron/daily', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     const { installAdaptiveThroughputCronMock } = await import('../helpers/mockAdaptiveThroughputForCron')
-    installAdaptiveThroughputCronMock()
+    installAdaptiveThroughputCronMock(mockResolveAdaptiveThroughputForCron)
     mockFetchLastSuccessfulExternalIngestionAt.mockResolvedValue(null)
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth by default
     mockProcessFavoriteSalesStartingSoonJob.mockResolvedValue({ success: true })

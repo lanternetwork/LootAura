@@ -1,11 +1,9 @@
-import { vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { buildStaticThroughputEnvelope } from '@/lib/ingestion/adaptiveThroughputConfig'
 import type {
   AdaptiveThroughputEnvelope,
   AdaptiveThroughputNoteFields,
 } from '@/lib/ingestion/adaptiveThroughputProfile'
-
-export const mockResolveAdaptiveThroughputForCron = vi.fn()
 
 export function normalAdaptiveNoteFromEnvelope(
   envelope: AdaptiveThroughputEnvelope
@@ -28,8 +26,10 @@ export function normalAdaptiveNoteFromEnvelope(
   }
 }
 
-export function installAdaptiveThroughputCronMock(): void {
-  mockResolveAdaptiveThroughputForCron.mockImplementation(async () => {
+export function installAdaptiveThroughputCronMock(
+  mockResolve: Mock<() => Promise<{ envelope: AdaptiveThroughputEnvelope; note: AdaptiveThroughputNoteFields }>>
+): void {
+  mockResolve.mockImplementation(async () => {
     const envelope = buildStaticThroughputEnvelope()
     return {
       envelope,

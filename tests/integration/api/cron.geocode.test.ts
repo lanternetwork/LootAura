@@ -41,8 +41,8 @@ describe('GET /api/cron/geocode', () => {
     const env = process.env as Record<string, string | undefined>
     vi.clearAllMocks()
     recordGeocodeCronOrchestrationRun.mockResolvedValue(undefined)
-    const adaptive = await import('../../helpers/mockAdaptiveThroughputForCron')
-    adaptive.installAdaptiveThroughputCronMock()
+    const { installAdaptiveThroughputCronMock } = await import('../../helpers/mockAdaptiveThroughputForCron')
+    installAdaptiveThroughputCronMock(mockResolveAdaptiveThroughputForCron)
     delete env.GEOCODE_BACKLOG_BATCH_SIZE
     env.NODE_ENV = 'test'
     env.VERCEL_ENV = 'preview'

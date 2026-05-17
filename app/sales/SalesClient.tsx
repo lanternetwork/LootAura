@@ -19,15 +19,19 @@ import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
 import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/lib/keyboard/shortcuts'
 import { 
-  expandBounds, 
   isViewportInsideBounds, 
   filterSalesForViewport,
   normalizeBounds,
   getNormalizedBboxKey,
   type Bounds,
-  MAP_BUFFER_FACTOR,
   MAP_BUFFER_SAFETY_FACTOR
 } from '@/lib/map/bounds'
+import {
+  prepareFetchBbox,
+  isLowZoomForDeferredFetch,
+  clampBoundsToApiLimit,
+  logFetchBboxDebug,
+} from '@/lib/map/fetchBbox'
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
 import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable, logLocationFallback } from '@/lib/map/geolocation'
@@ -425,6 +429,16 @@ export default function SalesClient({
 
   // Lightweight request-key dedupe: same bounds+filters cannot be in-flight twice (remount/strict-mode)
   const inFlightRequestKeyRef = useRef<string | null>(null)
+  /** True after Mapbox reports bounds via onLoad/onViewportChange (not synthetic mapView estimate). */
+  const mapboxBoundsReadyRef = useRef(false)
+
+  const buildFetchBoundsFromViewport = useCallback((viewportBounds: Bounds): Bounds => {
+    const { fetchBounds, wasClamped } = prepareFetchBbox(viewportBounds)
+    if (wasClamped) {
+      logFetchBboxDebug('fetch_bbox_clamped_to_api_limit')
+    }
+    return fetchBounds
+  }, [])
 
   // Fetch sales based on buffered bounds (not tight viewport)
   // This function now receives bufferedBounds, which are larger than the viewport
@@ -503,10 +517,11 @@ export default function SalesClient({
         if (!bufferedBbox) {
           throw new Error('bufferedBbox is required when not using near=1 mode')
         }
-        params.set('north', bufferedBbox.north.toString())
-        params.set('south', bufferedBbox.south.toString())
-        params.set('east', bufferedBbox.east.toString())
-        params.set('west', bufferedBbox.west.toString())
+        const { bounds: apiBbox } = clampBoundsToApiLimit(bufferedBbox)
+        params.set('north', apiBbox.north.toString())
+        params.set('south', apiBbox.south.toString())
+        params.set('east', apiBbox.east.toString())
+        params.set('west', apiBbox.west.toString())
         
         if (isDebugEnabled) {
           console.log('[FETCH] Buffered bbox area (degrees):', {
@@ -544,6 +559,17 @@ export default function SalesClient({
         signal: abortControllerRef.current.signal
       })
       if (!response.ok) {
+        let errorCode: string | undefined
+        try {
+          const errBody = (await response.json()) as { code?: string }
+          errorCode = errBody?.code
+        } catch {
+          // non-JSON error body
+        }
+        if (errorCode === 'BBOX_TOO_LARGE' && fetchedSales.length > 0) {
+          logFetchBboxDebug('bbox_too_large_ignored_preserving_existing_sales')
+          return
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
@@ -808,18 +834,18 @@ export default function SalesClient({
   useEffect(() => {
     if (initialSales.length > 0 && mapView?.bounds && !bufferedBounds) {
       // Estimate that initial sales were fetched for a buffered area around initial viewport
-      const initialBufferedBounds = expandBounds({
+      const initialBufferedBounds = buildFetchBoundsFromViewport({
         west: mapView.bounds.west,
         south: mapView.bounds.south,
         east: mapView.bounds.east,
         north: mapView.bounds.north
-      }, MAP_BUFFER_FACTOR)
+      })
       setBufferedBounds(initialBufferedBounds)
       if (isDebugEnabled) {
         console.log('[BUFFER] Initialized bufferedBounds from initial sales:', initialBufferedBounds)
       }
     }
-  }, [initialSales.length, mapView?.bounds, bufferedBounds])
+  }, [initialSales.length, mapView?.bounds, bufferedBounds, buildFetchBoundsFromViewport])
 
   // Proactive initial fetch: when mapView is established and there is no SSR sales data,
   // fetch immediately (no 200ms debounce) so the request runs in parallel with map load.
@@ -833,6 +859,15 @@ export default function SalesClient({
     ) {
       return
     }
+    if (isLowZoomForDeferredFetch(mapView.zoom)) {
+      if (!mapboxBoundsReadyRef.current) {
+        logFetchBboxDebug('initial_fetch_deferred_until_real_bounds', { zoom: mapView.zoom })
+        return
+      }
+      // Real bounds arrived via onLoad → handleViewportChange owns the first fetch.
+      proactiveInitialFetchTriggeredRef.current = true
+      return
+    }
     proactiveInitialFetchTriggeredRef.current = true
     const rawViewportBounds: Bounds = {
       west: mapView.bounds.west,
@@ -842,13 +877,13 @@ export default function SalesClient({
     }
     const viewportBoundsForProactive = normalizeBounds(rawViewportBounds)
     proactiveNormalizedBboxKeyRef.current = getNormalizedBboxKey(viewportBoundsForProactive)
-    const newBufferedBounds = expandBounds(viewportBoundsForProactive, MAP_BUFFER_FACTOR)
+    const newBufferedBounds = buildFetchBoundsFromViewport(viewportBoundsForProactive)
     setBufferedBounds(newBufferedBounds)
     if (isDebugEnabled) {
       console.log('[SALES] Proactive initial fetch (no debounce):', { viewportBoundsForProactive, newBufferedBounds })
     }
     fetchMapSales(newBufferedBounds)
-  }, [mapView?.bounds, initialSales.length, fetchMapSales])
+  }, [mapView?.bounds, mapView?.zoom, initialSales.length, fetchMapSales, buildFetchBoundsFromViewport])
 
   // Process pending create events when viewport becomes available
   useEffect(() => {
@@ -1310,6 +1345,8 @@ export default function SalesClient({
   // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
   // Core buffer logic: only fetch when viewport exits buffered area
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
+    mapboxBoundsReadyRef.current = true
+
     // Skip URL update if we're in the middle of an imperative recenter
     // This prevents the viewport resolver from triggering another easeTo conflict
     const skipUrlUpdate = isImperativeRecenterRef.current
@@ -1484,7 +1521,7 @@ export default function SalesClient({
         const needsFetch = !bufferedBounds || !isViewportInsideBounds(normalizedViewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
 
         if (needsFetch) {
-          const newBufferedBounds = expandBounds(normalizedViewportBounds, MAP_BUFFER_FACTOR)
+          const newBufferedBounds = buildFetchBoundsFromViewport(normalizedViewportBounds)
 
           if (isDebugEnabled) {
             console.log('[SALES] Viewport outside buffer - fetching new buffered area:', {
@@ -1529,7 +1566,7 @@ export default function SalesClient({
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
     }, 200)
-  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance, writeLocationCookie])
+  }, [bufferedBounds, fetchMapSales, buildFetchBoundsFromViewport, selectedPinId, hybridResult, pendingBounds, filters.dateRange, filters.categories, filters.distance, writeLocationCookie])
 
   // Imperative function to force recenter map to a location
   // This bypasses all guards (isUserDragging, fitBounds, authority checks) and directly moves the map
@@ -2075,7 +2112,7 @@ export default function SalesClient({
         }, 800) // Give map time to apply bounds
         
         // Trigger immediate refetch with new distance filter
-        const newBufferedBounds = expandBounds(newBounds, MAP_BUFFER_FACTOR)
+        const newBufferedBounds = buildFetchBoundsFromViewport(newBounds)
         fetchMapSales(newBufferedBounds, newFilters)
       } else {
         // No center yet, just update zoom
@@ -2137,8 +2174,8 @@ export default function SalesClient({
         east: mapView.bounds.east,
         north: mapView.bounds.north
       }
-      const newBufferedBounds = expandBounds(viewportBounds, MAP_BUFFER_FACTOR)
-      
+      const newBufferedBounds = buildFetchBoundsFromViewport(viewportBounds)
+
       if (isDebugEnabled) {
         console.log('[FILTERS] Filter change - fetching new buffered area with filters:', {
           newFilters,
@@ -2146,7 +2183,7 @@ export default function SalesClient({
           newBufferedBounds
         })
       }
-      
+
       // Fetch with buffered bounds and new filters
       // Old data stays visible during fetch (no clearing)
       fetchMapSales(newBufferedBounds, newFilters)

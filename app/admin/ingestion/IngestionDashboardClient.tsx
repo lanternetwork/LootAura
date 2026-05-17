@@ -178,12 +178,30 @@ export default function IngestionDashboardClient() {
                     ? '—'
                     : `${Math.round(data.volume.publish.oldestReadyAgeMs / 60000)} min`}{' '}
                   · Crawl overdue configs: {data.volume.fetch.configsOverdue}
+                  · Address enrichment backlog: {data.volume.addressLifecycle.enrichmentBacklog}
+                  · Image enrichment backlog: {data.volume.imageEnrichment.backlog}
                 </p>
               </div>
             )}
 
-            <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
               <MetricCard label="Backlog (needs_geocode)" value={data.backlog} highlight />
+              <MetricCard
+                label="Geocode eligible"
+                value={data.geocodeEligibleBacklog}
+                title="needs_geocode + address_available + address_raw"
+              />
+              <MetricCard
+                label="Needs check (D2)"
+                value={data.failureBreakdown.needs_check}
+                title="Publish review queue (e.g. low coordinate precision)"
+              />
+              <MetricCard
+                label="Address enrichment"
+                value={data.volume.addressLifecycle.enrichmentBacklog}
+              />
+              <MetricCard label="Image backlog (YSTM)" value={data.volume.imageEnrichment.backlog} />
+              <MetricCard label="With image" value={data.volume.imageEnrichment.hasImage} />
               <MetricCard label="Published 24h" value={data.published24h} />
               <MetricCard label="Claimed 24h (runs)" value={data.claimed24h} />
               <MetricCard label="Geocode touches 24h" value={data.geocodeTouches24h} />
@@ -192,6 +210,94 @@ export default function IngestionDashboardClient() {
                 value={data.efficiency == null ? '—' : `${(data.efficiency * 100).toFixed(1)}%`}
               />
               <MetricCard label="Updated" value={new Date(data.generatedAt).toLocaleTimeString()} />
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="mb-3 text-lg font-semibold">Address lifecycle (D1)</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500">
+                      <th className="py-2 pr-4">address_status</th>
+                      <th className="py-2">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(data.volume.addressLifecycle.byStatus)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([status, count]) => (
+                        <tr key={status} className="border-b border-gray-100">
+                          <td className="py-2 pr-4 font-mono text-xs">{status}</td>
+                          <td className="py-2 tabular-nums">{count}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                <p className="mt-3 text-xs text-gray-500">
+                  Enrichment backlog (gated / pending / retry):{' '}
+                  <span className="font-medium text-gray-800">
+                    {data.volume.addressLifecycle.enrichmentBacklog}
+                  </span>
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="mb-3 text-lg font-semibold">Image enrichment (D2.5)</h2>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <dt className="text-gray-500">YSTM backlog</dt>
+                  <dd className="font-medium tabular-nums">{data.volume.imageEnrichment.backlog}</dd>
+                  <dt className="text-gray-500">Rows with image</dt>
+                  <dd className="font-medium tabular-nums">{data.volume.imageEnrichment.hasImage}</dd>
+                  <dt className="text-gray-500">Attempts (24h)</dt>
+                  <dd className="font-medium tabular-nums">{data.volume.imageEnrichment.attempted24h}</dd>
+                </dl>
+                <h3 className="mb-2 mt-4 text-sm font-medium text-gray-700">Failure reasons</h3>
+                <table className="w-full text-sm">
+                  <tbody>
+                    {Object.entries(data.volume.imageEnrichment.byFailureReason)
+                      .filter(([, count]) => count > 0)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([reason, count]) => (
+                        <tr key={reason} className="border-b border-gray-100">
+                          <td className="py-1.5 pr-4 font-mono text-xs">{reason}</td>
+                          <td className="py-1.5 tabular-nums">{count}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {Object.values(data.volume.imageEnrichment.byFailureReason).every((c) => c === 0) && (
+                  <p className="mt-2 text-xs text-gray-500">No terminal failure reasons recorded.</p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="mb-3 text-lg font-semibold">Geocode queue</h2>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">All needs_geocode</dt>
+                    <dd className="font-medium tabular-nums">{data.volume.geocode.needsGeocodeCount}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">Claim-eligible</dt>
+                    <dd className="font-medium tabular-nums">
+                      {data.volume.geocode.eligibleNeedsGeocodeCount}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">Gated / not yet address_available</dt>
+                    <dd className="font-medium tabular-nums">
+                      {Math.max(
+                        0,
+                        data.volume.geocode.needsGeocodeCount -
+                          data.volume.geocode.eligibleNeedsGeocodeCount
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-4 text-xs text-gray-500">
+                  Bottleneck classification uses claim-eligible geocode count, not total needs_geocode.
+                </p>
+              </div>
             </div>
 
             <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -376,8 +482,9 @@ export default function IngestionDashboardClient() {
                       {data.oldestStuckRows.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-4 text-gray-500">
-                            No operational stuck rows (needs_geocode / ready / publishing / publish_failed). Expired
-                            sale windows appear in failure breakdown and publish expired charts, not here.
+                            No operational stuck rows (needs_geocode / ready / publishing / publish_failed).
+                            needs_check (D2 review) appears in failure breakdown above, not here. Expired sale
+                            windows appear in publish expired charts.
                           </td>
                         </tr>
                       ) : (
@@ -411,13 +518,16 @@ function MetricCard({
   label,
   value,
   highlight,
+  title,
 }: {
   label: string
   value: string | number
   highlight?: boolean
+  title?: string
 }) {
   return (
     <div
+      title={title}
       className={`rounded-lg border p-4 shadow-sm ${
         highlight ? 'border-blue-200 bg-blue-50/50' : 'border-gray-200 bg-white'
       }`}

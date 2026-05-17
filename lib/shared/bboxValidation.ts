@@ -3,12 +3,9 @@
  * Enforces maximum bbox size to prevent abuse and large queries
  */
 
-/**
- * Maximum allowed bbox span in degrees (latitude and longitude)
- * ~10 degrees ≈ 1110km, which is reasonable for a yard sale discovery app
- * This prevents queries that span entire continents
- */
-const MAX_BBOX_SPAN_DEGREES = 10
+import { MAX_BBOX_SPAN_DEGREES } from '@/lib/shared/bboxLimits'
+
+export { MAX_BBOX_SPAN_DEGREES }
 
 /**
  * Validate bbox size

@@ -19,7 +19,20 @@ vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'not', 'gte', 'in', 'is', 'order', 'limit', 'range']) {
+  for (const m of [
+    'select',
+    'eq',
+    'neq',
+    'not',
+    'gte',
+    'lt',
+    'in',
+    'is',
+    'or',
+    'order',
+    'limit',
+    'range',
+  ]) {
     q[m] = vi.fn(() => q)
   }
   q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
@@ -95,10 +108,12 @@ describe('GET /api/admin/ingestion/metrics', () => {
     expect(res.status).toBe(200)
     const json = (await res.json()) as {
       ok: boolean
+      geocodeEligibleBacklog: number
       volume: {
         addressLifecycle: { enrichmentBacklog: number; byStatus: Record<string, number> }
+        imageEnrichment: { backlog: number; hasImage: number }
         fetch: { crawlableConfigsTotal: number }
-        geocode: { needsGeocodeCount: number }
+        geocode: { needsGeocodeCount: number; eligibleNeedsGeocodeCount: number }
         bottleneck: string
       }
       oldestStuckRows: Array<Record<string, unknown>>
@@ -107,6 +122,9 @@ describe('GET /api/admin/ingestion/metrics', () => {
     expect(json.volume.fetch.crawlableConfigsTotal).toBe(10)
     expect(json.volume.geocode.needsGeocodeCount).toBe(5)
     expect(json.volume.addressLifecycle.enrichmentBacklog).toBe(5)
+    expect(json.volume.imageEnrichment.backlog).toBe(5)
+    expect(json.volume.geocode.eligibleNeedsGeocodeCount).toBe(5)
+    expect(json.geocodeEligibleBacklog).toBe(5)
     expect(json.volume.bottleneck).toBeTruthy()
     expect(JSON.stringify(json)).not.toMatch(/https?:\/\//i)
     for (const row of json.oldestStuckRows) {

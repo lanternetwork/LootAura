@@ -35,8 +35,17 @@ export interface IngestionVolumeAddressLifecycleMetrics {
   enrichmentBacklog: number
 }
 
+export interface IngestionVolumeImageEnrichmentMetrics {
+  backlog: number
+  hasImage: number
+  attempted24h: number
+  byFailureReason: Record<string, number>
+}
+
 export interface IngestionVolumeGeocodeMetrics {
   needsGeocodeCount: number
+  /** Rows claimable by geocode RPC (address_available + non-empty address_raw). */
+  eligibleNeedsGeocodeCount: number
   oldestNeedsGeocodeAgeMs: number | null
   geocodeSucceeded24h: number
   geocodeRetryableFailed24h: number
@@ -73,6 +82,7 @@ export interface IngestionVolumeReconciliationMetrics {
 export interface IngestionVolumeMetrics {
   fetch: IngestionVolumeFetchMetrics
   addressLifecycle: IngestionVolumeAddressLifecycleMetrics
+  imageEnrichment: IngestionVolumeImageEnrichmentMetrics
   geocode: IngestionVolumeGeocodeMetrics
   publish: IngestionVolumePublishMetrics
   discovery: IngestionVolumeDiscoveryMetrics
@@ -96,6 +106,8 @@ export interface IngestionMetricsResponse {
   ok: boolean
   generatedAt: string
   backlog: number
+  /** needs_geocode rows eligible for geocode claim (address_available + address_raw). */
+  geocodeEligibleBacklog: number
   published24h: number
   claimed24h: number
   geocodeTouches24h: number

@@ -9,7 +9,11 @@
  * CRITICAL: This must match client behavior exactly to avoid data mismatches.
  */
 
-import { expandBounds, type Bounds, MAP_BUFFER_FACTOR } from '@/lib/map/bounds'
+import { type Bounds } from '@/lib/map/bounds'
+import {
+  isLowZoomForDeferredFetch,
+  prepareFetchBbox,
+} from '@/lib/map/fetchBbox'
 import { Sale } from '@/lib/types'
 
 /**
@@ -128,7 +132,7 @@ async function fetchSalesForBbox(
 
 export interface SSRInitialSalesResult {
   initialSales: Sale[]
-  initialBufferedBounds: Bounds
+  initialBufferedBounds: Bounds | null
 }
 
 /**
@@ -153,15 +157,20 @@ export async function computeSSRInitialSales(
     distance?: number
   } = {}
 ): Promise<SSRInitialSalesResult> {
+  const defaultDistance = 10
+  const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(defaultDistance)
+  if (Number.isNaN(calculatedZoom) || isLowZoomForDeferredFetch(calculatedZoom)) {
+    return { initialSales: [], initialBufferedBounds: null }
+  }
+
   // Compute initial viewport bounds (matching client's mapView initialization)
   const viewportBounds = computeInitialViewportBounds(center, urlZoom)
-  
-  // Calculate buffered bounds (matching client's expandBounds call in handleViewportChange)
-  const bufferedBounds = expandBounds(viewportBounds, MAP_BUFFER_FACTOR)
-  
+
+  const { fetchBounds: bufferedBounds } = prepareFetchBbox(viewportBounds)
+
   // Convert distance from miles to km (matching client fetchMapSales line 354)
   const distanceKm = filters.distance ? filters.distance * 1.60934 : undefined
-  
+
   // Fetch sales with same logic as client
   const sales = await fetchSalesForBbox(bufferedBounds, baseUrl, {
     dateRange: filters.dateRange || 'any',

@@ -30,6 +30,7 @@ import {
 } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
 import { ADDRESS_STATUSES } from '@/lib/ingestion/address/addressLifecycleTypes'
+import type { ImageEnrichmentFailureReason } from '@/lib/ingestion/imageEnrichmentWorker'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
@@ -37,6 +38,21 @@ import { logger } from '@/lib/log'
 export const dynamic = 'force-dynamic'
 
 const ORCHESTRATION_RUNS_LIMIT = 2000
+
+const IMAGE_ENRICHMENT_FAILURE_REASONS: ImageEnrichmentFailureReason[] = [
+  'not_ystm_detail',
+  'fetch_failed',
+  'fetch_blocked',
+  'fetch_rate_limited',
+  'not_found',
+  'no_media_str',
+  'no_valid_urls',
+  'max_attempts_exceeded',
+]
+
+/** Approximates claim_ingested_sales_for_image_enrichment YSTM detail URL filter. */
+const YSTM_DETAIL_SOURCE_URL_FILTER =
+  'source_url.ilike.%yardsaletreasuremap%.com/%listing.html%,source_url.ilike.%yardsaletreasuremap%.net/%listing.html%,source_url.ilike.%yardsaletreasuremap%.org/%listing.html%,source_url.ilike.%yardsaletreasuremap%.com/%userlisting.html%,source_url.ilike.%yardsaletreasuremap%.net/%userlisting.html%,source_url.ilike.%yardsaletreasuremap%.org/%userlisting.html%'
 
 function jsonError(status: number, code: string, message: string) {
   return NextResponse.json({ ok: false, code, message }, { status })
@@ -223,6 +239,41 @@ export async function GET(request: NextRequest) {
         'address_enrichment_retry',
       ])
 
+    const geocodeEligibleBacklogPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'needs_geocode')
+      .eq('address_status', 'address_available')
+      .not('address_raw', 'is', null)
+      .neq('address_raw', '')
+
+    const imageEnrichmentBacklogPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('address_status', 'address_available')
+      .or('image_source_url.is.null,image_source_url.eq.')
+      .lt('image_enrichment_attempts', 5)
+      .or(YSTM_DETAIL_SOURCE_URL_FILTER)
+
+    const imageHasImagePromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .not('image_source_url', 'is', null)
+      .neq('image_source_url', '')
+
+    const imageAttempted24hPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .gte('last_image_enrichment_attempt_at', iso24h)
+
+    const imageFailureReasonCountPromises = IMAGE_ENRICHMENT_FAILURE_REASONS.map(
+      async (reason) => {
+        const { count, error } = await fromBase(admin, 'ingested_sales')
+          .select('id', { count: 'exact', head: true })
+          .eq('image_enrichment_failure_reason', reason)
+        if (error) {
+          throw new Error(error.message)
+        }
+        return { reason, count: count ?? 0 }
+      }
+    )
+
     const [
       statusParts,
       published24hResult,
@@ -242,6 +293,11 @@ export async function GET(request: NextRequest) {
       discoveryCounts,
       addressStatusParts,
       addressEnrichmentBacklogResult,
+      geocodeEligibleBacklogResult,
+      imageEnrichmentBacklogResult,
+      imageHasImageResult,
+      imageAttempted24hResult,
+      imageFailureReasonParts,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
       published24hPromise,
@@ -261,6 +317,11 @@ export async function GET(request: NextRequest) {
       Promise.all(discoveryStatusPromises),
       Promise.all(addressStatusCountPromises),
       addressEnrichmentBacklogPromise,
+      geocodeEligibleBacklogPromise,
+      imageEnrichmentBacklogPromise,
+      imageHasImagePromise,
+      imageAttempted24hPromise,
+      Promise.all(imageFailureReasonCountPromises),
     ])
 
     const statusMap = Object.fromEntries(statusParts.map((p) => [p.status, p.count])) as Record<
@@ -272,9 +333,30 @@ export async function GET(request: NextRequest) {
     if (addressEnrichmentBacklogResult.error) {
       throw new Error(addressEnrichmentBacklogResult.error.message)
     }
+    if (geocodeEligibleBacklogResult.error) {
+      throw new Error(geocodeEligibleBacklogResult.error.message)
+    }
+    if (imageEnrichmentBacklogResult.error) {
+      throw new Error(imageEnrichmentBacklogResult.error.message)
+    }
+    if (imageHasImageResult.error) {
+      throw new Error(imageHasImageResult.error.message)
+    }
+    if (imageAttempted24hResult.error) {
+      throw new Error(imageAttempted24hResult.error.message)
+    }
+    const geocodeEligibleBacklog = geocodeEligibleBacklogResult.count ?? 0
     const addressLifecycleMetrics = {
       byStatus: Object.fromEntries(addressStatusParts.map((p) => [p.addressStatus, p.count])),
       enrichmentBacklog: addressEnrichmentBacklogResult.count ?? 0,
+    }
+    const imageEnrichmentMetrics = {
+      backlog: imageEnrichmentBacklogResult.count ?? 0,
+      hasImage: imageHasImageResult.count ?? 0,
+      attempted24h: imageAttempted24hResult.count ?? 0,
+      byFailureReason: Object.fromEntries(
+        imageFailureReasonParts.map((p) => [p.reason, p.count])
+      ),
     }
     if (published24hResult.error) {
       throw new Error(published24hResult.error.message)
@@ -390,7 +472,7 @@ export async function GET(request: NextRequest) {
         : null
 
     const bottleneck = classifyIngestionBottleneck({
-      needsGeocodeCount: backlog,
+      needsGeocodeCount: geocodeEligibleBacklog,
       readyCount: statusMap.ready,
       oldestNeedsGeocodeAgeMs,
       oldestReadyAgeMs,
@@ -448,6 +530,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       generatedAt: now.toISOString(),
       backlog,
+      geocodeEligibleBacklog,
       published24h,
       claimed24h,
       geocodeTouches24h,
@@ -496,8 +579,10 @@ export async function GET(request: NextRequest) {
           budgetExitCount24h: fetchRollup.budgetExitCount,
         },
         addressLifecycle: addressLifecycleMetrics,
+        imageEnrichment: imageEnrichmentMetrics,
         geocode: {
           needsGeocodeCount: backlog,
+          eligibleNeedsGeocodeCount: geocodeEligibleBacklog,
           oldestNeedsGeocodeAgeMs,
           geocodeSucceeded24h: geocodeRollup.succeeded,
           geocodeRetryableFailed24h: geocodeRollup.retryableFailed,

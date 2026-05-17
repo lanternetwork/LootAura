@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import AdminTools from '@/components/AdminTools'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import DebugToggle from '@/components/debug/DebugToggle'
@@ -42,6 +43,20 @@ export default function AdminToolsPageClient() {
           <p className="mt-2 text-gray-600">
             Development and debugging tools for LootAura
           </p>
+        </div>
+
+        <div className="mb-8 rounded-lg border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-indigo-900">Ingestion operations</h2>
+          <p className="mt-1 text-sm text-indigo-800">
+            Live pipeline metrics: address enrichment (D1), image enrichment (D2.5), geocode, publish, and
+            crawl health.
+          </p>
+          <Link
+            href="/admin/ingestion"
+            className="mt-3 inline-block rounded-md bg-indigo-700 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-800"
+          >
+            Open ingestion dashboard →
+          </Link>
         </div>
         
         <div className="space-y-8">

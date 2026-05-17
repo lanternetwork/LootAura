@@ -7,6 +7,14 @@ import {
   normalizeIngestionState,
   normalizeLocalityForGeocodeQuery,
 } from '@/lib/ingestion/normalizeIngestionLocation'
+import {
+  confidenceForPrecision,
+  methodForPrecision,
+  type CoordinatePrecision,
+  type GeocodeConfidence,
+  type GeocodeMethod,
+} from '@/lib/geocode/geocodePrecisionPolicy'
+import { inferCoordinatePrecision } from '@/lib/geocode/inferCoordinatePrecision'
 
 const RATE_LIMIT_BACKOFF_MS = 250
 
@@ -27,6 +35,8 @@ export type GeocodeMode = 'primary' | 'fallback_arbitrated'
 
 export interface GeocodeAddressOptions {
   mode?: GeocodeMode
+  /** When `allow_broad_locality`, city-only queries and broad Nominatim matches may return coords tagged locality. */
+  classificationMode?: 'strict' | 'allow_broad_locality'
 }
 
 export type GeocodeQueryStrategy = 'minimal_locality' | 'normalize_locality'
@@ -81,8 +91,12 @@ export interface GeocodeAddressOutcome {
   geocodeCityRaw?: string
   /** City token after `normalizeLocalityForGeocodeQuery`; persisted on failed attempts only. */
   geocodeCityNormalized?: string
-  /** Single-attempt diagnostics (operator logs may include query text; DB persists fingerprint + length only). */
+  /** Single-attempt diagnostics (DB persists fingerprint + length only; no raw query text). */
   attemptLog?: GeocodeAttemptLog
+  coordinatePrecision?: CoordinatePrecision
+  geocodeConfidence?: GeocodeConfidence
+  geocodeMethod?: GeocodeMethod
+  broadMatch?: boolean
 }
 
 function normalizeWhitespace(value: string): string {
@@ -238,9 +252,11 @@ export async function geocodeAddress(
   const cityRaw = input.city.trim()
   const state = input.state.trim()
   const mode: GeocodeMode = options?.mode ?? 'fallback_arbitrated'
+  const classificationMode = options?.classificationMode ?? 'strict'
+  const localityOnly = classificationMode === 'allow_broad_locality' && address.length === 0
   const queryStrategy: GeocodeQueryStrategy = mode === 'primary' ? 'minimal_locality' : 'normalize_locality'
 
-  if (!address || !cityRaw || !state) {
+  if ((!address && !localityOnly) || !cityRaw || !state) {
     logger.info('Nominatim geocode skipped (empty locality inputs)', {
       component: 'geocode/geocodeAddress',
       operation: 'nominatim_query',
@@ -273,8 +289,10 @@ export async function geocodeAddress(
 
   try {
     const email = getNominatimEmail()
-    const postalCode = extractUsPostalCodeForGeocodeQuery(address, state)
-    const query = buildResidentialQuery(address, cityNormalized, state, postalCode)
+    const postalCode = localityOnly ? null : extractUsPostalCodeForGeocodeQuery(address, state)
+    const query = localityOnly
+      ? [cityNormalized, state, 'USA'].filter(Boolean).join(', ')
+      : buildResidentialQuery(address, cityNormalized, state, postalCode)
     const queryFingerprint = createHash('sha256').update(query.toLowerCase()).digest('hex').slice(0, 16)
     const attemptLog: GeocodeAttemptLog = {
       mode,
@@ -290,7 +308,7 @@ export async function geocodeAddress(
       queryFingerprint,
       geocodeMode: mode,
       queryStrategy,
-      queryString: query,
+      queryCharLength: query.length,
     })
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
       query
@@ -463,6 +481,28 @@ export async function geocodeAddress(
     if (cityMismatch) lowConfidenceReasons.push('city_mismatch')
     if (stateMismatch) lowConfidenceReasons.push('state_mismatch')
     if (broadMatch || cityMismatch || stateMismatch) {
+      if (classificationMode === 'allow_broad_locality' && broadMatch && !stateMismatch) {
+        const precision = inferCoordinatePrecision({
+          addressLine: address,
+          classificationMode,
+          broadMatch: true,
+        })
+        const method = methodForPrecision(precision, mode === 'fallback_arbitrated')
+        return {
+          coords: { lat, lng },
+          hit429: false,
+          queryFingerprint,
+          providerClassification: 'ok',
+          lowConfidenceReasons,
+          geocodeCityRaw: cityRaw,
+          geocodeCityNormalized: cityNormalized,
+          attemptLog,
+          coordinatePrecision: precision,
+          geocodeConfidence: confidenceForPrecision(precision),
+          geocodeMethod: method,
+          broadMatch: true,
+        }
+      }
       logger.warn('Nominatim returned low-confidence geocode candidate', {
         component: 'geocode/geocodeAddress',
         operation: 'nominatim_classify',
@@ -482,9 +522,16 @@ export async function geocodeAddress(
         geocodeCityRaw: cityRaw,
         geocodeCityNormalized: cityNormalized,
         attemptLog,
+        broadMatch,
       }
     }
 
+    const precision = inferCoordinatePrecision({
+      addressLine: address,
+      classificationMode,
+      broadMatch: false,
+    })
+    const method = methodForPrecision(precision, mode === 'fallback_arbitrated')
     logger.info('Nominatim geocode succeeded', {
       component: 'geocode/geocodeAddress',
       operation: 'nominatim_complete',
@@ -492,6 +539,8 @@ export async function geocodeAddress(
       geocode_city_normalized: cityNormalized,
       queryFingerprint,
       providerClassification: 'ok' as const,
+      coordinatePrecision: precision,
+      geocodeMethod: method,
       ...(lowImportance ? { low_importance_observed: true as const } : {}),
     })
     return {
@@ -502,6 +551,10 @@ export async function geocodeAddress(
       geocodeCityRaw: cityRaw,
       geocodeCityNormalized: cityNormalized,
       attemptLog,
+      coordinatePrecision: precision,
+      geocodeConfidence: confidenceForPrecision(precision),
+      geocodeMethod: method,
+      broadMatch: false,
     }
   } catch (error) {
     logger.error(

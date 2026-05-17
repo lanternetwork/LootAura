@@ -29,6 +29,7 @@ import {
   type OrchestrationRunRow,
 } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
+import { ADDRESS_STATUSES } from '@/lib/ingestion/address/addressLifecycleTypes'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
@@ -204,6 +205,24 @@ export async function GET(request: NextRequest) {
       countExternalDiscoveryStatus(admin, SOURCE_DISCOVERY_STATUS.failed),
     ] as const
 
+    const addressStatusCountPromises = ADDRESS_STATUSES.map(async (addressStatus) => {
+      const { count, error } = await fromBase(admin, 'ingested_sales')
+        .select('id', { count: 'exact', head: true })
+        .eq('address_status', addressStatus)
+      if (error) {
+        throw new Error(error.message)
+      }
+      return { addressStatus, count: count ?? 0 }
+    })
+
+    const addressEnrichmentBacklogPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .in('address_status', [
+        'address_gated',
+        'address_enrichment_pending',
+        'address_enrichment_retry',
+      ])
+
     const [
       statusParts,
       published24hResult,
@@ -221,6 +240,8 @@ export async function GET(request: NextRequest) {
       lastSuccessfulFetchAt,
       laneStateSummaries,
       discoveryCounts,
+      addressStatusParts,
+      addressEnrichmentBacklogResult,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
       published24hPromise,
@@ -238,6 +259,8 @@ export async function GET(request: NextRequest) {
       lastSuccessfulFetchPromise,
       laneStateSummariesPromise,
       Promise.all(discoveryStatusPromises),
+      Promise.all(addressStatusCountPromises),
+      addressEnrichmentBacklogPromise,
     ])
 
     const statusMap = Object.fromEntries(statusParts.map((p) => [p.status, p.count])) as Record<
@@ -246,6 +269,13 @@ export async function GET(request: NextRequest) {
     >
 
     const backlog = statusMap.needs_geocode
+    if (addressEnrichmentBacklogResult.error) {
+      throw new Error(addressEnrichmentBacklogResult.error.message)
+    }
+    const addressLifecycleMetrics = {
+      byStatus: Object.fromEntries(addressStatusParts.map((p) => [p.addressStatus, p.count])),
+      enrichmentBacklog: addressEnrichmentBacklogResult.count ?? 0,
+    }
     if (published24hResult.error) {
       throw new Error(published24hResult.error.message)
     }
@@ -465,6 +495,7 @@ export async function GET(request: NextRequest) {
           averageExternalFetchDurationMs,
           budgetExitCount24h: fetchRollup.budgetExitCount,
         },
+        addressLifecycle: addressLifecycleMetrics,
         geocode: {
           needsGeocodeCount: backlog,
           oldestNeedsGeocodeAgeMs,

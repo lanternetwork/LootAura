@@ -19,7 +19,7 @@ vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'not', 'gte', 'in', 'order', 'limit', 'range']) {
+  for (const m of ['select', 'eq', 'not', 'gte', 'in', 'is', 'order', 'limit', 'range']) {
     q[m] = vi.fn(() => q)
   }
   q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
@@ -96,6 +96,7 @@ describe('GET /api/admin/ingestion/metrics', () => {
     const json = (await res.json()) as {
       ok: boolean
       volume: {
+        addressLifecycle: { enrichmentBacklog: number; byStatus: Record<string, number> }
         fetch: { crawlableConfigsTotal: number }
         geocode: { needsGeocodeCount: number }
         bottleneck: string
@@ -105,6 +106,7 @@ describe('GET /api/admin/ingestion/metrics', () => {
     expect(json.ok).toBe(true)
     expect(json.volume.fetch.crawlableConfigsTotal).toBe(10)
     expect(json.volume.geocode.needsGeocodeCount).toBe(5)
+    expect(json.volume.addressLifecycle.enrichmentBacklog).toBe(5)
     expect(json.volume.bottleneck).toBeTruthy()
     expect(JSON.stringify(json)).not.toMatch(/https?:\/\//i)
     for (const row of json.oldestStuckRows) {

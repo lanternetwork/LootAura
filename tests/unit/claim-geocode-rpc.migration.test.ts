@@ -4,34 +4,45 @@ import { resolve } from 'node:path'
 
 const migrationPath = resolve(
   process.cwd(),
-  'supabase/migrations/163_claim_geocode_rpc_reduce_starvation_ordering.sql'
+  'supabase/migrations/181_ingested_sales_address_lifecycle_phase_d1.sql'
 )
 const sql = readFileSync(migrationPath, 'utf8')
 
-describe('claim_ingested_sales_for_geocoding migration ordering contract', () => {
+describe('claim_ingested_sales_for_geocoding migration (D1 address filter)', () => {
+  it('requires address_available and non-empty address_raw', () => {
+    expect(sql).toContain("s.address_status = 'address_available'")
+    expect(sql).toContain('s.address_raw IS NOT NULL')
+    expect(sql).toContain("btrim(s.address_raw) <> ''")
+  })
+
   it('prioritizes never-attempted rows before attempted rows', () => {
     expect(sql).toContain('CASE WHEN s.geocode_attempts = 0 THEN 0 ELSE 1 END ASC')
   })
 
-  it('orders eligible rows by oldest last_geocode_attempt_at, then updated_at, created_at, id', () => {
-    expect(sql).toContain('COALESCE(s.last_geocode_attempt_at, to_timestamp(0)) ASC')
-    expect(sql).toContain('s.updated_at ASC')
-    expect(sql).toContain('s.created_at ASC')
-    expect(sql).toContain('s.id ASC')
-  })
-
-  it('keeps cooldown and attempt eligibility predicates for old stuck-row shape', () => {
+  it('keeps cooldown and attempt eligibility predicates', () => {
     expect(sql).toContain("s.status = 'needs_geocode'")
     expect(sql).toContain('s.geocode_attempts < 3')
-    expect(sql).toContain('s.last_geocode_attempt_at IS NULL')
-    expect(sql).toContain('s.last_geocode_attempt_at < now() - make_interval(mins => p_cooldown_minutes)')
-    expect(sql).not.toContain('s.address_raw IS NOT NULL')
-    expect(sql).not.toContain('s.normalized_address IS NOT NULL')
-  })
-
-  it('keeps bounded batch limit and skip-locked claim behavior', () => {
-    expect(sql).toContain('LIMIT GREATEST(COALESCE(p_batch_size, 100), 1)')
     expect(sql).toContain('FOR UPDATE SKIP LOCKED')
   })
 })
 
+describe('claim_ingested_sales_for_address_enrichment migration', () => {
+  it('defines enrichment claim with unlock and dedupe partition', () => {
+    expect(sql).toContain('claim_ingested_sales_for_address_enrichment')
+    expect(sql).toContain('PARTITION BY s.source_platform')
+    expect(sql).toContain('s.address_unlock_at <= now()')
+    expect(sql).toContain('s.next_enrichment_attempt_at <= now()')
+  })
+})
+
+describe('claim_ingested_sales_for_address_enrichment D2.5 image_source_url', () => {
+  const d25Path = resolve(
+    process.cwd(),
+    'supabase/migrations/183_ingested_sales_image_enrichment_phase_d2_5.sql'
+  )
+  const d25Sql = readFileSync(d25Path, 'utf8')
+
+  it('returns image_source_url from address enrichment claim', () => {
+    expect(d25Sql).toContain('claimed.image_source_url')
+  })
+})

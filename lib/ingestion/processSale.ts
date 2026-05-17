@@ -1,6 +1,11 @@
 import { RawExternalSale, CityIngestionConfig, ProcessedIngestedSale, FailureReason } from '@/lib/ingestion/types'
 import { normalizeIngestionCity, normalizeIngestionState } from '@/lib/ingestion/normalizeIngestionLocation'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
+import { hasStreetNumberAndName } from '@/lib/ingestion/address/addressUsability'
+import {
+  addressLifecycleFieldsForDb,
+  resolveIngestAddressLifecycle,
+} from '@/lib/ingestion/address/resolveIngestAddressLifecycle'
 import { addressLineFromYstmListingUrlSlug, enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
 import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
 import {
@@ -13,11 +18,6 @@ function cleanText(value: string | null): string | null {
   if (value == null) return null
   const cleaned = value.replace(/\s+/g, ' ').trim()
   return cleaned.length > 0 ? cleaned : null
-}
-
-function hasStreetNumberAndName(address: string | null): boolean {
-  if (!address) return false
-  return /^\s*\d+\s+.+/.test(address)
 }
 
 function extractCityStateFromAddressRaw(address: string | null): { city: string | null; state: string | null } {
@@ -515,8 +515,20 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
 
   const hasAddressError = failureReasons.includes('missing_address') || failureReasons.includes('invalid_address_format')
   const hasDateError = failureReasons.includes('missing_date') || failureReasons.includes('invalid_date')
-  const status: ProcessedIngestedSale['status'] =
-    !hasAddressError && !hasDateError ? 'needs_geocode' : 'needs_check'
+  const wouldBeNeedsGeocode = !hasAddressError && !hasDateError
+  const addressLifecycle = resolveIngestAddressLifecycle({
+    sourceUrl: rawSale.sourceUrl ?? '',
+    addressRaw,
+    wouldBeNeedsGeocode,
+    diagnostics: {
+      slugWasPlaceholder: Boolean(
+        rawSale.sourceUrl &&
+          addressLineFromYstmListingUrlSlug(rawSale.sourceUrl) == null &&
+          /see-source-for-address/i.test(rawSale.sourceUrl)
+      ),
+    },
+  })
+  const status: ProcessedIngestedSale['status'] = addressLifecycle.ingestStatus
   const parseConfidence: ProcessedIngestedSale['parseConfidence'] = status === 'needs_geocode' ? 'high' : 'low'
 
   const dateSource: string | null = extensionIso
@@ -544,5 +556,7 @@ export async function processIngestedSale(rawSale: RawExternalSale, cityConfig: 
     failureReasons,
     parseConfidence,
     ingestionDiagnostics,
+    addressLifecycle,
+    addressLifecycleDbFields: addressLifecycleFieldsForDb(addressLifecycle),
   }
 }

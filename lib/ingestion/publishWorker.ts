@@ -10,6 +10,7 @@ import type { FailureReason } from '@/lib/ingestion/types'
 import { sanitizeExternalImageUrls } from '@/lib/ingestion/externalImageValidation'
 import { mergeSanitizedCloudinaryIntoPublishable } from '@/lib/ingestion/sanitizePublishCloudinaryFallback'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+import { isCoordinatePrecisionPublishable } from '@/lib/geocode/geocodePrecisionPolicy'
 import { isPublishingRowStaleReclaimBlockedByPastEndDateValidation } from '@/lib/ingestion/publishClaimStale'
 import { extractPublishImageCandidates } from '@/lib/ingestion/publishImageCandidates'
 
@@ -31,7 +32,7 @@ import { classifyQueuePressure } from '@/lib/observability/metrics'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
-  | { ok: true; skipped: true; reason: 'not_eligible' | 'past_end_date' }
+  | { ok: true; skipped: true; reason: 'not_eligible' | 'past_end_date' | 'non_publishable_precision' }
   | { ok: false; error: string }
 
 interface ClaimedPublishRow {
@@ -1215,7 +1216,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     .not('lat', 'is', null)
     .not('lng', 'is', null)
     .select(
-      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, image_source_url, raw_payload, published_sale_id, failure_reasons'
+      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, image_source_url, raw_payload, published_sale_id, failure_reasons, coordinate_precision'
     )
     .maybeSingle()
 
@@ -1232,7 +1233,16 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     return { ok: true, skipped: true, reason: 'not_eligible' }
   }
 
-  const claimed = row as unknown as ClaimedPublishRow
+  const claimed = row as unknown as ClaimedPublishRow & {
+    coordinate_precision?: string | null
+  }
+  if (!isCoordinatePrecisionPublishable(claimed.coordinate_precision)) {
+    await fromBase(admin, 'ingested_sales')
+      .update({ status: 'needs_check' })
+      .eq('id', ingestedSaleId)
+      .eq('status', 'publishing')
+    return { ok: true, skipped: true, reason: 'non_publishable_precision' }
+  }
   if (hasPastEndDate(claimed.date_end)) {
     await markIngestedExpiredPastEndDate(
       claimed.id,
@@ -1403,6 +1413,15 @@ export async function publishReadyIngestedSales(options?: {
         row.date_end as string
       )
       summary.expired += 1
+      continue
+    }
+
+    if (!isCoordinatePrecisionPublishable((row as { coordinate_precision?: string | null }).coordinate_precision)) {
+      await fromBase(admin, 'ingested_sales')
+        .update({ status: 'needs_check' })
+        .eq('id', row.id)
+        .eq('status', 'publishing')
+      summary.skipped += 1
       continue
     }
 

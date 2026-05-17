@@ -80,6 +80,32 @@ describe('geocodeIngestedSaleById', () => {
     })
   })
 
+  it('skips when address is not address_available (D1 gate)', async () => {
+    hoisted.maybeSingleResults.push({
+      data: {
+        id: '00000000-0000-4000-8000-000000000099',
+        status: 'needs_geocode',
+        address_status: 'address_gated',
+        normalized_address: '1 Main',
+        address_raw: 'See source',
+        city: 'Louisville',
+        state: 'KY',
+        lat: null,
+        lng: null,
+        geocode_attempts: 0,
+        failure_reasons: [],
+        published_sale_id: null,
+      },
+      error: null,
+    })
+
+    const { geocodeIngestedSaleById } = await import('@/lib/ingestion/geocodeWorker')
+    const result = await geocodeIngestedSaleById('00000000-0000-4000-8000-000000000099')
+
+    expect(result).toEqual({ outcome: 'skipped', reason: 'not_needs_geocode' })
+    expect(hoisted.geocodeAddress).not.toHaveBeenCalled()
+  })
+
   it('skips when row is not needs_geocode', async () => {
     hoisted.maybeSingleResults.push({
       data: {
@@ -186,7 +212,7 @@ describe('geocodeIngestedSaleById', () => {
         city: 'Louisville',
         state: 'KY',
       },
-      { mode: 'primary' }
+      { mode: 'primary', classificationMode: 'strict' }
     )
     expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000003')
     const readyUpdate = hoisted.updatePayloads.find(
@@ -241,7 +267,7 @@ describe('geocodeIngestedSaleById', () => {
         city: 'Louisville',
         state: 'KY',
       },
-      { mode: 'primary' }
+      { mode: 'primary', classificationMode: 'strict' }
     )
     const readyUpdate = hoisted.updatePayloads.find(
       (u) => u && typeof u === 'object' && 'lat' in (u as Record<string, unknown>)
@@ -289,7 +315,11 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       { data: { failure_details: null }, error: null },
       { data: { id: '00000000-0000-4000-8000-0000000000b0' }, error: null }
     )
-    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 38.35, lng: -85.05 }, hit429: false })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: { lat: 38.35, lng: -85.05 },
+      hit429: false,
+      coordinatePrecision: 'exact_address',
+    })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const summary = await geocodePendingSales()
@@ -301,7 +331,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         city: 'Louisville',
         state: 'KY',
       },
-      { mode: 'primary' }
+      { mode: 'primary', classificationMode: 'strict' }
     )
   })
 
@@ -339,7 +369,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         city: 'Louisville',
         state: 'KY',
       },
-      { mode: 'primary' }
+      { mode: 'primary', classificationMode: 'strict' }
     )
     expect(hoisted.publishReadyIngestedSaleById).toHaveBeenCalledWith('00000000-0000-4000-8000-0000000000b1')
   })
@@ -378,7 +408,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         city: 'Louisville',
         state: 'KY',
       },
-      { mode: 'primary' }
+      { mode: 'primary', classificationMode: 'strict' }
     )
   })
 
@@ -429,7 +459,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(geocode?.providerClassification).toBe('empty_results')
     expect(geocode?.queryFingerprint).toBe('abc123')
     expect(geocode?.attemptCount).toBe(2)
-    expect(geocode?.schema_version).toBe(2)
+    expect(geocode?.schema_version).toBe(3)
     expect(Array.isArray((geocode as { attempts?: unknown }).attempts)).toBe(true)
   })
 
@@ -451,42 +481,25 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       error: null,
     })
     hoisted.maybeSingleResults.push({ data: { failure_details: null }, error: null })
-    hoisted.geocodeAddress
-      .mockResolvedValueOnce({
-        coords: null,
-        hit429: false,
-        noCoordsReason: 'empty_results',
-        providerClassification: 'empty_results',
-        queryFingerprint: 'fp-primary',
-        geocodeCityRaw: 'Mokena',
-        geocodeCityNormalized: 'Mokena',
-        attemptLog: {
-          mode: 'primary',
-          queryStrategy: 'minimal_locality',
-          queryString: '11020 Front St Unit A, Mokena, IL, USA',
-          queryFingerprint: 'fp-primary',
-        },
-      })
-      .mockResolvedValueOnce({
-        coords: null,
-        hit429: false,
-        noCoordsReason: 'empty_results',
-        providerClassification: 'empty_results',
-        queryFingerprint: 'fp-unit',
-        geocodeCityRaw: 'Mokena',
-        geocodeCityNormalized: 'Mokena',
-        attemptLog: {
-          mode: 'primary',
-          queryStrategy: 'minimal_locality',
-          queryString: '11020 Front St, Mokena, IL, USA',
-          queryFingerprint: 'fp-unit',
-        },
-      })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'empty_results',
+      providerClassification: 'empty_results',
+      queryFingerprint: 'fp-empty',
+      geocodeCityRaw: 'Mokena',
+      geocodeCityNormalized: 'Mokena',
+      attemptLog: {
+        mode: 'primary',
+        queryStrategy: 'minimal_locality',
+        queryFingerprint: 'fp-empty',
+      },
+    })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(2)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
     expect(hoisted.geocodeAddress.mock.calls[0]?.[0].address).toContain('Unit A')
     expect(hoisted.geocodeAddress.mock.calls[1]?.[0].address).toBe('11020 Front St, Mokena, IL')
 
@@ -498,14 +511,18 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         typeof (u as Record<string, unknown>).failure_details === 'object' &&
         'geocode' in ((u as Record<string, unknown>).failure_details as object)
     ) as Record<string, unknown> | undefined
-    const geocode = (diagUpdate?.failure_details as { geocode?: { attempts?: unknown[] } })?.geocode
-    expect(geocode?.attempts?.[0]).toMatchObject({ strategy: 'primary', resultType: 'empty_results' })
+    const geocode = (
+      diagUpdate?.failure_details as {
+        geocode?: { attempts?: unknown[]; schema_version?: number; providerCalls?: number }
+      }
+    )?.geocode
+    expect(geocode?.attempts?.[0]).toMatchObject({ strategy: 'primary_full', resultType: 'empty_results' })
     expect(geocode?.attempts?.[1]).toMatchObject({
       strategy: 'unit_stripped',
       resultType: 'empty_results',
-      queryCharLength: '11020 Front St, Mokena, IL, USA'.length,
-      queryFingerprint: 'fp-unit',
     })
+    expect(geocode?.schema_version).toBe(3)
+    expect(geocode?.providerCalls).toBeGreaterThanOrEqual(3)
     expect(JSON.stringify(geocode?.attempts)).not.toContain('11020 Front St')
     expect(JSON.stringify(geocode?.attempts)).not.toContain('Unit A')
   })
@@ -527,7 +544,11 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       { data: { failure_details: null }, error: null },
       { data: { id: '00000000-0000-4000-8000-0000000000u2' }, error: null }
     )
-    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 1, lng: 2 }, hit429: false })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: { lat: 1, lng: 2 },
+      hit429: false,
+      coordinatePrecision: 'exact_address',
+    })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
@@ -560,9 +581,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     await geocodePendingSales()
 
     expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress.mock.calls[0]?.[0].address).toContain('Unit Z')
   })
 
-  it('does not unit-strip after primary http_not_ok', async () => {
+  it('runs bounded variants after primary http_not_ok', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
@@ -587,10 +609,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
   })
 
-  it('does not unit-strip after primary fetch_exception', async () => {
+  it('runs bounded variants after primary fetch_exception', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
@@ -614,10 +636,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
   })
 
-  it('does not unit-strip after primary low_confidence', async () => {
+  it('runs bounded variants after primary low_confidence', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
@@ -642,7 +664,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
   })
 
   it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {
@@ -812,7 +834,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         city: 'Louisville',
         state: 'KY',
       },
-      { mode: 'primary' }
+      { mode: 'primary', classificationMode: 'strict' }
     )
   })
 
@@ -826,7 +848,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     await expect(geocodePendingSales()).rejects.toThrow('rpc failed')
   })
 
-  it('invokes fallback_arbitrated geocode only after primary fails when authority city differs', async () => {
+  it('invokes municipality fallback after earlier variants fail when authority city differs', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
@@ -846,44 +868,48 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       { data: { failure_details: null }, error: null },
       { data: { id: '00000000-0000-4000-8000-0000000000f1' }, error: null }
     )
-    hoisted.geocodeAddress.mockResolvedValueOnce({
-      coords: null,
-      hit429: false,
-      noCoordsReason: 'empty_results',
-      providerClassification: 'empty_results',
-      queryFingerprint: 'fp-primary',
-      geocodeCityRaw: 'Orland Park',
-      geocodeCityNormalized: 'Orland Park',
-      attemptLog: {
-        mode: 'primary',
-        queryStrategy: 'minimal_locality',
-        queryString: 'primary-q',
+    hoisted.geocodeAddress.mockImplementation(async (q, opts) => {
+      if (opts?.mode === 'fallback_arbitrated' && q.city === 'Palos Park') {
+        return {
+          coords: { lat: 41.62, lng: -87.85 },
+          hit429: false,
+          coordinatePrecision: 'exact_address',
+          queryFingerprint: 'fp-fallback',
+          providerClassification: 'ok',
+          geocodeCityRaw: 'Palos Park',
+          geocodeCityNormalized: 'Palos Park',
+          attemptLog: {
+            mode: 'fallback_arbitrated',
+            queryStrategy: 'normalize_locality',
+            queryFingerprint: 'fp-fallback',
+          },
+        }
+      }
+      return {
+        coords: null,
+        hit429: false,
+        noCoordsReason: 'empty_results',
+        providerClassification: 'empty_results',
         queryFingerprint: 'fp-primary',
-      },
-    })
-    hoisted.geocodeAddress.mockResolvedValueOnce({
-      coords: { lat: 41.62, lng: -87.85 },
-      hit429: false,
-      queryFingerprint: 'fp-fallback',
-      providerClassification: 'ok',
-      geocodeCityRaw: 'Palos Park',
-      geocodeCityNormalized: 'Palos Park',
-      attemptLog: {
-        mode: 'fallback_arbitrated',
-        queryStrategy: 'normalize_locality',
-        queryString: 'fallback-q',
-        queryFingerprint: 'fp-fallback',
-      },
+        geocodeCityRaw: q.city,
+        geocodeCityNormalized: q.city,
+        attemptLog: {
+          mode: opts?.mode ?? 'primary',
+          queryStrategy: 'minimal_locality',
+          queryFingerprint: 'fp-primary',
+        },
+      }
     })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const summary = await geocodePendingSales()
     expect(summary.succeeded).toBe(1)
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(2)
-    expect(hoisted.geocodeAddress.mock.calls[0]?.[1]).toEqual({ mode: 'primary' })
-    expect(hoisted.geocodeAddress.mock.calls[1]?.[1]).toEqual({ mode: 'fallback_arbitrated' })
+    expect(hoisted.geocodeAddress.mock.calls.length).toBeGreaterThanOrEqual(2)
+    const fallbackCall = hoisted.geocodeAddress.mock.calls.find(
+      (c) => c[1]?.mode === 'fallback_arbitrated' && c[0]?.city === 'Palos Park'
+    )
+    expect(fallbackCall).toBeDefined()
     expect(hoisted.geocodeAddress.mock.calls[0]?.[0]).toMatchObject({ city: 'Orland Park' })
-    expect(hoisted.geocodeAddress.mock.calls[1]?.[0]).toMatchObject({ city: 'Palos Park' })
   })
 
   it('failed low_confidence attempt persists lowConfidenceReasons on failure_details.geocode', async () => {

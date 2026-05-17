@@ -14,6 +14,13 @@ export const ObservabilityEvents = {
     externalZeroListings: 'ingestion.external_page_source.zero_listings_page',
     duplicateScoringDecision: 'ingestion.duplicate.scoring_decision',
     orchestrationLeaseOutcome: 'ingestion.orchestration.lease_outcome',
+    addressEnrichmentBatchStarted: 'ingestion.address_enrichment.batch_started',
+    addressEnrichmentBatchCompleted: 'ingestion.address_enrichment.batch_completed',
+    addressEnrichmentRow: 'ingestion.address_enrichment.row',
+    addressRemediationBatch: 'ingestion.address_enrichment.remediation_batch',
+    imageEnrichmentBatchStarted: 'ingestion.image_enrichment.batch_started',
+    imageEnrichmentBatchCompleted: 'ingestion.image_enrichment.batch_completed',
+    imageEnrichmentRow: 'ingestion.image_enrichment.row',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',
@@ -26,6 +33,7 @@ export const ObservabilityEvents = {
     /** Aggregate only: DB update failures + lost races during bounded replay (no row ids). */
     deadLetterReplayPartialFailures: 'geocode.dead_letter.replay_partial_failures',
     replayExhausted: 'geocode.replay.exhausted',
+    variantBatchCompleted: 'geocode.variants.batch_completed',
   },
   publish: {
     batchCompleted: 'publish.worker.batch_completed',

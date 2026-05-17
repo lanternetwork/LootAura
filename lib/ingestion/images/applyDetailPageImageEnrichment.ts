@@ -4,6 +4,7 @@ import {
   type IngestedImageEnrichmentDetails,
 } from '@/lib/ingestion/images/ingestedImageEnrichmentDetails'
 import { mergeIngestedSaleImageFields } from '@/lib/ingestion/images/mergeIngestedSaleImageFields'
+import { syncPublishedSaleMediaFromIngestedRow } from '@/lib/ingestion/images/syncPublishedSaleMediaFromIngest'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
@@ -49,6 +50,8 @@ export async function applyDetailPageImageEnrichment(input: {
   attemptCount?: number
   detailAttemptSource?: 'address_enrichment' | 'image_enrichment'
   telemetryContext?: Record<string, unknown>
+  city?: string | null
+  state?: string | null
 }): Promise<ImageEnrichmentApplyResult> {
   if (!isYstmDetailListingUrl(input.sourceUrl)) {
     return {
@@ -191,6 +194,27 @@ export async function applyDetailPageImageEnrichment(input: {
     mediaStrFound: true,
     preservedExisting: merged.preservedExisting,
   })
+
+  const mediaSync = await syncPublishedSaleMediaFromIngestedRow({
+    rowId: input.rowId,
+    imageSourceUrl: merged.imageSourceUrl,
+    rawPayload: merged.rawPayload,
+    city: input.city,
+    state: input.state,
+  })
+  if (
+    mediaSync.outcome === 'updated_full' ||
+    mediaSync.outcome === 'updated_cover_only'
+  ) {
+    logger.info('Linked published sale media synced after image enrichment', {
+      component: 'ingestion/images/applyDetailPageImageEnrichment',
+      operation: 'post_enrich_sale_media_sync',
+      rowId: input.rowId,
+      publishedSaleId: mediaSync.publishedSaleId,
+      mediaSyncOutcome: mediaSync.outcome,
+      sanitizedCount: mediaSync.sanitizedCount,
+    })
+  }
 
   return {
     skipped: false,

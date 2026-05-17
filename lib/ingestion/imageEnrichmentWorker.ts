@@ -139,6 +139,8 @@ async function processImageEnrichmentRow(
     attemptCount,
     detailAttemptSource: 'image_enrichment',
     telemetryContext,
+    city: row.city,
+    state: row.state,
   })
 
   if (applyResult.updated) {

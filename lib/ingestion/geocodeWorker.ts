@@ -2,11 +2,7 @@ import { emitObservabilityRecord, buildTelemetryRecord } from '@/lib/observabili
 import { ObservabilityEvents } from '@/lib/observability/events'
 import { classifyQueuePressure } from '@/lib/observability/metrics'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
-import {
-  geocodeAddress,
-  type GeocodeAddressOutcome,
-  type GeocodeMode,
-} from '@/lib/geocode/geocodeAddress'
+import { type GeocodeAddressOutcome, type GeocodeMode } from '@/lib/geocode/geocodeAddress'
 import {
   classifyProviderHealth,
   defaultProviderHealthThresholds,
@@ -22,28 +18,32 @@ import {
   mergeGeocodeDeadLetterIntoFailureDetails,
   type GeocodeDeadLetterEnvelope,
 } from '@/lib/geocode/deadLetter'
-import { stripUnitDesignatorFromAddressLineForGeocode } from '@/lib/geocode/stripUnitDesignatorForGeocode'
+import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
+import { runBoundedGeocodeVariants } from '@/lib/geocode/runBoundedGeocodeVariants'
+import type { GeocodeMethod } from '@/lib/geocode/geocodePrecisionPolicy'
+import type { CoordinatePrecision } from '@/lib/geocode/geocodePrecisionPolicy'
+import type { GeocodeConfidence } from '@/lib/geocode/geocodePrecisionPolicy'
 import { logger } from '@/lib/log'
 import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
-import {
-  buildGeocodeAttemptPlan,
-  primaryAndFallbackCitiesEquivalent,
-} from '@/lib/ingestion/geocodeAttemptPlan'
+import { buildGeocodeAttemptPlan } from '@/lib/ingestion/geocodeAttemptPlan'
 import { publishReadyIngestedSaleById, type PublishReadyByIdResult } from '@/lib/ingestion/publishWorker'
 import type { FailureReason } from '@/lib/ingestion/types'
 
 /** Sub-key on `ingested_sales.failure_details` for last geocode attempt diagnostics (no raw address / full geocode query). */
 export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION = 1 as const
 export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_V2 = 2 as const
+export const INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_D2 = 3 as const
 
 export type GeocodeAttemptStrategy = GeocodeMode | 'unit_stripped'
 
 export type GeocodeAttemptDiagnostic = {
-  strategy: GeocodeAttemptStrategy
+  strategy: GeocodeAttemptStrategy | string
   queryStrategy: 'minimal_locality' | 'normalize_locality'
   addressSource: string
   municipalitySource: string
   fallbackArbitrationApplied: boolean
+  variantId?: string
+  structuredReason?: string
   /** Non-PII hint only; full geocode query must never be persisted. */
   queryCharLength?: number
   queryFingerprint?: string
@@ -526,15 +526,25 @@ async function hydrateFailureDetailsForClaimRows(admin: AdminDb, rows: ClaimedGe
   }
 }
 
-function shouldRetryGeocodeWithFallback(geo: GeocodeAddressOutcome): boolean {
-  if (geo.hit429) return false
-  const r = geo.noCoordsReason
-  return (
-    r === 'empty_results' ||
-    r === 'low_confidence' ||
-    r === 'invalid_coordinates' ||
-    r === 'empty_input'
-  )
+export function buildIngestedGeocodeFailureDetailsD2(
+  attemptCount: number,
+  geo: GeocodeAddressOutcome,
+  fallbackCityTrimmed: string,
+  attempts: GeocodeAttemptDiagnostic[],
+  extras: {
+    providerCalls: number
+    variantBudgetExhausted?: boolean
+    lastStructuredReason?: string
+  }
+): Record<string, unknown> {
+  const base = buildIngestedGeocodeFailureDetailsV2(attemptCount, geo, fallbackCityTrimmed, attempts)
+  return {
+    ...base,
+    schema_version: INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_D2,
+    providerCalls: extras.providerCalls,
+    variantBudgetExhausted: Boolean(extras.variantBudgetExhausted),
+    lastStructuredReason: extras.lastStructuredReason,
+  }
 }
 
 async function persistGeocodeAttemptFailureDetails(
@@ -543,11 +553,24 @@ async function persistGeocodeAttemptFailureDetails(
   attemptCount: number,
   geo: GeocodeAddressOutcome,
   fallbackCityTrimmed: string,
-  attemptDiagnostics?: GeocodeAttemptDiagnostic[]
+  attemptDiagnostics?: GeocodeAttemptDiagnostic[],
+  d2Extras?: {
+    providerCalls: number
+    variantBudgetExhausted?: boolean
+    lastStructuredReason?: string
+  }
 ): Promise<void> {
   const details =
     attemptDiagnostics && attemptDiagnostics.length > 0
-      ? buildIngestedGeocodeFailureDetailsV2(attemptCount, geo, fallbackCityTrimmed, attemptDiagnostics)
+      ? d2Extras
+        ? buildIngestedGeocodeFailureDetailsD2(
+            attemptCount,
+            geo,
+            fallbackCityTrimmed,
+            attemptDiagnostics,
+            d2Extras
+          )
+        : buildIngestedGeocodeFailureDetailsV2(attemptCount, geo, fallbackCityTrimmed, attemptDiagnostics)
       : (buildIngestedGeocodeFailureDetailsV1(attemptCount, geo, fallbackCityTrimmed) as Record<string, unknown>)
   const { data: prior, error: selErr } = await fromBase(admin, 'ingested_sales')
     .select('failure_details')
@@ -724,7 +747,12 @@ async function applyGeocodeSuccess(
   admin: ReturnType<typeof getAdminDb>,
   rowId: string,
   lat: number,
-  lng: number
+  lng: number,
+  metadata: {
+    geocode_confidence: GeocodeConfidence
+    coordinate_precision: CoordinatePrecision
+    geocode_method: GeocodeMethod
+  }
 ): Promise<{ kind: 'geocoded'; publish: PublishReadyByIdResult } | { kind: 'update_failed' }> {
   const { data: priorRow, error: priorErr } = await fromBase(admin, 'ingested_sales')
     .select('failure_details')
@@ -737,7 +765,14 @@ async function applyGeocodeSuccess(
       ? removeGeocodeSubDocumentFromFailureDetails((priorRow as { failure_details?: unknown }).failure_details)
       : undefined
 
-  const updatePayload: Record<string, unknown> = { lat, lng, status: 'ready' }
+  const updatePayload: Record<string, unknown> = {
+    lat,
+    lng,
+    status: 'ready',
+    geocode_confidence: metadata.geocode_confidence,
+    coordinate_precision: metadata.coordinate_precision,
+    geocode_method: metadata.geocode_method,
+  }
   if (clearedFailureDetails !== undefined) {
     updatePayload.failure_details = clearedFailureDetails
   }
@@ -832,6 +867,18 @@ async function runClaimedRowsWithConcurrency(
 /**
  * Shared processor for a row whose `geocode_attempts` has already been incremented (RPC claim or by-id path).
  */
+function mergeD2GeocodeFailureDetails(
+  existing: unknown,
+  payload: Record<string, unknown>
+): Record<string, unknown> {
+  const prior =
+    existing && typeof existing === 'object' && !Array.isArray(existing)
+      ? { ...(existing as Record<string, unknown>) }
+      : {}
+  prior.geocode = payload
+  return prior
+}
+
 async function processGeocodeAttempt(
   row: ClaimedGeocodeRow,
   telemetryContext?: Record<string, unknown>
@@ -840,111 +887,86 @@ async function processGeocodeAttempt(
   const rowId = row.id
   const attemptCount = row.geocode_attempts
   const plan = buildGeocodeAttemptPlan(row)
-  const attemptDiagnostics: GeocodeAttemptDiagnostic[] = []
-
+  let attemptDiagnostics: GeocodeAttemptDiagnostic[] = []
   let geo: GeocodeAddressOutcome | null = null
+  let providerCalls = 0
+  let variantBudgetExhausted = false
+  let lastStructuredReason: string | undefined
 
-  const runGeocode = async (
-    city: string,
-    mode: GeocodeMode,
-    municipalitySource: string,
-    fallbackArbitrationApplied: boolean,
-    opts?: { addressLine?: string; diagnosticStrategy?: GeocodeAttemptStrategy }
-  ): Promise<GeocodeAddressOutcome> => {
-    const address = opts?.addressLine ?? plan.addressLine
-    const out = await geocodeAddress({ address, city, state: plan.state }, { mode })
-    attemptDiagnostics.push(
-      toGeocodeAttemptDiagnostic(
-        out,
-        plan,
-        municipalitySource,
-        mode,
-        fallbackArbitrationApplied,
-        opts?.diagnosticStrategy
-      )
-    )
-    return out
-  }
-
-  if (plan.addressLine && plan.primaryCity && plan.state) {
-    geo = await runGeocode(plan.primaryCity, 'primary', plan.primaryMunicipalitySource, false)
-  }
-
-  if (
-    geo &&
-    !geo.coords &&
-    !geo.hit429 &&
-    geo.noCoordsReason === 'empty_results' &&
-    plan.addressLine &&
-    plan.primaryCity &&
-    plan.state
-  ) {
-    const stripped = stripUnitDesignatorFromAddressLineForGeocode(plan.addressLine)
-    if (stripped) {
-      geo = await runGeocode(plan.primaryCity, 'primary', plan.primaryMunicipalitySource, false, {
-        addressLine: stripped,
-        diagnosticStrategy: 'unit_stripped',
-      })
+  if (!isAddressGeocodeReady(plan.addressLine)) {
+    const cityNormalizedMissing =
+      (plan.fallbackCity || row.city?.trim() || '').length > 0
+        ? (normalizeLocalityForGeocodeQuery(plan.fallbackCity || row.city?.trim() || '') ??
+          (plan.fallbackCity || row.city?.trim() || undefined))
+        : undefined
+    geo = {
+      coords: null,
+      hit429: false,
+      noCoordsReason: 'empty_input',
+      providerClassification: 'empty_results',
+      geocodeCityRaw: plan.fallbackCity || row.city?.trim() || undefined,
+      geocodeCityNormalized: cityNormalizedMissing,
     }
-  }
+  } else {
+    const variantResult = await runBoundedGeocodeVariants(plan)
+    providerCalls = variantResult.providerCalls
+    variantBudgetExhausted = variantResult.variantBudgetExhausted
+    lastStructuredReason = variantResult.lastStructuredReason
+    attemptDiagnostics = variantResult.diagnostics
+    geo = variantResult.lastOutcome
 
-  if (
-    geo &&
-    !geo.coords &&
-    !geo.hit429 &&
-    shouldRetryGeocodeWithFallback(geo) &&
-    !primaryAndFallbackCitiesEquivalent(plan.primaryCity, plan.fallbackCity) &&
-    plan.addressLine &&
-    plan.fallbackCity &&
-    plan.state
-  ) {
-    geo = await runGeocode(plan.fallbackCity, 'fallback_arbitrated', plan.fallbackMunicipalitySource, true)
-  }
-
-  if (!geo && plan.addressLine && plan.fallbackCity && plan.state && !(plan.primaryCity && plan.state)) {
-    geo = await runGeocode(plan.fallbackCity, 'fallback_arbitrated', plan.fallbackMunicipalitySource, true)
-  }
-
-  if (geo?.coords) {
-    const outcome = await applyGeocodeSuccess(admin, rowId, geo.coords.lat, geo.coords.lng)
-    if (outcome.kind === 'update_failed') {
-      if (isPreviewGeocodeDiagnosticsEnabled()) {
-        logger.info('Geocode pipeline attempt outcome (preview diagnostic)', {
-          component: 'ingestion/geocodeWorker',
-          operation: 'process_geocode_attempt',
-          rowId,
+    if (variantResult.publishable) {
+      const p = variantResult.publishable
+      const outcome = await applyGeocodeSuccess(admin, rowId, p.coords.lat, p.coords.lng, {
+        geocode_confidence: p.geocodeConfidence,
+        coordinate_precision: p.coordinatePrecision,
+        geocode_method: p.geocodeMethod,
+      })
+      if (outcome.kind === 'update_failed') {
+        return {
+          kind: 'geocode_fail',
+          retriable: true,
+          terminal: false,
+          hit429: false,
+          providerClassification: p.outcome.providerClassification,
+          queryFingerprint: p.outcome.queryFingerprint,
           attemptCount,
-          path: 'apply_ready_update_failed',
-        })
+        }
       }
-      logger.warn('Geocode worker row processed', {
+      logger.info('Geocode worker row processed', {
         component: 'ingestion/geocodeWorker',
         operation: 'row_result',
         rowId,
         attemptCount,
-        result: 'update_failed_after_geocode',
-        queryFingerprint: geo.queryFingerprint,
+        result: 'geocode_ok',
+        providerCalls,
+        coordinatePrecision: p.coordinatePrecision,
+        geocodeMethod: p.geocodeMethod,
       })
-      return {
-        kind: 'geocode_fail',
-        retriable: true,
-        terminal: false,
-        hit429: false,
-        providerClassification: geo.providerClassification,
-        queryFingerprint: geo.queryFingerprint,
-        attemptCount,
-      }
+      return { kind: 'geocode_ok', publish: outcome.publish, hit429: false }
     }
 
-    logger.info('Geocode worker row processed', {
-      component: 'ingestion/geocodeWorker',
-      operation: 'row_result',
-      rowId,
-      attemptCount,
-      result: 'geocode_ok',
-    })
-
-    return { kind: 'geocode_ok', publish: outcome.publish, hit429: false }
+    if (variantResult.localityMetadataOnly) {
+      const lm = variantResult.localityMetadataOnly
+      await fromBase(admin, 'ingested_sales')
+        .update({
+          geocode_confidence: lm.geocodeConfidence,
+          coordinate_precision: lm.coordinatePrecision,
+          geocode_method: lm.geocodeMethod,
+          failure_details: mergeD2GeocodeFailureDetails(row.failure_details, {
+            schema_version: INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_D2,
+            recorded_at: new Date().toISOString(),
+            attemptCount,
+            attempts: attemptDiagnostics,
+            providerCalls,
+            localityMetadataOnly: true,
+            queryFingerprint: lm.queryFingerprint,
+            lastStructuredReason: 'broad_locality_match',
+          }),
+        })
+        .eq('id', rowId)
+        .eq('status', 'needs_geocode')
+    }
   }
 
   if (geo) {
@@ -971,7 +993,8 @@ async function processGeocodeAttempt(
       attemptCount,
       geo,
       fallbackCityForDetails,
-      attemptDiagnostics
+      attemptDiagnostics,
+      { providerCalls, variantBudgetExhausted, lastStructuredReason }
     )
     if (attemptCount >= 3) {
       await recordTerminalDeadLetterClassification(admin, {
@@ -1068,7 +1091,9 @@ async function processGeocodeAttempt(
     rowId,
     attemptCount,
     syntheticMissingLocalityGeo,
-    plan.fallbackCity || row.city?.trim() || ''
+    plan.fallbackCity || row.city?.trim() || '',
+    undefined,
+    { providerCalls, variantBudgetExhausted, lastStructuredReason: lastStructuredReason ?? 'missing_address_input' }
   )
 
   if (attemptCount >= 3) {

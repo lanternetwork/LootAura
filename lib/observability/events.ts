@@ -30,6 +30,7 @@ export const ObservabilityEvents = {
     /** Aggregate only: DB update failures + lost races during bounded replay (no row ids). */
     deadLetterReplayPartialFailures: 'geocode.dead_letter.replay_partial_failures',
     replayExhausted: 'geocode.replay.exhausted',
+    variantBatchCompleted: 'geocode.variants.batch_completed',
   },
   publish: {
     batchCompleted: 'publish.worker.batch_completed',

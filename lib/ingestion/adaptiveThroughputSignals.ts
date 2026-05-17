@@ -25,9 +25,18 @@ import {
   type AdaptiveDwellState,
   type AdaptivePressureSignals,
 } from '@/lib/ingestion/adaptiveThroughputProfile'
+import {
+  externalNoteMatchesLane,
+  LEGACY_ORCHESTRATION_STATE_KEY,
+  type IngestionLaneContext,
+} from '@/lib/ingestion/ingestionLanes'
 import { logger } from '@/lib/log'
 
 const ORCHESTRATION_ROWS_LIMIT = 80
+
+export type LoadAdaptivePressureSignalsOptions = {
+  laneContext?: IngestionLaneContext
+}
 
 function asExternalNote(notes: Record<string, unknown> | null | undefined): ExternalIngestionOrchestrationNote | null {
   if (!notes || typeof notes !== 'object') return null
@@ -82,7 +91,31 @@ export async function loadAdaptiveDwellState(): Promise<AdaptiveDwellState | nul
   }
 }
 
-export async function loadAdaptivePressureSignals(nowMs = Date.now()): Promise<AdaptivePressureSignals> {
+function filterOrchestrationRowsForLane(
+  rows: OrchestrationRunRow[],
+  laneContext?: IngestionLaneContext
+): OrchestrationRunRow[] {
+  if (!laneContext?.laneModeEnabled) {
+    return rows
+  }
+  return rows.filter((row) => {
+    const ext = asExternalNote(row.notes)
+    if (!ext) {
+      return row.mode === 'geocode_cron' || row.mode === 'daily' || row.mode === 'ingestion'
+    }
+    return externalNoteMatchesLane(ext, laneContext.lane, true)
+  })
+}
+
+export async function loadAdaptivePressureSignals(
+  nowMs = Date.now(),
+  options?: LoadAdaptivePressureSignalsOptions
+): Promise<AdaptivePressureSignals> {
+  const laneContext = options?.laneContext
+  const orchestrationStateKey =
+    laneContext?.lane.stateKey ?? LEGACY_ORCHESTRATION_STATE_KEY
+  const laneKeyForThrottle =
+    laneContext?.laneModeEnabled === true ? laneContext.lane.laneKey : null
   const unavailable: AdaptivePressureSignals = {
     metricsAvailable: false,
     metricsStale: true,
@@ -132,7 +165,7 @@ export async function loadAdaptivePressureSignals(nowMs = Date.now()): Promise<A
 
     const orchestrationStatePromise = fromBase(admin, 'ingestion_orchestration_state')
       .select('cursor')
-      .eq('key', 'external_page_source')
+      .eq('key', orchestrationStateKey)
       .limit(1)
 
     const orchestrationRowsPromise = fromBase(admin, 'ingestion_orchestration_runs')
@@ -143,7 +176,7 @@ export async function loadAdaptivePressureSignals(nowMs = Date.now()): Promise<A
       .order('created_at', { ascending: false })
       .limit(ORCHESTRATION_ROWS_LIMIT)
 
-    const lastFetchPromise = fetchLastSuccessfulExternalIngestionAt()
+    const lastFetchPromise = fetchLastSuccessfulExternalIngestionAt(laneKeyForThrottle)
 
     const [
       needsGeocodeResult,
@@ -172,10 +205,12 @@ export async function loadAdaptivePressureSignals(nowMs = Date.now()): Promise<A
     }
 
     const orchRows = (orchestrationRowsResult.data || []) as OrchestrationRunRow[]
-    const agg = aggregateOrchestrationRuns(orchRows, 48, nowMs)
+    const laneFilteredRows = filterOrchestrationRowsForLane(orchRows, laneContext)
+    const agg = aggregateOrchestrationRuns(laneFilteredRows, 48, nowMs)
+    const globalAgg = aggregateOrchestrationRuns(orchRows, 48, nowMs)
     const fetchRollup = agg.fetchRollup24h
-    const geocodeRollup = agg.geocodeRollup24h
-    const publishRollup = agg.publishRollup24h
+    const geocodeRollup = globalAgg.geocodeRollup24h
+    const publishRollup = globalAgg.publishRollup24h
 
     const newestRunMs =
       orchRows.length > 0 && orchRows[0]?.created_at
@@ -198,7 +233,7 @@ export async function loadAdaptivePressureSignals(nowMs = Date.now()): Promise<A
       nowMs,
     })
 
-    const recentIngestionRuns = orchRows
+    const recentIngestionRuns = laneFilteredRows
       .filter((r) => r.mode === 'ingestion' || r.mode === 'daily')
       .slice(0, 6)
     let recentDurationSum = 0
@@ -266,9 +301,12 @@ export async function loadAdaptivePressureSignals(nowMs = Date.now()): Promise<A
   }
 }
 
-export async function resolveAdaptiveThroughputForCron(caps?: AdaptiveCaps) {
+export async function resolveAdaptiveThroughputForCron(
+  caps?: AdaptiveCaps,
+  options?: LoadAdaptivePressureSignalsOptions
+) {
   const [signals, previousDwell] = await Promise.all([
-    loadAdaptivePressureSignals(),
+    loadAdaptivePressureSignals(Date.now(), options),
     loadAdaptiveDwellState(),
   ])
   return resolveAdaptiveThroughput({ signals, previousDwell, caps })

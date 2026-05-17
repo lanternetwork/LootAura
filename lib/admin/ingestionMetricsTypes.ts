@@ -121,6 +121,14 @@ export interface IngestionMetricsResponse {
     budgetExitRuns48h: number
     overlapPreventionEvents48h: number
     adaptiveLatest: Record<string, unknown> | null
+    laneModeEnabled: boolean
+    lanes: Array<{
+      laneKey: string
+      laneType: string
+      laneRegion: string | null
+      stateKey: string
+      cursor: number
+    }>
   }
   volume: IngestionVolumeMetrics
   oldestStuckRows: IngestionMetricsStuckRowSample[]

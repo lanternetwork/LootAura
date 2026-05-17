@@ -3,6 +3,11 @@ import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import { extractLatestAdaptiveNoteFromOrchestrationRows } from '@/lib/ingestion/adaptiveThroughputProfile'
 import {
+  fetchIngestionLaneStateSummaries,
+  primaryOrchestrationStateKeyForMetrics,
+} from '@/lib/admin/ingestionLaneMetricsHelpers'
+import { isIngestionLaneModeEnabled } from '@/lib/ingestion/ingestionLanes'
+import {
   parseIngestionOrchestrationConfigBatchSizeForMetrics,
   parseIngestionOrchestrationMinMinutesForMetrics,
   GEOCODE_STALE_CRITICAL_MS,
@@ -154,10 +159,12 @@ export async function GET(request: NextRequest) {
       .eq('source_platform', 'external_page_source')
       .not('source_crawl_excluded_at', 'is', null)
 
+    const orchestrationStateKey = primaryOrchestrationStateKeyForMetrics()
     const orchestrationStatePromise = fromBase(admin, 'ingestion_orchestration_state')
       .select('cursor')
-      .eq('key', 'external_page_source')
+      .eq('key', orchestrationStateKey)
       .limit(1)
+    const laneStateSummariesPromise = fetchIngestionLaneStateSummaries(admin)
 
     const stuckRowsPromise = fromBase(admin, 'ingested_sales')
       .select(
@@ -212,6 +219,7 @@ export async function GET(request: NextRequest) {
       ingestedPubTs,
       orchestrationRowsResult,
       lastSuccessfulFetchAt,
+      laneStateSummaries,
       discoveryCounts,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
@@ -228,6 +236,7 @@ export async function GET(request: NextRequest) {
       ingestedPubTsPromise,
       orchestrationRowsPromise,
       lastSuccessfulFetchPromise,
+      laneStateSummariesPromise,
       Promise.all(discoveryStatusPromises),
     ])
 
@@ -434,6 +443,8 @@ export async function GET(request: NextRequest) {
         budgetExitRuns48h: agg.budgetExitRuns48h,
         overlapPreventionEvents48h: agg.overlapPreventionEvents48h,
         adaptiveLatest: extractLatestAdaptiveNoteFromOrchestrationRows(orchRows),
+        laneModeEnabled: isIngestionLaneModeEnabled(),
+        lanes: laneStateSummaries,
       },
       volume: {
         fetch: {

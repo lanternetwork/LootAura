@@ -75,6 +75,17 @@ export type ExternalIngestionOrchestrationNote = {
   externalFetchDurationMs?: number
   publishDuplicateReuseCount?: number
   adaptive?: Record<string, unknown>
+  laneKey?: string
+  laneType?: string
+  laneRegion?: string | null
+  laneConfigsCrawlable?: number
+  laneConfigsProcessed?: number
+  laneConfigsRemaining?: number
+  laneCursorBefore?: number
+  laneCursorAfter?: number
+  laneOverlapPrevented?: boolean
+  laneStaleLockRecovered?: boolean
+  laneAdaptiveProfile?: string
 }
 
 export type DiscoveryCronOrchestrationNote = {
@@ -123,8 +134,9 @@ type NotesPayload = {
 /**
  * Latest successful external_page_source ingestion completion time from orchestration metrics (any mode).
  * Used to throttle frequent `mode=ingestion` cron without slowing geocode/publish.
+ * When `laneKey` is set (lane mode), only matches runs for that lane.
  */
-export async function fetchLastSuccessfulExternalIngestionAt(): Promise<string | null> {
+export async function fetchLastSuccessfulExternalIngestionAt(laneKey?: string | null): Promise<string | null> {
   try {
     const admin = getAdminDb()
     const { data, error } = await fromBase(admin, 'ingestion_orchestration_runs')
@@ -138,6 +150,7 @@ export async function fetchLastSuccessfulExternalIngestionAt(): Promise<string |
         component: 'ingestion/orchestrationMetrics',
         operation: 'select_last_ingestion',
         message: error.message,
+        laneKey: laneKey ?? null,
       })
       return null
     }
@@ -147,9 +160,18 @@ export async function fetchLastSuccessfulExternalIngestionAt(): Promise<string |
     for (const row of data as { notes: unknown }[]) {
       const notes = row.notes as NotesPayload | null
       const ext = notes?.external_ingestion
-      if (ext?.status === 'completed' && typeof ext.completedAt === 'string' && ext.completedAt.length > 0) {
-        return ext.completedAt
+      if (ext?.status !== 'completed' || typeof ext.completedAt !== 'string' || ext.completedAt.length === 0) {
+        continue
       }
+      if (laneKey != null && laneKey !== '') {
+        const noteLane = ext.laneKey
+        if (noteLane !== laneKey) {
+          continue
+        }
+      } else if (typeof ext.laneKey === 'string' && ext.laneKey.length > 0) {
+        continue
+      }
+      return ext.completedAt
     }
     return null
   } catch (err) {

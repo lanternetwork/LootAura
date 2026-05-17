@@ -58,13 +58,19 @@ import {
 } from '@/lib/ingestion/adapters/externalPageSource'
 import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 import { createEmptyDedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
+import {
+  acquireIngestionOrchestrationLease,
+  releaseIngestionOrchestrationLease,
+  type IngestionOrchestrationLease,
+} from '@/lib/ingestion/ingestionOrchestrationLease'
+import {
+  filterConfigsForLane,
+  laneNoteFields,
+  type IngestionLaneContext,
+} from '@/lib/ingestion/ingestionLanes'
+import { resolveIngestionLaneContext } from '@/lib/ingestion/resolveIngestionLaneContext'
 import { runArchiveEndedSalesJob } from '@/lib/sales/archiveEndedSalesSqlBatch'
 import type { ReportDigestItem } from '@/lib/email/templates/ModerationDailyDigestEmail'
-import {
-  isIngestionOrchestrationLeaseActiveAt,
-  isStaleOrchestrationLeaseAt,
-  parseIngestionOrchestrationLeaseSeconds,
-} from '@/lib/operationalResilience/ingestionOrchestrationLeaseGate'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,20 +117,6 @@ type ExternalConfigRow = {
   source_platform: string
   source_pages: unknown
   source_crawl_excluded_at?: string | null
-}
-
-type IngestionOrchestrationLease = {
-  acquired: boolean
-  owner: string
-  staleRecovered: boolean
-  cursor: number
-  reason?: 'active_lease' | 'acquire_failed' | 'lost_race'
-}
-
-type IngestionOrchestrationStateRow = {
-  cursor: number | null
-  lease_owner: string | null
-  lease_expires_at: string | null
 }
 
 function pickPrimaryDomainFromSourcePages(rawPages: unknown): string | null {
@@ -179,171 +171,6 @@ function sortExternalConfigsDeterministic(rows: ExternalConfigRow[]): ExternalCo
     const bPages = normalizeSourcePages(b.source_pages).join('|')
     return aPages.localeCompare(bPages)
   })
-}
-
-async function ensureIngestionOrchestrationStateRow(withOpId: (context?: any) => any): Promise<void> {
-  const adminDb = getAdminDb()
-  const { error } = await fromBase(adminDb, 'ingestion_orchestration_state').upsert(
-    { key: 'external_page_source', cursor: 0 },
-    { onConflict: 'key', ignoreDuplicates: true }
-  )
-  if (error) {
-    logger.error('Failed to ensure ingestion orchestration state row', new Error(error.message), withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-      operation: 'ensure_orchestration_state',
-    }))
-    throw new Error('Failed to ensure ingestion orchestration state')
-  }
-}
-
-async function acquireIngestionOrchestrationLease(
-  withOpId: (context?: any) => any
-): Promise<IngestionOrchestrationLease> {
-  const emitLeaseTelemetry = (result: IngestionOrchestrationLease): IngestionOrchestrationLease => {
-    emitObservabilityRecord(
-      buildTelemetryRecord(ObservabilityEvents.ingestion.orchestrationLeaseOutcome, {
-        acquired: result.acquired,
-        staleRecovered: result.staleRecovered,
-        cursor: result.cursor,
-        overlapContention:
-          !result.acquired && (result.reason === 'active_lease' || result.reason === 'lost_race'),
-        reason: result.reason ?? (result.acquired ? 'acquired' : 'none'),
-      })
-    )
-    return result
-  }
-
-  await ensureIngestionOrchestrationStateRow(withOpId)
-  const adminDb = getAdminDb()
-  const owner = generateOperationId()
-  const nowMs = Date.now()
-  const leaseSeconds = parseIngestionOrchestrationLeaseSeconds(process.env.INGESTION_ORCHESTRATION_LEASE_SECONDS)
-  const leaseExpiresAtIso = new Date(nowMs + leaseSeconds * 1000).toISOString()
-
-  const { data: stateRows, error: selectError } = await fromBase(adminDb, 'ingestion_orchestration_state')
-    .select('cursor, lease_owner, lease_expires_at')
-    .eq('key', 'external_page_source')
-    .limit(1)
-  if (selectError || !Array.isArray(stateRows) || stateRows.length === 0) {
-    logger.error('Failed to load ingestion orchestration state', new Error(selectError?.message || 'row missing'), withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-      operation: 'lease_acquire',
-    }))
-    return emitLeaseTelemetry({ acquired: false, owner, staleRecovered: false, cursor: 0, reason: 'acquire_failed' })
-  }
-
-  const current = stateRows[0] as IngestionOrchestrationStateRow
-  const ownerNow = current.lease_owner ?? null
-  const expiresNow = current.lease_expires_at ?? null
-
-  if (isIngestionOrchestrationLeaseActiveAt(nowMs, ownerNow, expiresNow)) {
-    logger.info('Ingestion orchestration lease already active; skipping overlapping run', withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-      operation: 'lease_acquire',
-      overlapPrevented: true,
-    }))
-    return emitLeaseTelemetry({
-      acquired: false,
-      owner,
-      staleRecovered: false,
-      cursor: current.cursor ?? 0,
-      reason: 'active_lease',
-    })
-  }
-
-  const staleRecovered = isStaleOrchestrationLeaseAt(nowMs, ownerNow, expiresNow)
-  const leaseUpdatePayload = {
-    lease_owner: owner,
-    lease_expires_at: leaseExpiresAtIso,
-    last_started_at: new Date(nowMs).toISOString(),
-    updated_at: new Date(nowMs).toISOString(),
-  }
-  let leaseUpdateQuery = fromBase(adminDb, 'ingestion_orchestration_state')
-    .update(leaseUpdatePayload)
-    .eq('key', 'external_page_source')
-
-  leaseUpdateQuery =
-    ownerNow === null
-      ? leaseUpdateQuery.is('lease_owner', null)
-      : leaseUpdateQuery.eq('lease_owner', ownerNow)
-  leaseUpdateQuery =
-    expiresNow === null
-      ? leaseUpdateQuery.is('lease_expires_at', null)
-      : leaseUpdateQuery.eq('lease_expires_at', expiresNow)
-
-  const { data: updatedRows, error: updateError } = await leaseUpdateQuery.select('cursor')
-
-  if (updateError || !Array.isArray(updatedRows) || updatedRows.length === 0) {
-    logger.warn('Ingestion orchestration lease acquire lost race; skipping run', withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-      operation: 'lease_acquire',
-      overlapPrevented: true,
-      message: updateError?.message,
-    }))
-    return emitLeaseTelemetry({
-      acquired: false,
-      owner,
-      staleRecovered: false,
-      cursor: current.cursor ?? 0,
-      reason: 'lost_race',
-    })
-  }
-
-  logger.info('Ingestion orchestration lease acquired', withOpId({
-    component: 'api/cron/daily',
-    task: 'ingestion-orchestration',
-    step: 'ingestion',
-    operation: 'lease_acquire',
-    staleRecovered,
-  }))
-  return emitLeaseTelemetry({
-    acquired: true,
-    owner,
-    staleRecovered,
-    cursor: (updatedRows[0]?.cursor as number | null) ?? (current.cursor ?? 0),
-  })
-}
-
-async function releaseIngestionOrchestrationLease(
-  withOpId: (context?: any) => any,
-  params: {
-    owner: string
-    nextCursor: number
-    markCompleted: boolean
-  }
-): Promise<void> {
-  const adminDb = getAdminDb()
-  const payload: Record<string, unknown> = {
-    cursor: params.nextCursor,
-    lease_owner: null,
-    lease_expires_at: null,
-    updated_at: new Date().toISOString(),
-  }
-  if (params.markCompleted) {
-    payload.last_completed_at = new Date().toISOString()
-  }
-  const { data, error } = await fromBase(adminDb, 'ingestion_orchestration_state')
-    .update(payload)
-    .eq('key', 'external_page_source')
-    .eq('lease_owner', params.owner)
-    .select('key')
-  if (error || !Array.isArray(data) || data.length === 0) {
-    logger.warn('Failed to release ingestion orchestration lease cleanly', withOpId({
-      component: 'api/cron/daily',
-      task: 'ingestion-orchestration',
-      step: 'ingestion',
-      operation: 'lease_release',
-      message: error?.message,
-    }))
-  }
 }
 
 export async function GET(request: NextRequest) {
@@ -468,8 +295,24 @@ async function handleRequest(request: NextRequest) {
 
     if (isIngestionOnly) {
       results.tasksRan = ['ingestionOrchestration'] as const
+      const laneParam = request.nextUrl.searchParams.get('lane')
+      const laneResolved = await resolveIngestionLaneContext({ mode: 'ingestion', laneParam })
+      if (!laneResolved.ok) {
+        results.ok = false
+        results.tasks.ingestionOrchestration = {
+          ok: false,
+          error: laneResolved.message,
+          code: laneResolved.code,
+        }
+        return NextResponse.json(results, { status: laneResolved.status })
+      }
       try {
-        const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'ingestion', orchestrationTelemetry)
+        const ingestionOrchestrationResult = await runIngestionOrchestration(
+          withOpId,
+          'ingestion',
+          orchestrationTelemetry,
+          laneResolved.context
+        )
         results.tasks.ingestionOrchestration = ingestionOrchestrationResult
       } catch (error) {
         logger.error('Ingestion orchestration task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
@@ -610,7 +453,19 @@ async function handleRequest(request: NextRequest) {
 
     // Task 5: Ingestion orchestration (ingestion -> geocode -> publish)
     try {
-      const ingestionOrchestrationResult = await runIngestionOrchestration(withOpId, 'daily', orchestrationTelemetry)
+      const dailyLaneResolved = await resolveIngestionLaneContext({
+        mode: 'daily',
+        laneParam: request.nextUrl.searchParams.get('lane'),
+      })
+      if (!dailyLaneResolved.ok) {
+        throw new Error(dailyLaneResolved.message)
+      }
+      const ingestionOrchestrationResult = await runIngestionOrchestration(
+        withOpId,
+        'daily',
+        orchestrationTelemetry,
+        dailyLaneResolved.context
+      )
       results.tasks.ingestionOrchestration = ingestionOrchestrationResult
     } catch (error) {
       logger.error('Ingestion orchestration task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
@@ -700,24 +555,42 @@ async function handleRequest(request: NextRequest) {
 async function runIngestionOrchestration(
   withOpId: (context?: any) => any,
   mode: 'daily' | 'ingestion',
-  telemetryContext: Record<string, unknown>
+  telemetryContext: Record<string, unknown>,
+  laneContext: IngestionLaneContext
 ): Promise<any> {
   const orchestrationStartedAt = Date.now()
+  const leaseLogContext = {
+    component: 'api/cron/daily',
+    task: 'ingestion-orchestration',
+    laneKey: laneContext.lane.laneKey,
+    stateKey: laneContext.lane.stateKey,
+    laneModeEnabled: laneContext.laneModeEnabled,
+    rotationApplied: laneContext.rotationApplied,
+  }
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.ingestion.orchestrationStarted, {
       ...telemetryContext,
       mode,
+      laneKey: laneContext.lane.laneKey,
     })
   )
   logger.info('Starting ingestion orchestration task', withOpId({
     component: 'api/cron/daily',
     task: 'ingestion-orchestration',
     mode,
+    laneKey: laneContext.lane.laneKey,
+    stateKey: laneContext.lane.stateKey,
   }))
 
   const taskResult: any = {
     ok: true,
     steps: {},
+    lane: {
+      laneKey: laneContext.lane.laneKey,
+      laneType: laneContext.lane.laneType,
+      laneRegion: laneContext.lane.laneRegion,
+      rotationApplied: laneContext.rotationApplied,
+    },
   }
 
   let geocodeSummary: GeocodeWorkerSummary | null = null
@@ -729,11 +602,18 @@ async function runIngestionOrchestration(
     aggregationMode: 'not_applicable_external_page_source' as const,
   }
 
-  const { envelope: adaptiveEnvelope, note: adaptiveNote } = await resolveAdaptiveThroughputForCron()
+  const { envelope: adaptiveEnvelope, note: adaptiveNote } = await resolveAdaptiveThroughputForCron(undefined, {
+    laneContext,
+  })
   const adaptivePayload = adaptiveNoteToOrchestrationPayload(adaptiveNote)
   taskResult.adaptive = adaptiveNote
+  const laneBaseNote = () =>
+    laneNoteFields(laneContext.lane, {
+      laneAdaptiveProfile: adaptiveNote.adaptiveProfile,
+    })
   const attachAdaptive = <T extends ExternalIngestionOrchestrationNote>(note: T): T => ({
     ...note,
+    ...laneBaseNote(),
     adaptive: adaptivePayload,
   })
 
@@ -742,7 +622,9 @@ async function runIngestionOrchestration(
   let skipExternalIngestion = false
 
   if (mode === 'ingestion' && minIngestionMinutes > 0) {
-    const lastCompletedAt = await fetchLastSuccessfulExternalIngestionAt()
+    const lastCompletedAt = await fetchLastSuccessfulExternalIngestionAt(
+      laneContext.laneModeEnabled ? laneContext.lane.laneKey : null
+    )
     if (lastCompletedAt) {
       const elapsedMs = Date.now() - Date.parse(lastCompletedAt)
       const minMs = minIngestionMinutes * 60_000
@@ -794,7 +676,7 @@ async function runIngestionOrchestration(
         step: 'ingestion',
       }))
 
-      acquiredLease = await acquireIngestionOrchestrationLease(withOpId)
+      acquiredLease = await acquireIngestionOrchestrationLease(laneContext.lane.stateKey, withOpId(leaseLogContext))
       if (!acquiredLease.acquired) {
         taskResult.steps.ingestion = {
           ok: true,
@@ -806,6 +688,7 @@ async function runIngestionOrchestration(
           status: 'skipped_lock_active',
           overlapPrevented: true,
           lockSkipped: true,
+          laneOverlapPrevented: true,
         })
         logger.info('Ingestion step skipped due to active orchestration lease', withOpId({
           component: 'api/cron/daily',
@@ -850,13 +733,20 @@ async function runIngestionOrchestration(
       const configsSkippedInvalidUrls = crawlablePartition.configsSkippedInvalidUrls
       const configsSkippedCrawlExcluded = crawlablePartition.configsSkippedCrawlExcluded
 
-      const rows = sortExternalConfigsDeterministic(crawlablePartition.crawlable)
+      const laneCrawlable = laneContext.laneModeEnabled
+        ? filterConfigsForLane(crawlablePartition.crawlable, laneContext.lane)
+        : crawlablePartition.crawlable
+      const rows = sortExternalConfigsDeterministic(laneCrawlable)
       const plannedRows = interleaveConfigsByDomain(rows)
       const totalConfigs = plannedRows.length
       const batchSize = adaptiveEnvelope.fetch.configBatchSize
       const executionBudgetMs = adaptiveEnvelope.fetch.executionBudgetMs
       const budgetStartedAtMs = Date.now()
-      const baseCursor =
+      const laneCursorBefore =
+        totalConfigs > 0 && acquiredLease
+          ? ((acquiredLease.cursor % totalConfigs) + totalConfigs) % totalConfigs
+          : 0
+      const baseCursor = laneCursorBefore
         totalConfigs > 0 && acquiredLease
           ? ((acquiredLease.cursor % totalConfigs) + totalConfigs) % totalConfigs
           : 0
@@ -1021,7 +911,7 @@ async function runIngestionOrchestration(
         completedAt,
         configsProcessed: totals.configsProcessed,
         configsConsumed,
-        configsCrawlable,
+        configsCrawlable: totalConfigs,
         configsSkippedNoSourcePages,
         configsSkippedInvalidUrls,
         configsSkippedCrawlExcluded,
@@ -1030,6 +920,13 @@ async function runIngestionOrchestration(
         budgetExit: budgetExited,
         overlapPrevented: false,
         staleLockRecovered: acquiredLease?.staleRecovered ?? false,
+        laneConfigsCrawlable: totalConfigs,
+        laneConfigsProcessed: totals.configsProcessed,
+        laneConfigsRemaining: configsRemaining,
+        laneCursorBefore,
+        laneCursorAfter: nextCursor,
+        laneOverlapPrevented: false,
+        laneStaleLockRecovered: acquiredLease?.staleRecovered ?? false,
         pagesProcessed: totals.pagesProcessed,
         fetched: totals.fetched,
         inserted: totals.inserted,
@@ -1117,7 +1014,7 @@ async function runIngestionOrchestration(
       }
     } finally {
       if (lockHeld && acquiredLease) {
-        await releaseIngestionOrchestrationLease(withOpId, {
+        await releaseIngestionOrchestrationLease(laneContext.lane.stateKey, withOpId(leaseLogContext), {
           owner: acquiredLease.owner,
           nextCursor,
           markCompleted,

@@ -95,10 +95,12 @@ describe('GET /api/admin/ingestion/metrics', () => {
     expect(res.status).toBe(200)
     const json = (await res.json()) as {
       ok: boolean
+      geocodeEligibleBacklog: number
       volume: {
         addressLifecycle: { enrichmentBacklog: number; byStatus: Record<string, number> }
+        imageEnrichment: { backlog: number; hasImage: number }
         fetch: { crawlableConfigsTotal: number }
-        geocode: { needsGeocodeCount: number }
+        geocode: { needsGeocodeCount: number; eligibleNeedsGeocodeCount: number }
         bottleneck: string
       }
       oldestStuckRows: Array<Record<string, unknown>>
@@ -107,6 +109,9 @@ describe('GET /api/admin/ingestion/metrics', () => {
     expect(json.volume.fetch.crawlableConfigsTotal).toBe(10)
     expect(json.volume.geocode.needsGeocodeCount).toBe(5)
     expect(json.volume.addressLifecycle.enrichmentBacklog).toBe(5)
+    expect(json.volume.imageEnrichment.backlog).toBe(5)
+    expect(json.volume.geocode.eligibleNeedsGeocodeCount).toBe(5)
+    expect(json.geocodeEligibleBacklog).toBe(5)
     expect(json.volume.bottleneck).toBeTruthy()
     expect(JSON.stringify(json)).not.toMatch(/https?:\/\//i)
     for (const row of json.oldestStuckRows) {

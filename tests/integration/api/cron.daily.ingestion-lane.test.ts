@@ -70,6 +70,9 @@ describe('GET /api/cron/daily?mode=ingestion lane param', () => {
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.ok).toBe(false)
-    expect(json.code).toBe('INVALID_INGESTION_LANE')
+    expect(json.tasks.ingestionOrchestration).toMatchObject({
+      ok: false,
+      code: 'INVALID_INGESTION_LANE',
+    })
   })
 })

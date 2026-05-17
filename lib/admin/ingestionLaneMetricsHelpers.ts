@@ -1,4 +1,4 @@
-import { fromBase } from '@/lib/supabase/clients'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import {
   allLaneStateKeysForSeed,
   isIngestionLaneModeEnabled,
@@ -23,7 +23,9 @@ export function primaryOrchestrationStateKeyForMetrics(): string {
     : LEGACY_ORCHESTRATION_STATE_KEY
 }
 
-export async function fetchIngestionLaneStateSummaries(admin: unknown): Promise<IngestionLaneStateSummary[]> {
+export async function fetchIngestionLaneStateSummaries(
+  admin: ReturnType<typeof getAdminDb>
+): Promise<IngestionLaneStateSummary[]> {
   if (!isIngestionLaneModeEnabled()) {
     return []
   }

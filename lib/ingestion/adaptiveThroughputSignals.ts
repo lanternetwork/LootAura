@@ -10,7 +10,11 @@ import {
   parseIngestionOrchestrationConfigBatchSizeForMetrics,
   parseIngestionOrchestrationMinMinutesForMetrics,
 } from '@/lib/admin/ingestionVolumeMetricsConfig'
-import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
+import {
+  fetchLastSuccessfulExternalIngestionAt,
+  type ExternalIngestionOrchestrationNote,
+  type GeocodeCronOrchestrationNote,
+} from '@/lib/ingestion/orchestrationMetrics'
 import {
   ADAPTIVE_METRICS_STALE_MS,
   type AdaptiveCaps,
@@ -21,10 +25,23 @@ import {
   type AdaptiveDwellState,
   type AdaptivePressureSignals,
 } from '@/lib/ingestion/adaptiveThroughputProfile'
-import { INGESTION_ORCHESTRATION_DEFAULTS } from '@/lib/ingestion/ingestionOrchestrationDefaults'
 import { logger } from '@/lib/log'
 
 const ORCHESTRATION_ROWS_LIMIT = 80
+
+function asExternalNote(notes: Record<string, unknown> | null | undefined): ExternalIngestionOrchestrationNote | null {
+  if (!notes || typeof notes !== 'object') return null
+  const ext = notes.external_ingestion
+  if (!ext || typeof ext !== 'object') return null
+  return ext as ExternalIngestionOrchestrationNote
+}
+
+function asGeocodeCronNote(notes: Record<string, unknown> | null | undefined): GeocodeCronOrchestrationNote | null {
+  if (!notes || typeof notes !== 'object') return null
+  const gc = notes.geocode_cron
+  if (!gc || typeof gc !== 'object') return null
+  return gc as GeocodeCronOrchestrationNote
+}
 
 export async function loadAdaptiveDwellState(): Promise<AdaptiveDwellState | null> {
   try {
@@ -193,15 +210,15 @@ export async function loadAdaptivePressureSignals(nowMs = Date.now()): Promise<A
         recentDurationSum += row.duration_ms
         recentDurationCount += 1
       }
-      const ext = row.notes?.external_ingestion
+      const ext = asExternalNote(row.notes)
       if (ext?.budgetExit === true) {
         recentFetchBudgetExitRuns += 1
       }
       if (ext?.status === 'failed') {
         recentOrchestrationErrorRuns += 1
       }
-      const gc = row.notes?.geocode_cron
-      if (gc && gc.ok === false) {
+      const gc = asGeocodeCronNote(row.notes)
+      if (gc?.ok === false) {
         recentOrchestrationErrorRuns += 1
       }
     }

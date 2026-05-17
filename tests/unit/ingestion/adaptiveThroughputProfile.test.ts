@@ -5,8 +5,7 @@ import {
   type AdaptiveDwellState,
   type AdaptivePressureSignals,
 } from '@/lib/ingestion/adaptiveThroughputProfile'
-import type { AdaptiveCaps } from '@/lib/ingestion/adaptiveThroughputConfig'
-import { isAdaptiveThroughputEnabled } from '@/lib/ingestion/adaptiveThroughputConfig'
+import { isAdaptiveThroughputEnabled, type AdaptiveCaps } from '@/lib/ingestion/adaptiveThroughputConfig'
 
 const testCaps: AdaptiveCaps = {
   maxConfigBatch: 40,

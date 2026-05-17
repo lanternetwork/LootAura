@@ -203,7 +203,7 @@ function derivePublishDesired(signals: AdaptivePressureSignals): { profile: Adap
 }
 
 function applyHysteresisForSubsystem(
-  subsystem: AdaptiveSubsystem,
+  _subsystem: AdaptiveSubsystem,
   previous: AdaptiveSubsystemProfile,
   desired: AdaptiveSubsystemProfile,
   dwellRemaining: number,
@@ -213,28 +213,28 @@ function applyHysteresisForSubsystem(
     return { profile: 'recovery', dwellRemaining: caps.recoveryDwellRuns }
   }
 
+  let profile: AdaptiveSubsystemProfile = desired
+
   if (previous === 'recovery') {
     if (dwellRemaining > 0) {
       return { profile: 'recovery', dwellRemaining: dwellRemaining - 1 }
     }
-    desired = 'conservative'
+    profile = 'conservative'
   }
 
-  if (PROFILE_RANK[desired] > PROFILE_RANK[previous] + 1) {
-    const stepped: AdaptiveSubsystemProfile =
-      PROFILE_RANK[previous] === 0 ? 'normal' : 'elevated'
-    desired = stepped
+  if (PROFILE_RANK[profile] > PROFILE_RANK[previous] + 1) {
+    profile = PROFILE_RANK[previous] === 0 ? 'normal' : 'elevated'
   }
 
-  if (desired === 'elevated' && previous !== 'elevated') {
-    return { profile: desired, dwellRemaining: caps.elevatedDwellRuns }
+  if (profile === 'elevated' && previous !== 'elevated') {
+    return { profile, dwellRemaining: caps.elevatedDwellRuns }
   }
 
-  if (previous === 'elevated' && desired === 'normal' && dwellRemaining > 0) {
+  if (previous === 'elevated' && profile === 'normal' && dwellRemaining > 0) {
     return { profile: 'elevated', dwellRemaining: dwellRemaining - 1 }
   }
 
-  return { profile: desired, dwellRemaining: desired === 'elevated' ? dwellRemaining : 0 }
+  return { profile, dwellRemaining: profile === 'elevated' ? dwellRemaining : 0 }
 }
 
 function aggregateAdaptiveLabel(profiles: Record<AdaptiveSubsystem, AdaptiveSubsystemProfile>): string {

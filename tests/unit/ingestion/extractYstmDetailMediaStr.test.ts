@@ -33,8 +33,8 @@ describe('extractYstmDetailMediaStrFromHtml', () => {
   it('rejects logo paths in media array', () => {
     const html = `<script>const mediaStr = '{"baseUrl":"https://yardsaletreasuremap.com/pics","media":["YSTM_site_logo.png","real.jpeg"]}';</script>`
     const result = extractYstmDetailMediaStrFromHtml(html, PAGE_URL)
-    expect(result.imageUrls).toHaveLength(0)
-    expect(result.rejectedCount).toBeGreaterThan(0)
+    expect(result.imageUrls).toEqual(['https://yardsaletreasuremap.com/pics/real.jpeg'])
+    expect(result.rejectedCount).toBe(1)
   })
 
   it('dedupes duplicate media filenames', () => {

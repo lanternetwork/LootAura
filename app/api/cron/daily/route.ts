@@ -25,7 +25,8 @@
  * `INGESTION_ORCHESTRATION_MIN_MINUTES` (default 30); geocode and publish always run.
  *
  * Ingestion geocode step: bounded DB backlog only —
- * `geocodePendingSales({ batchSizeOverride })` using `GEOCODE_BACKLOG_BATCH_SIZE` (default 25, cap 100).
+ * `geocodePendingSales({ batchSizeOverride })` using `GEOCODE_BACKLOG_BATCH_SIZE` (default 15, cap 100).
+ * Shares the `geocode_pipeline` lease with `/api/cron/geocode` to prevent overlapping drains.
  * Does not pass `captureClaimedRowIds` (cron geocode route owns that for observability).
  */
 
@@ -48,6 +49,7 @@ import {
   type ImageEnrichmentWorkerSummary,
 } from '@/lib/ingestion/imageEnrichmentWorker'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
+import { runWithGeocodePipelineLease } from '@/lib/ingestion/geocodePipelineLease'
 import {
   finalizeLinkedPublishedIngestedSales,
   publishReadyIngestedSales,
@@ -1132,15 +1134,45 @@ async function runIngestionOrchestration(
       step: 'geocode',
       backlogBatchSize,
     }))
-    geocodeSummary = await geocodePendingSales({
-      batchSizeOverride: backlogBatchSize,
-      concurrencyCeilingOverride: adaptiveEnvelope.geocode.concurrencyCeiling,
-      telemetryContext: telemetryContext,
+    const geocodeLease = await runWithGeocodePipelineLease({
+      logContext: withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'geocode',
+      }),
+      execute: () =>
+        geocodePendingSales({
+          batchSizeOverride: backlogBatchSize,
+          concurrencyCeilingOverride: adaptiveEnvelope.geocode.concurrencyCeiling,
+          telemetryContext: telemetryContext,
+        }),
     })
-    taskResult.steps.geocode = {
-      ok: true,
-      backlogBatchSize,
-      ...geocodeSummary,
+    if (geocodeLease.skipped) {
+      geocodeSummary = {
+        claimed: 0,
+        succeeded: 0,
+        failedRetriable: 0,
+        failedTerminal: 0,
+        rate429Count: 0,
+        processed: 0,
+        publishTriggered: 0,
+        publishOk: 0,
+        publishFailed: 0,
+      }
+      taskResult.steps.geocode = {
+        ok: true,
+        backlogBatchSize,
+        skippedDueToPipelineLease: true,
+        pipelineLeaseReason: geocodeLease.reason,
+        ...geocodeSummary,
+      }
+    } else {
+      geocodeSummary = geocodeLease.result
+      taskResult.steps.geocode = {
+        ok: true,
+        backlogBatchSize,
+        ...geocodeSummary,
+      }
     }
     logger.info('Geocode step completed', withOpId({
       component: 'api/cron/daily',

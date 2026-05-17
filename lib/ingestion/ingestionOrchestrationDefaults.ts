@@ -8,9 +8,9 @@ export const INGESTION_ORCHESTRATION_DEFAULTS = {
   executionBudgetMs: 45_000,
   minIntervalMinutes: 10,
   domainSpacingMs: 500,
-  geocodeBacklogBatchSize: 25,
-  geocodeCronQueueBatchSize: 50,
-  geocodeConcurrencyCeiling: 4,
+  geocodeBacklogBatchSize: 15,
+  geocodeCronQueueBatchSize: 20,
+  geocodeConcurrencyCeiling: 2,
   publishBatchSize: 150,
 } as const
 

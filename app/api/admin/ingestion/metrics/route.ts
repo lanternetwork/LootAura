@@ -29,6 +29,7 @@ import {
   type OrchestrationRunRow,
 } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
+import { countGeocodeDeadLetterReplayBuckets } from '@/lib/geocode/geocodeDeadLetterReplay'
 import { ADDRESS_STATUSES } from '@/lib/ingestion/address/addressLifecycleTypes'
 import type { ImageEnrichmentFailureReason } from '@/lib/ingestion/imageEnrichmentWorker'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
@@ -262,6 +263,8 @@ export async function GET(request: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .gte('last_image_enrichment_attempt_at', iso24h)
 
+    const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
+
     const imageFailureReasonCountPromises = IMAGE_ENRICHMENT_FAILURE_REASONS.map(
       async (reason) => {
         const { count, error } = await fromBase(admin, 'ingested_sales')
@@ -298,6 +301,7 @@ export async function GET(request: NextRequest) {
       imageHasImageResult,
       imageAttempted24hResult,
       imageFailureReasonParts,
+      geocodeDeadLetterBuckets,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
       published24hPromise,
@@ -322,6 +326,7 @@ export async function GET(request: NextRequest) {
       imageHasImagePromise,
       imageAttempted24hPromise,
       Promise.all(imageFailureReasonCountPromises),
+      geocodeDeadLetterBucketsPromise,
     ])
 
     const statusMap = Object.fromEntries(statusParts.map((p) => [p.status, p.count])) as Record<
@@ -589,6 +594,8 @@ export async function GET(request: NextRequest) {
           geocodeTerminalFailed24h: geocodeRollup.terminalFailed,
           rate429Count24h: geocodeRollup.rate429,
           effectiveConcurrencyLatest: agg.latestGeocodeConcurrency,
+          replayableTransientNeedsCheck: geocodeDeadLetterBuckets.replayableTransientNeedsCheck,
+          terminalGeocodeNeedsCheck: geocodeDeadLetterBuckets.terminalGeocodeNeedsCheck,
         },
         publish: {
           readyCount: statusMap.ready,

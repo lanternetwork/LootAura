@@ -52,6 +52,10 @@ export interface IngestionVolumeGeocodeMetrics {
   geocodeTerminalFailed24h: number
   rate429Count24h: number
   effectiveConcurrencyLatest: number | null
+  /** `needs_check` rows eligible for transient-provider dead-letter replay (bounded scan). */
+  replayableTransientNeedsCheck: number
+  /** Other `needs_check` geocode terminal rows (non-replayable or ineligible). */
+  terminalGeocodeNeedsCheck: number
 }
 
 export interface IngestionVolumePublishMetrics {

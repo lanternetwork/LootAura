@@ -52,6 +52,8 @@ async function replayHandler(request: NextRequest) {
   try {
     result = await runBoundedGeocodeDeadLetterReplay({
       limit,
+      requireTransientProvider: true,
+      requireNullCoordinates: true,
       telemetryContext: { jobType: 'geocode.dead_letter.replay' },
     })
   } catch (error) {

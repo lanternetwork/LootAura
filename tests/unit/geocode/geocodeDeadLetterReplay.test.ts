@@ -125,6 +125,38 @@ describe('evaluateGeocodeDeadLetterReplayEligibility', () => {
     ).toEqual({ ok: false, reason: 'replay_exhausted' })
   })
 
+  it('rejects empty_results when requireTransientProvider', () => {
+    expect(
+      evaluateGeocodeDeadLetterReplayEligibility({
+        status: 'needs_check',
+        failureDetails: {
+          geocode_dead_letter: {
+            ...baseDl,
+            reasons: ['empty_or_unresolved_results'],
+            classified_at_ms: now - 120_000,
+          },
+        },
+        nowMs: now,
+        maxReplayAttempts: max,
+        requireTransientProvider: true,
+      })
+    ).toEqual({ ok: false, reason: 'not_transient_provider' })
+  })
+
+  it('rejects rows with coordinates when requireNullCoordinates', () => {
+    expect(
+      evaluateGeocodeDeadLetterReplayEligibility({
+        status: 'needs_check',
+        failureDetails: { geocode_dead_letter: { ...baseDl, classified_at_ms: now - 120_000 } },
+        nowMs: now,
+        maxReplayAttempts: max,
+        requireNullCoordinates: true,
+        lat: 38.2,
+        lng: -85.7,
+      })
+    ).toEqual({ ok: false, reason: 'has_coordinates' })
+  })
+
   it('rejects wrong schema_version', () => {
     expect(
       evaluateGeocodeDeadLetterReplayEligibility({

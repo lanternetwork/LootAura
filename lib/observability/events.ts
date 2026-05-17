@@ -18,6 +18,9 @@ export const ObservabilityEvents = {
     addressEnrichmentBatchCompleted: 'ingestion.address_enrichment.batch_completed',
     addressEnrichmentRow: 'ingestion.address_enrichment.row',
     addressRemediationBatch: 'ingestion.address_enrichment.remediation_batch',
+    imageEnrichmentBatchStarted: 'ingestion.image_enrichment.batch_started',
+    imageEnrichmentBatchCompleted: 'ingestion.image_enrichment.batch_completed',
+    imageEnrichmentRow: 'ingestion.image_enrichment.row',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

@@ -1,0 +1,17 @@
+import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
+
+export function normalizeListingImageHttpsUrl(raw: string, baseUrl: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  try {
+    const url = new URL(trimmed, baseUrl)
+    if (url.protocol !== 'https:') return null
+    return url.href
+  } catch {
+    return null
+  }
+}
+
+export function isRejectedListingImageUrl(url: string): boolean {
+  return urlSuggestsNonListingPhoto(url) != null
+}

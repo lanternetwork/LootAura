@@ -13,6 +13,7 @@ import {
 } from '@/lib/ingestion/address/addressGated'
 import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
 import { isAddressGeocodeReady, normalizeAddressLineForIngest } from '@/lib/ingestion/address/addressUsability'
+import { applyDetailPageImageEnrichment } from '@/lib/ingestion/images/applyDetailPageImageEnrichment'
 import { enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
@@ -39,8 +40,10 @@ interface ClaimedAddressEnrichmentRow {
   state: string | null
   address_enrichment_attempts: number
   address_unlock_at: string | null
+  image_source_url?: string | null
   failure_reasons: unknown
   failure_details: unknown
+  raw_payload?: unknown
 }
 
 function parseBatchSize(): number {
@@ -189,6 +192,17 @@ async function processAddressEnrichmentRow(
     })
     return { outcome: 'retriable', reason: 'fetch_blocked' }
   }
+
+  await applyDetailPageImageEnrichment({
+    rowId,
+    sourceUrl: row.source_url,
+    html,
+    existingImageSourceUrl: row.image_source_url,
+    existingRawPayload: row.raw_payload,
+    existingFailureDetails: row.failure_details,
+    attemptCount,
+    telemetryContext,
+  })
 
   const extracted = extractDetailPageAddressFromHtml({
     html,

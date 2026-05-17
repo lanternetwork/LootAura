@@ -43,6 +43,10 @@ import {
   enrichPendingAddresses,
   type AddressEnrichmentWorkerSummary,
 } from '@/lib/ingestion/addressEnrichmentWorker'
+import {
+  enrichPendingImages,
+  type ImageEnrichmentWorkerSummary,
+} from '@/lib/ingestion/imageEnrichmentWorker'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import {
   finalizeLinkedPublishedIngestedSales,
@@ -598,6 +602,7 @@ async function runIngestionOrchestration(
   }
 
   let addressEnrichmentSummary: AddressEnrichmentWorkerSummary | null = null
+  let imageEnrichmentSummary: ImageEnrichmentWorkerSummary | null = null
   let geocodeSummary: GeocodeWorkerSummary | null = null
   let publishSummary: PublishWorkerBatchSummary | null = null
   let publishDuplicateReuseCount = 0
@@ -1070,6 +1075,50 @@ async function runIngestionOrchestration(
         component: 'api/cron/daily',
         task: 'ingestion-orchestration',
         step: 'address_enrichment',
+      })
+    )
+  }
+
+  // Step 2b: Image enrichment (D2.5) — detail mediaStr for rows missing images.
+  try {
+    const imageBatchSize = Math.min(
+      adaptiveEnvelope.geocode.backlogBatchSize,
+      parseInt(process.env.IMAGE_ENRICHMENT_BACKLOG_BATCH_SIZE ?? '25', 10) || 25
+    )
+    logger.info('Image enrichment step started', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'image_enrichment',
+      imageBatchSize,
+    }))
+    imageEnrichmentSummary = await enrichPendingImages({
+      batchSizeOverride: imageBatchSize,
+      telemetryContext: telemetryContext,
+    })
+    taskResult.steps.image_enrichment = {
+      ok: true,
+      imageBatchSize,
+      ...imageEnrichmentSummary,
+    }
+    logger.info('Image enrichment step completed', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'image_enrichment',
+      ...imageEnrichmentSummary,
+    }))
+  } catch (error) {
+    taskResult.ok = false
+    taskResult.steps.image_enrichment = {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+    logger.error(
+      'Image enrichment step failed',
+      error instanceof Error ? error : new Error(String(error)),
+      withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'image_enrichment',
       })
     )
   }

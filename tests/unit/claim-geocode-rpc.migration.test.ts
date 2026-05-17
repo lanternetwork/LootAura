@@ -34,3 +34,15 @@ describe('claim_ingested_sales_for_address_enrichment migration', () => {
     expect(sql).toContain('s.next_enrichment_attempt_at <= now()')
   })
 })
+
+describe('claim_ingested_sales_for_address_enrichment D2.5 image_source_url', () => {
+  const d25Path = resolve(
+    process.cwd(),
+    'supabase/migrations/183_ingested_sales_image_enrichment_phase_d2_5.sql'
+  )
+  const d25Sql = readFileSync(d25Path, 'utf8')
+
+  it('returns image_source_url from address enrichment claim', () => {
+    expect(d25Sql).toContain('claimed.image_source_url')
+  })
+})

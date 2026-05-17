@@ -3,7 +3,7 @@ import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthor
 
 /** Slug segment matches See-source-for-address-after-* (case-insensitive). */
 const SEE_SOURCE_AFTER_SLUG_RE =
-  /^see-source-for-address-after-(\d{4}-\d{2}-\d{2}-\d{2}(?:%3A|:)\d{2}(?:%3A|:)\d{2}(?:%3A|:)\d{2})$/i
+  /^see-source-for-address-after-(\d{4}-\d{2}-\d{2}-\d{2}(?:%3A|:)\d{2}(?:%3A|:)\d{2})$/i
 
 export function isSeeSourceGatedSlugSegment(segment: string | null | undefined): boolean {
   if (!segment) return false
@@ -19,7 +19,7 @@ export function parseSeeSourceUnlockAtFromSlug(segment: string | null | undefine
   if (!segment) return null
   const decoded = decodeURIComponent(segment.trim())
   const m = decoded.match(
-    /^see-source-for-address-after-(\d{4})-(\d{2})-(\d{2})-(\d{2})(?:%3A|:)(\d{2})(?:%3A|:)(\d{2})(?:%3A|:)(\d{2})$/i
+    /^see-source-for-address-after-(\d{4})-(\d{2})-(\d{2})-(\d{2})(?:%3A|:)(\d{2})(?:%3A|:)(\d{2})$/i
   )
   if (!m) return null
   const year = Number.parseInt(m[1]!, 10)

@@ -111,7 +111,7 @@ async function persistRowAddressOutcome(
 async function processAddressEnrichmentRow(
   admin: ReturnType<typeof getAdminDb>,
   row: ClaimedAddressEnrichmentRow,
-  telemetryContext?: Record<string, string>
+  telemetryContext?: Record<string, unknown>
 ): Promise<{
   outcome: 'ok' | 'retriable' | 'terminal' | 'still_gated'
   reason?: AddressEnrichmentFailureReason
@@ -272,7 +272,7 @@ async function processAddressEnrichmentRow(
 export async function enrichPendingAddresses(options?: {
   batchSizeOverride?: number
   cooldownMinutesOverride?: number
-  telemetryContext?: Record<string, string>
+  telemetryContext?: Record<string, unknown>
 }): Promise<AddressEnrichmentWorkerSummary> {
   const admin = getAdminDb()
   const batchSize =

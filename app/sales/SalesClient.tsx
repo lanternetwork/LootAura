@@ -19,13 +19,11 @@ import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
 import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/lib/keyboard/shortcuts'
 import { 
-  expandBounds, 
   isViewportInsideBounds, 
   filterSalesForViewport,
   normalizeBounds,
   getNormalizedBboxKey,
   type Bounds,
-  MAP_BUFFER_FACTOR,
   MAP_BUFFER_SAFETY_FACTOR
 } from '@/lib/map/bounds'
 import {

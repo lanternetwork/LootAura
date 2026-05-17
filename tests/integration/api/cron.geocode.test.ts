@@ -5,6 +5,8 @@ const { recordGeocodeCronOrchestrationRun } = vi.hoisted(() => ({
   recordGeocodeCronOrchestrationRun: vi.fn().mockResolvedValue(undefined),
 }))
 
+const mockResolveAdaptiveThroughputForCron = vi.hoisted(() => vi.fn())
+
 vi.mock('@/lib/auth/cron', () => ({
   assertCronAuthorized: vi.fn(),
 }))
@@ -21,6 +23,10 @@ vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
   recordGeocodeCronOrchestrationRun,
 }))
 
+vi.mock('@/lib/ingestion/adaptiveThroughputSignals', () => ({
+  resolveAdaptiveThroughputForCron: mockResolveAdaptiveThroughputForCron,
+}))
+
 vi.mock('@/lib/log', () => ({
   logger: {
     info: vi.fn(),
@@ -31,10 +37,12 @@ vi.mock('@/lib/log', () => ({
 }))
 
 describe('GET /api/cron/geocode', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     const env = process.env as Record<string, string | undefined>
     vi.clearAllMocks()
     recordGeocodeCronOrchestrationRun.mockResolvedValue(undefined)
+    const { installAdaptiveThroughputCronMock } = await import('../../helpers/mockAdaptiveThroughputForCron')
+    installAdaptiveThroughputCronMock(mockResolveAdaptiveThroughputForCron)
     delete env.GEOCODE_BACKLOG_BATCH_SIZE
     env.NODE_ENV = 'test'
     env.VERCEL_ENV = 'preview'
@@ -77,6 +85,7 @@ describe('GET /api/cron/geocode', () => {
     )
     expect(geocodePendingSales).toHaveBeenCalledWith({
       batchSizeOverride: 25,
+      concurrencyCeilingOverride: 4,
       captureClaimedRowIds: true,
       telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
@@ -91,15 +100,19 @@ describe('GET /api/cron/geocode', () => {
     expect(data.backlog.failed).toBe(1)
     expect(data.backlog.publishTriggered).toBe(3)
     expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledTimes(1)
-    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith({
-      durationMs: expect.any(Number),
-      backlogClaimed: 4,
-      queueProcessed: 3,
-      queueCompleted: 2,
-      queueRequeued: 1,
-      rate429Count: 0,
-      ok: true,
-    })
+    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        durationMs: expect.any(Number),
+        backlogClaimed: 4,
+        queueProcessed: 3,
+        queueCompleted: 2,
+        queueRequeued: 1,
+        rate429Count: 0,
+        ok: true,
+        effectiveGeocodeQueueBatch: 50,
+        effectiveGeocodeConcurrency: 4,
+      })
+    )
   })
 
   it('runs backlog drain when queue is empty', async () => {
@@ -135,6 +148,7 @@ describe('GET /api/cron/geocode', () => {
     expect(geocodePendingSales).toHaveBeenCalledTimes(1)
     expect(geocodePendingSales).toHaveBeenCalledWith({
       batchSizeOverride: 25,
+      concurrencyCeilingOverride: 4,
       captureClaimedRowIds: true,
       telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
@@ -181,6 +195,7 @@ describe('GET /api/cron/geocode', () => {
 
     expect(geocodePendingSales).toHaveBeenCalledWith({
       batchSizeOverride: 100,
+      concurrencyCeilingOverride: 4,
       captureClaimedRowIds: true,
       telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
@@ -209,16 +224,18 @@ describe('GET /api/cron/geocode', () => {
     const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
     const res = await GET(req)
     expect(res.status).toBe(500)
-    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith({
-      durationMs: expect.any(Number),
-      backlogClaimed: 0,
-      queueProcessed: 0,
-      queueCompleted: 0,
-      queueRequeued: 0,
-      rate429Count: 0,
-      ok: false,
-      error: 'redis down',
-    })
+    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        durationMs: expect.any(Number),
+        backlogClaimed: 0,
+        queueProcessed: 0,
+        queueCompleted: 0,
+        queueRequeued: 0,
+        rate429Count: 0,
+        ok: false,
+        error: 'redis down',
+      })
+    )
     expect(geocodePendingSales).not.toHaveBeenCalled()
   })
 
@@ -248,16 +265,18 @@ describe('GET /api/cron/geocode', () => {
       failed: 0,
     })
     expect(data.backlog.error).toBe('backlog claim failed')
-    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith({
-      durationMs: expect.any(Number),
-      backlogClaimed: 0,
-      queueProcessed: 5,
-      queueCompleted: 4,
-      queueRequeued: 1,
-      rate429Count: 0,
-      ok: false,
-      error: 'backlog claim failed',
-    })
+    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        durationMs: expect.any(Number),
+        backlogClaimed: 0,
+        queueProcessed: 5,
+        queueCompleted: 4,
+        queueRequeued: 1,
+        rate429Count: 0,
+        ok: false,
+        error: 'backlog claim failed',
+      })
+    )
   })
 
   it('returns 401 when cron auth fails', async () => {

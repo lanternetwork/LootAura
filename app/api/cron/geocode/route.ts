@@ -21,34 +21,13 @@ import { processGeocodeQueueBatch } from '@/lib/ingestion/geocodeQueue'
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 import { recordGeocodeCronOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
+import { adaptiveNoteToOrchestrationPayload } from '@/lib/ingestion/adaptiveThroughputProfile'
+import { resolveAdaptiveThroughputForCron } from '@/lib/ingestion/adaptiveThroughputSignals'
 import { createCorrelationBundle } from '@/lib/observability/correlation'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 
 export const dynamic = 'force-dynamic'
-
-const DEFAULT_QUEUE_BATCH = 50
-const MAX_QUEUE_BATCH = 100
-const DEFAULT_BACKLOG_BATCH = 25
-const MAX_BACKLOG_BATCH = 100
-
-function parseQueueBatchLimit(): number {
-  const raw = process.env.GEOCODE_CRON_QUEUE_BATCH
-  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_QUEUE_BATCH
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return DEFAULT_QUEUE_BATCH
-  }
-  return Math.min(parsed, MAX_QUEUE_BATCH)
-}
-
-function parseBacklogBatchLimit(): number {
-  const raw = process.env.GEOCODE_BACKLOG_BATCH_SIZE
-  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_BACKLOG_BATCH
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return DEFAULT_BACKLOG_BATCH
-  }
-  return Math.min(parsed, MAX_BACKLOG_BATCH)
-}
 
 export async function GET(request: NextRequest) {
   return handleGeocodeCron(request)
@@ -106,8 +85,10 @@ async function handleGeocodeCron(request: NextRequest) {
     throw error
   }
 
-  const limit = parseQueueBatchLimit()
-  const backlogBatchSize = parseBacklogBatchLimit()
+  const { envelope: adaptiveEnvelope, note: adaptiveNote } = await resolveAdaptiveThroughputForCron()
+  const adaptivePayload = adaptiveNoteToOrchestrationPayload(adaptiveNote)
+  const limit = adaptiveEnvelope.geocode.queueBatchSize
+  const backlogBatchSize = adaptiveEnvelope.geocode.backlogBatchSize
   let processed = 0
   let requeued = 0
   let completed = 0
@@ -140,6 +121,7 @@ async function handleGeocodeCron(request: NextRequest) {
     try {
       const backlog = await geocodePendingSales({
         batchSizeOverride: backlogBatchSize,
+        concurrencyCeilingOverride: adaptiveEnvelope.geocode.concurrencyCeiling,
         captureClaimedRowIds: true,
         telemetryContext,
       })
@@ -187,6 +169,9 @@ async function handleGeocodeCron(request: NextRequest) {
         rate429Count: 0,
         ok: false,
         error: backlogError,
+        adaptiveNote: adaptivePayload,
+        effectiveGeocodeQueueBatch: limit,
+        effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
       })
       emitObservabilityRecord(
         buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
@@ -257,6 +242,9 @@ async function handleGeocodeCron(request: NextRequest) {
       rate429Count: 0,
       ok: false,
       error: error instanceof Error ? error.message : String(error),
+      adaptiveNote: adaptivePayload,
+      effectiveGeocodeQueueBatch: limit,
+      effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
     })
     emitObservabilityRecord(
       buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
@@ -311,6 +299,9 @@ async function handleGeocodeCron(request: NextRequest) {
     queueRequeued: requeued,
     rate429Count: backlogRate429Count,
     ok: true,
+    adaptiveNote: adaptivePayload,
+    effectiveGeocodeQueueBatch: limit,
+    effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
   })
   logger.info('Geocode cron completed', {
     component: 'api/cron/geocode',

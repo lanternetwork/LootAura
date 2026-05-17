@@ -28,10 +28,15 @@ const mockReconcile = vi.hoisted(() =>
     schedulesUpdated: 0,
     titlesUpdated: 0,
     manualReviewRequired: 0,
+    scheduleMutationInhibited: 0,
     candidatePageRpcOk: true,
     candidatePageRpcErrorCode: null,
   })
 )
+
+vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
+  recordReconciliationCronOrchestrationRun: vi.fn().mockResolvedValue(undefined),
+}))
 
 vi.mock('@/lib/reconciliation/reconcileExternalSources', () => ({
   reconcileExternalSources: mockReconcile,

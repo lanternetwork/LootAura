@@ -1,5 +1,6 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import type { DedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
 import type { GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import type { PublishWorkerBatchSummary } from '@/lib/ingestion/publishWorker'
 
@@ -64,6 +65,52 @@ export type ExternalIngestionOrchestrationNote = {
   overlapPrevented?: boolean
   staleLockRecovered?: boolean
   lockSkipped?: boolean
+  pagesProcessed?: number
+  fetched?: number
+  inserted?: number
+  skipped?: number
+  invalid?: number
+  errors?: number
+  dedupeTelemetrySummary?: DedupeDecisionAggregate
+  externalFetchDurationMs?: number
+  publishDuplicateReuseCount?: number
+  adaptive?: Record<string, unknown>
+  laneKey?: string
+  laneType?: string
+  laneRegion?: string | null
+  laneConfigsCrawlable?: number
+  laneConfigsProcessed?: number
+  laneConfigsRemaining?: number
+  laneCursorBefore?: number
+  laneCursorAfter?: number
+  laneOverlapPrevented?: boolean
+  laneStaleLockRecovered?: boolean
+  laneAdaptiveProfile?: string
+}
+
+export type DiscoveryCronOrchestrationNote = {
+  ok: boolean
+  skipped: boolean
+  configsPromoted: number
+  configsRepaired: number
+  configsRevalidated: number
+  configsFailed: number
+  crawlableConfigCount: number
+  failedConfigCount: number
+  crawlExcludedConfigCount: number
+  candidatePagesDiscovered: number
+  candidatePagesValid: number
+}
+
+export type ReconciliationCronOrchestrationNote = {
+  ok: boolean
+  processed: number
+  changed: number
+  failed: number
+  candidatePageRpcOk: boolean
+  scheduleMutationInhibited: number
+  salesSyncUpdated: number
+  schedulesUpdated: number
 }
 
 export type GeocodeCronOrchestrationNote = {
@@ -73,18 +120,23 @@ export type GeocodeCronOrchestrationNote = {
   queue_requeued: number
   ok: boolean
   error?: string
+  adaptive?: Record<string, unknown>
 }
 
 type NotesPayload = {
   external_ingestion?: ExternalIngestionOrchestrationNote
   geocode_cron?: GeocodeCronOrchestrationNote
+  discovery_cron?: DiscoveryCronOrchestrationNote
+  reconciliation_cron?: ReconciliationCronOrchestrationNote
+  adaptive?: Record<string, unknown>
 }
 
 /**
  * Latest successful external_page_source ingestion completion time from orchestration metrics (any mode).
  * Used to throttle frequent `mode=ingestion` cron without slowing geocode/publish.
+ * When `laneKey` is set (lane mode), only matches runs for that lane.
  */
-export async function fetchLastSuccessfulExternalIngestionAt(): Promise<string | null> {
+export async function fetchLastSuccessfulExternalIngestionAt(laneKey?: string | null): Promise<string | null> {
   try {
     const admin = getAdminDb()
     const { data, error } = await fromBase(admin, 'ingestion_orchestration_runs')
@@ -98,6 +150,7 @@ export async function fetchLastSuccessfulExternalIngestionAt(): Promise<string |
         component: 'ingestion/orchestrationMetrics',
         operation: 'select_last_ingestion',
         message: error.message,
+        laneKey: laneKey ?? null,
       })
       return null
     }
@@ -107,9 +160,18 @@ export async function fetchLastSuccessfulExternalIngestionAt(): Promise<string |
     for (const row of data as { notes: unknown }[]) {
       const notes = row.notes as NotesPayload | null
       const ext = notes?.external_ingestion
-      if (ext?.status === 'completed' && typeof ext.completedAt === 'string' && ext.completedAt.length > 0) {
-        return ext.completedAt
+      if (ext?.status !== 'completed' || typeof ext.completedAt !== 'string' || ext.completedAt.length === 0) {
+        continue
       }
+      if (laneKey != null && laneKey !== '') {
+        const noteLane = ext.laneKey
+        if (noteLane !== laneKey) {
+          continue
+        }
+      } else if (typeof ext.laneKey === 'string' && ext.laneKey.length > 0) {
+        continue
+      }
+      return ext.completedAt
     }
     return null
   } catch (err) {
@@ -144,20 +206,39 @@ export async function recordIngestionOrchestrationRun(params: {
   geocodeSummary: GeocodeWorkerSummary | null
   publishSummary: PublishWorkerBatchSummary | null
   externalIngestion?: ExternalIngestionOrchestrationNote | null
+  adaptiveNote?: Record<string, unknown> | null
+  effectiveGeocodeBacklogBatch?: number
+  effectiveGeocodeConcurrency?: number
 }): Promise<void> {
   const geocode = params.geocodeSummary ?? emptyGeocode
   const publish = params.publishSummary ?? emptyPublish
-  const notes: NotesPayload | null =
-    params.externalIngestion != null
-      ? { external_ingestion: params.externalIngestion }
-      : null
+  const notes: NotesPayload | null = (() => {
+    if (params.externalIngestion == null && params.adaptiveNote == null) return null
+    const payload: NotesPayload = {}
+    if (params.externalIngestion != null) {
+      payload.external_ingestion = params.externalIngestion
+    }
+    if (params.adaptiveNote != null) {
+      payload.adaptive = params.adaptiveNote
+    }
+    return payload
+  })()
+
+  const batchSize =
+    typeof params.effectiveGeocodeBacklogBatch === 'number' && params.effectiveGeocodeBacklogBatch > 0
+      ? params.effectiveGeocodeBacklogBatch
+      : parseGeocodeBatchSizeForMetrics()
+  const concurrency =
+    typeof params.effectiveGeocodeConcurrency === 'number' && params.effectiveGeocodeConcurrency > 0
+      ? params.effectiveGeocodeConcurrency
+      : parseGeocodeConcurrencyForMetrics()
 
   try {
     const admin = getAdminDb()
     const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
       mode: params.mode,
-      batch_size: parseGeocodeBatchSizeForMetrics(),
-      concurrency: parseGeocodeConcurrencyForMetrics(),
+      batch_size: batchSize,
+      concurrency,
       claimed_count: geocode.claimed,
       geocode_succeeded_count: geocode.succeeded,
       failed_retriable_count: geocode.failedRetriable,
@@ -200,6 +281,9 @@ export async function recordGeocodeCronOrchestrationRun(params: {
   rate429Count?: number
   ok: boolean
   error?: string | null
+  adaptiveNote?: Record<string, unknown> | null
+  effectiveGeocodeQueueBatch?: number
+  effectiveGeocodeConcurrency?: number
 }): Promise<void> {
   const gcNote: GeocodeCronOrchestrationNote = {
     backlog_claimed: params.backlogClaimed,
@@ -208,15 +292,28 @@ export async function recordGeocodeCronOrchestrationRun(params: {
     queue_requeued: params.queueRequeued,
     ok: params.ok,
     ...(params.error ? { error: params.error } : {}),
+    ...(params.adaptiveNote ? { adaptive: params.adaptiveNote } : {}),
   }
-  const notes: NotesPayload = { geocode_cron: gcNote }
+  const notes: NotesPayload = {
+    geocode_cron: gcNote,
+    ...(params.adaptiveNote ? { adaptive: params.adaptiveNote } : {}),
+  }
+
+  const batchSize =
+    typeof params.effectiveGeocodeQueueBatch === 'number' && params.effectiveGeocodeQueueBatch > 0
+      ? params.effectiveGeocodeQueueBatch
+      : parseGeocodeCronQueueBatchForMetrics()
+  const concurrency =
+    typeof params.effectiveGeocodeConcurrency === 'number' && params.effectiveGeocodeConcurrency > 0
+      ? params.effectiveGeocodeConcurrency
+      : parseGeocodeConcurrencyForMetrics()
 
   try {
     const admin = getAdminDb()
     const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
       mode: 'geocode_cron',
-      batch_size: parseGeocodeCronQueueBatchForMetrics(),
-      concurrency: parseGeocodeConcurrencyForMetrics(),
+      batch_size: batchSize,
+      concurrency,
       claimed_count: 0,
       geocode_succeeded_count: 0,
       failed_retriable_count: 0,
@@ -242,6 +339,86 @@ export async function recordGeocodeCronOrchestrationRun(params: {
       'ingestion_orchestration_runs insert threw (geocode_cron)',
       err instanceof Error ? err : new Error(String(err)),
       { component: 'ingestion/orchestrationMetrics', operation: 'insert_geocode_cron' }
+    )
+  }
+}
+
+export async function recordDiscoveryCronOrchestrationRun(params: {
+  durationMs: number
+  note: DiscoveryCronOrchestrationNote
+}): Promise<void> {
+  const notes: NotesPayload = { discovery_cron: params.note }
+  try {
+    const admin = getAdminDb()
+    const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
+      mode: 'discovery_cron',
+      batch_size: 0,
+      concurrency: 0,
+      claimed_count: 0,
+      geocode_succeeded_count: 0,
+      failed_retriable_count: 0,
+      failed_terminal_count: 0,
+      publish_attempted_count: 0,
+      publish_succeeded_count: 0,
+      publish_failed_count: 0,
+      publish_expired_count: 0,
+      publish_skipped_count: 0,
+      duration_ms: params.durationMs,
+      rate_429_count: 0,
+      notes,
+    })
+    if (error) {
+      logger.error(
+        'ingestion_orchestration_runs insert failed (discovery_cron)',
+        new Error(error.message),
+        { component: 'ingestion/orchestrationMetrics', operation: 'insert_discovery_cron' }
+      )
+    }
+  } catch (err) {
+    logger.error(
+      'ingestion_orchestration_runs insert threw (discovery_cron)',
+      err instanceof Error ? err : new Error(String(err)),
+      { component: 'ingestion/orchestrationMetrics', operation: 'insert_discovery_cron' }
+    )
+  }
+}
+
+export async function recordReconciliationCronOrchestrationRun(params: {
+  durationMs: number
+  note: ReconciliationCronOrchestrationNote
+}): Promise<void> {
+  const notes: NotesPayload = { reconciliation_cron: params.note }
+  try {
+    const admin = getAdminDb()
+    const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
+      mode: 'reconciliation_cron',
+      batch_size: 0,
+      concurrency: 0,
+      claimed_count: 0,
+      geocode_succeeded_count: 0,
+      failed_retriable_count: 0,
+      failed_terminal_count: 0,
+      publish_attempted_count: 0,
+      publish_succeeded_count: 0,
+      publish_failed_count: 0,
+      publish_expired_count: 0,
+      publish_skipped_count: 0,
+      duration_ms: params.durationMs,
+      rate_429_count: 0,
+      notes,
+    })
+    if (error) {
+      logger.error(
+        'ingestion_orchestration_runs insert failed (reconciliation_cron)',
+        new Error(error.message),
+        { component: 'ingestion/orchestrationMetrics', operation: 'insert_reconciliation_cron' }
+      )
+    }
+  } catch (err) {
+    logger.error(
+      'ingestion_orchestration_runs insert threw (reconciliation_cron)',
+      err instanceof Error ? err : new Error(String(err)),
+      { component: 'ingestion/orchestrationMetrics', operation: 'insert_reconciliation_cron' }
     )
   }
 }

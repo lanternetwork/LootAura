@@ -1345,9 +1345,14 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
 
 export async function publishReadyIngestedSales(options?: {
   telemetryContext?: Record<string, unknown>
+  batchSizeOverride?: number
 }): Promise<PublishWorkerBatchSummary> {
   const admin = getAdminDb()
-  const batchSize = parseBatchSize()
+  const batchCandidate = options?.batchSizeOverride
+  const batchSize =
+    typeof batchCandidate === 'number' && Number.isFinite(batchCandidate) && batchCandidate > 0
+      ? Math.min(Math.floor(batchCandidate), 500)
+      : parseBatchSize()
   const publishStartedAt = Date.now()
 
   const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_publish', {

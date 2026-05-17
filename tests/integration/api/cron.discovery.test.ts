@@ -39,6 +39,10 @@ vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => ({}),
 }))
 
+vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
+  recordDiscoveryCronOrchestrationRun: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@/lib/auth/cron', () => ({
   assertCronAuthorized: vi.fn(),
   isCronAuthorized: vi.fn(() => true),

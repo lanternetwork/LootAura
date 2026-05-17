@@ -61,6 +61,12 @@ vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
     mockFetchLastSuccessfulExternalIngestionAt(...args),
 }))
 
+const mockResolveAdaptiveThroughputForCron = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/ingestion/adaptiveThroughputSignals', () => ({
+  resolveAdaptiveThroughputForCron: mockResolveAdaptiveThroughputForCron,
+}))
+
 const { mockPersistExternalPageSource } = vi.hoisted(() => ({
   mockPersistExternalPageSource: vi.fn(),
 }))
@@ -250,8 +256,10 @@ describe('GET /api/cron/daily', () => {
     GET = route.GET
   })
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    const { installAdaptiveThroughputCronMock } = await import('../helpers/mockAdaptiveThroughputForCron')
+    installAdaptiveThroughputCronMock(mockResolveAdaptiveThroughputForCron)
     mockFetchLastSuccessfulExternalIngestionAt.mockResolvedValue(null)
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth by default
     mockProcessFavoriteSalesStartingSoonJob.mockResolvedValue({ success: true })
@@ -1060,7 +1068,11 @@ describe('GET /api/cron/daily', () => {
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledWith(
-        expect.objectContaining({ batchSizeOverride: 25, telemetryContext: expect.any(Object) })
+        expect.objectContaining({
+          batchSizeOverride: 25,
+          concurrencyCeilingOverride: 4,
+          telemetryContext: expect.any(Object),
+        })
       )
       expect(mockPublishReadyIngestedSales).toHaveBeenCalledTimes(1)
     })
@@ -1077,7 +1089,11 @@ describe('GET /api/cron/daily', () => {
       const response = await GET(request)
       expect(response.status).toBe(200)
       expect(mockGeocodePendingSales).toHaveBeenCalledWith(
-        expect.objectContaining({ batchSizeOverride: 100, telemetryContext: expect.any(Object) })
+        expect.objectContaining({
+          batchSizeOverride: 100,
+          concurrencyCeilingOverride: 4,
+          telemetryContext: expect.any(Object),
+        })
       )
     })
 

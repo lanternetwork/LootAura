@@ -412,6 +412,7 @@ export interface ReconcileExternalSourcesResult {
   readonly schedulesUpdated: number
   readonly titlesUpdated: number
   readonly manualReviewRequired: number
+  readonly scheduleMutationInhibited: number
   /** False when reconciliation candidate RPC failed; cursor unchanged in DB for that scenario. */
   readonly candidatePageRpcOk: boolean
   readonly candidatePageRpcErrorCode: string | null
@@ -518,6 +519,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
   let descriptionsUpdated = 0
   let imagesUpdated = 0
   let schedulesUpdated = 0
+  let scheduleMutationInhibited = 0
   let titlesUpdated = 0
   let manualReviewRequired = 0
   const capTallies: Record<SourceRefreshCapability, number> = {
@@ -910,6 +912,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
       }
 
       if (syncRes.scheduleMutationInhibited && !dryRun) {
+        scheduleMutationInhibited += 1
         const mergedDetails: Record<string, unknown> = {
           ...details,
           manual_review_required: true,
@@ -1087,6 +1090,7 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     schedulesUpdated,
     titlesUpdated,
     manualReviewRequired,
+    scheduleMutationInhibited,
     candidatePageRpcOk: !candidatePageRpcFailed,
     candidatePageRpcErrorCode: candidatePageRpcFailed ? candidatePageRpcErrorCode : null,
   }

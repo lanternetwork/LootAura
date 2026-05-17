@@ -78,6 +78,7 @@ describe('GET /api/admin/ingestion/metrics', () => {
                     configsProcessed: 2,
                     fetched: 8,
                     inserted: 1,
+                    skipped: 7,
                     invalid: 0,
                     errors: 0,
                   },
@@ -88,7 +89,23 @@ describe('GET /api/admin/ingestion/metrics', () => {
         case 'ingestion_orchestration_state':
           return thenableQuery({ data: [{ cursor: 2 }] })
         case 'ingestion_city_configs':
-          return thenableQuery({ count: 1 })
+          return thenableQuery({
+            data: [
+              {
+                city: 'Louisville',
+                state: 'KY',
+                source_platform: 'external_page_source',
+                source_pages: ['https://yardsaletreasuremap.com/kentucky/louisville.html'],
+                source_discovery_status: 'validated',
+                source_crawl_window_fetched: 10,
+                source_crawl_window_skipped: 2,
+                source_crawl_window_inserted: 1,
+                source_crawl_last_at: '2026-05-17T10:00:00.000Z',
+                source_crawl_last_insert_at: '2026-05-17T09:00:00.000Z',
+              },
+            ],
+            count: 1,
+          })
         case 'sales':
           return thenableQuery({ count: 0, data: [] })
         case 'ingestion_runs':
@@ -112,7 +129,8 @@ describe('GET /api/admin/ingestion/metrics', () => {
       volume: {
         addressLifecycle: { enrichmentBacklog: number; byStatus: Record<string, number> }
         imageEnrichment: { backlog: number; hasImage: number }
-        fetch: { crawlableConfigsTotal: number }
+        acquisition: { crawlableConfigs: number; saturatedConfigs: number }
+        fetch: { crawlableConfigsTotal: number; insertYield24h: number | null }
         geocode: { needsGeocodeCount: number; eligibleNeedsGeocodeCount: number }
         bottleneck: string
       }
@@ -120,6 +138,8 @@ describe('GET /api/admin/ingestion/metrics', () => {
     }
     expect(json.ok).toBe(true)
     expect(json.volume.fetch.crawlableConfigsTotal).toBe(10)
+    expect(json.volume.acquisition.crawlableConfigs).toBe(1)
+    expect(json.volume.fetch.insertYield24h).toBe(0.125)
     expect(json.volume.geocode.needsGeocodeCount).toBe(5)
     expect(json.volume.addressLifecycle.enrichmentBacklog).toBe(5)
     expect(json.volume.imageEnrichment.backlog).toBe(5)

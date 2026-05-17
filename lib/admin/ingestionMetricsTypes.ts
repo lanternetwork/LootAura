@@ -5,6 +5,9 @@ export interface IngestionMetricsHourlyRates {
   configsProcessedPerHour: number
   listingsDiscoveredPerHour: number
   listingsInsertedPerHour: number
+  listingsSkippedPerHour: number
+  insertYieldPerHour: number | null
+  saturationRatePerHour: number | null
   geocodeSucceededPerHour: number
   geocodeRetryableFailedPerHour: number
   geocodeTerminalFailedPerHour: number
@@ -12,6 +15,23 @@ export interface IngestionMetricsHourlyRates {
   publishSucceededPerHour: number
   publishFailedPerHour: number
   reconciliationProcessedPerHour: number
+}
+
+export interface IngestionVolumeAcquisitionMetrics {
+  insertYield24h: number | null
+  saturationRate24h: number | null
+  enabledExternalConfigs: number
+  crawlableConfigs: number
+  configsSkippedNoSourcePages: number
+  configsSkippedInvalidUrls: number
+  saturatedConfigs: number
+  configsWithRecentInsert: number
+  avgConfigWindowInsertYield: number | null
+  pendingDiscoveryConfigs: number
+  validatedDiscoveryConfigs: number
+  manualDiscoveryConfigs: number
+  failedDiscoveryConfigs: number
+  discoveryFailureReasons: Record<string, number>
 }
 
 export interface IngestionVolumeFetchMetrics {
@@ -23,6 +43,9 @@ export interface IngestionVolumeFetchMetrics {
   configsProcessed24h: number
   listingsDiscovered24h: number
   listingsInserted24h: number
+  listingsSkipped24h: number
+  insertYield24h: number | null
+  saturationRate24h: number | null
   duplicateSkipRate: number | null
   parserFailureRate: number | null
   fetchFailureRate: number | null
@@ -84,6 +107,7 @@ export interface IngestionVolumeReconciliationMetrics {
 }
 
 export interface IngestionVolumeMetrics {
+  acquisition: IngestionVolumeAcquisitionMetrics
   fetch: IngestionVolumeFetchMetrics
   addressLifecycle: IngestionVolumeAddressLifecycleMetrics
   imageEnrichment: IngestionVolumeImageEnrichmentMetrics
@@ -135,6 +159,9 @@ export interface IngestionMetricsResponse {
     sourcePagesFetchedByHour: Array<{ bucket: string; count: number }>
     configsProcessedByHour: Array<{ bucket: string; count: number }>
     listingsInsertedByHour: Array<{ bucket: string; count: number }>
+    listingsSkippedByHour: Array<{ bucket: string; count: number }>
+    insertYieldByHour: Array<{ bucket: string; value: number | null }>
+    saturationRateByHour: Array<{ bucket: string; value: number | null }>
     publishFailedByHour: Array<{ bucket: string; count: number }>
     geocodeRetryableFailedByHour: Array<{ bucket: string; count: number }>
   }

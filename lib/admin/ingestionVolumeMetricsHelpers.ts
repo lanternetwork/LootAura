@@ -34,6 +34,7 @@ export type FetchRollup24h = {
   configsProcessed: number
   listingsDiscovered: number
   listingsInserted: number
+  listingsSkipped: number
   duplicateSkips: number
   dedupeDenominator: number
   parserInvalid: number
@@ -259,6 +260,7 @@ export function aggregateOrchestrationRuns(
   const fetchHourly = buildEmptyHourBuckets(hours, nowMs)
   const configsProcessedHourly = buildEmptyHourBuckets(hours, nowMs)
   const insertedHourly = buildEmptyHourBuckets(hours, nowMs)
+  const listingsSkippedHourly = buildEmptyHourBuckets(hours, nowMs)
   const listingsDiscoveredHourly = buildEmptyHourBuckets(hours, nowMs)
   const geocodeSuccessHourly = buildEmptyHourBuckets(hours, nowMs)
   const geocodeRetryableHourly = buildEmptyHourBuckets(hours, nowMs)
@@ -277,6 +279,7 @@ export function aggregateOrchestrationRuns(
     configsProcessed: 0,
     listingsDiscovered: 0,
     listingsInserted: 0,
+    listingsSkipped: 0,
     duplicateSkips: 0,
     dedupeDenominator: 0,
     parserInvalid: 0,
@@ -400,6 +403,7 @@ export function aggregateOrchestrationRuns(
     const processed = num(ext.configsProcessed)
     const fetched = num(ext.fetched)
     const inserted = num(ext.inserted)
+    const skipped = num(ext.skipped)
     const invalid = num(ext.invalid)
     const errors = num(ext.errors)
 
@@ -407,6 +411,7 @@ export function aggregateOrchestrationRuns(
     fetchRollup24h.configsProcessed += processed
     fetchRollup24h.listingsDiscovered += fetched
     fetchRollup24h.listingsInserted += inserted
+    fetchRollup24h.listingsSkipped += skipped
     fetchRollup24h.parserInvalid += invalid
     fetchRollup24h.fetchErrors += errors
     fetchRollup24h.fetchDenominator += processed > 0 ? processed : pages > 0 ? 1 : 0
@@ -427,6 +432,7 @@ export function aggregateOrchestrationRuns(
       fetchHourly.set(k, (fetchHourly.get(k) ?? 0) + pages)
       configsProcessedHourly.set(k, (configsProcessedHourly.get(k) ?? 0) + processed)
       insertedHourly.set(k, (insertedHourly.get(k) ?? 0) + inserted)
+      listingsSkippedHourly.set(k, (listingsSkippedHourly.get(k) ?? 0) + skipped)
       listingsDiscoveredHourly.set(k, (listingsDiscoveredHourly.get(k) ?? 0) + fetched)
     }
 
@@ -449,6 +455,7 @@ export function aggregateOrchestrationRuns(
     fetchHourly,
     configsProcessedHourly,
     insertedHourly,
+    listingsSkippedHourly,
     listingsDiscoveredHourly,
     geocodeSuccessHourly,
     geocodeRetryableHourly,

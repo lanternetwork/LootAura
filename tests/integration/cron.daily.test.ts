@@ -36,14 +36,30 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: (db: any, table: string) => db.from(table),
 }))
 
-const { mockGeocodePendingSales, mockPublishReadyIngestedSales, mockFinalizeLinkedPublishedIngestedSales } = vi.hoisted(() => ({
+const {
+  mockGeocodePendingSales,
+  mockPublishReadyIngestedSales,
+  mockFinalizeLinkedPublishedIngestedSales,
+  mockEnrichPendingAddresses,
+  mockEnrichPendingImages,
+} = vi.hoisted(() => ({
   mockGeocodePendingSales: vi.fn(),
   mockPublishReadyIngestedSales: vi.fn(),
   mockFinalizeLinkedPublishedIngestedSales: vi.fn(),
+  mockEnrichPendingAddresses: vi.fn(),
+  mockEnrichPendingImages: vi.fn(),
 }))
 
 vi.mock('@/lib/ingestion/geocodeWorker', () => ({
   geocodePendingSales: (...args: unknown[]) => mockGeocodePendingSales(...args),
+}))
+
+vi.mock('@/lib/ingestion/addressEnrichmentWorker', () => ({
+  enrichPendingAddresses: (...args: unknown[]) => mockEnrichPendingAddresses(...args),
+}))
+
+vi.mock('@/lib/ingestion/imageEnrichmentWorker', () => ({
+  enrichPendingImages: (...args: unknown[]) => mockEnrichPendingImages(...args),
 }))
 
 const { mockRunWithGeocodePipelineLease, mockRecordConfigCrawlStats } = vi.hoisted(() => ({
@@ -57,6 +73,10 @@ vi.mock('@/lib/ingestion/geocodePipelineLease', () => ({
 
 vi.mock('@/lib/ingestion/acquisition/configCrawlStats', () => ({
   recordConfigCrawlStats: (...args: unknown[]) => mockRecordConfigCrawlStats(...args),
+}))
+
+vi.mock('@/lib/ingestion/acquisition/yieldAwareCrawlSchedule', () => ({
+  buildYieldAwareCrawlPlan: <T,>(rows: T[]) => rows,
 }))
 
 vi.mock('@/lib/ingestion/publishWorker', () => ({
@@ -283,6 +303,26 @@ describe('GET /api/cron/daily', () => {
       failedRetriable: 0,
       failedTerminal: 0,
       rate429Count: 0,
+    })
+    mockEnrichPendingAddresses.mockResolvedValue({
+      claimed: 0,
+      succeeded: 0,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      stillGated: 0,
+      byFailureReason: {},
+    })
+    mockEnrichPendingImages.mockResolvedValue({
+      claimed: 0,
+      attempted: 0,
+      updated: 0,
+      skippedUnchanged: 0,
+      skippedRecentDetailAttempt: 0,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      mediaStrFound: 0,
+      mediaStrMissing: 0,
+      byFailureReason: {},
     })
     mockPublishReadyIngestedSales.mockResolvedValue({
       attempted: 0,
@@ -1089,8 +1129,8 @@ describe('GET /api/cron/daily', () => {
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledWith(
         expect.objectContaining({
-          batchSizeOverride: 25,
-          concurrencyCeilingOverride: 4,
+          batchSizeOverride: 15,
+          concurrencyCeilingOverride: 2,
           telemetryContext: expect.any(Object),
         })
       )
@@ -1111,7 +1151,7 @@ describe('GET /api/cron/daily', () => {
       expect(mockGeocodePendingSales).toHaveBeenCalledWith(
         expect.objectContaining({
           batchSizeOverride: 100,
-          concurrencyCeilingOverride: 4,
+          concurrencyCeilingOverride: 2,
           telemetryContext: expect.any(Object),
         })
       )

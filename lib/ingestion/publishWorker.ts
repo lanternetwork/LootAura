@@ -32,7 +32,7 @@ import { classifyQueuePressure } from '@/lib/observability/metrics'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
-  | { ok: true; skipped: true; reason: 'not_eligible' | 'past_end_date' }
+  | { ok: true; skipped: true; reason: 'not_eligible' | 'past_end_date' | 'non_publishable_precision' }
   | { ok: false; error: string }
 
 interface ClaimedPublishRow {

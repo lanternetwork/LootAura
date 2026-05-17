@@ -1,5 +1,7 @@
-import type { GeocodeAttemptPlan } from '@/lib/ingestion/geocodeAttemptPlan'
-import { primaryAndFallbackCitiesEquivalent } from '@/lib/ingestion/geocodeAttemptPlan'
+import {
+  primaryAndFallbackCitiesEquivalent,
+  type GeocodeAttemptPlan,
+} from '@/lib/ingestion/geocodeAttemptPlan'
 import { stripUnitDesignatorFromAddressLineForGeocode } from '@/lib/geocode/stripUnitDesignatorForGeocode'
 import type { GeocodeVariantId } from '@/lib/geocode/geocodeVariantIds'
 import {

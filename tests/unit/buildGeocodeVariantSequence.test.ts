@@ -8,9 +8,9 @@ function plan(overrides: Partial<GeocodeAttemptPlan>): GeocodeAttemptPlan {
     addressLineSource: 'address_raw',
     state: 'IL',
     primaryCity: 'Orland Park',
-    primaryMunicipalitySource: 'ingest_city',
+    primaryMunicipalitySource: 'row_city',
     fallbackCity: 'Palos Park',
-    fallbackMunicipalitySource: 'source_url_path',
+    fallbackMunicipalitySource: 'authority_resolved',
     ...overrides,
   }
 }

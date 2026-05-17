@@ -336,13 +336,20 @@ describe('Redis-unavailable geocode ingestion fallback', () => {
   })
 
   it('backlog retry: retriable no-coords then success after cooldown window (no needs_check)', async () => {
-    let geoCalls = 0
     ctx.geocodeAddress.mockImplementation(async () => {
-      geoCalls += 1
-      if (geoCalls === 1) {
-        return { coords: null, hit429: false, noCoordsReason: 'empty_results' }
+      if (ctx.store.row.geocode_attempts < 2) {
+        return {
+          coords: null,
+          hit429: false,
+          noCoordsReason: 'empty_results',
+          providerClassification: 'empty_results',
+        }
       }
-      return { coords: { lat: 47.61, lng: -122.34 }, hit429: false }
+      return {
+        coords: { lat: 47.61, lng: -122.34 },
+        hit429: false,
+        coordinatePrecision: 'exact_address',
+      }
     })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')

@@ -511,7 +511,11 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         typeof (u as Record<string, unknown>).failure_details === 'object' &&
         'geocode' in ((u as Record<string, unknown>).failure_details as object)
     ) as Record<string, unknown> | undefined
-    const geocode = (diagUpdate?.failure_details as { geocode?: { attempts?: unknown[] } })?.geocode
+    const geocode = (
+      diagUpdate?.failure_details as {
+        geocode?: { attempts?: unknown[]; schema_version?: number; providerCalls?: number }
+      }
+    )?.geocode
     expect(geocode?.attempts?.[0]).toMatchObject({ strategy: 'primary', resultType: 'empty_results' })
     expect(geocode?.attempts?.[1]).toMatchObject({
       strategy: 'unit_stripped',

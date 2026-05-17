@@ -20,9 +20,11 @@ import {
 } from '@/lib/geocode/deadLetter'
 import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
 import { runBoundedGeocodeVariants } from '@/lib/geocode/runBoundedGeocodeVariants'
-import type { GeocodeMethod } from '@/lib/geocode/geocodePrecisionPolicy'
-import type { CoordinatePrecision } from '@/lib/geocode/geocodePrecisionPolicy'
-import type { GeocodeConfidence } from '@/lib/geocode/geocodePrecisionPolicy'
+import type {
+  CoordinatePrecision,
+  GeocodeConfidence,
+  GeocodeMethod,
+} from '@/lib/geocode/geocodePrecisionPolicy'
 import { logger } from '@/lib/log'
 import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
 import { buildGeocodeAttemptPlan } from '@/lib/ingestion/geocodeAttemptPlan'
@@ -92,44 +94,6 @@ export function buildIngestedGeocodeFailureDetailsV1(
     geocode_city_raw: raw.length > 0 ? raw : null,
     geocode_city_normalized: norm && norm.length > 0 ? norm : null,
     httpStatus: geo.httpStatus,
-  }
-}
-
-function mapGeoOutcomeToResultType(geo: GeocodeAddressOutcome): GeocodeAttemptDiagnostic['resultType'] {
-  if (geo.coords) return 'success'
-  if (geo.hit429) return 'rate_limited'
-  const r = geo.noCoordsReason
-  if (r === 'low_confidence' && geo.lowConfidenceReasons?.includes('state_mismatch')) return 'cross_state'
-  if (r === 'low_confidence') return 'low_confidence'
-  if (r === 'empty_results') return 'empty_results'
-  if (r === 'http_not_ok') return 'http_error'
-  if (r === 'invalid_coordinates') return 'invalid_coordinates'
-  if (r === 'fetch_exception') return 'fetch_exception'
-  if (r === 'empty_input') return 'empty_input'
-  return 'empty_results'
-}
-
-function toGeocodeAttemptDiagnostic(
-  geo: GeocodeAddressOutcome,
-  plan: ReturnType<typeof buildGeocodeAttemptPlan>,
-  municipalitySource: string,
-  mode: GeocodeMode,
-  fallbackArbitrationApplied: boolean,
-  diagnosticStrategy?: GeocodeAttemptStrategy
-): GeocodeAttemptDiagnostic {
-  const rawQs = geo.attemptLog?.queryString
-  const queryCharLength =
-    typeof rawQs === 'string' && rawQs.length > 0 ? rawQs.length : undefined
-  return {
-    strategy: diagnosticStrategy ?? mode,
-    queryStrategy:
-      geo.attemptLog?.queryStrategy ?? (mode === 'primary' ? 'minimal_locality' : 'normalize_locality'),
-    addressSource: plan.addressLineSource,
-    municipalitySource,
-    fallbackArbitrationApplied,
-    queryCharLength,
-    queryFingerprint: geo.queryFingerprint,
-    resultType: mapGeoOutcomeToResultType(geo),
   }
 }
 

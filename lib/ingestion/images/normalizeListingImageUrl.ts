@@ -4,7 +4,12 @@ export function normalizeListingImageHttpsUrl(raw: string, baseUrl: string): str
   const trimmed = raw.trim()
   if (!trimmed) return null
   try {
-    const url = new URL(trimmed, baseUrl)
+    const url = /^https?:\/\//i.test(trimmed)
+      ? new URL(trimmed)
+      : new URL(
+          trimmed.replace(/^\//, ''),
+          baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
+        )
     if (url.protocol !== 'https:') return null
     return url.href
   } catch {

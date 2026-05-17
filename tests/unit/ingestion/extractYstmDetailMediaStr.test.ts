@@ -72,16 +72,18 @@ describe('mergeIngestedSaleImageFields', () => {
     ])
   })
 
-  it('preserves existing valid URLs without overwrite', () => {
+  it('preserves existing valid URLs and appends new ones', () => {
     const existing = ['https://cdn.example.com/existing.jpg']
+    const newUrl = 'https://gsf.tlstatic.com/image/a/new.jpeg'
     const merged = mergeIngestedSaleImageFields({
       existingImageSourceUrl: existing[0],
       existingRawPayload: { imageUrls: existing },
-      newUrls: ['https://gsf.tlstatic.com/image/a/new.jpeg'],
+      newUrls: [newUrl],
     })
-    expect(merged.updated).toBe(false)
+    expect(merged.updated).toBe(true)
     expect(merged.preservedExisting).toBe(true)
-    expect(merged.rawPayload.imageUrls).toEqual(existing)
+    expect(merged.imageSourceUrl).toBe(existing[0])
+    expect(merged.rawPayload.imageUrls).toEqual([...existing, newUrl])
   })
 
   it('appends new URLs when existing list is empty', () => {

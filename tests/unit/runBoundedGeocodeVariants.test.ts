@@ -13,9 +13,9 @@ function plan(overrides: Partial<GeocodeAttemptPlan> = {}): GeocodeAttemptPlan {
     addressLineSource: 'normalized_address',
     state: 'NY',
     primaryCity: 'Albany',
-    primaryMunicipalitySource: 'ingest_city',
+    primaryMunicipalitySource: 'row_city',
     fallbackCity: 'Auburn',
-    fallbackMunicipalitySource: 'source_url_path',
+    fallbackMunicipalitySource: 'listing_url',
     ...overrides,
   }
 }

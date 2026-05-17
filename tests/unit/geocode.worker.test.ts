@@ -499,7 +499,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(2)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
     expect(hoisted.geocodeAddress.mock.calls[0]?.[0].address).toContain('Unit A')
     expect(hoisted.geocodeAddress.mock.calls[1]?.[0].address).toBe('11020 Front St, Mokena, IL')
 
@@ -516,13 +516,13 @@ describe('geocodePendingSales (batch / RPC path)', () => {
         geocode?: { attempts?: unknown[]; schema_version?: number; providerCalls?: number }
       }
     )?.geocode
-    expect(geocode?.attempts?.[0]).toMatchObject({ strategy: 'primary', resultType: 'empty_results' })
+    expect(geocode?.attempts?.[0]).toMatchObject({ strategy: 'primary_full', resultType: 'empty_results' })
     expect(geocode?.attempts?.[1]).toMatchObject({
       strategy: 'unit_stripped',
       resultType: 'empty_results',
     })
     expect(geocode?.schema_version).toBe(3)
-    expect(geocode?.providerCalls).toBeGreaterThanOrEqual(2)
+    expect(geocode?.providerCalls).toBeGreaterThanOrEqual(3)
     expect(JSON.stringify(geocode?.attempts)).not.toContain('11020 Front St')
     expect(JSON.stringify(geocode?.attempts)).not.toContain('Unit A')
   })
@@ -544,7 +544,11 @@ describe('geocodePendingSales (batch / RPC path)', () => {
       { data: { failure_details: null }, error: null },
       { data: { id: '00000000-0000-4000-8000-0000000000u2' }, error: null }
     )
-    hoisted.geocodeAddress.mockResolvedValue({ coords: { lat: 1, lng: 2 }, hit429: false })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: { lat: 1, lng: 2 },
+      hit429: false,
+      coordinatePrecision: 'exact_address',
+    })
 
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
@@ -577,9 +581,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     await geocodePendingSales()
 
     expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress.mock.calls[0]?.[0].address).toContain('Unit Z')
   })
 
-  it('does not unit-strip after primary http_not_ok', async () => {
+  it('runs bounded variants after primary http_not_ok', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
@@ -604,10 +609,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
   })
 
-  it('does not unit-strip after primary fetch_exception', async () => {
+  it('runs bounded variants after primary fetch_exception', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
@@ -631,10 +636,10 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
   })
 
-  it('does not unit-strip after primary low_confidence', async () => {
+  it('runs bounded variants after primary low_confidence', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [
         {
@@ -659,7 +664,7 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     await geocodePendingSales()
 
-    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(1)
+    expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
   })
 
   it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {

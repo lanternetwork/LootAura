@@ -1079,7 +1079,15 @@ async function runIngestionOrchestration(
         skipped: totals.skipped,
         invalid: totals.invalid,
         errors: totals.errors,
-        dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
+        dedupeTelemetrySummary: {
+          source_url: ingestionDedupeTelemetrySummary.source_url,
+          exact_address_date: ingestionDedupeTelemetrySummary.exact_address_date,
+          soft_date_window: ingestionDedupeTelemetrySummary.soft_date_window,
+          soft_duplicate_rejected: ingestionDedupeTelemetrySummary.soft_duplicate_rejected,
+          no_match: ingestionDedupeTelemetrySummary.no_match,
+          duplicateDecisionTrue: ingestionDedupeTelemetrySummary.duplicateDecisionTrue,
+          duplicateDecisionFalse: ingestionDedupeTelemetrySummary.duplicateDecisionFalse,
+        },
         externalFetchDurationMs,
       }
 

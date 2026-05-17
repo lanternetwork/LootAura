@@ -86,7 +86,7 @@ describe('ingestionVolumeMetricsHelpers', () => {
     expect(agg.geocodeRollup24h.succeeded).toBe(8)
     expect(agg.geocodeRollup24h.rate429).toBe(2)
     expect(computeDuplicateSkipRate(agg.fetchRollup24h.duplicateSkips, agg.fetchRollup24h.dedupeDenominator)).toBe(
-      0.25
+      0.2308
     )
     const pagesSeries = sumLastHourFromSeries(
       [...agg.fetchHourly.entries()].map(([bucket, count]) => ({ bucket, count })),

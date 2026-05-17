@@ -19,6 +19,8 @@ export type FailureReason = (typeof FAILURE_REASONS)[number]
 
 export type TimeSource = 'explicit' | 'default'
 export type ParseConfidence = 'high' | 'low'
+export type { AddressStatus } from '@/lib/ingestion/address/addressLifecycleTypes'
+
 export type IngestionStatus =
   | 'ready'
   | 'needs_check'
@@ -70,6 +72,8 @@ export interface ProcessedIngestedSale {
   parseConfidence: ParseConfidence
   /** Merged into `raw_payload` on manual upload for observability. */
   ingestionDiagnostics?: Record<string, unknown>
+  addressLifecycle?: import('@/lib/ingestion/address/resolveIngestAddressLifecycle').ResolvedIngestAddressLifecycle
+  addressLifecycleDbFields?: Record<string, unknown>
 }
 
 export interface IngestionRunSummary {

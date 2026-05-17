@@ -14,6 +14,10 @@ export const ObservabilityEvents = {
     externalZeroListings: 'ingestion.external_page_source.zero_listings_page',
     duplicateScoringDecision: 'ingestion.duplicate.scoring_decision',
     orchestrationLeaseOutcome: 'ingestion.orchestration.lease_outcome',
+    addressEnrichmentBatchStarted: 'ingestion.address_enrichment.batch_started',
+    addressEnrichmentBatchCompleted: 'ingestion.address_enrichment.batch_completed',
+    addressEnrichmentRow: 'ingestion.address_enrichment.row',
+    addressRemediationBatch: 'ingestion.address_enrichment.remediation_batch',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

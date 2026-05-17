@@ -10,6 +10,12 @@ import {
   parseYstmListingPathParts,
   resolveYstmListingCityAuthority,
 } from '@/lib/ingestion/ystmListingCityAuthority'
+import type { GatedListingDiagnostics } from '@/lib/ingestion/address/addressGated'
+import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
+import {
+  addressLifecycleFieldsForDb,
+  resolveIngestAddressLifecycle,
+} from '@/lib/ingestion/address/resolveIngestAddressLifecycle'
 import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
@@ -1142,6 +1148,20 @@ export async function persistExternalPageSource(
         continue
       }
 
+      const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as GatedListingDiagnostics & {
+        chosenAddressSource?: string
+      }
+      const addressLifecycle = resolveIngestAddressLifecycle({
+        sourceUrl: listing.sourceUrl,
+        addressRaw: listing.addressRaw,
+        wouldBeNeedsGeocode:
+          isAddressGeocodeReady(listing.addressRaw) && Boolean(listing.startDate),
+        diagnostics: {
+          slugWasPlaceholder: ingestDiag.slugWasPlaceholder,
+          chosenAddressSource: ingestDiag.chosenAddressSource,
+        },
+      })
+
       const { error: insErr } = await fromBase(admin, 'ingested_sales').insert({
         source_platform: platform,
         source_url: listing.sourceUrl,
@@ -1166,12 +1186,13 @@ export async function persistExternalPageSource(
         image_source_url: listing.imageSourceUrl,
         raw_text: null,
         raw_payload: rowPayload,
-        status: 'needs_geocode',
+        status: addressLifecycle.ingestStatus,
         failure_reasons: [],
         parser_version: PARSER_VERSION_ROW,
-        parse_confidence: 'low',
+        parse_confidence: addressLifecycle.ingestStatus === 'needs_geocode' ? 'high' : 'low',
         is_duplicate: false,
         duplicate_of: null,
+        ...addressLifecycleFieldsForDb(addressLifecycle),
       })
 
       if (insErr) {

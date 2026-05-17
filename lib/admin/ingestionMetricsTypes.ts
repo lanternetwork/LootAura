@@ -30,6 +30,11 @@ export interface IngestionVolumeFetchMetrics {
   budgetExitCount24h: number
 }
 
+export interface IngestionVolumeAddressLifecycleMetrics {
+  byStatus: Record<string, number>
+  enrichmentBacklog: number
+}
+
 export interface IngestionVolumeGeocodeMetrics {
   needsGeocodeCount: number
   oldestNeedsGeocodeAgeMs: number | null
@@ -67,6 +72,7 @@ export interface IngestionVolumeReconciliationMetrics {
 
 export interface IngestionVolumeMetrics {
   fetch: IngestionVolumeFetchMetrics
+  addressLifecycle: IngestionVolumeAddressLifecycleMetrics
   geocode: IngestionVolumeGeocodeMetrics
   publish: IngestionVolumePublishMetrics
   discovery: IngestionVolumeDiscoveryMetrics

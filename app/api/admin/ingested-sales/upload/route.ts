@@ -581,6 +581,7 @@ async function uploadHandler(request: NextRequest): Promise<NextResponse> {
         is_duplicate: isDuplicate,
         duplicate_of: isDuplicate ? match?.id : null,
         normalized_date: processed.dateStart,
+        ...(processed.addressLifecycleDbFields ?? {}),
       }
 
       if (match) {

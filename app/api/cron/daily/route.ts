@@ -39,6 +39,10 @@ import { logger, generateOperationId } from '@/lib/log'
 import { createCorrelationBundle } from '@/lib/observability/correlation'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
+import {
+  enrichPendingAddresses,
+  type AddressEnrichmentWorkerSummary,
+} from '@/lib/ingestion/addressEnrichmentWorker'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import {
   finalizeLinkedPublishedIngestedSales,
@@ -593,6 +597,7 @@ async function runIngestionOrchestration(
     },
   }
 
+  let addressEnrichmentSummary: AddressEnrichmentWorkerSummary | null = null
   let geocodeSummary: GeocodeWorkerSummary | null = null
   let publishSummary: PublishWorkerBatchSummary | null = null
   let publishDuplicateReuseCount = 0
@@ -1025,7 +1030,51 @@ async function runIngestionOrchestration(
 
   const geoPublishStartMs = Date.now()
 
-  // Step 2: Geocode pending sales.
+  // Step 2: Address enrichment (D1) before geocode.
+  try {
+    const enrichmentBatchSize = Math.min(
+      adaptiveEnvelope.geocode.backlogBatchSize,
+      parseInt(process.env.ADDRESS_ENRICHMENT_BACKLOG_BATCH_SIZE ?? '25', 10) || 25
+    )
+    logger.info('Address enrichment step started', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'address_enrichment',
+      enrichmentBatchSize,
+    }))
+    addressEnrichmentSummary = await enrichPendingAddresses({
+      batchSizeOverride: enrichmentBatchSize,
+      telemetryContext: telemetryContext,
+    })
+    taskResult.steps.address_enrichment = {
+      ok: true,
+      enrichmentBatchSize,
+      ...addressEnrichmentSummary,
+    }
+    logger.info('Address enrichment step completed', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'address_enrichment',
+      ...addressEnrichmentSummary,
+    }))
+  } catch (error) {
+    taskResult.ok = false
+    taskResult.steps.address_enrichment = {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+    logger.error(
+      'Address enrichment step failed',
+      error instanceof Error ? error : new Error(String(error)),
+      withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'address_enrichment',
+      })
+    )
+  }
+
+  // Step 3: Geocode pending sales.
   try {
     const backlogBatchSize = adaptiveEnvelope.geocode.backlogBatchSize
     logger.info('Geocode step started', withOpId({
@@ -1071,7 +1120,7 @@ async function runIngestionOrchestration(
     }))
   }
 
-  // Step 3: Publish ready ingested sales.
+  // Step 4: Publish ready ingested sales.
   try {
     logger.info('Publish step started', withOpId({
       component: 'api/cron/daily',

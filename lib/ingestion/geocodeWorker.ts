@@ -1124,7 +1124,7 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
 
   const { data: row, error: fetchError } = await fromBase(admin, 'ingested_sales')
     .select(
-      'id, status, normalized_address, address_raw, city, state, lat, lng, geocode_attempts, failure_reasons, failure_details, published_sale_id, source_url, raw_payload'
+      'id, status, address_status, normalized_address, address_raw, city, state, lat, lng, geocode_attempts, failure_reasons, failure_details, published_sale_id, source_url, raw_payload'
     )
     .eq('id', saleId)
     .maybeSingle()
@@ -1143,6 +1143,7 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
   const r = row as {
     id: string
     status: string
+    address_status?: string | null
     normalized_address: string | null
     address_raw: string | null
     city: string | null
@@ -1158,6 +1159,10 @@ export async function geocodeIngestedSaleById(saleId: string): Promise<GeocodeIn
   }
 
   if (r.status !== 'needs_geocode') {
+    return { outcome: 'skipped', reason: 'not_needs_geocode' }
+  }
+
+  if (r.address_status != null && r.address_status !== 'address_available') {
     return { outcome: 'skipped', reason: 'not_needs_geocode' }
   }
 

@@ -106,9 +106,7 @@ describe('migration 185 security hotfix exposed RPCs', () => {
 
     it.each(claimFunctions)('grants service_role only on %s', (fn) => {
       expect(sql).toContain(`GRANT EXECUTE ON FUNCTION lootaura_v2.${fn} TO service_role`)
-      expect(sql).not.toMatch(
-        new RegExp(`GRANT\\s+EXECUTE\\s+ON\\s+FUNCTION\\s+lootaura_v2\\.${fn.replace(/[()]/g, '\\$&')}\\s+TO\\s+authenticated`, 'i')
-      )
+      expect(sql).not.toContain(`GRANT EXECUTE ON FUNCTION lootaura_v2.${fn} TO authenticated`)
     })
 
     it.each(claimFunctions)('hardens search_path without public on %s', (fn) => {

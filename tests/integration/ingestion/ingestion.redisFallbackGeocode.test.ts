@@ -237,6 +237,15 @@ vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
   recordGeocodeCronOrchestrationRun: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/ingestion/geocodePipelineLease', () => ({
+  runWithGeocodePipelineLease: async <T,>({ execute }: { execute: () => Promise<T> }) => ({
+    ok: true,
+    skipped: false,
+    result: await execute(),
+    lease: { acquired: true, owner: 'redis-fallback-test', staleRecovered: false, cursor: 0 },
+  }),
+}))
+
 vi.mock('@/lib/auth/cron', () => ({
   assertCronAuthorized: vi.fn(),
 }))

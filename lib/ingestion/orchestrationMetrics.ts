@@ -74,6 +74,7 @@ export type ExternalIngestionOrchestrationNote = {
   dedupeTelemetrySummary?: DedupeDecisionAggregate
   externalFetchDurationMs?: number
   publishDuplicateReuseCount?: number
+  adaptive?: Record<string, unknown>
 }
 
 export type DiscoveryCronOrchestrationNote = {
@@ -108,6 +109,7 @@ export type GeocodeCronOrchestrationNote = {
   queue_requeued: number
   ok: boolean
   error?: string
+  adaptive?: Record<string, unknown>
 }
 
 type NotesPayload = {
@@ -115,6 +117,7 @@ type NotesPayload = {
   geocode_cron?: GeocodeCronOrchestrationNote
   discovery_cron?: DiscoveryCronOrchestrationNote
   reconciliation_cron?: ReconciliationCronOrchestrationNote
+  adaptive?: Record<string, unknown>
 }
 
 /**
@@ -181,20 +184,39 @@ export async function recordIngestionOrchestrationRun(params: {
   geocodeSummary: GeocodeWorkerSummary | null
   publishSummary: PublishWorkerBatchSummary | null
   externalIngestion?: ExternalIngestionOrchestrationNote | null
+  adaptiveNote?: Record<string, unknown> | null
+  effectiveGeocodeBacklogBatch?: number
+  effectiveGeocodeConcurrency?: number
 }): Promise<void> {
   const geocode = params.geocodeSummary ?? emptyGeocode
   const publish = params.publishSummary ?? emptyPublish
-  const notes: NotesPayload | null =
-    params.externalIngestion != null
-      ? { external_ingestion: params.externalIngestion }
-      : null
+  const notes: NotesPayload | null = (() => {
+    if (params.externalIngestion == null && params.adaptiveNote == null) return null
+    const payload: NotesPayload = {}
+    if (params.externalIngestion != null) {
+      payload.external_ingestion = params.externalIngestion
+    }
+    if (params.adaptiveNote != null) {
+      payload.adaptive = params.adaptiveNote
+    }
+    return payload
+  })()
+
+  const batchSize =
+    typeof params.effectiveGeocodeBacklogBatch === 'number' && params.effectiveGeocodeBacklogBatch > 0
+      ? params.effectiveGeocodeBacklogBatch
+      : parseGeocodeBatchSizeForMetrics()
+  const concurrency =
+    typeof params.effectiveGeocodeConcurrency === 'number' && params.effectiveGeocodeConcurrency > 0
+      ? params.effectiveGeocodeConcurrency
+      : parseGeocodeConcurrencyForMetrics()
 
   try {
     const admin = getAdminDb()
     const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
       mode: params.mode,
-      batch_size: parseGeocodeBatchSizeForMetrics(),
-      concurrency: parseGeocodeConcurrencyForMetrics(),
+      batch_size: batchSize,
+      concurrency,
       claimed_count: geocode.claimed,
       geocode_succeeded_count: geocode.succeeded,
       failed_retriable_count: geocode.failedRetriable,
@@ -237,6 +259,9 @@ export async function recordGeocodeCronOrchestrationRun(params: {
   rate429Count?: number
   ok: boolean
   error?: string | null
+  adaptiveNote?: Record<string, unknown> | null
+  effectiveGeocodeQueueBatch?: number
+  effectiveGeocodeConcurrency?: number
 }): Promise<void> {
   const gcNote: GeocodeCronOrchestrationNote = {
     backlog_claimed: params.backlogClaimed,
@@ -245,15 +270,28 @@ export async function recordGeocodeCronOrchestrationRun(params: {
     queue_requeued: params.queueRequeued,
     ok: params.ok,
     ...(params.error ? { error: params.error } : {}),
+    ...(params.adaptiveNote ? { adaptive: params.adaptiveNote } : {}),
   }
-  const notes: NotesPayload = { geocode_cron: gcNote }
+  const notes: NotesPayload = {
+    geocode_cron: gcNote,
+    ...(params.adaptiveNote ? { adaptive: params.adaptiveNote } : {}),
+  }
+
+  const batchSize =
+    typeof params.effectiveGeocodeQueueBatch === 'number' && params.effectiveGeocodeQueueBatch > 0
+      ? params.effectiveGeocodeQueueBatch
+      : parseGeocodeCronQueueBatchForMetrics()
+  const concurrency =
+    typeof params.effectiveGeocodeConcurrency === 'number' && params.effectiveGeocodeConcurrency > 0
+      ? params.effectiveGeocodeConcurrency
+      : parseGeocodeConcurrencyForMetrics()
 
   try {
     const admin = getAdminDb()
     const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
       mode: 'geocode_cron',
-      batch_size: parseGeocodeCronQueueBatchForMetrics(),
-      concurrency: parseGeocodeConcurrencyForMetrics(),
+      batch_size: batchSize,
+      concurrency,
       claimed_count: 0,
       geocode_succeeded_count: 0,
       failed_retriable_count: 0,

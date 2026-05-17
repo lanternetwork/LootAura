@@ -221,6 +221,8 @@ export type GeocodeIngestedSaleByIdResult =
 
 export interface GeocodeWorkerRunOptions {
   batchSizeOverride?: number
+  /** Adaptive ceiling; worker may lower further via provider-health gate. */
+  concurrencyCeilingOverride?: number
   cooldownMinutesOverride?: number
   captureClaimedRowIds?: boolean
   /** Merged into structured telemetry (requestId, correlationId, jobType, etc.) — no PII. */
@@ -1354,10 +1356,15 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
 
   const claimedRows = await hydrateGeocodeClaimRows((Array.isArray(data) ? data : []) as ClaimedGeocodeRow[])
   await hydrateFailureDetailsForClaimRows(admin, claimedRows)
-  const concurrency = parseGeocodeConcurrency()
+  const configuredConcurrency =
+    typeof options?.concurrencyCeilingOverride === 'number' &&
+    Number.isFinite(options.concurrencyCeilingOverride) &&
+    options.concurrencyCeilingOverride >= 1
+      ? Math.min(Math.floor(options.concurrencyCeilingOverride), 5)
+      : parseGeocodeConcurrency()
   const effectiveConcurrency = gateDecision.shouldReduceConcurrency
-    ? Math.max(1, Math.floor(concurrency / 2))
-    : concurrency
+    ? Math.max(1, Math.floor(configuredConcurrency / 2))
+    : configuredConcurrency
   const summary: GeocodeWorkerSummary = {
     claimed: claimedRows.length,
     succeeded: 0,
@@ -1510,7 +1517,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       queueGrowth,
       queueDepthDeltaSupplied: queueGrowthFromCaller !== undefined,
       effectiveConcurrency,
-      configuredConcurrency: concurrency,
+      configuredConcurrency,
       maxPoisonFingerprintCount: maxPoisonFp,
     })
   )
@@ -1553,7 +1560,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     failureCount,
     durationMs,
     concurrency: effectiveConcurrency,
-    configuredConcurrency: concurrency,
+    configuredConcurrency,
     providerHealthStatus: batchDecision.status,
   })
 
@@ -1577,7 +1584,7 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
       publishFailed: publishFailedCount,
       durationMs,
       concurrency: effectiveConcurrency,
-      configuredConcurrency: concurrency,
+      configuredConcurrency,
       queuePressureClass: classifyQueuePressure(summary.claimed, Math.max(1, batchSize)),
       dbBacklogDepletionSignal: summary.claimed === 0,
       providerHealthStatus: batchDecision.status,

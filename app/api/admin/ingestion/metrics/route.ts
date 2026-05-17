@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import { extractLatestAdaptiveNoteFromOrchestrationRows } from '@/lib/ingestion/adaptiveThroughputProfile'
 import {
   parseIngestionOrchestrationConfigBatchSizeForMetrics,
   parseIngestionOrchestrationMinMinutesForMetrics,
@@ -432,6 +433,7 @@ export async function GET(request: NextRequest) {
         lockSkippedRuns48h: agg.lockSkippedRuns48h,
         budgetExitRuns48h: agg.budgetExitRuns48h,
         overlapPreventionEvents48h: agg.overlapPreventionEvents48h,
+        adaptiveLatest: extractLatestAdaptiveNoteFromOrchestrationRows(orchRows),
       },
       volume: {
         fetch: {

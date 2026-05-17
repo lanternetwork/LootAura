@@ -120,6 +120,7 @@ export interface IngestionMetricsResponse {
     lockSkippedRuns48h: number
     budgetExitRuns48h: number
     overlapPreventionEvents48h: number
+    adaptiveLatest: Record<string, unknown> | null
   }
   volume: IngestionVolumeMetrics
   oldestStuckRows: IngestionMetricsStuckRowSample[]

@@ -50,6 +50,8 @@ import {
   recordIngestionOrchestrationRun,
   type ExternalIngestionOrchestrationNote,
 } from '@/lib/ingestion/orchestrationMetrics'
+import { adaptiveNoteToOrchestrationPayload } from '@/lib/ingestion/adaptiveThroughputProfile'
+import { resolveAdaptiveThroughputForCron } from '@/lib/ingestion/adaptiveThroughputSignals'
 import {
   normalizeSourcePages,
   persistExternalPageSource,
@@ -65,40 +67,6 @@ import {
 } from '@/lib/operationalResilience/ingestionOrchestrationLeaseGate'
 
 export const dynamic = 'force-dynamic'
-const DEFAULT_BACKLOG_BATCH = 25
-const MAX_BACKLOG_BATCH = 100
-
-/** Minimum minutes between external_page_source ingestion runs when `mode=ingestion` (geocode/publish always run). */
-function parseIngestionOrchestrationMinMinutes(): number {
-  const raw = process.env.INGESTION_ORCHESTRATION_MIN_MINUTES
-  const defaultMinutes = 10
-  if (raw === undefined || raw === '') {
-    return defaultMinutes
-  }
-  const parsed = Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return defaultMinutes
-  }
-  return Math.min(parsed, 24 * 60)
-}
-
-function parseBacklogBatchLimit(): number {
-  const raw = process.env.GEOCODE_BACKLOG_BATCH_SIZE
-  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_BACKLOG_BATCH
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return DEFAULT_BACKLOG_BATCH
-  }
-  return Math.min(parsed, MAX_BACKLOG_BATCH)
-}
-
-function parseExternalFetchDomainMinSpacingMs(): number {
-  const raw = process.env.EXTERNAL_FETCH_DOMAIN_MIN_SPACING_MS
-  const defaultMs = 500
-  if (raw === undefined || raw === '') return defaultMs
-  const parsed = Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed) || parsed < 0) return defaultMs
-  return Math.min(parsed, 60_000)
-}
 
 function parseExternalFetchJitterRangeMs(): { minMs: number; maxMs: number } {
   const rawMin = process.env.EXTERNAL_FETCH_JITTER_MIN_MS
@@ -211,26 +179,6 @@ function sortExternalConfigsDeterministic(rows: ExternalConfigRow[]): ExternalCo
     const bPages = normalizeSourcePages(b.source_pages).join('|')
     return aPages.localeCompare(bPages)
   })
-}
-
-function parseIngestionOrchestrationConfigBatchSize(): number {
-  const raw = process.env.INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE
-  const defaultSize = 20
-  if (raw === undefined || raw === '') return defaultSize
-  const parsed = Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed) || parsed <= 0) return defaultSize
-  return Math.min(parsed, 500)
-}
-
-function parseIngestionOrchestrationExecutionBudgetMs(): number {
-  const raw = process.env.INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS
-  const defaultBudgetMs = 45_000
-  if (raw === undefined || raw === '') return defaultBudgetMs
-  const parsed = Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed) || parsed < 0) return defaultBudgetMs
-  // 0 = no wall time budget for bounded config work (exit before first row; tests / emergency brake)
-  if (parsed === 0) return 0
-  return Math.min(parsed, 240_000)
 }
 
 async function ensureIngestionOrchestrationStateRow(withOpId: (context?: any) => any): Promise<void> {
@@ -781,7 +729,16 @@ async function runIngestionOrchestration(
     aggregationMode: 'not_applicable_external_page_source' as const,
   }
 
-  const minIngestionMinutes = mode === 'ingestion' ? parseIngestionOrchestrationMinMinutes() : 0
+  const { envelope: adaptiveEnvelope, note: adaptiveNote } = await resolveAdaptiveThroughputForCron()
+  const adaptivePayload = adaptiveNoteToOrchestrationPayload(adaptiveNote)
+  taskResult.adaptive = adaptiveNote
+  const attachAdaptive = <T extends ExternalIngestionOrchestrationNote>(note: T): T => ({
+    ...note,
+    adaptive: adaptivePayload,
+  })
+
+  const minIngestionMinutes =
+    mode === 'ingestion' ? adaptiveEnvelope.fetch.minIntervalMinutes : 0
   let skipExternalIngestion = false
 
   if (mode === 'ingestion' && minIngestionMinutes > 0) {
@@ -799,12 +756,12 @@ async function runIngestionOrchestration(
           lastSuccessfulExternalIngestionAt: lastCompletedAt,
           dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
         }
-        externalIngestionNote = {
+        externalIngestionNote = attachAdaptive({
           status: 'skipped_throttle',
           reason: 'ingestion_interval',
           minIntervalMinutes: minIngestionMinutes,
           lastSuccessfulExternalIngestionAt: lastCompletedAt,
-        }
+        })
         logger.info('Ingestion step skipped (min interval not elapsed)', withOpId({
           component: 'api/cron/daily',
           task: 'ingestion-orchestration',
@@ -845,11 +802,11 @@ async function runIngestionOrchestration(
           reason: 'active_orchestration_lock',
           dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
         }
-        externalIngestionNote = {
+        externalIngestionNote = attachAdaptive({
           status: 'skipped_lock_active',
           overlapPrevented: true,
           lockSkipped: true,
-        }
+        })
         logger.info('Ingestion step skipped due to active orchestration lease', withOpId({
           component: 'api/cron/daily',
           task: 'ingestion-orchestration',
@@ -896,8 +853,8 @@ async function runIngestionOrchestration(
       const rows = sortExternalConfigsDeterministic(crawlablePartition.crawlable)
       const plannedRows = interleaveConfigsByDomain(rows)
       const totalConfigs = plannedRows.length
-      const batchSize = parseIngestionOrchestrationConfigBatchSize()
-      const executionBudgetMs = parseIngestionOrchestrationExecutionBudgetMs()
+      const batchSize = adaptiveEnvelope.fetch.configBatchSize
+      const executionBudgetMs = adaptiveEnvelope.fetch.executionBudgetMs
       const budgetStartedAtMs = Date.now()
       const baseCursor =
         totalConfigs > 0 && acquiredLease
@@ -911,7 +868,7 @@ async function runIngestionOrchestration(
       let budgetExited = false
       let configsConsumed = 0
       let configsSkippedInvalidPages = 0
-      const domainMinSpacingMs = parseExternalFetchDomainMinSpacingMs()
+      const domainMinSpacingMs = adaptiveEnvelope.fetch.domainSpacingMs
       const jitterRangeMs = parseExternalFetchJitterRangeMs()
       const jitterSeedString = `ingestion:${mode}:${new Date().toISOString()}`
       const jitterSeed = hashStringToUint32(jitterSeedString)
@@ -1059,7 +1016,7 @@ async function runIngestionOrchestration(
 
       const completedAt = new Date().toISOString()
       externalFetchDurationMs = Date.now() - externalFetchStartedAtMs
-      externalIngestionNote = {
+      externalIngestionNote = attachAdaptive({
         status: 'completed',
         completedAt,
         configsProcessed: totals.configsProcessed,
@@ -1089,7 +1046,7 @@ async function runIngestionOrchestration(
           duplicateDecisionFalse: ingestionDedupeTelemetrySummary.duplicateDecisionFalse,
         },
         externalFetchDurationMs,
-      }
+      })
 
       logger.info('Ingestion step completed', withOpId({
         component: 'api/cron/daily',
@@ -1151,7 +1108,7 @@ async function runIngestionOrchestration(
         error: error instanceof Error ? error.message : String(error),
         dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
       }
-      externalIngestionNote = { status: 'failed' }
+      externalIngestionNote = attachAdaptive({ status: 'failed' })
       logger.error('Ingestion step failed', error instanceof Error ? error : new Error(String(error)), withOpId({
         component: 'api/cron/daily',
         task: 'ingestion-orchestration',
@@ -1173,7 +1130,7 @@ async function runIngestionOrchestration(
 
   // Step 2: Geocode pending sales.
   try {
-    const backlogBatchSize = parseBacklogBatchLimit()
+    const backlogBatchSize = adaptiveEnvelope.geocode.backlogBatchSize
     logger.info('Geocode step started', withOpId({
       component: 'api/cron/daily',
       task: 'ingestion-orchestration',
@@ -1182,6 +1139,7 @@ async function runIngestionOrchestration(
     }))
     geocodeSummary = await geocodePendingSales({
       batchSizeOverride: backlogBatchSize,
+      concurrencyCeilingOverride: adaptiveEnvelope.geocode.concurrencyCeiling,
       telemetryContext: telemetryContext,
     })
     taskResult.steps.geocode = {
@@ -1223,7 +1181,10 @@ async function runIngestionOrchestration(
       task: 'ingestion-orchestration',
       step: 'publish',
     }))
-    publishSummary = await publishReadyIngestedSales({ telemetryContext: telemetryContext })
+    publishSummary = await publishReadyIngestedSales({
+      telemetryContext: telemetryContext,
+      batchSizeOverride: adaptiveEnvelope.publish.batchSize,
+    })
     const linkedFinalizeSummary = await finalizeLinkedPublishedIngestedSales()
     publishDuplicateReuseCount = linkedFinalizeSummary.alreadyPublished
     taskResult.steps.publish = {
@@ -1264,6 +1225,9 @@ async function runIngestionOrchestration(
     geocodeSummary,
     publishSummary,
     externalIngestion: externalIngestionNote,
+    adaptiveNote: adaptivePayload,
+    effectiveGeocodeBacklogBatch: adaptiveEnvelope.geocode.backlogBatchSize,
+    effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
   })
 
   logger.info('Ingestion orchestration task completed', withOpId({

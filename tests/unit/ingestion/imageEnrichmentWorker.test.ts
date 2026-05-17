@@ -66,6 +66,42 @@ describe('enrichPendingImages', () => {
     expect(hoisted.fetchHtml).not.toHaveBeenCalled()
   })
 
+  it('skips redundant detail fetch when address enrichment recently parsed HTML', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          id: ROW_ID,
+          source_platform: 'external_page_source',
+          canonical_source_url: DETAIL_URL,
+          source_url: DETAIL_URL,
+          city: 'Chicago',
+          state: 'IL',
+          image_enrichment_attempts: 1,
+          image_source_url: null,
+          failure_reasons: [],
+          failure_details: {
+            image_enrichment: {
+              schema_version: 1,
+              recorded_at: new Date().toISOString(),
+              detailHtmlParsed: true,
+              detailAttemptSource: 'address_enrichment',
+              skipReason: 'no_valid_urls',
+            },
+          },
+          raw_payload: {},
+        },
+      ],
+      error: null,
+    })
+
+    const { enrichPendingImages } = await import('@/lib/ingestion/imageEnrichmentWorker')
+    const summary = await enrichPendingImages({ batchSizeOverride: 5, cooldownMinutesOverride: 15 })
+
+    expect(summary.skippedRecentDetailAttempt).toBe(1)
+    expect(hoisted.fetchHtml).not.toHaveBeenCalled()
+    expect(hoisted.applyImage).not.toHaveBeenCalled()
+  })
+
   it('updates row when applyDetailPageImageEnrichment succeeds', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [

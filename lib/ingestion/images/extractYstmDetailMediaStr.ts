@@ -1,19 +1,8 @@
 import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
-import {
-  isRejectedListingImageUrl,
-  normalizeListingImageHttpsUrl,
-} from '@/lib/ingestion/images/normalizeListingImageUrl'
+import { filterValidListingImageUrls } from '@/lib/ingestion/images/filterValidListingImageUrls'
 import { imageUrlFingerprints } from '@/lib/ingestion/images/imageUrlFingerprint'
-
-function decodeJsSingleQuotedLiteral(raw: string): string {
-  return raw
-    .replace(/\\'/g, "'")
-    .replace(/\\"/g, '"')
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\//g, '/')
-}
+import { normalizeListingImageHttpsUrl } from '@/lib/ingestion/images/normalizeListingImageUrl'
+import { extractYstmMediaStrJsonLiteral } from '@/lib/ingestion/images/ystmDetailMediaStrLiteral'
 
 export type YstmMediaStrExtractionResult = {
   mediaStrFound: boolean
@@ -50,10 +39,10 @@ export function extractYstmDetailMediaStrFromHtml(
     urlFingerprints: [],
   }
 
-  const m = html.match(/(?:const|let|var)\s+mediaStr\s*=\s*'([\s\S]*?)'\s*;/i)
-  if (!m?.[1]) return empty
+  const literal = extractYstmMediaStrJsonLiteral(html)
+  if (!literal) return empty
 
-  const obj = parseMediaStrObject(decodeJsSingleQuotedLiteral(m[1]))
+  const obj = parseMediaStrObject(literal)
   if (!obj) return { ...empty, mediaStrFound: true }
 
   const baseRaw = typeof obj.baseUrl === 'string' ? obj.baseUrl.trim() : ''
@@ -62,32 +51,14 @@ export function extractYstmDetailMediaStrFromHtml(
     return { ...empty, mediaStrFound: true, baseUrl }
   }
 
-  const out: string[] = []
-  const seen = new Set<string>()
-  let rejectedCount = 0
-
-  for (const item of obj.media) {
-    if (typeof item !== 'string' || !item.trim()) continue
-    const normalized = normalizeListingImageHttpsUrl(item, baseUrl)
-    if (!normalized) {
-      rejectedCount += 1
-      continue
-    }
-    if (isRejectedListingImageUrl(normalized)) {
-      rejectedCount += 1
-      continue
-    }
-    if (seen.has(normalized)) continue
-    seen.add(normalized)
-    out.push(normalized)
-    if (out.length >= maxImages) break
-  }
+  const mediaStrings = obj.media.filter((item): item is string => typeof item === 'string' && !!item.trim())
+  const filtered = filterValidListingImageUrls(mediaStrings, baseUrl, maxImages)
 
   return {
     mediaStrFound: true,
     baseUrl,
-    imageUrls: out,
-    rejectedCount,
-    urlFingerprints: imageUrlFingerprints(out),
+    imageUrls: filtered.imageUrls,
+    rejectedCount: filtered.rejectedCount,
+    urlFingerprints: imageUrlFingerprints(filtered.imageUrls),
   }
 }

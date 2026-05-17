@@ -1,5 +1,6 @@
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 import { applyDetailPageImageEnrichment } from '@/lib/ingestion/images/applyDetailPageImageEnrichment'
+import { shouldSkipRedundantDetailImageFetch } from '@/lib/ingestion/images/ingestedImageEnrichmentDetails'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
@@ -23,6 +24,7 @@ export type ImageEnrichmentWorkerSummary = {
   attempted: number
   updated: number
   skippedUnchanged: number
+  skippedRecentDetailAttempt: number
   failedRetriable: number
   failedTerminal: number
   mediaStrFound: number
@@ -85,9 +87,10 @@ async function persistImageFailureReason(
 async function processImageEnrichmentRow(
   admin: ReturnType<typeof getAdminDb>,
   row: ClaimedImageEnrichmentRow,
+  cooldownMinutes: number,
   telemetryContext?: Record<string, unknown>
 ): Promise<{
-  outcome: 'updated' | 'skipped' | 'retriable' | 'terminal'
+  outcome: 'updated' | 'skipped' | 'skipped_recent_detail' | 'retriable' | 'terminal'
   reason?: ImageEnrichmentFailureReason
   mediaStrFound?: boolean
 }> {
@@ -97,6 +100,10 @@ async function processImageEnrichmentRow(
   if (!isYstmDetailListingUrl(row.source_url)) {
     await persistImageFailureReason(admin, rowId, 'not_ystm_detail')
     return { outcome: 'terminal', reason: 'not_ystm_detail' }
+  }
+
+  if (shouldSkipRedundantDetailImageFetch(row.failure_details, cooldownMinutes)) {
+    return { outcome: 'skipped_recent_detail' }
   }
 
   let html: string
@@ -130,6 +137,7 @@ async function processImageEnrichmentRow(
     existingRawPayload: row.raw_payload,
     existingFailureDetails: row.failure_details,
     attemptCount,
+    detailAttemptSource: 'image_enrichment',
     telemetryContext,
   })
 
@@ -184,6 +192,7 @@ export async function enrichPendingImages(options?: {
     attempted: 0,
     updated: 0,
     skippedUnchanged: 0,
+    skippedRecentDetailAttempt: 0,
     failedRetriable: 0,
     failedTerminal: 0,
     mediaStrFound: 0,
@@ -218,7 +227,7 @@ export async function enrichPendingImages(options?: {
 
   for (const row of claimed) {
     summary.attempted += 1
-    const result = await processImageEnrichmentRow(admin, row, options?.telemetryContext)
+    const result = await processImageEnrichmentRow(admin, row, cooldownMinutes, options?.telemetryContext)
     if (result.reason) {
       summary.byFailureReason[result.reason] = (summary.byFailureReason[result.reason] ?? 0) + 1
     }
@@ -226,6 +235,7 @@ export async function enrichPendingImages(options?: {
     else if (result.outcome !== 'skipped') summary.mediaStrMissing += 1
 
     if (result.outcome === 'updated') summary.updated += 1
+    else if (result.outcome === 'skipped_recent_detail') summary.skippedRecentDetailAttempt += 1
     else if (result.outcome === 'skipped') summary.skippedUnchanged += 1
     else if (result.outcome === 'terminal') summary.failedTerminal += 1
     else summary.failedRetriable += 1

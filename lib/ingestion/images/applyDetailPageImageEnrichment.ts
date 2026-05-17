@@ -1,4 +1,8 @@
 import { extractYstmDetailMediaStrFromHtml } from '@/lib/ingestion/images/extractYstmDetailMediaStr'
+import {
+  mergeIngestedImageEnrichmentDetails,
+  type IngestedImageEnrichmentDetails,
+} from '@/lib/ingestion/images/ingestedImageEnrichmentDetails'
 import { mergeIngestedSaleImageFields } from '@/lib/ingestion/images/mergeIngestedSaleImageFields'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
@@ -6,7 +10,7 @@ import { logger } from '@/lib/log'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 
-export const INGESTED_IMAGE_ENRICHMENT_DETAILS_SCHEMA_VERSION = 1 as const
+export { INGESTED_IMAGE_ENRICHMENT_DETAILS_SCHEMA_VERSION } from '@/lib/ingestion/images/ingestedImageEnrichmentDetails'
 
 export type ImageEnrichmentApplyResult = {
   skipped: boolean
@@ -18,20 +22,17 @@ export type ImageEnrichmentApplyResult = {
   urlFingerprints: string[]
 }
 
-function mergeImageEnrichmentDetails(
-  existing: unknown,
-  patch: Record<string, unknown>
-): Record<string, unknown> {
-  const prior =
-    existing && typeof existing === 'object' && !Array.isArray(existing)
-      ? { ...(existing as Record<string, unknown>) }
-      : {}
-  prior.image_enrichment = {
-    schema_version: INGESTED_IMAGE_ENRICHMENT_DETAILS_SCHEMA_VERSION,
-    recorded_at: new Date().toISOString(),
-    ...patch,
-  }
-  return prior
+async function persistImageEnrichmentAttempt(
+  rowId: string,
+  existingFailureDetails: unknown,
+  patch: Omit<IngestedImageEnrichmentDetails, 'schema_version' | 'recorded_at'>
+): Promise<void> {
+  const admin = getAdminDb()
+  await fromBase(admin, 'ingested_sales')
+    .update({
+      failure_details: mergeIngestedImageEnrichmentDetails(existingFailureDetails, patch),
+    })
+    .eq('id', rowId)
 }
 
 /**
@@ -46,6 +47,7 @@ export async function applyDetailPageImageEnrichment(input: {
   existingRawPayload?: unknown
   existingFailureDetails?: unknown
   attemptCount?: number
+  detailAttemptSource?: 'address_enrichment' | 'image_enrichment'
   telemetryContext?: Record<string, unknown>
 }): Promise<ImageEnrichmentApplyResult> {
   if (!isYstmDetailListingUrl(input.sourceUrl)) {
@@ -60,8 +62,21 @@ export async function applyDetailPageImageEnrichment(input: {
     }
   }
 
+  const attemptMeta = {
+    detailHtmlParsed: true as const,
+    detailAttemptSource: input.detailAttemptSource,
+    attemptCount: input.attemptCount,
+  }
+
   const extracted = extractYstmDetailMediaStrFromHtml(input.html, input.sourceUrl)
   if (!extracted.mediaStrFound) {
+    await persistImageEnrichmentAttempt(input.rowId, input.existingFailureDetails, {
+      ...attemptMeta,
+      skipReason: 'no_media_str',
+      mediaStrFound: false,
+      validImageCount: 0,
+      rejectedCount: extracted.rejectedCount,
+    })
     return {
       skipped: true,
       skipReason: 'no_media_str',
@@ -74,6 +89,14 @@ export async function applyDetailPageImageEnrichment(input: {
   }
 
   if (extracted.imageUrls.length === 0) {
+    await persistImageEnrichmentAttempt(input.rowId, input.existingFailureDetails, {
+      ...attemptMeta,
+      skipReason: 'no_valid_urls',
+      mediaStrFound: true,
+      validImageCount: 0,
+      rejectedCount: extracted.rejectedCount,
+      urlFingerprints: extracted.urlFingerprints,
+    })
     return {
       skipped: true,
       skipReason: 'no_valid_urls',
@@ -81,7 +104,7 @@ export async function applyDetailPageImageEnrichment(input: {
       validImageCount: 0,
       rejectedCount: extracted.rejectedCount,
       updated: false,
-      urlFingerprints: [],
+      urlFingerprints: extracted.urlFingerprints,
     }
   }
 
@@ -92,6 +115,14 @@ export async function applyDetailPageImageEnrichment(input: {
   })
 
   if (!merged.updated) {
+    await persistImageEnrichmentAttempt(input.rowId, input.existingFailureDetails, {
+      ...attemptMeta,
+      skipReason: 'unchanged',
+      mediaStrFound: true,
+      validImageCount: merged.mergedCount,
+      rejectedCount: extracted.rejectedCount,
+      urlFingerprints: extracted.urlFingerprints,
+    })
     return {
       skipped: true,
       skipReason: 'unchanged',
@@ -108,12 +139,13 @@ export async function applyDetailPageImageEnrichment(input: {
     .update({
       image_source_url: merged.imageSourceUrl,
       raw_payload: merged.rawPayload,
-      failure_details: mergeImageEnrichmentDetails(input.existingFailureDetails, {
+      failure_details: mergeIngestedImageEnrichmentDetails(input.existingFailureDetails, {
+        ...attemptMeta,
+        skipReason: undefined,
         validImageCount: merged.mergedCount,
         rejectedCount: extracted.rejectedCount,
         mediaStrFound: true,
         urlFingerprints: extracted.urlFingerprints,
-        attemptCount: input.attemptCount,
       }),
     })
     .eq('id', input.rowId)

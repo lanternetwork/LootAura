@@ -201,6 +201,7 @@ async function processAddressEnrichmentRow(
     existingRawPayload: row.raw_payload,
     existingFailureDetails: row.failure_details,
     attemptCount,
+    detailAttemptSource: 'address_enrichment',
     telemetryContext,
   })
 

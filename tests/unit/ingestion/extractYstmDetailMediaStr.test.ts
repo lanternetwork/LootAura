@@ -9,6 +9,15 @@ const PAGE_URL =
 const MEDIA_STR_FIXTURE = `const mediaStr = '{"baseUrl":"https:\\/\\/gsf.tlstatic.com\\/image\\/w700-h500\\/2026\\/05\\/16\\/s\\/4\\/3\\/21584843","media":["XXMwY-0.jpeg","2MdD-0.jpeg","XDvt4-0.jpeg"],"listingUrl":"https:\\/\\/garagesalefinder.com\\/s\\/x"}';`
 
 describe('extractYstmDetailMediaStrFromHtml', () => {
+  it('parses double-quoted mediaStr assignment', () => {
+    const html = `<script>const mediaStr = "{\\"baseUrl\\":\\"https://gsf.tlstatic.com/image/w700-h500/2026/05/16/s/4/3/21584843\\",\\"media\\":[\\"a.jpeg\\",\\"b.jpeg\\"]}";</script>`
+    const result = extractYstmDetailMediaStrFromHtml(html, PAGE_URL)
+    expect(result.imageUrls).toEqual([
+      'https://gsf.tlstatic.com/image/w700-h500/2026/05/16/s/4/3/21584843/a.jpeg',
+      'https://gsf.tlstatic.com/image/w700-h500/2026/05/16/s/4/3/21584843/b.jpeg',
+    ])
+  })
+
   it('parses baseUrl + media[] into absolute HTTPS URLs', () => {
     const html = `<html><body><script>${MEDIA_STR_FIXTURE}</script></body></html>`
     const result = extractYstmDetailMediaStrFromHtml(html, PAGE_URL)

@@ -1,5 +1,6 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import type { DedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
 import type { GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import type { PublishWorkerBatchSummary } from '@/lib/ingestion/publishWorker'
 
@@ -64,6 +65,40 @@ export type ExternalIngestionOrchestrationNote = {
   overlapPrevented?: boolean
   staleLockRecovered?: boolean
   lockSkipped?: boolean
+  pagesProcessed?: number
+  fetched?: number
+  inserted?: number
+  skipped?: number
+  invalid?: number
+  errors?: number
+  dedupeTelemetrySummary?: DedupeDecisionAggregate
+  externalFetchDurationMs?: number
+  publishDuplicateReuseCount?: number
+}
+
+export type DiscoveryCronOrchestrationNote = {
+  ok: boolean
+  skipped: boolean
+  configsPromoted: number
+  configsRepaired: number
+  configsRevalidated: number
+  configsFailed: number
+  crawlableConfigCount: number
+  failedConfigCount: number
+  crawlExcludedConfigCount: number
+  candidatePagesDiscovered: number
+  candidatePagesValid: number
+}
+
+export type ReconciliationCronOrchestrationNote = {
+  ok: boolean
+  processed: number
+  changed: number
+  failed: number
+  candidatePageRpcOk: boolean
+  scheduleMutationInhibited: number
+  salesSyncUpdated: number
+  schedulesUpdated: number
 }
 
 export type GeocodeCronOrchestrationNote = {
@@ -78,6 +113,8 @@ export type GeocodeCronOrchestrationNote = {
 type NotesPayload = {
   external_ingestion?: ExternalIngestionOrchestrationNote
   geocode_cron?: GeocodeCronOrchestrationNote
+  discovery_cron?: DiscoveryCronOrchestrationNote
+  reconciliation_cron?: ReconciliationCronOrchestrationNote
 }
 
 /**
@@ -242,6 +279,86 @@ export async function recordGeocodeCronOrchestrationRun(params: {
       'ingestion_orchestration_runs insert threw (geocode_cron)',
       err instanceof Error ? err : new Error(String(err)),
       { component: 'ingestion/orchestrationMetrics', operation: 'insert_geocode_cron' }
+    )
+  }
+}
+
+export async function recordDiscoveryCronOrchestrationRun(params: {
+  durationMs: number
+  note: DiscoveryCronOrchestrationNote
+}): Promise<void> {
+  const notes: NotesPayload = { discovery_cron: params.note }
+  try {
+    const admin = getAdminDb()
+    const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
+      mode: 'discovery_cron',
+      batch_size: 0,
+      concurrency: 0,
+      claimed_count: 0,
+      geocode_succeeded_count: 0,
+      failed_retriable_count: 0,
+      failed_terminal_count: 0,
+      publish_attempted_count: 0,
+      publish_succeeded_count: 0,
+      publish_failed_count: 0,
+      publish_expired_count: 0,
+      publish_skipped_count: 0,
+      duration_ms: params.durationMs,
+      rate_429_count: 0,
+      notes,
+    })
+    if (error) {
+      logger.error(
+        'ingestion_orchestration_runs insert failed (discovery_cron)',
+        new Error(error.message),
+        { component: 'ingestion/orchestrationMetrics', operation: 'insert_discovery_cron' }
+      )
+    }
+  } catch (err) {
+    logger.error(
+      'ingestion_orchestration_runs insert threw (discovery_cron)',
+      err instanceof Error ? err : new Error(String(err)),
+      { component: 'ingestion/orchestrationMetrics', operation: 'insert_discovery_cron' }
+    )
+  }
+}
+
+export async function recordReconciliationCronOrchestrationRun(params: {
+  durationMs: number
+  note: ReconciliationCronOrchestrationNote
+}): Promise<void> {
+  const notes: NotesPayload = { reconciliation_cron: params.note }
+  try {
+    const admin = getAdminDb()
+    const { error } = await fromBase(admin, 'ingestion_orchestration_runs').insert({
+      mode: 'reconciliation_cron',
+      batch_size: 0,
+      concurrency: 0,
+      claimed_count: 0,
+      geocode_succeeded_count: 0,
+      failed_retriable_count: 0,
+      failed_terminal_count: 0,
+      publish_attempted_count: 0,
+      publish_succeeded_count: 0,
+      publish_failed_count: 0,
+      publish_expired_count: 0,
+      publish_skipped_count: 0,
+      duration_ms: params.durationMs,
+      rate_429_count: 0,
+      notes,
+    })
+    if (error) {
+      logger.error(
+        'ingestion_orchestration_runs insert failed (reconciliation_cron)',
+        new Error(error.message),
+        { component: 'ingestion/orchestrationMetrics', operation: 'insert_reconciliation_cron' }
+      )
+    }
+  } catch (err) {
+    logger.error(
+      'ingestion_orchestration_runs insert threw (reconciliation_cron)',
+      err instanceof Error ? err : new Error(String(err)),
+      { component: 'ingestion/orchestrationMetrics', operation: 'insert_reconciliation_cron' }
     )
   }
 }

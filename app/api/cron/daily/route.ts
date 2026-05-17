@@ -774,6 +774,7 @@ async function runIngestionOrchestration(
 
   let geocodeSummary: GeocodeWorkerSummary | null = null
   let publishSummary: PublishWorkerBatchSummary | null = null
+  let publishDuplicateReuseCount = 0
   let externalIngestionNote: ExternalIngestionOrchestrationNote | null = null
   const ingestionDedupeTelemetrySummary = {
     ...createEmptyDedupeDecisionAggregate(),
@@ -828,6 +829,7 @@ async function runIngestionOrchestration(
     let lockHeld = false
     let nextCursor = 0
     let markCompleted = false
+    let externalFetchDurationMs: number | undefined
     try {
       logger.info('Ingestion step started', withOpId({
         component: 'api/cron/daily',
@@ -916,6 +918,7 @@ async function runIngestionOrchestration(
       const nextRandom = makeSeededPrng(jitterSeed)
       const lastRequestAtByDomain = new Map<string, number>()
       const requestsByDomain = new Map<string, number>()
+      const externalFetchStartedAtMs = Date.now()
 
       logger.info('Ingestion external fetch pacing initialized', withOpId({
         component: 'api/cron/daily',
@@ -1055,6 +1058,7 @@ async function runIngestionOrchestration(
       }
 
       const completedAt = new Date().toISOString()
+      externalFetchDurationMs = Date.now() - externalFetchStartedAtMs
       externalIngestionNote = {
         status: 'completed',
         completedAt,
@@ -1069,6 +1073,14 @@ async function runIngestionOrchestration(
         budgetExit: budgetExited,
         overlapPrevented: false,
         staleLockRecovered: acquiredLease?.staleRecovered ?? false,
+        pagesProcessed: totals.pagesProcessed,
+        fetched: totals.fetched,
+        inserted: totals.inserted,
+        skipped: totals.skipped,
+        invalid: totals.invalid,
+        errors: totals.errors,
+        dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
+        externalFetchDurationMs,
       }
 
       logger.info('Ingestion step completed', withOpId({
@@ -1205,6 +1217,7 @@ async function runIngestionOrchestration(
     }))
     publishSummary = await publishReadyIngestedSales({ telemetryContext: telemetryContext })
     const linkedFinalizeSummary = await finalizeLinkedPublishedIngestedSales()
+    publishDuplicateReuseCount = linkedFinalizeSummary.alreadyPublished
     taskResult.steps.publish = {
       ok: true,
       ...publishSummary,
@@ -1231,6 +1244,12 @@ async function runIngestionOrchestration(
   }
 
   const orchestrationGeoPublishDurationMs = Date.now() - geoPublishStartMs
+  if (externalIngestionNote && publishDuplicateReuseCount > 0) {
+    externalIngestionNote = {
+      ...externalIngestionNote,
+      publishDuplicateReuseCount,
+    }
+  }
   await recordIngestionOrchestrationRun({
     mode,
     orchestrationGeoPublishDurationMs,

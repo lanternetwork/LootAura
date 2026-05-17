@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized, isCronAuthorized } from '@/lib/auth/cron'
 import { runSourceDiscoveryCron } from '@/lib/ingestion/discovery/runSourceDiscoveryCron'
+import { recordDiscoveryCronOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
 import { getAdminDb } from '@/lib/supabase/clients'
 
 export const dynamic = 'force-dynamic'
@@ -63,10 +64,28 @@ async function runDiscoveryCron(request: NextRequest) {
     return NextResponse.json({ ok: false, code: 'UNAUTHORIZED', message: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAtMs = Date.now()
   try {
     const result = await runSourceDiscoveryCron(getAdminDb(), {
       telemetryContext: {
         authMode: cronAuth ? 'cron' : 'unknown',
+      },
+    })
+    const t = result.telemetry
+    void recordDiscoveryCronOrchestrationRun({
+      durationMs: Date.now() - startedAtMs,
+      note: {
+        ok: result.ok,
+        skipped: result.skipped,
+        configsPromoted: t.configsPromoted,
+        configsRepaired: t.configsRepaired,
+        configsRevalidated: t.configsRevalidated,
+        configsFailed: t.configsFailed,
+        crawlableConfigCount: t.crawlableConfigCount,
+        failedConfigCount: t.failedConfigCount,
+        crawlExcludedConfigCount: t.crawlExcludedConfigCount,
+        candidatePagesDiscovered: t.candidatePagesDiscovered,
+        candidatePagesValid: t.candidatePagesValid,
       },
     })
     const status = result.ok ? 200 : 500

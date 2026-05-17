@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized, isCronAuthorized } from '@/lib/auth/cron'
 import { parseCronReconciliationBatchLimit } from '@/lib/reconciliation/cronReconciliation'
+import { recordReconciliationCronOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
 import { reconcileExternalSources } from '@/lib/reconciliation/reconcileExternalSources'
 
 export const dynamic = 'force-dynamic'
@@ -64,6 +65,7 @@ async function runReconciliationCron(request: NextRequest) {
   }
 
   const limit = parseCronReconciliationBatchLimit()
+  const startedAtMs = Date.now()
 
   try {
     const result = await reconcileExternalSources({
@@ -74,6 +76,19 @@ async function runReconciliationCron(request: NextRequest) {
       telemetryContext: {
         jobType: 'cron.reconciliation.phase2a',
         authMode: cronAuth ? 'cron' : 'unknown',
+      },
+    })
+    void recordReconciliationCronOrchestrationRun({
+      durationMs: Date.now() - startedAtMs,
+      note: {
+        ok: true,
+        processed: result.processed,
+        changed: result.changed,
+        failed: result.failed,
+        candidatePageRpcOk: result.candidatePageRpcOk,
+        scheduleMutationInhibited: result.scheduleMutationInhibited,
+        salesSyncUpdated: result.salesSyncUpdated,
+        schedulesUpdated: result.schedulesUpdated,
       },
     })
     return NextResponse.json(cronReconciliationJsonBody(result))

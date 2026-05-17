@@ -163,6 +163,25 @@ export default function IngestionDashboardClient() {
 
         {data && (
           <>
+            {data.volume && (
+              <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                <p className="text-sm font-medium text-indigo-900">
+                  Active bottleneck: <span className="uppercase">{data.volume.bottleneck}</span>
+                </p>
+                <p className="mt-1 text-xs text-indigo-800">
+                  Geocode oldest age:{' '}
+                  {data.volume.geocode.oldestNeedsGeocodeAgeMs == null
+                    ? '—'
+                    : `${Math.round(data.volume.geocode.oldestNeedsGeocodeAgeMs / 60000)} min`}{' '}
+                  · Publish oldest ready:{' '}
+                  {data.volume.publish.oldestReadyAgeMs == null
+                    ? '—'
+                    : `${Math.round(data.volume.publish.oldestReadyAgeMs / 60000)} min`}{' '}
+                  · Crawl overdue configs: {data.volume.fetch.configsOverdue}
+                </p>
+              </div>
+            )}
+
             <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               <MetricCard label="Backlog (needs_geocode)" value={data.backlog} highlight />
               <MetricCard label="Published 24h" value={data.published24h} />

@@ -19,7 +19,20 @@ vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'not', 'gte', 'in', 'is', 'order', 'limit', 'range']) {
+  for (const m of [
+    'select',
+    'eq',
+    'neq',
+    'not',
+    'gte',
+    'lt',
+    'in',
+    'is',
+    'or',
+    'order',
+    'limit',
+    'range',
+  ]) {
     q[m] = vi.fn(() => q)
   }
   q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>

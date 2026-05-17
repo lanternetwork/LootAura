@@ -78,7 +78,7 @@ describe('GET /api/cron/geocode', () => {
         attempted: 5,
         eligible: 3,
         replayed: 2,
-        skipped: {},
+        skipped: 0,
         updateErrors: 0,
         lostRaces: 0,
         skippedDueTo429Pressure: false,

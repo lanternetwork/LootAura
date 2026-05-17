@@ -265,7 +265,7 @@ export default function IngestionDashboardClient() {
               </p>
             </div>
 
-            <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
               <ChartCard title="Listings inserted / hour">
                 {listingsInsertedData.length === 0 ? (
                   <p className="py-8 text-center text-sm text-gray-500">No data</p>
@@ -295,6 +295,23 @@ export default function IngestionDashboardClient() {
                         <YAxis tick={{ fontSize: 10 }} />
                         <Tooltip />
                         <Line type="monotone" dataKey="value" stroke="#059669" dot={false} strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartWrap>
+                )}
+              </ChartCard>
+              <ChartCard title="Saturation % / hour">
+                {saturationRateData.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-500">No data</p>
+                ) : (
+                  <ChartWrap>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={saturationRateData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="value" stroke="#dc2626" dot={false} strokeWidth={2} />
                       </LineChart>
                     </ResponsiveContainer>
                   </ChartWrap>

@@ -434,7 +434,6 @@ export async function GET(request: NextRequest) {
     const configsProcessedByHour = mapToSortedSeries(agg.configsProcessedHourly)
     const listingsInsertedByHour = mapToSortedSeries(agg.insertedHourly)
     const listingsSkippedByHour = mapToSortedSeries(agg.listingsSkippedHourly)
-    const listingsDiscoveredByHour = mapToSortedSeries(agg.listingsDiscoveredHourly)
     const insertYieldByHour = mapHourlyRateSeries({
       numeratorByHour: agg.insertedHourly,
       denominatorByHour: agg.listingsDiscoveredHourly,

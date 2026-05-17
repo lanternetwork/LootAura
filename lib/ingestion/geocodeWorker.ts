@@ -700,7 +700,7 @@ async function handleGeocodeAttemptExhausted(
   admin: ReturnType<typeof getAdminDb>,
   params: {
     rowId: string
-    row: { failure_reasons: unknown; failure_details: unknown }
+    row: { failure_reasons: unknown; failure_details?: unknown }
     attemptCount: number
     hit429: boolean
     noCoordsReason?: string | null

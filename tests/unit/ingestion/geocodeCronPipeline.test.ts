@@ -37,7 +37,7 @@ describe('runGeocodeCronPipeline', () => {
       attempted: 3,
       eligible: 2,
       replayed: 1,
-      skipped: {},
+      skipped: 0,
       updateErrors: 0,
       lostRaces: 0,
     })

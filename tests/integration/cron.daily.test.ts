@@ -46,6 +46,19 @@ vi.mock('@/lib/ingestion/geocodeWorker', () => ({
   geocodePendingSales: (...args: unknown[]) => mockGeocodePendingSales(...args),
 }))
 
+const { mockRunWithGeocodePipelineLease, mockRecordConfigCrawlStats } = vi.hoisted(() => ({
+  mockRunWithGeocodePipelineLease: vi.fn(),
+  mockRecordConfigCrawlStats: vi.fn(),
+}))
+
+vi.mock('@/lib/ingestion/geocodePipelineLease', () => ({
+  runWithGeocodePipelineLease: (...args: unknown[]) => mockRunWithGeocodePipelineLease(...args),
+}))
+
+vi.mock('@/lib/ingestion/acquisition/configCrawlStats', () => ({
+  recordConfigCrawlStats: (...args: unknown[]) => mockRecordConfigCrawlStats(...args),
+}))
+
 vi.mock('@/lib/ingestion/publishWorker', () => ({
   publishReadyIngestedSales: (...args: unknown[]) => mockPublishReadyIngestedSales(...args),
   finalizeLinkedPublishedIngestedSales: (...args: unknown[]) => mockFinalizeLinkedPublishedIngestedSales(...args),
@@ -292,6 +305,13 @@ describe('GET /api/cron/daily', () => {
       errors: 0,
       pagesProcessed: 0,
     })
+    mockRunWithGeocodePipelineLease.mockImplementation(async ({ execute }: { execute: () => Promise<unknown> }) => ({
+      ok: true,
+      skipped: false,
+      result: await execute(),
+      lease: { acquired: true, owner: 'test', staleRecovered: false, cursor: 0 },
+    }))
+    mockRecordConfigCrawlStats.mockResolvedValue(undefined)
 
     mockAdminDb.rpc.mockImplementation(defaultArchiveAdminRpcImpl())
 

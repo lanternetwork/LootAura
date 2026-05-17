@@ -73,7 +73,7 @@ export async function runGeocodeCronPipeline(params: {
       attempted: 0,
       eligible: 0,
       replayed: 0,
-      skipped: {},
+      skipped: 0,
       updateErrors: 0,
       lostRaces: 0,
       skippedDueTo429Pressure: true,

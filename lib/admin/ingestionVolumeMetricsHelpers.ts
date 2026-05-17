@@ -232,6 +232,7 @@ export function aggregateOrchestrationRuns(
   fetchHourly: Map<string, number>
   configsProcessedHourly: Map<string, number>
   insertedHourly: Map<string, number>
+  listingsSkippedHourly: Map<string, number>
   listingsDiscoveredHourly: Map<string, number>
   geocodeSuccessHourly: Map<string, number>
   geocodeRetryableHourly: Map<string, number>

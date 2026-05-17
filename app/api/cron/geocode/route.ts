@@ -92,7 +92,8 @@ async function handleGeocodeCron(request: NextRequest) {
   const limit = adaptiveEnvelope.geocode.queueBatchSize
   const backlogBatchSize = adaptiveEnvelope.geocode.backlogBatchSize
 
-  const leaseRun = await runWithGeocodePipelineLease({
+  try {
+    const leaseRun = await runWithGeocodePipelineLease({
     logContext: {
       component: 'api/cron/geocode',
       requestId,
@@ -106,9 +107,9 @@ async function handleGeocodeCron(request: NextRequest) {
         concurrencyCeiling: adaptiveEnvelope.geocode.concurrencyCeiling,
         telemetryContext,
       }),
-  })
+    })
 
-  if (leaseRun.skipped) {
+    if (leaseRun.skipped) {
     const durationMs = Date.now() - startedAt
     logger.info('Geocode cron skipped due to active pipeline lease', {
       component: 'api/cron/geocode',
@@ -148,7 +149,6 @@ async function handleGeocodeCron(request: NextRequest) {
     })
   }
 
-  try {
     const pipeline = leaseRun.result
     const durationMs = Date.now() - startedAt
     const { queue, backlog, replay } = pipeline

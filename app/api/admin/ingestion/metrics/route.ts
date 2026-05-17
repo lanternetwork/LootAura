@@ -380,19 +380,21 @@ export async function GET(request: NextRequest) {
       publishSucceededPerHour: sumLastHourFromSeries(mapToSortedSeries(agg.publishSuccessHourly), nowMs),
       publishFailedPerHour: sumLastHourFromSeries(publishFailedByHour, nowMs),
       reconciliationProcessedPerHour: sumLastHourFromSeries(
-        (() => {
-          const m = buildEmptyHourBuckets(METRICS_HOURS, nowMs)
-          for (const row of orchRows) {
-            if (row.mode !== 'reconciliation_cron' || !row.created_at) continue
-            const r = row.notes?.reconciliation_cron as { processed?: number } | undefined
-            const d = new Date(row.created_at)
-            d.setUTCMinutes(0, 0, 0)
-            d.setUTCMilliseconds(0)
-            const k = d.toISOString()
-            if (m.has(k)) m.set(k, (m.get(k) ?? 0) + (typeof r?.processed === 'number' ? r.processed : 0))
-          }
-          return m
-        })(),
+        mapToSortedSeries(
+          (() => {
+            const m = buildEmptyHourBuckets(METRICS_HOURS, nowMs)
+            for (const row of orchRows) {
+              if (row.mode !== 'reconciliation_cron' || !row.created_at) continue
+              const r = row.notes?.reconciliation_cron as { processed?: number } | undefined
+              const d = new Date(row.created_at)
+              d.setUTCMinutes(0, 0, 0)
+              d.setUTCMilliseconds(0)
+              const k = d.toISOString()
+              if (m.has(k)) m.set(k, (m.get(k) ?? 0) + (typeof r?.processed === 'number' ? r.processed : 0))
+            }
+            return m
+          })()
+        ),
         nowMs
       ),
     }

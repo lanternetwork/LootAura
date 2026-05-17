@@ -88,7 +88,7 @@ describe('GET /api/admin/ingestion/metrics', () => {
 
   it('returns volume metrics shape without raw URLs', async () => {
     const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
-    vi.mocked(assertAdminOrThrow).mockResolvedValue(undefined)
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-test' } })
 
     const { GET } = await import('@/app/api/admin/ingestion/metrics/route')
     const res = await GET(new NextRequest('http://localhost/api/admin/ingestion/metrics'))

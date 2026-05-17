@@ -369,7 +369,7 @@ export default function IngestionDashboardClient() {
                         <th className="py-2 pr-2">City</th>
                         <th className="py-2 pr-2">Attempts</th>
                         <th className="py-2 pr-2">Updated</th>
-                        <th className="py-2">Link</th>
+                        <th className="py-2">Id</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -391,16 +391,7 @@ export default function IngestionDashboardClient() {
                             <td className="py-2 pr-2 whitespace-nowrap">
                               {new Date(row.updated_at).toLocaleString()}
                             </td>
-                            <td className="py-2">
-                              <a
-                                href={row.source_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                source
-                              </a>
-                            </td>
+                            <td className="py-2 font-mono text-xs text-gray-500">{row.id.slice(0, 8)}…</td>
                           </tr>
                         ))
                       )}

@@ -14,8 +14,14 @@ vi.mock('@/lib/auth/adminGate', () => ({
 }))
 
 vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
-  fetchLastSuccessfulExternalIngestionAt: vi.fn().mockResolvedValue('2026-05-17T10:00:00.000Z'),
+  fetchLastSuccessfulExternalIngestionAt: vi.fn().mockImplementation(async () =>
+    new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  ),
 }))
+
+function hoursAgoIso(hours: number): string {
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+}
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
@@ -46,17 +52,19 @@ describe('GET /api/admin/ingestion/metrics', () => {
     vi.resetModules()
     mockFromBase.mockReset()
     mockFromBase.mockImplementation((_admin, table: string) => {
+      const recentCreatedAt = hoursAgoIso(2)
+      const recentUpdatedAt = hoursAgoIso(1)
       switch (table) {
         case 'ingested_sales':
           return thenableQuery({
-            data: [{ created_at: '2026-05-17T08:00:00.000Z', updated_at: '2026-05-17T08:30:00.000Z' }],
+            data: [{ created_at: recentCreatedAt, updated_at: recentUpdatedAt }],
             count: 5,
           })
         case 'ingestion_orchestration_runs':
           return thenableQuery({
             data: [
               {
-                created_at: '2026-05-17T11:00:00.000Z',
+                created_at: recentCreatedAt,
                 mode: 'ingestion',
                 duration_ms: 1000,
                 batch_size: 25,
@@ -101,8 +109,8 @@ describe('GET /api/admin/ingestion/metrics', () => {
                 source_crawl_window_fetched: 10,
                 source_crawl_window_skipped: 2,
                 source_crawl_window_inserted: 1,
-                source_crawl_last_at: '2026-05-17T10:00:00.000Z',
-                source_crawl_last_insert_at: '2026-05-17T09:00:00.000Z',
+                source_crawl_last_at: recentUpdatedAt,
+                source_crawl_last_insert_at: recentCreatedAt,
               },
             ],
             count: 1,

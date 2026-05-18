@@ -29,7 +29,6 @@ import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatial
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents, type ObservabilityEventName } from '@/lib/observability/events'
-export { isYstmDetailFirstReadyEnabled } from '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
 export { parseYstmDetailFirstConcurrencyFromEnv } from '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
 
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v3'

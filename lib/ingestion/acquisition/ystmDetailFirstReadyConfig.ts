@@ -1,11 +1,4 @@
-/** Phase 3B: detail-first READY fast-path (feature flag + throughput knobs). */
-
-export function isYstmDetailFirstReadyEnabled(): boolean {
-  const raw = process.env.YSTM_DETAIL_FIRST_READY_ENABLED
-  if (raw === undefined || raw === '') return false
-  const normalized = raw.trim().toLowerCase()
-  return normalized === '1' || normalized === 'true' || normalized === 'yes'
-}
+/** Phase 3B: bounded concurrency for YSTM detail-first READY fast-path. */
 
 const DEFAULT_DETAIL_FETCH_CONCURRENCY = 3
 const MAX_DETAIL_FETCH_CONCURRENCY = 8

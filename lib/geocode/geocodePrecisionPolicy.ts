@@ -11,6 +11,7 @@ export const COORDINATE_PRECISIONS = [
   'interpolated',
   'locality',
   'city_centroid',
+  'provider_native',
 ] as const
 export type CoordinatePrecision = (typeof COORDINATE_PRECISIONS)[number]
 
@@ -20,6 +21,8 @@ export const GEOCODE_METHODS = [
   'nominatim_interpolated',
   'nominatim_locality',
   'nominatim_municipality_fallback',
+  'ystm_provider_native',
+  'address_geocode_cache',
 ] as const
 export type GeocodeMethod = (typeof GEOCODE_METHODS)[number]
 
@@ -28,6 +31,7 @@ const NON_PUBLISHABLE: ReadonlySet<CoordinatePrecision> = new Set(['locality', '
 /** Lower rank = preferred when comparing matches. */
 const PRECISION_RANK: Record<CoordinatePrecision, number> = {
   exact_address: 0,
+  provider_native: 0,
   intersection: 1,
   interpolated: 2,
   locality: 90,
@@ -65,7 +69,7 @@ export function methodForPrecision(precision: CoordinatePrecision, municipalityF
 }
 
 export function confidenceForPrecision(precision: CoordinatePrecision): GeocodeConfidence {
-  if (precision === 'exact_address') return 'high'
+  if (precision === 'exact_address' || precision === 'provider_native') return 'high'
   if (precision === 'intersection') return 'medium'
   return 'low'
 }

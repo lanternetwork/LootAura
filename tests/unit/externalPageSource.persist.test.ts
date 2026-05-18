@@ -32,6 +32,30 @@ vi.mock('@/lib/ingestion/dedupe', () => ({
   }),
 }))
 
+vi.mock('@/lib/ingestion/publishWorker', () => ({
+  publishReadyIngestedSaleById: vi.fn().mockResolvedValue({ ok: true, skipped: true, reason: 'not_eligible' }),
+}))
+
+vi.mock('@/lib/ingestion/spatial/resolveSpatialCoordinates', () => ({
+  lookupSpatialCoordinates: vi.fn().mockResolvedValue(null),
+  pageHtmlEligibleForYstmNative: vi.fn().mockReturnValue(false),
+}))
+
+function ingestedSalesInsertChain() {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      })),
+    })),
+    insert: vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'ingest-test-id' }, error: null }),
+      })),
+    })),
+  }
+}
+
 const listHtml =
   '<a href="https://example.com/US/Illinois/Chicago/100-A/1001/listing.html">One</a>'
 
@@ -50,14 +74,7 @@ describe('persistExternalPageSource', () => {
       if (table !== 'ingested_sales') {
         return {}
       }
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          })),
-        })),
-        insert: vi.fn().mockResolvedValue({ error: null }),
-      }
+      return ingestedSalesInsertChain()
     })
 
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(htmlFetchResponse(listHtml))))
@@ -107,12 +124,12 @@ describe('persistExternalPageSource', () => {
       .mockResolvedValueOnce({ data: null, error: null })
       .mockResolvedValueOnce({ data: { id: 'existing' }, error: null })
     mockFrom.mockImplementation(() => ({
+      ...ingestedSalesInsertChain(),
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           maybeSingle,
         })),
       })),
-      insert: vi.fn().mockResolvedValue({ error: null }),
     }))
 
     const html = `
@@ -151,7 +168,11 @@ describe('persistExternalPageSource', () => {
   })
 
   it('persists image_source_url from first accepted parser candidate', async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null })
+    const insert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'ingest-test-id' }, error: null }),
+      })),
+    }))
     mockFrom.mockImplementation(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
@@ -178,8 +199,13 @@ describe('persistExternalPageSource', () => {
 
     expect(summary.inserted).toBe(1)
     expect(insert).toHaveBeenCalledTimes(1)
-    const insertedRow = insert.mock.calls[0]?.[0]
-    expect(insertedRow.image_source_url).toBe('https://cdn.example.com/listing-primary.jpg')
-    expect(insertedRow.raw_payload.imageUrls).toEqual(['https://cdn.example.com/listing-primary.jpg'])
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image_source_url: 'https://cdn.example.com/listing-primary.jpg',
+        raw_payload: expect.objectContaining({
+          imageUrls: ['https://cdn.example.com/listing-primary.jpg'],
+        }),
+      })
+    )
   })
 })

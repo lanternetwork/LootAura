@@ -17,6 +17,8 @@ import { applyDetailPageImageEnrichment } from '@/lib/ingestion/images/applyDeta
 import { enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import { promoteIngestedSaleCoordinates } from '@/lib/ingestion/spatial/promoteIngestedSaleCoordinates'
+import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 
@@ -258,6 +260,18 @@ async function processAddressEnrichmentRow(
   }
 
   const normalized = addressRaw.toLowerCase().replace(/\s+/g, ' ')
+  const city = row.city?.trim() ?? ''
+  const state = row.state?.trim() ?? ''
+  const spatial = await lookupSpatialCoordinates({
+    addressRaw,
+    normalizedAddress: normalized,
+    city,
+    state,
+    sourceUrl: row.source_url,
+    pageHtml: html,
+    telemetryContext,
+  })
+
   const ok = await persistRowAddressOutcome(admin, rowId, {
     address_raw: addressRaw,
     normalized_address: normalized,
@@ -276,11 +290,23 @@ async function processAddressEnrichmentRow(
     return { outcome: 'retriable', reason: 'fetch_failed' }
   }
 
+  if (spatial) {
+    const promoted = await promoteIngestedSaleCoordinates(rowId, spatial.lat, spatial.lng, {
+      geocode_confidence: spatial.geocode_confidence,
+      coordinate_precision: spatial.coordinate_precision,
+      geocode_method: spatial.geocode_method,
+    })
+    if (promoted.kind === 'update_failed') {
+      return { outcome: 'retriable', reason: 'fetch_failed' }
+    }
+  }
+
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.ingestion.addressEnrichmentRow, {
       ...(telemetryContext ?? {}),
       outcome: 'ok',
       attemptCount,
+      spatialPromoted: Boolean(spatial),
     })
   )
   return { outcome: 'ok' }

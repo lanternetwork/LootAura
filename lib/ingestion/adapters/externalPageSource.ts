@@ -20,6 +20,11 @@ import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLin
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
 import { evaluateDuplicateSkipForExternalListListing } from '@/lib/ingestion/dedupe'
+import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
+import {
+  lookupSpatialCoordinates,
+  pageHtmlEligibleForYstmNative,
+} from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 
@@ -1162,38 +1167,73 @@ export async function persistExternalPageSource(
         },
       })
 
-      const { error: insErr } = await fromBase(admin, 'ingested_sales').insert({
-        source_platform: platform,
-        source_url: listing.sourceUrl,
-        external_id: (listing.rawPayload.externalId as string | null) ?? null,
-        title: listing.title,
-        description: listing.description,
-        address_raw: listing.addressRaw,
-        normalized_address: listing.addressRaw
-          ? listing.addressRaw.toLowerCase().replace(/\s+/g, ' ')
-          : null,
-        city: listing.city,
-        state: listing.state,
-        zip_code: null,
-        lat: null,
-        lng: null,
-        date_start: listing.startDate ?? null,
-        date_end: listing.endDate ?? null,
-        time_start: null,
-        time_end: null,
-        date_source: listing.startDate ? 'external_list_page' : null,
-        time_source: null,
-        image_source_url: listing.imageSourceUrl,
-        raw_text: null,
-        raw_payload: rowPayload,
-        status: addressLifecycle.ingestStatus,
-        failure_reasons: [],
-        parser_version: PARSER_VERSION_ROW,
-        parse_confidence: addressLifecycle.ingestStatus === 'needs_geocode' ? 'high' : 'low',
-        is_duplicate: false,
-        duplicate_of: null,
-        ...addressLifecycleFieldsForDb(addressLifecycle),
-      })
+      const normalizedLine = listing.addressRaw
+        ? listing.addressRaw.toLowerCase().replace(/\s+/g, ' ')
+        : null
+      let insertStatus = addressLifecycle.ingestStatus
+      let insertLat: number | null = null
+      let insertLng: number | null = null
+      const spatialInsertFields: Record<string, unknown> = {}
+
+      if (
+        insertStatus === 'needs_geocode' &&
+        isAddressGeocodeReady(listing.addressRaw) &&
+        listing.city?.trim() &&
+        listing.state?.trim()
+      ) {
+        const spatial = await lookupSpatialCoordinates({
+          addressRaw: listing.addressRaw,
+          normalizedAddress: normalizedLine,
+          city: listing.city,
+          state: listing.state,
+          sourceUrl: listing.sourceUrl,
+          pageHtml: pageHtmlEligibleForYstmNative(listing.sourceUrl, html) ? html : null,
+          telemetryContext: telemBase,
+        })
+        if (spatial) {
+          insertLat = spatial.lat
+          insertLng = spatial.lng
+          insertStatus = 'ready'
+          spatialInsertFields.geocode_confidence = spatial.geocode_confidence
+          spatialInsertFields.coordinate_precision = spatial.coordinate_precision
+          spatialInsertFields.geocode_method = spatial.geocode_method
+        }
+      }
+
+      const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
+        .insert({
+          source_platform: platform,
+          source_url: listing.sourceUrl,
+          external_id: (listing.rawPayload.externalId as string | null) ?? null,
+          title: listing.title,
+          description: listing.description,
+          address_raw: listing.addressRaw,
+          normalized_address: normalizedLine,
+          city: listing.city,
+          state: listing.state,
+          zip_code: null,
+          lat: insertLat,
+          lng: insertLng,
+          date_start: listing.startDate ?? null,
+          date_end: listing.endDate ?? null,
+          time_start: null,
+          time_end: null,
+          date_source: listing.startDate ? 'external_list_page' : null,
+          time_source: null,
+          image_source_url: listing.imageSourceUrl,
+          raw_text: null,
+          raw_payload: rowPayload,
+          status: insertStatus,
+          failure_reasons: [],
+          parser_version: PARSER_VERSION_ROW,
+          parse_confidence: insertStatus === 'needs_geocode' ? 'high' : 'low',
+          is_duplicate: false,
+          duplicate_of: null,
+          ...addressLifecycleFieldsForDb(addressLifecycle),
+          ...spatialInsertFields,
+        })
+        .select('id')
+        .maybeSingle()
 
       if (insErr) {
         if (/duplicate key|unique constraint|23505/i.test(insErr.message)) {
@@ -1216,6 +1256,11 @@ export async function persistExternalPageSource(
         )
         continue
       }
+
+      if (insertedRow?.id && insertStatus === 'ready') {
+        await publishReadyIngestedSaleById(String(insertedRow.id))
+      }
+
       summary.inserted += 1
     }
   }

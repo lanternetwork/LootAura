@@ -31,6 +31,9 @@ import { logger } from '@/lib/log'
 import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
 import { buildGeocodeAttemptPlan } from '@/lib/ingestion/geocodeAttemptPlan'
 import { publishReadyIngestedSaleById, type PublishReadyByIdResult } from '@/lib/ingestion/publishWorker'
+import { upsertAddressGeocodeCache } from '@/lib/ingestion/spatial/addressGeocodeCache'
+import { promoteIngestedSaleCoordinates } from '@/lib/ingestion/spatial/promoteIngestedSaleCoordinates'
+import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import type { FailureReason } from '@/lib/ingestion/types'
 
 /** Sub-key on `ingested_sales.failure_details` for last geocode attempt diagnostics (no raw address / full geocode query). */
@@ -177,6 +180,10 @@ export interface GeocodeWorkerSummary {
   providerHealth?: ProviderHealthDecision
   /** Bounded signals passed into the classifier for this batch (for operators / next gate). */
   providerHealthSignals?: ProviderHealthSignals
+  /** Phase 2A: rows resolved via durable address cache (no Nominatim). */
+  spatialCacheHits?: number
+  /** Phase 2A: rows resolved via YSTM embedded coordinates in worker path. */
+  spatialNativeResolved?: number
 }
 
 export type GeocodeIngestedSaleByIdResult =
@@ -798,62 +805,47 @@ async function applyGeocodeSuccess(
     geocode_confidence: GeocodeConfidence
     coordinate_precision: CoordinatePrecision
     geocode_method: GeocodeMethod
+  },
+  cacheWrite?: {
+    addressRaw: string | null
+    normalizedAddress: string | null
+    city: string
+    state: string
   }
 ): Promise<{ kind: 'geocoded'; publish: PublishReadyByIdResult } | { kind: 'update_failed' }> {
-  const { data: priorRow, error: priorErr } = await fromBase(admin, 'ingested_sales')
-    .select('failure_details')
-    .eq('id', rowId)
-    .eq('status', 'needs_geocode')
-    .maybeSingle()
-
-  const clearedFailureDetails =
-    !priorErr && priorRow != null
-      ? removeGeocodeSubDocumentFromFailureDetails((priorRow as { failure_details?: unknown }).failure_details)
-      : undefined
-
-  const updatePayload: Record<string, unknown> = {
-    lat,
-    lng,
-    status: 'ready',
-    geocode_confidence: metadata.geocode_confidence,
-    coordinate_precision: metadata.coordinate_precision,
-    geocode_method: metadata.geocode_method,
-  }
-  if (clearedFailureDetails !== undefined) {
-    updatePayload.failure_details = clearedFailureDetails
-  }
-
-  const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
-    .update(updatePayload)
-    .eq('id', rowId)
-    .eq('status', 'needs_geocode')
-    .select('id')
-    .maybeSingle()
-
-  if (updateError) {
-    logger.error('Failed to update geocoded row', new Error(updateError.message), {
-      component: 'ingestion/geocodeWorker',
-      operation: 'mark_ready',
-      rowId,
-    })
+  const outcome = await promoteIngestedSaleCoordinates(rowId, lat, lng, metadata)
+  if (outcome.kind === 'update_failed') {
     return { kind: 'update_failed' }
   }
 
-  const publishResult = await publishReadyIngestedSaleById(rowId)
-
-  if (!updated) {
-    logger.info('Geocode update skipped (concurrent transition); publish attempted', {
-      component: 'ingestion/geocodeWorker',
-      operation: 'apply_geocode_success',
-      rowId,
+  if (cacheWrite) {
+    await upsertAddressGeocodeCache({
+      addressRaw: cacheWrite.addressRaw,
+      normalizedAddress: cacheWrite.normalizedAddress,
+      city: cacheWrite.city,
+      state: cacheWrite.state,
+      lat,
+      lng,
+      coordinate_precision: metadata.coordinate_precision,
+      geocode_method: metadata.geocode_method,
     })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.ingestion.spatialCacheWritten, {
+        coordinatePrecision: metadata.coordinate_precision,
+      })
+    )
   }
 
-  return { kind: 'geocoded', publish: publishResult }
+  return outcome
 }
 
 type AttemptResult =
-  | { kind: 'geocode_ok'; publish: PublishReadyByIdResult; hit429: false }
+  | {
+      kind: 'geocode_ok'
+      publish: PublishReadyByIdResult
+      hit429: false
+      spatialResolution?: 'address_geocode_cache' | 'ystm_provider_native'
+    }
   | {
       kind: 'geocode_fail'
       retriable: boolean
@@ -954,6 +946,52 @@ async function processGeocodeAttempt(
       geocodeCityNormalized: cityNormalizedMissing,
     }
   } else {
+    const city = (row.city ?? '').trim()
+    const state = (row.state ?? '').trim()
+    const spatial = await lookupSpatialCoordinates({
+      addressRaw: row.address_raw,
+      normalizedAddress: row.normalized_address,
+      city,
+      state,
+      sourceUrl: row.source_url,
+      pageHtml: null,
+      telemetryContext,
+    })
+
+    if (spatial) {
+      const outcome = await applyGeocodeSuccess(admin, rowId, spatial.lat, spatial.lng, {
+        geocode_confidence: spatial.geocode_confidence,
+        coordinate_precision: spatial.coordinate_precision,
+        geocode_method: spatial.geocode_method,
+      })
+      if (outcome.kind === 'update_failed') {
+        return {
+          kind: 'geocode_fail',
+          retriable: true,
+          terminal: false,
+          hit429: false,
+          attemptCount,
+        }
+      }
+      logger.info('Geocode worker row processed (spatial cache)', {
+        component: 'ingestion/geocodeWorker',
+        operation: 'row_result',
+        rowId,
+        attemptCount,
+        result: 'geocode_ok',
+        providerCalls: 0,
+        coordinatePrecision: spatial.coordinate_precision,
+        geocodeMethod: spatial.geocode_method,
+        spatialResolution: spatial.resolutionSource,
+      })
+      return {
+        kind: 'geocode_ok',
+        publish: outcome.publish,
+        hit429: false,
+        spatialResolution: spatial.resolutionSource,
+      }
+    }
+
     const variantResult = await runBoundedGeocodeVariants(plan)
     providerCalls = variantResult.providerCalls
     variantBudgetExhausted = variantResult.variantBudgetExhausted
@@ -963,11 +1001,23 @@ async function processGeocodeAttempt(
 
     if (variantResult.publishable) {
       const p = variantResult.publishable
-      const outcome = await applyGeocodeSuccess(admin, rowId, p.coords.lat, p.coords.lng, {
-        geocode_confidence: p.geocodeConfidence,
-        coordinate_precision: p.coordinatePrecision,
-        geocode_method: p.geocodeMethod,
-      })
+      const outcome = await applyGeocodeSuccess(
+        admin,
+        rowId,
+        p.coords.lat,
+        p.coords.lng,
+        {
+          geocode_confidence: p.geocodeConfidence,
+          coordinate_precision: p.coordinatePrecision,
+          geocode_method: p.geocodeMethod,
+        },
+        {
+          addressRaw: row.address_raw,
+          normalizedAddress: row.normalized_address,
+          city,
+          state,
+        }
+      )
       if (outcome.kind === 'update_failed') {
         return {
           kind: 'geocode_fail',
@@ -1512,6 +1562,11 @@ export async function geocodePendingSales(options?: GeocodeWorkerRunOptions): Pr
     }
     if (rowResult.kind === 'geocode_ok') {
       summary.succeeded += 1
+      if (rowResult.spatialResolution === 'address_geocode_cache') {
+        summary.spatialCacheHits = (summary.spatialCacheHits ?? 0) + 1
+      } else if (rowResult.spatialResolution === 'ystm_provider_native') {
+        summary.spatialNativeResolved = (summary.spatialNativeResolved ?? 0) + 1
+      }
     } else if (rowResult.terminal) {
       summary.failedTerminal += 1
     } else {

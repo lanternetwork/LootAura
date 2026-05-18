@@ -257,6 +257,19 @@ vi.mock('@/lib/supabase/clients', () => ({
     if (table === 'ingested_sales') {
       return ctx.createIngstedSalesChain()
     }
+    if (table === 'address_geocode_cache') {
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: null }),
+          }),
+        }),
+        update: () => ({
+          eq: async () => ({ error: null }),
+        }),
+        upsert: async () => ({ error: null }),
+      }
+    }
     return {
       update: () => ({
         eq: () => ({ error: null }),

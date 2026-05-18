@@ -14,6 +14,7 @@ import {
   CartesianGrid,
 } from 'recharts'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import IngestionFunnelSection from '@/app/admin/ingestion/IngestionFunnelSection'
 
 const POLL_MS = 5000
 const MAX_SNAPSHOT_POINTS = 360
@@ -201,6 +202,8 @@ export default function IngestionDashboardClient() {
                 </p>
               </div>
             )}
+
+            {data.funnel && <IngestionFunnelSection funnel={data.funnel} />}
 
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
               <MetricCard

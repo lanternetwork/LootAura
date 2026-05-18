@@ -18,7 +18,12 @@ vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: vi.fn(() => ({
     rpc: hoisted.adminRpc,
   })),
-  fromBase: vi.fn(() => createQueryBuilder()),
+  fromBase: vi.fn((_admin: unknown, table: string) => {
+    if (table === 'address_geocode_cache') {
+      return createAddressGeocodeCacheQueryBuilder()
+    }
+    return createQueryBuilder()
+  }),
 }))
 
 vi.mock('@/lib/geocode/geocodeAddress', () => ({
@@ -28,6 +33,20 @@ vi.mock('@/lib/geocode/geocodeAddress', () => ({
 vi.mock('@/lib/ingestion/publishWorker', () => ({
   publishReadyIngestedSaleById: hoisted.publishReadyIngestedSaleById,
 }))
+
+function createAddressGeocodeCacheQueryBuilder() {
+  return {
+    select: () => ({
+      eq: () => ({
+        maybeSingle: async () => ({ data: null, error: null }),
+      }),
+    }),
+    update: () => ({
+      eq: async () => ({ error: null }),
+    }),
+    upsert: async () => ({ error: null }),
+  }
+}
 
 function createQueryBuilder() {
   const builder: Record<string, unknown> = {}

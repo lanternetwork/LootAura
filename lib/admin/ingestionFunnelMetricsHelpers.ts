@@ -97,6 +97,17 @@ export type IngestionFunnelFreshRates = {
   expiredInsertRatio: number | null
 }
 
+export type IngestionFunnelDetailFirstMetrics = {
+  attempted: number
+  succeeded: number
+  published: number
+  fallback: number
+  fetchFailed: number
+  freshInsertReadyAtInsertRate: number | null
+  medianMsToPublished: number | null
+  providerGeocodeBypassRate: number | null
+}
+
 export type ConfigYieldLeaderboardEntry = {
   city: string
   state: string
@@ -119,6 +130,7 @@ export type IngestionFunnelWindowMetrics = {
   freshRates: IngestionFunnelFreshRates
   skippedExpired: number
   freshInserted: number
+  detailFirst: IngestionFunnelDetailFirstMetrics
   configLeaderboards: {
     topFreshYield: ConfigYieldLeaderboardEntry[]
     topStale: ConfigYieldLeaderboardEntry[]
@@ -163,6 +175,12 @@ export type ExternalIngestionRollup = {
   discoveredByHour: Map<string, number>
   insertedByHour: Map<string, number>
   skippedByHour: Map<string, number>
+  detailFirstAttempted: number
+  detailFirstSucceeded: number
+  detailFirstPublished: number
+  detailFirstFallback: number
+  detailFirstFetchFailed: number
+  detailFirstMsToPublishedSamples: number[]
 }
 
 function recomputeDuplicateHitsTotal(target: IngestionFunnelDuplicateHits): void {
@@ -335,6 +353,12 @@ export function rollupExternalIngestionForWindow(
     discoveredByHour,
     insertedByHour,
     skippedByHour,
+    detailFirstAttempted: 0,
+    detailFirstSucceeded: 0,
+    detailFirstPublished: 0,
+    detailFirstFallback: 0,
+    detailFirstFetchFailed: 0,
+    detailFirstMsToPublishedSamples: [],
   }
 
   for (const row of rows) {
@@ -365,6 +389,15 @@ export function rollupExternalIngestionForWindow(
       duplicateCanonicalCollision: ext.duplicateCanonicalCollision,
       duplicateExpiredRow: ext.duplicateExpiredRow,
     })
+
+    rollup.detailFirstAttempted += num(ext.ystmDetailFirstAttempted)
+    rollup.detailFirstSucceeded += num(ext.ystmDetailFirstSucceeded)
+    rollup.detailFirstPublished += num(ext.ystmDetailFirstPublished)
+    rollup.detailFirstFallback += num(ext.ystmDetailFirstFallback)
+    rollup.detailFirstFetchFailed += num(ext.ystmDetailFirstFetchFailed)
+    if (ext.medianMsToPublished != null && Number.isFinite(ext.medianMsToPublished)) {
+      rollup.detailFirstMsToPublishedSamples.push(ext.medianMsToPublished)
+    }
 
     const k = hourFloorUtc(row.created_at)
     discoveredByHour.set(k, (discoveredByHour.get(k) ?? 0) + fetched)
@@ -640,6 +673,35 @@ export function buildIngestionFunnelWindowMetrics(params: {
     cohortExpiredAtInsert: reach.expired_at_insert,
   })
 
+  const detailFirstMsSamples = externalRollup.detailFirstMsToPublishedSamples
+  let detailFirstMedianMsToPublished: number | null = null
+  if (detailFirstMsSamples.length > 0) {
+    const sorted = [...detailFirstMsSamples].sort((a, b) => a - b)
+    const mid = Math.floor(sorted.length / 2)
+    detailFirstMedianMsToPublished =
+      sorted.length % 2 === 1
+        ? sorted[mid]!
+        : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2)
+  }
+
+  const detailFirstAttempted = externalRollup.detailFirstAttempted
+  const detailFirstSucceeded = externalRollup.detailFirstSucceeded
+  const detailFirstPublished = externalRollup.detailFirstPublished
+  const detailFirst: IngestionFunnelDetailFirstMetrics = {
+    attempted: detailFirstAttempted,
+    succeeded: detailFirstSucceeded,
+    published: detailFirstPublished,
+    fallback: externalRollup.detailFirstFallback,
+    fetchFailed: externalRollup.detailFirstFetchFailed,
+    freshInsertReadyAtInsertRate:
+      freshInserted > 0 ? Math.round((detailFirstSucceeded / freshInserted) * 10000) / 10000 : null,
+    medianMsToPublished: detailFirstMedianMsToPublished,
+    providerGeocodeBypassRate:
+      detailFirstAttempted > 0
+        ? Math.round((detailFirstSucceeded / detailFirstAttempted) * 10000) / 10000
+        : null,
+  }
+
   return {
     windowHours,
     stages,
@@ -650,6 +712,7 @@ export function buildIngestionFunnelWindowMetrics(params: {
     freshRates,
     skippedExpired,
     freshInserted,
+    detailFirst,
     configLeaderboards: buildConfigYieldLeaderboards(configRows, nowMs),
     bySourcePlatform: cohort.bySourcePlatform,
     ystm: cohort.ystm,

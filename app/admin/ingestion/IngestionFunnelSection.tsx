@@ -234,6 +234,48 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
 
       <ConfigLeaderboardTables leaderboards={metrics.configLeaderboards} />
 
+      <div className="rounded-md border border-emerald-200 bg-emerald-50/70 p-3 text-sm">
+        <p className="font-semibold text-emerald-950">YSTM detail-first READY (Phase 3B)</p>
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+          <div>
+            <dt className="text-xs text-emerald-800">Attempted</dt>
+            <dd className="font-medium tabular-nums">{metrics.detailFirst.attempted.toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Ready at insert</dt>
+            <dd className="font-medium tabular-nums">{metrics.detailFirst.succeeded.toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Published same run</dt>
+            <dd className="font-medium tabular-nums">{metrics.detailFirst.published.toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Fallback to legacy</dt>
+            <dd className="font-medium tabular-nums">{metrics.detailFirst.fallback.toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Detail fetch failed</dt>
+            <dd className="font-medium tabular-nums">{metrics.detailFirst.fetchFailed.toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Fresh → READY rate</dt>
+            <dd className="font-medium tabular-nums">{pct(metrics.detailFirst.freshInsertReadyAtInsertRate)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Detail-first success rate</dt>
+            <dd className="font-medium tabular-nums">{pct(metrics.detailFirst.providerGeocodeBypassRate)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Median ms → published</dt>
+            <dd className="font-medium tabular-nums">
+              {metrics.detailFirst.medianMsToPublished != null
+                ? Math.round(metrics.detailFirst.medianMsToPublished).toLocaleString()
+                : '—'}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
       {metrics.topDropoff && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <span className="font-semibold">Top dropoff ({windowKey}):</span>{' '}

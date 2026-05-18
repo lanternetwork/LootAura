@@ -28,9 +28,7 @@ import { upsertAddressGeocodeCache } from '@/lib/ingestion/spatial/addressGeocod
 import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
-import { ObservabilityEvents } from '@/lib/observability/events'
-import { isYstmDetailFirstReadyEnabled } from '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
-
+import { ObservabilityEvents, type ObservabilityEventName } from '@/lib/observability/events'
 export { isYstmDetailFirstReadyEnabled } from '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
 export { parseYstmDetailFirstConcurrencyFromEnv } from '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
 
@@ -156,9 +154,9 @@ export function parseYstmDetailListingFromHtml(input: {
   const merged = mergeListingFields(input.listSeed, detailMatch)
 
   const media = extractYstmDetailMediaStrFromHtml(input.html, input.sourceUrl)
-  if (media.urls.length > 0) {
-    merged.imageSourceUrl = media.urls[0] ?? merged.imageSourceUrl
-    merged.rawPayload = { ...merged.rawPayload, imageUrls: media.urls }
+  if (media.imageUrls.length > 0) {
+    merged.imageSourceUrl = media.imageUrls[0] ?? merged.imageSourceUrl
+    merged.rawPayload = { ...merged.rawPayload, imageUrls: media.imageUrls }
   }
 
   const hourRange = extractAuthoritativeSaleHourRangeFromText(
@@ -477,7 +475,7 @@ export async function mapWithBoundedConcurrency<T>(
 }
 
 function emitDetailFirstEvent(
-  event: string,
+  event: ObservabilityEventName,
   telemetryContext: Record<string, unknown>,
   fields: Record<string, unknown>
 ): void {

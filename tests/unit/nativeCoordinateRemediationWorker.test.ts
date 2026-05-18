@@ -5,15 +5,18 @@ const hoisted = vi.hoisted(() => ({
   fetchHtml: vi.fn(),
   lookupSpatial: vi.fn(),
   applySuccess: vi.fn(),
-  fromUpdate: vi.fn(),
+  updatePayloads: [] as Record<string, unknown>[],
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: vi.fn(() => ({ rpc: hoisted.adminRpc })),
   fromBase: vi.fn(() => ({
-    update: () => ({
-      eq: hoisted.fromUpdate,
-    }),
+    update: (payload: Record<string, unknown>) => {
+      hoisted.updatePayloads.push(payload)
+      return {
+        eq: async () => ({ error: null }),
+      }
+    },
   })),
 }))
 
@@ -61,8 +64,7 @@ describe('runNativeCoordinateRemediation', () => {
     hoisted.fetchHtml.mockReset()
     hoisted.lookupSpatial.mockReset()
     hoisted.applySuccess.mockReset()
-    hoisted.fromUpdate.mockReset()
-    hoisted.fromUpdate.mockResolvedValue({ error: null })
+    hoisted.updatePayloads.length = 0
   })
 
   it('claims via RPC and promotes on native success with cache upsert path', async () => {
@@ -110,9 +112,8 @@ describe('runNativeCoordinateRemediation', () => {
 
     expect(summary.retryScheduled).toBe(1)
     expect(hoisted.applySuccess).not.toHaveBeenCalled()
-    expect(hoisted.fromUpdate).toHaveBeenCalled()
-    const updateArg = hoisted.fromUpdate.mock.calls[0]?.[0]
-    expect(updateArg).toMatchObject({
+    expect(hoisted.updatePayloads.length).toBeGreaterThan(0)
+    expect(hoisted.updatePayloads[0]).toMatchObject({
       native_coord_failure_reason: 'fetch_rate_limited',
       native_coord_next_attempt_at: expect.any(String),
     })
@@ -130,9 +131,8 @@ describe('runNativeCoordinateRemediation', () => {
     const summary = await runNativeCoordinateRemediation({ batchSizeOverride: 5 })
 
     expect(summary.fallbackToGeocode).toBe(1)
-    expect(hoisted.fromUpdate).toHaveBeenCalled()
-    const updateArg = hoisted.fromUpdate.mock.calls.at(-1)?.[0]
-    expect(updateArg).toMatchObject({
+    expect(hoisted.updatePayloads.length).toBeGreaterThan(0)
+    expect(hoisted.updatePayloads.at(-1)).toMatchObject({
       native_coord_failure_reason: 'terminal_no_coords',
     })
   })

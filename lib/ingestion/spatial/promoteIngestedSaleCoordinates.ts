@@ -17,15 +17,21 @@ export async function promoteIngestedSaleCoordinates(
   rowId: string,
   lat: number,
   lng: number,
-  metadata: PromoteIngestedSaleCoordinatesMetadata
+  metadata: PromoteIngestedSaleCoordinatesMetadata,
+  options?: { allowedPriorStatuses?: Array<'needs_geocode' | 'needs_check'> }
 ): Promise<{ kind: 'geocoded'; publish: PublishReadyByIdResult } | { kind: 'update_failed' }> {
   const admin = getAdminDb()
+  const allowedPriorStatuses = options?.allowedPriorStatuses ?? ['needs_geocode']
 
-  const { data: priorRow, error: priorErr } = await fromBase(admin, 'ingested_sales')
-    .select('failure_details')
+  let priorQuery = fromBase(admin, 'ingested_sales')
+    .select('failure_details, status')
     .eq('id', rowId)
-    .eq('status', 'needs_geocode')
-    .maybeSingle()
+  priorQuery =
+    allowedPriorStatuses.length === 1 && allowedPriorStatuses[0] === 'needs_geocode'
+      ? priorQuery.eq('status', 'needs_geocode')
+      : priorQuery.in('status', allowedPriorStatuses)
+
+  const { data: priorRow, error: priorErr } = await priorQuery.maybeSingle()
 
   const clearedFailureDetails =
     !priorErr && priorRow != null
@@ -44,12 +50,13 @@ export async function promoteIngestedSaleCoordinates(
     updatePayload.failure_details = clearedFailureDetails
   }
 
-  const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
-    .update(updatePayload)
-    .eq('id', rowId)
-    .eq('status', 'needs_geocode')
-    .select('id')
-    .maybeSingle()
+  let updateQuery = fromBase(admin, 'ingested_sales').update(updatePayload).eq('id', rowId)
+  updateQuery =
+    allowedPriorStatuses.length === 1 && allowedPriorStatuses[0] === 'needs_geocode'
+      ? updateQuery.eq('status', 'needs_geocode')
+      : updateQuery.in('status', allowedPriorStatuses)
+
+  const { data: updated, error: updateError } = await updateQuery.select('id').maybeSingle()
 
   if (updateError) {
     logger.error('Failed to promote ingested row with coordinates', new Error(updateError.message), {

@@ -268,6 +268,65 @@ export async function GET(request: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .gte('last_image_enrichment_attempt_at', iso24h)
 
+    const nativeCoordBacklogPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('source_platform', 'external_page_source')
+      .is('lat', null)
+      .is('lng', null)
+      .is('published_sale_id', null)
+      .eq('address_status', 'address_available')
+      .not('address_raw', 'is', null)
+      .neq('address_raw', '')
+      .or(YSTM_DETAIL_SOURCE_URL_FILTER)
+      .eq('status', 'needs_geocode')
+
+    const nativeCoordClaimEligiblePromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('source_platform', 'external_page_source')
+      .is('lat', null)
+      .is('lng', null)
+      .is('published_sale_id', null)
+      .eq('address_status', 'address_available')
+      .not('address_raw', 'is', null)
+      .neq('address_raw', '')
+      .or(YSTM_DETAIL_SOURCE_URL_FILTER)
+      .in('status', ['needs_geocode', 'needs_check'])
+      .lt('native_coord_attempts', 5)
+      .or(
+        `native_coord_next_attempt_at.is.null,native_coord_next_attempt_at.lte.${new Date(nowMs).toISOString()}`
+      )
+      .or('native_coord_failure_reason.is.null,native_coord_failure_reason.not.ilike.terminal_%')
+
+    const nativeCoordPromoted24hPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('geocode_method', 'ystm_provider_native')
+      .gte('updated_at', iso24h)
+
+    const nativeCoordFallback24hPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .ilike('native_coord_failure_reason', 'terminal_%')
+      .gte('native_coord_last_attempt_at', iso24h)
+
+    const nativeCoordRetry24hPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .not('native_coord_failure_reason', 'is', null)
+      .not('native_coord_failure_reason', 'ilike', 'terminal_%')
+      .gte('native_coord_last_attempt_at', iso24h)
+
+    const nativeCoordTerminal24hPromise = nativeCoordFallback24hPromise
+
+    const readyFromNative24hPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'ready')
+      .eq('geocode_method', 'ystm_provider_native')
+      .gte('updated_at', iso24h)
+
+    const publishedFromNative24hPromise = fromBase(admin, 'ingested_sales')
+      .select('id', { count: 'exact', head: true })
+      .not('published_sale_id', 'is', null)
+      .eq('geocode_method', 'ystm_provider_native')
+      .gte('published_at', iso24h)
+
     const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
     const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
 
@@ -307,6 +366,14 @@ export async function GET(request: NextRequest) {
       imageHasImageResult,
       imageAttempted24hResult,
       imageFailureReasonParts,
+      nativeCoordBacklogResult,
+      nativeCoordClaimEligibleResult,
+      nativeCoordPromoted24hResult,
+      nativeCoordFallback24hResult,
+      nativeCoordRetry24hResult,
+      nativeCoordTerminal24hResult,
+      readyFromNative24hResult,
+      publishedFromNative24hResult,
       geocodeDeadLetterBuckets,
       acquisitionRegistry,
     ] = await Promise.all([
@@ -333,6 +400,14 @@ export async function GET(request: NextRequest) {
       imageHasImagePromise,
       imageAttempted24hPromise,
       Promise.all(imageFailureReasonCountPromises),
+      nativeCoordBacklogPromise,
+      nativeCoordClaimEligiblePromise,
+      nativeCoordPromoted24hPromise,
+      nativeCoordFallback24hPromise,
+      nativeCoordRetry24hPromise,
+      nativeCoordTerminal24hPromise,
+      readyFromNative24hPromise,
+      publishedFromNative24hPromise,
       geocodeDeadLetterBucketsPromise,
       acquisitionRegistryPromise,
     ])
@@ -643,6 +718,17 @@ export async function GET(request: NextRequest) {
         },
         addressLifecycle: addressLifecycleMetrics,
         imageEnrichment: imageEnrichmentMetrics,
+        nativeCoordinateRemediation: {
+          nativeCoordBacklog: nativeCoordBacklogResult.count ?? 0,
+          nativeCoordClaimEligible: nativeCoordClaimEligibleResult.count ?? 0,
+          nativeCoordPromoted24h: nativeCoordPromoted24hResult.count ?? 0,
+          nativeCoordFallbackToGeocode24h: nativeCoordFallback24hResult.count ?? 0,
+          nativeCoordRetry24h: nativeCoordRetry24hResult.count ?? 0,
+          nativeCoordTerminal24h: nativeCoordTerminal24hResult.count ?? 0,
+          readyFromNative24h: readyFromNative24hResult.count ?? 0,
+          publishedFromNative24h: publishedFromNative24hResult.count ?? 0,
+          geocodeProviderAvoided24h: nativeCoordPromoted24hResult.count ?? 0,
+        },
         geocode: {
           needsGeocodeCount: backlog,
           eligibleNeedsGeocodeCount: geocodeEligibleBacklog,

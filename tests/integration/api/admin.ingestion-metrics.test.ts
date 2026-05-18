@@ -29,6 +29,7 @@ function thenableQuery(result: { data?: unknown; error?: unknown; count?: number
     'in',
     'is',
     'or',
+    'ilike',
     'order',
     'limit',
     'range',

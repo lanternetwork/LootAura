@@ -27,6 +27,13 @@ export const ObservabilityEvents = {
     spatialNativeResolved: 'ingestion.spatial.native_coords_resolved',
     spatialNativeValidationFailed: 'ingestion.spatial.native_validation_failed',
     spatialRemediationBatch: 'ingestion.spatial.remediation_batch',
+    nativeCoordClaimed: 'ingestion.native_coord.claimed',
+    nativeCoordPromoted: 'ingestion.native_coord.promoted',
+    nativeCoordRetry: 'ingestion.native_coord.retry',
+    nativeCoordFallbackToGeocode: 'ingestion.native_coord.fallback_to_geocode',
+    nativeCoordTerminal: 'ingestion.native_coord.terminal',
+    nativeCoordPublishSuccess: 'ingestion.native_coord.publish_success',
+    nativeCoordPublishFailed: 'ingestion.native_coord.publish_failed',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

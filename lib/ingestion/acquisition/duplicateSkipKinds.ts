@@ -1,5 +1,7 @@
-import type { DedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
-import { createEmptyDedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
+import {
+  createEmptyDedupeDecisionAggregate,
+  type DedupeDecisionAggregate,
+} from '@/lib/ingestion/dedupe'
 
 /** Classified duplicate / skip reason at external list crawl time. */
 export type ExternalDuplicateSkipKind =

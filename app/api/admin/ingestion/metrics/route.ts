@@ -44,6 +44,7 @@ import {
   buildIngestionFunnelMetrics,
   FUNNEL_WINDOW_7D,
 } from '@/lib/admin/ingestionFunnelMetricsHelpers'
+import { fetchFunnelLeaderboardConfigRows } from '@/lib/ingestion/acquisition/configCrawlStats'
 
 export const dynamic = 'force-dynamic'
 
@@ -226,42 +227,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(ORCHESTRATION_RUNS_LIMIT)
 
-    const funnelConfigRowsPromise = fetchAllRows<{
-      city: string
-      state: string
-      source_crawl_window_fetched: number | null
-      source_crawl_window_skipped_expired: number | null
-      source_crawl_window_fresh_inserted: number | null
-      source_crawl_window_dup_existing_url: number | null
-      source_crawl_window_dup_cross_page: number | null
-      source_crawl_window_dup_canonical: number | null
-      source_crawl_window_dup_expired_row: number | null
-      source_crawl_window_skipped: number | null
-      source_crawl_window_inserted: number | null
-      source_crawl_window_started_at: string | null
-      source_crawl_last_at: string | null
-      source_crawl_last_insert_at: string | null
-    }>(
-      admin,
-      'ingestion_city_configs',
-      [
-        'city',
-        'state',
-        'source_crawl_window_fetched',
-        'source_crawl_window_skipped_expired',
-        'source_crawl_window_fresh_inserted',
-        'source_crawl_window_dup_existing_url',
-        'source_crawl_window_dup_cross_page',
-        'source_crawl_window_dup_canonical',
-        'source_crawl_window_dup_expired_row',
-        'source_crawl_window_skipped',
-        'source_crawl_window_inserted',
-        'source_crawl_window_started_at',
-        'source_crawl_last_at',
-        'source_crawl_last_insert_at',
-      ].join(', '),
-      (q) => q.eq('enabled', true).eq('source_platform', 'external_page_source')
-    )
+    const funnelConfigRowsPromise = fetchFunnelLeaderboardConfigRows(admin)
 
     const funnelCohortRowsPromise = fetchAllRows<{
       created_at: string

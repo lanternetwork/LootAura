@@ -71,7 +71,10 @@ import {
   persistExternalPageSource,
 } from '@/lib/ingestion/adapters/externalPageSource'
 import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
-import { recordConfigCrawlStats } from '@/lib/ingestion/acquisition/configCrawlStats'
+import {
+  fetchEnabledExternalIngestionCityConfigs,
+  recordConfigCrawlStats,
+} from '@/lib/ingestion/acquisition/configCrawlStats'
 import { freshAcquisitionOrchestrationFields } from '@/lib/ingestion/acquisition/freshAcquisitionOrchestrationFields'
 import {
   buildYieldAwareCrawlPlan,
@@ -668,11 +671,8 @@ async function runIngestionOrchestration(
       }
 
       const adminDb = getAdminDb()
-      const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
-        .select(
-          'city, state, source_platform, source_pages, source_crawl_excluded_at, source_discovery_status, source_crawl_lifetime_fetched, source_crawl_lifetime_skipped, source_crawl_lifetime_inserted, source_crawl_lifetime_skipped_expired, source_crawl_lifetime_fresh_inserted, source_crawl_window_fetched, source_crawl_window_skipped, source_crawl_window_inserted, source_crawl_window_skipped_expired, source_crawl_window_fresh_inserted, source_crawl_window_dup_existing_url, source_crawl_window_dup_cross_page, source_crawl_window_dup_canonical, source_crawl_window_dup_expired_row, source_crawl_window_started_at, source_crawl_last_at, source_crawl_last_insert_at'
-        )
-        .eq('enabled', true)
+      const { data: enabledCities, error: cityError } =
+        await fetchEnabledExternalIngestionCityConfigs(adminDb)
 
       if (cityError) {
         throw new Error(cityError.message || 'Failed to load ingestion city configs')
@@ -835,17 +835,17 @@ async function runIngestionOrchestration(
         totals.invalid += s.invalid
         totals.errors += s.errors
         totals.pagesProcessed += s.pagesProcessed
-        totals.skippedExpired += s.skippedExpired
-        totals.freshInserted += s.freshInserted
-        totals.duplicateExistingUrl += s.duplicateExistingUrl
-        totals.duplicateCrossCityPage += s.duplicateCrossCityPage
-        totals.duplicateCanonicalCollision += s.duplicateCanonicalCollision
-        totals.duplicateExpiredRow += s.duplicateExpiredRow
+        totals.skippedExpired += s.skippedExpired ?? 0
+        totals.freshInserted += s.freshInserted ?? 0
+        totals.duplicateExistingUrl += s.duplicateExistingUrl ?? 0
+        totals.duplicateCrossCityPage += s.duplicateCrossCityPage ?? 0
+        totals.duplicateCanonicalCollision += s.duplicateCanonicalCollision ?? 0
+        totals.duplicateExpiredRow += s.duplicateExpiredRow ?? 0
 
-        ingestionDedupeTelemetrySummary.source_url += s.duplicateExistingUrl
-        ingestionDedupeTelemetrySummary.soft_date_window += s.duplicateCrossCityPage
+        ingestionDedupeTelemetrySummary.source_url += s.duplicateExistingUrl ?? 0
+        ingestionDedupeTelemetrySummary.soft_date_window += s.duplicateCrossCityPage ?? 0
         ingestionDedupeTelemetrySummary.duplicateDecisionTrue +=
-          s.duplicateCrossCityPage + s.duplicateExpiredRow
+          (s.duplicateCrossCityPage ?? 0) + (s.duplicateExpiredRow ?? 0)
 
         await recordConfigCrawlStats({
           city: row.city,

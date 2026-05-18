@@ -48,6 +48,76 @@ export type ConfigCrawlRunTotals = {
   duplicateSkips?: ExternalDuplicateSkipCounts
 }
 
+/** Columns from migration 188 (always required for crawl scheduling). */
+export const INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE =
+  'source_crawl_lifetime_fetched, source_crawl_lifetime_skipped, source_crawl_lifetime_inserted, source_crawl_window_fetched, source_crawl_window_skipped, source_crawl_window_inserted, source_crawl_window_started_at, source_crawl_last_at, source_crawl_last_insert_at'
+
+/** Columns from migration 191 (optional until applied on the target database). */
+export const INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A =
+  'source_crawl_lifetime_skipped_expired, source_crawl_lifetime_fresh_inserted, source_crawl_window_skipped_expired, source_crawl_window_fresh_inserted, source_crawl_window_dup_existing_url, source_crawl_window_dup_cross_page, source_crawl_window_dup_canonical, source_crawl_window_dup_expired_row'
+
+export const ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE =
+  `city, state, source_platform, source_pages, source_crawl_excluded_at, source_discovery_status, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}`
+
+export const ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_PHASE_3A =
+  INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A
+
+function isMissingCrawlStatsColumnError(message: string): boolean {
+  return /does not exist/i.test(message) && /ingestion_city_configs/i.test(message)
+}
+
+export async function fetchFunnelLeaderboardConfigRows(
+  admin: ReturnType<typeof getAdminDb>
+): Promise<ConfigCrawlStatsSnapshot[]> {
+  const extended = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A}`
+  const legacy = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}`
+  const pageSize = 1000
+  let from = 0
+  const out: ConfigCrawlStatsSnapshot[] = []
+  let useLegacy = false
+
+  for (;;) {
+    const select = useLegacy ? legacy : extended
+    const { data, error } = await fromBase(admin, 'ingestion_city_configs')
+      .select(select)
+      .eq('enabled', true)
+      .eq('source_platform', 'external_page_source')
+      .range(from, from + pageSize - 1)
+    if (error) {
+      if (!useLegacy && isMissingCrawlStatsColumnError(error.message)) {
+        useLegacy = true
+        from = 0
+        out.length = 0
+        continue
+      }
+      throw new Error(error.message)
+    }
+    const chunk = (data ?? []) as ConfigCrawlStatsSnapshot[]
+    out.push(...chunk)
+    if (chunk.length < pageSize) break
+    from += pageSize
+  }
+  return out
+}
+
+export async function fetchEnabledExternalIngestionCityConfigs(
+  admin: ReturnType<typeof getAdminDb>
+): Promise<{ data: unknown[] | null; error: { message: string } | null }> {
+  const extended = `${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE}, ${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_PHASE_3A}`
+  const extendedResult = await fromBase(admin, 'ingestion_city_configs')
+    .select(extended)
+    .eq('enabled', true)
+  if (!extendedResult.error) {
+    return extendedResult
+  }
+  if (!isMissingCrawlStatsColumnError(extendedResult.error.message)) {
+    return extendedResult
+  }
+  return fromBase(admin, 'ingestion_city_configs')
+    .select(ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE)
+    .eq('enabled', true)
+}
+
 function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : 0
 }
@@ -193,13 +263,20 @@ export async function recordConfigCrawlStats(params: {
   const nowMs = params.nowMs ?? Date.now()
   const nowIso = new Date(nowMs).toISOString()
 
-  const { data: row, error: fetchErr } = await fromBase(admin, 'ingestion_city_configs')
-    .select(
-      'city, state, source_crawl_lifetime_fetched, source_crawl_lifetime_skipped, source_crawl_lifetime_inserted, source_crawl_lifetime_skipped_expired, source_crawl_lifetime_fresh_inserted, source_crawl_window_fetched, source_crawl_window_skipped, source_crawl_window_inserted, source_crawl_window_skipped_expired, source_crawl_window_fresh_inserted, source_crawl_window_dup_existing_url, source_crawl_window_dup_cross_page, source_crawl_window_dup_canonical, source_crawl_window_dup_expired_row, source_crawl_window_started_at, source_crawl_last_at, source_crawl_last_insert_at'
-    )
+  const rowSelectExtended = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A}`
+  let rowResult = await fromBase(admin, 'ingestion_city_configs')
+    .select(rowSelectExtended)
     .eq('city', params.city)
     .eq('state', params.state)
     .maybeSingle()
+  if (rowResult.error && isMissingCrawlStatsColumnError(rowResult.error.message)) {
+    rowResult = await fromBase(admin, 'ingestion_city_configs')
+      .select(`city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}`)
+      .eq('city', params.city)
+      .eq('state', params.state)
+      .maybeSingle()
+  }
+  const { data: row, error: fetchErr } = rowResult
 
   if (fetchErr) {
     logger.warn('Failed to load config crawl stats for update', {
@@ -249,10 +326,35 @@ export async function recordConfigCrawlStats(params: {
     payload.source_crawl_last_insert_at = nowIso
   }
 
-  const { error: upErr } = await fromBase(admin, 'ingestion_city_configs')
-    .update(payload)
-    .eq('city', params.city)
-    .eq('state', params.state)
+  const legacyPayload: Record<string, unknown> = {
+    source_crawl_lifetime_fetched: payload.source_crawl_lifetime_fetched,
+    source_crawl_lifetime_skipped: payload.source_crawl_lifetime_skipped,
+    source_crawl_lifetime_inserted: payload.source_crawl_lifetime_inserted,
+    source_crawl_window_fetched: payload.source_crawl_window_fetched,
+    source_crawl_window_skipped: payload.source_crawl_window_skipped,
+    source_crawl_window_inserted: payload.source_crawl_window_inserted,
+    source_crawl_window_started_at: payload.source_crawl_window_started_at,
+    source_crawl_last_at: payload.source_crawl_last_at,
+  }
+  if (freshInserted > 0) {
+    legacyPayload.source_crawl_last_insert_at = nowIso
+  }
+
+  let upErr = (
+    await fromBase(admin, 'ingestion_city_configs')
+      .update(payload)
+      .eq('city', params.city)
+      .eq('state', params.state)
+  ).error
+
+  if (upErr && isMissingCrawlStatsColumnError(upErr.message)) {
+    upErr = (
+      await fromBase(admin, 'ingestion_city_configs')
+        .update(legacyPayload)
+        .eq('city', params.city)
+        .eq('state', params.state)
+    ).error
+  }
 
   if (upErr) {
     logger.warn('Failed to persist config crawl stats', {

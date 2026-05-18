@@ -47,15 +47,17 @@ export async function lookupAddressGeocodeCache(
   const lng = Number(data.lng)
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
 
-  await fromBase(admin, 'address_geocode_cache')
-    .update({
-      hit_count: (typeof data.hit_count === 'number' ? data.hit_count : 0) + 1,
-      last_hit_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('normalized_address_key', key)
-    .then(() => undefined)
-    .catch(() => undefined)
+  try {
+    await fromBase(admin, 'address_geocode_cache')
+      .update({
+        hit_count: (typeof data.hit_count === 'number' ? data.hit_count : 0) + 1,
+        last_hit_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('normalized_address_key', key)
+  } catch {
+    // Best-effort hit counter; cache read still succeeds.
+  }
 
   return {
     normalizedAddressKey: key,

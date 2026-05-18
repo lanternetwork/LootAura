@@ -3,11 +3,13 @@
  * POST /api/cron/geocode
  *
  * Deterministic cron-only geocode drain (no public/request-path triggers):
- * 1. One bounded batch from the Redis-backed job queue (`processGeocodeQueueBatch`).
- * 2. One bounded DB backlog batch via `geocodePendingSales({ batchSizeOverride, captureClaimedRowIds: true })`.
+ * 1. Acquire shared `geocode_pipeline` lease (skips when daily cron holds overlap).
+ * 2. One bounded batch from the Redis-backed job queue (`processGeocodeQueueBatch`).
+ * 3. One bounded DB backlog batch via `geocodePendingSales`.
+ * 4. Bounded transient dead-letter replay (`needs_check` → `needs_geocode`) when 429 pressure is low.
  *
- * Backlog batch size: `GEOCODE_BACKLOG_BATCH_SIZE` (default 25, hard cap 100).
- * Response JSON includes `queue` and `backlog` metrics.
+ * Backlog batch size: `GEOCODE_BACKLOG_BATCH_SIZE` (default 15, hard cap 100).
+ * Response JSON includes `queue`, `backlog`, `replay`, and lease metadata.
  *
  * Preview: workflow `.github/workflows/preview-post-deploy-geocode-cron.yml` calls this
  * route on the live URL after Vercel `repository_dispatch` (or legacy `deployment_status`).
@@ -17,8 +19,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized } from '@/lib/auth/cron'
-import { processGeocodeQueueBatch } from '@/lib/ingestion/geocodeQueue'
-import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
 import { logger, generateOperationId } from '@/lib/log'
 import { recordGeocodeCronOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
 import { adaptiveNoteToOrchestrationPayload } from '@/lib/ingestion/adaptiveThroughputProfile'
@@ -26,6 +26,8 @@ import { resolveAdaptiveThroughputForCron } from '@/lib/ingestion/adaptiveThroug
 import { createCorrelationBundle } from '@/lib/observability/correlation'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
+import { runWithGeocodePipelineLease } from '@/lib/ingestion/geocodePipelineLease'
+import { runGeocodeCronPipeline } from '@/lib/ingestion/geocodeCronPipeline'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,24 +91,69 @@ async function handleGeocodeCron(request: NextRequest) {
   const adaptivePayload = adaptiveNoteToOrchestrationPayload(adaptiveNote)
   const limit = adaptiveEnvelope.geocode.queueBatchSize
   const backlogBatchSize = adaptiveEnvelope.geocode.backlogBatchSize
-  let processed = 0
-  let requeued = 0
-  let completed = 0
-  let errors = 0
-  let backlogClaimed = 0
-  let backlogProcessed = 0
-  let backlogFailed = 0
-  let backlogPublishTriggered = 0
-  let backlogDurationMs = 0
-  let backlogError: string | null = null
-  let backlogRate429Count = 0
 
   try {
-    const batch = await processGeocodeQueueBatch(limit, { telemetryContext })
-    processed = batch.dequeued
-    requeued = batch.requeued
-    completed = batch.completed
-    if (processed === 0) {
+    const leaseRun = await runWithGeocodePipelineLease({
+    logContext: {
+      component: 'api/cron/geocode',
+      requestId,
+      environment,
+      deploymentEnv,
+    },
+    execute: () =>
+      runGeocodeCronPipeline({
+        queueBatchSize: limit,
+        backlogBatchSize,
+        concurrencyCeiling: adaptiveEnvelope.geocode.concurrencyCeiling,
+        telemetryContext,
+      }),
+    })
+
+    if (leaseRun.skipped) {
+    const durationMs = Date.now() - startedAt
+    logger.info('Geocode cron skipped due to active pipeline lease', {
+      component: 'api/cron/geocode',
+      operation: 'lease_skipped',
+      requestId,
+      reason: leaseRun.reason,
+      durationMs,
+    })
+    await recordGeocodeCronOrchestrationRun({
+      durationMs,
+      backlogClaimed: 0,
+      queueProcessed: 0,
+      queueCompleted: 0,
+      queueRequeued: 0,
+      rate429Count: 0,
+      ok: true,
+      adaptiveNote: adaptivePayload,
+      effectiveGeocodeQueueBatch: limit,
+      effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
+    })
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
+        ...telemetryContext,
+        phase: 'lease_skipped',
+        ok: true,
+        leaseReason: leaseRun.reason,
+        durationMs,
+      })
+    )
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      skip_reason: leaseRun.reason,
+      environment,
+      deployment_environment: deploymentEnv,
+      duration_ms: durationMs,
+    })
+  }
+
+    const pipeline = leaseRun.result
+    const durationMs = Date.now() - startedAt
+    const { queue, backlog, replay } = pipeline
+
+    if (queue.processed === 0) {
       logger.warn('Geocode cron processed zero queue rows', {
         component: 'api/cron/geocode',
         operation: 'queue_empty',
@@ -116,132 +163,122 @@ async function handleGeocodeCron(request: NextRequest) {
         deploymentEnv,
       })
     }
-
-    const backlogStartedAt = Date.now()
-    try {
-      const backlog = await geocodePendingSales({
-        batchSizeOverride: backlogBatchSize,
-        concurrencyCeilingOverride: adaptiveEnvelope.geocode.concurrencyCeiling,
-        captureClaimedRowIds: true,
-        telemetryContext,
-      })
-      backlogDurationMs = Date.now() - backlogStartedAt
-      backlogRate429Count = Number(backlog.rate429Count ?? 0)
-      backlogClaimed = backlog.claimed
-      backlogProcessed =
-        backlog.processed ??
-        (Number(backlog.succeeded ?? 0) + Number(backlog.failedRetriable ?? 0) + Number(backlog.failedTerminal ?? 0))
-      backlogFailed = Number(backlog.failedRetriable ?? 0) + Number(backlog.failedTerminal ?? 0)
-      backlogPublishTriggered = Number(backlog.publishTriggered ?? 0)
-      if (backlogClaimed === 0) {
-        logger.warn('Geocode cron backlog drain claimed zero rows', {
-          component: 'api/cron/geocode',
-          operation: 'backlog_empty',
-          requestId,
-          backlogBatchSize,
-          environment,
-          deploymentEnv,
-        })
-      }
-    } catch (error) {
-      backlogDurationMs = Date.now() - backlogStartedAt
-      backlogError = error instanceof Error ? error.message : String(error)
-      logger.error(
-        'Geocode cron backlog drain failed',
-        error instanceof Error ? error : new Error(backlogError),
-        {
-          component: 'api/cron/geocode',
-          operation: 'backlog_drain',
-          requestId,
-          backlogBatchSize,
-          environment,
-          deploymentEnv,
-        }
-      )
-      errors = 1
-      const durationMs = Date.now() - startedAt
-      await recordGeocodeCronOrchestrationRun({
-        durationMs,
-        backlogClaimed: 0,
-        queueProcessed: processed,
-        queueCompleted: completed,
-        queueRequeued: requeued,
-        rate429Count: 0,
-        ok: false,
-        error: backlogError,
-        adaptiveNote: adaptivePayload,
-        effectiveGeocodeQueueBatch: limit,
-        effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
-      })
-      emitObservabilityRecord(
-        buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
-          ...telemetryContext,
-          phase: 'backlog_error',
-          ok: false,
-          environment,
-          deploymentEnv,
-          durationMs,
-          queueProcessed: processed,
-          backlogClaimed,
-        })
-      )
-      return NextResponse.json(
-        {
-          ok: false,
-          environment,
-          deployment_environment: deploymentEnv,
-          duration_ms: durationMs,
-          claimed: processed,
-          processed,
-          failed: errors,
-          requeued,
-          completed,
-          errors,
-          limit,
-          queue: {
-            processed,
-            completed,
-            requeued,
-            failed: 0,
-          },
-          backlog: {
-            batch_size: backlogBatchSize,
-            claimed: backlogClaimed,
-            processed: backlogProcessed,
-            failed: backlogFailed,
-            publishTriggered: backlogPublishTriggered,
-            duration_ms: backlogDurationMs,
-            error: backlogError,
-          },
-          error: backlogError,
-        },
-        { status: 500 }
-      )
-    }
-  } catch (error) {
-    errors = 1
-    logger.error(
-      'Geocode queue cron batch failed',
-      error instanceof Error ? error : new Error(String(error)),
-      {
+    if (backlog.claimed === 0) {
+      logger.warn('Geocode cron backlog drain claimed zero rows', {
         component: 'api/cron/geocode',
-        operation: 'processGeocodeQueueBatch',
+        operation: 'backlog_empty',
         requestId,
-        limit,
+        backlogBatchSize,
         environment,
         deploymentEnv,
-      }
-    )
-    const durationMs = Date.now() - startedAt
+      })
+    }
+
     await recordGeocodeCronOrchestrationRun({
       durationMs,
-      backlogClaimed,
-      queueProcessed: processed,
-      queueCompleted: completed,
-      queueRequeued: requeued,
+      backlogClaimed: backlog.claimed,
+      queueProcessed: queue.processed,
+      queueCompleted: queue.completed,
+      queueRequeued: queue.requeued,
+      rate429Count: backlog.rate429Count,
+      ok: true,
+      adaptiveNote: adaptivePayload,
+      effectiveGeocodeQueueBatch: limit,
+      effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
+    })
+
+    logger.info('Geocode cron completed', {
+      component: 'api/cron/geocode',
+      operation: 'cron_complete',
+      requestId,
+      environment,
+      deploymentEnv,
+      durationMs,
+      limit,
+      processed: queue.processed,
+      completed: queue.completed,
+      requeued: queue.requeued,
+      backlogBatchSize,
+      backlogClaimed: backlog.claimed,
+      backlogProcessed: backlog.processed,
+      backlogFailed: backlog.failed,
+      backlogPublishTriggered: backlog.publishTriggered,
+      backlogDurationMs: backlog.duration_ms,
+      replayReplayed: replay.replayed,
+      replaySkipped429: replay.skippedDueTo429Pressure === true,
+    })
+
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
+        ...telemetryContext,
+        phase: 'complete',
+        ok: true,
+        environment,
+        deploymentEnv,
+        durationMs,
+        queueProcessed: queue.processed,
+        queueCompleted: queue.completed,
+        queueRequeued: queue.requeued,
+        backlogClaimed: backlog.claimed,
+        backlogProcessed: backlog.processed,
+        backlogFailed: backlog.failed,
+        backlogPublishTriggered: backlog.publishTriggered,
+        replayReplayed: replay.replayed,
+      })
+    )
+
+    return NextResponse.json({
+      ok: true,
+      skipped: false,
+      environment,
+      deployment_environment: deploymentEnv,
+      duration_ms: durationMs,
+      claimed: queue.processed,
+      processed: queue.processed,
+      failed: 0,
+      requeued: queue.requeued,
+      completed: queue.completed,
+      errors: 0,
+      limit,
+      queue,
+      backlog: {
+        batch_size: backlog.batch_size,
+        claimed: backlog.claimed,
+        processed: backlog.processed,
+        failed: backlog.failed,
+        publishTriggered: backlog.publishTriggered,
+        duration_ms: backlog.duration_ms,
+        error: backlog.error,
+      },
+      replay: {
+        attempted: replay.attempted,
+        eligible: replay.eligible,
+        replayed: replay.replayed,
+        skipped: replay.skipped,
+        updateErrors: replay.updateErrors,
+        lostRaces: replay.lostRaces,
+        skipped_due_to_429_pressure: replay.skippedDueTo429Pressure === true,
+      },
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const durationMs = Date.now() - startedAt
+    logger.error('Geocode cron pipeline failed', error instanceof Error ? error : new Error(message), {
+      component: 'api/cron/geocode',
+      operation: 'pipeline_failed',
+      requestId,
+      environment,
+      deploymentEnv,
+    })
+    await recordGeocodeCronOrchestrationRun({
+      durationMs,
+      backlogClaimed: 0,
+      queueProcessed: 0,
+      queueCompleted: 0,
+      queueRequeued: 0,
       rate429Count: 0,
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
       adaptiveNote: adaptivePayload,
       effectiveGeocodeQueueBatch: limit,
       effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
@@ -249,11 +286,12 @@ async function handleGeocodeCron(request: NextRequest) {
     emitObservabilityRecord(
       buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
         ...telemetryContext,
-        phase: 'queue_error',
+        phase: 'pipeline_error',
         ok: false,
         environment,
         deploymentEnv,
         durationMs,
+        error: message,
       })
     )
     return NextResponse.json(
@@ -262,111 +300,9 @@ async function handleGeocodeCron(request: NextRequest) {
         environment,
         deployment_environment: deploymentEnv,
         duration_ms: durationMs,
-        claimed: processed,
-        processed,
-        failed: errors,
-        requeued,
-        completed,
-        errors,
-        limit,
-        queue: {
-          processed,
-          completed,
-          requeued,
-          failed: errors,
-        },
-        backlog: {
-          batch_size: backlogBatchSize,
-          claimed: backlogClaimed,
-          processed: backlogProcessed,
-          failed: backlogFailed,
-          publishTriggered: backlogPublishTriggered,
-          duration_ms: backlogDurationMs,
-          error: backlogError,
-        },
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       },
       { status: 500 }
     )
   }
-
-  const durationMs = Date.now() - startedAt
-  await recordGeocodeCronOrchestrationRun({
-    durationMs,
-    backlogClaimed,
-    queueProcessed: processed,
-    queueCompleted: completed,
-    queueRequeued: requeued,
-    rate429Count: backlogRate429Count,
-    ok: true,
-    adaptiveNote: adaptivePayload,
-    effectiveGeocodeQueueBatch: limit,
-    effectiveGeocodeConcurrency: adaptiveEnvelope.geocode.concurrencyCeiling,
-  })
-  logger.info('Geocode cron completed', {
-    component: 'api/cron/geocode',
-    operation: 'cron_complete',
-    requestId,
-    environment,
-    deploymentEnv,
-    durationMs,
-    limit,
-    processed,
-    completed,
-    requeued,
-    failed: errors,
-    backlogBatchSize,
-    backlogClaimed,
-    backlogProcessed,
-    backlogFailed,
-    backlogPublishTriggered,
-    backlogDurationMs,
-  })
-
-  emitObservabilityRecord(
-    buildTelemetryRecord(ObservabilityEvents.api.cronGeocodeHit, {
-      ...telemetryContext,
-      phase: 'complete',
-      ok: true,
-      environment,
-      deploymentEnv,
-      durationMs,
-      queueProcessed: processed,
-      queueCompleted: completed,
-      queueRequeued: requeued,
-      backlogClaimed,
-      backlogProcessed,
-      backlogFailed,
-      backlogPublishTriggered,
-    })
-  )
-
-  return NextResponse.json({
-    ok: true,
-    environment,
-    deployment_environment: deploymentEnv,
-    duration_ms: durationMs,
-    claimed: processed,
-    processed,
-    failed: errors,
-    requeued,
-    completed,
-    errors,
-    limit,
-    queue: {
-      processed,
-      completed,
-      requeued,
-      failed: 0,
-    },
-    backlog: {
-      batch_size: backlogBatchSize,
-      claimed: backlogClaimed,
-      processed: backlogProcessed,
-      failed: backlogFailed,
-      publishTriggered: backlogPublishTriggered,
-      duration_ms: backlogDurationMs,
-      error: backlogError,
-    },
-  })
 }

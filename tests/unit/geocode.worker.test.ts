@@ -667,6 +667,46 @@ describe('geocodePendingSales (batch / RPC path)', () => {
     expect(hoisted.geocodeAddress).toHaveBeenCalledTimes(3)
   })
 
+  it('batch transient: third rate_limited attempt requeues to needs_geocode instead of needs_check', async () => {
+    hoisted.adminRpc.mockResolvedValue({
+      data: [
+        {
+          ...claimedRowBase,
+          id: '00000000-0000-4000-8000-0000000000b4',
+          normalized_address: '100 Main St',
+          address_raw: '100 Main St',
+          geocode_attempts: 3,
+        },
+      ],
+      error: null,
+    })
+    hoisted.maybeSingleResults.push({ data: { failure_details: null }, error: null })
+    hoisted.geocodeAddress.mockResolvedValue({
+      coords: null,
+      hit429: true,
+      noCoordsReason: 'rate_limited',
+      providerClassification: 'rate_limited',
+    })
+
+    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
+    const summary = await geocodePendingSales()
+
+    expect(summary.failedTerminal).toBe(0)
+    expect(summary.failedRetriable).toBe(1)
+    const needsCheck = hoisted.updatePayloads.find(
+      (u) => u && typeof u === 'object' && (u as Record<string, unknown>).status === 'needs_check'
+    )
+    expect(needsCheck).toBeUndefined()
+    const requeue = hoisted.updatePayloads.find(
+      (u) =>
+        u &&
+        typeof u === 'object' &&
+        (u as Record<string, unknown>).status === 'needs_geocode' &&
+        (u as Record<string, unknown>).geocode_attempts === 0
+    )
+    expect(requeue).toBeDefined()
+  })
+
   it('batch terminal: third failed attempt with no street line moves to needs_check path', async () => {
     hoisted.adminRpc.mockResolvedValue({
       data: [

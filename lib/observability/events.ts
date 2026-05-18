@@ -30,6 +30,7 @@ export const ObservabilityEvents = {
     providerHealthClassified: 'geocode.provider.health_classified',
     deadLetterClassified: 'geocode.dead_letter.classified',
     deadLetterReplayed: 'geocode.dead_letter.replayed',
+    transientTerminalRequeued: 'geocode.dead_letter.transient_terminal_requeued',
     /** Aggregate only: DB update failures + lost races during bounded replay (no row ids). */
     deadLetterReplayPartialFailures: 'geocode.dead_letter.replay_partial_failures',
     replayExhausted: 'geocode.replay.exhausted',

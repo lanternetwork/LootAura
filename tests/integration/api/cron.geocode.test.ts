@@ -6,17 +6,19 @@ const { recordGeocodeCronOrchestrationRun } = vi.hoisted(() => ({
 }))
 
 const mockResolveAdaptiveThroughputForCron = vi.hoisted(() => vi.fn())
+const mockRunWithGeocodePipelineLease = vi.hoisted(() => vi.fn())
+const mockRunGeocodeCronPipeline = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/auth/cron', () => ({
   assertCronAuthorized: vi.fn(),
 }))
 
-vi.mock('@/lib/ingestion/geocodeQueue', () => ({
-  processGeocodeQueueBatch: vi.fn(),
+vi.mock('@/lib/ingestion/geocodePipelineLease', () => ({
+  runWithGeocodePipelineLease: mockRunWithGeocodePipelineLease,
 }))
 
-vi.mock('@/lib/ingestion/geocodeWorker', () => ({
-  geocodePendingSales: vi.fn(),
+vi.mock('@/lib/ingestion/geocodeCronPipeline', () => ({
+  runGeocodeCronPipeline: mockRunGeocodeCronPipeline,
 }))
 
 vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
@@ -46,30 +48,41 @@ describe('GET /api/cron/geocode', () => {
     delete env.GEOCODE_BACKLOG_BATCH_SIZE
     env.NODE_ENV = 'test'
     env.VERCEL_ENV = 'preview'
+
+    mockRunWithGeocodePipelineLease.mockImplementation(async ({ execute }) => ({
+      ok: true,
+      skipped: false,
+      result: await execute(),
+      lease: { acquired: true, owner: 'test', staleRecovered: false, cursor: 0 },
+    }))
   })
 
-  it('processes queue and then drains DB backlog', async () => {
+  it('processes queue and then drains DB backlog under pipeline lease', async () => {
     const { assertCronAuthorized } = await import('@/lib/auth/cron')
-    const { processGeocodeQueueBatch } = await import('@/lib/ingestion/geocodeQueue')
-    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const { GET } = await import('@/app/api/cron/geocode/route')
 
     vi.mocked(assertCronAuthorized).mockImplementation(() => {})
-    vi.mocked(processGeocodeQueueBatch).mockResolvedValue({
-      dequeued: 3,
-      completed: 2,
-      requeued: 1,
-    })
-    vi.mocked(geocodePendingSales).mockResolvedValue({
-      claimed: 4,
-      succeeded: 3,
-      failedRetriable: 1,
-      failedTerminal: 0,
-      rate429Count: 0,
-      processed: 4,
-      publishTriggered: 3,
-      publishOk: 2,
-      publishFailed: 1,
+    mockRunGeocodeCronPipeline.mockResolvedValue({
+      queue: { processed: 3, completed: 2, requeued: 1, failed: 0 },
+      backlog: {
+        batch_size: 15,
+        claimed: 4,
+        processed: 4,
+        failed: 1,
+        publishTriggered: 3,
+        duration_ms: 12,
+        error: null,
+        rate429Count: 0,
+      },
+      replay: {
+        attempted: 5,
+        eligible: 3,
+        replayed: 2,
+        skipped: 0,
+        updateErrors: 0,
+        lostRaces: 0,
+        skippedDueTo429Pressure: false,
+      },
     })
 
     const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
@@ -77,16 +90,10 @@ describe('GET /api/cron/geocode', () => {
     const data = await res.json()
 
     expect(res.status).toBe(200)
-    expect(processGeocodeQueueBatch).toHaveBeenCalledWith(
-      50,
-      expect.objectContaining({
-        telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
-      })
-    )
-    expect(geocodePendingSales).toHaveBeenCalledWith({
-      batchSizeOverride: 25,
-      concurrencyCeilingOverride: 4,
-      captureClaimedRowIds: true,
+    expect(mockRunGeocodeCronPipeline).toHaveBeenCalledWith({
+      queueBatchSize: 20,
+      backlogBatchSize: 15,
+      concurrencyCeiling: 2,
       telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
     expect(data.queue).toEqual({
@@ -96,47 +103,29 @@ describe('GET /api/cron/geocode', () => {
       failed: 0,
     })
     expect(data.backlog.claimed).toBe(4)
-    expect(data.backlog.processed).toBe(4)
-    expect(data.backlog.failed).toBe(1)
-    expect(data.backlog.publishTriggered).toBe(3)
-    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledTimes(1)
+    expect(data.replay.replayed).toBe(2)
     expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        durationMs: expect.any(Number),
         backlogClaimed: 4,
         queueProcessed: 3,
-        queueCompleted: 2,
-        queueRequeued: 1,
         rate429Count: 0,
         ok: true,
-        effectiveGeocodeQueueBatch: 50,
-        effectiveGeocodeConcurrency: 4,
+        effectiveGeocodeQueueBatch: 20,
+        effectiveGeocodeConcurrency: 2,
       })
     )
   })
 
-  it('runs backlog drain when queue is empty', async () => {
+  it('returns skipped when pipeline lease is active', async () => {
     const { assertCronAuthorized } = await import('@/lib/auth/cron')
-    const { processGeocodeQueueBatch } = await import('@/lib/ingestion/geocodeQueue')
-    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const { GET } = await import('@/app/api/cron/geocode/route')
 
     vi.mocked(assertCronAuthorized).mockImplementation(() => {})
-    vi.mocked(processGeocodeQueueBatch).mockResolvedValue({
-      dequeued: 0,
-      completed: 0,
-      requeued: 0,
-    })
-    vi.mocked(geocodePendingSales).mockResolvedValue({
-      claimed: 2,
-      succeeded: 2,
-      failedRetriable: 0,
-      failedTerminal: 0,
-      rate429Count: 0,
-      processed: 2,
-      publishTriggered: 2,
-      publishOk: 2,
-      publishFailed: 0,
+    mockRunWithGeocodePipelineLease.mockResolvedValue({
+      ok: true,
+      skipped: true,
+      reason: 'active_lease',
+      lease: { acquired: false, owner: '', staleRecovered: false, cursor: 0, reason: 'active_lease' },
     })
 
     const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
@@ -144,138 +133,26 @@ describe('GET /api/cron/geocode', () => {
     const data = await res.json()
 
     expect(res.status).toBe(200)
-    expect(processGeocodeQueueBatch).toHaveBeenCalledTimes(1)
-    expect(geocodePendingSales).toHaveBeenCalledTimes(1)
-    expect(geocodePendingSales).toHaveBeenCalledWith({
-      batchSizeOverride: 25,
-      concurrencyCeilingOverride: 4,
-      captureClaimedRowIds: true,
-      telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
-    })
-    expect(data.queue.processed).toBe(0)
-    expect(data.backlog.claimed).toBe(2)
-    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        backlogClaimed: 2,
-        queueProcessed: 0,
-        queueCompleted: 0,
-        queueRequeued: 0,
-        ok: true,
-      })
-    )
+    expect(data.skipped).toBe(true)
+    expect(data.skip_reason).toBe('active_lease')
+    expect(mockRunGeocodeCronPipeline).not.toHaveBeenCalled()
   })
 
-  it('caps backlog drain batch size from env at 100', async () => {
-    process.env.GEOCODE_BACKLOG_BATCH_SIZE = '999'
+  it('returns 500 when pipeline throws', async () => {
     const { assertCronAuthorized } = await import('@/lib/auth/cron')
-    const { processGeocodeQueueBatch } = await import('@/lib/ingestion/geocodeQueue')
-    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
     const { GET } = await import('@/app/api/cron/geocode/route')
 
     vi.mocked(assertCronAuthorized).mockImplementation(() => {})
-    vi.mocked(processGeocodeQueueBatch).mockResolvedValue({
-      dequeued: 0,
-      completed: 0,
-      requeued: 0,
-    })
-    vi.mocked(geocodePendingSales).mockResolvedValue({
-      claimed: 0,
-      succeeded: 0,
-      failedRetriable: 0,
-      failedTerminal: 0,
-      rate429Count: 0,
-      processed: 0,
-      publishTriggered: 0,
-      publishOk: 0,
-      publishFailed: 0,
-    })
-
-    const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
-    await GET(req)
-
-    expect(geocodePendingSales).toHaveBeenCalledWith({
-      batchSizeOverride: 100,
-      concurrencyCeilingOverride: 4,
-      captureClaimedRowIds: true,
-      telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
-    })
-  })
-
-  it('records metrics when queue batch fails before backlog', async () => {
-    const { assertCronAuthorized } = await import('@/lib/auth/cron')
-    const { processGeocodeQueueBatch } = await import('@/lib/ingestion/geocodeQueue')
-    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
-    const { GET } = await import('@/app/api/cron/geocode/route')
-
-    vi.mocked(assertCronAuthorized).mockImplementation(() => {})
-    vi.mocked(processGeocodeQueueBatch).mockRejectedValue(new Error('redis down'))
-    vi.mocked(geocodePendingSales).mockResolvedValue({
-      claimed: 0,
-      succeeded: 0,
-      failedRetriable: 0,
-      failedTerminal: 0,
-      rate429Count: 0,
-      processed: 0,
-      publishTriggered: 0,
-      publishOk: 0,
-      publishFailed: 0,
-    })
-
-    const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
-    const res = await GET(req)
-    expect(res.status).toBe(500)
-    expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        durationMs: expect.any(Number),
-        backlogClaimed: 0,
-        queueProcessed: 0,
-        queueCompleted: 0,
-        queueRequeued: 0,
-        rate429Count: 0,
-        ok: false,
-        error: 'redis down',
-      })
-    )
-    expect(geocodePendingSales).not.toHaveBeenCalled()
-  })
-
-  it('returns queue metrics even when backlog drain fails', async () => {
-    const { assertCronAuthorized } = await import('@/lib/auth/cron')
-    const { processGeocodeQueueBatch } = await import('@/lib/ingestion/geocodeQueue')
-    const { geocodePendingSales } = await import('@/lib/ingestion/geocodeWorker')
-    const { GET } = await import('@/app/api/cron/geocode/route')
-
-    vi.mocked(assertCronAuthorized).mockImplementation(() => {})
-    vi.mocked(processGeocodeQueueBatch).mockResolvedValue({
-      dequeued: 5,
-      completed: 4,
-      requeued: 1,
-    })
-    vi.mocked(geocodePendingSales).mockRejectedValue(new Error('backlog claim failed'))
+    mockRunGeocodeCronPipeline.mockRejectedValue(new Error('backlog claim failed'))
 
     const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
     const res = await GET(req)
     const data = await res.json()
 
     expect(res.status).toBe(500)
-    expect(data.queue).toEqual({
-      processed: 5,
-      completed: 4,
-      requeued: 1,
-      failed: 0,
-    })
-    expect(data.backlog.error).toBe('backlog claim failed')
+    expect(data.error).toBe('backlog claim failed')
     expect(recordGeocodeCronOrchestrationRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        durationMs: expect.any(Number),
-        backlogClaimed: 0,
-        queueProcessed: 5,
-        queueCompleted: 4,
-        queueRequeued: 1,
-        rate429Count: 0,
-        ok: false,
-        error: 'backlog claim failed',
-      })
+      expect.objectContaining({ ok: false, error: 'backlog claim failed' })
     )
   })
 
@@ -296,4 +173,3 @@ describe('GET /api/cron/geocode', () => {
     expect(recordGeocodeCronOrchestrationRun).not.toHaveBeenCalled()
   })
 })
-

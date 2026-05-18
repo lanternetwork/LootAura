@@ -21,14 +21,20 @@ import {
   computeCrawlScheduleEstimates,
   computeDuplicateSkipRate,
   computeRate,
-  mapToSortedDurationAvg,
   mapToSortedSeries,
+  mapToSortedDurationAvg,
   oldestAgeMsFromTimestamp,
   sanitizeStuckRowSample,
   sumLastHourFromSeries,
   type OrchestrationRunRow,
 } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
+import { countGeocodeDeadLetterReplayBuckets } from '@/lib/geocode/geocodeDeadLetterReplay'
+import {
+  computeAcquisitionRunRates,
+  fetchAcquisitionRegistrySummary,
+  mapHourlyRateSeries,
+} from '@/lib/admin/acquisitionMetricsHelpers'
 import { ADDRESS_STATUSES } from '@/lib/ingestion/address/addressLifecycleTypes'
 import type { ImageEnrichmentFailureReason } from '@/lib/ingestion/imageEnrichmentWorker'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
@@ -262,6 +268,9 @@ export async function GET(request: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .gte('last_image_enrichment_attempt_at', iso24h)
 
+    const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
+    const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
+
     const imageFailureReasonCountPromises = IMAGE_ENRICHMENT_FAILURE_REASONS.map(
       async (reason) => {
         const { count, error } = await fromBase(admin, 'ingested_sales')
@@ -298,6 +307,8 @@ export async function GET(request: NextRequest) {
       imageHasImageResult,
       imageAttempted24hResult,
       imageFailureReasonParts,
+      geocodeDeadLetterBuckets,
+      acquisitionRegistry,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
       published24hPromise,
@@ -322,6 +333,8 @@ export async function GET(request: NextRequest) {
       imageHasImagePromise,
       imageAttempted24hPromise,
       Promise.all(imageFailureReasonCountPromises),
+      geocodeDeadLetterBucketsPromise,
+      acquisitionRegistryPromise,
     ])
 
     const statusMap = Object.fromEntries(statusParts.map((p) => [p.status, p.count])) as Record<
@@ -420,6 +433,20 @@ export async function GET(request: NextRequest) {
     const sourcePagesFetchedByHour = mapToSortedSeries(agg.fetchHourly)
     const configsProcessedByHour = mapToSortedSeries(agg.configsProcessedHourly)
     const listingsInsertedByHour = mapToSortedSeries(agg.insertedHourly)
+    const listingsSkippedByHour = mapToSortedSeries(agg.listingsSkippedHourly)
+    const insertYieldByHour = mapHourlyRateSeries({
+      numeratorByHour: agg.insertedHourly,
+      denominatorByHour: agg.listingsDiscoveredHourly,
+    })
+    const saturationRateByHour = mapHourlyRateSeries({
+      numeratorByHour: agg.listingsSkippedHourly,
+      denominatorByHour: new Map(
+        [...agg.listingsDiscoveredHourly.entries()].map(([k, fetched]) => [
+          k,
+          fetched + (agg.listingsSkippedHourly.get(k) ?? 0),
+        ])
+      ),
+    })
     const publishFailedByHour = mapToSortedSeries(agg.publishFailedHourly)
     const geocodeRetryableFailedByHour = mapToSortedSeries(agg.geocodeRetryableHourly)
 
@@ -458,6 +485,11 @@ export async function GET(request: NextRequest) {
     })
 
     const fetchRollup = agg.fetchRollup24h
+    const acquisitionRates = computeAcquisitionRunRates({
+      fetched24h: fetchRollup.listingsDiscovered,
+      inserted24h: fetchRollup.listingsInserted,
+      skipped24h: fetchRollup.listingsSkipped,
+    })
     const geocodeRollup = agg.geocodeRollup24h
     const publishRollup = agg.publishRollup24h
     const reconRollup = agg.reconciliationRollup24h
@@ -492,6 +524,15 @@ export async function GET(request: NextRequest) {
         nowMs
       ),
       listingsInsertedPerHour: sumLastHourFromSeries(listingsInsertedByHour, nowMs),
+      listingsSkippedPerHour: sumLastHourFromSeries(listingsSkippedByHour, nowMs),
+      insertYieldPerHour: (() => {
+        const last = insertYieldByHour[insertYieldByHour.length - 1]
+        return last?.value ?? null
+      })(),
+      saturationRatePerHour: (() => {
+        const last = saturationRateByHour[saturationRateByHour.length - 1]
+        return last?.value ?? null
+      })(),
       geocodeSucceededPerHour: sumLastHourFromSeries(mapToSortedSeries(agg.geocodeSuccessHourly), nowMs),
       geocodeRetryableFailedPerHour: sumLastHourFromSeries(geocodeRetryableFailedByHour, nowMs),
       geocodeTerminalFailedPerHour: sumLastHourFromSeries(
@@ -548,6 +589,9 @@ export async function GET(request: NextRequest) {
         sourcePagesFetchedByHour,
         configsProcessedByHour,
         listingsInsertedByHour,
+        listingsSkippedByHour,
+        insertYieldByHour,
+        saturationRateByHour,
         publishFailedByHour,
         geocodeRetryableFailedByHour,
       },
@@ -560,6 +604,22 @@ export async function GET(request: NextRequest) {
         lanes: laneStateSummaries,
       },
       volume: {
+        acquisition: {
+          insertYield24h: acquisitionRates.insertYield24h,
+          saturationRate24h: acquisitionRates.saturationRate24h,
+          enabledExternalConfigs: acquisitionRegistry.enabledExternalConfigs,
+          crawlableConfigs: acquisitionRegistry.crawlableConfigs,
+          configsSkippedNoSourcePages: acquisitionRegistry.configsSkippedNoSourcePages,
+          configsSkippedInvalidUrls: acquisitionRegistry.configsSkippedInvalidUrls,
+          saturatedConfigs: acquisitionRegistry.saturatedConfigs,
+          configsWithRecentInsert: acquisitionRegistry.configsWithRecentInsert,
+          avgConfigWindowInsertYield: acquisitionRegistry.avgConfigWindowInsertYield,
+          pendingDiscoveryConfigs: acquisitionRegistry.pendingDiscoveryConfigs,
+          validatedDiscoveryConfigs: acquisitionRegistry.validatedDiscoveryConfigs,
+          manualDiscoveryConfigs: acquisitionRegistry.manualDiscoveryConfigs,
+          failedDiscoveryConfigs: acquisitionRegistry.failedDiscoveryConfigs,
+          discoveryFailureReasons: acquisitionRegistry.discoveryFailureReasons,
+        },
         fetch: {
           crawlableConfigsTotal,
           configsDueForCrawl: crawlSchedule.configsDueForCrawl,
@@ -569,6 +629,9 @@ export async function GET(request: NextRequest) {
           configsProcessed24h: fetchRollup.configsProcessed,
           listingsDiscovered24h: fetchRollup.listingsDiscovered,
           listingsInserted24h: externalInserted24hResult.count ?? fetchRollup.listingsInserted,
+          listingsSkipped24h: fetchRollup.listingsSkipped,
+          insertYield24h: acquisitionRates.insertYield24h,
+          saturationRate24h: acquisitionRates.saturationRate24h,
           duplicateSkipRate: computeDuplicateSkipRate(
             fetchRollup.duplicateSkips,
             fetchRollup.dedupeDenominator
@@ -589,6 +652,8 @@ export async function GET(request: NextRequest) {
           geocodeTerminalFailed24h: geocodeRollup.terminalFailed,
           rate429Count24h: geocodeRollup.rate429,
           effectiveConcurrencyLatest: agg.latestGeocodeConcurrency,
+          replayableTransientNeedsCheck: geocodeDeadLetterBuckets.replayableTransientNeedsCheck,
+          terminalGeocodeNeedsCheck: geocodeDeadLetterBuckets.terminalGeocodeNeedsCheck,
         },
         publish: {
           readyCount: statusMap.ready,

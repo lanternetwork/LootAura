@@ -22,10 +22,12 @@ export type GeocodeDeadLetterReplaySkipReason =
   | 'wrong_status'
   | 'no_dead_letter'
   | 'not_retryable_disposition'
+  | 'not_transient_provider'
   | 'ineligible_replay_flag'
   | 'permanent_terminal'
   | 'cooldown_active'
   | 'replay_exhausted'
+  | 'has_coordinates'
 
 export type GeocodeDeadLetterReplayRunResult = {
   attempted: number
@@ -55,6 +57,19 @@ function readFiniteNumber(v: unknown, fallback: number): number {
   return v
 }
 
+export function parseGeocodeCronReplayLimitFromEnv(): number {
+  const raw = process.env.GEOCODE_CRON_REPLAY_LIMIT
+  const defaultLimit = 50
+  if (raw === undefined || raw === '') return defaultLimit
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) return defaultLimit
+  return Math.min(parsed, 200)
+}
+
+function hasTransientProviderReason(dl: Record<string, unknown>): boolean {
+  return readReasons(dl).includes('transient_provider')
+}
+
 function readReasons(dl: Record<string, unknown>): GeocodeDeadLetterReason[] {
   const r = dl.reasons
   if (!Array.isArray(r)) return []
@@ -75,13 +90,25 @@ export function evaluateGeocodeDeadLetterReplayEligibility(params: {
   failureDetails: unknown
   nowMs: number
   maxReplayAttempts: number
+  /** When true, only replay rate-limit / transient provider terminal rows (Phase 0). */
+  requireTransientProvider?: boolean
+  /** When true, reject rows that already have coordinates. */
+  requireNullCoordinates?: boolean
+  lat?: number | null
+  lng?: number | null
 }): { ok: true } | { ok: false; reason: GeocodeDeadLetterReplaySkipReason } {
   if (params.status !== 'needs_check') {
     return { ok: false, reason: 'wrong_status' }
   }
+  if (params.requireNullCoordinates && params.lat != null && params.lng != null) {
+    return { ok: false, reason: 'has_coordinates' }
+  }
   const dl = readDeadLetterSection(params.failureDetails)
   if (!dl) {
     return { ok: false, reason: 'no_dead_letter' }
+  }
+  if (params.requireTransientProvider && !hasTransientProviderReason(dl)) {
+    return { ok: false, reason: 'not_transient_provider' }
   }
   const disposition = dl.disposition
   if (disposition === 'permanent_terminal') {
@@ -146,6 +173,65 @@ export type GeocodeDeadLetterReplayRow = {
   status: string
   failure_details: unknown
   failure_reasons: unknown
+  lat?: number | null
+  lng?: number | null
+}
+
+export type GeocodeDeadLetterReplayCounts = {
+  replayableTransientNeedsCheck: number
+  terminalGeocodeNeedsCheck: number
+  scanned: number
+}
+
+/** Count eligible Phase-0 replay rows vs terminal parked rows (bounded scan). */
+export async function countGeocodeDeadLetterReplayBuckets(params?: {
+  scanCap?: number
+  nowMs?: number
+  maxReplayAttempts?: number
+}): Promise<GeocodeDeadLetterReplayCounts> {
+  const admin = getAdminDb()
+  const nowMs = params?.nowMs ?? Date.now()
+  const maxReplayAttempts = params?.maxReplayAttempts ?? DEFAULT_MAX_GEOCODE_DEAD_LETTER_REPLAYS
+  const scanCap = Math.min(500, Math.max(50, params?.scanCap ?? 500))
+
+  const { data, error } = await fromBase(admin, 'ingested_sales')
+    .select('id, status, failure_details, lat, lng')
+    .eq('status', 'needs_check')
+    .not('failure_details', 'is', null)
+    .order('updated_at', { ascending: true })
+    .limit(scanCap)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const rows = (Array.isArray(data) ? data : []) as GeocodeDeadLetterReplayRow[]
+  let replayableTransientNeedsCheck = 0
+  let terminalGeocodeNeedsCheck = 0
+
+  for (const row of rows) {
+    const ev = evaluateGeocodeDeadLetterReplayEligibility({
+      status: row.status,
+      failureDetails: row.failure_details,
+      nowMs,
+      maxReplayAttempts,
+      requireTransientProvider: true,
+      requireNullCoordinates: true,
+      lat: row.lat,
+      lng: row.lng,
+    })
+    if (ev.ok) {
+      replayableTransientNeedsCheck += 1
+    } else {
+      terminalGeocodeNeedsCheck += 1
+    }
+  }
+
+  return {
+    replayableTransientNeedsCheck,
+    terminalGeocodeNeedsCheck,
+    scanned: rows.length,
+  }
 }
 
 export async function runBoundedGeocodeDeadLetterReplay(params: {
@@ -153,6 +239,8 @@ export async function runBoundedGeocodeDeadLetterReplay(params: {
   nowMs?: number
   maxReplayAttempts?: number
   telemetryContext?: Record<string, unknown>
+  requireTransientProvider?: boolean
+  requireNullCoordinates?: boolean
 }): Promise<GeocodeDeadLetterReplayRunResult> {
   const admin = getAdminDb()
   const nowMs = params.nowMs ?? Date.now()
@@ -161,7 +249,7 @@ export async function runBoundedGeocodeDeadLetterReplay(params: {
   const scanCap = Math.min(500, Math.max(limit * 20, limit))
 
   const { data, error } = await fromBase(admin, 'ingested_sales')
-    .select('id, status, failure_details, failure_reasons')
+    .select('id, status, failure_details, failure_reasons, lat, lng')
     .eq('status', 'needs_check')
     .not('failure_details', 'is', null)
     .order('updated_at', { ascending: true })
@@ -183,6 +271,10 @@ export async function runBoundedGeocodeDeadLetterReplay(params: {
       failureDetails: row.failure_details,
       nowMs,
       maxReplayAttempts,
+      requireTransientProvider: params.requireTransientProvider,
+      requireNullCoordinates: params.requireNullCoordinates,
+      lat: row.lat,
+      lng: row.lng,
     })
     if (!ev.ok) {
       ineligible += 1
@@ -209,12 +301,20 @@ export async function runBoundedGeocodeDeadLetterReplay(params: {
     const mergedDetails = mergeGeocodeDeadLetterIntoFailureDetails(row.failure_details, envelope)
     const reasons = stripGeocodeFailedFromFailureReasons(toFailureReasonArray(row.failure_reasons))
     const publishClear = publishLinkageFieldsToClearOnReopenUpload('needs_geocode')
+    const replayAudit = {
+      replay_audit: {
+        schema_version: 1,
+        replayed_at: new Date(nowMs).toISOString(),
+        source: params.telemetryContext?.jobType ?? 'geocode.dead_letter.replay',
+        replay_count: nextReplay,
+      },
+    }
 
     const updatePayload: Record<string, unknown> = {
       status: 'needs_geocode',
       geocode_attempts: 0,
       last_geocode_attempt_at: null,
-      failure_details: mergedDetails,
+      failure_details: { ...mergedDetails, ...replayAudit },
       failure_reasons: reasons,
       ...(publishClear ?? {}),
     }

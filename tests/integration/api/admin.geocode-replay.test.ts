@@ -75,6 +75,8 @@ describe('POST /api/admin/geocode/replay', () => {
     expect(mockRunBounded).toHaveBeenCalledWith(
       expect.objectContaining({
         limit: 10,
+        requireTransientProvider: true,
+        requireNullCoordinates: true,
         telemetryContext: { jobType: 'geocode.dead_letter.replay' },
       })
     )

@@ -15,7 +15,9 @@ import {
   classifyGeocodeTerminalDeadLetter,
   defaultGeocodeDeadLetterThresholds,
   extractPriorDeadLetterClassificationCount,
+  isEligibleTransientGeocodeReplayDecision,
   mergeGeocodeDeadLetterIntoFailureDetails,
+  type GeocodeDeadLetterDecision,
   type GeocodeDeadLetterEnvelope,
 } from '@/lib/geocode/deadLetter'
 import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
@@ -614,6 +616,44 @@ async function persistGeocodeDeadLetterMetadata(
   }
 }
 
+async function requeueTransientGeocodeForCooldown(
+  admin: ReturnType<typeof getAdminDb>,
+  params: {
+    rowId: string
+    telemetryContext?: Record<string, unknown>
+  }
+): Promise<boolean> {
+  const { error } = await fromBase(admin, 'ingested_sales')
+    .update({
+      status: 'needs_geocode',
+      geocode_attempts: 0,
+      last_geocode_attempt_at: new Date().toISOString(),
+    })
+    .eq('id', params.rowId)
+    .eq('status', 'needs_geocode')
+
+  if (error) {
+    logger.error(
+      'Failed to requeue transient geocode terminal row for cooldown',
+      new Error(error.message),
+      {
+        component: 'ingestion/geocodeWorker',
+        operation: 'transient_terminal_requeue',
+        rowId: params.rowId,
+      }
+    )
+    return false
+  }
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.geocode.transientTerminalRequeued, {
+      ...(params.telemetryContext ?? {}),
+      rowId: params.rowId,
+    })
+  )
+  return true
+}
+
 async function recordTerminalDeadLetterClassification(
   admin: AdminDb,
   params: {
@@ -625,7 +665,7 @@ async function recordTerminalDeadLetterClassification(
     failureDetailsSnapshot: unknown
     telemetryContext?: Record<string, unknown>
   }
-): Promise<void> {
+): Promise<GeocodeDeadLetterDecision> {
   const thresholds = defaultGeocodeDeadLetterThresholds()
   const prior = extractPriorDeadLetterClassificationCount(params.failureDetailsSnapshot)
   const decision = classifyGeocodeTerminalDeadLetter(
@@ -653,6 +693,48 @@ async function recordTerminalDeadLetterClassification(
       replayCooldownMs: envelope.replay_cooldown_ms,
     })
   )
+  return decision
+}
+
+async function handleGeocodeAttemptExhausted(
+  admin: ReturnType<typeof getAdminDb>,
+  params: {
+    rowId: string
+    row: { failure_reasons: unknown; failure_details?: unknown }
+    attemptCount: number
+    hit429: boolean
+    noCoordsReason?: string | null
+    providerClassification?: string | null
+    telemetryContext?: Record<string, unknown>
+  }
+): Promise<{ terminal: boolean; retriable: boolean }> {
+  const decision = await recordTerminalDeadLetterClassification(admin, {
+    rowId: params.rowId,
+    attemptCount: params.attemptCount,
+    hit429: params.hit429,
+    noCoordsReason: params.noCoordsReason,
+    providerClassification: params.providerClassification,
+    failureDetailsSnapshot: params.row.failure_details,
+    telemetryContext: params.telemetryContext,
+  })
+
+  if (isEligibleTransientGeocodeReplayDecision(decision)) {
+    const requeued = await requeueTransientGeocodeForCooldown(admin, {
+      rowId: params.rowId,
+      telemetryContext: params.telemetryContext,
+    })
+    if (requeued) {
+      return { terminal: false, retriable: true }
+    }
+  }
+
+  const ok = await markGeocodeTerminalNeedsCheckOnceRetry(
+    admin,
+    params.rowId,
+    params.row.failure_reasons,
+    'geocode_failed'
+  )
+  return { terminal: ok, retriable: !ok }
 }
 
 async function markGeocodeTerminalNeedsCheck(
@@ -961,17 +1043,16 @@ async function processGeocodeAttempt(
       { providerCalls, variantBudgetExhausted, lastStructuredReason }
     )
     if (attemptCount >= 3) {
-      await recordTerminalDeadLetterClassification(admin, {
+      const exhausted = await handleGeocodeAttemptExhausted(admin, {
         rowId,
+        row,
         attemptCount,
         hit429,
         noCoordsReason: geo.noCoordsReason,
         providerClassification: geo.providerClassification,
-        failureDetailsSnapshot: row.failure_details,
         telemetryContext,
       })
-      const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')
-      if (ok) {
+      if (exhausted.terminal) {
         logger.warn('Geocode worker row processed', {
           component: 'ingestion/geocodeWorker',
           operation: 'row_result',
@@ -995,7 +1076,7 @@ async function processGeocodeAttempt(
       }
       return {
         kind: 'geocode_fail',
-        retriable: true,
+        retriable: exhausted.retriable,
         terminal: false,
         hit429,
         noCoordsReason: geo.noCoordsReason,
@@ -1061,17 +1142,16 @@ async function processGeocodeAttempt(
   )
 
   if (attemptCount >= 3) {
-    await recordTerminalDeadLetterClassification(admin, {
+    const exhausted = await handleGeocodeAttemptExhausted(admin, {
       rowId,
+      row,
       attemptCount,
       hit429: false,
       noCoordsReason: syntheticMissingLocalityGeo.noCoordsReason,
       providerClassification: syntheticMissingLocalityGeo.providerClassification,
-      failureDetailsSnapshot: row.failure_details,
       telemetryContext,
     })
-    const ok = await markGeocodeTerminalNeedsCheckOnceRetry(admin, rowId, row.failure_reasons, 'geocode_failed')
-    if (ok) {
+    if (exhausted.terminal) {
       logger.warn('Geocode worker row processed', {
         component: 'ingestion/geocodeWorker',
         operation: 'row_result',
@@ -1081,7 +1161,7 @@ async function processGeocodeAttempt(
       })
       return { kind: 'geocode_fail', retriable: false, terminal: true, hit429: false }
     }
-    return { kind: 'geocode_fail', retriable: true, terminal: false, hit429: false }
+    return { kind: 'geocode_fail', retriable: exhausted.retriable, terminal: false, hit429: false }
   }
 
   if (isPreviewGeocodeDiagnosticsEnabled()) {

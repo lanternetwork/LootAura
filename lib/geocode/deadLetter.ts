@@ -71,6 +71,15 @@ export function defaultGeocodeDeadLetterThresholds(): GeocodeDeadLetterThreshold
   }
 }
 
+/** Phase 0: only `transient_provider` dead-letter rows are eligible for automated replay. */
+export function isEligibleTransientGeocodeReplayDecision(decision: GeocodeDeadLetterDecision): boolean {
+  return (
+    decision.disposition === 'retryable' &&
+    decision.eligibleReplay === true &&
+    decision.reasons.includes('transient_provider')
+  )
+}
+
 function isTransientProviderSignal(input: GeocodeTerminalDeadLetterInput): boolean {
   if (input.hit429) return true
   const n = (input.noCoordsReason ?? '').trim()

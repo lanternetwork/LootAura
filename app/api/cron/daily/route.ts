@@ -25,7 +25,8 @@
  * `INGESTION_ORCHESTRATION_MIN_MINUTES` (default 30); geocode and publish always run.
  *
  * Ingestion geocode step: bounded DB backlog only —
- * `geocodePendingSales({ batchSizeOverride })` using `GEOCODE_BACKLOG_BATCH_SIZE` (default 25, cap 100).
+ * `geocodePendingSales({ batchSizeOverride })` using `GEOCODE_BACKLOG_BATCH_SIZE` (default 15, cap 100).
+ * Shares the `geocode_pipeline` lease with `/api/cron/geocode` to prevent overlapping drains.
  * Does not pass `captureClaimedRowIds` (cron geocode route owns that for observability).
  */
 
@@ -48,6 +49,7 @@ import {
   type ImageEnrichmentWorkerSummary,
 } from '@/lib/ingestion/imageEnrichmentWorker'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
+import { runWithGeocodePipelineLease } from '@/lib/ingestion/geocodePipelineLease'
 import {
   finalizeLinkedPublishedIngestedSales,
   publishReadyIngestedSales,
@@ -65,6 +67,11 @@ import {
   persistExternalPageSource,
 } from '@/lib/ingestion/adapters/externalPageSource'
 import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
+import { recordConfigCrawlStats } from '@/lib/ingestion/acquisition/configCrawlStats'
+import {
+  buildYieldAwareCrawlPlan,
+  type CrawlConfigRow,
+} from '@/lib/ingestion/acquisition/yieldAwareCrawlSchedule'
 import { createEmptyDedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
 import {
   acquireIngestionOrchestrationLease,
@@ -119,66 +126,8 @@ function sleepMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-type ExternalConfigRow = {
-  city: string
-  state: string
-  source_platform: string
-  source_pages: unknown
-  source_crawl_excluded_at?: string | null
-}
-
-function pickPrimaryDomainFromSourcePages(rawPages: unknown): string | null {
-  const pages = normalizeSourcePages(rawPages)
-  for (const page of pages) {
-    try {
-      return new URL(page).hostname.toLowerCase()
-    } catch {
-      continue
-    }
-  }
-  return null
-}
-
-function interleaveConfigsByDomain(rows: ExternalConfigRow[]): ExternalConfigRow[] {
-  const byDomain = new Map<string, ExternalConfigRow[]>()
-  const domainOrder: string[] = []
-  for (const row of rows) {
-    const domain = pickPrimaryDomainFromSourcePages(row.source_pages) ?? '__unknown__'
-    if (!byDomain.has(domain)) {
-      byDomain.set(domain, [])
-      domainOrder.push(domain)
-    }
-    byDomain.get(domain)!.push(row)
-  }
-
-  const out: ExternalConfigRow[] = []
-  while (true) {
-    let added = false
-    for (const domain of domainOrder) {
-      const q = byDomain.get(domain)
-      if (!q || q.length === 0) continue
-      const next = q.shift()
-      if (next) {
-        out.push(next)
-        added = true
-      }
-    }
-    if (!added) break
-  }
-  return out
-}
-
-function sortExternalConfigsDeterministic(rows: ExternalConfigRow[]): ExternalConfigRow[] {
-  return [...rows].sort((a, b) => {
-    const aCity = `${a.state || ''}|${a.city || ''}`.toLowerCase()
-    const bCity = `${b.state || ''}|${b.city || ''}`.toLowerCase()
-    if (aCity !== bCity) {
-      return aCity.localeCompare(bCity)
-    }
-    const aPages = normalizeSourcePages(a.source_pages).join('|')
-    const bPages = normalizeSourcePages(b.source_pages).join('|')
-    return aPages.localeCompare(bPages)
-  })
+type ExternalConfigRow = CrawlConfigRow & {
+  source_discovery_status?: string | null
 }
 
 export async function GET(request: NextRequest) {
@@ -717,7 +666,9 @@ async function runIngestionOrchestration(
 
       const adminDb = getAdminDb()
       const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
-        .select('city, state, source_platform, source_pages, source_crawl_excluded_at')
+        .select(
+          'city, state, source_platform, source_pages, source_crawl_excluded_at, source_discovery_status, source_crawl_lifetime_fetched, source_crawl_lifetime_skipped, source_crawl_lifetime_inserted, source_crawl_window_fetched, source_crawl_window_skipped, source_crawl_window_inserted, source_crawl_window_started_at, source_crawl_last_at, source_crawl_last_insert_at'
+        )
         .eq('enabled', true)
 
       if (cityError) {
@@ -746,8 +697,7 @@ async function runIngestionOrchestration(
       const laneCrawlable = laneContext.laneModeEnabled
         ? filterConfigsForLane(crawlablePartition.crawlable, laneContext.lane)
         : crawlablePartition.crawlable
-      const rows = sortExternalConfigsDeterministic(laneCrawlable)
-      const plannedRows = interleaveConfigsByDomain(rows)
+      const plannedRows = buildYieldAwareCrawlPlan(laneCrawlable as CrawlConfigRow[])
       const totalConfigs = plannedRows.length
       const batchSize = adaptiveEnvelope.fetch.configBatchSize
       const executionBudgetMs = adaptiveEnvelope.fetch.executionBudgetMs
@@ -757,9 +707,6 @@ async function runIngestionOrchestration(
           ? ((acquiredLease.cursor % totalConfigs) + totalConfigs) % totalConfigs
           : 0
       const baseCursor = laneCursorBefore
-        totalConfigs > 0 && acquiredLease
-          ? ((acquiredLease.cursor % totalConfigs) + totalConfigs) % totalConfigs
-          : 0
       const cappedCount = Math.min(batchSize, totalConfigs)
       const boundedRows =
         totalConfigs === 0
@@ -879,6 +826,12 @@ async function runIngestionOrchestration(
         totals.invalid += s.invalid
         totals.errors += s.errors
         totals.pagesProcessed += s.pagesProcessed
+
+        await recordConfigCrawlStats({
+          city: row.city,
+          state: row.state,
+          totals: { fetched: s.fetched, skipped: s.skipped, inserted: s.inserted },
+        })
       }
 
       nextCursor =
@@ -1132,15 +1085,45 @@ async function runIngestionOrchestration(
       step: 'geocode',
       backlogBatchSize,
     }))
-    geocodeSummary = await geocodePendingSales({
-      batchSizeOverride: backlogBatchSize,
-      concurrencyCeilingOverride: adaptiveEnvelope.geocode.concurrencyCeiling,
-      telemetryContext: telemetryContext,
+    const geocodeLease = await runWithGeocodePipelineLease({
+      logContext: withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'geocode',
+      }),
+      execute: () =>
+        geocodePendingSales({
+          batchSizeOverride: backlogBatchSize,
+          concurrencyCeilingOverride: adaptiveEnvelope.geocode.concurrencyCeiling,
+          telemetryContext: telemetryContext,
+        }),
     })
-    taskResult.steps.geocode = {
-      ok: true,
-      backlogBatchSize,
-      ...geocodeSummary,
+    if (geocodeLease.skipped) {
+      geocodeSummary = {
+        claimed: 0,
+        succeeded: 0,
+        failedRetriable: 0,
+        failedTerminal: 0,
+        rate429Count: 0,
+        processed: 0,
+        publishTriggered: 0,
+        publishOk: 0,
+        publishFailed: 0,
+      }
+      taskResult.steps.geocode = {
+        ok: true,
+        backlogBatchSize,
+        skippedDueToPipelineLease: true,
+        pipelineLeaseReason: geocodeLease.reason,
+        ...geocodeSummary,
+      }
+    } else {
+      geocodeSummary = geocodeLease.result
+      taskResult.steps.geocode = {
+        ok: true,
+        backlogBatchSize,
+        ...geocodeSummary,
+      }
     }
     logger.info('Geocode step completed', withOpId({
       component: 'api/cron/daily',

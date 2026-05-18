@@ -104,6 +104,24 @@ export default function IngestionDashboardClient() {
       count: row.count,
     })) ?? []
 
+  const listingsInsertedData =
+    data?.timeseries.listingsInsertedByHour.map((row) => ({
+      label: formatHourLabel(row.bucket),
+      count: row.count,
+    })) ?? []
+
+  const insertYieldData =
+    data?.timeseries.insertYieldByHour.map((row) => ({
+      label: formatHourLabel(row.bucket),
+      value: row.value == null ? null : Math.round(row.value * 1000) / 10,
+    })) ?? []
+
+  const saturationRateData =
+    data?.timeseries.saturationRateByHour.map((row) => ({
+      label: formatHourLabel(row.bucket),
+      value: row.value == null ? null : Math.round(row.value * 1000) / 10,
+    })) ?? []
+
   const geocodeSuccessOrchestrationData =
     data?.timeseries.geocodeSuccessByHour.map((row) => ({
       label: formatHourLabel(row.bucket),
@@ -185,7 +203,30 @@ export default function IngestionDashboardClient() {
             )}
 
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-              <MetricCard label="Backlog (needs_geocode)" value={data.backlog} highlight />
+              <MetricCard
+                label="Inserted / hour"
+                value={data.volume.hourlyRates.listingsInsertedPerHour}
+                title="Primary acquisition KPI"
+                highlight
+              />
+              <MetricCard
+                label="Insert yield (24h)"
+                value={
+                  data.volume.fetch.insertYield24h == null
+                    ? '—'
+                    : `${(data.volume.fetch.insertYield24h * 100).toFixed(2)}%`
+                }
+              />
+              <MetricCard
+                label="Saturation (24h)"
+                value={
+                  data.volume.fetch.saturationRate24h == null
+                    ? '—'
+                    : `${(data.volume.fetch.saturationRate24h * 100).toFixed(1)}%`
+                }
+                title="Recrawl duplicate skip pressure"
+              />
+              <MetricCard label="Backlog (needs_geocode)" value={data.backlog} />
               <MetricCard
                 label="Geocode eligible"
                 value={data.geocodeEligibleBacklog}
@@ -210,6 +251,72 @@ export default function IngestionDashboardClient() {
                 value={data.efficiency == null ? '—' : `${(data.efficiency * 100).toFixed(1)}%`}
               />
               <MetricCard label="Updated" value={new Date(data.generatedAt).toLocaleTimeString()} />
+            </div>
+
+            <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold">Acquisition</h2>
+              <p className="text-sm text-gray-700">
+                Crawlable {data.volume.acquisition.crawlableConfigs} · Saturated{' '}
+                {data.volume.acquisition.saturatedConfigs} · Validated{' '}
+                {data.volume.acquisition.validatedDiscoveryConfigs} · Manual{' '}
+                {data.volume.acquisition.manualDiscoveryConfigs} · Pending{' '}
+                {data.volume.acquisition.pendingDiscoveryConfigs} · Inserted/hr{' '}
+                {data.volume.hourlyRates.listingsInsertedPerHour}
+              </p>
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <ChartCard title="Listings inserted / hour">
+                {listingsInsertedData.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-500">No data</p>
+                ) : (
+                  <ChartWrap>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={listingsInsertedData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#059669" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartWrap>
+                )}
+              </ChartCard>
+              <ChartCard title="Insert yield % / hour">
+                {insertYieldData.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-500">No data</p>
+                ) : (
+                  <ChartWrap>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={insertYieldData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="value" stroke="#059669" dot={false} strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartWrap>
+                )}
+              </ChartCard>
+              <ChartCard title="Saturation % / hour">
+                {saturationRateData.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-500">No data</p>
+                ) : (
+                  <ChartWrap>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={saturationRateData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="value" stroke="#dc2626" dot={false} strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartWrap>
+                )}
+              </ChartCard>
             </div>
 
             <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">

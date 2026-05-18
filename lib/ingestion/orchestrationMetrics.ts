@@ -79,6 +79,13 @@ export type ExternalIngestionOrchestrationNote = {
   duplicateCrossCityPage?: number
   duplicateCanonicalCollision?: number
   duplicateExpiredRow?: number
+  ystmDetailFirstAttempted?: number
+  ystmDetailFirstSucceeded?: number
+  ystmDetailFirstPublished?: number
+  ystmDetailFirstFallback?: number
+  ystmDetailFirstFetchFailed?: number
+  freshInsertReadyAtInsertRate?: number | null
+  medianMsToPublished?: number | null
   dedupeTelemetrySummary?: DedupeDecisionAggregate
   externalFetchDurationMs?: number
   publishDuplicateReuseCount?: number

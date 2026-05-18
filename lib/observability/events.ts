@@ -34,6 +34,12 @@ export const ObservabilityEvents = {
     nativeCoordTerminal: 'ingestion.native_coord.terminal',
     nativeCoordPublishSuccess: 'ingestion.native_coord.publish_success',
     nativeCoordPublishFailed: 'ingestion.native_coord.publish_failed',
+    ystmDetailFirstAttempted: 'ingestion.ystm_detail_first.attempted',
+    ystmDetailFirstSucceeded: 'ingestion.ystm_detail_first.succeeded',
+    ystmDetailFirstPublished: 'ingestion.ystm_detail_first.published',
+    ystmDetailFirstFallback: 'ingestion.ystm_detail_first.fallback',
+    ystmDetailFirstFetchFailed: 'ingestion.ystm_detail_first.fetch_failed',
+    ystmDetailFirstRejectedReason: 'ingestion.ystm_detail_first.rejected_reason',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

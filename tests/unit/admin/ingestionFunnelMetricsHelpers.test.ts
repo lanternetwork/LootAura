@@ -153,4 +153,55 @@ describe('ingestionFunnelMetricsHelpers', () => {
       is_duplicate: false,
     })).toBe('native_coord_failed')
   })
+
+  it('rolls up YSTM detail-first counters from external ingestion notes', () => {
+    const created = '2026-05-17T11:00:00.000Z'
+    const rollup = rollupExternalIngestionForWindow(
+      [
+        orchRow(created, {
+          status: 'completed',
+          fetched: 10,
+          inserted: 2,
+          skipped: 8,
+          freshInserted: 2,
+          ystmDetailFirstAttempted: 5,
+          ystmDetailFirstSucceeded: 2,
+          ystmDetailFirstPublished: 1,
+          ystmDetailFirstFallback: 3,
+          ystmDetailFirstFetchFailed: 1,
+          medianMsToPublished: 420,
+        }),
+      ],
+      24,
+      NOW
+    )
+    expect(rollup.detailFirstAttempted).toBe(5)
+    expect(rollup.detailFirstSucceeded).toBe(2)
+    expect(rollup.detailFirstPublished).toBe(1)
+    expect(rollup.detailFirstFallback).toBe(3)
+    expect(rollup.detailFirstFetchFailed).toBe(1)
+    expect(rollup.detailFirstMsToPublishedSamples).toEqual([420])
+
+    const funnel = buildIngestionFunnelMetrics({
+      orchestrationRows: [
+        orchRow(created, {
+          status: 'completed',
+          fetched: 10,
+          inserted: 2,
+          skipped: 8,
+          freshInserted: 2,
+          ystmDetailFirstAttempted: 5,
+          ystmDetailFirstSucceeded: 2,
+          ystmDetailFirstPublished: 1,
+          ystmDetailFirstFallback: 3,
+          ystmDetailFirstFetchFailed: 1,
+          medianMsToPublished: 420,
+        }),
+      ],
+      cohortRows: [],
+      nowMs: NOW,
+    })
+    expect(funnel['24h'].detailFirst.attempted).toBe(5)
+    expect(funnel['24h'].detailFirst.providerGeocodeBypassRate).toBe(0.4)
+  })
 })

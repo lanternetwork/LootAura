@@ -75,6 +75,7 @@ import {
   fetchEnabledExternalIngestionCityConfigs,
   recordConfigCrawlStats,
 } from '@/lib/ingestion/acquisition/configCrawlStats'
+import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
 import { freshAcquisitionOrchestrationFields } from '@/lib/ingestion/acquisition/freshAcquisitionOrchestrationFields'
 import {
   buildYieldAwareCrawlPlan,
@@ -692,6 +693,12 @@ async function runIngestionOrchestration(
         duplicateCrossCityPage: 0,
         duplicateCanonicalCollision: 0,
         duplicateExpiredRow: 0,
+        ystmDetailFirstAttempted: 0,
+        ystmDetailFirstSucceeded: 0,
+        ystmDetailFirstPublished: 0,
+        ystmDetailFirstFallback: 0,
+        ystmDetailFirstFetchFailed: 0,
+        ystmDetailFirstMsSamples: [] as number[],
       }
 
       const externalRows = ((enabledCities || []) as ExternalConfigRow[]).filter(
@@ -841,6 +848,12 @@ async function runIngestionOrchestration(
         totals.duplicateCrossCityPage += s.duplicateCrossCityPage ?? 0
         totals.duplicateCanonicalCollision += s.duplicateCanonicalCollision ?? 0
         totals.duplicateExpiredRow += s.duplicateExpiredRow ?? 0
+        totals.ystmDetailFirstAttempted += s.ystmDetailFirstAttempted ?? 0
+        totals.ystmDetailFirstSucceeded += s.ystmDetailFirstSucceeded ?? 0
+        totals.ystmDetailFirstPublished += s.ystmDetailFirstPublished ?? 0
+        totals.ystmDetailFirstFallback += s.ystmDetailFirstFallback ?? 0
+        totals.ystmDetailFirstFetchFailed += s.ystmDetailFirstFetchFailed ?? 0
+        totals.ystmDetailFirstMsSamples.push(...(s.ystmDetailFirstMsToPublishedSamples ?? []))
 
         ingestionDedupeTelemetrySummary.source_url += s.duplicateExistingUrl ?? 0
         ingestionDedupeTelemetrySummary.soft_date_window += s.duplicateCrossCityPage ?? 0
@@ -897,6 +910,18 @@ async function runIngestionOrchestration(
         invalid: totals.invalid,
         errors: totals.errors,
         ...freshAcquisitionOrchestrationFields(totals),
+        ...detailFirstOrchestrationFields(
+          {
+            attempted: totals.ystmDetailFirstAttempted,
+            succeeded: totals.ystmDetailFirstSucceeded,
+            published: totals.ystmDetailFirstPublished,
+            fallback: totals.ystmDetailFirstFallback,
+            fetchFailed: totals.ystmDetailFirstFetchFailed,
+            rejectedByReason: {},
+            msToPublishedSamples: totals.ystmDetailFirstMsSamples,
+          },
+          totals.freshInserted
+        ),
         dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
       }
 
@@ -930,6 +955,18 @@ async function runIngestionOrchestration(
         invalid: totals.invalid,
         errors: totals.errors,
         ...freshAcquisitionOrchestrationFields(totals),
+        ...detailFirstOrchestrationFields(
+          {
+            attempted: totals.ystmDetailFirstAttempted,
+            succeeded: totals.ystmDetailFirstSucceeded,
+            published: totals.ystmDetailFirstPublished,
+            fallback: totals.ystmDetailFirstFallback,
+            fetchFailed: totals.ystmDetailFirstFetchFailed,
+            rejectedByReason: {},
+            msToPublishedSamples: totals.ystmDetailFirstMsSamples,
+          },
+          totals.freshInserted
+        ),
         dedupeTelemetrySummary: {
           source_url: ingestionDedupeTelemetrySummary.source_url,
           exact_address_date: ingestionDedupeTelemetrySummary.exact_address_date,

@@ -25,6 +25,17 @@ import {
   type ExternalDuplicateSkipCounts,
 } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
 import { evaluateDuplicateSkipForExternalListListing } from '@/lib/ingestion/dedupe'
+import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
+import {
+  attemptYstmDetailFirstReady,
+  emptyYstmDetailFirstRunMetrics,
+  isYstmDetailFirstReadyEnabled,
+  mapWithBoundedConcurrency,
+  mergeYstmDetailFirstMetrics,
+  parseYstmDetailFirstConcurrencyFromEnv,
+  type YstmDetailFirstRunMetrics,
+} from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
 import { isSaleWindowExpiredAtDiscovery } from '@/lib/ingestion/saleWindowDates'
 import {
@@ -81,6 +92,15 @@ export interface ExternalPageSourcePersistSummary {
   duplicateCrossCityPage: number
   duplicateCanonicalCollision: number
   duplicateExpiredRow: number
+  /** Phase 3B detail-first READY fast-path counters. */
+  ystmDetailFirstAttempted: number
+  ystmDetailFirstSucceeded: number
+  ystmDetailFirstPublished: number
+  ystmDetailFirstFallback: number
+  ystmDetailFirstFetchFailed: number
+  ystmDetailFirstReadyAtInsertRate: number | null
+  ystmDetailFirstMedianMsToPublished: number | null
+  ystmDetailFirstMsToPublishedSamples: number[]
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -995,7 +1015,19 @@ export async function persistExternalPageSource(
     duplicateCrossCityPage: 0,
     duplicateCanonicalCollision: 0,
     duplicateExpiredRow: 0,
+    ystmDetailFirstAttempted: 0,
+    ystmDetailFirstSucceeded: 0,
+    ystmDetailFirstPublished: 0,
+    ystmDetailFirstFallback: 0,
+    ystmDetailFirstFetchFailed: 0,
+    ystmDetailFirstReadyAtInsertRate: null,
+    ystmDetailFirstMedianMsToPublished: null,
+    ystmDetailFirstMsToPublishedSamples: [],
   }
+
+  const detailFirstEnabled = isYstmDetailFirstReadyEnabled()
+  const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
+  const detailFirstMetrics: YstmDetailFirstRunMetrics = emptyYstmDetailFirstRunMetrics()
 
   const bumpDuplicateKind = (counts: ExternalDuplicateSkipCounts, kind: keyof ExternalDuplicateSkipCounts) => {
     counts[kind] += 1
@@ -1123,79 +1155,13 @@ export async function persistExternalPageSource(
       )
     }
 
-    for (const listing of parseResult.listings) {
-      if ((listing.rawPayload as { cityConflict?: boolean }).cityConflict === true) {
-        normalizationWarnings += 1
-      }
+    type DetailFirstCandidate = {
+      listing: ExternalPageSourceListing
+      rowPayload: Record<string, unknown>
+    }
+    const detailFirstCandidates: DetailFirstCandidate[] = []
 
-      if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
-        summary.skippedExpired += 1
-        summary.skipped += 1
-        continue
-      }
-
-      const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
-
-      const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
-        .select('id, status, failure_reasons')
-        .eq('source_url', listing.sourceUrl)
-        .maybeSingle()
-
-      if (selErr) {
-        summary.errors += 1
-        logger.error(
-          'External page source: source_url lookup failed',
-          new Error(selErr.message),
-          {
-            component: 'ingestion/adapters/externalPageSource',
-            operation: 'dedupe_lookup',
-            city: config.city,
-            state: config.state,
-            adapter: ADAPTER_ID,
-            externalId: listing.rawPayload.externalId ?? null,
-          }
-        )
-        emitObservabilityRecord(
-          buildTelemetryRecord(ObservabilityEvents.parser.extractionFailure, {
-            ...telemBase,
-            adapter: ADAPTER_ID,
-            parserVersion: PARSER_VERSION_ROW,
-            pageIndex,
-            pageHostHash,
-            errorCode: 'dedupe_lookup',
-          })
-        )
-        continue
-      }
-      if (existing?.id) {
-        duplicateUrlSkipped += 1
-        const kind = isIngestedRowExpiredForDuplicate(
-          existing.status as string,
-          existing.failure_reasons
-        )
-          ? 'duplicate_expired_row'
-          : 'duplicate_existing_url'
-        bumpDuplicateKind(duplicateKinds, kind)
-        continue
-      }
-
-      const scoredDup = await evaluateDuplicateSkipForExternalListListing(admin, platform, {
-        title: listing.title,
-        city: listing.city,
-        state: listing.state,
-        addressRaw: listing.addressRaw,
-        startDate: listing.startDate ?? null,
-        endDate: listing.endDate ?? null,
-        externalId: (listing.rawPayload.externalId as string | null) ?? null,
-        imageSourceUrl: listing.imageSourceUrl,
-        sourceUrl: listing.sourceUrl,
-      })
-      if (scoredDup.skip) {
-        summary.duplicateScoredSkipped += 1
-        bumpDuplicateKind(duplicateKinds, scoredDup.skipKind ?? 'duplicate_cross_city_page')
-        continue
-      }
-
+    const insertListingLegacy = async (listing: ExternalPageSourceListing, rowPayload: Record<string, unknown>) => {
       const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as GatedListingDiagnostics & {
         chosenAddressSource?: string
       }
@@ -1282,7 +1248,7 @@ export async function persistExternalPageSource(
         if (/duplicate key|unique constraint|23505/i.test(insErr.message)) {
           duplicateConstraintSkipped += 1
           bumpDuplicateKind(duplicateKinds, 'duplicate_canonical_collision')
-          continue
+          return
         }
         summary.errors += 1
         logger.error(
@@ -1297,7 +1263,7 @@ export async function persistExternalPageSource(
             externalId: listing.rawPayload.externalId ?? null,
           }
         )
-        continue
+        return
       }
 
       if (insertedRow?.id && insertStatus === 'ready') {
@@ -1306,6 +1272,119 @@ export async function persistExternalPageSource(
 
       summary.inserted += 1
       summary.freshInserted += 1
+    }
+
+    for (const listing of parseResult.listings) {
+      if ((listing.rawPayload as { cityConflict?: boolean }).cityConflict === true) {
+        normalizationWarnings += 1
+      }
+
+      if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
+        summary.skippedExpired += 1
+        summary.skipped += 1
+        continue
+      }
+
+      const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
+
+      const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
+        .select('id, status, failure_reasons')
+        .eq('source_url', listing.sourceUrl)
+        .maybeSingle()
+
+      if (selErr) {
+        summary.errors += 1
+        logger.error(
+          'External page source: source_url lookup failed',
+          new Error(selErr.message),
+          {
+            component: 'ingestion/adapters/externalPageSource',
+            operation: 'dedupe_lookup',
+            city: config.city,
+            state: config.state,
+            adapter: ADAPTER_ID,
+            externalId: listing.rawPayload.externalId ?? null,
+          }
+        )
+        emitObservabilityRecord(
+          buildTelemetryRecord(ObservabilityEvents.parser.extractionFailure, {
+            ...telemBase,
+            adapter: ADAPTER_ID,
+            parserVersion: PARSER_VERSION_ROW,
+            pageIndex,
+            pageHostHash,
+            errorCode: 'dedupe_lookup',
+          })
+        )
+        continue
+      }
+      if (existing?.id) {
+        duplicateUrlSkipped += 1
+        const kind = isIngestedRowExpiredForDuplicate(
+          existing.status as string,
+          existing.failure_reasons
+        )
+          ? 'duplicate_expired_row'
+          : 'duplicate_existing_url'
+        bumpDuplicateKind(duplicateKinds, kind)
+        continue
+      }
+
+      const scoredDup = await evaluateDuplicateSkipForExternalListListing(admin, platform, {
+        title: listing.title,
+        city: listing.city,
+        state: listing.state,
+        addressRaw: listing.addressRaw,
+        startDate: listing.startDate ?? null,
+        endDate: listing.endDate ?? null,
+        externalId: (listing.rawPayload.externalId as string | null) ?? null,
+        imageSourceUrl: listing.imageSourceUrl,
+        sourceUrl: listing.sourceUrl,
+      })
+      if (scoredDup.skip) {
+        summary.duplicateScoredSkipped += 1
+        bumpDuplicateKind(duplicateKinds, scoredDup.skipKind ?? 'duplicate_cross_city_page')
+        continue
+      }
+
+      if (detailFirstEnabled && isYstmDetailListingUrl(listing.sourceUrl)) {
+        detailFirstCandidates.push({ listing, rowPayload })
+        continue
+      }
+
+      await insertListingLegacy(listing, rowPayload)
+    }
+
+    if (detailFirstCandidates.length > 0) {
+      await mapWithBoundedConcurrency(detailFirstCandidates, detailFirstConcurrency, async (candidate) => {
+        const { result, metrics: attemptMetrics } = await attemptYstmDetailFirstReady({
+          config,
+          listSeed: candidate.listing,
+          platform,
+          rowPayload: candidate.rowPayload,
+          pageIndex,
+          telemetryContext: telemBase,
+          beforeDetailFetch: options?.beforePageFetch
+            ? async ({ detailUrl, pageIndex: detailPageIndex, city, state }) => {
+                await options.beforePageFetch!({
+                  pageUrl: detailUrl,
+                  pageIndex: detailPageIndex,
+                  city,
+                  state,
+                })
+              }
+            : undefined,
+        })
+        mergeYstmDetailFirstMetrics(detailFirstMetrics, attemptMetrics)
+
+        if (result.outcome === 'ready') {
+          summary.inserted += 1
+          summary.freshInserted += 1
+          return
+        }
+
+        await insertListingLegacy(candidate.listing, candidate.rowPayload)
+      })
     }
   }
 
@@ -1381,6 +1460,16 @@ export async function persistExternalPageSource(
     })
   )
 
+  summary.ystmDetailFirstAttempted = detailFirstMetrics.attempted
+  summary.ystmDetailFirstSucceeded = detailFirstMetrics.succeeded
+  summary.ystmDetailFirstPublished = detailFirstMetrics.published
+  summary.ystmDetailFirstFallback = detailFirstMetrics.fallback
+  summary.ystmDetailFirstFetchFailed = detailFirstMetrics.fetchFailed
+  const detailFirstFields = detailFirstOrchestrationFields(detailFirstMetrics, summary.freshInserted)
+  summary.ystmDetailFirstReadyAtInsertRate = detailFirstFields.freshInsertReadyAtInsertRate
+  summary.ystmDetailFirstMedianMsToPublished = detailFirstFields.medianMsToPublished
+  summary.ystmDetailFirstMsToPublishedSamples = [...detailFirstMetrics.msToPublishedSamples]
+
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.ingestion.externalPersistSummary, {
       ...telemBase,
@@ -1403,6 +1492,11 @@ export async function persistExternalPageSource(
       duplicateCrossCityPage: summary.duplicateCrossCityPage,
       duplicateCanonicalCollision: summary.duplicateCanonicalCollision,
       duplicateExpiredRow: summary.duplicateExpiredRow,
+      ystmDetailFirstAttempted: summary.ystmDetailFirstAttempted,
+      ystmDetailFirstSucceeded: summary.ystmDetailFirstSucceeded,
+      ystmDetailFirstPublished: summary.ystmDetailFirstPublished,
+      ystmDetailFirstFallback: summary.ystmDetailFirstFallback,
+      ystmDetailFirstFetchFailed: summary.ystmDetailFirstFetchFailed,
       normalizationWarnings,
     })
   )

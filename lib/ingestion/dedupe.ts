@@ -196,7 +196,9 @@ async function fetchSoftAddressCandidates(
 ): Promise<SoftDuplicateCandidateRow[]> {
   const { min, max } = softFetchDateBounds(dateStart)
   const { data, error } = await fromBase(admin, 'ingested_sales')
-    .select('id, date_start, date_end, title, source_platform, external_id, lat, lng, image_source_url')
+    .select(
+      'id, date_start, date_end, title, source_platform, external_id, lat, lng, image_source_url, source_url, canonical_source_url'
+    )
     .eq('normalized_address', normalizedAddress)
     .not('date_start', 'is', null)
     .gte('date_start', min)
@@ -230,16 +232,24 @@ export type ExternalListDuplicateProbe = {
  * External list ingestion: deterministic duplicate skip before insert when the listing URL is new
  * but the same normalized address + scored duplicate signals match an existing ingested row.
  */
+export type ExternalListDuplicateSkipResult = {
+  skip: boolean
+  duplicateOfId: string | null
+  evaluation: SoftDuplicateEvaluation | null
+  /** Set when `skip` is true from soft scoring (URL-level skips classified in adapter). */
+  skipKind: 'duplicate_cross_city_page' | null
+}
+
 export async function evaluateDuplicateSkipForExternalListListing(
   admin: ReturnType<typeof getAdminDb>,
   platform: string,
   probe: ExternalListDuplicateProbe
-): Promise<{ skip: boolean; duplicateOfId: string | null; evaluation: SoftDuplicateEvaluation | null }> {
+): Promise<ExternalListDuplicateSkipResult> {
   const normalizedAddress = probe.addressRaw
     ? probe.addressRaw.toLowerCase().replace(/\s+/g, ' ').trim()
     : null
   if (!normalizedAddress || !probe.startDate) {
-    return { skip: false, duplicateOfId: null, evaluation: null }
+    return { skip: false, duplicateOfId: null, evaluation: null, skipKind: null }
   }
 
   const incoming: DuplicateScoringIncoming = {
@@ -269,9 +279,19 @@ export async function evaluateDuplicateSkipForExternalListListing(
         context: 'external_list_insert_skip',
       })
     )
-    return { skip: true, duplicateOfId: evaluation.winner.id, evaluation }
+    return {
+      skip: true,
+      duplicateOfId: evaluation.winner.id,
+      evaluation,
+      skipKind: 'duplicate_cross_city_page',
+    }
   }
-  return { skip: false, duplicateOfId: null, evaluation: rows.length > 0 ? evaluation : null }
+  return {
+    skip: false,
+    duplicateOfId: null,
+    evaluation: rows.length > 0 ? evaluation : null,
+    skipKind: null,
+  }
 }
 
 export async function findIngestedSaleMatch(

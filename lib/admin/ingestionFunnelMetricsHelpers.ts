@@ -5,6 +5,11 @@
 import type { DedupeDecisionAggregate } from '@/lib/ingestion/dedupe'
 import type { ExternalIngestionOrchestrationNote } from '@/lib/ingestion/orchestrationMetrics'
 import {
+  buildConfigYieldLeaderboards,
+  summarizeFreshAcquisitionRates,
+} from '@/lib/admin/configYieldLeaderboards'
+import type { ConfigCrawlStatsSnapshot } from '@/lib/ingestion/acquisition/configCrawlStats'
+import {
   dedupeDenominatorFromAggregate,
   dedupeSkipCountFromAggregate,
   computeRate,
@@ -19,6 +24,8 @@ export const FUNNEL_WINDOW_7D = 24 * 7
 export type IngestionFunnelStageId =
   | 'discovered'
   | 'duplicate_skipped'
+  | 'skipped_expired'
+  | 'fresh_inserted'
   | 'inserted'
   | 'expired_at_insert'
   | 'invalid_address'
@@ -48,6 +55,10 @@ export type IngestionFunnelDuplicateHits = {
   exact_address_date: number
   soft_date_window: number
   duplicate_decision_true: number
+  duplicate_existing_url: number
+  duplicate_cross_city_page: number
+  duplicate_canonical_collision: number
+  duplicate_expired_row: number
   total: number
 }
 
@@ -80,6 +91,24 @@ export type IngestionFunnelPlatformBreakdown = {
   uniqueCanonicalUrls: number
 }
 
+export type IngestionFunnelFreshRates = {
+  freshInsertYield: number | null
+  expiredDiscoveryRatio: number | null
+  expiredInsertRatio: number | null
+}
+
+export type ConfigYieldLeaderboardEntry = {
+  city: string
+  state: string
+  windowFetched: number
+  windowSkippedExpired: number
+  windowFreshInserted: number
+  windowDupSkips: number
+  freshInsertYield: number | null
+  expiredDiscoveryRatio: number | null
+  skipRatio: number | null
+}
+
 export type IngestionFunnelWindowMetrics = {
   windowHours: number
   stages: IngestionFunnelStage[]
@@ -87,6 +116,14 @@ export type IngestionFunnelWindowMetrics = {
   reconciliation: IngestionFunnelReconciliation
   uniqueCanonicalUrls: number
   duplicateHits: IngestionFunnelDuplicateHits
+  freshRates: IngestionFunnelFreshRates
+  skippedExpired: number
+  freshInserted: number
+  configLeaderboards: {
+    topFreshYield: ConfigYieldLeaderboardEntry[]
+    topStale: ConfigYieldLeaderboardEntry[]
+    topDuplicate: ConfigYieldLeaderboardEntry[]
+  }
   bySourcePlatform: Record<string, IngestionFunnelPlatformBreakdown>
   ystm: IngestionFunnelPlatformBreakdown
   sparklines: {
@@ -117,6 +154,8 @@ export type ExternalIngestionRollup = {
   listingsDiscovered: number
   listingsInserted: number
   listingsSkipped: number
+  skippedExpired: number
+  freshInserted: number
   parserInvalid: number
   duplicateSkips: number
   dedupeDenominator: number
@@ -124,6 +163,18 @@ export type ExternalIngestionRollup = {
   discoveredByHour: Map<string, number>
   insertedByHour: Map<string, number>
   skippedByHour: Map<string, number>
+}
+
+function recomputeDuplicateHitsTotal(target: IngestionFunnelDuplicateHits): void {
+  target.total =
+    target.source_url +
+    target.exact_address_date +
+    target.soft_date_window +
+    target.duplicate_decision_true +
+    target.duplicate_existing_url +
+    target.duplicate_cross_city_page +
+    target.duplicate_canonical_collision +
+    target.duplicate_expired_row
 }
 
 function num(v: unknown): number {
@@ -223,6 +274,10 @@ export function emptyDuplicateHits(): IngestionFunnelDuplicateHits {
     exact_address_date: 0,
     soft_date_window: 0,
     duplicate_decision_true: 0,
+    duplicate_existing_url: 0,
+    duplicate_cross_city_page: 0,
+    duplicate_canonical_collision: 0,
+    duplicate_expired_row: 0,
     total: 0,
   }
 }
@@ -236,11 +291,24 @@ export function accumulateDuplicateHits(
   target.exact_address_date += num(agg.exact_address_date)
   target.soft_date_window += num(agg.soft_date_window)
   target.duplicate_decision_true += num(agg.duplicateDecisionTrue)
-  target.total =
-    target.source_url +
-    target.exact_address_date +
-    target.soft_date_window +
-    target.duplicate_decision_true
+  recomputeDuplicateHitsTotal(target)
+  return target
+}
+
+export function accumulateClassifiedDuplicateHits(
+  target: IngestionFunnelDuplicateHits,
+  ext: {
+    duplicateExistingUrl?: number
+    duplicateCrossCityPage?: number
+    duplicateCanonicalCollision?: number
+    duplicateExpiredRow?: number
+  }
+): IngestionFunnelDuplicateHits {
+  target.duplicate_existing_url += num(ext.duplicateExistingUrl)
+  target.duplicate_cross_city_page += num(ext.duplicateCrossCityPage)
+  target.duplicate_canonical_collision += num(ext.duplicateCanonicalCollision)
+  target.duplicate_expired_row += num(ext.duplicateExpiredRow)
+  recomputeDuplicateHitsTotal(target)
   return target
 }
 
@@ -258,6 +326,8 @@ export function rollupExternalIngestionForWindow(
     listingsDiscovered: 0,
     listingsInserted: 0,
     listingsSkipped: 0,
+    skippedExpired: 0,
+    freshInserted: 0,
     parserInvalid: 0,
     duplicateSkips: 0,
     dedupeDenominator: 0,
@@ -281,12 +351,20 @@ export function rollupExternalIngestionForWindow(
     rollup.listingsDiscovered += fetched
     rollup.listingsInserted += inserted
     rollup.listingsSkipped += skipped
+    rollup.skippedExpired += num(ext.skippedExpired)
+    rollup.freshInserted += num(ext.freshInserted)
     rollup.parserInvalid += invalid
 
     const agg = ext.dedupeTelemetrySummary
     rollup.duplicateSkips += dedupeSkipCountFromAggregate(agg)
     rollup.dedupeDenominator += dedupeDenominatorFromAggregate(agg)
     accumulateDuplicateHits(rollup.duplicateHits, agg)
+    accumulateClassifiedDuplicateHits(rollup.duplicateHits, {
+      duplicateExistingUrl: ext.duplicateExistingUrl,
+      duplicateCrossCityPage: ext.duplicateCrossCityPage,
+      duplicateCanonicalCollision: ext.duplicateCanonicalCollision,
+      duplicateExpiredRow: ext.duplicateExpiredRow,
+    })
 
     const k = hourFloorUtc(row.created_at)
     discoveredByHour.set(k, (discoveredByHour.get(k) ?? 0) + fetched)
@@ -433,6 +511,7 @@ export function aggregateCohortFunnel(
 
 const LOSS_STAGE_IDS = new Set<IngestionFunnelStageId>([
   'duplicate_skipped',
+  'skipped_expired',
   'expired_at_insert',
   'invalid_address',
   'address_gated',
@@ -489,11 +568,14 @@ export function buildIngestionFunnelWindowMetrics(params: {
   windowHours: number
   externalRollup: ExternalIngestionRollup
   cohort: CohortFunnelAggregate
+  configRows?: ConfigCrawlStatsSnapshot[]
   nowMs?: number
 }): IngestionFunnelWindowMetrics {
-  const { windowHours, externalRollup, cohort } = params
+  const { windowHours, externalRollup, cohort, configRows = [], nowMs = Date.now() } = params
   const discovered = externalRollup.listingsDiscovered
   const duplicateSkipped = externalRollup.listingsSkipped + externalRollup.duplicateSkips
+  const skippedExpired = externalRollup.skippedExpired
+  const freshInserted = externalRollup.freshInserted
   const inserted = cohort.inserted
   const orchInserted = externalRollup.listingsInserted
 
@@ -510,7 +592,9 @@ export function buildIngestionFunnelWindowMetrics(params: {
 
   push('discovered', 'Discovered / fetched', 'crawler', discovered)
   push('duplicate_skipped', 'Duplicate / skipped', 'crawler', duplicateSkipped)
-  push('inserted', 'Inserted (unique rows)', 'unique_listings', inserted)
+  push('skipped_expired', 'Skipped expired (at discovery)', 'crawler', skippedExpired)
+  push('fresh_inserted', 'Fresh inserted (non-expired)', 'unique_listings', freshInserted)
+  push('inserted', 'Inserted (unique rows, DB cohort)', 'unique_listings', inserted)
   push('expired_at_insert', 'Expired (past date)', 'publishable', reach.expired_at_insert)
   push('invalid_address', 'Invalid address', 'publishable', reach.invalid_address)
   push('address_gated', 'Address gated', 'publishable', reach.address_gated)
@@ -548,6 +632,14 @@ export function buildIngestionFunnelWindowMetrics(params: {
   cohort.ystm.discovered = discovered
   cohort.ystm.duplicate_skipped = duplicateSkipped
 
+  const freshRates = summarizeFreshAcquisitionRates({
+    discovered,
+    skippedExpired,
+    freshInserted,
+    cohortInserted: inserted,
+    cohortExpiredAtInsert: reach.expired_at_insert,
+  })
+
   return {
     windowHours,
     stages,
@@ -555,6 +647,10 @@ export function buildIngestionFunnelWindowMetrics(params: {
     reconciliation,
     uniqueCanonicalUrls: cohort.uniqueCanonicalUrls,
     duplicateHits: externalRollup.duplicateHits,
+    freshRates,
+    skippedExpired,
+    freshInserted,
+    configLeaderboards: buildConfigYieldLeaderboards(configRows, nowMs),
     bySourcePlatform: cohort.bySourcePlatform,
     ystm: cohort.ystm,
     sparklines: {
@@ -574,6 +670,7 @@ export function buildIngestionFunnelWindowMetrics(params: {
 export function buildIngestionFunnelMetrics(params: {
   orchestrationRows: OrchestrationRunRow[]
   cohortRows: IngestedSaleFunnelRow[]
+  configRows?: ConfigCrawlStatsSnapshot[]
   nowMs?: number
 }): { '24h': IngestionFunnelWindowMetrics; '7d': IngestionFunnelWindowMetrics } {
   const nowMs = params.nowMs ?? Date.now()
@@ -582,6 +679,7 @@ export function buildIngestionFunnelMetrics(params: {
       windowHours,
       externalRollup: rollupExternalIngestionForWindow(params.orchestrationRows, windowHours, nowMs),
       cohort: aggregateCohortFunnel(params.cohortRows, windowHours, nowMs),
+      configRows: params.configRows,
       nowMs,
     })
 

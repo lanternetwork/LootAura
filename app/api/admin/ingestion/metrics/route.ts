@@ -44,6 +44,7 @@ import {
   buildIngestionFunnelMetrics,
   FUNNEL_WINDOW_7D,
 } from '@/lib/admin/ingestionFunnelMetricsHelpers'
+import { fetchFunnelLeaderboardConfigRows } from '@/lib/ingestion/acquisition/configCrawlStats'
 
 export const dynamic = 'force-dynamic'
 
@@ -226,6 +227,8 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(ORCHESTRATION_RUNS_LIMIT)
 
+    const funnelConfigRowsPromise = fetchFunnelLeaderboardConfigRows(admin)
+
     const funnelCohortRowsPromise = fetchAllRows<{
       created_at: string
       source_platform: string | null
@@ -396,6 +399,7 @@ export async function GET(request: NextRequest) {
       ingestedPubTs,
       orchestrationRowsResult,
       funnelCohortRows,
+      funnelConfigRows,
       lastSuccessfulFetchAt,
       laneStateSummaries,
       discoveryCounts,
@@ -431,6 +435,7 @@ export async function GET(request: NextRequest) {
       ingestedPubTsPromise,
       orchestrationRowsPromise,
       funnelCohortRowsPromise,
+      funnelConfigRowsPromise,
       lastSuccessfulFetchPromise,
       laneStateSummariesPromise,
       Promise.all(discoveryStatusPromises),
@@ -546,6 +551,7 @@ export async function GET(request: NextRequest) {
     const funnel = buildIngestionFunnelMetrics({
       orchestrationRows: orchRows,
       cohortRows: funnelCohortRows,
+      configRows: funnelConfigRows,
       nowMs,
     })
 

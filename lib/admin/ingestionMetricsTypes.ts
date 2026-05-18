@@ -1,6 +1,8 @@
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import type {
+  ConfigYieldLeaderboardEntry,
   IngestionFunnelDuplicateHits,
+  IngestionFunnelFreshRates,
   IngestionFunnelPlatformBreakdown,
   IngestionFunnelReconciliation,
   IngestionFunnelStage,
@@ -9,7 +11,9 @@ import type {
 } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 
 export type {
+  ConfigYieldLeaderboardEntry,
   IngestionFunnelDuplicateHits,
+  IngestionFunnelFreshRates,
   IngestionFunnelPlatformBreakdown,
   IngestionFunnelReconciliation,
   IngestionFunnelStage,

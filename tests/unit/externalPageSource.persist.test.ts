@@ -29,6 +29,7 @@ vi.mock('@/lib/ingestion/dedupe', () => ({
     skip: false,
     duplicateOfId: null,
     evaluation: null,
+    skipKind: null,
   }),
 }))
 

@@ -77,9 +77,14 @@ vi.mock('@/lib/ingestion/geocodePipelineLease', () => ({
   runWithGeocodePipelineLease: (...args: unknown[]) => mockRunWithGeocodePipelineLease(...args),
 }))
 
-vi.mock('@/lib/ingestion/acquisition/configCrawlStats', () => ({
-  recordConfigCrawlStats: (...args: unknown[]) => mockRecordConfigCrawlStats(...args),
-}))
+vi.mock('@/lib/ingestion/acquisition/configCrawlStats', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/ingestion/acquisition/configCrawlStats')>()
+  return {
+    ...actual,
+    recordConfigCrawlStats: (...args: unknown[]) => mockRecordConfigCrawlStats(...args),
+  }
+})
 
 vi.mock('@/lib/ingestion/acquisition/yieldAwareCrawlSchedule', () => ({
   buildYieldAwareCrawlPlan: <T,>(rows: T[]) => rows,
@@ -1125,18 +1130,26 @@ describe('GET /api/cron/daily', () => {
         configsCrawlable: 1,
         configsSkippedNoSourcePages: 0,
         configsSkippedInvalidUrls: 0,
+        configsSkippedCrawlExcluded: 0,
         batchSize: 2,
         configsConsumed: 1,
         configsSkippedInvalidPages: 0,
         configsRemaining: 0,
         cursorStart: 0,
         cursorNext: 0,
+        executionBudgetMs: 45000,
         executionBudgetExit: false,
         configsProcessed: 1,
         pagesProcessed: 2,
         fetched: 3,
         inserted: 2,
         skipped: 1,
+        skippedExpired: 0,
+        freshInserted: 0,
+        duplicateExistingUrl: 0,
+        duplicateCrossCityPage: 0,
+        duplicateCanonicalCollision: 0,
+        duplicateExpiredRow: 0,
         invalid: 0,
         errors: 0,
         dedupeTelemetrySummary: {
@@ -1147,7 +1160,6 @@ describe('GET /api/cron/daily', () => {
           no_match: 0,
           duplicateDecisionTrue: 0,
           duplicateDecisionFalse: 0,
-          aggregationMode: 'not_applicable_external_page_source',
         },
       })
       expect(mockPersistExternalPageSource).toHaveBeenCalledTimes(1)

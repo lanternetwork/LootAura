@@ -71,6 +71,14 @@ export type ExternalIngestionOrchestrationNote = {
   skipped?: number
   invalid?: number
   errors?: number
+  /** Listings skipped at crawl — sale window already ended (Phase 3A). */
+  skippedExpired?: number
+  /** Non-expired inserts from this run. */
+  freshInserted?: number
+  duplicateExistingUrl?: number
+  duplicateCrossCityPage?: number
+  duplicateCanonicalCollision?: number
+  duplicateExpiredRow?: number
   dedupeTelemetrySummary?: DedupeDecisionAggregate
   externalFetchDurationMs?: number
   publishDuplicateReuseCount?: number

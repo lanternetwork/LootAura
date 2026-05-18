@@ -48,6 +48,10 @@ import {
   enrichPendingImages,
   type ImageEnrichmentWorkerSummary,
 } from '@/lib/ingestion/imageEnrichmentWorker'
+import {
+  runNativeCoordinateRemediation,
+  type NativeCoordinateRemediationSummary,
+} from '@/lib/ingestion/nativeCoordinateRemediationWorker'
 import { geocodePendingSales, type GeocodeWorkerSummary } from '@/lib/ingestion/geocodeWorker'
 import { runWithGeocodePipelineLease } from '@/lib/ingestion/geocodePipelineLease'
 import {
@@ -552,6 +556,7 @@ async function runIngestionOrchestration(
 
   let addressEnrichmentSummary: AddressEnrichmentWorkerSummary | null = null
   let imageEnrichmentSummary: ImageEnrichmentWorkerSummary | null = null
+  let nativeCoordSummary: NativeCoordinateRemediationSummary | null = null
   let geocodeSummary: GeocodeWorkerSummary | null = null
   let publishSummary: PublishWorkerBatchSummary | null = null
   let publishDuplicateReuseCount = 0
@@ -1076,7 +1081,51 @@ async function runIngestionOrchestration(
     )
   }
 
-  // Step 3: Geocode pending sales.
+  // Step 3: YSTM native coordinate remediation (before geocode).
+  try {
+    const nativeBatchSize = Math.min(
+      adaptiveEnvelope.geocode.backlogBatchSize,
+      parseInt(process.env.NATIVE_COORD_REMEDIATION_BATCH_SIZE ?? '75', 10) || 75
+    )
+    logger.info('Native coordinate remediation step started', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'native_coordinate_remediation',
+      nativeBatchSize,
+    }))
+    nativeCoordSummary = await runNativeCoordinateRemediation({
+      batchSizeOverride: nativeBatchSize,
+      telemetryContext: telemetryContext,
+    })
+    taskResult.steps.native_coordinate_remediation = {
+      ok: true,
+      nativeBatchSize,
+      ...nativeCoordSummary,
+    }
+    logger.info('Native coordinate remediation step completed', withOpId({
+      component: 'api/cron/daily',
+      task: 'ingestion-orchestration',
+      step: 'native_coordinate_remediation',
+      ...nativeCoordSummary,
+    }))
+  } catch (error) {
+    taskResult.ok = false
+    taskResult.steps.native_coordinate_remediation = {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+    logger.error(
+      'Native coordinate remediation step failed',
+      error instanceof Error ? error : new Error(String(error)),
+      withOpId({
+        component: 'api/cron/daily',
+        task: 'ingestion-orchestration',
+        step: 'native_coordinate_remediation',
+      })
+    )
+  }
+
+  // Step 4: Geocode pending sales.
   try {
     const backlogBatchSize = adaptiveEnvelope.geocode.backlogBatchSize
     logger.info('Geocode step started', withOpId({

@@ -17,14 +17,16 @@ export async function promoteIngestedSaleCoordinates(
   rowId: string,
   lat: number,
   lng: number,
-  metadata: PromoteIngestedSaleCoordinatesMetadata
+  metadata: PromoteIngestedSaleCoordinatesMetadata,
+  options?: { allowedPriorStatuses?: Array<'needs_geocode' | 'needs_check'> }
 ): Promise<{ kind: 'geocoded'; publish: PublishReadyByIdResult } | { kind: 'update_failed' }> {
   const admin = getAdminDb()
+  const allowedPriorStatuses = options?.allowedPriorStatuses ?? ['needs_geocode']
 
   const { data: priorRow, error: priorErr } = await fromBase(admin, 'ingested_sales')
-    .select('failure_details')
+    .select('failure_details, status')
     .eq('id', rowId)
-    .eq('status', 'needs_geocode')
+    .in('status', allowedPriorStatuses)
     .maybeSingle()
 
   const clearedFailureDetails =
@@ -47,7 +49,7 @@ export async function promoteIngestedSaleCoordinates(
   const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
     .update(updatePayload)
     .eq('id', rowId)
-    .eq('status', 'needs_geocode')
+    .in('status', allowedPriorStatuses)
     .select('id')
     .maybeSingle()
 

@@ -65,6 +65,18 @@ export interface IngestionVolumeImageEnrichmentMetrics {
   byFailureReason: Record<string, number>
 }
 
+export interface IngestionVolumeNativeCoordMetrics {
+  nativeCoordBacklog: number
+  nativeCoordClaimEligible: number
+  nativeCoordPromoted24h: number
+  nativeCoordFallbackToGeocode24h: number
+  nativeCoordRetry24h: number
+  nativeCoordTerminal24h: number
+  readyFromNative24h: number
+  publishedFromNative24h: number
+  geocodeProviderAvoided24h: number
+}
+
 export interface IngestionVolumeGeocodeMetrics {
   needsGeocodeCount: number
   /** Rows claimable by geocode RPC (address_available + non-empty address_raw). */
@@ -111,6 +123,7 @@ export interface IngestionVolumeMetrics {
   fetch: IngestionVolumeFetchMetrics
   addressLifecycle: IngestionVolumeAddressLifecycleMetrics
   imageEnrichment: IngestionVolumeImageEnrichmentMetrics
+  nativeCoordinateRemediation: IngestionVolumeNativeCoordMetrics
   geocode: IngestionVolumeGeocodeMetrics
   publish: IngestionVolumePublishMetrics
   discovery: IngestionVolumeDiscoveryMetrics

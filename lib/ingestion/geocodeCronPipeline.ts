@@ -1,6 +1,10 @@
 import { processGeocodeQueueBatch } from '@/lib/ingestion/geocodeQueue'
 import { geocodePendingSales } from '@/lib/ingestion/geocodeWorker'
 import {
+  runNativeCoordinateRemediation,
+  type NativeCoordinateRemediationSummary,
+} from '@/lib/ingestion/nativeCoordinateRemediationWorker'
+import {
   parseGeocodeCronReplayLimitFromEnv,
   runBoundedGeocodeDeadLetterReplay,
   type GeocodeDeadLetterReplayRunResult,
@@ -17,6 +21,7 @@ export function parseGeocodeCronReplayMax429FromEnv(): number {
 }
 
 export type GeocodeCronPipelineResult = {
+  nativeCoord: NativeCoordinateRemediationSummary & { duration_ms: number; error: string | null }
   queue: {
     processed: number
     completed: number
@@ -42,6 +47,47 @@ export async function runGeocodeCronPipeline(params: {
   concurrencyCeiling: number
   telemetryContext: Record<string, unknown>
 }): Promise<GeocodeCronPipelineResult> {
+  const nativeStartedAt = Date.now()
+  let nativeCoord: GeocodeCronPipelineResult['nativeCoord'] = {
+    claimed: 0,
+    promoted: 0,
+    cacheHits: 0,
+    retryScheduled: 0,
+    fallbackToGeocode: 0,
+    terminal: 0,
+    skipped: 0,
+    fetchFailed: 0,
+    publishFailed: 0,
+    duration_ms: 0,
+    error: null,
+  }
+  try {
+    const summary = await runNativeCoordinateRemediation({
+      batchSizeOverride: params.backlogBatchSize,
+      telemetryContext: {
+        ...params.telemetryContext,
+        jobType: 'cron.geocode.native_coord',
+      },
+    })
+    nativeCoord = { ...summary, duration_ms: Date.now() - nativeStartedAt, error: null }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error(
+      'Native coordinate remediation failed; continuing geocode pipeline',
+      error instanceof Error ? error : new Error(message),
+      {
+        component: 'ingestion/geocodeCronPipeline',
+        operation: 'native_coord_remediation',
+        ...params.telemetryContext,
+      }
+    )
+    nativeCoord = {
+      ...nativeCoord,
+      duration_ms: Date.now() - nativeStartedAt,
+      error: message,
+    }
+  }
+
   const batch = await processGeocodeQueueBatch(params.queueBatchSize, {
     telemetryContext: params.telemetryContext,
   })
@@ -94,6 +140,7 @@ export async function runGeocodeCronPipeline(params: {
   }
 
   return {
+    nativeCoord,
     queue: {
       processed: batch.dequeued,
       completed: batch.completed,

@@ -42,12 +42,14 @@ const {
   mockFinalizeLinkedPublishedIngestedSales,
   mockEnrichPendingAddresses,
   mockEnrichPendingImages,
+  mockRunNativeCoordinateRemediation,
 } = vi.hoisted(() => ({
   mockGeocodePendingSales: vi.fn(),
   mockPublishReadyIngestedSales: vi.fn(),
   mockFinalizeLinkedPublishedIngestedSales: vi.fn(),
   mockEnrichPendingAddresses: vi.fn(),
   mockEnrichPendingImages: vi.fn(),
+  mockRunNativeCoordinateRemediation: vi.fn(),
 }))
 
 vi.mock('@/lib/ingestion/geocodeWorker', () => ({
@@ -60,6 +62,10 @@ vi.mock('@/lib/ingestion/addressEnrichmentWorker', () => ({
 
 vi.mock('@/lib/ingestion/imageEnrichmentWorker', () => ({
   enrichPendingImages: (...args: unknown[]) => mockEnrichPendingImages(...args),
+}))
+
+vi.mock('@/lib/ingestion/nativeCoordinateRemediationWorker', () => ({
+  runNativeCoordinateRemediation: (...args: unknown[]) => mockRunNativeCoordinateRemediation(...args),
 }))
 
 const { mockRunWithGeocodePipelineLease, mockRecordConfigCrawlStats } = vi.hoisted(() => ({
@@ -323,6 +329,17 @@ describe('GET /api/cron/daily', () => {
       mediaStrFound: 0,
       mediaStrMissing: 0,
       byFailureReason: {},
+    })
+    mockRunNativeCoordinateRemediation.mockResolvedValue({
+      claimed: 0,
+      promoted: 0,
+      cacheHits: 0,
+      retryScheduled: 0,
+      fallbackToGeocode: 0,
+      terminal: 0,
+      skipped: 0,
+      fetchFailed: 0,
+      publishFailed: 0,
     })
     mockPublishReadyIngestedSales.mockResolvedValue({
       attempted: 0,
@@ -1078,6 +1095,11 @@ describe('GET /api/cron/daily', () => {
       expect(data.tasksRan).toEqual(['ingestionOrchestration'])
       expect(data.tasks.ingestionOrchestration).toBeDefined()
       expect(data.tasks.ingestionOrchestration.ok).toBe(true)
+      expect(data.tasks.ingestionOrchestration.steps.native_coordinate_remediation).toMatchObject({
+        ok: true,
+        claimed: 0,
+        promoted: 0,
+      })
       expect(data.tasks.ingestionOrchestration.steps.geocode).toMatchObject({
         ok: true,
         claimed: 0,
@@ -1086,6 +1108,9 @@ describe('GET /api/cron/daily', () => {
         failedTerminal: 0,
         rate429Count: 0,
       })
+      expect(mockRunNativeCoordinateRemediation.mock.invocationCallOrder[0]).toBeLessThan(
+        mockGeocodePendingSales.mock.invocationCallOrder[0]!
+      )
       expect(data.tasks.ingestionOrchestration.steps.publish).toMatchObject({
         ok: true,
         attempted: 0,

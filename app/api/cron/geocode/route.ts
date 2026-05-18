@@ -151,7 +151,7 @@ async function handleGeocodeCron(request: NextRequest) {
 
     const pipeline = leaseRun.result
     const durationMs = Date.now() - startedAt
-    const { queue, backlog, replay } = pipeline
+    const { nativeCoord, queue, backlog, replay } = pipeline
 
     if (queue.processed === 0) {
       logger.warn('Geocode cron processed zero queue rows', {
@@ -240,6 +240,7 @@ async function handleGeocodeCron(request: NextRequest) {
       completed: queue.completed,
       errors: 0,
       limit,
+      native_coord: nativeCoord,
       queue,
       backlog: {
         batch_size: backlog.batch_size,

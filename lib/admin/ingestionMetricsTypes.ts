@@ -1,4 +1,26 @@
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
+import type {
+  IngestionFunnelDuplicateHits,
+  IngestionFunnelPlatformBreakdown,
+  IngestionFunnelReconciliation,
+  IngestionFunnelStage,
+  IngestionFunnelTopDropoff,
+  IngestionFunnelWindowMetrics,
+} from '@/lib/admin/ingestionFunnelMetricsHelpers'
+
+export type {
+  IngestionFunnelDuplicateHits,
+  IngestionFunnelPlatformBreakdown,
+  IngestionFunnelReconciliation,
+  IngestionFunnelStage,
+  IngestionFunnelTopDropoff,
+  IngestionFunnelWindowMetrics,
+}
+
+export type IngestionFunnelMetrics = {
+  '24h': IngestionFunnelWindowMetrics
+  '7d': IngestionFunnelWindowMetrics
+}
 
 export interface IngestionMetricsHourlyRates {
   sourcePagesFetchedPerHour: number
@@ -193,5 +215,6 @@ export interface IngestionMetricsResponse {
     }>
   }
   volume: IngestionVolumeMetrics
+  funnel: IngestionFunnelMetrics
   oldestStuckRows: IngestionMetricsStuckRowSample[]
 }

@@ -40,10 +40,15 @@ import type { ImageEnrichmentFailureReason } from '@/lib/ingestion/imageEnrichme
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import {
+  buildIngestionFunnelMetrics,
+  FUNNEL_WINDOW_7D,
+} from '@/lib/admin/ingestionFunnelMetricsHelpers'
 
 export const dynamic = 'force-dynamic'
 
 const ORCHESTRATION_RUNS_LIMIT = 2000
+const FUNNEL_COHORT_HOURS = FUNNEL_WINDOW_7D
 
 const IMAGE_ENRICHMENT_FAILURE_REASONS: ImageEnrichmentFailureReason[] = [
   'not_ystm_detail',
@@ -120,6 +125,8 @@ export async function GET(request: NextRequest) {
   const nowMs = now.getTime()
   const iso24h = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
   const iso48h = new Date(nowMs - METRICS_HOURS * 60 * 60 * 1000).toISOString()
+  const isoFunnelCohort = new Date(nowMs - FUNNEL_COHORT_HOURS * 60 * 60 * 1000).toISOString()
+  const isoFunnelOrch = isoFunnelCohort
 
   try {
     const statusTargets = [
@@ -215,9 +222,41 @@ export async function GET(request: NextRequest) {
       .select(
         'created_at, mode, duration_ms, batch_size, concurrency, claimed_count, geocode_succeeded_count, failed_retriable_count, failed_terminal_count, publish_attempted_count, publish_succeeded_count, publish_failed_count, publish_expired_count, publish_skipped_count, rate_429_count, notes'
       )
-      .gte('created_at', iso48h)
+      .gte('created_at', isoFunnelOrch)
       .order('created_at', { ascending: false })
       .limit(ORCHESTRATION_RUNS_LIMIT)
+
+    const funnelCohortRowsPromise = fetchAllRows<{
+      created_at: string
+      source_platform: string | null
+      canonical_source_url: string | null
+      source_url: string | null
+      status: string
+      address_status: string | null
+      geocode_method: string | null
+      lat: number | null
+      lng: number | null
+      native_coord_failure_reason: string | null
+      native_coord_attempts: number | null
+      failure_reasons: unknown
+      published_at: string | null
+      is_duplicate: boolean | null
+    }>(admin, 'ingested_sales', [
+      'created_at',
+      'source_platform',
+      'canonical_source_url',
+      'source_url',
+      'status',
+      'address_status',
+      'geocode_method',
+      'lat',
+      'lng',
+      'native_coord_failure_reason',
+      'native_coord_attempts',
+      'failure_reasons',
+      'published_at',
+      'is_duplicate',
+    ].join(', '), (q) => q.gte('created_at', isoFunnelCohort))
 
     const lastSuccessfulFetchPromise = fetchLastSuccessfulExternalIngestionAt()
 
@@ -356,6 +395,7 @@ export async function GET(request: NextRequest) {
       salesTs,
       ingestedPubTs,
       orchestrationRowsResult,
+      funnelCohortRows,
       lastSuccessfulFetchAt,
       laneStateSummaries,
       discoveryCounts,
@@ -390,6 +430,7 @@ export async function GET(request: NextRequest) {
       salesTsPromise,
       ingestedPubTsPromise,
       orchestrationRowsPromise,
+      funnelCohortRowsPromise,
       lastSuccessfulFetchPromise,
       laneStateSummariesPromise,
       Promise.all(discoveryStatusPromises),
@@ -502,6 +543,11 @@ export async function GET(request: NextRequest) {
     const orchRows = (orchestrationRowsResult.data || []) as OrchestrationRunRow[]
 
     const agg = aggregateOrchestrationRuns(orchRows, METRICS_HOURS, nowMs)
+    const funnel = buildIngestionFunnelMetrics({
+      orchestrationRows: orchRows,
+      cohortRows: funnelCohortRows,
+      nowMs,
+    })
 
     const durationMsByHour = mapToSortedDurationAvg(agg.durationSumByHour, agg.durationCountByHour)
     const rate429ByHourSeries = mapToSortedSeries(agg.rate429Hourly)
@@ -678,6 +724,7 @@ export async function GET(request: NextRequest) {
         laneModeEnabled: isIngestionLaneModeEnabled(),
         lanes: laneStateSummaries,
       },
+      funnel,
       volume: {
         acquisition: {
           insertYield24h: acquisitionRates.insertYield24h,

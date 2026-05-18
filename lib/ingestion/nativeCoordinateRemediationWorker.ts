@@ -386,15 +386,12 @@ export async function runNativeCoordinateRemediation(options?: {
     publishFailed: 0,
   }
 
-  const { data, error } = await (admin as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc(
-    'claim_ingested_sales_for_native_coordinate_remediation',
-    {
-      p_batch_size: batchSize,
-      p_cooldown_minutes: cooldownMinutes,
-      p_max_attempts: MAX_NATIVE_COORD_REMEDIATION_ATTEMPTS,
-      p_claimed_by: claimedBy,
-    }
-  )
+  const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_native_coordinate_remediation', {
+    p_batch_size: batchSize,
+    p_cooldown_minutes: cooldownMinutes,
+    p_max_attempts: MAX_NATIVE_COORD_REMEDIATION_ATTEMPTS,
+    p_claimed_by: claimedBy,
+  })
 
   if (error) {
     logger.error('Failed to claim rows for native coordinate remediation', new Error(error.message), {

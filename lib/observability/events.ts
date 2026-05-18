@@ -21,6 +21,12 @@ export const ObservabilityEvents = {
     imageEnrichmentBatchStarted: 'ingestion.image_enrichment.batch_started',
     imageEnrichmentBatchCompleted: 'ingestion.image_enrichment.batch_completed',
     imageEnrichmentRow: 'ingestion.image_enrichment.row',
+    spatialCacheHit: 'ingestion.spatial.cache_hit',
+    spatialCacheMiss: 'ingestion.spatial.cache_miss',
+    spatialCacheWritten: 'ingestion.spatial.cache_written',
+    spatialNativeResolved: 'ingestion.spatial.native_coords_resolved',
+    spatialNativeValidationFailed: 'ingestion.spatial.native_validation_failed',
+    spatialRemediationBatch: 'ingestion.spatial.remediation_batch',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

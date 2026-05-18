@@ -77,12 +77,17 @@ export async function fetchFunnelLeaderboardConfigRows(
   let useLegacy = false
 
   for (;;) {
-    const select = useLegacy ? legacy : extended
-    const { data, error } = await fromBase(admin, 'ingestion_city_configs')
-      .select(select)
-      .eq('enabled', true)
-      .eq('source_platform', 'external_page_source')
-      .range(from, from + pageSize - 1)
+    const { data, error } = useLegacy
+      ? await fromBase(admin, 'ingestion_city_configs')
+          .select(legacy)
+          .eq('enabled', true)
+          .eq('source_platform', 'external_page_source')
+          .range(from, from + pageSize - 1)
+      : await fromBase(admin, 'ingestion_city_configs')
+          .select(extended)
+          .eq('enabled', true)
+          .eq('source_platform', 'external_page_source')
+          .range(from, from + pageSize - 1)
     if (error) {
       if (!useLegacy && isMissingCrawlStatsColumnError(error.message)) {
         useLegacy = true
@@ -92,7 +97,7 @@ export async function fetchFunnelLeaderboardConfigRows(
       }
       throw new Error(error.message)
     }
-    const chunk = (data ?? []) as ConfigCrawlStatsSnapshot[]
+    const chunk = (data ?? []) as unknown as ConfigCrawlStatsSnapshot[]
     out.push(...chunk)
     if (chunk.length < pageSize) break
     from += pageSize
@@ -289,7 +294,7 @@ export async function recordConfigCrawlStats(params: {
     return
   }
 
-  const prior = (row ?? {}) as ConfigCrawlStatsSnapshot
+  const prior = (row ?? {}) as unknown as ConfigCrawlStatsSnapshot
   const window = rollCrawlStatsWindow(prior, nowMs)
   const fetched = Math.max(0, params.totals.fetched)
   const skipped = Math.max(0, params.totals.skipped)

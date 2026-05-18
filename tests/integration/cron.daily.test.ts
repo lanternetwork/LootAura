@@ -77,9 +77,14 @@ vi.mock('@/lib/ingestion/geocodePipelineLease', () => ({
   runWithGeocodePipelineLease: (...args: unknown[]) => mockRunWithGeocodePipelineLease(...args),
 }))
 
-vi.mock('@/lib/ingestion/acquisition/configCrawlStats', () => ({
-  recordConfigCrawlStats: (...args: unknown[]) => mockRecordConfigCrawlStats(...args),
-}))
+vi.mock('@/lib/ingestion/acquisition/configCrawlStats', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/ingestion/acquisition/configCrawlStats')>()
+  return {
+    ...actual,
+    recordConfigCrawlStats: (...args: unknown[]) => mockRecordConfigCrawlStats(...args),
+  }
+})
 
 vi.mock('@/lib/ingestion/acquisition/yieldAwareCrawlSchedule', () => ({
   buildYieldAwareCrawlPlan: <T,>(rows: T[]) => rows,

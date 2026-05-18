@@ -199,8 +199,13 @@ describe('persistExternalPageSource', () => {
 
     expect(summary.inserted).toBe(1)
     expect(insert).toHaveBeenCalledTimes(1)
-    const insertedRow = insert.mock.calls[0]?.[0]
-    expect(insertedRow.image_source_url).toBe('https://cdn.example.com/listing-primary.jpg')
-    expect(insertedRow.raw_payload.imageUrls).toEqual(['https://cdn.example.com/listing-primary.jpg'])
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image_source_url: 'https://cdn.example.com/listing-primary.jpg',
+        raw_payload: expect.objectContaining({
+          imageUrls: ['https://cdn.example.com/listing-primary.jpg'],
+        }),
+      })
+    )
   })
 })

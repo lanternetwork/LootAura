@@ -1,8 +1,30 @@
+import { normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSource'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 
-export function buildValidatedSourcePagesPatch(now: string, canonicalUrl: string) {
+/** Merge validated HTTPS list URLs without dropping existing crawl pages. */
+export function mergeHttpsSourcePages(existing: unknown, ...additions: string[]): string[] {
+  const pages = normalizeSourcePages(existing)
+  const set = new Set(pages)
+  for (const raw of additions) {
+    const u = raw.trim()
+    if (!u) continue
+    try {
+      const parsed = new URL(u)
+      if (parsed.protocol === 'https:') set.add(parsed.toString())
+    } catch {
+      if (/^https:\/\//i.test(u)) set.add(u)
+    }
+  }
+  return [...set].sort()
+}
+
+export function buildValidatedSourcePagesPatch(
+  now: string,
+  canonicalUrl: string,
+  existingPages?: unknown
+) {
   return {
-    source_pages: [canonicalUrl],
+    source_pages: mergeHttpsSourcePages(existingPages, canonicalUrl),
     source_discovery_status: SOURCE_DISCOVERY_STATUS.validated,
     source_last_discovered_at: now,
     source_last_validated_at: now,

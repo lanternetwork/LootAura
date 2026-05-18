@@ -19,8 +19,14 @@ import {
 import { enrichStreetLineWithPathMunicipalityWhenNoTail, slugSegmentToAddressLine } from '@/lib/ingestion/ystmAddressSlug'
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
 import { urlSuggestsNonListingPhoto } from '@/lib/ingestion/nonSaleImageHeuristics'
+import {
+  emptyExternalDuplicateSkipCounts,
+  isIngestedRowExpiredForDuplicate,
+  type ExternalDuplicateSkipCounts,
+} from '@/lib/ingestion/acquisition/duplicateSkipKinds'
 import { evaluateDuplicateSkipForExternalListListing } from '@/lib/ingestion/dedupe'
 import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
+import { isSaleWindowExpiredAtDiscovery } from '@/lib/ingestion/saleWindowDates'
 import {
   lookupSpatialCoordinates,
   pageHtmlEligibleForYstmNative,
@@ -67,6 +73,14 @@ export interface ExternalPageSourcePersistSummary {
   pagesProcessed: number
   /** Skipped insert: scored duplicate vs existing ingested row (same address window). */
   duplicateScoredSkipped: number
+  /** Sale window already ended at crawl — not inserted (Phase 3A). */
+  skippedExpired: number
+  /** Inserts with non-expired sale window at discovery. */
+  freshInserted: number
+  duplicateExistingUrl: number
+  duplicateCrossCityPage: number
+  duplicateCanonicalCollision: number
+  duplicateExpiredRow: number
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -975,7 +989,23 @@ export async function persistExternalPageSource(
     errors: 0,
     pagesProcessed: 0,
     duplicateScoredSkipped: 0,
+    skippedExpired: 0,
+    freshInserted: 0,
+    duplicateExistingUrl: 0,
+    duplicateCrossCityPage: 0,
+    duplicateCanonicalCollision: 0,
+    duplicateExpiredRow: 0,
   }
+
+  const bumpDuplicateKind = (counts: ExternalDuplicateSkipCounts, kind: keyof ExternalDuplicateSkipCounts) => {
+    counts[kind] += 1
+    summary.skipped += 1
+    if (kind === 'duplicate_existing_url') summary.duplicateExistingUrl += 1
+    if (kind === 'duplicate_cross_city_page') summary.duplicateCrossCityPage += 1
+    if (kind === 'duplicate_canonical_collision') summary.duplicateCanonicalCollision += 1
+    if (kind === 'duplicate_expired_row') summary.duplicateExpiredRow += 1
+  }
+  const duplicateKinds = emptyExternalDuplicateSkipCounts()
 
   const telemBase = options?.telemetryContext ?? {}
   let parseDurationMsTotal = 0
@@ -1097,10 +1127,17 @@ export async function persistExternalPageSource(
       if ((listing.rawPayload as { cityConflict?: boolean }).cityConflict === true) {
         normalizationWarnings += 1
       }
+
+      if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
+        summary.skippedExpired += 1
+        summary.skipped += 1
+        continue
+      }
+
       const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
 
       const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
-        .select('id')
+        .select('id, status, failure_reasons')
         .eq('source_url', listing.sourceUrl)
         .maybeSingle()
 
@@ -1131,8 +1168,14 @@ export async function persistExternalPageSource(
         continue
       }
       if (existing?.id) {
-        summary.skipped += 1
         duplicateUrlSkipped += 1
+        const kind = isIngestedRowExpiredForDuplicate(
+          existing.status as string,
+          existing.failure_reasons
+        )
+          ? 'duplicate_expired_row'
+          : 'duplicate_existing_url'
+        bumpDuplicateKind(duplicateKinds, kind)
         continue
       }
 
@@ -1148,8 +1191,8 @@ export async function persistExternalPageSource(
         sourceUrl: listing.sourceUrl,
       })
       if (scoredDup.skip) {
-        summary.skipped += 1
         summary.duplicateScoredSkipped += 1
+        bumpDuplicateKind(duplicateKinds, scoredDup.skipKind ?? 'duplicate_cross_city_page')
         continue
       }
 
@@ -1237,8 +1280,8 @@ export async function persistExternalPageSource(
 
       if (insErr) {
         if (/duplicate key|unique constraint|23505/i.test(insErr.message)) {
-          summary.skipped += 1
           duplicateConstraintSkipped += 1
+          bumpDuplicateKind(duplicateKinds, 'duplicate_canonical_collision')
           continue
         }
         summary.errors += 1
@@ -1262,6 +1305,7 @@ export async function persistExternalPageSource(
       }
 
       summary.inserted += 1
+      summary.freshInserted += 1
     }
   }
 
@@ -1278,6 +1322,12 @@ export async function persistExternalPageSource(
     errors: summary.errors,
     pagesProcessed: summary.pagesProcessed,
     duplicateScoredSkipped: summary.duplicateScoredSkipped,
+    skippedExpired: summary.skippedExpired,
+    freshInserted: summary.freshInserted,
+    duplicateExistingUrl: summary.duplicateExistingUrl,
+    duplicateCrossCityPage: summary.duplicateCrossCityPage,
+    duplicateCanonicalCollision: summary.duplicateCanonicalCollision,
+    duplicateExpiredRow: summary.duplicateExpiredRow,
   })
 
   const duplicateSuppressedTotal =
@@ -1347,6 +1397,12 @@ export async function persistExternalPageSource(
       duplicateUrlSkipped,
       duplicateConstraintSkipped,
       duplicateScoredSkipped: summary.duplicateScoredSkipped,
+      skippedExpired: summary.skippedExpired,
+      freshInserted: summary.freshInserted,
+      duplicateExistingUrl: summary.duplicateExistingUrl,
+      duplicateCrossCityPage: summary.duplicateCrossCityPage,
+      duplicateCanonicalCollision: summary.duplicateCanonicalCollision,
+      duplicateExpiredRow: summary.duplicateExpiredRow,
       normalizationWarnings,
     })
   )

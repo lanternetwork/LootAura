@@ -72,7 +72,7 @@ describe('ingestionFunnelMetricsHelpers', () => {
     })
 
     expect(funnel['24h'].reconciliation.crawlerReconciles).toBe(true)
-    expect(funnel['24h'].duplicateHits.total).toBe(10)
+    expect(funnel['24h'].duplicateHits.duplicate_cross_city_page).toBe(0)
   })
 
   it('partitions cohort rows to sum inserted', () => {

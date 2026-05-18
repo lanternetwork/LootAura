@@ -72,6 +72,7 @@ import {
 } from '@/lib/ingestion/adapters/externalPageSource'
 import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 import { recordConfigCrawlStats } from '@/lib/ingestion/acquisition/configCrawlStats'
+import { freshAcquisitionOrchestrationFields } from '@/lib/ingestion/acquisition/freshAcquisitionOrchestrationFields'
 import {
   buildYieldAwareCrawlPlan,
   type CrawlConfigRow,
@@ -561,10 +562,7 @@ async function runIngestionOrchestration(
   let publishSummary: PublishWorkerBatchSummary | null = null
   let publishDuplicateReuseCount = 0
   let externalIngestionNote: ExternalIngestionOrchestrationNote | null = null
-  const ingestionDedupeTelemetrySummary = {
-    ...createEmptyDedupeDecisionAggregate(),
-    aggregationMode: 'not_applicable_external_page_source' as const,
-  }
+  const ingestionDedupeTelemetrySummary = createEmptyDedupeDecisionAggregate()
 
   const { envelope: adaptiveEnvelope, note: adaptiveNote } = await resolveAdaptiveThroughputForCron(undefined, {
     laneContext,
@@ -672,7 +670,7 @@ async function runIngestionOrchestration(
       const adminDb = getAdminDb()
       const { data: enabledCities, error: cityError } = await fromBase(adminDb, 'ingestion_city_configs')
         .select(
-          'city, state, source_platform, source_pages, source_crawl_excluded_at, source_discovery_status, source_crawl_lifetime_fetched, source_crawl_lifetime_skipped, source_crawl_lifetime_inserted, source_crawl_window_fetched, source_crawl_window_skipped, source_crawl_window_inserted, source_crawl_window_started_at, source_crawl_last_at, source_crawl_last_insert_at'
+          'city, state, source_platform, source_pages, source_crawl_excluded_at, source_discovery_status, source_crawl_lifetime_fetched, source_crawl_lifetime_skipped, source_crawl_lifetime_inserted, source_crawl_lifetime_skipped_expired, source_crawl_lifetime_fresh_inserted, source_crawl_window_fetched, source_crawl_window_skipped, source_crawl_window_inserted, source_crawl_window_skipped_expired, source_crawl_window_fresh_inserted, source_crawl_window_dup_existing_url, source_crawl_window_dup_cross_page, source_crawl_window_dup_canonical, source_crawl_window_dup_expired_row, source_crawl_window_started_at, source_crawl_last_at, source_crawl_last_insert_at'
         )
         .eq('enabled', true)
 
@@ -688,6 +686,12 @@ async function runIngestionOrchestration(
         errors: 0,
         configsProcessed: 0,
         pagesProcessed: 0,
+        skippedExpired: 0,
+        freshInserted: 0,
+        duplicateExistingUrl: 0,
+        duplicateCrossCityPage: 0,
+        duplicateCanonicalCollision: 0,
+        duplicateExpiredRow: 0,
       }
 
       const externalRows = ((enabledCities || []) as ExternalConfigRow[]).filter(
@@ -831,11 +835,34 @@ async function runIngestionOrchestration(
         totals.invalid += s.invalid
         totals.errors += s.errors
         totals.pagesProcessed += s.pagesProcessed
+        totals.skippedExpired += s.skippedExpired
+        totals.freshInserted += s.freshInserted
+        totals.duplicateExistingUrl += s.duplicateExistingUrl
+        totals.duplicateCrossCityPage += s.duplicateCrossCityPage
+        totals.duplicateCanonicalCollision += s.duplicateCanonicalCollision
+        totals.duplicateExpiredRow += s.duplicateExpiredRow
+
+        ingestionDedupeTelemetrySummary.source_url += s.duplicateExistingUrl
+        ingestionDedupeTelemetrySummary.soft_date_window += s.duplicateCrossCityPage
+        ingestionDedupeTelemetrySummary.duplicateDecisionTrue +=
+          s.duplicateCrossCityPage + s.duplicateExpiredRow
 
         await recordConfigCrawlStats({
           city: row.city,
           state: row.state,
-          totals: { fetched: s.fetched, skipped: s.skipped, inserted: s.inserted },
+          totals: {
+            fetched: s.fetched,
+            skipped: s.skipped,
+            inserted: s.inserted,
+            skippedExpired: s.skippedExpired,
+            freshInserted: s.freshInserted,
+            duplicateSkips: {
+              duplicate_existing_url: s.duplicateExistingUrl,
+              duplicate_cross_city_page: s.duplicateCrossCityPage,
+              duplicate_canonical_collision: s.duplicateCanonicalCollision,
+              duplicate_expired_row: s.duplicateExpiredRow,
+            },
+          },
         })
       }
 
@@ -869,6 +896,7 @@ async function runIngestionOrchestration(
         skipped: totals.skipped,
         invalid: totals.invalid,
         errors: totals.errors,
+        ...freshAcquisitionOrchestrationFields(totals),
         dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
       }
 
@@ -901,6 +929,7 @@ async function runIngestionOrchestration(
         skipped: totals.skipped,
         invalid: totals.invalid,
         errors: totals.errors,
+        ...freshAcquisitionOrchestrationFields(totals),
         dedupeTelemetrySummary: {
           source_url: ingestionDedupeTelemetrySummary.source_url,
           exact_address_date: ingestionDedupeTelemetrySummary.exact_address_date,

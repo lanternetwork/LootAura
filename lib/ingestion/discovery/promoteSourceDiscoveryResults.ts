@@ -109,8 +109,8 @@ function resolvePromotionTimezone(
   return resolveTimezoneForIngestionState(stateCode)
 }
 
-function buildValidatedPromotionPatch(now: string, canonicalUrl: string) {
-  return buildValidatedSourcePagesPatch(now, canonicalUrl)
+function buildValidatedPromotionPatch(now: string, canonicalUrl: string, existingPages?: unknown) {
+  return buildValidatedSourcePagesPatch(now, canonicalUrl, existingPages)
 }
 
 function findExistingRow(
@@ -261,7 +261,8 @@ export async function promoteSourceDiscoveryResults(
       continue
     }
 
-    const patch = buildValidatedPromotionPatch(now, canonical)
+    const patch = buildValidatedPromotionPatch(now, canonical, existing?.source_pages)
+    const mergedPages = normalizeSourcePages(patch.source_pages)
     const needsCityNormalize =
       existing != null && isMalformedIngestionCityName(existing.city) && existing.city !== loc.city
     const needsUrlRepair =
@@ -271,7 +272,8 @@ export async function promoteSourceDiscoveryResults(
     const needsPopulate =
       existing == null ||
       !hasCrawlableSourcePages(existing) ||
-      normalizeSourcePages(existing.source_pages)[0] !== canonical
+      !mergedPages.includes(canonical) ||
+      mergedPages.length > normalizeSourcePages(existing?.source_pages).length
 
     if (existing && !needsPopulate && !needsCityNormalize) {
       records.push({

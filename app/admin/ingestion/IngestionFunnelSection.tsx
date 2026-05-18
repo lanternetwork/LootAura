@@ -8,6 +8,8 @@ import type {
   IngestionFunnelWindowMetrics,
 } from '@/lib/admin/ingestionMetricsTypes'
 
+type Leaderboards = IngestionFunnelWindowMetrics['configLeaderboards']
+
 const LAYER_LABEL: Record<string, string> = {
   crawler: 'Crawler encounters',
   unique_listings: 'Unique listings',
@@ -59,6 +61,7 @@ function FunnelBar({ stage, maxCount }: { stage: IngestionFunnelStage; maxCount:
   const widthPct = maxCount > 0 ? Math.max(4, Math.round((stage.count / maxCount) * 100)) : 4
   const isLoss =
     stage.id === 'duplicate_skipped' ||
+    stage.id === 'skipped_expired' ||
     stage.id === 'expired_at_insert' ||
     stage.id === 'invalid_address' ||
     stage.id === 'address_gated' ||
@@ -81,6 +84,9 @@ function FunnelBar({ stage, maxCount }: { stage: IngestionFunnelStage; maxCount:
           {stage.id === 'duplicate_skipped' && (
             <span className="text-xs text-amber-800">(saturation / dedupe)</span>
           )}
+          {stage.id === 'skipped_expired' && (
+            <span className="text-xs text-rose-800">(stale inventory)</span>
+          )}
         </div>
         <div className="tabular-nums text-gray-700">
           <span className="font-semibold">{stage.count.toLocaleString()}</span>
@@ -102,6 +108,64 @@ function FunnelBar({ stage, maxCount }: { stage: IngestionFunnelStage; maxCount:
   )
 }
 
+function ConfigLeaderboardTables({ leaderboards }: { leaderboards: Leaderboards }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <LeaderboardTable title="Top fresh-yield configs" rows={leaderboards.topFreshYield} valueKey="freshInsertYield" />
+      <LeaderboardTable title="Top stale configs (expired discovery)" rows={leaderboards.topStale} valueKey="expiredDiscoveryRatio" />
+      <LeaderboardTable title="Top duplicate configs" rows={leaderboards.topDuplicate} valueKey="windowDupSkips" />
+    </div>
+  )
+}
+
+function LeaderboardTable({
+  title,
+  rows,
+  valueKey,
+}: {
+  title: string
+  rows: Leaderboards['topFreshYield']
+  valueKey: 'freshInsertYield' | 'expiredDiscoveryRatio' | 'windowDupSkips'
+}) {
+  return (
+    <div className="rounded-md border border-gray-200 bg-white p-3">
+      <h3 className="mb-2 text-sm font-semibold text-gray-800">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="text-xs text-gray-500">No configs with enough window activity yet.</p>
+      ) : (
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="text-gray-500">
+              <th className="py-1 pr-2">Config</th>
+              <th className="py-1 pr-2 text-right">Fetched</th>
+              <th className="py-1 text-right">Signal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={`${row.state}|${row.city}`} className="border-t border-gray-100">
+                <td className="py-1.5 pr-2 font-mono">
+                  {row.city}, {row.state}
+                </td>
+                <td className="py-1.5 pr-2 text-right tabular-nums">{row.windowFetched}</td>
+                <td className="py-1.5 text-right tabular-nums">
+                  {valueKey === 'windowDupSkips'
+                    ? row.windowDupSkips
+                    : pct(
+                        valueKey === 'freshInsertYield'
+                          ? row.freshInsertYield
+                          : row.expiredDiscoveryRatio
+                      )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
 function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics: IngestionFunnelWindowMetrics }) {
   const maxCount = Math.max(...metrics.stages.map((s) => s.count), 1)
   const rec = metrics.reconciliation
@@ -117,8 +181,10 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
           <p className="text-xs font-medium uppercase text-gray-500">Duplicate hits (dedupe telemetry)</p>
           <p className="mt-1 text-xl font-semibold tabular-nums">{metrics.duplicateHits.total}</p>
           <p className="mt-1 text-xs text-gray-600">
-            url {metrics.duplicateHits.source_url} · addr+date {metrics.duplicateHits.exact_address_date} · soft{' '}
-            {metrics.duplicateHits.soft_date_window}
+            existing URL {metrics.duplicateHits.duplicate_existing_url} · cross-page{' '}
+            {metrics.duplicateHits.duplicate_cross_city_page} · canonical{' '}
+            {metrics.duplicateHits.duplicate_canonical_collision} · expired row{' '}
+            {metrics.duplicateHits.duplicate_expired_row}
           </p>
         </div>
         <div className="rounded-md border border-gray-200 bg-white p-3 text-sm">
@@ -144,6 +210,29 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
           </p>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-md border border-rose-200 bg-rose-50/80 p-3 text-sm">
+          <p className="text-xs font-medium uppercase text-rose-800">Fresh insert yield</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-rose-950">
+            {pct(metrics.freshRates.freshInsertYield)}
+          </p>
+          <p className="mt-1 text-xs text-rose-900">
+            Skipped expired at discovery: {metrics.skippedExpired.toLocaleString()}
+          </p>
+        </div>
+        <div className="rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm">
+          <p className="text-xs font-medium uppercase text-amber-900">Expired discovery ratio</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{pct(metrics.freshRates.expiredDiscoveryRatio)}</p>
+        </div>
+        <div className="rounded-md border border-stone-200 bg-stone-50/80 p-3 text-sm">
+          <p className="text-xs font-medium uppercase text-stone-700">Expired insert ratio (cohort)</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{pct(metrics.freshRates.expiredInsertRatio)}</p>
+          <p className="mt-1 text-xs text-stone-600">Fresh inserted: {metrics.freshInserted.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <ConfigLeaderboardTables leaderboards={metrics.configLeaderboards} />
 
       {metrics.topDropoff && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">

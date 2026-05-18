@@ -67,6 +67,8 @@ export type SoftDuplicateCandidateRow = {
   lat: number | null
   lng: number | null
   image_source_url: string | null
+  source_url?: string | null
+  canonical_source_url?: string | null
 }
 
 export type DuplicateScoringIncoming = {

@@ -65,25 +65,7 @@ const LIST_SEED = {
 
 describe('ystmDetailFirstReadyConfig', () => {
   afterEach(() => {
-    delete process.env.YSTM_DETAIL_FIRST_READY_ENABLED
     delete process.env.YSTM_DETAIL_FIRST_CONCURRENCY
-  })
-
-  it('is disabled by default', async () => {
-    const { isYstmDetailFirstReadyEnabled } = await import(
-      '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
-    )
-    expect(isYstmDetailFirstReadyEnabled()).toBe(false)
-  })
-
-  it('enables for true/1/yes', async () => {
-    const { isYstmDetailFirstReadyEnabled } = await import(
-      '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
-    )
-    for (const value of ['true', '1', 'yes', ' YES ']) {
-      process.env.YSTM_DETAIL_FIRST_READY_ENABLED = value
-      expect(isYstmDetailFirstReadyEnabled()).toBe(true)
-    }
   })
 
   it('caps detail fetch concurrency', async () => {

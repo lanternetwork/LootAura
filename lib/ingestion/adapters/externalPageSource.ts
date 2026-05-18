@@ -29,7 +29,6 @@ import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/deta
 import {
   attemptYstmDetailFirstReady,
   emptyYstmDetailFirstRunMetrics,
-  isYstmDetailFirstReadyEnabled,
   mapWithBoundedConcurrency,
   mergeYstmDetailFirstMetrics,
   parseYstmDetailFirstConcurrencyFromEnv,
@@ -1025,7 +1024,6 @@ export async function persistExternalPageSource(
     ystmDetailFirstMsToPublishedSamples: [],
   }
 
-  const detailFirstEnabled = isYstmDetailFirstReadyEnabled()
   const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
   const detailFirstMetrics: YstmDetailFirstRunMetrics = emptyYstmDetailFirstRunMetrics()
 
@@ -1347,7 +1345,7 @@ export async function persistExternalPageSource(
         continue
       }
 
-      if (detailFirstEnabled && isYstmDetailListingUrl(listing.sourceUrl)) {
+      if (isYstmDetailListingUrl(listing.sourceUrl)) {
         detailFirstCandidates.push({ listing, rowPayload })
         continue
       }

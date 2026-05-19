@@ -35,9 +35,15 @@ vi.mock('@/lib/ingestion/publishWorker', () => ({
   publishReadyIngestedSaleById: (...args: unknown[]) => mockPublishReady(...args),
 }))
 
-vi.mock('@/lib/ingestion/spatial/addressGeocodeCache', () => ({
-  upsertAddressGeocodeCache: (...args: unknown[]) => mockUpsertCache(...args),
-}))
+vi.mock('@/lib/ingestion/spatial/addressGeocodeCache', async () => {
+  const mod = await vi.importActual<typeof import('@/lib/ingestion/spatial/addressGeocodeCache')>(
+    '@/lib/ingestion/spatial/addressGeocodeCache'
+  )
+  return {
+    ...mod,
+    upsertAddressGeocodeCache: (...args: unknown[]) => mockUpsertCache(...args),
+  }
+})
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => ({ from: mockFrom }),

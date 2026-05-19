@@ -159,8 +159,8 @@ export function buildIngestionDiagnostics(
     bullet('unique canonical URLs', ystm.uniqueCanonicalUrls),
     bullet('published', ystm.published),
     '',
-    '## Top Dropoff',
-  ]
+    '## Top Dropoff'
+  )
 
   if (funnel.topDropoff) {
     const d = funnel.topDropoff

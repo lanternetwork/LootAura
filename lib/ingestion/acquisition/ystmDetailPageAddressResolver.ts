@@ -37,7 +37,10 @@ export function ystmDetailChosenAddressSourceKey(
   addressSource: YstmDetailAddressSource | null | undefined
 ): string | null {
   if (!addressSource) return null
-  return `ystm_detail_${addressSource}`
+  const suffix = addressSource.startsWith('detail_')
+    ? addressSource.slice('detail_'.length)
+    : addressSource
+  return `ystm_detail_${suffix}`
 }
 
 /** Detail page has provider coords but no publishable address line (e.g. #address Hidden). */

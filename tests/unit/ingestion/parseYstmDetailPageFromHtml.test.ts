@@ -74,10 +74,11 @@ describe('parseYstmDetailPageFromHtml', () => {
     })
   })
 
-  it('returns null when detail page has no title or address', () => {
+  it('returns null when detail page has no title, address, or native coords', () => {
     const parsed = parseYstmDetailPageFromHtml({
       html: '<html><body><div class="listing"></div></body></html>',
-      sourceUrl: CHICAGO_URL,
+      sourceUrl:
+        'https://yardsaletreasuremap.com/US/Illinois/Chicago/Moving-Sale/999/userlisting.html',
       configCity: 'Chicago',
       configState: 'IL',
     })

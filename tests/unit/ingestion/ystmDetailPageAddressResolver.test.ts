@@ -40,6 +40,7 @@ describe('ystmDetailPageAddressResolver', () => {
 
   it('maps address source to chosenAddressSource key', () => {
     expect(ystmDetailChosenAddressSourceKey('json_ld')).toBe('ystm_detail_json_ld')
+    expect(ystmDetailChosenAddressSourceKey('detail_dom')).toBe('ystm_detail_dom')
   })
 
   it('suppresses list seed address when detail has native coords only', () => {

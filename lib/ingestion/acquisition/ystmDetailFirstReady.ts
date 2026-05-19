@@ -7,7 +7,7 @@ import {
 } from '@/lib/ingestion/adapters/externalPageSource'
 import {
   buildDetailFirstFieldProvenance,
-  dateScheduleFieldsForListing,
+  detailScheduleFieldsForListing,
   mergeIngestionDiagnosticsForDetailFirst,
   readDetailFirstFieldProvenance,
 } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'

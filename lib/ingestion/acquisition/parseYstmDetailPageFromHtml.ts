@@ -1,18 +1,25 @@
 import { JSDOM } from 'jsdom'
-import { extractFallbackAddressAndDates } from '@/lib/ingestion/adapters/externalPageSource'
 import { extractYstmDetailMediaStrFromHtml } from '@/lib/ingestion/images/extractYstmDetailMediaStr'
 import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
+import {
+  resolveYstmDetailPageAddress,
+  type YstmDetailAddressSource,
+} from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import {
   extractYstmNativeCoordinatesFromHtml,
   type YstmNativeCoordinates,
 } from '@/lib/ingestion/spatial/extractYstmNativeCoordinates'
-import { enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
+import { extractFallbackAddressAndDates } from '@/lib/ingestion/adapters/externalPageSource'
+
+export type { YstmDetailAddressSource } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 
 export type YstmDetailPageParsed = {
   title: string | null
   description: string | null
   addressRaw: string | null
+  /** Phase A: which cascade step produced addressRaw (null when gated/placeholder-only). */
+  addressSource: YstmDetailAddressSource | null
   startDate?: string
   endDate?: string
   city: string | null
@@ -37,17 +44,6 @@ function extractTitleFromDetailDocument(document: Document): string | null {
   }
   const title = clone.textContent?.replace(/\s+/g, ' ').trim()
   return title && title.length > 0 ? title : null
-}
-
-function extractAddressFromDetailDocument(document: Document): string | null {
-  const addressEl = document.getElementById('address')
-  if (!addressEl) return null
-  const clone = addressEl.cloneNode(true) as HTMLElement
-  for (const el of clone.querySelectorAll('a, br')) {
-    el.remove()
-  }
-  const line = clone.textContent?.replace(/\s+/g, ' ').trim()
-  return line && line.length > 0 ? line : null
 }
 
 function extractDescriptionFromDetailDocument(document: Document): string | null {
@@ -90,25 +86,23 @@ export function parseYstmDetailPageFromHtml(input: {
   const dom = new JSDOM(html, { url: input.sourceUrl })
   const { document } = dom.window
 
-  let addressRaw = extractAddressFromDetailDocument(document)
   const title = extractTitleFromDetailDocument(document)
   const description = extractDescriptionFromDetailDocument(document)
-
   const fullText = document.body?.textContent ?? ''
-  const fromBody = extractFallbackAddressAndDates(fullText, cityHint, stateHint)
-  if (!addressRaw?.trim() && fromBody.address?.trim()) {
-    addressRaw = fromBody.address.trim()
-  }
 
-  if (addressRaw?.trim()) {
-    const enriched = enrichStreetLineWithPathMunicipalityWhenNoTail(addressRaw.trim(), input.sourceUrl)
-    addressRaw = enriched.line
-  }
+  const { addressRaw, addressSource } = resolveYstmDetailPageAddress({
+    document,
+    html,
+    sourceUrl: input.sourceUrl,
+    configCity: cityHint,
+    configState: stateHint,
+  })
 
   const authority = resolveYstmListingCityAuthority(input.sourceUrl, addressRaw)
   const city = authority.resolvedCity ?? cityHint
   const state = authority.resolvedState ?? stateHint
 
+  const fromBody = extractFallbackAddressAndDates(fullText, cityHint, stateHint)
   const startDate = fromBody.start
   const endDate = fromBody.end
 
@@ -118,7 +112,7 @@ export function parseYstmDetailPageFromHtml(input: {
   const hourSource = [description, title, addressRaw, fullText].filter(Boolean).join('\n')
   const hourRange = extractAuthoritativeSaleHourRangeFromText(hourSource)
 
-  if (!title?.trim() && !addressRaw?.trim()) {
+  if (!title?.trim() && !addressRaw?.trim() && !nativeCoords) {
     return null
   }
 
@@ -126,6 +120,7 @@ export function parseYstmDetailPageFromHtml(input: {
     title,
     description,
     addressRaw,
+    addressSource,
     startDate,
     endDate,
     city,

@@ -1,4 +1,5 @@
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
+import { ystmDetailChosenAddressSourceKey } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import type { YstmNativeCoordinates } from '@/lib/ingestion/spatial/extractYstmNativeCoordinates'
 
 export type DetailPageListingEnrichment = {
@@ -13,7 +14,7 @@ export type DetailPageListingEnrichment = {
   nativeCoords: YstmNativeCoordinates | null
   detailTimeStart?: string
   detailTimeEnd?: string
-  chosenAddressSource: 'ystm_detail_page' | null
+  chosenAddressSource: string | null
 }
 
 /**
@@ -54,6 +55,8 @@ export function extractDetailPageListingEnrichmentFromHtml(input: {
     nativeCoords: detailPage.nativeCoords,
     detailTimeStart: detailPage.detailTimeStart,
     detailTimeEnd: detailPage.detailTimeEnd,
-    chosenAddressSource: detailPage.addressRaw?.trim() ? 'ystm_detail_page' : null,
+    chosenAddressSource:
+      ystmDetailChosenAddressSourceKey(detailPage.addressSource) ??
+      (detailPage.addressRaw?.trim() ? 'ystm_detail_page' : null),
   }
 }

@@ -39,8 +39,54 @@ function isPublishableAddressForSpatial(
   }
 }
 
+function resolveYstmNativeSpatialFromPageHtml(input: {
+  pageHtml: string
+  city: string
+  state: string
+  sourceUrl?: string | null
+  telemetryContext?: Record<string, unknown>
+}): SpatialCoordinateResolution | null {
+  const native = extractYstmNativeCoordinatesFromHtml(input.pageHtml)
+  if (!native) return null
+
+  const validation = validateNativeCoordinates({
+    lat: native.lat,
+    lng: native.lng,
+    city: input.city,
+    state: input.state,
+    sourceUrl: input.sourceUrl,
+  })
+  if (!validation.ok) {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.ingestion.spatialNativeValidationFailed, {
+        ...(input.telemetryContext ?? {}),
+        failureReason: validation.reason,
+        nativeSource: native.source,
+      })
+    )
+    return null
+  }
+
+  emitObservabilityRecord(
+    buildTelemetryRecord(ObservabilityEvents.ingestion.spatialNativeResolved, {
+      ...(input.telemetryContext ?? {}),
+      nativeSource: native.source,
+    })
+  )
+
+  return {
+    lat: native.lat,
+    lng: native.lng,
+    geocode_confidence: 'high',
+    coordinate_precision: 'provider_native',
+    geocode_method: 'ystm_provider_native',
+    resolutionSource: 'ystm_provider_native',
+  }
+}
+
 /**
  * Tier order: durable cache → YSTM native (page HTML). Does not call Nominatim.
+ * When address is not publishable, still resolves YSTM embedded coords from detail HTML.
  */
 export async function lookupSpatialCoordinates(input: {
   addressRaw: string | null
@@ -53,7 +99,19 @@ export async function lookupSpatialCoordinates(input: {
 }): Promise<SpatialCoordinateResolution | null> {
   const city = input.city?.trim() ?? ''
   const state = input.state?.trim() ?? ''
-  if (!city || !state || !isPublishableAddressForSpatial(input.addressRaw, city, state)) {
+  if (!city || !state) return null
+
+  if (!isPublishableAddressForSpatial(input.addressRaw, city, state)) {
+    const html = input.pageHtml?.trim()
+    if (html && pageHtmlEligibleForYstmNative(input.sourceUrl, html)) {
+      return resolveYstmNativeSpatialFromPageHtml({
+        pageHtml: html,
+        city,
+        state,
+        sourceUrl: input.sourceUrl,
+        telemetryContext: input.telemetryContext,
+      })
+    }
     return null
   }
 
@@ -89,42 +147,13 @@ export async function lookupSpatialCoordinates(input: {
   const html = input.pageHtml?.trim()
   if (!html) return null
 
-  const native = extractYstmNativeCoordinatesFromHtml(html)
-  if (!native) return null
-
-  const validation = validateNativeCoordinates({
-    lat: native.lat,
-    lng: native.lng,
+  return resolveYstmNativeSpatialFromPageHtml({
+    pageHtml: html,
     city,
     state,
     sourceUrl: input.sourceUrl,
+    telemetryContext: input.telemetryContext,
   })
-  if (!validation.ok) {
-    emitObservabilityRecord(
-      buildTelemetryRecord(ObservabilityEvents.ingestion.spatialNativeValidationFailed, {
-        ...(input.telemetryContext ?? {}),
-        failureReason: validation.reason,
-        nativeSource: native.source,
-      })
-    )
-    return null
-  }
-
-  emitObservabilityRecord(
-    buildTelemetryRecord(ObservabilityEvents.ingestion.spatialNativeResolved, {
-      ...(input.telemetryContext ?? {}),
-      nativeSource: native.source,
-    })
-  )
-
-  return {
-    lat: native.lat,
-    lng: native.lng,
-    geocode_confidence: 'high',
-    coordinate_precision: 'provider_native',
-    geocode_method: 'ystm_provider_native',
-    resolutionSource: 'ystm_provider_native',
-  }
 }
 
 export function shouldAttemptYstmNativeFromUrl(sourceUrl: string | null | undefined): boolean {

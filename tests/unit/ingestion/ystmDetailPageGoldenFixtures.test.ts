@@ -41,8 +41,16 @@ describe('YSTM detail page golden fixtures', () => {
         expect(parsed!.title).toBe(golden.title)
       }
 
-      for (const fragment of golden.addressContains ?? []) {
-        expect(parsed!.addressRaw).toContain(fragment)
+      if (golden.expectNoAddress) {
+        expect(parsed!.addressRaw).toBeNull()
+      } else {
+        for (const fragment of golden.addressContains ?? []) {
+          expect(parsed!.addressRaw).toContain(fragment)
+        }
+      }
+
+      if (golden.addressSource !== undefined) {
+        expect(parsed!.addressSource).toBe(golden.addressSource)
       }
 
       if (golden.city != null) expect(parsed!.city).toBe(golden.city)

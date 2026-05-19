@@ -12,6 +12,7 @@ import {
   readDetailFirstFieldProvenance,
 } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
+import { resolveDetailFirstMergedAddressRaw } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import {
   detailFirstValidationTelemetry,
   validateDetailEnrichedListing,
@@ -103,15 +104,24 @@ function mergeListingFields(
   listSeed: ExternalPageSourceListing,
   detail: ExternalPageSourceListing
 ): ExternalPageSourceListing {
+  const detailPayload =
+    typeof detail.rawPayload === 'object' && detail.rawPayload ? detail.rawPayload : {}
+  const detailParsed = Boolean(
+    (detailPayload as { detailPageParsed?: boolean }).detailPageParsed
+  )
   const rawPayload = {
     ...(typeof listSeed.rawPayload === 'object' && listSeed.rawPayload ? listSeed.rawPayload : {}),
-    ...(typeof detail.rawPayload === 'object' && detail.rawPayload ? detail.rawPayload : {}),
+    ...detailPayload,
     detailFirstReady: true,
   }
   return {
     title: detail.title?.trim() ? detail.title : listSeed.title,
     description: detail.description?.trim() ? detail.description : listSeed.description,
-    addressRaw: detail.addressRaw?.trim() ? detail.addressRaw : listSeed.addressRaw,
+    addressRaw: detailParsed
+      ? detail.addressRaw ?? null
+      : detail.addressRaw?.trim()
+        ? detail.addressRaw
+        : listSeed.addressRaw,
     city: detail.city?.trim() ? detail.city : listSeed.city,
     state: detail.state?.trim() ? detail.state : listSeed.state,
     startDate: detail.startDate ?? listSeed.startDate,
@@ -145,10 +155,12 @@ export function parseYstmDetailListingFromHtml(input: {
     return null
   }
 
+  const mergedAddressRaw = resolveDetailFirstMergedAddressRaw(detailPage, input.listSeed)
+
   const detailListing: ExternalPageSourceListing = {
     title: detailPage.title ?? input.listSeed.title,
     description: detailPage.description ?? input.listSeed.description,
-    addressRaw: detailPage.addressRaw ?? input.listSeed.addressRaw,
+    addressRaw: mergedAddressRaw,
     city: detailPage.city ?? input.listSeed.city,
     state: detailPage.state ?? input.listSeed.state,
     startDate: detailPage.startDate ?? input.listSeed.startDate,
@@ -172,6 +184,7 @@ export function parseYstmDetailListingFromHtml(input: {
       ...(detailPage.detailTimeStart
         ? { detailTimeStart: detailPage.detailTimeStart, detailTimeEnd: detailPage.detailTimeEnd }
         : {}),
+      ...(detailPage.addressSource ? { detailFirstAddressSource: detailPage.addressSource } : {}),
     },
   }
 
@@ -180,7 +193,8 @@ export function parseYstmDetailListingFromHtml(input: {
   const ingestionDiagnostics = mergeIngestionDiagnosticsForDetailFirst(
     input.listSeed,
     provenance,
-    merged
+    merged,
+    detailPage
   )
 
   return {
@@ -353,13 +367,15 @@ export async function attemptYstmDetailFirstReady(
     }
   }
 
-  const { city, state, normalizedLine } = validation
+  const nativeFirst = validation.mode === 'native'
+  const { city, state } = validation
+  const normalizedLine = validation.mode === 'address' ? validation.normalizedLine : null
 
   const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as Record<string, unknown>
   const addressLifecycle = resolveIngestAddressLifecycle({
     sourceUrl,
     addressRaw: listing.addressRaw,
-    wouldBeNeedsGeocode: true,
+    wouldBeNeedsGeocode: !nativeFirst,
     diagnostics: {
       slugWasPlaceholder: Boolean(ingestDiag.slugWasPlaceholder),
       chosenAddressSource:
@@ -368,7 +384,7 @@ export async function attemptYstmDetailFirstReady(
   })
 
   const gated = detectGatedListing({ sourceUrl, addressRaw: listing.addressRaw })
-  if (gated.gated && addressLifecycle.addressStatus === 'address_gated') {
+  if (!nativeFirst && gated.gated && addressLifecycle.addressStatus === 'address_gated') {
     recordDetailFirstFallback(metrics, 'gated_address')
     finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
@@ -418,16 +434,18 @@ export async function attemptYstmDetailFirstReady(
     }
   }
 
-  await upsertAddressGeocodeCache({
-    addressRaw: listing.addressRaw,
-    normalizedAddress: normalizedLine,
-    city,
-    state,
-    lat: spatial.lat,
-    lng: spatial.lng,
-    coordinate_precision: spatial.coordinate_precision,
-    geocode_method: spatial.geocode_method,
-  })
+  if (!nativeFirst && listing.addressRaw?.trim() && normalizedLine) {
+    await upsertAddressGeocodeCache({
+      addressRaw: listing.addressRaw,
+      normalizedAddress: normalizedLine,
+      city,
+      state,
+      lat: spatial.lat,
+      lng: spatial.lng,
+      coordinate_precision: spatial.coordinate_precision,
+      geocode_method: spatial.geocode_method,
+    })
+  }
 
   const admin = getAdminDb()
   const scheduleFields = detailScheduleFieldsForListing(listing)
@@ -435,6 +453,7 @@ export async function attemptYstmDetailFirstReady(
     ...params.rowPayload,
     detailFirstReady: true,
     detailFirstResolution: spatial.resolutionSource,
+    ...(nativeFirst ? { detailFirstNativeCoordsOnly: true } : {}),
   }
 
   const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
@@ -469,13 +488,23 @@ export async function attemptYstmDetailFirstReady(
       geocode_confidence: spatial.geocode_confidence,
       coordinate_precision: spatial.coordinate_precision,
       geocode_method: spatial.geocode_method,
-      ...addressLifecycleFieldsForDb({
-        addressStatus: 'address_available',
-        canonicalSourceUrl: addressLifecycle.canonicalSourceUrl,
-        addressUnlockAt: addressLifecycle.addressUnlockAt,
-        nextEnrichmentAttemptAt: null,
-        ingestStatus: 'ready',
-      }),
+      ...addressLifecycleFieldsForDb(
+        nativeFirst
+          ? {
+              addressStatus: 'address_enrichment_pending',
+              canonicalSourceUrl: addressLifecycle.canonicalSourceUrl,
+              addressUnlockAt: null,
+              nextEnrichmentAttemptAt: null,
+              ingestStatus: 'ready',
+            }
+          : {
+              addressStatus: 'address_available',
+              canonicalSourceUrl: addressLifecycle.canonicalSourceUrl,
+              addressUnlockAt: addressLifecycle.addressUnlockAt,
+              nextEnrichmentAttemptAt: null,
+              ingestStatus: 'ready',
+            }
+      ),
     })
     .select('id')
     .maybeSingle()

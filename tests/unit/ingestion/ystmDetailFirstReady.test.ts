@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockFetchExternalPageSource = vi.fn()
 const mockLookupSpatialCoordinates = vi.fn()
+const mockClassifySpatialFailure = vi.fn()
 const mockPublishReady = vi.fn()
 const mockUpsertCache = vi.fn()
 const mockFrom = vi.fn()
@@ -29,6 +30,10 @@ vi.mock('@/lib/ingestion/adapters/externalPageSource', async () => {
 
 vi.mock('@/lib/ingestion/spatial/resolveSpatialCoordinates', () => ({
   lookupSpatialCoordinates: (...args: unknown[]) => mockLookupSpatialCoordinates(...args),
+}))
+
+vi.mock('@/lib/ingestion/acquisition/classifyDetailFirstSpatialFailure', () => ({
+  classifyDetailFirstSpatialFailure: (...args: unknown[]) => mockClassifySpatialFailure(...args),
 }))
 
 vi.mock('@/lib/ingestion/publishWorker', () => ({
@@ -199,9 +204,11 @@ describe('attemptYstmDetailFirstReady', () => {
   beforeEach(() => {
     mockFetchExternalPageSource.mockReset()
     mockLookupSpatialCoordinates.mockReset()
+    mockClassifySpatialFailure.mockReset()
     mockPublishReady.mockReset()
     mockUpsertCache.mockReset()
     mockFrom.mockReset()
+    mockClassifySpatialFailure.mockResolvedValue('spatial_lookup_failed')
 
     mockFrom.mockImplementation(() => ({
       insert: vi.fn(() => ({

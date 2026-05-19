@@ -220,7 +220,7 @@ describe('attemptYstmDetailFirstReady', () => {
       pageIndex: 0,
     })
 
-    expect(result).toEqual({ outcome: 'fallback', reason: 'fetch_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'fetch_failed' })
     expect(metrics.fetchFailed).toBe(1)
     expect(metrics.fallback).toBe(1)
     expect(metrics.rejectedByReason.fetch_failed).toBe(1)

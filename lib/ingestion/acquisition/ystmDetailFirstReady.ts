@@ -414,7 +414,7 @@ export async function attemptYstmDetailFirstReady(
   })
 
   const admin = getAdminDb()
-  const scheduleFields = dateScheduleFieldsForListing(listing)
+  const scheduleFields = detailScheduleFieldsForListing(listing)
   const rowPayload = {
     ...params.rowPayload,
     detailFirstReady: true,

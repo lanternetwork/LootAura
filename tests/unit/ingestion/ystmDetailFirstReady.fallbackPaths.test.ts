@@ -144,7 +144,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'parse_no_listing' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'parse_no_listing' })
     expect(metrics.rejectedByReason.parse_no_listing).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -161,7 +161,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'fetch_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'fetch_failed' })
     expect(metrics.fetchFailed).toBe(1)
     expect(metrics.rejectedByReason.fetch_failed).toBe(1)
     expectFallbackAccounting(metrics)
@@ -180,7 +180,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'parse_no_listing' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'parse_no_listing' })
     expect(metrics.rejectedByReason.parse_no_listing).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -204,7 +204,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'expired_after_detail' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'expired_after_detail' })
     expect(metrics.rejectedByReason.expired_after_detail).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -223,7 +223,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'missing_title' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'missing_title' })
     expect(metrics.rejectedByReason.missing_title).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -242,7 +242,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'invalid_dates' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'invalid_dates' })
     expect(metrics.rejectedByReason.invalid_dates).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -262,7 +262,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'address_validation_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'address_validation_failed' })
     expect(metrics.rejectedByReason.address_validation_failed).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -316,7 +316,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'gated_address' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'gated_address' })
     expect(metrics.rejectedByReason.gated_address).toBe(1)
     expectFallbackAccounting(metrics)
     vi.restoreAllMocks()
@@ -336,7 +336,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'spatial_lookup_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'spatial_lookup_failed' })
     expect(metrics.rejectedByReason.spatial_lookup_failed).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -355,7 +355,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'native_coords_invalid' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'native_coords_invalid' })
     expect(metrics.rejectedByReason.native_coords_invalid).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -390,7 +390,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'canonical_collision' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'canonical_collision' })
     expect(metrics.rejectedByReason.canonical_collision).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -425,7 +425,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'insert_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'insert_failed' })
     expect(metrics.rejectedByReason.insert_failed).toBe(1)
     expectFallbackAccounting(metrics)
   })

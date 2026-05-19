@@ -25,6 +25,10 @@ function hoursAgoIso(hours: number): string {
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
+  const maybeSingleResult = {
+    data: Array.isArray(result.data) ? (result.data[0] ?? null) : (result.data ?? null),
+    error: result.error ?? null,
+  }
   for (const m of [
     'select',
     'eq',
@@ -42,6 +46,7 @@ function thenableQuery(result: { data?: unknown; error?: unknown; count?: number
   ]) {
     q[m] = vi.fn(() => q)
   }
+  q.maybeSingle = vi.fn(() => Promise.resolve(maybeSingleResult))
   q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(onFulfilled, onRejected)
   return q

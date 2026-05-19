@@ -2,19 +2,16 @@ import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import {
   fetchExternalPageSource,
-  parseExternalPageSourceHtml,
   type ExternalPageSourceIngestionConfig,
   type ExternalPageSourceListing,
 } from '@/lib/ingestion/adapters/externalPageSource'
-import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
-import { extractDetailPageAddressFromHtml } from '@/lib/ingestion/address/extractDetailPageAddress'
+import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
 import { detectGatedListing } from '@/lib/ingestion/address/addressGated'
 import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
 import {
   addressLifecycleFieldsForDb,
   resolveIngestAddressLifecycle,
 } from '@/lib/ingestion/address/resolveIngestAddressLifecycle'
-import { extractYstmDetailMediaStrFromHtml } from '@/lib/ingestion/images/extractYstmDetailMediaStr'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
@@ -27,7 +24,6 @@ import {
   reconcileDetailFirstFallbackReasonCounts,
   type YstmDetailFirstFallbackReason,
 } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
-import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
 import {
   coerceIngestedDateToYyyyMmDd,
   isSaleWindowExpiredAtDiscovery,
@@ -142,7 +138,7 @@ function mergeListingFields(
 }
 
 /**
- * Parse a YSTM detail page into a listing row (anchors, or list seed + detail enrichment).
+ * Parse a YSTM detail page into a listing row (detail DOM is authoritative; list seed fills gaps).
  */
 export function parseYstmDetailListingFromHtml(input: {
   html: string
@@ -150,52 +146,51 @@ export function parseYstmDetailListingFromHtml(input: {
   config: ExternalPageSourceIngestionConfig
   listSeed: ExternalPageSourceListing
 }): ExternalPageSourceListing | null {
-  const parsed = parseExternalPageSourceHtml(input.html, input.config, input.sourceUrl)
-  const target = canonicalSourceUrl(input.sourceUrl)
-  let detailMatch =
-    parsed.listings.find((l) => canonicalSourceUrl(l.sourceUrl) === target) ??
-    (parsed.listings.length === 1 ? parsed.listings[0]! : null)
+  if (!parseYstmListingPathParts(input.sourceUrl)) {
+    return null
+  }
 
-  const addrFromDetail = extractDetailPageAddressFromHtml({
+  const detailPage = parseYstmDetailPageFromHtml({
     html: input.html,
     sourceUrl: input.sourceUrl,
-    city: input.listSeed.city,
-    state: input.listSeed.state,
-    sourcePlatform: input.config.source_platform,
+    configCity: input.config.city,
+    configState: input.config.state,
   })
-
-  if (detailMatch) {
-    if (addrFromDetail.addressRaw?.trim()) {
-      detailMatch = { ...detailMatch, addressRaw: addrFromDetail.addressRaw }
-    }
-  } else {
-    const path = parseYstmListingPathParts(input.sourceUrl)
-    if (!path) return null
-    detailMatch = {
-      ...input.listSeed,
-      addressRaw: addrFromDetail.addressRaw ?? input.listSeed.addressRaw,
-    }
+  if (!detailPage) {
+    return null
   }
 
-  const merged = mergeListingFields(input.listSeed, detailMatch)
-
-  const media = extractYstmDetailMediaStrFromHtml(input.html, input.sourceUrl)
-  if (media.imageUrls.length > 0) {
-    merged.imageSourceUrl = media.imageUrls[0] ?? merged.imageSourceUrl
-    merged.rawPayload = { ...merged.rawPayload, imageUrls: media.imageUrls }
+  const detailListing: ExternalPageSourceListing = {
+    title: detailPage.title ?? input.listSeed.title,
+    description: detailPage.description ?? input.listSeed.description,
+    addressRaw: detailPage.addressRaw ?? input.listSeed.addressRaw,
+    city: detailPage.city ?? input.listSeed.city,
+    state: detailPage.state ?? input.listSeed.state,
+    startDate: detailPage.startDate ?? input.listSeed.startDate,
+    endDate: detailPage.endDate ?? input.listSeed.endDate,
+    sourceUrl: input.listSeed.sourceUrl,
+    imageSourceUrl: detailPage.imageUrls[0] ?? input.listSeed.imageSourceUrl,
+    rawPayload: {
+      ...(typeof input.listSeed.rawPayload === 'object' && input.listSeed.rawPayload
+        ? input.listSeed.rawPayload
+        : {}),
+      detailPageParsed: true,
+      cityConflict: detailPage.cityConflict,
+      ...(detailPage.nativeCoords
+        ? {
+            ystmNativeLat: detailPage.nativeCoords.lat,
+            ystmNativeLng: detailPage.nativeCoords.lng,
+            ystmNativeCoordSource: detailPage.nativeCoords.source,
+          }
+        : {}),
+      ...(detailPage.imageUrls.length > 0 ? { imageUrls: detailPage.imageUrls } : {}),
+      ...(detailPage.detailTimeStart
+        ? { detailTimeStart: detailPage.detailTimeStart, detailTimeEnd: detailPage.detailTimeEnd }
+        : {}),
+    },
   }
 
-  const hourRange = extractAuthoritativeSaleHourRangeFromText(
-    [merged.description, merged.title, merged.addressRaw].filter(Boolean).join('\n')
-  )
-  if (hourRange) {
-    merged.rawPayload = {
-      ...merged.rawPayload,
-      detailTimeStart: hourRange.timeStart,
-      detailTimeEnd: hourRange.timeEnd,
-    }
-  }
-
+  const merged = mergeListingFields(input.listSeed, detailListing)
   return merged
 }
 

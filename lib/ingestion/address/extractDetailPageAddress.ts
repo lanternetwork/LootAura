@@ -1,5 +1,4 @@
-import { parseExternalPageSourceHtml } from '@/lib/ingestion/adapters/externalPageSource'
-import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
+import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
 import { enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
 
 export type DetailPageAddressExtraction = {
@@ -7,7 +6,7 @@ export type DetailPageAddressExtraction = {
 }
 
 /**
- * D1: extract address_raw only from refreshed detail/list HTML (no dates/images/seller).
+ * Extract address_raw from YSTM detail/list HTML via the detail-native parser.
  */
 export function extractDetailPageAddressFromHtml(input: {
   html: string
@@ -16,32 +15,25 @@ export function extractDetailPageAddressFromHtml(input: {
   state: string | null
   sourcePlatform: string
 }): DetailPageAddressExtraction {
+  void input.sourcePlatform
   const city = typeof input.city === 'string' && input.city.trim() ? input.city.trim() : null
   const state = typeof input.state === 'string' && input.state.trim() ? input.state.trim() : null
   if (!city || !state) {
     return { addressRaw: null }
   }
 
-  const { listings } = parseExternalPageSourceHtml(
-    input.html,
-    {
-      city,
-      state,
-      source_platform: input.sourcePlatform,
-      source_pages: [],
-    },
-    input.sourceUrl
-  )
+  const detailPage = parseYstmDetailPageFromHtml({
+    html: input.html,
+    sourceUrl: input.sourceUrl,
+    configCity: city,
+    configState: state,
+  })
 
-  const target = canonicalSourceUrl(input.sourceUrl)
-  const match =
-    listings.find((l) => canonicalSourceUrl(l.sourceUrl) === target) ??
-    (listings.length === 1 ? listings[0] : null)
-
-  if (!match?.addressRaw?.trim()) {
+  const line = detailPage?.addressRaw?.trim() ?? null
+  if (!line) {
     return { addressRaw: null }
   }
 
-  const enriched = enrichStreetLineWithPathMunicipalityWhenNoTail(match.addressRaw.trim(), input.sourceUrl)
+  const enriched = enrichStreetLineWithPathMunicipalityWhenNoTail(line, input.sourceUrl)
   return { addressRaw: enriched.line }
 }

@@ -292,7 +292,7 @@ function cleanDescriptionText(
   return cleaned || null
 }
 
-function extractFallbackAddressAndDates(
+export function extractFallbackAddressAndDates(
   fullText: string,
   city: string,
   state: string,

@@ -102,6 +102,7 @@ export function validateDetailEnrichedListing(
     return { ok: false, reason: 'invalid_dates' }
   }
 
+  // Phase D: native coords before street publish validation (Hidden/placeholder address).
   const nativeFirst = tryNativeFirstValidation(listing, provenance)
   if (nativeFirst) {
     return nativeFirst

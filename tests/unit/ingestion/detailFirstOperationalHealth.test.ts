@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DETAIL_FIRST_SLO_MIN_ATTEMPTS,
+  DETAIL_FIRST_SUCCESS_RATE_TARGET,
   DETAIL_FIRST_SUCCESS_RATE_WARNING,
   evaluateDetailFirstOperationalHealth,
   type DetailFirstOperationalHealthInput,
@@ -50,7 +51,8 @@ describe('evaluateDetailFirstOperationalHealth', () => {
     expect(health.healthy).toBe(false)
     expect(health.alerts.some((a) => a.code === 'detail_first_success_rate_low')).toBe(true)
     const lowRateAlert = health.alerts.find((a) => a.code === 'detail_first_success_rate_low')
-    expect(lowRateAlert?.message).toContain(`${DETAIL_FIRST_SUCCESS_RATE_WARNING * 100}%`)
+    expect(lowRateAlert?.message).toContain(`${DETAIL_FIRST_SUCCESS_RATE_TARGET * 100}%`)
+    expect(DETAIL_FIRST_SUCCESS_RATE_WARNING).toBe(DETAIL_FIRST_SUCCESS_RATE_TARGET)
   })
 
   it('fires warning when detail-page address rate is low', () => {

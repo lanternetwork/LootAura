@@ -1,5 +1,6 @@
 import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 export type BuildIngestionDiagnosticsOptions = {
@@ -90,7 +91,10 @@ export function buildIngestionDiagnostics(
     bullet('published same run', df.published),
     bullet('fallback to legacy', df.fallback),
     bullet('detail fetch failed', df.fetchFailed),
-    bullet('success rate', formatPct(df.providerGeocodeBypassRate)),
+    bullet(
+      'success rate',
+      `${formatPct(df.providerGeocodeBypassRate)} (target ≥${(DETAIL_FIRST_SUCCESS_RATE_TARGET * 100).toFixed(0)}%)`
+    ),
     bullet('address from detail page', formatCount(df.addressFromDetailPage)),
     bullet('address from list seed', formatCount(df.addressFromListSeed)),
     bullet('address from detail page rate', formatPct(df.addressFromDetailPageRate)),

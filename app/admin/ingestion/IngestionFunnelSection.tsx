@@ -7,6 +7,7 @@ import type {
   IngestionFunnelStage,
   IngestionFunnelWindowMetrics,
 } from '@/lib/admin/ingestionMetricsTypes'
+import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 type Leaderboards = IngestionFunnelWindowMetrics['configLeaderboards']
@@ -281,7 +282,12 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
           </div>
           <div>
             <dt className="text-xs text-emerald-800">Detail-first success rate</dt>
-            <dd className="font-medium tabular-nums">{pct(metrics.detailFirst.providerGeocodeBypassRate)}</dd>
+            <dd className="font-medium tabular-nums">
+              {pct(metrics.detailFirst.providerGeocodeBypassRate)}
+              <span className="ml-1 font-normal text-emerald-800">
+                (target ≥{Math.round(DETAIL_FIRST_SUCCESS_RATE_TARGET * 100)}%)
+              </span>
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-emerald-800">Median ms → published</dt>

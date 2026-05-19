@@ -106,9 +106,11 @@ describe('detailFirstOrchestrationFields', () => {
         msToPublishedSamples: [100, 300, 200],
         addressValidatedFromDetailPage: 3,
         addressValidatedFromListSeed: 1,
+        insertFailedByDbCode: { '23514': 2 },
       },
       10
     )
+    expect(fields.ystmDetailFirstInsertFailedByDbCode).toEqual({ '23514': 2 })
     expect(fields.freshInsertReadyAtInsertRate).toBe(0.2)
     expect(fields.medianMsToPublished).toBe(200)
     expect(fields.ystmDetailFirstAttempted).toBe(4)

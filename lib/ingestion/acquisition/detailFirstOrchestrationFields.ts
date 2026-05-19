@@ -15,6 +15,7 @@ export type DetailFirstOrchestrationFields = {
   detailFirstAddressFromDetailPage: number
   detailFirstAddressFromListSeed: number
   detailFirstAddressFromDetailPageRate: number | null
+  ystmDetailFirstInsertFailedByDbCode: Record<string, number>
 }
 
 export function detailFirstOrchestrationFields(
@@ -60,5 +61,6 @@ export function detailFirstOrchestrationFields(
       attempted > 0
         ? Math.round((metrics.addressValidatedFromDetailPage / attempted) * 10000) / 10000
         : null,
+    ystmDetailFirstInsertFailedByDbCode: { ...metrics.insertFailedByDbCode },
   }
 }

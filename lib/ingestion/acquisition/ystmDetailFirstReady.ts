@@ -11,7 +11,15 @@ import {
   mergeIngestionDiagnosticsForDetailFirst,
   readDetailFirstFieldProvenance,
 } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
+import {
+  classifyDetailFirstInsertFailure,
+  insertFailureTelemetryFields,
+} from '@/lib/ingestion/acquisition/classifyDetailFirstInsertFailure'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
+import {
+  findPublishedIngestedSaleIdForDetailFirst,
+  promoteExistingIngestedSaleForDetailFirst,
+} from '@/lib/ingestion/acquisition/promoteExistingIngestedSaleForDetailFirst'
 import { resolveDetailFirstMergedAddressRaw } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import {
   detailFirstValidationTelemetry,
@@ -32,6 +40,8 @@ import {
 import { upsertAddressGeocodeCache } from '@/lib/ingestion/spatial/addressGeocodeCache'
 import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
+import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
+import type { SpatialCoordinateResolution } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents, type ObservabilityEventName } from '@/lib/observability/events'
 export { parseYstmDetailFirstConcurrencyFromEnv } from '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'
@@ -53,6 +63,8 @@ export type YstmDetailFirstRunMetrics = {
   addressValidatedFromDetailPage: number
   /** Listings whose validated address came from list seed after merge (Phase 4 observability). */
   addressValidatedFromListSeed: number
+  /** Phase C: postgres / API codes for insert_failed attempts (e.g. 23505, 23514). */
+  insertFailedByDbCode: Record<string, number>
 }
 
 export function emptyYstmDetailFirstRunMetrics(): YstmDetailFirstRunMetrics {
@@ -66,6 +78,18 @@ export function emptyYstmDetailFirstRunMetrics(): YstmDetailFirstRunMetrics {
     msToPublishedSamples: [],
     addressValidatedFromDetailPage: 0,
     addressValidatedFromListSeed: 0,
+    insertFailedByDbCode: {},
+  }
+}
+
+export function mergeDetailFirstInsertFailedByDbCode(
+  target: Record<string, number>,
+  delta: Record<string, number> | undefined
+): void {
+  if (!delta) return
+  for (const [code, count] of Object.entries(delta)) {
+    if (!count || count <= 0) continue
+    target[code] = (target[code] ?? 0) + count
   }
 }
 
@@ -85,6 +109,7 @@ export function mergeYstmDetailFirstMetrics(
     const key = reason as YstmDetailFirstFallbackReason
     target.rejectedByReason[key] = (target.rejectedByReason[key] ?? 0) + (count ?? 0)
   }
+  mergeDetailFirstInsertFailedByDbCode(target.insertFailedByDbCode, delta.insertFailedByDbCode)
   reconcileDetailFirstFallbackReasonCounts(target.rejectedByReason, target.fallback)
 }
 
@@ -98,6 +123,83 @@ function recordDetailFirstFallback(
 
 function finalizeDetailFirstAttemptMetrics(metrics: YstmDetailFirstRunMetrics): void {
   reconcileDetailFirstFallbackReasonCounts(metrics.rejectedByReason, metrics.fallback)
+}
+
+function recordDetailFirstInsertFailure(
+  metrics: YstmDetailFirstRunMetrics,
+  classification: ReturnType<typeof classifyDetailFirstInsertFailure>
+): void {
+  if (classification.reason === 'insert_failed') {
+    const code = classification.dbCode?.trim() || 'unknown'
+    metrics.insertFailedByDbCode[code] = (metrics.insertFailedByDbCode[code] ?? 0) + 1
+  }
+  recordDetailFirstFallback(metrics, classification.reason)
+}
+
+function buildDetailFirstIngestedSaleInsertRow(input: {
+  platform: string
+  listing: ExternalPageSourceListing
+  city: string
+  state: string
+  normalizedLine: string | null
+  nativeFirst: boolean
+  spatial: SpatialCoordinateResolution
+  scheduleFields: ReturnType<typeof detailScheduleFieldsForListing>
+  addressLifecycle: ReturnType<typeof resolveIngestAddressLifecycle>
+  rowPayload: Record<string, unknown>
+}): Record<string, unknown> {
+  const dateStart = coerceIngestedDateToYyyyMmDd(input.listing.startDate)
+  const dateEnd = coerceIngestedDateToYyyyMmDd(input.listing.endDate)
+
+  return {
+    source_platform: input.platform,
+    source_url: input.listing.sourceUrl,
+    external_id: (input.listing.rawPayload.externalId as string | null) ?? null,
+    title: input.listing.title,
+    description: input.listing.description,
+    address_raw: input.listing.addressRaw,
+    normalized_address: input.normalizedLine,
+    city: input.city,
+    state: input.state,
+    zip_code: null,
+    lat: input.spatial.lat,
+    lng: input.spatial.lng,
+    date_start: dateStart,
+    date_end: dateEnd,
+    time_start: input.scheduleFields.time_start,
+    time_end: input.scheduleFields.time_end,
+    date_source: input.scheduleFields.date_source,
+    time_source: input.scheduleFields.time_source,
+    image_source_url: input.listing.imageSourceUrl,
+    raw_text: null,
+    raw_payload: input.rowPayload,
+    status: 'ready',
+    failure_reasons: [],
+    parser_version: PARSER_VERSION_ROW,
+    parse_confidence: 'high',
+    is_duplicate: false,
+    duplicate_of: null,
+    geocode_confidence: input.spatial.geocode_confidence,
+    coordinate_precision: input.spatial.coordinate_precision,
+    geocode_method: input.spatial.geocode_method,
+    ...addressLifecycleFieldsForDb(
+      input.nativeFirst
+        ? {
+            addressStatus: 'address_enrichment_pending',
+            canonicalSourceUrl: input.addressLifecycle.canonicalSourceUrl,
+            addressUnlockAt: null,
+            nextEnrichmentAttemptAt: null,
+            ingestStatus: 'ready',
+          }
+        : {
+            addressStatus: 'address_available',
+            canonicalSourceUrl: input.addressLifecycle.canonicalSourceUrl,
+            addressUnlockAt: input.addressLifecycle.addressUnlockAt,
+            nextEnrichmentAttemptAt: null,
+            ingestStatus: 'ready',
+          }
+    ),
+  }
 }
 
 function mergeListingFields(
@@ -455,77 +557,65 @@ export async function attemptYstmDetailFirstReady(
     detailFirstResolution: spatial.resolutionSource,
     ...(nativeFirst ? { detailFirstNativeCoordsOnly: true } : {}),
   }
+  const ingestRow = buildDetailFirstIngestedSaleInsertRow({
+    platform: params.platform,
+    listing,
+    city,
+    state,
+    normalizedLine,
+    nativeFirst,
+    spatial,
+    scheduleFields,
+    addressLifecycle,
+    rowPayload,
+  })
 
   const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
-    .insert({
-      source_platform: params.platform,
-      source_url: listing.sourceUrl,
-      external_id: (listing.rawPayload.externalId as string | null) ?? null,
-      title: listing.title,
-      description: listing.description,
-      address_raw: listing.addressRaw,
-      normalized_address: normalizedLine,
-      city,
-      state,
-      zip_code: null,
-      lat: spatial.lat,
-      lng: spatial.lng,
-      date_start: listing.startDate ?? null,
-      date_end: listing.endDate ?? null,
-      time_start: scheduleFields.time_start,
-      time_end: scheduleFields.time_end,
-      date_source: scheduleFields.date_source,
-      time_source: scheduleFields.time_source,
-      image_source_url: listing.imageSourceUrl,
-      raw_text: null,
-      raw_payload: rowPayload,
-      status: 'ready',
-      failure_reasons: [],
-      parser_version: PARSER_VERSION_ROW,
-      parse_confidence: 'high',
-      is_duplicate: false,
-      duplicate_of: null,
-      geocode_confidence: spatial.geocode_confidence,
-      coordinate_precision: spatial.coordinate_precision,
-      geocode_method: spatial.geocode_method,
-      ...addressLifecycleFieldsForDb(
-        nativeFirst
-          ? {
-              addressStatus: 'address_enrichment_pending',
-              canonicalSourceUrl: addressLifecycle.canonicalSourceUrl,
-              addressUnlockAt: null,
-              nextEnrichmentAttemptAt: null,
-              ingestStatus: 'ready',
-            }
-          : {
-              addressStatus: 'address_available',
-              canonicalSourceUrl: addressLifecycle.canonicalSourceUrl,
-              addressUnlockAt: addressLifecycle.addressUnlockAt,
-              nextEnrichmentAttemptAt: null,
-              ingestStatus: 'ready',
-            }
-      ),
-    })
+    .insert(ingestRow)
     .select('id')
     .maybeSingle()
 
-  if (insErr || !insertedRow?.id) {
-    const insertReason =
-      insErr && /duplicate key|unique constraint|23505/i.test(insErr.message)
-        ? 'canonical_collision'
-        : 'insert_failed'
-    recordDetailFirstFallback(metrics, insertReason)
-    finalizeDetailFirstAttemptMetrics(metrics)
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
-      rejectedReason: insertReason,
-      ...validationTelemetry,
-    })
-    return {
-      result: buildDetailFirstFallbackResult(insertReason, {
-        detailEnrichedListing: listing,
-        detailPageHtml: html,
-      }),
-      metrics,
+  let ingestedSaleId = insertedRow?.id ? String(insertedRow.id) : null
+
+  if (!ingestedSaleId) {
+    const insertFailure = classifyDetailFirstInsertFailure(insErr)
+
+    if (insertFailure.reason === 'canonical_collision') {
+      const promoted = await promoteExistingIngestedSaleForDetailFirst(admin, {
+        sourceUrl: listing.sourceUrl,
+        row: ingestRow,
+      })
+      if (promoted?.id) {
+        ingestedSaleId = promoted.id
+      } else {
+        const publishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, listing.sourceUrl)
+        if (publishedId) {
+          ingestedSaleId = publishedId
+          metrics.succeeded = 1
+          finalizeDetailFirstAttemptMetrics(metrics)
+          return {
+            result: { outcome: 'ready', ingestedSaleId: publishedId, published: true },
+            metrics,
+          }
+        }
+      }
+    }
+
+    if (!ingestedSaleId) {
+      recordDetailFirstInsertFailure(metrics, insertFailure)
+      finalizeDetailFirstAttemptMetrics(metrics)
+      emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
+        rejectedReason: insertFailure.reason,
+        ...insertFailureTelemetryFields(insertFailure),
+        ...validationTelemetry,
+      })
+      return {
+        result: buildDetailFirstFallbackResult(insertFailure.reason, {
+          detailEnrichedListing: listing,
+          detailPageHtml: html,
+        }),
+        metrics,
+      }
     }
   }
 
@@ -535,7 +625,7 @@ export async function attemptYstmDetailFirstReady(
     ...validationTelemetry,
   })
 
-  const publishResult = await publishReadyIngestedSaleById(String(insertedRow.id))
+  const publishResult = await publishReadyIngestedSaleById(ingestedSaleId)
   const published = publishResult.ok === true && 'publishedSaleId' in publishResult
   if (published) {
     metrics.published = 1
@@ -553,7 +643,7 @@ export async function attemptYstmDetailFirstReady(
 
   finalizeDetailFirstAttemptMetrics(metrics)
   return {
-    result: { outcome: 'ready', ingestedSaleId: String(insertedRow.id), published },
+    result: { outcome: 'ready', ingestedSaleId, published },
     metrics,
   }
 }

@@ -18,6 +18,7 @@ import {
   evaluateDetailFirstOperationalHealth,
   type DetailFirstOperationalHealth,
 } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import { mergeDetailFirstInsertFailedByDbCode } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 import {
   dedupeDenominatorFromAggregate,
   dedupeSkipCountFromAggregate,
@@ -123,6 +124,7 @@ export type IngestionFunnelDetailFirstMetrics = {
   addressFromDetailPage: number
   addressFromListSeed: number
   addressFromDetailPageRate: number | null
+  insertFailedByDbCode: Record<string, number>
   operationalHealth: DetailFirstOperationalHealth
 }
 
@@ -204,6 +206,7 @@ export type ExternalIngestionRollup = {
   detailFirstFallbackByReason: Record<string, number>
   detailFirstAddressFromDetailPage: number
   detailFirstAddressFromListSeed: number
+  detailFirstInsertFailedByDbCode: Record<string, number>
 }
 
 function recomputeDuplicateHitsTotal(target: IngestionFunnelDuplicateHits): void {
@@ -385,6 +388,7 @@ export function rollupExternalIngestionForWindow(
     detailFirstFallbackByReason: {},
     detailFirstAddressFromDetailPage: 0,
     detailFirstAddressFromListSeed: 0,
+    detailFirstInsertFailedByDbCode: {},
   }
 
   for (const row of rows) {
@@ -430,6 +434,10 @@ export function rollupExternalIngestionForWindow(
     )
     rollup.detailFirstAddressFromDetailPage += num(ext.detailFirstAddressFromDetailPage)
     rollup.detailFirstAddressFromListSeed += num(ext.detailFirstAddressFromListSeed)
+    mergeDetailFirstInsertFailedByDbCode(
+      rollup.detailFirstInsertFailedByDbCode,
+      ext.ystmDetailFirstInsertFailedByDbCode
+    )
 
     const k = hourFloorUtc(row.created_at)
     discoveredByHour.set(k, (discoveredByHour.get(k) ?? 0) + fetched)
@@ -756,6 +764,7 @@ export function buildIngestionFunnelWindowMetrics(params: {
             (externalRollup.detailFirstAddressFromDetailPage / detailFirstAttempted) * 10000
           ) / 10000
         : null,
+    insertFailedByDbCode: { ...externalRollup.detailFirstInsertFailedByDbCode },
   }
   const detailFirst: IngestionFunnelDetailFirstMetrics = {
     ...detailFirstMetricsInput,

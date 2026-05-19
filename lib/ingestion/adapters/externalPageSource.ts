@@ -110,6 +110,7 @@ export interface ExternalPageSourcePersistSummary {
   detailFirstAddressFromDetailPage: number
   detailFirstAddressFromListSeed: number
   detailFirstAddressFromDetailPageRate: number | null
+  ystmDetailFirstInsertFailedByDbCode: Record<string, number>
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -1038,6 +1039,7 @@ export async function persistExternalPageSource(
     detailFirstAddressFromDetailPage: 0,
     detailFirstAddressFromListSeed: 0,
     detailFirstAddressFromDetailPageRate: null,
+    ystmDetailFirstInsertFailedByDbCode: {},
   }
 
   const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
@@ -1535,6 +1537,9 @@ export async function persistExternalPageSource(
   summary.detailFirstAddressFromDetailPage = detailFirstFields.detailFirstAddressFromDetailPage
   summary.detailFirstAddressFromListSeed = detailFirstFields.detailFirstAddressFromListSeed
   summary.detailFirstAddressFromDetailPageRate = detailFirstFields.detailFirstAddressFromDetailPageRate
+  summary.ystmDetailFirstInsertFailedByDbCode = {
+    ...detailFirstFields.ystmDetailFirstInsertFailedByDbCode,
+  }
 
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.ingestion.externalPersistSummary, {

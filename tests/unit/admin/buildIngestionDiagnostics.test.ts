@@ -137,6 +137,7 @@ describe('buildIngestionDiagnostics', () => {
             addressFromDetailPage: 3,
             addressFromListSeed: 1,
             addressFromDetailPageRate: 0.75,
+            insertFailedByDbCode: { '23514': 1 },
             operationalHealth: { healthy: true, alerts: [] },
           },
           configLeaderboards: {
@@ -177,6 +178,8 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('- fresh inserted: 15')
     expect(md).toContain('- attempted: 4')
     expect(md).toContain('- address from detail page: 3')
+    expect(md).toContain('### Phase C insert_failed DB codes')
+    expect(md).toContain('- 23514: 1 (25.0% of attempts)')
     expect(md).toContain('- operational health: healthy')
     expect(md).toContain('- fallback reasons accounted: 2/2')
     expect(md).toContain('- top fallback reason: spatial_lookup_failed (50.0% of attempts)')

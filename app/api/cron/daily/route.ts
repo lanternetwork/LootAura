@@ -76,6 +76,7 @@ import {
   recordConfigCrawlStats,
 } from '@/lib/ingestion/acquisition/configCrawlStats'
 import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
+import { mergeDetailFirstInsertFailedByDbCode } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 import { mergeDetailFirstFallbackReasonCounts } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import { freshAcquisitionOrchestrationFields } from '@/lib/ingestion/acquisition/freshAcquisitionOrchestrationFields'
 import {
@@ -703,6 +704,7 @@ async function runIngestionOrchestration(
         ystmDetailFirstRejectedByReason: {} as Record<string, number>,
         detailFirstAddressFromDetailPage: 0,
         detailFirstAddressFromListSeed: 0,
+        ystmDetailFirstInsertFailedByDbCode: {} as Record<string, number>,
       }
 
       const externalRows = ((enabledCities || []) as ExternalConfigRow[]).filter(
@@ -864,6 +866,10 @@ async function runIngestionOrchestration(
         )
         totals.detailFirstAddressFromDetailPage += s.detailFirstAddressFromDetailPage ?? 0
         totals.detailFirstAddressFromListSeed += s.detailFirstAddressFromListSeed ?? 0
+        mergeDetailFirstInsertFailedByDbCode(
+          totals.ystmDetailFirstInsertFailedByDbCode,
+          s.ystmDetailFirstInsertFailedByDbCode
+        )
 
         ingestionDedupeTelemetrySummary.source_url += s.duplicateExistingUrl ?? 0
         ingestionDedupeTelemetrySummary.soft_date_window += s.duplicateCrossCityPage ?? 0
@@ -933,6 +939,7 @@ async function runIngestionOrchestration(
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
             addressValidatedFromDetailPage: totals.detailFirstAddressFromDetailPage,
             addressValidatedFromListSeed: totals.detailFirstAddressFromListSeed,
+            insertFailedByDbCode: totals.ystmDetailFirstInsertFailedByDbCode,
           },
           totals.freshInserted
         ),
@@ -980,6 +987,7 @@ async function runIngestionOrchestration(
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
             addressValidatedFromDetailPage: totals.detailFirstAddressFromDetailPage,
             addressValidatedFromListSeed: totals.detailFirstAddressFromListSeed,
+            insertFailedByDbCode: totals.ystmDetailFirstInsertFailedByDbCode,
           },
           totals.freshInserted
         ),

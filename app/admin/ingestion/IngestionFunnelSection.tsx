@@ -333,6 +333,32 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
             fell back without a recorded reason (legacy crawl or missing code path)
           </p>
         )}
+        {Object.values(metrics.detailFirst.insertFailedByDbCode ?? {}).some((n) => n > 0) && (
+          <div className="mt-3" role="region" aria-label="insert_failed DB codes">
+            <p className="text-xs font-medium text-emerald-900">insert_failed DB codes (Phase C)</p>
+            <dl className="mt-1 grid gap-1 text-xs sm:grid-cols-2">
+              {Object.entries(metrics.detailFirst.insertFailedByDbCode)
+                .filter(([, count]) => count > 0)
+                .sort((a, b) => b[1] - a[1])
+                .map(([code, count]) => (
+                  <div
+                    key={code}
+                    className="flex justify-between gap-2 rounded bg-emerald-50/80 px-2 py-1"
+                  >
+                    <dt className="font-mono text-emerald-900">{code}</dt>
+                    <dd className="tabular-nums font-medium">
+                      {count.toLocaleString()}
+                      {metrics.detailFirst.attempted > 0 && (
+                        <span className="ml-1 font-normal text-emerald-800">
+                          ({pct(count / metrics.detailFirst.attempted)})
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
+        )}
         {metrics.detailFirst.attempted > 0 && (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-xs">

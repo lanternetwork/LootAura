@@ -157,6 +157,24 @@ export function buildIngestionDiagnostics(
     }
   }
 
+  const insertFailedCodes = Object.entries(df.insertFailedByDbCode ?? {}).filter(
+    ([, count]) => count > 0
+  )
+  lines.push('', '### Phase C insert_failed DB codes')
+  if (insertFailedCodes.length === 0) {
+    lines.push(bullet('(none)', '—'))
+  } else {
+    for (const [code, count] of insertFailedCodes.sort((a, b) => b[1] - a[1])) {
+      const rate = df.attempted > 0 ? count / df.attempted : null
+      lines.push(
+        bullet(
+          code,
+          `${formatCount(count)} (${formatPct(rate)} of attempts)`
+        )
+      )
+    }
+  }
+
   lines.push(
     '',
     '## Queues',

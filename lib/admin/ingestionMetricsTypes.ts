@@ -172,6 +172,8 @@ export interface IngestionMetricsStuckRowSample {
 export interface IngestionMetricsResponse {
   ok: boolean
   generatedAt: string
+  /** When set, funnel rollups exclude orchestration + cohort rows before this instant. */
+  detailFirstMetricsBaselineAt: string | null
   backlog: number
   /** needs_geocode rows eligible for geocode claim (address_available + address_raw). */
   geocodeEligibleBacklog: number

@@ -134,6 +134,7 @@ describe('GET /api/admin/ingestion/metrics', () => {
     expect(res.status).toBe(200)
     const json = (await res.json()) as {
       ok: boolean
+      detailFirstMetricsBaselineAt: string | null
       geocodeEligibleBacklog: number
       funnel: {
         '24h': { stages: Array<{ id: string; count: number }>; reconciliation: { crawlerReconciles: boolean } }
@@ -149,6 +150,7 @@ describe('GET /api/admin/ingestion/metrics', () => {
       oldestStuckRows: Array<Record<string, unknown>>
     }
     expect(json.ok).toBe(true)
+    expect(json.detailFirstMetricsBaselineAt).toBeNull()
     expect(json.funnel['24h'].stages.length).toBeGreaterThan(0)
     expect(json.funnel['24h'].reconciliation.crawlerReconciles).toBe(true)
     expect(json.volume.fetch.crawlableConfigsTotal).toBe(10)

@@ -18,6 +18,7 @@ import {
   evaluateDetailFirstOperationalHealth,
   type DetailFirstOperationalHealth,
 } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import { funnelIsoCutoff } from '@/lib/admin/ingestionMetricsBaseline'
 import { mergeDetailFirstInsertFailedByDbCode } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 import {
   dedupeDenominatorFromAggregate,
@@ -359,9 +360,10 @@ export function accumulateClassifiedDuplicateHits(
 export function rollupExternalIngestionForWindow(
   rows: OrchestrationRunRow[],
   windowHours: number,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  metricsBaselineAt: string | null = null
 ): ExternalIngestionRollup {
-  const isoCutoff = new Date(nowMs - windowHours * 60 * 60 * 1000).toISOString()
+  const isoCutoff = funnelIsoCutoff({ windowHours, nowMs, metricsBaselineAt })
   const discoveredByHour = new Map<string, number>()
   const insertedByHour = new Map<string, number>()
   const skippedByHour = new Map<string, number>()
@@ -487,9 +489,10 @@ export type CohortFunnelAggregate = {
 export function aggregateCohortFunnel(
   rows: IngestedSaleFunnelRow[],
   windowHours: number,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  metricsBaselineAt: string | null = null
 ): CohortFunnelAggregate {
-  const isoCutoff = new Date(nowMs - windowHours * 60 * 60 * 1000).toISOString()
+  const isoCutoff = funnelIsoCutoff({ windowHours, nowMs, metricsBaselineAt })
   const partition: Record<CohortPartition, number> = {
     published: 0,
     publish_failed: 0,
@@ -804,13 +807,20 @@ export function buildIngestionFunnelMetrics(params: {
   cohortRows: IngestedSaleFunnelRow[]
   configRows?: ConfigCrawlStatsSnapshot[]
   nowMs?: number
+  metricsBaselineAt?: string | null
 }): { '24h': IngestionFunnelWindowMetrics; '7d': IngestionFunnelWindowMetrics } {
   const nowMs = params.nowMs ?? Date.now()
+  const metricsBaselineAt = params.metricsBaselineAt ?? null
   const build = (windowHours: number) =>
     buildIngestionFunnelWindowMetrics({
       windowHours,
-      externalRollup: rollupExternalIngestionForWindow(params.orchestrationRows, windowHours, nowMs),
-      cohort: aggregateCohortFunnel(params.cohortRows, windowHours, nowMs),
+      externalRollup: rollupExternalIngestionForWindow(
+        params.orchestrationRows,
+        windowHours,
+        nowMs,
+        metricsBaselineAt
+      ),
+      cohort: aggregateCohortFunnel(params.cohortRows, windowHours, nowMs, metricsBaselineAt),
       configRows: params.configRows,
       nowMs,
     })

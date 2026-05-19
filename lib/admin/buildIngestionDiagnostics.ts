@@ -70,6 +70,10 @@ export function buildIngestionDiagnostics(
     `Timestamp: ${timestamp}`,
     `Environment: ${environment}`,
     `Current bottleneck: ${vol.bottleneck}`,
+    bullet(
+      'detail-first metrics baseline',
+      data.detailFirstMetricsBaselineAt ?? 'not set (full 24h/7d windows)'
+    ),
     '',
     '## Funnel (24h)',
     bullet('discovered', stageCount(stages, 'discovered')),

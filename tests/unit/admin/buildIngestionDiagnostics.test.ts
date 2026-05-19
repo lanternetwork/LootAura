@@ -19,6 +19,7 @@ describe('buildIngestionDiagnostics', () => {
     const data = {
       ok: true,
       generatedAt: '2026-05-18T12:00:00.000Z',
+      detailFirstMetricsBaselineAt: '2026-05-18T06:00:00.000Z',
       backlog: 0,
       geocodeEligibleBacklog: 0,
       published24h: 0,
@@ -173,6 +174,7 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('Timestamp: 2026-05-18T13:00:00.000Z')
     expect(md).toContain('Environment: test-env')
     expect(md).toContain('Current bottleneck: none')
+    expect(md).toContain('- detail-first metrics baseline: 2026-05-18T06:00:00.000Z')
     expect(md).toContain('- duplicate/skipped: 10')
     expect(md).toContain('- skipped expired: 5')
     expect(md).toContain('- fresh inserted: 15')

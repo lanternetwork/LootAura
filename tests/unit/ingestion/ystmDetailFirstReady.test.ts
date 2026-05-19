@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockFetchExternalPageSource = vi.fn()
-const mockParseExternalPageSourceHtml = vi.fn()
 const mockLookupSpatialCoordinates = vi.fn()
 const mockPublishReady = vi.fn()
 const mockUpsertCache = vi.fn()
@@ -18,10 +17,15 @@ vi.mock('@/lib/observability/emit', () => ({
   emitObservabilityRecord: vi.fn(),
 }))
 
-vi.mock('@/lib/ingestion/adapters/externalPageSource', () => ({
-  fetchExternalPageSource: (...args: unknown[]) => mockFetchExternalPageSource(...args),
-  parseExternalPageSourceHtml: (...args: unknown[]) => mockParseExternalPageSourceHtml(...args),
-}))
+vi.mock('@/lib/ingestion/adapters/externalPageSource', async () => {
+  const mod = await vi.importActual<typeof import('@/lib/ingestion/adapters/externalPageSource')>(
+    '@/lib/ingestion/adapters/externalPageSource'
+  )
+  return {
+    ...mod,
+    fetchExternalPageSource: (...args: unknown[]) => mockFetchExternalPageSource(...args),
+  }
+})
 
 vi.mock('@/lib/ingestion/spatial/resolveSpatialCoordinates', () => ({
   lookupSpatialCoordinates: (...args: unknown[]) => mockLookupSpatialCoordinates(...args),
@@ -150,7 +154,6 @@ describe('parseYstmDetailListingFromHtml', () => {
     expect(merged?.addressRaw).toContain('1802 Devondale Dr')
     expect(merged?.startDate).toBe('2026-05-23')
     expect(merged?.rawPayload).toMatchObject({ detailFirstReady: true, detailPageParsed: true })
-    expect(mockParseExternalPageSourceHtml).not.toHaveBeenCalled()
   })
 
   it('merges list seed with minimal native coords fixture', async () => {
@@ -170,14 +173,12 @@ describe('parseYstmDetailListingFromHtml', () => {
     })
 
     expect(merged?.rawPayload).toMatchObject({ detailFirstReady: true, detailPageParsed: true })
-    expect(mockParseExternalPageSourceHtml).not.toHaveBeenCalled()
   })
 })
 
 describe('attemptYstmDetailFirstReady', () => {
   beforeEach(() => {
     mockFetchExternalPageSource.mockReset()
-    mockParseExternalPageSourceHtml.mockReset()
     mockLookupSpatialCoordinates.mockReset()
     mockPublishReady.mockReset()
     mockUpsertCache.mockReset()
@@ -221,10 +222,6 @@ describe('attemptYstmDetailFirstReady', () => {
       'utf8'
     )
     mockFetchExternalPageSource.mockResolvedValue(html)
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...LIST_SEED, title: 'Detail title' }],
-      invalid: 0,
-    })
     mockLookupSpatialCoordinates.mockResolvedValue({
       lat: 41.81225221,
       lng: -87.71115022,

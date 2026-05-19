@@ -149,7 +149,7 @@ export function buildIngestionDiagnostics(
       : []),
     '',
     '### Detail-first operational alerts',
-  ]
+  )
 
   if (df.operationalHealth.alerts.length === 0) {
     lines.push(bullet('(none)', '—'))

@@ -134,6 +134,10 @@ describe('buildIngestionDiagnostics', () => {
             topFallbackReasonPct: 0.5,
             fallbackUnclassified: 0,
             fallbackReasonAccounted: 2,
+            addressFromDetailPage: 3,
+            addressFromListSeed: 1,
+            addressFromDetailPageRate: 0.75,
+            operationalHealth: { healthy: true, alerts: [] },
           },
           configLeaderboards: {
             topFreshYield: [],
@@ -172,6 +176,8 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('- skipped expired: 5')
     expect(md).toContain('- fresh inserted: 15')
     expect(md).toContain('- attempted: 4')
+    expect(md).toContain('- address from detail page: 3')
+    expect(md).toContain('- operational health: healthy')
     expect(md).toContain('- fallback reasons accounted: 2/2')
     expect(md).toContain('- top fallback reason: spatial_lookup_failed (50.0% of attempts)')
     expect(md).toContain('- spatial_lookup_failed: 2 (50.0% of attempts)')

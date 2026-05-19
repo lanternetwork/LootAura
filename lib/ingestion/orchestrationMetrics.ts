@@ -89,6 +89,12 @@ export type ExternalIngestionOrchestrationNote = {
   ystmDetailFirstTopFallbackReasonPct?: number | null
   freshInsertReadyAtInsertRate?: number | null
   medianMsToPublished?: number | null
+  /** Detail-first attempts where validated address came from `#address` / detail parser. */
+  detailFirstAddressFromDetailPage?: number
+  /** Detail-first attempts where validated address fell back to list seed. */
+  detailFirstAddressFromListSeed?: number
+  /** detailFirstAddressFromDetailPage / ystmDetailFirstAttempted when attempted > 0. */
+  detailFirstAddressFromDetailPageRate?: number | null
   dedupeTelemetrySummary?: DedupeDecisionAggregate
   externalFetchDurationMs?: number
   publishDuplicateReuseCount?: number

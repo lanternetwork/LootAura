@@ -1,5 +1,5 @@
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
-import { extractDetailPageAddressFromHtml } from '@/lib/ingestion/address/extractDetailPageAddress'
+import { extractDetailPageListingEnrichmentFromHtml } from '@/lib/ingestion/address/extractDetailPageListingEnrichment'
 import {
   ADDRESS_NOT_FOUND_TERMINAL_THRESHOLD,
   MAX_ADDRESS_ENRICHMENT_ATTEMPTS,
@@ -209,15 +209,14 @@ async function processAddressEnrichmentRow(
     state: row.state,
   })
 
-  const extracted = extractDetailPageAddressFromHtml({
+  const enrichment = extractDetailPageListingEnrichmentFromHtml({
     html,
     sourceUrl: row.source_url,
     city: row.city,
     state: row.state,
-    sourcePlatform: row.source_platform,
   })
 
-  let addressRaw = normalizeAddressLineForIngest(extracted.addressRaw)
+  let addressRaw = normalizeAddressLineForIngest(enrichment?.addressRaw)
   if (addressRaw) {
     const enriched = enrichStreetLineWithPathMunicipalityWhenNoTail(addressRaw, row.source_url)
     addressRaw = enriched.line
@@ -283,6 +282,9 @@ async function processAddressEnrichmentRow(
     failure_details: mergeAddressEnrichmentDetails(row.failure_details, {
       lastReason: 'success',
       attemptCount,
+      ...(enrichment?.chosenAddressSource
+        ? { chosenAddressSource: enrichment.chosenAddressSource }
+        : {}),
     }),
   })
 

@@ -173,6 +173,8 @@ describe('ingestionFunnelMetricsHelpers', () => {
             spatial_lookup_failed: 2,
             address_validation_failed: 1,
           },
+          detailFirstAddressFromDetailPage: 3,
+          detailFirstAddressFromListSeed: 1,
           medianMsToPublished: 420,
         }),
       ],
@@ -180,6 +182,8 @@ describe('ingestionFunnelMetricsHelpers', () => {
       NOW
     )
     expect(rollup.detailFirstAttempted).toBe(5)
+    expect(rollup.detailFirstAddressFromDetailPage).toBe(3)
+    expect(rollup.detailFirstAddressFromListSeed).toBe(1)
     expect(rollup.detailFirstFallbackByReason).toEqual({
       spatial_lookup_failed: 2,
       address_validation_failed: 1,
@@ -207,6 +211,8 @@ describe('ingestionFunnelMetricsHelpers', () => {
             spatial_lookup_failed: 2,
             address_validation_failed: 1,
           },
+          detailFirstAddressFromDetailPage: 3,
+          detailFirstAddressFromListSeed: 1,
           medianMsToPublished: 420,
         }),
       ],
@@ -214,6 +220,9 @@ describe('ingestionFunnelMetricsHelpers', () => {
       nowMs: NOW,
     })
     expect(funnel['24h'].detailFirst.attempted).toBe(5)
+    expect(funnel['24h'].detailFirst.addressFromDetailPage).toBe(3)
+    expect(funnel['24h'].detailFirst.addressFromListSeed).toBe(1)
+    expect(funnel['24h'].detailFirst.addressFromDetailPageRate).toBe(0.6)
     expect(funnel['24h'].detailFirst.providerGeocodeBypassRate).toBe(0.4)
     expect(funnel['24h'].detailFirst.topFallbackReason).toBe('spatial_lookup_failed')
     expect(funnel['24h'].detailFirst.topFallbackReasonPct).toBe(0.4)
@@ -223,6 +232,8 @@ describe('ingestionFunnelMetricsHelpers', () => {
     })
     expect(funnel['24h'].detailFirst.fallbackReasonAccounted).toBe(3)
     expect(funnel['24h'].detailFirst.fallbackUnclassified).toBe(0)
+    expect(funnel['24h'].detailFirst.operationalHealth.healthy).toBe(true)
+    expect(funnel['24h'].detailFirst.operationalHealth.alerts).toHaveLength(0)
   })
 
   it('reconciles legacy fallback totals with sparse ByReason into fallback_unclassified', () => {

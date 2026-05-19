@@ -12,6 +12,9 @@ export type DetailFirstOrchestrationFields = {
   ystmDetailFirstFallbackByReason: Record<string, number>
   ystmDetailFirstTopFallbackReason: string | null
   ystmDetailFirstTopFallbackReasonPct: number | null
+  detailFirstAddressFromDetailPage: number
+  detailFirstAddressFromListSeed: number
+  detailFirstAddressFromDetailPageRate: number | null
 }
 
 export function detailFirstOrchestrationFields(
@@ -51,5 +54,11 @@ export function detailFirstOrchestrationFields(
     ystmDetailFirstFallbackByReason: fallbackSummary.fallbackByReason,
     ystmDetailFirstTopFallbackReason: fallbackSummary.topFallbackReason,
     ystmDetailFirstTopFallbackReasonPct: fallbackSummary.topFallbackReasonPct,
+    detailFirstAddressFromDetailPage: metrics.addressValidatedFromDetailPage,
+    detailFirstAddressFromListSeed: metrics.addressValidatedFromListSeed,
+    detailFirstAddressFromDetailPageRate:
+      attempted > 0
+        ? Math.round((metrics.addressValidatedFromDetailPage / attempted) * 10000) / 10000
+        : null,
   }
 }

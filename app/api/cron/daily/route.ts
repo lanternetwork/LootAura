@@ -701,6 +701,8 @@ async function runIngestionOrchestration(
         ystmDetailFirstFetchFailed: 0,
         ystmDetailFirstMsSamples: [] as number[],
         ystmDetailFirstRejectedByReason: {} as Record<string, number>,
+        detailFirstAddressFromDetailPage: 0,
+        detailFirstAddressFromListSeed: 0,
       }
 
       const externalRows = ((enabledCities || []) as ExternalConfigRow[]).filter(
@@ -860,6 +862,8 @@ async function runIngestionOrchestration(
           totals.ystmDetailFirstRejectedByReason,
           s.ystmDetailFirstFallbackByReason
         )
+        totals.detailFirstAddressFromDetailPage += s.detailFirstAddressFromDetailPage ?? 0
+        totals.detailFirstAddressFromListSeed += s.detailFirstAddressFromListSeed ?? 0
 
         ingestionDedupeTelemetrySummary.source_url += s.duplicateExistingUrl ?? 0
         ingestionDedupeTelemetrySummary.soft_date_window += s.duplicateCrossCityPage ?? 0
@@ -881,6 +885,8 @@ async function runIngestionOrchestration(
               duplicate_canonical_collision: s.duplicateCanonicalCollision,
               duplicate_expired_row: s.duplicateExpiredRow,
             },
+            detailFirstAttempted: s.ystmDetailFirstAttempted,
+            detailFirstSucceeded: s.ystmDetailFirstSucceeded,
           },
         })
       }
@@ -925,6 +931,8 @@ async function runIngestionOrchestration(
             fetchFailed: totals.ystmDetailFirstFetchFailed,
             rejectedByReason: totals.ystmDetailFirstRejectedByReason,
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
+            addressValidatedFromDetailPage: totals.detailFirstAddressFromDetailPage,
+            addressValidatedFromListSeed: totals.detailFirstAddressFromListSeed,
           },
           totals.freshInserted
         ),
@@ -970,6 +978,8 @@ async function runIngestionOrchestration(
             fetchFailed: totals.ystmDetailFirstFetchFailed,
             rejectedByReason: totals.ystmDetailFirstRejectedByReason,
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
+            addressValidatedFromDetailPage: totals.detailFirstAddressFromDetailPage,
+            addressValidatedFromListSeed: totals.detailFirstAddressFromListSeed,
           },
           totals.freshInserted
         ),

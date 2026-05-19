@@ -93,12 +93,35 @@ export async function runGeocodeCronPipeline(params: {
   })
 
   const backlogStartedAt = Date.now()
-  const backlog = await geocodePendingSales({
-    batchSizeOverride: params.backlogBatchSize,
-    concurrencyCeilingOverride: params.concurrencyCeiling,
-    captureClaimedRowIds: true,
-    telemetryContext: params.telemetryContext,
-  })
+  let backlog: Awaited<ReturnType<typeof geocodePendingSales>>
+  try {
+    backlog = await geocodePendingSales({
+      batchSizeOverride: params.backlogBatchSize,
+      concurrencyCeilingOverride: params.concurrencyCeiling,
+      captureClaimedRowIds: true,
+      telemetryContext: params.telemetryContext,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error(
+      'Geocode backlog drain failed; continuing geocode pipeline',
+      error instanceof Error ? error : new Error(message),
+      {
+        component: 'ingestion/geocodeCronPipeline',
+        operation: 'backlog_drain',
+        ...params.telemetryContext,
+      }
+    )
+    backlog = {
+      claimed: 0,
+      succeeded: 0,
+      failedRetriable: 0,
+      failedTerminal: 0,
+      rate429Count: 0,
+      processed: 0,
+      publishTriggered: 0,
+    }
+  }
   const backlogDurationMs = Date.now() - backlogStartedAt
   const backlogRate429Count = Number(backlog.rate429Count ?? 0)
   const backlogProcessed =
@@ -125,17 +148,39 @@ export async function runGeocodeCronPipeline(params: {
       skippedDueTo429Pressure: true,
     }
   } else {
-    replay = {
-      ...(await runBoundedGeocodeDeadLetterReplay({
-        limit: parseGeocodeCronReplayLimitFromEnv(),
-        requireTransientProvider: true,
-        requireNullCoordinates: true,
-        telemetryContext: {
+    try {
+      replay = {
+        ...(await runBoundedGeocodeDeadLetterReplay({
+          limit: parseGeocodeCronReplayLimitFromEnv(),
+          requireTransientProvider: true,
+          requireNullCoordinates: true,
+          telemetryContext: {
+            ...params.telemetryContext,
+            jobType: 'cron.geocode.dead_letter_replay',
+          },
+        })),
+        skippedDueTo429Pressure: false,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error(
+        'Geocode dead-letter replay failed; continuing geocode pipeline',
+        error instanceof Error ? error : new Error(message),
+        {
+          component: 'ingestion/geocodeCronPipeline',
+          operation: 'dead_letter_replay',
           ...params.telemetryContext,
-          jobType: 'cron.geocode.dead_letter_replay',
-        },
-      })),
-      skippedDueTo429Pressure: false,
+        }
+      )
+      replay = {
+        attempted: 0,
+        eligible: 0,
+        replayed: 0,
+        skipped: 0,
+        updateErrors: 0,
+        lostRaces: 0,
+        skippedDueTo429Pressure: false,
+      }
     }
   }
 

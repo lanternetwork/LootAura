@@ -29,8 +29,9 @@ vi.mock('@/lib/rateLimit/limiter', () => ({
 }))
 
 // Mock nanoid
+const mockNanoid = vi.fn(() => 'test12345')
 vi.mock('nanoid', () => ({
-  nanoid: vi.fn(() => 'test12345')
+  nanoid: () => mockNanoid(),
 }))
 
 describe('Share API', () => {
@@ -40,6 +41,7 @@ describe('Share API', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockNanoid.mockReturnValue('test12345')
     vi.mocked(getAdminDb).mockReturnValue(mockAdminDb as any)
     vi.mocked(shouldBypassRateLimit).mockReturnValue(true)
   })
@@ -95,6 +97,35 @@ describe('Share API', () => {
 
       expect(response.status).toBe(400)
       expect(data.error).toBe('Invalid request format')
+    })
+
+    it('retries insert when short id collides', async () => {
+      const mockInsert = vi
+        .fn()
+        .mockResolvedValueOnce({ error: { code: '23505', message: 'duplicate key' } })
+        .mockResolvedValueOnce({ error: null })
+      mockAdminDb.from.mockReturnValue({ insert: mockInsert })
+      mockNanoid.mockReturnValueOnce('collision1').mockReturnValueOnce('unique12')
+
+      const requestBody = {
+        state: {
+          view: { lat: 40.7128, lng: -74.0060, zoom: 12 },
+          filters: { dateRange: 'today', categories: [], radius: 25 },
+        },
+      }
+
+      const request = new NextRequest('http://localhost:3000/api/share', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data).toEqual({ shortId: 'unique12' })
+      expect(mockInsert).toHaveBeenCalledTimes(2)
     })
 
     it('should handle database errors', async () => {

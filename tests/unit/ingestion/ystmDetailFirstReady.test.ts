@@ -3,8 +3,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockFetchExternalPageSource = vi.fn()
-const mockParseExternalPageSourceHtml = vi.fn()
 const mockLookupSpatialCoordinates = vi.fn()
+const mockClassifySpatialFailure = vi.fn()
 const mockPublishReady = vi.fn()
 const mockUpsertCache = vi.fn()
 const mockFrom = vi.fn()
@@ -18,13 +18,22 @@ vi.mock('@/lib/observability/emit', () => ({
   emitObservabilityRecord: vi.fn(),
 }))
 
-vi.mock('@/lib/ingestion/adapters/externalPageSource', () => ({
-  fetchExternalPageSource: (...args: unknown[]) => mockFetchExternalPageSource(...args),
-  parseExternalPageSourceHtml: (...args: unknown[]) => mockParseExternalPageSourceHtml(...args),
-}))
+vi.mock('@/lib/ingestion/adapters/externalPageSource', async () => {
+  const mod = await vi.importActual<typeof import('@/lib/ingestion/adapters/externalPageSource')>(
+    '@/lib/ingestion/adapters/externalPageSource'
+  )
+  return {
+    ...mod,
+    fetchExternalPageSource: (...args: unknown[]) => mockFetchExternalPageSource(...args),
+  }
+})
 
 vi.mock('@/lib/ingestion/spatial/resolveSpatialCoordinates', () => ({
   lookupSpatialCoordinates: (...args: unknown[]) => mockLookupSpatialCoordinates(...args),
+}))
+
+vi.mock('@/lib/ingestion/acquisition/classifyDetailFirstSpatialFailure', () => ({
+  classifyDetailFirstSpatialFailure: (...args: unknown[]) => mockClassifySpatialFailure(...args),
 }))
 
 vi.mock('@/lib/ingestion/publishWorker', () => ({
@@ -95,6 +104,8 @@ describe('detailFirstOrchestrationFields', () => {
           fetch_failed: 1,
         },
         msToPublishedSamples: [100, 300, 200],
+        addressValidatedFromDetailPage: 3,
+        addressValidatedFromListSeed: 1,
       },
       10
     )
@@ -108,11 +119,66 @@ describe('detailFirstOrchestrationFields', () => {
     })
     expect(fields.ystmDetailFirstTopFallbackReason).toBe('spatial_lookup_failed')
     expect(fields.ystmDetailFirstTopFallbackReasonPct).toBe(0.25)
+    expect(fields.detailFirstAddressFromDetailPage).toBe(3)
+    expect(fields.detailFirstAddressFromDetailPageRate).toBe(0.75)
   })
 })
 
 describe('parseYstmDetailListingFromHtml', () => {
-  it('merges list seed with parsed detail listing and native coords fixture', async () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-19T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('uses detail-native parser over list seed for Louisville fixture', async () => {
+    const { parseYstmDetailListingFromHtml } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
+    const html = readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-louisville-devondale.html'),
+      'utf8'
+    )
+    const url =
+      'https://yardsaletreasuremap.com/US/Kentucky/Louisville/1802-Devondale-Dr/38754131/userlisting.html'
+
+    const merged = parseYstmDetailListingFromHtml({
+      html,
+      sourceUrl: url,
+      config: { ...CONFIG, city: 'Louisville', state: 'KY' },
+      listSeed: {
+        ...LIST_SEED,
+        title: 'List seed title only',
+        addressRaw: 'bad seed address',
+        sourceUrl: url,
+        city: 'Louisville',
+        state: 'KY',
+      },
+    })
+
+    expect(merged?.title).toBe('Our Biggest Yard Sale')
+    expect(merged?.addressRaw).toContain('1802 Devondale Dr')
+    expect(merged?.startDate).toBe('2026-05-23')
+    expect(merged?.rawPayload).toMatchObject({
+      detailFirstReady: true,
+      detailPageParsed: true,
+      detailFirstFieldProvenance: {
+        addressRaw: 'detail_page',
+        title: 'detail_page',
+        startDate: 'detail_page',
+      },
+      ingestionDiagnostics: {
+        chosenAddressSource: 'ystm_detail_page',
+        detailFirstValidated: true,
+        listSeedAddressRaw: 'bad seed address',
+      },
+    })
+  })
+
+  it('merges list seed with minimal native coords fixture', async () => {
     const { parseYstmDetailListingFromHtml } = await import(
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
@@ -120,16 +186,6 @@ describe('parseYstmDetailListingFromHtml', () => {
       join(process.cwd(), 'tests/fixtures/ystm/detail-with-native-coords.html'),
       'utf8'
     )
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [
-        {
-          ...LIST_SEED,
-          title: 'Detail title',
-          description: 'Detail body',
-        },
-      ],
-      invalid: 0,
-    })
 
     const merged = parseYstmDetailListingFromHtml({
       html,
@@ -138,19 +194,19 @@ describe('parseYstmDetailListingFromHtml', () => {
       listSeed: LIST_SEED,
     })
 
-    expect(merged?.title).toBe('Detail title')
-    expect(merged?.rawPayload).toMatchObject({ detailFirstReady: true })
+    expect(merged?.rawPayload).toMatchObject({ detailFirstReady: true, detailPageParsed: true })
   })
 })
 
 describe('attemptYstmDetailFirstReady', () => {
   beforeEach(() => {
     mockFetchExternalPageSource.mockReset()
-    mockParseExternalPageSourceHtml.mockReset()
     mockLookupSpatialCoordinates.mockReset()
+    mockClassifySpatialFailure.mockReset()
     mockPublishReady.mockReset()
     mockUpsertCache.mockReset()
     mockFrom.mockReset()
+    mockClassifySpatialFailure.mockResolvedValue('spatial_lookup_failed')
 
     mockFrom.mockImplementation(() => ({
       insert: vi.fn(() => ({
@@ -175,10 +231,50 @@ describe('attemptYstmDetailFirstReady', () => {
       pageIndex: 0,
     })
 
-    expect(result).toEqual({ outcome: 'fallback', reason: 'fetch_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'fetch_failed' })
     expect(metrics.fetchFailed).toBe(1)
     expect(metrics.fallback).toBe(1)
     expect(metrics.rejectedByReason.fetch_failed).toBe(1)
+  })
+
+  it('returns detail-enriched listing on validation fallback for legacy insert', async () => {
+    const { attemptYstmDetailFirstReady } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
+    const html = readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-louisville-devondale.html'),
+      'utf8'
+    )
+    const url =
+      'https://yardsaletreasuremap.com/US/Kentucky/Louisville/1802-Devondale-Dr/38754131/userlisting.html'
+    mockFetchExternalPageSource.mockResolvedValue(html)
+    mockLookupSpatialCoordinates.mockResolvedValue(null)
+
+    const { result } = await attemptYstmDetailFirstReady({
+      config: { ...CONFIG, city: 'Louisville', state: 'KY' },
+      listSeed: {
+        ...LIST_SEED,
+        title: 'List seed title',
+        addressRaw: 'bad seed address',
+        sourceUrl: url,
+        city: 'Louisville',
+        state: 'KY',
+      },
+      platform: 'external_page_source',
+      rowPayload: { pageIndex: 0 },
+      pageIndex: 0,
+    })
+
+    expect(result.outcome).toBe('fallback')
+    if (result.outcome === 'fallback') {
+      expect(result.reason).toBe('spatial_lookup_failed')
+      expect(result.detailEnrichedListing?.addressRaw).toContain('1802 Devondale Dr')
+      expect(result.detailPageHtml).toBe(html)
+      expect(result.detailEnrichedListing?.rawPayload).toMatchObject({
+        detailPageParsed: true,
+        ingestionDiagnostics: { chosenAddressSource: 'ystm_detail_page' },
+      })
+    }
   })
 
   it('inserts ready and publishes when detail validation passes', async () => {
@@ -190,10 +286,6 @@ describe('attemptYstmDetailFirstReady', () => {
       'utf8'
     )
     mockFetchExternalPageSource.mockResolvedValue(html)
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...LIST_SEED, title: 'Detail title' }],
-      invalid: 0,
-    })
     mockLookupSpatialCoordinates.mockResolvedValue({
       lat: 41.81225221,
       lng: -87.71115022,

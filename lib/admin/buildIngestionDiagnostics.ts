@@ -87,7 +87,16 @@ export function buildIngestionDiagnostics(
     bullet('fallback to legacy', df.fallback),
     bullet('detail fetch failed', df.fetchFailed),
     bullet('success rate', formatPct(df.providerGeocodeBypassRate)),
+    bullet('address from detail page', formatCount(df.addressFromDetailPage)),
+    bullet('address from list seed', formatCount(df.addressFromListSeed)),
+    bullet('address from detail page rate', formatPct(df.addressFromDetailPageRate)),
     bullet('median ms to publish', formatMs(df.medianMsToPublished)),
+    bullet(
+      'operational health',
+      df.operationalHealth.healthy
+        ? 'healthy'
+        : `${df.operationalHealth.alerts.length} alert(s)`
+    ),
     bullet(
       'top fallback reason',
       df.topFallbackReason != null
@@ -109,8 +118,18 @@ export function buildIngestionDiagnostics(
         ]
       : []),
     '',
-    '### Phase 3B fallback reasons',
+    '### Detail-first operational alerts',
   ]
+
+  if (df.operationalHealth.alerts.length === 0) {
+    lines.push(bullet('(none)', '—'))
+  } else {
+    for (const alert of df.operationalHealth.alerts) {
+      lines.push(bullet(`${alert.level}: ${alert.code}`, alert.message))
+    }
+  }
+
+  lines.push('', '### Phase 3B fallback reasons')
 
   const fallbackReasonRows = [
     ...YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER.filter(

@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { YstmDetailPageParsed } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
 import { sumDetailFirstFallbackReasonCounts } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import type { YstmDetailFirstRunMetrics } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 
 const mockFetchExternalPageSource = vi.fn()
-const mockParseExternalPageSourceHtml = vi.fn()
+const mockParseYstmDetailPageFromHtml = vi.fn()
 const mockLookupSpatialCoordinates = vi.fn()
 const mockClassifySpatialFailure = vi.fn()
 const mockPublishReady = vi.fn()
@@ -21,9 +22,18 @@ vi.mock('@/lib/observability/emit', () => ({
   emitObservabilityRecord: vi.fn(),
 }))
 
-vi.mock('@/lib/ingestion/adapters/externalPageSource', () => ({
-  fetchExternalPageSource: (...args: unknown[]) => mockFetchExternalPageSource(...args),
-  parseExternalPageSourceHtml: (...args: unknown[]) => mockParseExternalPageSourceHtml(...args),
+vi.mock('@/lib/ingestion/adapters/externalPageSource', async () => {
+  const mod = await vi.importActual<typeof import('@/lib/ingestion/adapters/externalPageSource')>(
+    '@/lib/ingestion/adapters/externalPageSource'
+  )
+  return {
+    ...mod,
+    fetchExternalPageSource: (...args: unknown[]) => mockFetchExternalPageSource(...args),
+  }
+})
+
+vi.mock('@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml', () => ({
+  parseYstmDetailPageFromHtml: (...args: unknown[]) => mockParseYstmDetailPageFromHtml(...args),
 }))
 
 vi.mock('@/lib/ingestion/spatial/resolveSpatialCoordinates', () => ({
@@ -73,6 +83,26 @@ const VALID_LISTING = {
   rawPayload: {},
 }
 
+function detailParsedFromListing(
+  listing: Omit<typeof VALID_LISTING, 'startDate' | 'endDate'> & {
+    startDate?: string
+    endDate?: string
+  }
+): YstmDetailPageParsed {
+  return {
+    title: listing.title,
+    description: listing.description,
+    addressRaw: listing.addressRaw,
+    startDate: listing.startDate,
+    endDate: listing.endDate,
+    city: listing.city,
+    state: listing.state,
+    imageUrls: [],
+    nativeCoords: null,
+    cityConflict: false,
+  }
+}
+
 function expectFallbackAccounting(metrics: YstmDetailFirstRunMetrics): void {
   const { publish_failed: _publishFailed, ...fallbackReasons } = metrics.rejectedByReason
   expect(sumDetailFirstFallbackReasonCounts(fallbackReasons)).toBe(metrics.fallback)
@@ -92,7 +122,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
   beforeEach(() => {
     vi.resetModules()
     mockFetchExternalPageSource.mockReset()
-    mockParseExternalPageSourceHtml.mockReset()
+    mockParseYstmDetailPageFromHtml.mockReset()
     mockLookupSpatialCoordinates.mockReset()
     mockClassifySpatialFailure.mockReset()
     mockPublishReady.mockReset()
@@ -100,6 +130,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
     mockFrom.mockReset()
     mockHappyInsert()
     mockClassifySpatialFailure.mockResolvedValue('spatial_lookup_failed')
+    mockParseYstmDetailPageFromHtml.mockReturnValue(detailParsedFromListing(VALID_LISTING))
   })
 
   it('records parse_no_listing when source is not a detail URL', async () => {
@@ -113,7 +144,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'parse_no_listing' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'parse_no_listing' })
     expect(metrics.rejectedByReason.parse_no_listing).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -130,7 +161,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'fetch_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'fetch_failed' })
     expect(metrics.fetchFailed).toBe(1)
     expect(metrics.rejectedByReason.fetch_failed).toBe(1)
     expectFallbackAccounting(metrics)
@@ -141,7 +172,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({ listings: [], invalid: 1 })
+    mockParseYstmDetailPageFromHtml.mockReturnValue(null)
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: { ...VALID_LISTING, sourceUrl: UNPARSEABLE_DETAIL_URL },
@@ -149,7 +180,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'parse_no_listing' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'parse_no_listing' })
     expect(metrics.rejectedByReason.parse_no_listing).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -159,10 +190,13 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...VALID_LISTING, startDate: '2020-01-01', endDate: '2020-01-02' }],
-      invalid: 0,
-    })
+    mockParseYstmDetailPageFromHtml.mockReturnValue(
+      detailParsedFromListing({
+        ...VALID_LISTING,
+        startDate: '2020-01-01',
+        endDate: '2020-01-02',
+      })
+    )
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: VALID_LISTING,
@@ -170,7 +204,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'expired_after_detail' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'expired_after_detail' })
     expect(metrics.rejectedByReason.expired_after_detail).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -180,11 +214,8 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...VALID_LISTING, title: '   ' }],
-      invalid: 0,
-    })
     const noTitleSeed = { ...VALID_LISTING, title: '   ' }
+    mockParseYstmDetailPageFromHtml.mockReturnValue(detailParsedFromListing(noTitleSeed))
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: noTitleSeed,
@@ -192,7 +223,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'missing_title' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'missing_title' })
     expect(metrics.rejectedByReason.missing_title).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -203,10 +234,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
     const noDatesSeed = { ...VALID_LISTING, startDate: undefined, endDate: undefined }
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [noDatesSeed],
-      invalid: 0,
-    })
+    mockParseYstmDetailPageFromHtml.mockReturnValue(detailParsedFromListing(noDatesSeed))
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: noDatesSeed,
@@ -214,7 +242,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'invalid_dates' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'invalid_dates' })
     expect(metrics.rejectedByReason.invalid_dates).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -224,10 +252,9 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...VALID_LISTING, addressRaw: 'Chicago IL' }],
-      invalid: 0,
-    })
+    mockParseYstmDetailPageFromHtml.mockReturnValue(
+      detailParsedFromListing({ ...VALID_LISTING, addressRaw: 'Chicago IL' })
+    )
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: VALID_LISTING,
@@ -235,7 +262,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'address_validation_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'address_validation_failed' })
     expect(metrics.rejectedByReason.address_validation_failed).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -245,10 +272,9 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...VALID_LISTING, addressRaw: 'Chicago' }],
-      invalid: 0,
-    })
+    mockParseYstmDetailPageFromHtml.mockReturnValue(
+      detailParsedFromListing({ ...VALID_LISTING, addressRaw: 'Chicago' })
+    )
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: VALID_LISTING,
@@ -283,7 +309,6 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({ listings: [VALID_LISTING], invalid: 0 })
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: VALID_LISTING,
@@ -291,7 +316,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'gated_address' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'gated_address' })
     expect(metrics.rejectedByReason.gated_address).toBe(1)
     expectFallbackAccounting(metrics)
     vi.restoreAllMocks()
@@ -302,7 +327,6 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({ listings: [VALID_LISTING], invalid: 0 })
     mockLookupSpatialCoordinates.mockResolvedValue(null)
     mockClassifySpatialFailure.mockResolvedValue('spatial_lookup_failed')
     const { result, metrics } = await attemptYstmDetailFirstReady({
@@ -312,7 +336,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'spatial_lookup_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'spatial_lookup_failed' })
     expect(metrics.rejectedByReason.spatial_lookup_failed).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -322,7 +346,6 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({ listings: [VALID_LISTING], invalid: 0 })
     mockLookupSpatialCoordinates.mockResolvedValue(null)
     mockClassifySpatialFailure.mockResolvedValue('native_coords_invalid')
     const { result, metrics } = await attemptYstmDetailFirstReady({
@@ -332,7 +355,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'native_coords_invalid' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'native_coords_invalid' })
     expect(metrics.rejectedByReason.native_coords_invalid).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -342,7 +365,6 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({ listings: [VALID_LISTING], invalid: 0 })
     mockLookupSpatialCoordinates.mockResolvedValue({
       lat: 41.81,
       lng: -87.71,
@@ -368,7 +390,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'canonical_collision' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'canonical_collision' })
     expect(metrics.rejectedByReason.canonical_collision).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -378,7 +400,6 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    mockParseExternalPageSourceHtml.mockReturnValue({ listings: [VALID_LISTING], invalid: 0 })
     mockLookupSpatialCoordinates.mockResolvedValue({
       lat: 41.81,
       lng: -87.71,
@@ -404,7 +425,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       rowPayload: {},
       pageIndex: 0,
     })
-    expect(result).toEqual({ outcome: 'fallback', reason: 'insert_failed' })
+    expect(result).toMatchObject({ outcome: 'fallback', reason: 'insert_failed' })
     expect(metrics.rejectedByReason.insert_failed).toBe(1)
     expectFallbackAccounting(metrics)
   })
@@ -418,10 +439,6 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       'utf8'
     )
     mockFetchExternalPageSource.mockResolvedValue(html)
-    mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...VALID_LISTING, title: 'Detail title' }],
-      invalid: 0,
-    })
     mockLookupSpatialCoordinates.mockResolvedValue({
       lat: 41.81225221,
       lng: -87.71115022,

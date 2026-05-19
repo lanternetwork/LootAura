@@ -71,7 +71,8 @@ const VALID_LISTING = {
 }
 
 function expectFallbackAccounting(metrics: YstmDetailFirstRunMetrics): void {
-  expect(sumDetailFirstFallbackReasonCounts(metrics.rejectedByReason)).toBe(metrics.fallback)
+  const { publish_failed: _publishFailed, ...fallbackReasons } = metrics.rejectedByReason
+  expect(sumDetailFirstFallbackReasonCounts(fallbackReasons)).toBe(metrics.fallback)
 }
 
 function mockHappyInsert() {
@@ -133,9 +134,9 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
   })
 
   it('records parse_no_listing when detail HTML does not parse', async () => {
-    const { attemptYstmDetailFirstReady } = await import(
-      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
-    )
+    const readyModule = await import('@/lib/ingestion/acquisition/ystmDetailFirstReady')
+    vi.spyOn(readyModule, 'parseYstmDetailListingFromHtml').mockReturnValue(null)
+    const { attemptYstmDetailFirstReady } = readyModule
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
     mockParseExternalPageSourceHtml.mockReturnValue({ listings: [], invalid: 1 })
     const { result, metrics } = await attemptYstmDetailFirstReady({
@@ -180,9 +181,10 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       listings: [{ ...VALID_LISTING, title: '   ' }],
       invalid: 0,
     })
+    const noTitleSeed = { ...VALID_LISTING, title: '   ' }
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
-      listSeed: VALID_LISTING,
+      listSeed: noTitleSeed,
       platform: 'external_page_source',
       rowPayload: {},
       pageIndex: 0,
@@ -197,13 +199,14 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
+    const noDatesSeed = { ...VALID_LISTING, startDate: null, endDate: null }
     mockParseExternalPageSourceHtml.mockReturnValue({
-      listings: [{ ...VALID_LISTING, startDate: null, endDate: null }],
+      listings: [noDatesSeed],
       invalid: 0,
     })
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
-      listSeed: VALID_LISTING,
+      listSeed: noDatesSeed,
       platform: 'external_page_source',
       rowPayload: {},
       pageIndex: 0,

@@ -68,7 +68,10 @@ describe('buildIngestionDiagnostics', () => {
           failedDiscoveryConfigs: 0,
           discoveryFailureReasons: {},
         },
-        fetch: {} as IngestionMetricsResponse['volume']['fetch'],
+        fetch: {
+          insertYield24h: 0,
+          saturationRate24h: 0,
+        } as IngestionMetricsResponse['volume']['fetch'],
         addressLifecycle: {
           byStatus: {},
           enrichmentBacklog: 0,

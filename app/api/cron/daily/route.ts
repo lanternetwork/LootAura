@@ -881,6 +881,8 @@ async function runIngestionOrchestration(
               duplicate_canonical_collision: s.duplicateCanonicalCollision,
               duplicate_expired_row: s.duplicateExpiredRow,
             },
+            detailFirstAttempted: s.ystmDetailFirstAttempted,
+            detailFirstSucceeded: s.ystmDetailFirstSucceeded,
           },
         })
       }

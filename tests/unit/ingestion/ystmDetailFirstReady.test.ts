@@ -40,15 +40,9 @@ vi.mock('@/lib/ingestion/publishWorker', () => ({
   publishReadyIngestedSaleById: (...args: unknown[]) => mockPublishReady(...args),
 }))
 
-vi.mock('@/lib/ingestion/spatial/addressGeocodeCache', async () => {
-  const mod = await vi.importActual<typeof import('@/lib/ingestion/spatial/addressGeocodeCache')>(
-    '@/lib/ingestion/spatial/addressGeocodeCache'
-  )
-  return {
-    ...mod,
-    upsertAddressGeocodeCache: (...args: unknown[]) => mockUpsertCache(...args),
-  }
-})
+vi.mock('@/lib/ingestion/spatial/addressGeocodeCache', () => ({
+  upsertAddressGeocodeCache: (...args: unknown[]) => mockUpsertCache(...args),
+}))
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => ({ from: mockFrom }),
@@ -110,6 +104,8 @@ describe('detailFirstOrchestrationFields', () => {
           fetch_failed: 1,
         },
         msToPublishedSamples: [100, 300, 200],
+        addressValidatedFromDetailPage: 3,
+        addressValidatedFromListSeed: 1,
       },
       10
     )
@@ -123,6 +119,8 @@ describe('detailFirstOrchestrationFields', () => {
     })
     expect(fields.ystmDetailFirstTopFallbackReason).toBe('spatial_lookup_failed')
     expect(fields.ystmDetailFirstTopFallbackReasonPct).toBe(0.25)
+    expect(fields.detailFirstAddressFromDetailPage).toBe(3)
+    expect(fields.detailFirstAddressFromDetailPageRate).toBe(0.75)
   })
 })
 

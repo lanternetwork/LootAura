@@ -24,7 +24,10 @@ import {
   isIngestedRowExpiredForDuplicate,
   type ExternalDuplicateSkipCounts,
 } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
-import { evaluateDuplicateSkipForExternalListListing } from '@/lib/ingestion/dedupe'
+import {
+  evaluatePostDetailEnrichedDuplicateSkip,
+  shouldDeferListSeedSoftDedupe,
+} from '@/lib/ingestion/acquisition/detailFirstCrawlPolicy'
 import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
 import {
@@ -104,6 +107,9 @@ export interface ExternalPageSourcePersistSummary {
   ystmDetailFirstFallbackByReason: Record<string, number>
   ystmDetailFirstTopFallbackReason: string | null
   ystmDetailFirstTopFallbackReasonPct: number | null
+  detailFirstAddressFromDetailPage: number
+  detailFirstAddressFromListSeed: number
+  detailFirstAddressFromDetailPageRate: number | null
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -1029,6 +1035,9 @@ export async function persistExternalPageSource(
     ystmDetailFirstFallbackByReason: {},
     ystmDetailFirstTopFallbackReason: null,
     ystmDetailFirstTopFallbackReasonPct: null,
+    detailFirstAddressFromDetailPage: 0,
+    detailFirstAddressFromListSeed: 0,
+    detailFirstAddressFromDetailPageRate: null,
   }
 
   const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
@@ -1355,21 +1364,23 @@ export async function persistExternalPageSource(
         continue
       }
 
-      const scoredDup = await evaluateDuplicateSkipForExternalListListing(admin, platform, {
-        title: listing.title,
-        city: listing.city,
-        state: listing.state,
-        addressRaw: listing.addressRaw,
-        startDate: listing.startDate ?? null,
-        endDate: listing.endDate ?? null,
-        externalId: (listing.rawPayload.externalId as string | null) ?? null,
-        imageSourceUrl: listing.imageSourceUrl,
-        sourceUrl: listing.sourceUrl,
-      })
-      if (scoredDup.skip) {
-        summary.duplicateScoredSkipped += 1
-        bumpDuplicateKind(duplicateKinds, scoredDup.skipKind ?? 'duplicate_cross_city_page')
-        continue
+      if (!shouldDeferListSeedSoftDedupe(listing.sourceUrl)) {
+        const scoredDup = await evaluatePostDetailEnrichedDuplicateSkip(admin, platform, {
+          title: listing.title,
+          city: listing.city,
+          state: listing.state,
+          addressRaw: listing.addressRaw,
+          startDate: listing.startDate ?? null,
+          endDate: listing.endDate ?? null,
+          externalId: (listing.rawPayload.externalId as string | null) ?? null,
+          imageSourceUrl: listing.imageSourceUrl,
+          sourceUrl: listing.sourceUrl,
+        })
+        if (scoredDup.skip) {
+          summary.duplicateScoredSkipped += 1
+          bumpDuplicateKind(duplicateKinds, scoredDup.skipKind ?? 'duplicate_cross_city_page')
+          continue
+        }
       }
 
       if (isYstmDetailListingUrl(listing.sourceUrl)) {
@@ -1414,6 +1425,24 @@ export async function persistExternalPageSource(
             : candidate.listing
         const fallbackDetailHtml =
           result.outcome === 'fallback' ? result.detailPageHtml : undefined
+
+        const postDetailDup = await evaluatePostDetailEnrichedDuplicateSkip(admin, platform, {
+          title: fallbackListing.title,
+          city: fallbackListing.city,
+          state: fallbackListing.state,
+          addressRaw: fallbackListing.addressRaw,
+          startDate: fallbackListing.startDate ?? null,
+          endDate: fallbackListing.endDate ?? null,
+          externalId: (fallbackListing.rawPayload.externalId as string | null) ?? null,
+          imageSourceUrl: fallbackListing.imageSourceUrl,
+          sourceUrl: fallbackListing.sourceUrl,
+        })
+        if (postDetailDup.skip) {
+          summary.duplicateScoredSkipped += 1
+          bumpDuplicateKind(duplicateKinds, postDetailDup.skipKind ?? 'duplicate_cross_city_page')
+          return
+        }
+
         await insertListingLegacy(fallbackListing, candidate.rowPayload, fallbackDetailHtml)
       })
     }
@@ -1503,6 +1532,9 @@ export async function persistExternalPageSource(
   summary.ystmDetailFirstFallbackByReason = { ...detailFirstFields.ystmDetailFirstFallbackByReason }
   summary.ystmDetailFirstTopFallbackReason = detailFirstFields.ystmDetailFirstTopFallbackReason
   summary.ystmDetailFirstTopFallbackReasonPct = detailFirstFields.ystmDetailFirstTopFallbackReasonPct
+  summary.detailFirstAddressFromDetailPage = detailFirstFields.detailFirstAddressFromDetailPage
+  summary.detailFirstAddressFromListSeed = detailFirstFields.detailFirstAddressFromListSeed
+  summary.detailFirstAddressFromDetailPageRate = detailFirstFields.detailFirstAddressFromDetailPageRate
 
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.ingestion.externalPersistSummary, {

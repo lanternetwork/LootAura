@@ -48,6 +48,10 @@ export type YstmDetailFirstRunMetrics = {
   fetchFailed: number
   rejectedByReason: Partial<Record<YstmDetailFirstFallbackReason, number>>
   msToPublishedSamples: number[]
+  /** Listings whose validated address came from detail DOM (Phase 4 observability). */
+  addressValidatedFromDetailPage: number
+  /** Listings whose validated address came from list seed after merge (Phase 4 observability). */
+  addressValidatedFromListSeed: number
 }
 
 export function emptyYstmDetailFirstRunMetrics(): YstmDetailFirstRunMetrics {
@@ -59,6 +63,8 @@ export function emptyYstmDetailFirstRunMetrics(): YstmDetailFirstRunMetrics {
     fetchFailed: 0,
     rejectedByReason: {},
     msToPublishedSamples: [],
+    addressValidatedFromDetailPage: 0,
+    addressValidatedFromListSeed: 0,
   }
 }
 
@@ -71,6 +77,8 @@ export function mergeYstmDetailFirstMetrics(
   target.published += delta.published
   target.fallback += delta.fallback
   target.fetchFailed += delta.fetchFailed
+  target.addressValidatedFromDetailPage += delta.addressValidatedFromDetailPage
+  target.addressValidatedFromListSeed += delta.addressValidatedFromListSeed
   target.msToPublishedSamples.push(...delta.msToPublishedSamples)
   for (const [reason, count] of Object.entries(delta.rejectedByReason)) {
     const key = reason as YstmDetailFirstFallbackReason
@@ -322,6 +330,12 @@ export async function attemptYstmDetailFirstReady(
   }
 
   const validationTelemetry = detailFirstValidationTelemetry(params.listSeed, listing, provenance)
+  if (provenance.addressRaw === 'detail_page') {
+    metrics.addressValidatedFromDetailPage = 1
+  } else if (provenance.addressRaw === 'list_seed') {
+    metrics.addressValidatedFromListSeed = 1
+  }
+
   const validation = validateDetailEnrichedListing(listing, provenance)
   if (!validation.ok) {
     recordDetailFirstFallback(metrics, validation.reason)

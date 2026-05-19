@@ -69,6 +69,8 @@ describe('detailFirstOrchestrationFields regression', () => {
         fetchFailed: 5,
         rejectedByReason: { spatial_lookup_failed: 7 },
         msToPublishedSamples: [],
+        addressValidatedFromDetailPage: 0,
+        addressValidatedFromListSeed: 0,
       },
       10
     )

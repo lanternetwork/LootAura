@@ -34,6 +34,10 @@ export type ConfigCrawlStatsSnapshot = {
   source_crawl_window_dup_cross_page?: number | null
   source_crawl_window_dup_canonical?: number | null
   source_crawl_window_dup_expired_row?: number | null
+  source_crawl_window_detail_first_attempted?: number | null
+  source_crawl_window_detail_first_succeeded?: number | null
+  source_crawl_lifetime_detail_first_attempted?: number | null
+  source_crawl_lifetime_detail_first_succeeded?: number | null
   source_crawl_window_started_at?: string | null
   source_crawl_last_at?: string | null
   source_crawl_last_insert_at?: string | null
@@ -46,7 +50,18 @@ export type ConfigCrawlRunTotals = {
   skippedExpired?: number
   freshInserted?: number
   duplicateSkips?: ExternalDuplicateSkipCounts
+  detailFirstAttempted?: number
+  detailFirstSucceeded?: number
 }
+
+/** Minimum detail-first attempts in the rolling window before yield affects scheduling. */
+export const CRAWL_DETAIL_FIRST_MIN_WINDOW_ATTEMPTS = 8
+
+/** Detail-first ready rate at or above this boosts crawl priority (visible-active capture). */
+export const CRAWL_DETAIL_FIRST_HIGH_YIELD_RATE = 0.12
+
+/** Detail-first ready rate below this with enough attempts deprioritizes saturated configs. */
+export const CRAWL_DETAIL_FIRST_LOW_YIELD_RATE = 0.02
 
 /** Columns from migration 188 (always required for crawl scheduling). */
 export const INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE =
@@ -56,11 +71,20 @@ export const INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE =
 export const INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A =
   'source_crawl_lifetime_skipped_expired, source_crawl_lifetime_fresh_inserted, source_crawl_window_skipped_expired, source_crawl_window_fresh_inserted, source_crawl_window_dup_existing_url, source_crawl_window_dup_cross_page, source_crawl_window_dup_canonical, source_crawl_window_dup_expired_row'
 
+/** Columns from migration 192 (optional until applied on the target database). */
+export const INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_4 =
+  'source_crawl_lifetime_detail_first_attempted, source_crawl_lifetime_detail_first_succeeded, source_crawl_window_detail_first_attempted, source_crawl_window_detail_first_succeeded'
+
+export const INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A_AND_4 = `${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A}, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_4}`
+
 export const ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE =
   `city, state, source_platform, source_pages, source_crawl_excluded_at, source_discovery_status, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}`
 
 export const ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_PHASE_3A =
   INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A
+
+export const ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_PHASE_3A_AND_4 =
+  INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A_AND_4
 
 function isMissingCrawlStatsColumnError(message: string): boolean {
   return /does not exist/i.test(message) && /ingestion_city_configs/i.test(message)
@@ -69,7 +93,7 @@ function isMissingCrawlStatsColumnError(message: string): boolean {
 export async function fetchFunnelLeaderboardConfigRows(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<ConfigCrawlStatsSnapshot[]> {
-  const extended = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A}`
+  const extended = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A_AND_4}`
   const legacy = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}`
   const pageSize = 1000
   let from = 0
@@ -108,7 +132,7 @@ export async function fetchFunnelLeaderboardConfigRows(
 export async function fetchEnabledExternalIngestionCityConfigs(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<{ data: unknown[] | null; error: { message: string } | null }> {
-  const extended = `${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE}, ${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_PHASE_3A}`
+  const extended = `${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE}, ${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_PHASE_3A_AND_4}`
   const extendedResult = await fromBase(admin, 'ingestion_city_configs')
     .select(extended)
     .eq('enabled', true)
@@ -117,6 +141,16 @@ export async function fetchEnabledExternalIngestionCityConfigs(
   }
   if (!isMissingCrawlStatsColumnError(extendedResult.error.message)) {
     return extendedResult
+  }
+  const phase3aOnly = `${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE}, ${ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_PHASE_3A}`
+  const phase3aResult = await fromBase(admin, 'ingestion_city_configs')
+    .select(phase3aOnly)
+    .eq('enabled', true)
+  if (!phase3aResult.error) {
+    return phase3aResult
+  }
+  if (!isMissingCrawlStatsColumnError(phase3aResult.error.message)) {
+    return phase3aResult
   }
   return fromBase(admin, 'ingestion_city_configs')
     .select(ENABLED_EXTERNAL_INGESTION_CONFIG_SELECT_BASE)
@@ -150,6 +184,12 @@ export function windowFreshInsertYield(stats: ConfigCrawlStatsSnapshot): number 
   const fresh = num(stats.source_crawl_window_fresh_inserted)
   if (fetched < CRAWL_SATURATION_MIN_WINDOW_FETCHED) return null
   return fresh / fetched
+}
+
+export function windowDetailFirstReadyRate(stats: ConfigCrawlStatsSnapshot): number | null {
+  const attempted = num(stats.source_crawl_window_detail_first_attempted)
+  if (attempted < CRAWL_DETAIL_FIRST_MIN_WINDOW_ATTEMPTS) return null
+  return num(stats.source_crawl_window_detail_first_succeeded) / attempted
 }
 
 export function isConfigCrawlSaturated(stats: ConfigCrawlStatsSnapshot, nowMs: number): boolean {
@@ -209,6 +249,19 @@ export function computeConfigCrawlScheduleWeight(stats: ConfigCrawlStatsSnapshot
   if (freshYield != null && freshYield >= 0.01) {
     return 72
   }
+
+  const detailFirstRate = windowDetailFirstReadyRate(stats)
+  if (detailFirstRate != null && detailFirstRate >= CRAWL_DETAIL_FIRST_HIGH_YIELD_RATE) {
+    return Math.min(98, 85)
+  }
+  if (
+    detailFirstRate != null &&
+    detailFirstRate < CRAWL_DETAIL_FIRST_LOW_YIELD_RATE &&
+    num(stats.source_crawl_window_detail_first_attempted) >= CRAWL_DETAIL_FIRST_MIN_WINDOW_ATTEMPTS * 2
+  ) {
+    return isConfigCrawlStale(stats, nowMs) ? 35 : 18
+  }
+
   return 50
 }
 
@@ -222,6 +275,8 @@ type RolledWindow = {
   windowDupCrossPage: number
   windowDupCanonical: number
   windowDupExpiredRow: number
+  windowDetailFirstAttempted: number
+  windowDetailFirstSucceeded: number
   windowStartedAt: string
 }
 
@@ -241,6 +296,8 @@ export function rollCrawlStatsWindow(stats: ConfigCrawlStatsSnapshot, nowMs: num
       windowDupCrossPage: 0,
       windowDupCanonical: 0,
       windowDupExpiredRow: 0,
+      windowDetailFirstAttempted: 0,
+      windowDetailFirstSucceeded: 0,
       windowStartedAt: new Date(nowMs).toISOString(),
     }
   }
@@ -254,6 +311,8 @@ export function rollCrawlStatsWindow(stats: ConfigCrawlStatsSnapshot, nowMs: num
     windowDupCrossPage: num(stats.source_crawl_window_dup_cross_page),
     windowDupCanonical: num(stats.source_crawl_window_dup_canonical),
     windowDupExpiredRow: num(stats.source_crawl_window_dup_expired_row),
+    windowDetailFirstAttempted: num(stats.source_crawl_window_detail_first_attempted),
+    windowDetailFirstSucceeded: num(stats.source_crawl_window_detail_first_succeeded),
     windowStartedAt: started!,
   }
 }
@@ -268,7 +327,7 @@ export async function recordConfigCrawlStats(params: {
   const nowMs = params.nowMs ?? Date.now()
   const nowIso = new Date(nowMs).toISOString()
 
-  const rowSelectExtended = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A}`
+  const rowSelectExtended = `city, state, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_BASE}, ${INGESTION_CITY_CONFIG_CRAWL_STATS_SELECT_PHASE_3A_AND_4}`
   let rowResult = await fromBase(admin, 'ingestion_city_configs')
     .select(rowSelectExtended)
     .eq('city', params.city)
@@ -302,6 +361,8 @@ export async function recordConfigCrawlStats(params: {
   const skippedExpired = Math.max(0, params.totals.skippedExpired ?? 0)
   const freshInserted = Math.max(0, params.totals.freshInserted ?? inserted)
   const dup = params.totals.duplicateSkips
+  const detailFirstAttempted = Math.max(0, params.totals.detailFirstAttempted ?? 0)
+  const detailFirstSucceeded = Math.max(0, params.totals.detailFirstSucceeded ?? 0)
 
   const payload: Record<string, unknown> = {
     source_crawl_lifetime_fetched: num(prior.source_crawl_lifetime_fetched) + fetched,
@@ -324,6 +385,14 @@ export async function recordConfigCrawlStats(params: {
       window.windowDupCanonical + (dup?.duplicate_canonical_collision ?? 0),
     source_crawl_window_dup_expired_row:
       window.windowDupExpiredRow + (dup?.duplicate_expired_row ?? 0),
+    source_crawl_lifetime_detail_first_attempted:
+      num(prior.source_crawl_lifetime_detail_first_attempted) + detailFirstAttempted,
+    source_crawl_lifetime_detail_first_succeeded:
+      num(prior.source_crawl_lifetime_detail_first_succeeded) + detailFirstSucceeded,
+    source_crawl_window_detail_first_attempted:
+      window.windowDetailFirstAttempted + detailFirstAttempted,
+    source_crawl_window_detail_first_succeeded:
+      window.windowDetailFirstSucceeded + detailFirstSucceeded,
     source_crawl_window_started_at: window.windowStartedAt,
     source_crawl_last_at: nowIso,
   }

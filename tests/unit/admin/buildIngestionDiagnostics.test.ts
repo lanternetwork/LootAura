@@ -126,6 +126,12 @@ describe('buildIngestionDiagnostics', () => {
             freshInsertReadyAtInsertRate: 0.13,
             medianMsToPublished: 420,
             providerGeocodeBypassRate: 0.5,
+            fallbackByReason: {
+              spatial_lookup_failed: 2,
+              fetch_failed: 1,
+            },
+            topFallbackReason: 'spatial_lookup_failed',
+            topFallbackReasonPct: 0.5,
           },
           configLeaderboards: {
             topFreshYield: [],
@@ -164,6 +170,9 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('- skipped expired: 5')
     expect(md).toContain('- fresh inserted: 15')
     expect(md).toContain('- attempted: 4')
+    expect(md).toContain('- top fallback reason: spatial_lookup_failed (50.0% of attempts)')
+    expect(md).toContain('- spatial_lookup_failed: 2 (50.0% of attempts)')
+    expect(md).toContain('- fetch_failed: 1 (25.0% of attempts)')
     expect(md).toContain('- published/hour: 3')
     expect(md).toContain('- insert yield: 0.0%')
     expect(md).toContain('- saturation: 0.0%')

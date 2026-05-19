@@ -1,4 +1,5 @@
 import type { YstmDetailFirstRunMetrics } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+import { summarizeDetailFirstFallbackReasons } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 export type DetailFirstOrchestrationFields = {
   ystmDetailFirstAttempted: number
@@ -8,6 +9,9 @@ export type DetailFirstOrchestrationFields = {
   ystmDetailFirstFetchFailed: number
   freshInsertReadyAtInsertRate: number | null
   medianMsToPublished: number | null
+  ystmDetailFirstFallbackByReason: Record<string, number>
+  ystmDetailFirstTopFallbackReason: string | null
+  ystmDetailFirstTopFallbackReasonPct: number | null
 }
 
 export function detailFirstOrchestrationFields(
@@ -30,6 +34,8 @@ export function detailFirstOrchestrationFields(
         : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2)
   }
 
+  const fallbackSummary = summarizeDetailFirstFallbackReasons(metrics.rejectedByReason, attempted)
+
   return {
     ystmDetailFirstAttempted: attempted,
     ystmDetailFirstSucceeded: succeeded,
@@ -38,5 +44,8 @@ export function detailFirstOrchestrationFields(
     ystmDetailFirstFetchFailed: metrics.fetchFailed,
     freshInsertReadyAtInsertRate,
     medianMsToPublished,
+    ystmDetailFirstFallbackByReason: fallbackSummary.fallbackByReason,
+    ystmDetailFirstTopFallbackReason: fallbackSummary.topFallbackReason,
+    ystmDetailFirstTopFallbackReasonPct: fallbackSummary.topFallbackReasonPct,
   }
 }

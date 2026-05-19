@@ -76,6 +76,7 @@ import {
   recordConfigCrawlStats,
 } from '@/lib/ingestion/acquisition/configCrawlStats'
 import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
+import { mergeDetailFirstFallbackReasonCounts } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import { freshAcquisitionOrchestrationFields } from '@/lib/ingestion/acquisition/freshAcquisitionOrchestrationFields'
 import {
   buildYieldAwareCrawlPlan,
@@ -699,6 +700,7 @@ async function runIngestionOrchestration(
         ystmDetailFirstFallback: 0,
         ystmDetailFirstFetchFailed: 0,
         ystmDetailFirstMsSamples: [] as number[],
+        ystmDetailFirstRejectedByReason: {} as Record<string, number>,
       }
 
       const externalRows = ((enabledCities || []) as ExternalConfigRow[]).filter(
@@ -854,6 +856,10 @@ async function runIngestionOrchestration(
         totals.ystmDetailFirstFallback += s.ystmDetailFirstFallback ?? 0
         totals.ystmDetailFirstFetchFailed += s.ystmDetailFirstFetchFailed ?? 0
         totals.ystmDetailFirstMsSamples.push(...(s.ystmDetailFirstMsToPublishedSamples ?? []))
+        mergeDetailFirstFallbackReasonCounts(
+          totals.ystmDetailFirstRejectedByReason,
+          s.ystmDetailFirstFallbackByReason
+        )
 
         ingestionDedupeTelemetrySummary.source_url += s.duplicateExistingUrl ?? 0
         ingestionDedupeTelemetrySummary.soft_date_window += s.duplicateCrossCityPage ?? 0
@@ -917,7 +923,7 @@ async function runIngestionOrchestration(
             published: totals.ystmDetailFirstPublished,
             fallback: totals.ystmDetailFirstFallback,
             fetchFailed: totals.ystmDetailFirstFetchFailed,
-            rejectedByReason: {},
+            rejectedByReason: totals.ystmDetailFirstRejectedByReason,
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
           },
           totals.freshInserted
@@ -962,7 +968,7 @@ async function runIngestionOrchestration(
             published: totals.ystmDetailFirstPublished,
             fallback: totals.ystmDetailFirstFallback,
             fetchFailed: totals.ystmDetailFirstFetchFailed,
-            rejectedByReason: {},
+            rejectedByReason: totals.ystmDetailFirstRejectedByReason,
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
           },
           totals.freshInserted

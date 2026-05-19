@@ -1,5 +1,6 @@
 import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 export type BuildIngestionDiagnosticsOptions = {
   /** e.g. production, preview, development, or hostname */
@@ -87,6 +88,43 @@ export function buildIngestionDiagnostics(
     bullet('detail fetch failed', df.fetchFailed),
     bullet('success rate', formatPct(df.providerGeocodeBypassRate)),
     bullet('median ms to publish', formatMs(df.medianMsToPublished)),
+    bullet(
+      'top fallback reason',
+      df.topFallbackReason != null
+        ? `${df.topFallbackReason} (${formatPct(df.topFallbackReasonPct)} of attempts)`
+        : '—'
+    ),
+    '',
+    '### Phase 3B fallback reasons',
+  ]
+
+  const fallbackReasonRows = [
+    ...YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER.filter(
+      (r) => (df.fallbackByReason[r] ?? 0) > 0
+    ),
+    ...Object.keys(df.fallbackByReason).filter(
+      (r) =>
+        !YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER.includes(
+          r as (typeof YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER)[number]
+        ) && (df.fallbackByReason[r] ?? 0) > 0
+    ),
+  ]
+  if (fallbackReasonRows.length === 0) {
+    lines.push(bullet('(none)', '—'))
+  } else {
+    for (const reason of fallbackReasonRows) {
+      const count = df.fallbackByReason[reason] ?? 0
+      const rate = df.attempted > 0 ? count / df.attempted : null
+      lines.push(
+        bullet(
+          reason,
+          `${formatCount(count)} (${formatPct(rate)} of attempts)`
+        )
+      )
+    }
+  }
+
+  lines.push(
     '',
     '## Queues',
     bullet('needs_geocode', vol.geocode.needsGeocodeCount),

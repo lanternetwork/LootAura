@@ -18,7 +18,12 @@ import { extractYstmDetailMediaStrFromHtml } from '@/lib/ingestion/images/extrac
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
-import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
+import {
+  InsufficientAddressForPublishError,
+  validateResolvedAddressForPublish,
+} from '@/lib/ingestion/publishValidation'
+import { classifyDetailFirstSpatialFailure } from '@/lib/ingestion/acquisition/classifyDetailFirstSpatialFailure'
+import type { YstmDetailFirstFallbackReason } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
 import {
   coerceIngestedDateToYyyyMmDd,
@@ -33,17 +38,8 @@ export { parseYstmDetailFirstConcurrencyFromEnv } from '@/lib/ingestion/acquisit
 
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v3'
 
-export type YstmDetailFirstRejectedReason =
-  | 'fetch_failed'
-  | 'parse_no_listing'
-  | 'expired_dates'
-  | 'missing_title'
-  | 'missing_datetime'
-  | 'address_not_publishable'
-  | 'address_gated'
-  | 'spatial_unresolved'
-  | 'insert_failed'
-  | 'publish_not_published'
+export type { YstmDetailFirstFallbackReason } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
+export type YstmDetailFirstRejectedReason = YstmDetailFirstFallbackReason
 
 export type YstmDetailFirstRunMetrics = {
   attempted: number
@@ -51,7 +47,7 @@ export type YstmDetailFirstRunMetrics = {
   published: number
   fallback: number
   fetchFailed: number
-  rejectedByReason: Partial<Record<YstmDetailFirstRejectedReason, number>>
+  rejectedByReason: Partial<Record<YstmDetailFirstFallbackReason, number>>
   msToPublishedSamples: number[]
 }
 
@@ -78,13 +74,32 @@ export function mergeYstmDetailFirstMetrics(
   target.fetchFailed += delta.fetchFailed
   target.msToPublishedSamples.push(...delta.msToPublishedSamples)
   for (const [reason, count] of Object.entries(delta.rejectedByReason)) {
-    const key = reason as YstmDetailFirstRejectedReason
+    const key = reason as YstmDetailFirstFallbackReason
     target.rejectedByReason[key] = (target.rejectedByReason[key] ?? 0) + (count ?? 0)
   }
 }
 
-function bumpRejected(metrics: YstmDetailFirstRunMetrics, reason: YstmDetailFirstRejectedReason): void {
+function bumpRejected(metrics: YstmDetailFirstRunMetrics, reason: YstmDetailFirstFallbackReason): void {
   metrics.rejectedByReason[reason] = (metrics.rejectedByReason[reason] ?? 0) + 1
+}
+
+function classifyAddressPublishFailure(
+  normalizedPublish: string,
+  city: string,
+  state: string
+): YstmDetailFirstFallbackReason {
+  try {
+    validateResolvedAddressForPublish(normalizedPublish, city, state)
+    return 'address_validation_failed'
+  } catch (err) {
+    if (err instanceof InsufficientAddressForPublishError) {
+      const msg = err.message.toLowerCase()
+      if (msg.includes('lacks a resolvable street') || msg.includes('street detail required')) {
+        return 'missing_street_number'
+      }
+    }
+    return 'address_validation_failed'
+  }
 }
 
 function hasValidDatetime(start: unknown, end: unknown): boolean {
@@ -189,7 +204,7 @@ export type YstmDetailFirstAttemptParams = {
 
 export type YstmDetailFirstAttemptResult =
   | { outcome: 'ready'; ingestedSaleId: string; published: boolean }
-  | { outcome: 'fallback'; reason: YstmDetailFirstRejectedReason }
+  | { outcome: 'fallback'; reason: YstmDetailFirstFallbackReason }
 
 export async function attemptYstmDetailFirstReady(
   params: YstmDetailFirstAttemptParams
@@ -264,11 +279,11 @@ export async function attemptYstmDetailFirstReady(
 
   if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
     metrics.fallback = 1
-    bumpRejected(metrics, 'expired_dates')
+    bumpRejected(metrics, 'expired_after_detail')
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'expired_dates',
+      rejectedReason: 'expired_after_detail',
     })
-    return { result: { outcome: 'fallback', reason: 'expired_dates' }, metrics }
+    return { result: { outcome: 'fallback', reason: 'expired_after_detail' }, metrics }
   }
 
   if (!listing.title?.trim()) {
@@ -282,35 +297,44 @@ export async function attemptYstmDetailFirstReady(
 
   if (!hasValidDatetime(listing.startDate, listing.endDate)) {
     metrics.fallback = 1
-    bumpRejected(metrics, 'missing_datetime')
+    bumpRejected(metrics, 'invalid_dates')
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'missing_datetime',
+      rejectedReason: 'invalid_dates',
     })
-    return { result: { outcome: 'fallback', reason: 'missing_datetime' }, metrics }
+    return { result: { outcome: 'fallback', reason: 'invalid_dates' }, metrics }
   }
 
   const city = listing.city?.trim() ?? ''
   const state = listing.state?.trim() ?? ''
   if (!city || !state || !isAddressGeocodeReady(listing.addressRaw)) {
     metrics.fallback = 1
-    bumpRejected(metrics, 'address_not_publishable')
+    bumpRejected(metrics, 'address_validation_failed')
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'address_not_publishable',
+      rejectedReason: 'address_validation_failed',
     })
-    return { result: { outcome: 'fallback', reason: 'address_not_publishable' }, metrics }
+    return { result: { outcome: 'fallback', reason: 'address_validation_failed' }, metrics }
   }
 
   const normalizedLine = listing.addressRaw!.toLowerCase().replace(/\s+/g, ' ')
   const normalizedPublish = normalizeAddressForPublish(normalizedLine, city, state)
+  if (!normalizedPublish) {
+    metrics.fallback = 1
+    bumpRejected(metrics, 'address_validation_failed')
+    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
+      rejectedReason: 'address_validation_failed',
+    })
+    return { result: { outcome: 'fallback', reason: 'address_validation_failed' }, metrics }
+  }
   try {
     validateResolvedAddressForPublish(normalizedPublish, city, state)
   } catch {
     metrics.fallback = 1
-    bumpRejected(metrics, 'address_not_publishable')
+    const publishFailReason = classifyAddressPublishFailure(normalizedPublish, city, state)
+    bumpRejected(metrics, publishFailReason)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'address_not_publishable',
+      rejectedReason: publishFailReason,
     })
-    return { result: { outcome: 'fallback', reason: 'address_not_publishable' }, metrics }
+    return { result: { outcome: 'fallback', reason: publishFailReason }, metrics }
   }
 
   const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as Record<string, unknown>
@@ -328,11 +352,11 @@ export async function attemptYstmDetailFirstReady(
   const gated = detectGatedListing({ sourceUrl, addressRaw: listing.addressRaw })
   if (gated.gated && addressLifecycle.addressStatus === 'address_gated') {
     metrics.fallback = 1
-    bumpRejected(metrics, 'address_gated')
+    bumpRejected(metrics, 'gated_address')
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'address_gated',
+      rejectedReason: 'gated_address',
     })
-    return { result: { outcome: 'fallback', reason: 'address_gated' }, metrics }
+    return { result: { outcome: 'fallback', reason: 'gated_address' }, metrics }
   }
 
   const spatial = await lookupSpatialCoordinates({
@@ -347,11 +371,19 @@ export async function attemptYstmDetailFirstReady(
 
   if (!spatial) {
     metrics.fallback = 1
-    bumpRejected(metrics, 'spatial_unresolved')
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
-      rejectedReason: 'spatial_unresolved',
+    const spatialReason = await classifyDetailFirstSpatialFailure({
+      addressRaw: listing.addressRaw,
+      normalizedAddress: normalizedLine,
+      city,
+      state,
+      sourceUrl,
+      pageHtml: html,
     })
-    return { result: { outcome: 'fallback', reason: 'spatial_unresolved' }, metrics }
+    bumpRejected(metrics, spatialReason)
+    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
+      rejectedReason: spatialReason,
+    })
+    return { result: { outcome: 'fallback', reason: spatialReason }, metrics }
   }
 
   await upsertAddressGeocodeCache({
@@ -418,11 +450,15 @@ export async function attemptYstmDetailFirstReady(
 
   if (insErr || !insertedRow?.id) {
     metrics.fallback = 1
-    bumpRejected(metrics, 'insert_failed')
+    const insertReason =
+      insErr && /duplicate key|unique constraint|23505/i.test(insErr.message)
+        ? 'canonical_collision'
+        : 'insert_failed'
+    bumpRejected(metrics, insertReason)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
-      rejectedReason: 'insert_failed',
+      rejectedReason: insertReason,
     })
-    return { result: { outcome: 'fallback', reason: 'insert_failed' }, metrics }
+    return { result: { outcome: 'fallback', reason: insertReason }, metrics }
   }
 
   metrics.succeeded = 1
@@ -440,9 +476,9 @@ export async function attemptYstmDetailFirstReady(
       msToPublished: Date.now() - startedMs,
     })
   } else {
-    bumpRejected(metrics, 'publish_not_published')
+    bumpRejected(metrics, 'publish_failed')
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'publish_not_published',
+      rejectedReason: 'publish_failed',
     })
   }
 

@@ -7,6 +7,7 @@ import type {
   IngestionFunnelStage,
   IngestionFunnelWindowMetrics,
 } from '@/lib/admin/ingestionMetricsTypes'
+import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 type Leaderboards = IngestionFunnelWindowMetrics['configLeaderboards']
 
@@ -273,7 +274,57 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
                 : '—'}
             </dd>
           </div>
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-emerald-800">Top fallback reason</dt>
+            <dd className="font-medium">
+              {metrics.detailFirst.topFallbackReason ?? '—'}
+              {metrics.detailFirst.topFallbackReasonPct != null && (
+                <span className="ml-1 tabular-nums text-emerald-800">
+                  ({pct(metrics.detailFirst.topFallbackReasonPct)} of attempts)
+                </span>
+              )}
+            </dd>
+          </div>
         </dl>
+        {metrics.detailFirst.attempted > 0 && (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-emerald-200 text-emerald-900">
+                  <th className="py-1 pr-3 font-medium">Fallback reason</th>
+                  <th className="py-1 pr-3 font-medium">Count</th>
+                  <th className="py-1 font-medium">% attempts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ...YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER.filter(
+                    (r) => (metrics.detailFirst.fallbackByReason[r] ?? 0) > 0
+                  ),
+                  ...Object.keys(metrics.detailFirst.fallbackByReason).filter(
+                    (r) =>
+                      !YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER.includes(
+                        r as (typeof YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER)[number]
+                      ) && (metrics.detailFirst.fallbackByReason[r] ?? 0) > 0
+                  ),
+                ].map((reason) => {
+                  const count = metrics.detailFirst.fallbackByReason[reason] ?? 0
+                  const rate =
+                    metrics.detailFirst.attempted > 0
+                      ? count / metrics.detailFirst.attempted
+                      : null
+                  return (
+                    <tr key={reason} className="border-b border-emerald-100/80">
+                      <td className="py-1 pr-3 font-mono">{reason}</td>
+                      <td className="py-1 pr-3 tabular-nums">{count.toLocaleString()}</td>
+                      <td className="py-1 tabular-nums">{pct(rate)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {metrics.topDropoff && (

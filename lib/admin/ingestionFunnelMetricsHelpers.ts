@@ -116,6 +116,9 @@ export type IngestionFunnelDetailFirstMetrics = {
   topFallbackReasonPct: number | null
   fallbackUnclassified: number
   fallbackReasonAccounted: number
+  addressFromDetailPage: number
+  addressFromListSeed: number
+  addressFromDetailPageRate: number | null
 }
 
 export type ConfigYieldLeaderboardEntry = {
@@ -192,6 +195,8 @@ export type ExternalIngestionRollup = {
   detailFirstFetchFailed: number
   detailFirstMsToPublishedSamples: number[]
   detailFirstFallbackByReason: Record<string, number>
+  detailFirstAddressFromDetailPage: number
+  detailFirstAddressFromListSeed: number
 }
 
 function recomputeDuplicateHitsTotal(target: IngestionFunnelDuplicateHits): void {
@@ -371,6 +376,8 @@ export function rollupExternalIngestionForWindow(
     detailFirstFetchFailed: 0,
     detailFirstMsToPublishedSamples: [],
     detailFirstFallbackByReason: {},
+    detailFirstAddressFromDetailPage: 0,
+    detailFirstAddressFromListSeed: 0,
   }
 
   for (const row of rows) {
@@ -414,6 +421,8 @@ export function rollupExternalIngestionForWindow(
       rollup.detailFirstFallbackByReason,
       ext.ystmDetailFirstFallbackByReason
     )
+    rollup.detailFirstAddressFromDetailPage += num(ext.detailFirstAddressFromDetailPage)
+    rollup.detailFirstAddressFromListSeed += num(ext.detailFirstAddressFromListSeed)
 
     const k = hourFloorUtc(row.created_at)
     discoveredByHour.set(k, (discoveredByHour.get(k) ?? 0) + fetched)
@@ -732,6 +741,14 @@ export function buildIngestionFunnelWindowMetrics(params: {
     topFallbackReasonPct: fallbackSummary.topFallbackReasonPct,
     fallbackUnclassified: fallbackSummary.fallbackByReason.fallback_unclassified ?? 0,
     fallbackReasonAccounted: fallbackSummary.fallbackReasonAccounted,
+    addressFromDetailPage: externalRollup.detailFirstAddressFromDetailPage,
+    addressFromListSeed: externalRollup.detailFirstAddressFromListSeed,
+    addressFromDetailPageRate:
+      detailFirstAttempted > 0
+        ? Math.round(
+            (externalRollup.detailFirstAddressFromDetailPage / detailFirstAttempted) * 10000
+          ) / 10000
+        : null,
   }
 
   return {

@@ -931,6 +931,8 @@ async function runIngestionOrchestration(
             fetchFailed: totals.ystmDetailFirstFetchFailed,
             rejectedByReason: totals.ystmDetailFirstRejectedByReason,
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
+            addressValidatedFromDetailPage: totals.detailFirstAddressFromDetailPage,
+            addressValidatedFromListSeed: totals.detailFirstAddressFromListSeed,
           },
           totals.freshInserted
         ),
@@ -976,6 +978,8 @@ async function runIngestionOrchestration(
             fetchFailed: totals.ystmDetailFirstFetchFailed,
             rejectedByReason: totals.ystmDetailFirstRejectedByReason,
             msToPublishedSamples: totals.ystmDetailFirstMsSamples,
+            addressValidatedFromDetailPage: totals.detailFirstAddressFromDetailPage,
+            addressValidatedFromListSeed: totals.detailFirstAddressFromListSeed,
           },
           totals.freshInserted
         ),

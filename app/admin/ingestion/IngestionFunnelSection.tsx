@@ -274,6 +274,23 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
                 : '—'}
             </dd>
           </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Address from detail page</dt>
+            <dd className="font-medium tabular-nums">
+              {metrics.detailFirst.addressFromDetailPage.toLocaleString()}
+              {metrics.detailFirst.addressFromDetailPageRate != null && (
+                <span className="ml-1 text-emerald-800">
+                  ({pct(metrics.detailFirst.addressFromDetailPageRate)} of attempts)
+                </span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-emerald-800">Address from list seed</dt>
+            <dd className="font-medium tabular-nums">
+              {metrics.detailFirst.addressFromListSeed.toLocaleString()}
+            </dd>
+          </div>
           <div className="sm:col-span-2">
             <dt className="text-xs text-emerald-800">Top fallback reason</dt>
             <dd className="font-medium">

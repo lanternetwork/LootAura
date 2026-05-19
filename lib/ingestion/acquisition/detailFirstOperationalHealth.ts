@@ -91,7 +91,6 @@ export function evaluateDetailFirstOperationalHealth(
     })
   }
 
-  const hasCritical = alerts.some((a) => a.level === 'critical')
   return {
     healthy: alerts.length === 0,
     alerts,

@@ -100,6 +100,7 @@ function detailParsedFromListing(
     imageUrls: [],
     nativeCoords: null,
     cityConflict: false,
+    addressSource: listing.addressRaw?.trim() ? 'detail_dom' : null,
   }
 }
 

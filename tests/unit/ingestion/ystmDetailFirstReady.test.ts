@@ -178,6 +178,7 @@ describe('attemptYstmDetailFirstReady', () => {
     expect(result).toEqual({ outcome: 'fallback', reason: 'fetch_failed' })
     expect(metrics.fetchFailed).toBe(1)
     expect(metrics.fallback).toBe(1)
+    expect(metrics.rejectedByReason.fetch_failed).toBe(1)
   })
 
   it('inserts ready and publishes when detail validation passes', async () => {

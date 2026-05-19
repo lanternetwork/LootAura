@@ -23,7 +23,10 @@ import {
   validateResolvedAddressForPublish,
 } from '@/lib/ingestion/publishValidation'
 import { classifyDetailFirstSpatialFailure } from '@/lib/ingestion/acquisition/classifyDetailFirstSpatialFailure'
-import type { YstmDetailFirstFallbackReason } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
+import {
+  reconcileDetailFirstFallbackReasonCounts,
+  type YstmDetailFirstFallbackReason,
+} from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
 import {
   coerceIngestedDateToYyyyMmDd,
@@ -77,10 +80,19 @@ export function mergeYstmDetailFirstMetrics(
     const key = reason as YstmDetailFirstFallbackReason
     target.rejectedByReason[key] = (target.rejectedByReason[key] ?? 0) + (count ?? 0)
   }
+  reconcileDetailFirstFallbackReasonCounts(target.rejectedByReason, target.fallback)
 }
 
-function bumpRejected(metrics: YstmDetailFirstRunMetrics, reason: YstmDetailFirstFallbackReason): void {
+function recordDetailFirstFallback(
+  metrics: YstmDetailFirstRunMetrics,
+  reason: YstmDetailFirstFallbackReason
+): void {
+  metrics.fallback = 1
   metrics.rejectedByReason[reason] = (metrics.rejectedByReason[reason] ?? 0) + 1
+}
+
+function finalizeDetailFirstAttemptMetrics(metrics: YstmDetailFirstRunMetrics): void {
+  reconcileDetailFirstFallbackReasonCounts(metrics.rejectedByReason, metrics.fallback)
 }
 
 function classifyAddressPublishFailure(
@@ -216,8 +228,8 @@ export async function attemptYstmDetailFirstReady(
   const sourceUrl = params.listSeed.sourceUrl
 
   if (!isYstmDetailListingUrl(sourceUrl)) {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'parse_no_listing')
+    recordDetailFirstFallback(metrics, 'parse_no_listing')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: 'parse_no_listing',
     })
@@ -247,8 +259,8 @@ export async function attemptYstmDetailFirstReady(
     html = await fetchExternalPageSource(params.config, sourceUrl, params.pageIndex)
   } catch (err) {
     metrics.fetchFailed = 1
-    metrics.fallback = 1
-    bumpRejected(metrics, 'fetch_failed')
+    recordDetailFirstFallback(metrics, 'fetch_failed')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFetchFailed, telem, {
       pageIndex: params.pageIndex,
     })
@@ -269,8 +281,8 @@ export async function attemptYstmDetailFirstReady(
     listSeed: params.listSeed,
   })
   if (!listing) {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'parse_no_listing')
+    recordDetailFirstFallback(metrics, 'parse_no_listing')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: 'parse_no_listing',
     })
@@ -278,8 +290,8 @@ export async function attemptYstmDetailFirstReady(
   }
 
   if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'expired_after_detail')
+    recordDetailFirstFallback(metrics, 'expired_after_detail')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'expired_after_detail',
     })
@@ -287,8 +299,8 @@ export async function attemptYstmDetailFirstReady(
   }
 
   if (!listing.title?.trim()) {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'missing_title')
+    recordDetailFirstFallback(metrics, 'missing_title')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'missing_title',
     })
@@ -296,8 +308,8 @@ export async function attemptYstmDetailFirstReady(
   }
 
   if (!hasValidDatetime(listing.startDate, listing.endDate)) {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'invalid_dates')
+    recordDetailFirstFallback(metrics, 'invalid_dates')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'invalid_dates',
     })
@@ -307,8 +319,8 @@ export async function attemptYstmDetailFirstReady(
   const city = listing.city?.trim() ?? ''
   const state = listing.state?.trim() ?? ''
   if (!city || !state || !isAddressGeocodeReady(listing.addressRaw)) {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'address_validation_failed')
+    recordDetailFirstFallback(metrics, 'address_validation_failed')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'address_validation_failed',
     })
@@ -318,8 +330,8 @@ export async function attemptYstmDetailFirstReady(
   const normalizedLine = listing.addressRaw!.toLowerCase().replace(/\s+/g, ' ')
   const normalizedPublish = normalizeAddressForPublish(normalizedLine, city, state)
   if (!normalizedPublish) {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'address_validation_failed')
+    recordDetailFirstFallback(metrics, 'address_validation_failed')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'address_validation_failed',
     })
@@ -328,9 +340,9 @@ export async function attemptYstmDetailFirstReady(
   try {
     validateResolvedAddressForPublish(normalizedPublish, city, state)
   } catch {
-    metrics.fallback = 1
     const publishFailReason = classifyAddressPublishFailure(normalizedPublish, city, state)
-    bumpRejected(metrics, publishFailReason)
+    recordDetailFirstFallback(metrics, publishFailReason)
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: publishFailReason,
     })
@@ -351,8 +363,8 @@ export async function attemptYstmDetailFirstReady(
 
   const gated = detectGatedListing({ sourceUrl, addressRaw: listing.addressRaw })
   if (gated.gated && addressLifecycle.addressStatus === 'address_gated') {
-    metrics.fallback = 1
-    bumpRejected(metrics, 'gated_address')
+    recordDetailFirstFallback(metrics, 'gated_address')
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'gated_address',
     })
@@ -370,7 +382,6 @@ export async function attemptYstmDetailFirstReady(
   })
 
   if (!spatial) {
-    metrics.fallback = 1
     const spatialReason = await classifyDetailFirstSpatialFailure({
       addressRaw: listing.addressRaw,
       normalizedAddress: normalizedLine,
@@ -379,7 +390,8 @@ export async function attemptYstmDetailFirstReady(
       sourceUrl,
       pageHtml: html,
     })
-    bumpRejected(metrics, spatialReason)
+    recordDetailFirstFallback(metrics, spatialReason)
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: spatialReason,
     })
@@ -449,12 +461,12 @@ export async function attemptYstmDetailFirstReady(
     .maybeSingle()
 
   if (insErr || !insertedRow?.id) {
-    metrics.fallback = 1
     const insertReason =
       insErr && /duplicate key|unique constraint|23505/i.test(insErr.message)
         ? 'canonical_collision'
         : 'insert_failed'
-    bumpRejected(metrics, insertReason)
+    recordDetailFirstFallback(metrics, insertReason)
+    finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: insertReason,
     })
@@ -476,12 +488,13 @@ export async function attemptYstmDetailFirstReady(
       msToPublished: Date.now() - startedMs,
     })
   } else {
-    bumpRejected(metrics, 'publish_failed')
+    metrics.rejectedByReason.publish_failed = (metrics.rejectedByReason.publish_failed ?? 0) + 1
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'publish_failed',
     })
   }
 
+  finalizeDetailFirstAttemptMetrics(metrics)
   return {
     result: { outcome: 'ready', ingestedSaleId: String(insertedRow.id), published },
     metrics,

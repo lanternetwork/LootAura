@@ -132,6 +132,8 @@ describe('buildIngestionDiagnostics', () => {
             },
             topFallbackReason: 'spatial_lookup_failed',
             topFallbackReasonPct: 0.5,
+            fallbackUnclassified: 0,
+            fallbackReasonAccounted: 2,
           },
           configLeaderboards: {
             topFreshYield: [],
@@ -170,6 +172,7 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('- skipped expired: 5')
     expect(md).toContain('- fresh inserted: 15')
     expect(md).toContain('- attempted: 4')
+    expect(md).toContain('- fallback reasons accounted: 2/2')
     expect(md).toContain('- top fallback reason: spatial_lookup_failed (50.0% of attempts)')
     expect(md).toContain('- spatial_lookup_failed: 2 (50.0% of attempts)')
     expect(md).toContain('- fetch_failed: 1 (25.0% of attempts)')

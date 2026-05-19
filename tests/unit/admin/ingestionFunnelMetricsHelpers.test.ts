@@ -221,5 +221,35 @@ describe('ingestionFunnelMetricsHelpers', () => {
       spatial_lookup_failed: 2,
       address_validation_failed: 1,
     })
+    expect(funnel['24h'].detailFirst.fallbackReasonAccounted).toBe(3)
+    expect(funnel['24h'].detailFirst.fallbackUnclassified).toBe(0)
+  })
+
+  it('reconciles legacy fallback totals with sparse ByReason into fallback_unclassified', () => {
+    const created = '2026-05-17T11:00:00.000Z'
+    const funnel = buildIngestionFunnelMetrics({
+      orchestrationRows: [
+        orchRow(created, {
+          status: 'completed',
+          fetched: 10,
+          inserted: 2,
+          skipped: 8,
+          freshInserted: 2,
+          ystmDetailFirstAttempted: 117,
+          ystmDetailFirstSucceeded: 3,
+          ystmDetailFirstPublished: 2,
+          ystmDetailFirstFallback: 114,
+          ystmDetailFirstFetchFailed: 5,
+          ystmDetailFirstFallbackByReason: { spatial_lookup_failed: 7 },
+        }),
+      ],
+      cohortRows: [],
+      nowMs: NOW,
+    })
+    expect(funnel['24h'].detailFirst.fallback).toBe(114)
+    expect(funnel['24h'].detailFirst.fallbackReasonAccounted).toBe(114)
+    expect(funnel['24h'].detailFirst.fallbackUnclassified).toBe(107)
+    expect(funnel['24h'].detailFirst.fallbackByReason.spatial_lookup_failed).toBe(7)
+    expect(funnel['24h'].detailFirst.fallbackByReason.fallback_unclassified).toBe(107)
   })
 })

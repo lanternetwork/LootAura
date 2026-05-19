@@ -34,7 +34,11 @@ export function detailFirstOrchestrationFields(
         : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2)
   }
 
-  const fallbackSummary = summarizeDetailFirstFallbackReasons(metrics.rejectedByReason, attempted)
+  const fallbackSummary = summarizeDetailFirstFallbackReasons(
+    metrics.rejectedByReason,
+    attempted,
+    metrics.fallback
+  )
 
   return {
     ystmDetailFirstAttempted: attempted,

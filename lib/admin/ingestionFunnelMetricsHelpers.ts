@@ -11,6 +11,7 @@ import {
 import type { ConfigCrawlStatsSnapshot } from '@/lib/ingestion/acquisition/configCrawlStats'
 import {
   mergeDetailFirstFallbackReasonCounts,
+  reconcileDetailFirstFallbackReasonCounts,
   summarizeDetailFirstFallbackReasons,
 } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import {
@@ -113,6 +114,8 @@ export type IngestionFunnelDetailFirstMetrics = {
   fallbackByReason: Record<string, number>
   topFallbackReason: string | null
   topFallbackReasonPct: number | null
+  fallbackUnclassified: number
+  fallbackReasonAccounted: number
 }
 
 export type ConfigYieldLeaderboardEntry = {
@@ -418,6 +421,11 @@ export function rollupExternalIngestionForWindow(
     skippedByHour.set(k, (skippedByHour.get(k) ?? 0) + skipped)
   }
 
+  reconcileDetailFirstFallbackReasonCounts(
+    rollup.detailFirstFallbackByReason,
+    rollup.detailFirstFallback
+  )
+
   return rollup
 }
 
@@ -700,15 +708,17 @@ export function buildIngestionFunnelWindowMetrics(params: {
   const detailFirstAttempted = externalRollup.detailFirstAttempted
   const detailFirstSucceeded = externalRollup.detailFirstSucceeded
   const detailFirstPublished = externalRollup.detailFirstPublished
+  const detailFirstFallback = externalRollup.detailFirstFallback
   const fallbackSummary = summarizeDetailFirstFallbackReasons(
     externalRollup.detailFirstFallbackByReason,
-    detailFirstAttempted
+    detailFirstAttempted,
+    detailFirstFallback
   )
   const detailFirst: IngestionFunnelDetailFirstMetrics = {
     attempted: detailFirstAttempted,
     succeeded: detailFirstSucceeded,
     published: detailFirstPublished,
-    fallback: externalRollup.detailFirstFallback,
+    fallback: detailFirstFallback,
     fetchFailed: externalRollup.detailFirstFetchFailed,
     freshInsertReadyAtInsertRate:
       freshInserted > 0 ? Math.round((detailFirstSucceeded / freshInserted) * 10000) / 10000 : null,
@@ -720,6 +730,8 @@ export function buildIngestionFunnelWindowMetrics(params: {
     fallbackByReason: fallbackSummary.fallbackByReason,
     topFallbackReason: fallbackSummary.topFallbackReason,
     topFallbackReasonPct: fallbackSummary.topFallbackReasonPct,
+    fallbackUnclassified: fallbackSummary.fallbackByReason.fallback_unclassified ?? 0,
+    fallbackReasonAccounted: fallbackSummary.fallbackReasonAccounted,
   }
 
   return {

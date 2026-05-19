@@ -84,6 +84,9 @@ export type ExternalIngestionOrchestrationNote = {
   ystmDetailFirstPublished?: number
   ystmDetailFirstFallback?: number
   ystmDetailFirstFetchFailed?: number
+  ystmDetailFirstFallbackByReason?: Record<string, number>
+  ystmDetailFirstTopFallbackReason?: string | null
+  ystmDetailFirstTopFallbackReasonPct?: number | null
   freshInsertReadyAtInsertRate?: number | null
   medianMsToPublished?: number | null
   dedupeTelemetrySummary?: DedupeDecisionAggregate

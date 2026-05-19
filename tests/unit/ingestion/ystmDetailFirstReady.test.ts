@@ -90,7 +90,10 @@ describe('detailFirstOrchestrationFields', () => {
         published: 1,
         fallback: 2,
         fetchFailed: 1,
-        rejectedByReason: {},
+        rejectedByReason: {
+          spatial_lookup_failed: 1,
+          fetch_failed: 1,
+        },
         msToPublishedSamples: [100, 300, 200],
       },
       10
@@ -99,6 +102,12 @@ describe('detailFirstOrchestrationFields', () => {
     expect(fields.medianMsToPublished).toBe(200)
     expect(fields.ystmDetailFirstAttempted).toBe(4)
     expect(fields.ystmDetailFirstPublished).toBe(1)
+    expect(fields.ystmDetailFirstFallbackByReason).toEqual({
+      spatial_lookup_failed: 1,
+      fetch_failed: 1,
+    })
+    expect(fields.ystmDetailFirstTopFallbackReason).toBe('spatial_lookup_failed')
+    expect(fields.ystmDetailFirstTopFallbackReasonPct).toBe(0.25)
   })
 })
 

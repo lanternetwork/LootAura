@@ -10,6 +10,10 @@ import {
 } from '@/lib/admin/configYieldLeaderboards'
 import type { ConfigCrawlStatsSnapshot } from '@/lib/ingestion/acquisition/configCrawlStats'
 import {
+  mergeDetailFirstFallbackReasonCounts,
+  summarizeDetailFirstFallbackReasons,
+} from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
+import {
   dedupeDenominatorFromAggregate,
   dedupeSkipCountFromAggregate,
   computeRate,
@@ -106,6 +110,9 @@ export type IngestionFunnelDetailFirstMetrics = {
   freshInsertReadyAtInsertRate: number | null
   medianMsToPublished: number | null
   providerGeocodeBypassRate: number | null
+  fallbackByReason: Record<string, number>
+  topFallbackReason: string | null
+  topFallbackReasonPct: number | null
 }
 
 export type ConfigYieldLeaderboardEntry = {
@@ -181,6 +188,7 @@ export type ExternalIngestionRollup = {
   detailFirstFallback: number
   detailFirstFetchFailed: number
   detailFirstMsToPublishedSamples: number[]
+  detailFirstFallbackByReason: Record<string, number>
 }
 
 function recomputeDuplicateHitsTotal(target: IngestionFunnelDuplicateHits): void {
@@ -359,6 +367,7 @@ export function rollupExternalIngestionForWindow(
     detailFirstFallback: 0,
     detailFirstFetchFailed: 0,
     detailFirstMsToPublishedSamples: [],
+    detailFirstFallbackByReason: {},
   }
 
   for (const row of rows) {
@@ -398,6 +407,10 @@ export function rollupExternalIngestionForWindow(
     if (ext.medianMsToPublished != null && Number.isFinite(ext.medianMsToPublished)) {
       rollup.detailFirstMsToPublishedSamples.push(ext.medianMsToPublished)
     }
+    mergeDetailFirstFallbackReasonCounts(
+      rollup.detailFirstFallbackByReason,
+      ext.ystmDetailFirstFallbackByReason
+    )
 
     const k = hourFloorUtc(row.created_at)
     discoveredByHour.set(k, (discoveredByHour.get(k) ?? 0) + fetched)
@@ -687,6 +700,10 @@ export function buildIngestionFunnelWindowMetrics(params: {
   const detailFirstAttempted = externalRollup.detailFirstAttempted
   const detailFirstSucceeded = externalRollup.detailFirstSucceeded
   const detailFirstPublished = externalRollup.detailFirstPublished
+  const fallbackSummary = summarizeDetailFirstFallbackReasons(
+    externalRollup.detailFirstFallbackByReason,
+    detailFirstAttempted
+  )
   const detailFirst: IngestionFunnelDetailFirstMetrics = {
     attempted: detailFirstAttempted,
     succeeded: detailFirstSucceeded,
@@ -700,6 +717,9 @@ export function buildIngestionFunnelWindowMetrics(params: {
       detailFirstAttempted > 0
         ? Math.round((detailFirstSucceeded / detailFirstAttempted) * 10000) / 10000
         : null,
+    fallbackByReason: fallbackSummary.fallbackByReason,
+    topFallbackReason: fallbackSummary.topFallbackReason,
+    topFallbackReasonPct: fallbackSummary.topFallbackReasonPct,
   }
 
   return {

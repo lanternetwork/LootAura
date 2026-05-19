@@ -100,6 +100,9 @@ export interface ExternalPageSourcePersistSummary {
   ystmDetailFirstReadyAtInsertRate: number | null
   ystmDetailFirstMedianMsToPublished: number | null
   ystmDetailFirstMsToPublishedSamples: number[]
+  ystmDetailFirstFallbackByReason: Record<string, number>
+  ystmDetailFirstTopFallbackReason: string | null
+  ystmDetailFirstTopFallbackReasonPct: number | null
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -1022,6 +1025,9 @@ export async function persistExternalPageSource(
     ystmDetailFirstReadyAtInsertRate: null,
     ystmDetailFirstMedianMsToPublished: null,
     ystmDetailFirstMsToPublishedSamples: [],
+    ystmDetailFirstFallbackByReason: {},
+    ystmDetailFirstTopFallbackReason: null,
+    ystmDetailFirstTopFallbackReasonPct: null,
   }
 
   const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
@@ -1467,6 +1473,9 @@ export async function persistExternalPageSource(
   summary.ystmDetailFirstReadyAtInsertRate = detailFirstFields.freshInsertReadyAtInsertRate
   summary.ystmDetailFirstMedianMsToPublished = detailFirstFields.medianMsToPublished
   summary.ystmDetailFirstMsToPublishedSamples = [...detailFirstMetrics.msToPublishedSamples]
+  summary.ystmDetailFirstFallbackByReason = { ...detailFirstFields.ystmDetailFirstFallbackByReason }
+  summary.ystmDetailFirstTopFallbackReason = detailFirstFields.ystmDetailFirstTopFallbackReason
+  summary.ystmDetailFirstTopFallbackReasonPct = detailFirstFields.ystmDetailFirstTopFallbackReasonPct
 
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.ingestion.externalPersistSummary, {

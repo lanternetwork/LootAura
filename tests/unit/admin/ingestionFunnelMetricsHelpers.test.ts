@@ -169,6 +169,10 @@ describe('ingestionFunnelMetricsHelpers', () => {
           ystmDetailFirstPublished: 1,
           ystmDetailFirstFallback: 3,
           ystmDetailFirstFetchFailed: 1,
+          ystmDetailFirstFallbackByReason: {
+            spatial_lookup_failed: 2,
+            address_validation_failed: 1,
+          },
           medianMsToPublished: 420,
         }),
       ],
@@ -176,6 +180,10 @@ describe('ingestionFunnelMetricsHelpers', () => {
       NOW
     )
     expect(rollup.detailFirstAttempted).toBe(5)
+    expect(rollup.detailFirstFallbackByReason).toEqual({
+      spatial_lookup_failed: 2,
+      address_validation_failed: 1,
+    })
     expect(rollup.detailFirstSucceeded).toBe(2)
     expect(rollup.detailFirstPublished).toBe(1)
     expect(rollup.detailFirstFallback).toBe(3)
@@ -195,6 +203,10 @@ describe('ingestionFunnelMetricsHelpers', () => {
           ystmDetailFirstPublished: 1,
           ystmDetailFirstFallback: 3,
           ystmDetailFirstFetchFailed: 1,
+          ystmDetailFirstFallbackByReason: {
+            spatial_lookup_failed: 2,
+            address_validation_failed: 1,
+          },
           medianMsToPublished: 420,
         }),
       ],
@@ -203,5 +215,11 @@ describe('ingestionFunnelMetricsHelpers', () => {
     })
     expect(funnel['24h'].detailFirst.attempted).toBe(5)
     expect(funnel['24h'].detailFirst.providerGeocodeBypassRate).toBe(0.4)
+    expect(funnel['24h'].detailFirst.topFallbackReason).toBe('spatial_lookup_failed')
+    expect(funnel['24h'].detailFirst.topFallbackReasonPct).toBe(0.4)
+    expect(funnel['24h'].detailFirst.fallbackByReason).toEqual({
+      spatial_lookup_failed: 2,
+      address_validation_failed: 1,
+    })
   })
 })

@@ -140,6 +140,7 @@ describe('GET /api/admin/ingestion/metrics', () => {
     const json = (await res.json()) as {
       ok: boolean
       detailFirstMetricsBaselineAt: string | null
+      detailFirstProof: { status: string; passed: boolean; checks: unknown[] }
       geocodeEligibleBacklog: number
       funnel: {
         '24h': { stages: Array<{ id: string; count: number }>; reconciliation: { crawlerReconciles: boolean } }
@@ -156,6 +157,9 @@ describe('GET /api/admin/ingestion/metrics', () => {
     }
     expect(json.ok).toBe(true)
     expect(json.detailFirstMetricsBaselineAt).toBeNull()
+    expect(json.detailFirstProof.status).toBe('pending_baseline')
+    expect(json.detailFirstProof.passed).toBe(false)
+    expect(json.detailFirstProof.checks.length).toBeGreaterThan(0)
     expect(json.funnel['24h'].stages.length).toBeGreaterThan(0)
     expect(json.funnel['24h'].reconciliation.crawlerReconciles).toBe(true)
     expect(json.volume.fetch.crawlableConfigsTotal).toBe(10)

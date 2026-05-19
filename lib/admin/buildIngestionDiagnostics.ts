@@ -1,6 +1,7 @@
 import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import type { DetailFirstProofCheck } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 export type BuildIngestionDiagnosticsOptions = {
@@ -47,6 +48,12 @@ function bullet(label: string, value: string | number): string {
   return `- ${label}: ${typeof value === 'number' ? formatCount(value) : value}`
 }
 
+function proofCheckBullet(check: DetailFirstProofCheck): string {
+  const mark = check.pass ? 'PASS' : 'FAIL'
+  const req = check.required ? 'required' : 'advisory'
+  return `- [${mark}] ${check.label} (${req}): ${check.actual} (threshold: ${check.threshold})`
+}
+
 /**
  * Serialize loaded ingestion dashboard metrics as markdown for clipboard / debugging.
  */
@@ -84,6 +91,21 @@ export function buildIngestionDiagnostics(
     bullet('fresh inserted', funnel.freshInserted),
     bullet('published', stageCount(stages, 'published')),
     bullet('publish failed', stageCount(stages, 'publish_failed')),
+    '',
+    '## Phase 3B proof protocol',
+    bullet('status', data.detailFirstProof.status),
+    bullet('passed', data.detailFirstProof.passed ? 'yes' : 'no'),
+    bullet('window', data.detailFirstProof.windowLabel),
+    bullet('summary', data.detailFirstProof.summary),
+    '',
+    '### Proof checklist',
+  ]
+
+  for (const check of data.detailFirstProof.checks) {
+    lines.push(proofCheckBullet(check))
+  }
+
+  lines.push(
     '',
     '## Phase 3B',
     bullet('attempted', df.attempted),

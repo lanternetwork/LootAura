@@ -287,7 +287,12 @@ export default function IngestionDashboardClient() {
               </p>
             )}
 
-            {data.funnel && <IngestionFunnelSection funnel={data.funnel} />}
+            {data.funnel && data.detailFirstProof && (
+              <IngestionFunnelSection
+                funnel={data.funnel}
+                detailFirstProof={data.detailFirstProof}
+              />
+            )}
 
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
               <MetricCard

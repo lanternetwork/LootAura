@@ -48,6 +48,7 @@ import {
   cohortQueryIsoCutoff,
   fetchDetailFirstMetricsBaselineAt,
 } from '@/lib/admin/ingestionMetricsBaseline'
+import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { fetchFunnelLeaderboardConfigRows } from '@/lib/ingestion/acquisition/configCrawlStats'
 
 export const dynamic = 'force-dynamic'
@@ -703,10 +704,16 @@ export async function GET(request: NextRequest) {
         ? Math.round(fetchRollup.externalFetchDurationMsSum / fetchRollup.externalFetchDurationSampleCount)
         : null
 
+    const detailFirstProof = evaluateDetailFirstProofProtocol({
+      metricsBaselineAt: detailFirstMetricsBaselineAt,
+      detailFirst: funnel['24h'].detailFirst,
+    })
+
     const body: IngestionMetricsResponse = {
       ok: true,
       generatedAt: now.toISOString(),
       detailFirstMetricsBaselineAt,
+      detailFirstProof,
       backlog,
       geocodeEligibleBacklog,
       published24h,

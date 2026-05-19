@@ -1,4 +1,5 @@
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
+import type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import type {
   ConfigYieldLeaderboardEntry,
   IngestionFunnelDuplicateHits,
@@ -9,6 +10,8 @@ import type {
   IngestionFunnelTopDropoff,
   IngestionFunnelWindowMetrics,
 } from '@/lib/admin/ingestionFunnelMetricsHelpers'
+
+export type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 
 export type {
   ConfigYieldLeaderboardEntry,
@@ -174,6 +177,8 @@ export interface IngestionMetricsResponse {
   generatedAt: string
   /** When set, funnel rollups exclude orchestration + cohort rows before this instant. */
   detailFirstMetricsBaselineAt: string | null
+  /** Post-deploy proof verdict for Phase 3B (24h funnel, post-baseline when set). */
+  detailFirstProof: DetailFirstProofEvaluation
   backlog: number
   /** needs_geocode rows eligible for geocode claim (address_available + address_raw). */
   geocodeEligibleBacklog: number

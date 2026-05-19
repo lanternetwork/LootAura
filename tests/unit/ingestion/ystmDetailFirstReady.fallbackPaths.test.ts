@@ -119,6 +119,19 @@ function mockHappyInsert() {
   }))
 }
 
+function mockPublishedLookupNoRow() {
+  const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+  const limit = vi.fn(() => ({ maybeSingle }))
+  const not = vi.fn(() => ({ limit }))
+  const eqChain = {
+    eq: vi.fn(function (this: unknown) {
+      return eqChain
+    }),
+    not,
+  }
+  return { select: vi.fn(() => eqChain) }
+}
+
 function mockInsertUniqueViolationNoRecovery() {
   mockFrom.mockImplementation(() => ({
     insert: vi.fn(() => ({
@@ -145,6 +158,7 @@ function mockInsertUniqueViolationNoRecovery() {
         })),
       })),
     })),
+    ...mockPublishedLookupNoRow(),
   }))
 }
 

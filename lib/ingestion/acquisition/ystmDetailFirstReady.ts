@@ -38,10 +38,12 @@ import {
   type YstmDetailFirstFallbackReason,
 } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import { upsertAddressGeocodeCache } from '@/lib/ingestion/spatial/addressGeocodeCache'
-import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
+import {
+  lookupSpatialCoordinates,
+  type SpatialCoordinateResolution,
+} from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
-import type { SpatialCoordinateResolution } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents, type ObservabilityEventName } from '@/lib/observability/events'
 export { parseYstmDetailFirstConcurrencyFromEnv } from '@/lib/ingestion/acquisition/ystmDetailFirstReadyConfig'

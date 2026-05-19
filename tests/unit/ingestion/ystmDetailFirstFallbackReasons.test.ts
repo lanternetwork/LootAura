@@ -71,6 +71,7 @@ describe('detailFirstOrchestrationFields regression', () => {
         msToPublishedSamples: [],
         addressValidatedFromDetailPage: 0,
         addressValidatedFromListSeed: 0,
+        insertFailedByDbCode: {},
       },
       10
     )

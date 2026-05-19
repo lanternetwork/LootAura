@@ -15,7 +15,7 @@ type InsertErrorLike = {
 
 function extractPostgresCode(message: string | undefined): string | null {
   if (!message) return null
-  const match = message.match(/\b([0-9A-Z]{5})\b/)
+  const match = message.match(/\b([0-9]{5})\b/)
   return match?.[1] ?? null
 }
 

@@ -199,7 +199,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
-    const noDatesSeed = { ...VALID_LISTING, startDate: null, endDate: null }
+    const noDatesSeed = { ...VALID_LISTING, startDate: undefined, endDate: undefined }
     mockParseExternalPageSourceHtml.mockReturnValue({
       listings: [noDatesSeed],
       invalid: 0,

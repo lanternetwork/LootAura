@@ -118,19 +118,36 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(rawBody)
     const { state } = ShareRequestSchema.parse(body)
 
-    const shortId = nanoid(8) // 8-character short ID
+    const admin = getAdminDb()
+    const MAX_SHARE_ID_ATTEMPTS = 3
+    let shortId: string | null = null
 
-    // Server-only: lootaura_v2.shared_states (see migration 156). Same API as before.
-    const { error } = await getAdminDb()
-      .from('shared_states')
-      .insert({
-        id: shortId,
+    for (let attempt = 0; attempt < MAX_SHARE_ID_ATTEMPTS; attempt += 1) {
+      const candidateId = nanoid(8)
+      const { error } = await admin.from('shared_states').insert({
+        id: candidateId,
         state_json: state,
-        version: 1
+        version: 1,
       })
 
-    if (error) {
+      if (!error) {
+        shortId = candidateId
+        break
+      }
+
+      if (error.code === '23505') {
+        continue
+      }
+
       console.error('Failed to store shared state:', error)
+      return NextResponse.json(
+        { error: 'Failed to create shareable link' },
+        { status: 500 }
+      )
+    }
+
+    if (!shortId) {
+      console.error('Failed to store shared state: exhausted share id attempts')
       return NextResponse.json(
         { error: 'Failed to create shareable link' },
         { status: 500 }

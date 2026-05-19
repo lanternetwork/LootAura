@@ -108,6 +108,36 @@ describe('runGeocodeCronPipeline', () => {
     expect(mockGeocodePendingSales).toHaveBeenCalled()
   })
 
+  it('continues geocode when backlog drain throws', async () => {
+    mockGeocodePendingSales.mockRejectedValue(new Error('claim rpc failed'))
+    const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
+    const result = await runGeocodeCronPipeline({
+      queueBatchSize: 20,
+      backlogBatchSize: 15,
+      concurrencyCeiling: 2,
+      telemetryContext: { jobType: 'cron.geocode' },
+    })
+
+    expect(result.backlog.claimed).toBe(0)
+    expect(result.backlog.error).toBeNull()
+    expect(mockRunBoundedGeocodeDeadLetterReplay).toHaveBeenCalled()
+  })
+
+  it('continues geocode when dead-letter replay throws', async () => {
+    mockRunBoundedGeocodeDeadLetterReplay.mockRejectedValue(new Error('replay scan failed'))
+    const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
+    const result = await runGeocodeCronPipeline({
+      queueBatchSize: 20,
+      backlogBatchSize: 15,
+      concurrencyCeiling: 2,
+      telemetryContext: { jobType: 'cron.geocode' },
+    })
+
+    expect(result.replay.replayed).toBe(0)
+    expect(result.replay.skippedDueTo429Pressure).toBe(false)
+    expect(mockGeocodePendingSales).toHaveBeenCalled()
+  })
+
   it('skips replay when backlog 429 count exceeds threshold', async () => {
     mockGeocodePendingSales.mockResolvedValue({
       claimed: 2,

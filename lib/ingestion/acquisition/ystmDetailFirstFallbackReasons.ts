@@ -3,6 +3,7 @@
  */
 
 export type YstmDetailFirstFallbackReason =
+  | 'fallback_unclassified'
   | 'fetch_failed'
   | 'parse_no_listing'
   | 'expired_after_detail'
@@ -18,6 +19,7 @@ export type YstmDetailFirstFallbackReason =
   | 'publish_failed'
 
 export const YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER: YstmDetailFirstFallbackReason[] = [
+  'fallback_unclassified',
   'spatial_lookup_failed',
   'native_coords_invalid',
   'address_validation_failed',
@@ -53,20 +55,51 @@ export function mergeDetailFirstFallbackReasonCounts(
   }
 }
 
+export function sumDetailFirstFallbackReasonCounts(
+  counts: DetailFirstFallbackReasonCounts | Record<string, number> | undefined
+): number {
+  if (!counts) return 0
+  let total = 0
+  for (const count of Object.values(counts)) {
+    if (count && count > 0) total += count
+  }
+  return total
+}
+
+/**
+ * Ensure every fallback has a reason bucket (adds `fallback_unclassified` for any gap).
+ */
+export function reconcileDetailFirstFallbackReasonCounts(
+  target: DetailFirstFallbackReasonCounts | Record<string, number>,
+  fallbackCount: number
+): void {
+  if (fallbackCount <= 0) return
+  const sum = sumDetailFirstFallbackReasonCounts(target)
+  const gap = fallbackCount - sum
+  if (gap > 0) {
+    target.fallback_unclassified = (target.fallback_unclassified ?? 0) + gap
+  }
+}
+
 export type DetailFirstFallbackReasonSummary = {
   fallbackByReason: Record<string, number>
   topFallbackReason: string | null
   topFallbackReasonCount: number
   topFallbackReasonPct: number | null
+  fallbackReasonAccounted: number
 }
 
 /** Summarize fallback counts; percentages are share of `attempted`. */
 export function summarizeDetailFirstFallbackReasons(
   rejectedByReason: DetailFirstFallbackReasonCounts | Record<string, number> | undefined,
-  attempted: number
+  attempted: number,
+  fallbackCount?: number
 ): DetailFirstFallbackReasonSummary {
   const fallbackByReason: Record<string, number> = {}
   mergeDetailFirstFallbackReasonCounts(fallbackByReason, rejectedByReason)
+  if (fallbackCount != null && fallbackCount > 0) {
+    reconcileDetailFirstFallbackReasonCounts(fallbackByReason, fallbackCount)
+  }
 
   let topFallbackReason: string | null = null
   let topFallbackReasonCount = 0
@@ -87,5 +120,6 @@ export function summarizeDetailFirstFallbackReasons(
     topFallbackReason,
     topFallbackReasonCount,
     topFallbackReasonPct,
+    fallbackReasonAccounted: sumDetailFirstFallbackReasonCounts(fallbackByReason),
   }
 }

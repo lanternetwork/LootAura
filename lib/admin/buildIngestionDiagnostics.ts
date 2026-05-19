@@ -94,6 +94,20 @@ export function buildIngestionDiagnostics(
         ? `${df.topFallbackReason} (${formatPct(df.topFallbackReasonPct)} of attempts)`
         : '—'
     ),
+    bullet(
+      'fallback reasons accounted',
+      df.fallback > 0
+        ? `${formatCount(df.fallbackReasonAccounted)}/${formatCount(df.fallback)}`
+        : '—'
+    ),
+    ...(df.fallbackUnclassified > 0
+      ? [
+          bullet(
+            'fallback_unclassified (needs code path)',
+            formatCount(df.fallbackUnclassified)
+          ),
+        ]
+      : []),
     '',
     '### Phase 3B fallback reasons',
   ]

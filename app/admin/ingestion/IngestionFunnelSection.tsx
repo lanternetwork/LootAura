@@ -286,6 +286,19 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
             </dd>
           </div>
         </dl>
+        {metrics.detailFirst.fallback > 0 &&
+          metrics.detailFirst.fallbackReasonAccounted !== metrics.detailFirst.fallback && (
+            <p className="mt-2 rounded border border-amber-400 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-950">
+              Fallback reason coverage: {metrics.detailFirst.fallbackReasonAccounted.toLocaleString()}/
+              {metrics.detailFirst.fallback.toLocaleString()} accounted
+            </p>
+          )}
+        {metrics.detailFirst.fallbackUnclassified > 0 && (
+          <p className="mt-2 rounded border border-red-400 bg-red-100 px-2 py-1 text-xs font-semibold text-red-950">
+            fallback_unclassified: {metrics.detailFirst.fallbackUnclassified.toLocaleString()} — detail-first
+            fell back without a recorded reason (legacy crawl or missing code path)
+          </p>
+        )}
         {metrics.detailFirst.attempted > 0 && (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -314,7 +327,14 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
                       ? count / metrics.detailFirst.attempted
                       : null
                   return (
-                    <tr key={reason} className="border-b border-emerald-100/80">
+                    <tr
+                      key={reason}
+                      className={
+                        reason === 'fallback_unclassified'
+                          ? 'border-b border-red-200 bg-red-50/80'
+                          : 'border-b border-emerald-100/80'
+                      }
+                    >
                       <td className="py-1 pr-3 font-mono">{reason}</td>
                       <td className="py-1 pr-3 tabular-nums">{count.toLocaleString()}</td>
                       <td className="py-1 tabular-nums">{pct(rate)}</td>

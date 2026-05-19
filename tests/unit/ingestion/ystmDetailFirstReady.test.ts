@@ -153,7 +153,20 @@ describe('parseYstmDetailListingFromHtml', () => {
     expect(merged?.title).toBe('Our Biggest Yard Sale')
     expect(merged?.addressRaw).toContain('1802 Devondale Dr')
     expect(merged?.startDate).toBe('2026-05-23')
-    expect(merged?.rawPayload).toMatchObject({ detailFirstReady: true, detailPageParsed: true })
+    expect(merged?.rawPayload).toMatchObject({
+      detailFirstReady: true,
+      detailPageParsed: true,
+      detailFirstFieldProvenance: {
+        addressRaw: 'detail_page',
+        title: 'detail_page',
+        startDate: 'detail_page',
+      },
+      ingestionDiagnostics: {
+        chosenAddressSource: 'ystm_detail_page',
+        detailFirstValidated: true,
+        listSeedAddressRaw: 'bad seed address',
+      },
+    })
   })
 
   it('merges list seed with minimal native coords fixture', async () => {

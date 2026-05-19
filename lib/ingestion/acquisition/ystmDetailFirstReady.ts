@@ -5,29 +5,29 @@ import {
   type ExternalPageSourceIngestionConfig,
   type ExternalPageSourceListing,
 } from '@/lib/ingestion/adapters/externalPageSource'
+import {
+  buildDetailFirstFieldProvenance,
+  dateSourceForDetailFirst,
+  mergeIngestionDiagnosticsForDetailFirst,
+  type DetailFirstFieldProvenance,
+} from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
+import {
+  detailFirstValidationTelemetry,
+  validateDetailEnrichedListing,
+} from '@/lib/ingestion/acquisition/validateDetailEnrichedListing'
 import { detectGatedListing } from '@/lib/ingestion/address/addressGated'
-import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
 import {
   addressLifecycleFieldsForDb,
   resolveIngestAddressLifecycle,
 } from '@/lib/ingestion/address/resolveIngestAddressLifecycle'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
-import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
-import {
-  InsufficientAddressForPublishError,
-  validateResolvedAddressForPublish,
-} from '@/lib/ingestion/publishValidation'
 import { classifyDetailFirstSpatialFailure } from '@/lib/ingestion/acquisition/classifyDetailFirstSpatialFailure'
 import {
   reconcileDetailFirstFallbackReasonCounts,
   type YstmDetailFirstFallbackReason,
 } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
-import {
-  coerceIngestedDateToYyyyMmDd,
-  isSaleWindowExpiredAtDiscovery,
-} from '@/lib/ingestion/saleWindowDates'
 import { upsertAddressGeocodeCache } from '@/lib/ingestion/spatial/addressGeocodeCache'
 import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
@@ -89,29 +89,6 @@ function recordDetailFirstFallback(
 
 function finalizeDetailFirstAttemptMetrics(metrics: YstmDetailFirstRunMetrics): void {
   reconcileDetailFirstFallbackReasonCounts(metrics.rejectedByReason, metrics.fallback)
-}
-
-function classifyAddressPublishFailure(
-  normalizedPublish: string,
-  city: string,
-  state: string
-): YstmDetailFirstFallbackReason {
-  try {
-    validateResolvedAddressForPublish(normalizedPublish, city, state)
-    return 'address_validation_failed'
-  } catch (err) {
-    if (err instanceof InsufficientAddressForPublishError) {
-      const msg = err.message.toLowerCase()
-      if (msg.includes('lacks a resolvable street') || msg.includes('street detail required')) {
-        return 'missing_street_number'
-      }
-    }
-    return 'address_validation_failed'
-  }
-}
-
-function hasValidDatetime(start: unknown, end: unknown): boolean {
-  return coerceIngestedDateToYyyyMmDd(start) != null || coerceIngestedDateToYyyyMmDd(end) != null
 }
 
 function mergeListingFields(
@@ -191,7 +168,28 @@ export function parseYstmDetailListingFromHtml(input: {
   }
 
   const merged = mergeListingFields(input.listSeed, detailListing)
-  return merged
+  const provenance = buildDetailFirstFieldProvenance(detailPage, input.listSeed)
+  const ingestionDiagnostics = mergeIngestionDiagnosticsForDetailFirst(
+    input.listSeed,
+    provenance,
+    merged
+  )
+
+  return {
+    ...merged,
+    rawPayload: {
+      ...(typeof merged.rawPayload === 'object' && merged.rawPayload ? merged.rawPayload : {}),
+      detailFirstFieldProvenance: provenance,
+      ingestionDiagnostics,
+    },
+  }
+}
+
+function readDetailFirstFieldProvenance(
+  listing: ExternalPageSourceListing
+): DetailFirstFieldProvenance | null {
+  const raw = listing.rawPayload as { detailFirstFieldProvenance?: DetailFirstFieldProvenance }
+  return raw.detailFirstFieldProvenance ?? null
 }
 
 export type YstmDetailFirstAttemptParams = {
@@ -284,65 +282,29 @@ export async function attemptYstmDetailFirstReady(
     return { result: { outcome: 'fallback', reason: 'parse_no_listing' }, metrics }
   }
 
-  if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
-    recordDetailFirstFallback(metrics, 'expired_after_detail')
+  const provenance = readDetailFirstFieldProvenance(listing)
+  if (!provenance) {
+    recordDetailFirstFallback(metrics, 'parse_no_listing')
     finalizeDetailFirstAttemptMetrics(metrics)
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'expired_after_detail',
+    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
+      rejectedReason: 'parse_no_listing',
     })
-    return { result: { outcome: 'fallback', reason: 'expired_after_detail' }, metrics }
+    return { result: { outcome: 'fallback', reason: 'parse_no_listing' }, metrics }
   }
 
-  if (!listing.title?.trim()) {
-    recordDetailFirstFallback(metrics, 'missing_title')
+  const validationTelemetry = detailFirstValidationTelemetry(params.listSeed, listing, provenance)
+  const validation = validateDetailEnrichedListing(listing, provenance)
+  if (!validation.ok) {
+    recordDetailFirstFallback(metrics, validation.reason)
     finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'missing_title',
+      rejectedReason: validation.reason,
+      ...validationTelemetry,
     })
-    return { result: { outcome: 'fallback', reason: 'missing_title' }, metrics }
+    return { result: { outcome: 'fallback', reason: validation.reason }, metrics }
   }
 
-  if (!hasValidDatetime(listing.startDate, listing.endDate)) {
-    recordDetailFirstFallback(metrics, 'invalid_dates')
-    finalizeDetailFirstAttemptMetrics(metrics)
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'invalid_dates',
-    })
-    return { result: { outcome: 'fallback', reason: 'invalid_dates' }, metrics }
-  }
-
-  const city = listing.city?.trim() ?? ''
-  const state = listing.state?.trim() ?? ''
-  if (!city || !state || !isAddressGeocodeReady(listing.addressRaw)) {
-    recordDetailFirstFallback(metrics, 'address_validation_failed')
-    finalizeDetailFirstAttemptMetrics(metrics)
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'address_validation_failed',
-    })
-    return { result: { outcome: 'fallback', reason: 'address_validation_failed' }, metrics }
-  }
-
-  const normalizedLine = listing.addressRaw!.toLowerCase().replace(/\s+/g, ' ')
-  const normalizedPublish = normalizeAddressForPublish(normalizedLine, city, state)
-  if (!normalizedPublish) {
-    recordDetailFirstFallback(metrics, 'address_validation_failed')
-    finalizeDetailFirstAttemptMetrics(metrics)
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'address_validation_failed',
-    })
-    return { result: { outcome: 'fallback', reason: 'address_validation_failed' }, metrics }
-  }
-  try {
-    validateResolvedAddressForPublish(normalizedPublish, city, state)
-  } catch {
-    const publishFailReason = classifyAddressPublishFailure(normalizedPublish, city, state)
-    recordDetailFirstFallback(metrics, publishFailReason)
-    finalizeDetailFirstAttemptMetrics(metrics)
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: publishFailReason,
-    })
-    return { result: { outcome: 'fallback', reason: publishFailReason }, metrics }
-  }
+  const { city, state, normalizedLine } = validation
 
   const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as Record<string, unknown>
   const addressLifecycle = resolveIngestAddressLifecycle({
@@ -430,7 +392,7 @@ export async function attemptYstmDetailFirstReady(
       date_end: listing.endDate ?? null,
       time_start: timePayload.detailTimeStart ?? null,
       time_end: timePayload.detailTimeEnd ?? null,
-      date_source: listing.startDate ? 'ystm_detail_page' : null,
+      date_source: dateSourceForDetailFirst(provenance),
       time_source: timePayload.detailTimeStart ? 'ystm_detail_page' : null,
       image_source_url: listing.imageSourceUrl,
       raw_text: null,
@@ -471,6 +433,7 @@ export async function attemptYstmDetailFirstReady(
   metrics.succeeded = 1
   emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstSucceeded, telem, {
     resolutionSource: spatial.resolutionSource,
+    ...validationTelemetry,
   })
 
   const publishResult = await publishReadyIngestedSaleById(String(insertedRow.id))

@@ -50,6 +50,9 @@ vi.mock('@/lib/supabase/clients', () => ({
 const DETAIL_URL =
   'https://yardsaletreasuremap.com/US/Illinois/Chicago/4443-S-St-Louis-Ave/38754131/userlisting.html'
 
+/** Detail-shaped URL with too few path segments for YSTM listing parse (returns null). */
+const UNPARSEABLE_DETAIL_URL = 'https://yardsaletreasuremap.com/US/IL/userlisting.html'
+
 const CONFIG = {
   city: 'Chicago',
   state: 'IL',
@@ -134,14 +137,14 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
   })
 
   it('records parse_no_listing when detail HTML does not parse', async () => {
-    const readyModule = await import('@/lib/ingestion/acquisition/ystmDetailFirstReady')
-    vi.spyOn(readyModule, 'parseYstmDetailListingFromHtml').mockReturnValue(null)
-    const { attemptYstmDetailFirstReady } = readyModule
+    const { attemptYstmDetailFirstReady } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
     mockFetchExternalPageSource.mockResolvedValue('<html></html>')
     mockParseExternalPageSourceHtml.mockReturnValue({ listings: [], invalid: 1 })
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
-      listSeed: VALID_LISTING,
+      listSeed: { ...VALID_LISTING, sourceUrl: UNPARSEABLE_DETAIL_URL },
       platform: 'external_page_source',
       rowPayload: {},
       pageIndex: 0,

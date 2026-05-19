@@ -14,6 +14,7 @@ import {
   CartesianGrid,
 } from 'recharts'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import IngestionFunnelSection from '@/app/admin/ingestion/IngestionFunnelSection'
 
 const POLL_MS = 5000
@@ -39,6 +40,7 @@ export default function IngestionDashboardClient() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [snapshots, setSnapshots] = useState<SnapshotPoint[]>([])
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
 
   const load = useCallback(async () => {
     try {
@@ -141,6 +143,26 @@ export default function IngestionDashboardClient() {
       count: row.count,
     })) ?? []
 
+  const copyDiagnostics = useCallback(async () => {
+    if (!data) return
+    const environment =
+      process.env.NEXT_PUBLIC_VERCEL_ENV ??
+      process.env.NODE_ENV ??
+      (typeof window !== 'undefined' ? window.location.hostname : 'unknown')
+    const text = buildIngestionDiagnostics(data, {
+      environment,
+      copiedAt: new Date().toISOString(),
+    })
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyState('copied')
+      window.setTimeout(() => setCopyState('idle'), 2000)
+    } catch {
+      setCopyState('error')
+      window.setTimeout(() => setCopyState('idle'), 2000)
+    }
+  }, [data])
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 text-gray-900">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -151,12 +173,26 @@ export default function IngestionDashboardClient() {
               Polls every {POLL_MS / 1000}s · Timeseries from DB (48h) + live backlog / efficiency samples
             </p>
           </div>
-          <Link
-            href="/admin/tools"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"
-          >
-            ← Admin tools
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void copyDiagnostics()}
+              disabled={!data}
+              className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 shadow-sm hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {copyState === 'copied'
+                ? 'Copied'
+                : copyState === 'error'
+                  ? 'Copy failed'
+                  : 'Copy diagnostics'}
+            </button>
+            <Link
+              href="/admin/tools"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"
+            >
+              ← Admin tools
+            </Link>
+          </div>
         </div>
 
         {loading && !data && (

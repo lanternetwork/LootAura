@@ -226,6 +226,46 @@ describe('attemptYstmDetailFirstReady', () => {
     expect(metrics.rejectedByReason.fetch_failed).toBe(1)
   })
 
+  it('returns detail-enriched listing on validation fallback for legacy insert', async () => {
+    const { attemptYstmDetailFirstReady } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
+    const html = readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-louisville-devondale.html'),
+      'utf8'
+    )
+    const url =
+      'https://yardsaletreasuremap.com/US/Kentucky/Louisville/1802-Devondale-Dr/38754131/userlisting.html'
+    mockFetchExternalPageSource.mockResolvedValue(html)
+    mockLookupSpatialCoordinates.mockResolvedValue(null)
+
+    const { result } = await attemptYstmDetailFirstReady({
+      config: { ...CONFIG, city: 'Louisville', state: 'KY' },
+      listSeed: {
+        ...LIST_SEED,
+        title: 'List seed title',
+        addressRaw: 'bad seed address',
+        sourceUrl: url,
+        city: 'Louisville',
+        state: 'KY',
+      },
+      platform: 'external_page_source',
+      rowPayload: { pageIndex: 0 },
+      pageIndex: 0,
+    })
+
+    expect(result.outcome).toBe('fallback')
+    if (result.outcome === 'fallback') {
+      expect(result.reason).toBe('spatial_lookup_failed')
+      expect(result.detailEnrichedListing?.addressRaw).toContain('1802 Devondale Dr')
+      expect(result.detailPageHtml).toBe(html)
+      expect(result.detailEnrichedListing?.rawPayload).toMatchObject({
+        detailPageParsed: true,
+        ingestionDiagnostics: { chosenAddressSource: 'ystm_detail_page' },
+      })
+    }
+  })
+
   it('inserts ready and publishes when detail validation passes', async () => {
     const { attemptYstmDetailFirstReady } = await import(
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'

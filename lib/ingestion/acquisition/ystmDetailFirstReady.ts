@@ -7,9 +7,9 @@ import {
 } from '@/lib/ingestion/adapters/externalPageSource'
 import {
   buildDetailFirstFieldProvenance,
-  dateSourceForDetailFirst,
+  dateScheduleFieldsForListing,
   mergeIngestionDiagnosticsForDetailFirst,
-  type DetailFirstFieldProvenance,
+  readDetailFirstFieldProvenance,
 } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
 import {
@@ -185,13 +185,6 @@ export function parseYstmDetailListingFromHtml(input: {
   }
 }
 
-function readDetailFirstFieldProvenance(
-  listing: ExternalPageSourceListing
-): DetailFirstFieldProvenance | null {
-  const raw = listing.rawPayload as { detailFirstFieldProvenance?: DetailFirstFieldProvenance }
-  return raw.detailFirstFieldProvenance ?? null
-}
-
 export type YstmDetailFirstAttemptParams = {
   config: ExternalPageSourceIngestionConfig
   listSeed: ExternalPageSourceListing
@@ -209,7 +202,34 @@ export type YstmDetailFirstAttemptParams = {
 
 export type YstmDetailFirstAttemptResult =
   | { outcome: 'ready'; ingestedSaleId: string; published: boolean }
-  | { outcome: 'fallback'; reason: YstmDetailFirstFallbackReason }
+  | {
+      outcome: 'fallback'
+      reason: YstmDetailFirstFallbackReason
+      /** Parsed detail+seed merge for legacy insert when detail-first validation fails. */
+      detailEnrichedListing?: ExternalPageSourceListing
+      /** Fetched detail HTML for native coord lookup on legacy fallback. */
+      detailPageHtml?: string
+    }
+
+function buildDetailFirstFallbackResult(
+  reason: YstmDetailFirstFallbackReason,
+  legacyContext?: {
+    detailEnrichedListing?: ExternalPageSourceListing
+    detailPageHtml?: string
+  }
+): YstmDetailFirstAttemptResult {
+  if (!legacyContext?.detailEnrichedListing && !legacyContext?.detailPageHtml) {
+    return { outcome: 'fallback', reason }
+  }
+  return {
+    outcome: 'fallback',
+    reason,
+    ...(legacyContext.detailEnrichedListing
+      ? { detailEnrichedListing: legacyContext.detailEnrichedListing }
+      : {}),
+    ...(legacyContext.detailPageHtml ? { detailPageHtml: legacyContext.detailPageHtml } : {}),
+  }
+}
 
 export async function attemptYstmDetailFirstReady(
   params: YstmDetailFirstAttemptParams
@@ -279,7 +299,10 @@ export async function attemptYstmDetailFirstReady(
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: 'parse_no_listing',
     })
-    return { result: { outcome: 'fallback', reason: 'parse_no_listing' }, metrics }
+    return {
+      result: buildDetailFirstFallbackResult('parse_no_listing', { detailPageHtml: html }),
+      metrics,
+    }
   }
 
   const provenance = readDetailFirstFieldProvenance(listing)
@@ -289,7 +312,13 @@ export async function attemptYstmDetailFirstReady(
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: 'parse_no_listing',
     })
-    return { result: { outcome: 'fallback', reason: 'parse_no_listing' }, metrics }
+    return {
+      result: buildDetailFirstFallbackResult('parse_no_listing', {
+        detailEnrichedListing: listing,
+        detailPageHtml: html,
+      }),
+      metrics,
+    }
   }
 
   const validationTelemetry = detailFirstValidationTelemetry(params.listSeed, listing, provenance)
@@ -301,7 +330,13 @@ export async function attemptYstmDetailFirstReady(
       rejectedReason: validation.reason,
       ...validationTelemetry,
     })
-    return { result: { outcome: 'fallback', reason: validation.reason }, metrics }
+    return {
+      result: buildDetailFirstFallbackResult(validation.reason, {
+        detailEnrichedListing: listing,
+        detailPageHtml: html,
+      }),
+      metrics,
+    }
   }
 
   const { city, state, normalizedLine } = validation
@@ -325,7 +360,13 @@ export async function attemptYstmDetailFirstReady(
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'gated_address',
     })
-    return { result: { outcome: 'fallback', reason: 'gated_address' }, metrics }
+    return {
+      result: buildDetailFirstFallbackResult('gated_address', {
+        detailEnrichedListing: listing,
+        detailPageHtml: html,
+      }),
+      metrics,
+    }
   }
 
   const spatial = await lookupSpatialCoordinates({
@@ -352,7 +393,13 @@ export async function attemptYstmDetailFirstReady(
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: spatialReason,
     })
-    return { result: { outcome: 'fallback', reason: spatialReason }, metrics }
+    return {
+      result: buildDetailFirstFallbackResult(spatialReason, {
+        detailEnrichedListing: listing,
+        detailPageHtml: html,
+      }),
+      metrics,
+    }
   }
 
   await upsertAddressGeocodeCache({
@@ -367,7 +414,7 @@ export async function attemptYstmDetailFirstReady(
   })
 
   const admin = getAdminDb()
-  const timePayload = listing.rawPayload as { detailTimeStart?: string; detailTimeEnd?: string }
+  const scheduleFields = dateScheduleFieldsForListing(listing)
   const rowPayload = {
     ...params.rowPayload,
     detailFirstReady: true,
@@ -390,10 +437,10 @@ export async function attemptYstmDetailFirstReady(
       lng: spatial.lng,
       date_start: listing.startDate ?? null,
       date_end: listing.endDate ?? null,
-      time_start: timePayload.detailTimeStart ?? null,
-      time_end: timePayload.detailTimeEnd ?? null,
-      date_source: dateSourceForDetailFirst(provenance),
-      time_source: timePayload.detailTimeStart ? 'ystm_detail_page' : null,
+      time_start: scheduleFields.time_start,
+      time_end: scheduleFields.time_end,
+      date_source: scheduleFields.date_source,
+      time_source: scheduleFields.time_source,
       image_source_url: listing.imageSourceUrl,
       raw_text: null,
       raw_payload: rowPayload,
@@ -427,7 +474,13 @@ export async function attemptYstmDetailFirstReady(
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: insertReason,
     })
-    return { result: { outcome: 'fallback', reason: insertReason }, metrics }
+    return {
+      result: buildDetailFirstFallbackResult(insertReason, {
+        detailEnrichedListing: listing,
+        detailPageHtml: html,
+      }),
+      metrics,
+    }
   }
 
   metrics.succeeded = 1

@@ -110,3 +110,32 @@ export function dateSourceForDetailFirst(provenance: DetailFirstFieldProvenance)
   }
   return null
 }
+
+export function readDetailFirstFieldProvenance(
+  listing: ExternalPageSourceListing
+): DetailFirstFieldProvenance | null {
+  const raw = listing.rawPayload as { detailFirstFieldProvenance?: DetailFirstFieldProvenance }
+  return raw.detailFirstFieldProvenance ?? null
+}
+
+export function detailScheduleFieldsForListing(
+  listing: ExternalPageSourceListing
+): {
+  date_source: string | null
+  time_start: string | null
+  time_end: string | null
+  time_source: string | null
+} {
+  const timePayload = listing.rawPayload as { detailTimeStart?: string; detailTimeEnd?: string }
+  const provenance = readDetailFirstFieldProvenance(listing)
+  return {
+    date_source: provenance
+      ? dateSourceForDetailFirst(provenance)
+      : listing.startDate
+        ? 'external_list_page'
+        : null,
+    time_start: timePayload.detailTimeStart ?? null,
+    time_end: timePayload.detailTimeEnd ?? null,
+    time_source: timePayload.detailTimeStart ? 'ystm_detail_page' : null,
+  }
+}

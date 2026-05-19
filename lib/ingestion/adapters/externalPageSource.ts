@@ -25,6 +25,7 @@ import {
   type ExternalDuplicateSkipCounts,
 } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
 import { evaluateDuplicateSkipForExternalListListing } from '@/lib/ingestion/dedupe'
+import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
 import {
   attemptYstmDetailFirstReady,
@@ -1165,7 +1166,11 @@ export async function persistExternalPageSource(
     }
     const detailFirstCandidates: DetailFirstCandidate[] = []
 
-    const insertListingLegacy = async (listing: ExternalPageSourceListing, rowPayload: Record<string, unknown>) => {
+    const insertListingLegacy = async (
+      listing: ExternalPageSourceListing,
+      rowPayload: Record<string, unknown>,
+      detailPageHtml?: string | null
+    ) => {
       const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as GatedListingDiagnostics & {
         chosenAddressSource?: string
       }
@@ -1194,13 +1199,19 @@ export async function persistExternalPageSource(
         listing.city?.trim() &&
         listing.state?.trim()
       ) {
+        const nativeLookupHtml =
+          detailPageHtml?.trim() && pageHtmlEligibleForYstmNative(listing.sourceUrl, detailPageHtml)
+            ? detailPageHtml
+            : pageHtmlEligibleForYstmNative(listing.sourceUrl, html)
+              ? html
+              : null
         const spatial = await lookupSpatialCoordinates({
           addressRaw: listing.addressRaw,
           normalizedAddress: normalizedLine,
           city: listing.city,
           state: listing.state,
           sourceUrl: listing.sourceUrl,
-          pageHtml: pageHtmlEligibleForYstmNative(listing.sourceUrl, html) ? html : null,
+          pageHtml: nativeLookupHtml,
           telemetryContext: telemBase,
         })
         if (spatial) {
@@ -1211,6 +1222,16 @@ export async function persistExternalPageSource(
           spatialInsertFields.coordinate_precision = spatial.coordinate_precision
           spatialInsertFields.geocode_method = spatial.geocode_method
         }
+      }
+
+      const scheduleFields = detailScheduleFieldsForListing(listing)
+      const legacyRowPayload = {
+        ...rowPayload,
+        ...(typeof listing.rawPayload === 'object' &&
+        listing.rawPayload &&
+        (listing.rawPayload as { detailPageParsed?: boolean }).detailPageParsed
+          ? { detailPageLegacyFallback: true, detailPageParsed: true }
+          : {}),
       }
 
       const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
@@ -1229,13 +1250,13 @@ export async function persistExternalPageSource(
           lng: insertLng,
           date_start: listing.startDate ?? null,
           date_end: listing.endDate ?? null,
-          time_start: null,
-          time_end: null,
-          date_source: listing.startDate ? 'external_list_page' : null,
-          time_source: null,
+          time_start: scheduleFields.time_start,
+          time_end: scheduleFields.time_end,
+          date_source: scheduleFields.date_source,
+          time_source: scheduleFields.time_source,
           image_source_url: listing.imageSourceUrl,
           raw_text: null,
-          raw_payload: rowPayload,
+          raw_payload: legacyRowPayload,
           status: insertStatus,
           failure_reasons: [],
           parser_version: PARSER_VERSION_ROW,
@@ -1387,7 +1408,13 @@ export async function persistExternalPageSource(
           return
         }
 
-        await insertListingLegacy(candidate.listing, candidate.rowPayload)
+        const fallbackListing =
+          result.outcome === 'fallback' && result.detailEnrichedListing
+            ? result.detailEnrichedListing
+            : candidate.listing
+        const fallbackDetailHtml =
+          result.outcome === 'fallback' ? result.detailPageHtml : undefined
+        await insertListingLegacy(fallbackListing, candidate.rowPayload, fallbackDetailHtml)
       })
     }
   }

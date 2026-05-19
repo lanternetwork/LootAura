@@ -237,6 +237,23 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
 
       <div className="rounded-md border border-emerald-200 bg-emerald-50/70 p-3 text-sm">
         <p className="font-semibold text-emerald-950">YSTM detail-first READY (Phase 3B)</p>
+        {!metrics.detailFirst.operationalHealth.healthy &&
+          metrics.detailFirst.operationalHealth.alerts.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {metrics.detailFirst.operationalHealth.alerts.map((alert) => (
+                <p
+                  key={alert.code}
+                  className={`rounded border px-2 py-1 text-xs font-medium ${
+                    alert.level === 'critical'
+                      ? 'border-red-500 bg-red-100 text-red-950'
+                      : 'border-amber-500 bg-amber-100 text-amber-950'
+                  }`}
+                >
+                  {alert.level === 'critical' ? 'Critical' : 'Warning'}: {alert.message}
+                </p>
+              ))}
+            </div>
+          )}
         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
           <div>
             <dt className="text-xs text-emerald-800">Attempted</dt>

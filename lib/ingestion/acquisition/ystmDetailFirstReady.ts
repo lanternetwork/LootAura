@@ -373,6 +373,7 @@ export async function attemptYstmDetailFirstReady(
     finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
       rejectedReason: 'gated_address',
+      ...validationTelemetry,
     })
     return {
       result: buildDetailFirstFallbackResult('gated_address', {
@@ -406,6 +407,7 @@ export async function attemptYstmDetailFirstReady(
     finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: spatialReason,
+      ...validationTelemetry,
     })
     return {
       result: buildDetailFirstFallbackResult(spatialReason, {
@@ -487,6 +489,7 @@ export async function attemptYstmDetailFirstReady(
     finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
       rejectedReason: insertReason,
+      ...validationTelemetry,
     })
     return {
       result: buildDetailFirstFallbackResult(insertReason, {

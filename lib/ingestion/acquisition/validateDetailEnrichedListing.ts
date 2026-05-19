@@ -88,6 +88,21 @@ export function validateDetailEnrichedListing(
   return { ok: true, city, state, normalizedLine, normalizedPublish }
 }
 
+function normalizeAddressForMismatchCompare(raw: string | null | undefined): string | null {
+  const normalized = raw?.trim().toLowerCase().replace(/\s+/g, ' ')
+  return normalized && normalized.length > 0 ? normalized : null
+}
+
+export function listSeedAddressMismatch(
+  listSeed: ExternalPageSourceListing,
+  listing: ExternalPageSourceListing
+): boolean {
+  const seed = normalizeAddressForMismatchCompare(listSeed.addressRaw)
+  const validated = normalizeAddressForMismatchCompare(listing.addressRaw)
+  if (!seed || !validated) return false
+  return seed !== validated
+}
+
 export function detailFirstValidationTelemetry(
   listSeed: ExternalPageSourceListing,
   listing: ExternalPageSourceListing,
@@ -100,5 +115,6 @@ export function detailFirstValidationTelemetry(
       provenance.startDate === 'detail_page' || provenance.endDate === 'detail_page',
     listSeedAddressRaw: listSeed.addressRaw ?? null,
     validatedAddressRaw: listing.addressRaw ?? null,
+    listSeedAddressMismatch: listSeedAddressMismatch(listSeed, listing),
   }
 }

@@ -232,6 +232,8 @@ describe('ingestionFunnelMetricsHelpers', () => {
     })
     expect(funnel['24h'].detailFirst.fallbackReasonAccounted).toBe(3)
     expect(funnel['24h'].detailFirst.fallbackUnclassified).toBe(0)
+    expect(funnel['24h'].detailFirst.operationalHealth.healthy).toBe(true)
+    expect(funnel['24h'].detailFirst.operationalHealth.alerts).toHaveLength(0)
   })
 
   it('reconciles legacy fallback totals with sparse ByReason into fallback_unclassified', () => {

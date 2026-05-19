@@ -15,6 +15,10 @@ import {
   summarizeDetailFirstFallbackReasons,
 } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import {
+  evaluateDetailFirstOperationalHealth,
+  type DetailFirstOperationalHealth,
+} from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import {
   dedupeDenominatorFromAggregate,
   dedupeSkipCountFromAggregate,
   computeRate,
@@ -119,7 +123,10 @@ export type IngestionFunnelDetailFirstMetrics = {
   addressFromDetailPage: number
   addressFromListSeed: number
   addressFromDetailPageRate: number | null
+  operationalHealth: DetailFirstOperationalHealth
 }
+
+export type { DetailFirstOperationalAlert, DetailFirstOperationalHealth } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 
 export type ConfigYieldLeaderboardEntry = {
   city: string
@@ -723,7 +730,7 @@ export function buildIngestionFunnelWindowMetrics(params: {
     detailFirstAttempted,
     detailFirstFallback
   )
-  const detailFirst: IngestionFunnelDetailFirstMetrics = {
+  const detailFirstMetricsInput = {
     attempted: detailFirstAttempted,
     succeeded: detailFirstSucceeded,
     published: detailFirstPublished,
@@ -749,6 +756,10 @@ export function buildIngestionFunnelWindowMetrics(params: {
             (externalRollup.detailFirstAddressFromDetailPage / detailFirstAttempted) * 10000
           ) / 10000
         : null,
+  }
+  const detailFirst: IngestionFunnelDetailFirstMetrics = {
+    ...detailFirstMetricsInput,
+    operationalHealth: evaluateDetailFirstOperationalHealth(detailFirstMetricsInput),
   }
 
   return {

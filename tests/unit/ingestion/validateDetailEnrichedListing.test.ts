@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildDetailFirstFieldProvenance } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import type { YstmDetailPageParsed } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
-import { validateDetailEnrichedListing } from '@/lib/ingestion/acquisition/validateDetailEnrichedListing'
+import {
+  detailFirstValidationTelemetry,
+  listSeedAddressMismatch,
+  validateDetailEnrichedListing,
+} from '@/lib/ingestion/acquisition/validateDetailEnrichedListing'
 
 const LIST_SEED = {
   title: 'List title',
@@ -76,6 +80,15 @@ describe('validateDetailEnrichedListing', () => {
     expect(result).toEqual({ ok: false, reason: 'address_validation_failed' })
     expect(listing.addressRaw).toBe('Chicago IL')
     expect(provenance.addressRaw).toBe('detail_page')
+  })
+
+  it('flags list seed vs detail address mismatch in telemetry', () => {
+    const { listing, provenance } = enrichedListing(detailPage())
+    expect(listSeedAddressMismatch(LIST_SEED, listing)).toBe(true)
+    const telemetry = detailFirstValidationTelemetry(LIST_SEED, listing, provenance)
+    expect(telemetry.listSeedAddressMismatch).toBe(true)
+    expect(telemetry.listSeedAddressRaw).toBe('Chicago IL')
+    expect(telemetry.validatedAddressRaw).toContain('4443 S St Louis Ave')
   })
 
   it('rejects expired detail-enriched sale windows', () => {

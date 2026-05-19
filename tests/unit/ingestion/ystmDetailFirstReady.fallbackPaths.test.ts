@@ -83,7 +83,12 @@ const VALID_LISTING = {
   rawPayload: {},
 }
 
-function detailParsedFromListing(listing: typeof VALID_LISTING): YstmDetailPageParsed {
+function detailParsedFromListing(
+  listing: Omit<typeof VALID_LISTING, 'startDate' | 'endDate'> & {
+    startDate?: string
+    endDate?: string
+  }
+): YstmDetailPageParsed {
   return {
     title: listing.title,
     description: listing.description,

@@ -11,7 +11,7 @@ function baseParsed(overrides: Partial<YstmDetailPageParsed> = {}): YstmDetailPa
     title: 'Big yard sale',
     description: 'Lots of furniture and tools for sale this weekend.',
     addressRaw: '123 Main St, Springfield, IL',
-    addressSource: 'detail_page',
+    addressSource: 'detail_dom',
     startDate: '2099-06-01',
     endDate: '2099-06-02',
     city: 'Springfield',

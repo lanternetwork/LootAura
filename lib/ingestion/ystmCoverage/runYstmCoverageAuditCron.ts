@@ -23,7 +23,10 @@ import {
   acquireIngestionOrchestrationLease,
   releaseIngestionOrchestrationLease,
 } from '@/lib/ingestion/ingestionOrchestrationLease'
-import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
+import {
+  partitionCrawlableExternalCityConfigs,
+  type ExternalCityConfigRow,
+} from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
@@ -49,13 +52,7 @@ export type YstmCoverageAuditCronResult = {
   telemetry: YstmCoverageAuditCronTelemetry
 }
 
-type CrawlConfig = {
-  city: string
-  state: string
-  source_pages: unknown
-}
-
-function sortConfigsDeterministic(rows: CrawlConfig[]): CrawlConfig[] {
+function sortConfigsDeterministic(rows: ExternalCityConfigRow[]): ExternalCityConfigRow[] {
   return [...rows].sort((a, b) => {
     const ak = `${a.state || ''}|${a.city || ''}`.toLowerCase()
     const bk = `${b.state || ''}|${b.city || ''}`.toLowerCase()
@@ -139,8 +136,8 @@ export async function runYstmCoverageAuditCron(
       throw new Error(configError.message)
     }
 
-    const partition = partitionCrawlableExternalCityConfigs((configData ?? []) as CrawlConfig[])
-    const sorted = sortConfigsDeterministic(partition.crawlable as CrawlConfig[])
+    const partition = partitionCrawlableExternalCityConfigs((configData ?? []) as ExternalCityConfigRow[])
+    const sorted = sortConfigsDeterministic(partition.crawlable)
     const catalogSize = sorted.length
 
     runId = await insertAuditRun(admin, {

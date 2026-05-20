@@ -16,5 +16,6 @@ describe('parseDiscoveryCronBudgets', () => {
     expect(budgets.maxStatesPerRun).toBe(3)
     expect(budgets.maxDiscoveredPagesPerRun).toBe(80)
     expect(budgets.maxRuntimeMs).toBe(240_000)
+    expect(budgets.maxPlaceholderRepairConfigsPerRun).toBe(60)
   })
 })

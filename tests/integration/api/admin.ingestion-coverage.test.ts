@@ -44,6 +44,19 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
               },
             ],
           })
+        case 'ingestion_city_configs':
+          return thenableQuery({
+            data: [
+              {
+                city: 'Springfield',
+                state: 'IL',
+                source_platform: 'external_page_source',
+                source_pages: ['https://yardsaletreasuremap.com/US/Illinois/Springfield/Springfield.html'],
+                source_crawl_excluded_at: null,
+                source_discovery_status: 'validated',
+              },
+            ],
+          })
         default:
           return thenableQuery({ data: [] })
       }
@@ -60,5 +73,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.publishedActiveLootAuraYstmUrls).toBe(1)
     expect(json.validActiveYstmUrls).toBe(0)
     expect(json.coveragePct).toBeNull()
+    expect(json.sourceExpansion.crawlableConfigs).toBe(1)
+    expect(json.sourceExpansion.configsWithoutSourcePages).toBe(0)
   })
 })

@@ -32,6 +32,8 @@ function discoveryCronJsonBody(result: Awaited<ReturnType<typeof runSourceDiscov
     candidatePagesInvalid: t.candidatePagesInvalid,
     configsPromoted: t.configsPromoted,
     configsRepaired: t.configsRepaired,
+    placeholderRepairRepaired: t.placeholderRepairRepaired,
+    placeholderRepairFailed: t.placeholderRepairFailed,
     configsRevalidated: t.configsRevalidated,
     configsFailed: t.configsFailed,
     placeholdersUnresolved: t.placeholdersUnresolved,

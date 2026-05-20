@@ -7,6 +7,10 @@ import {
   computeCoveragePct,
   YSTM_COVERAGE_TARGET_PCT,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
+import {
+  buildYstmSourceExpansionMetrics,
+  type YstmSourceExpansionMetrics,
+} from '@/lib/admin/ystmSourceExpansionMetrics'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type YstmCoverageTrendPoint = {
@@ -36,6 +40,7 @@ export type YstmCoverageScoreboard = {
     detailPagesValidated: number
     configCursorAfter: number
   } | null
+  sourceExpansion: YstmSourceExpansionMetrics
 }
 
 type AuditRunRow = {
@@ -62,9 +67,10 @@ export async function buildYstmCoverageScoreboard(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<YstmCoverageScoreboard> {
   const now = new Date()
-  const [agg, publishedIndex, runsResult] = await Promise.all([
+  const [agg, publishedIndex, sourceExpansion, runsResult] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
+    buildYstmSourceExpansionMetrics(admin, now.getTime()),
     fromBase(admin, 'ystm_coverage_audit_runs')
       .select(
         'completed_at, status, coverage_pct, valid_active_ystm_urls, published_visible_in_audit, list_pages_fetched, listing_urls_discovered, detail_pages_validated, config_cursor_after'
@@ -122,7 +128,10 @@ export async function buildYstmCoverageScoreboard(
           configCursorAfter: last.config_cursor_after ?? 0,
         }
       : null,
+    sourceExpansion,
   }
 }
+
+export type { YstmSourceExpansionMetrics }
 
 export type { YstmCoverageObservationAggregate }

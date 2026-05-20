@@ -28,6 +28,21 @@ function formatWhen(iso: string | null): string {
   }
 }
 
+function Metric(props: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div
+      className={
+        props.highlight
+          ? 'rounded border border-amber-200 bg-amber-50 px-3 py-2'
+          : 'rounded border border-slate-200 bg-white px-3 py-2'
+      }
+    >
+      <p className="text-xs text-slate-600">{props.label}</p>
+      <p className="text-lg font-semibold tabular-nums">{props.value.toLocaleString()}</p>
+    </div>
+  )
+}
+
 export default function YstmCoverageScoreboardSection() {
   const [data, setData] = useState<YstmCoverageMetricsResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -120,11 +135,29 @@ export default function YstmCoverageScoreboardSection() {
 
           {data.lastRun && (
             <p className="mb-4 text-xs text-gray-600">
-              Last run: {data.lastRun.listPagesFetched} list pages · {data.lastRun.listingUrlsDiscovered}{' '}
+              Last audit: {data.lastRun.listPagesFetched} list pages · {data.lastRun.listingUrlsDiscovered}{' '}
               URLs discovered · {data.lastRun.detailPagesValidated} detail checks · config cursor{' '}
               {data.lastRun.configCursorAfter}
             </p>
           )}
+
+          <div className="mb-6 rounded-md border border-slate-200 bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold text-slate-900">Source expansion (Phase 2)</h3>
+            <p className="mt-1 text-xs text-slate-600">
+              Nationwide crawl footprint — discovery cron promotes validated city pages and repairs empty{' '}
+              <code className="text-xs">source_pages</code> before general revalidation.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Crawlable configs" value={data.sourceExpansion.crawlableConfigs} />
+              <Metric
+                label="No source pages"
+                value={data.sourceExpansion.configsWithoutSourcePages}
+                highlight
+              />
+              <Metric label="Pending discovery" value={data.sourceExpansion.pendingDiscoveryConfigs} />
+              <Metric label="Validated discovery" value={data.sourceExpansion.validatedDiscoveryConfigs} />
+            </div>
+          </div>
 
           {trendData.length > 1 && (
             <div className="mb-6 h-56 w-full">

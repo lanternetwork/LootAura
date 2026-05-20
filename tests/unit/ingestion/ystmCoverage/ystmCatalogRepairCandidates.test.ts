@@ -13,7 +13,6 @@ describe('ystmCatalogRepairCandidates', () => {
   it('accepts repairable YSTM rows without published_sale_id', () => {
     expect(
       isCatalogRepairCandidateRow({
-        id: '1',
         source_url: DETAIL_URL,
         status: 'needs_geocode',
         published_sale_id: null,
@@ -24,7 +23,6 @@ describe('ystmCatalogRepairCandidates', () => {
   it('rejects non-detail URLs', () => {
     expect(
       isCatalogRepairCandidateRow({
-        id: '1',
         source_url: 'https://example.com/x',
         status: 'needs_geocode',
         published_sale_id: null,
@@ -35,7 +33,6 @@ describe('ystmCatalogRepairCandidates', () => {
   it('rejects ready rows that already have published_sale_id', () => {
     expect(
       isCatalogRepairCandidateRow({
-        id: '1',
         source_url: DETAIL_URL,
         status: 'ready',
         published_sale_id: 'sale-1',

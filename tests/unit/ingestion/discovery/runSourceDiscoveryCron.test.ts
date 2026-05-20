@@ -97,6 +97,7 @@ describe('runSourceDiscoveryCron', () => {
         maxDiscoveredPagesPerRun: 10,
         maxValidationFetchesPerRun: 10,
         maxRevalidationConfigsPerRun: 10,
+        maxPlaceholderRepairConfigsPerRun: 10,
         leaseSeconds: 120,
         maxRuntimeMs: 60_000,
         placeholderFailureExcludeThreshold: 1,
@@ -106,7 +107,7 @@ describe('runSourceDiscoveryCron', () => {
     expect(result.skipped).toBe(false)
     expect(discoveryMock).toHaveBeenCalledTimes(1)
     expect(promoteMock).toHaveBeenCalledTimes(1)
-    expect(revalidateMock).toHaveBeenCalledTimes(1)
+    expect(revalidateMock).toHaveBeenCalledTimes(2)
     expect(releaseMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ markCompleted: true })
@@ -114,6 +115,7 @@ describe('runSourceDiscoveryCron', () => {
     expect(result.telemetry.configsPromoted).toBe(2)
     expect(result.telemetry.phasesCompleted).toContain('discover')
     expect(result.telemetry.phasesCompleted).toContain('promote')
+    expect(result.telemetry.phasesCompleted).toContain('placeholder_repair')
     expect(result.telemetry.phasesCompleted).toContain('revalidate')
   })
 
@@ -141,6 +143,7 @@ describe('runSourceDiscoveryCron', () => {
         maxDiscoveredPagesPerRun: 10,
         maxValidationFetchesPerRun: 10,
         maxRevalidationConfigsPerRun: 5,
+        maxPlaceholderRepairConfigsPerRun: 5,
         leaseSeconds: 120,
         maxRuntimeMs: 60_000,
         placeholderFailureExcludeThreshold: 1,

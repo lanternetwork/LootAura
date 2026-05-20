@@ -52,7 +52,7 @@ describe('selectRevalidationConfigRows', () => {
     expect(selected.map((r) => r.id)).toEqual(['2'])
   })
 
-  it('skips disabled and manual configs', () => {
+  it('skips disabled configs and deprioritizes manual for repair selection', () => {
     const rows = [
       config({ id: '1', city: 'A', state: 'CA', source_pages: [], enabled: false }),
       config({
@@ -64,8 +64,23 @@ describe('selectRevalidationConfigRows', () => {
       }),
       config({ id: '3', city: 'C', state: 'CA', source_pages: [] }),
     ]
-    const selected = selectRevalidationConfigRows(rows, { max: 10 })
+    const selected = selectRevalidationConfigRows(rows, { max: 1 })
     expect(selected.map((r) => r.id)).toEqual(['3'])
+  })
+
+  it('excludes manual from no_source_pages_only repair pass', () => {
+    const rows = [
+      config({
+        id: '1',
+        city: 'B',
+        state: 'CA',
+        source_pages: [],
+        source_discovery_status: SOURCE_DISCOVERY_STATUS.manual,
+      }),
+      config({ id: '2', city: 'C', state: 'CA', source_pages: [] }),
+    ]
+    const selected = selectRevalidationConfigRows(rows, { max: 10, mode: 'no_source_pages_only' })
+    expect(selected.map((r) => r.id)).toEqual(['2'])
   })
 
   it('filters by state when provided', () => {

@@ -21,6 +21,7 @@ function isManualProtectedRow(row: IngestionCityConfigDiscoveryRow): boolean {
 }
 
 function revalidationPriorityTier(row: IngestionCityConfigDiscoveryRow): number {
+  if (isManualProtectedRow(row)) return 99
   const pages = normalizeSourcePages(row.source_pages)
   if (pages.length === 0) return 0
   if (row.source_discovery_status === SOURCE_DISCOVERY_STATUS.pending) return 1
@@ -45,12 +46,12 @@ export function selectRevalidationConfigRows(
   const eligible = rows.filter((row) => {
     if (!row.enabled) return false
     if (isCrawlExcludedDiscoveryRow(row)) return false
-    if (isManualProtectedRow(row)) return false
     if (stateSet) {
       const st = normalizeIngestionState(row.state)
       if (!st || !stateSet.has(st)) return false
     }
     if (mode === 'no_source_pages_only') {
+      if (isManualProtectedRow(row)) return false
       return normalizeSourcePages(row.source_pages).length === 0
     }
     return true

@@ -47,7 +47,9 @@ export function isEligibleForCatalogRepairRetry(
   return nowMs - attemptedMs >= failedRetryHours * 60 * 60 * 1000
 }
 
-export function isCatalogRepairCandidateRow(row: IngestedRow): boolean {
+export function isCatalogRepairCandidateRow(
+  row: Pick<IngestedRow, 'source_url' | 'status' | 'published_sale_id'>
+): boolean {
   if (!isYstmDetailListingUrl(row.source_url)) return false
   if (!YSTM_CATALOG_REPAIRABLE_STATUSES.includes(row.status as (typeof YSTM_CATALOG_REPAIRABLE_STATUSES)[number])) {
     return false

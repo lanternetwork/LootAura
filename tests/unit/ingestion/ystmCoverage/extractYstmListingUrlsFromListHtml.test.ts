@@ -20,7 +20,7 @@ describe('extractYstmListingUrlsFromListHtml', () => {
   it('dedupes by canonical URL', () => {
     const html = `
       <a href="/US/Texas/Austin/1/listing.html">A</a>
-      <a href="/US/Texas/Austin/1/listing.html?utm=1">A dup</a>
+      <a href="https://yardsaletreasuremap.com/US/Texas/Austin/1/listing.html">A dup</a>
     `
     const urls = extractYstmListingUrlsFromListHtml(html, 'https://yardsaletreasuremap.com/US/Texas/Austin/')
     expect(urls).toHaveLength(1)

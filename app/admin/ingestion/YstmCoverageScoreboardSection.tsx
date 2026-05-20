@@ -141,6 +141,20 @@ export default function YstmCoverageScoreboardSection() {
             </p>
           )}
 
+          <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
+            <h3 className="text-sm font-semibold text-sky-950">Existing URL refresh (Phase 4)</h3>
+            <p className="mt-1 text-xs text-sky-900">
+              Re-fetches YSTM detail pages for known ingested_sales to sync dates, content, and publish state.
+              Stale threshold defaults to 12h since last source sync.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="YSTM ingested corpus" value={data.existingRefresh.ystmDetailIngestedTotal} />
+              <Metric label="Stale (&gt;12h)" value={data.existingRefresh.staleOver12h} highlight />
+              <Metric label="Synced last 24h" value={data.existingRefresh.syncedLast24h} />
+              <Metric label="Never synced" value={data.existingRefresh.neverSynced} />
+            </div>
+          </div>
+
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">Missing URL ingestion (Phase 3)</h3>
             <p className="mt-1 text-xs text-violet-900">

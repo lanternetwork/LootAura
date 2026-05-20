@@ -30,6 +30,10 @@
     {
       "path": "/api/cron/ystm-missing-ingest",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/ystm-existing-refresh",
+      "schedule": "0 10 * * *"
     }
   ]
 }

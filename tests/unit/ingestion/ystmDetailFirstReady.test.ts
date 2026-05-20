@@ -312,10 +312,13 @@ describe('attemptYstmDetailFirstReady', () => {
       pageIndex: 0,
     })
 
-    expect(insertSpy).toHaveBeenCalled()
-    const row = insertSpy.mock.calls[0]?.[0] as { time_source?: string; raw_payload?: Record<string, unknown> }
-    expect(row.time_source).toBe('explicit')
-    expect(row.raw_payload).toMatchObject({ detailTimeStart: '09:00:00' })
+    expect(insertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        time_source: 'explicit',
+        time_start: '09:00:00',
+        time_end: '15:00:00',
+      })
+    )
   })
 
   it('inserts ready and publishes when detail validation passes', async () => {

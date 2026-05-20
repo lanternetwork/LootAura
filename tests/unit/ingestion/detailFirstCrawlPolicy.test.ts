@@ -38,11 +38,11 @@ describe('detailFirstCrawlPolicy', () => {
   })
 
   it('parses list re-crawl refresh cap per page from env', () => {
-    expect(parseYstmListRecrawlRefreshMaxPerPage({})).toBe(32)
+    expect(parseYstmListRecrawlRefreshMaxPerPage({} as unknown as NodeJS.ProcessEnv)).toBe(32)
     expect(
       parseYstmListRecrawlRefreshMaxPerPage({
         INGESTION_YSTM_LIST_RECRAWL_REFRESH_MAX_PER_PAGE: '8',
-      })
+      } as unknown as NodeJS.ProcessEnv)
     ).toBe(8)
   })
 })

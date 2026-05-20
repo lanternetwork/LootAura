@@ -75,5 +75,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.coveragePct).toBeNull()
     expect(json.sourceExpansion.crawlableConfigs).toBe(1)
     expect(json.sourceExpansion.configsWithoutSourcePages).toBe(0)
+    expect(json.missingIngestion.missingQueueTotal).toBe(0)
+    expect(json.missingIngestion.missingIngestionNeverAttempted).toBe(0)
   })
 })

@@ -44,6 +44,13 @@ export async function upsertYstmCoverageObservations(
   }
 }
 
+export type YstmCoverageMissingIngestionOutcome =
+  | 'skipped_visible'
+  | 'skipped_existing'
+  | 'published'
+  | 'ingested'
+  | 'failed'
+
 export type YstmCoverageObservationAggregate = {
   validActiveYstmUrls: number
   publishedVisibleInAudit: number
@@ -51,6 +58,112 @@ export type YstmCoverageObservationAggregate = {
   missingByState: Record<string, number>
   missingByMetro: Record<string, number>
   observationCount: number
+}
+
+export type YstmCoverageMissingIngestionAggregate = {
+  missingQueueTotal: number
+  missingIngestionAttempted: number
+  missingIngestionPublished: number
+  missingIngestionIngested: number
+  missingIngestionFailed: number
+  missingIngestionSkippedVisible: number
+  missingIngestionSkippedExisting: number
+  missingIngestionNeverAttempted: number
+}
+
+export async function recordYstmCoverageMissingIngestionOutcome(
+  admin: ReturnType<typeof getAdminDb>,
+  canonicalUrl: string,
+  patch: {
+    outcome: YstmCoverageMissingIngestionOutcome
+    failureReason?: string | null
+    lootauraVisible?: boolean
+  }
+): Promise<void> {
+  const { error } = await fromBase(admin, 'ystm_coverage_observations')
+    .update({
+      missing_ingestion_attempted_at: new Date().toISOString(),
+      missing_ingestion_outcome: patch.outcome,
+      missing_ingestion_failure_reason: patch.failureReason ?? null,
+      ...(patch.lootauraVisible === true ? { lootaura_visible: true } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('canonical_url', canonicalUrl)
+  if (error) {
+    throw new Error(error.message)
+  }
+}
+
+export async function aggregateYstmCoverageMissingIngestion(
+  admin: ReturnType<typeof getAdminDb>
+): Promise<YstmCoverageMissingIngestionAggregate> {
+  const pageSize = 1000
+  let from = 0
+  let missingQueueTotal = 0
+  let missingIngestionAttempted = 0
+  let missingIngestionPublished = 0
+  let missingIngestionIngested = 0
+  let missingIngestionFailed = 0
+  let missingIngestionSkippedVisible = 0
+  let missingIngestionSkippedExisting = 0
+  let missingIngestionNeverAttempted = 0
+
+  for (;;) {
+    const { data, error } = await fromBase(admin, 'ystm_coverage_observations')
+      .select('ystm_valid_active, lootaura_visible, missing_ingestion_outcome, missing_ingestion_attempted_at')
+      .order('canonical_url', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) {
+      throw new Error(error.message)
+    }
+    const chunk = (data ?? []) as Array<{
+      ystm_valid_active: boolean
+      lootaura_visible: boolean
+      missing_ingestion_outcome: string | null
+      missing_ingestion_attempted_at: string | null
+    }>
+    for (const row of chunk) {
+      if (!row.ystm_valid_active || row.lootaura_visible) continue
+      missingQueueTotal += 1
+      if (!row.missing_ingestion_attempted_at) {
+        missingIngestionNeverAttempted += 1
+        continue
+      }
+      missingIngestionAttempted += 1
+      switch (row.missing_ingestion_outcome) {
+        case 'published':
+          missingIngestionPublished += 1
+          break
+        case 'ingested':
+          missingIngestionIngested += 1
+          break
+        case 'failed':
+          missingIngestionFailed += 1
+          break
+        case 'skipped_visible':
+          missingIngestionSkippedVisible += 1
+          break
+        case 'skipped_existing':
+          missingIngestionSkippedExisting += 1
+          break
+        default:
+          break
+      }
+    }
+    if (chunk.length < pageSize) break
+    from += pageSize
+  }
+
+  return {
+    missingQueueTotal,
+    missingIngestionAttempted,
+    missingIngestionPublished,
+    missingIngestionIngested,
+    missingIngestionFailed,
+    missingIngestionSkippedVisible,
+    missingIngestionSkippedExisting,
+    missingIngestionNeverAttempted,
+  }
 }
 
 export async function aggregateYstmCoverageObservations(

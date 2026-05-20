@@ -141,6 +141,32 @@ export default function YstmCoverageScoreboardSection() {
             </p>
           )}
 
+          <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
+            <h3 className="text-sm font-semibold text-violet-950">Missing URL ingestion (Phase 3)</h3>
+            <p className="mt-1 text-xs text-violet-900">
+              Daily cron ingests valid YSTM URLs from the coverage audit footprint via detail-first + publish.
+              Queue rotates by canonical URL offset.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Missing queue" value={data.missingIngestion.missingQueueTotal} highlight />
+              <Metric
+                label="Never attempted"
+                value={data.missingIngestion.missingIngestionNeverAttempted}
+              />
+              <Metric
+                label="Published via queue"
+                value={data.missingIngestion.missingIngestionPublished}
+              />
+              <Metric label="Failed / retry later" value={data.missingIngestion.missingIngestionFailed} />
+            </div>
+            <p className="mt-2 text-xs text-violet-800">
+              Attempted {data.missingIngestion.missingIngestionAttempted.toLocaleString()} · ingested{' '}
+              {data.missingIngestion.missingIngestionIngested.toLocaleString()} · skipped existing{' '}
+              {data.missingIngestion.missingIngestionSkippedExisting.toLocaleString()} · skipped already
+              visible {data.missingIngestion.missingIngestionSkippedVisible.toLocaleString()}
+            </p>
+          </div>
+
           <div className="mb-6 rounded-md border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-sm font-semibold text-slate-900">Source expansion (Phase 2)</h3>
             <p className="mt-1 text-xs text-slate-600">

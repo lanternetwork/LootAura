@@ -279,6 +279,45 @@ describe('attemptYstmDetailFirstReady', () => {
     }
   })
 
+  it('maps ystm_detail_page time_source to explicit on ingested_sales insert', async () => {
+    const { attemptYstmDetailFirstReady } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'ready-row-1' }, error: null }),
+      })),
+    }))
+    mockFrom.mockImplementation(() => ({ insert: insertSpy }))
+    const html = `${readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-with-native-coords.html'),
+      'utf8'
+    ).replace('</body>', '<p>Hours: 9:00 am - 3:00 pm</p></body>')}`
+    mockFetchExternalPageSource.mockResolvedValue(html)
+    mockLookupSpatialCoordinates.mockResolvedValue({
+      lat: 41.81225221,
+      lng: -87.71115022,
+      coordinate_precision: 'provider_native',
+      geocode_method: 'ystm_provider_native',
+      geocode_confidence: 'high',
+      resolutionSource: 'ystm_provider_native',
+    })
+    mockPublishReady.mockResolvedValue({ ok: true, publishedSaleId: 'sale-1' })
+
+    await attemptYstmDetailFirstReady({
+      config: CONFIG,
+      listSeed: LIST_SEED,
+      platform: 'external_page_source',
+      rowPayload: { pageIndex: 0 },
+      pageIndex: 0,
+    })
+
+    expect(insertSpy).toHaveBeenCalled()
+    const row = insertSpy.mock.calls[0]?.[0] as { time_source?: string; raw_payload?: Record<string, unknown> }
+    expect(row.time_source).toBe('explicit')
+    expect(row.raw_payload).toMatchObject({ detailTimeStart: '09:00:00' })
+  })
+
   it('inserts ready and publishes when detail validation passes', async () => {
     const { attemptYstmDetailFirstReady } = await import(
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'

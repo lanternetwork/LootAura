@@ -42,6 +42,7 @@ import {
   lookupSpatialCoordinates,
   type SpatialCoordinateResolution,
 } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
+import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
@@ -171,7 +172,7 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
     time_start: input.scheduleFields.time_start,
     time_end: input.scheduleFields.time_end,
     date_source: input.scheduleFields.date_source,
-    time_source: input.scheduleFields.time_source,
+    time_source: ingestedSaleTimeSourceForDb(input.scheduleFields.time_source),
     image_source_url: input.listing.imageSourceUrl,
     raw_text: null,
     raw_payload: input.rowPayload,

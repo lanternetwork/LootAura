@@ -29,6 +29,7 @@ import {
   shouldDeferListSeedSoftDedupe,
 } from '@/lib/ingestion/acquisition/detailFirstCrawlPolicy'
 import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
+import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
 import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
 import {
   attemptYstmDetailFirstReady,
@@ -1264,7 +1265,7 @@ export async function persistExternalPageSource(
           time_start: scheduleFields.time_start,
           time_end: scheduleFields.time_end,
           date_source: scheduleFields.date_source,
-          time_source: scheduleFields.time_source,
+          time_source: ingestedSaleTimeSourceForDb(scheduleFields.time_source),
           image_source_url: listing.imageSourceUrl,
           raw_text: null,
           raw_payload: legacyRowPayload,

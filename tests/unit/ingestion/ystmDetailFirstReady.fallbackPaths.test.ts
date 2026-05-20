@@ -100,6 +100,7 @@ function detailParsedFromListing(
     imageUrls: [],
     nativeCoords: null,
     cityConflict: false,
+    addressSource: listing.addressRaw?.trim() ? 'detail_dom' : null,
   }
 }
 
@@ -113,6 +114,78 @@ function mockHappyInsert() {
     insert: vi.fn(() => ({
       select: vi.fn(() => ({
         maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'ready-row-1' }, error: null }),
+      })),
+    })),
+  }))
+}
+
+function mockPublishedLookupNoRow() {
+  const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+  const limit = vi.fn(() => ({ maybeSingle }))
+  const not = vi.fn(() => ({ limit }))
+  const eqChain = {
+    eq: vi.fn(function (this: unknown) {
+      return eqChain
+    }),
+    not,
+  }
+  return { select: vi.fn(() => eqChain) }
+}
+
+function mockInsertUniqueViolationNoRecovery() {
+  mockFrom.mockImplementation(() => ({
+    insert: vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: null,
+          error: {
+            code: '23505',
+            message: 'duplicate key value violates unique constraint',
+          },
+        }),
+      })),
+    })),
+    update: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          is: vi.fn(() => ({
+            in: vi.fn(() => ({
+              select: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              })),
+            })),
+          })),
+        })),
+      })),
+    })),
+    ...mockPublishedLookupNoRow(),
+  }))
+}
+
+function mockInsertUniqueViolationWithPromote(promotedId: string) {
+  mockFrom.mockImplementation(() => ({
+    insert: vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: null,
+          error: {
+            code: '23505',
+            message: 'duplicate key value violates unique constraint',
+          },
+        }),
+      })),
+    })),
+    update: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          is: vi.fn(() => ({
+            in: vi.fn(() => ({
+              select: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: { id: promotedId }, error: null }),
+              })),
+            })),
+          })),
+        })),
       })),
     })),
   }))
@@ -360,7 +433,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
     expectFallbackAccounting(metrics)
   })
 
-  it('records canonical_collision on unique constraint insert errors', async () => {
+  it('records canonical_collision when unique violation cannot be promoted', async () => {
     const { attemptYstmDetailFirstReady } = await import(
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'
     )
@@ -373,16 +446,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
       geocode_confidence: 'high',
       resolutionSource: 'ystm_native_html',
     })
-    mockFrom.mockImplementation(() => ({
-      insert: vi.fn(() => ({
-        select: vi.fn(() => ({
-          maybeSingle: vi.fn().mockResolvedValue({
-            data: null,
-            error: { message: 'duplicate key value violates unique constraint' },
-          }),
-        })),
-      })),
-    }))
+    mockInsertUniqueViolationNoRecovery()
     const { result, metrics } = await attemptYstmDetailFirstReady({
       config: CONFIG,
       listSeed: VALID_LISTING,
@@ -392,7 +456,40 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
     })
     expect(result).toMatchObject({ outcome: 'fallback', reason: 'canonical_collision' })
     expect(metrics.rejectedByReason.canonical_collision).toBe(1)
+    expect(metrics.insertFailedByDbCode).toEqual({})
     expectFallbackAccounting(metrics)
+  })
+
+  it('promotes existing row after unique violation and completes ready path', async () => {
+    const { attemptYstmDetailFirstReady } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
+    mockFetchExternalPageSource.mockResolvedValue('<html></html>')
+    mockLookupSpatialCoordinates.mockResolvedValue({
+      lat: 41.81,
+      lng: -87.71,
+      coordinate_precision: 'provider_native',
+      geocode_method: 'ystm_provider_native',
+      geocode_confidence: 'high',
+      resolutionSource: 'ystm_native_html',
+    })
+    mockInsertUniqueViolationWithPromote('promoted-row-2')
+    mockPublishReady.mockResolvedValue({ ok: true, publishedSaleId: 'pub-2' })
+    const { result, metrics } = await attemptYstmDetailFirstReady({
+      config: CONFIG,
+      listSeed: VALID_LISTING,
+      platform: 'external_page_source',
+      rowPayload: {},
+      pageIndex: 0,
+    })
+    expect(result).toMatchObject({
+      outcome: 'ready',
+      ingestedSaleId: 'promoted-row-2',
+      published: true,
+    })
+    expect(metrics.succeeded).toBe(1)
+    expect(metrics.fallback).toBe(0)
+    expect(metrics.insertFailedByDbCode).toEqual({})
   })
 
   it('records insert_failed on non-duplicate insert errors', async () => {
@@ -427,6 +524,7 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
     })
     expect(result).toMatchObject({ outcome: 'fallback', reason: 'insert_failed' })
     expect(metrics.rejectedByReason.insert_failed).toBe(1)
+    expect(metrics.insertFailedByDbCode.unknown).toBe(1)
     expectFallbackAccounting(metrics)
   })
 

@@ -1,5 +1,7 @@
 import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import type { DetailFirstProofCheck } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 export type BuildIngestionDiagnosticsOptions = {
@@ -46,6 +48,12 @@ function bullet(label: string, value: string | number): string {
   return `- ${label}: ${typeof value === 'number' ? formatCount(value) : value}`
 }
 
+function proofCheckBullet(check: DetailFirstProofCheck): string {
+  const mark = check.pass ? 'PASS' : 'FAIL'
+  const req = check.required ? 'required' : 'advisory'
+  return `- [${mark}] ${check.label} (${req}): ${check.actual} (threshold: ${check.threshold})`
+}
+
 /**
  * Serialize loaded ingestion dashboard metrics as markdown for clipboard / debugging.
  */
@@ -70,6 +78,10 @@ export function buildIngestionDiagnostics(
     `Timestamp: ${timestamp}`,
     `Environment: ${environment}`,
     `Current bottleneck: ${vol.bottleneck}`,
+    bullet(
+      'detail-first metrics baseline',
+      data.detailFirstMetricsBaselineAt ?? 'not set (full 24h/7d windows)'
+    ),
     '',
     '## Funnel (24h)',
     bullet('discovered', stageCount(stages, 'discovered')),
@@ -80,13 +92,44 @@ export function buildIngestionDiagnostics(
     bullet('published', stageCount(stages, 'published')),
     bullet('publish failed', stageCount(stages, 'publish_failed')),
     '',
+    '## Phase 3B proof protocol',
+    bullet('status', data.detailFirstProof.status),
+    bullet('passed', data.detailFirstProof.passed ? 'yes' : 'no'),
+    bullet('window', data.detailFirstProof.windowLabel),
+    bullet('summary', data.detailFirstProof.summary),
+    '',
+    '### Proof checklist',
+  ]
+
+  for (const check of data.detailFirstProof.checks) {
+    lines.push(proofCheckBullet(check))
+  }
+
+  const capture = funnel.detailFirstCapture
+  lines.push(
+    '',
+    '## Phase G — crawl volume (parser vs visible capture)',
+    bullet('crawler discovered', capture.crawlerDiscovered),
+    bullet('detail-first ready', capture.detailFirstReady),
+    bullet('fresh inserted', capture.freshInserted),
+    bullet('parser success rate', formatPct(capture.parserSuccessRate)),
+    bullet('visible capture rate', formatPct(capture.visibleCaptureRate)),
+    bullet('parser − visible gap', formatPct(capture.parserToVisibleGapRate)),
+    bullet(
+      'parser SLO met, visible capture low',
+      capture.parserSloMetVisibleCaptureLow ? 'yes' : 'no'
+    ),
+    '',
     '## Phase 3B',
     bullet('attempted', df.attempted),
     bullet('ready at insert', df.succeeded),
     bullet('published same run', df.published),
     bullet('fallback to legacy', df.fallback),
     bullet('detail fetch failed', df.fetchFailed),
-    bullet('success rate', formatPct(df.providerGeocodeBypassRate)),
+    bullet(
+      'success rate',
+      `${formatPct(df.providerGeocodeBypassRate)} (target ≥${(DETAIL_FIRST_SUCCESS_RATE_TARGET * 100).toFixed(0)}%)`
+    ),
     bullet('address from detail page', formatCount(df.addressFromDetailPage)),
     bullet('address from list seed', formatCount(df.addressFromListSeed)),
     bullet('address from detail page rate', formatPct(df.addressFromDetailPageRate)),
@@ -119,7 +162,7 @@ export function buildIngestionDiagnostics(
       : []),
     '',
     '### Detail-first operational alerts',
-  ]
+  )
 
   if (df.operationalHealth.alerts.length === 0) {
     lines.push(bullet('(none)', '—'))
@@ -151,6 +194,24 @@ export function buildIngestionDiagnostics(
       lines.push(
         bullet(
           reason,
+          `${formatCount(count)} (${formatPct(rate)} of attempts)`
+        )
+      )
+    }
+  }
+
+  const insertFailedCodes = Object.entries(df.insertFailedByDbCode ?? {}).filter(
+    ([, count]) => count > 0
+  )
+  lines.push('', '### Phase C insert_failed DB codes')
+  if (insertFailedCodes.length === 0) {
+    lines.push(bullet('(none)', '—'))
+  } else {
+    for (const [code, count] of insertFailedCodes.sort((a, b) => b[1] - a[1])) {
+      const rate = df.attempted > 0 ? count / df.attempted : null
+      lines.push(
+        bullet(
+          code,
           `${formatCount(count)} (${formatPct(rate)} of attempts)`
         )
       )

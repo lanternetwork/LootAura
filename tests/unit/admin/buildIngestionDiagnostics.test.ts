@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 
 function stage(id: string, count: number) {
   return {
@@ -16,9 +17,37 @@ function stage(id: string, count: number) {
 
 describe('buildIngestionDiagnostics', () => {
   it('formats markdown with explicit zeros and header lines', () => {
+    const detailFirst = {
+      attempted: 4,
+      succeeded: 2,
+      published: 1,
+      fallback: 2,
+      fetchFailed: 1,
+      freshInsertReadyAtInsertRate: 0.13,
+      medianMsToPublished: 420,
+      providerGeocodeBypassRate: 0.5,
+      fallbackByReason: {
+        spatial_lookup_failed: 2,
+        fetch_failed: 1,
+      },
+      topFallbackReason: 'spatial_lookup_failed',
+      topFallbackReasonPct: 0.5,
+      fallbackUnclassified: 0,
+      fallbackReasonAccounted: 2,
+      addressFromDetailPage: 3,
+      addressFromListSeed: 1,
+      addressFromDetailPageRate: 0.75,
+      insertFailedByDbCode: { '23514': 1 },
+      operationalHealth: { healthy: true, alerts: [] },
+    }
     const data = {
       ok: true,
       generatedAt: '2026-05-18T12:00:00.000Z',
+      detailFirstMetricsBaselineAt: '2026-05-18T06:00:00.000Z',
+      detailFirstProof: evaluateDetailFirstProofProtocol({
+        metricsBaselineAt: '2026-05-18T06:00:00.000Z',
+        detailFirst,
+      }),
       backlog: 0,
       geocodeEligibleBacklog: 0,
       published24h: 0,
@@ -117,32 +146,26 @@ describe('buildIngestionDiagnostics', () => {
           freshRates: {} as import('@/lib/admin/ingestionMetricsTypes').IngestionFunnelWindowMetrics['freshRates'],
           skippedExpired: 5,
           freshInserted: 15,
-          detailFirst: {
-            attempted: 4,
-            succeeded: 2,
-            published: 1,
-            fallback: 2,
-            fetchFailed: 1,
-            freshInsertReadyAtInsertRate: 0.13,
-            medianMsToPublished: 420,
-            providerGeocodeBypassRate: 0.5,
-            fallbackByReason: {
-              spatial_lookup_failed: 2,
-              fetch_failed: 1,
-            },
-            topFallbackReason: 'spatial_lookup_failed',
-            topFallbackReasonPct: 0.5,
-            fallbackUnclassified: 0,
-            fallbackReasonAccounted: 2,
-            addressFromDetailPage: 3,
-            addressFromListSeed: 1,
-            addressFromDetailPageRate: 0.75,
-            operationalHealth: { healthy: true, alerts: [] },
+          detailFirst,
+          detailFirstCapture: {
+            crawlerDiscovered: 100,
+            duplicateSkipped: 10,
+            freshInserted: 15,
+            detailFirstAttempted: 4,
+            detailFirstReady: 2,
+            detailFirstPublished: 1,
+            parserSuccessRate: 0.5,
+            visibleCaptureRate: 0.15,
+            visiblePublishRate: 0.01,
+            parserToVisibleGapRate: 0.35,
+            parserSloMetVisibleCaptureLow: false,
           },
           configLeaderboards: {
             topFreshYield: [],
             topStale: [],
             topDuplicate: [],
+            topDetailFirstYield: [],
+            topParserVisibleGap: [],
           },
           bySourcePlatform: {},
           ystm: {
@@ -172,11 +195,17 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('Timestamp: 2026-05-18T13:00:00.000Z')
     expect(md).toContain('Environment: test-env')
     expect(md).toContain('Current bottleneck: none')
+    expect(md).toContain('- detail-first metrics baseline: 2026-05-18T06:00:00.000Z')
+    expect(md).toContain('## Phase G — crawl volume (parser vs visible capture)')
+    expect(md).toContain('## Phase 3B proof protocol')
+    expect(md).toContain('### Proof checklist')
     expect(md).toContain('- duplicate/skipped: 10')
     expect(md).toContain('- skipped expired: 5')
     expect(md).toContain('- fresh inserted: 15')
     expect(md).toContain('- attempted: 4')
     expect(md).toContain('- address from detail page: 3')
+    expect(md).toContain('### Phase C insert_failed DB codes')
+    expect(md).toContain('- 23514: 1 (25.0% of attempts)')
     expect(md).toContain('- operational health: healthy')
     expect(md).toContain('- fallback reasons accounted: 2/2')
     expect(md).toContain('- top fallback reason: spatial_lookup_failed (50.0% of attempts)')

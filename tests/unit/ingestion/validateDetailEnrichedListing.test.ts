@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildDetailFirstFieldProvenance } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
+import { resolveDetailFirstMergedAddressRaw } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import type { YstmDetailPageParsed } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
 import {
   detailFirstValidationTelemetry,
@@ -25,6 +26,7 @@ function detailPage(overrides: Partial<YstmDetailPageParsed> = {}): YstmDetailPa
     title: 'Garage sale',
     description: null,
     addressRaw: '4443 S St Louis Ave, Chicago, IL',
+    addressSource: 'detail_dom',
     startDate: '2026-06-01',
     endDate: '2026-06-02',
     city: 'Chicago',
@@ -41,14 +43,22 @@ function enrichedListing(detail: YstmDetailPageParsed) {
   const listing = {
     title: detail.title?.trim() ? detail.title : LIST_SEED.title,
     description: detail.description ?? LIST_SEED.description,
-    addressRaw: detail.addressRaw?.trim() ? detail.addressRaw : LIST_SEED.addressRaw,
+    addressRaw: resolveDetailFirstMergedAddressRaw(detail, LIST_SEED),
     city: detail.city?.trim() ? detail.city : LIST_SEED.city,
     state: detail.state?.trim() ? detail.state : LIST_SEED.state,
     startDate: detail.startDate ?? LIST_SEED.startDate,
     endDate: detail.endDate ?? LIST_SEED.endDate,
     sourceUrl: LIST_SEED.sourceUrl,
     imageSourceUrl: null,
-    rawPayload: { detailFirstFieldProvenance: provenance },
+    rawPayload: {
+      detailFirstFieldProvenance: provenance,
+      ...(detail.nativeCoords
+        ? {
+            ystmNativeLat: detail.nativeCoords.lat,
+            ystmNativeLng: detail.nativeCoords.lng,
+          }
+        : {}),
+    },
   }
   return { listing, provenance }
 }
@@ -67,9 +77,25 @@ describe('validateDetailEnrichedListing', () => {
     const { listing, provenance } = enrichedListing(detailPage())
     const result = validateDetailEnrichedListing(listing, provenance)
     expect(result.ok).toBe(true)
-    if (result.ok) {
+    if (result.ok && result.mode === 'address') {
       expect(result.normalizedPublish).toContain('4443 s st louis ave')
     }
+  })
+
+  it('accepts native-only detail when list seed address is suppressed', () => {
+    const { listing, provenance } = enrichedListing(
+      detailPage({
+        addressRaw: null,
+        addressSource: null,
+        nativeCoords: { lat: 41.92775, lng: -87.70562, source: 'script_const' },
+        startDate: '2026-05-21',
+        endDate: '2026-05-24',
+      })
+    )
+    expect(provenance.addressRaw).toBe('none')
+    expect(listing.addressRaw).toBeNull()
+    const result = validateDetailEnrichedListing(listing, provenance)
+    expect(result).toEqual({ ok: true, mode: 'native', city: 'Chicago', state: 'IL' })
   })
 
   it('rejects detail address even when list seed address would pass geocode-ready', () => {

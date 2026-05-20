@@ -106,9 +106,11 @@ describe('detailFirstOrchestrationFields', () => {
         msToPublishedSamples: [100, 300, 200],
         addressValidatedFromDetailPage: 3,
         addressValidatedFromListSeed: 1,
+        insertFailedByDbCode: { '23514': 2 },
       },
       10
     )
+    expect(fields.ystmDetailFirstInsertFailedByDbCode).toEqual({ '23514': 2 })
     expect(fields.freshInsertReadyAtInsertRate).toBe(0.2)
     expect(fields.medianMsToPublished).toBe(200)
     expect(fields.ystmDetailFirstAttempted).toBe(4)
@@ -171,7 +173,7 @@ describe('parseYstmDetailListingFromHtml', () => {
         startDate: 'detail_page',
       },
       ingestionDiagnostics: {
-        chosenAddressSource: 'ystm_detail_page',
+        chosenAddressSource: 'ystm_detail_dom',
         detailFirstValidated: true,
         listSeedAddressRaw: 'bad seed address',
       },
@@ -272,7 +274,7 @@ describe('attemptYstmDetailFirstReady', () => {
       expect(result.detailPageHtml).toBe(html)
       expect(result.detailEnrichedListing?.rawPayload).toMatchObject({
         detailPageParsed: true,
-        ingestionDiagnostics: { chosenAddressSource: 'ystm_detail_page' },
+        ingestionDiagnostics: { chosenAddressSource: 'ystm_detail_dom' },
       })
     }
   })
@@ -313,6 +315,50 @@ describe('attemptYstmDetailFirstReady', () => {
     expect(metrics.published).toBe(1)
     expect(mockUpsertCache).toHaveBeenCalled()
     expect(mockPublishReady).toHaveBeenCalledWith('ready-row-1')
+  })
+
+  it('inserts ready for Hidden address with native coords (native-first)', async () => {
+    const { attemptYstmDetailFirstReady } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
+    const html = readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-logan-square-hidden.html'),
+      'utf8'
+    )
+    const url =
+      'https://yardsaletreasuremap.com/US/Illinois/Chicago/Logan-Square-Moving-Sale/2441465/userlisting.html'
+    mockFetchExternalPageSource.mockResolvedValue(html)
+    mockLookupSpatialCoordinates.mockResolvedValue({
+      lat: 41.92775,
+      lng: -87.70562,
+      coordinate_precision: 'provider_native',
+      geocode_method: 'ystm_provider_native',
+      geocode_confidence: 'high',
+      resolutionSource: 'ystm_provider_native',
+    })
+    mockPublishReady.mockResolvedValue({ ok: false, error: 'Missing address line' })
+
+    const { result, metrics } = await attemptYstmDetailFirstReady({
+      config: CONFIG,
+      listSeed: {
+        ...LIST_SEED,
+        title: 'List seed title',
+        addressRaw: 'Logan Square Moving Sale',
+        sourceUrl: url,
+        startDate: '2026-05-21',
+        endDate: '2026-05-24',
+      },
+      platform: 'external_page_source',
+      rowPayload: { pageIndex: 0 },
+      pageIndex: 0,
+    })
+
+    expect(result.outcome).toBe('ready')
+    expect(metrics.succeeded).toBe(1)
+    expect(mockUpsertCache).not.toHaveBeenCalled()
+    if (result.outcome === 'ready') {
+      expect(result.published).toBe(false)
+    }
   })
 })
 

@@ -33,7 +33,7 @@ describe('extractDetailPageListingEnrichmentFromHtml', () => {
     expect(enrichment!.addressRaw).toContain('1802 Devondale Dr')
     expect(enrichment!.title).toBe('Our Biggest Yard Sale')
     expect(enrichment!.startDate).toBe('2026-05-23')
-    expect(enrichment!.chosenAddressSource).toBe('ystm_detail_page')
+    expect(enrichment!.chosenAddressSource).toBe('ystm_detail_dom')
     expect(enrichment!.nativeCoords).toMatchObject({ lat: 38.276708, lng: -85.613833 })
   })
 

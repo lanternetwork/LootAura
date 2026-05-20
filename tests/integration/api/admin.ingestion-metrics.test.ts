@@ -25,6 +25,10 @@ function hoursAgoIso(hours: number): string {
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
+  const maybeSingleResult = {
+    data: Array.isArray(result.data) ? (result.data[0] ?? null) : (result.data ?? null),
+    error: result.error ?? null,
+  }
   for (const m of [
     'select',
     'eq',
@@ -42,6 +46,7 @@ function thenableQuery(result: { data?: unknown; error?: unknown; count?: number
   ]) {
     q[m] = vi.fn(() => q)
   }
+  q.maybeSingle = vi.fn(() => Promise.resolve(maybeSingleResult))
   q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(onFulfilled, onRejected)
   return q
@@ -134,6 +139,8 @@ describe('GET /api/admin/ingestion/metrics', () => {
     expect(res.status).toBe(200)
     const json = (await res.json()) as {
       ok: boolean
+      detailFirstMetricsBaselineAt: string | null
+      detailFirstProof: { status: string; passed: boolean; checks: unknown[] }
       geocodeEligibleBacklog: number
       funnel: {
         '24h': { stages: Array<{ id: string; count: number }>; reconciliation: { crawlerReconciles: boolean } }
@@ -149,6 +156,10 @@ describe('GET /api/admin/ingestion/metrics', () => {
       oldestStuckRows: Array<Record<string, unknown>>
     }
     expect(json.ok).toBe(true)
+    expect(json.detailFirstMetricsBaselineAt).toBeNull()
+    expect(json.detailFirstProof.status).toBe('pending_baseline')
+    expect(json.detailFirstProof.passed).toBe(false)
+    expect(json.detailFirstProof.checks.length).toBeGreaterThan(0)
     expect(json.funnel['24h'].stages.length).toBeGreaterThan(0)
     expect(json.funnel['24h'].reconciliation.crawlerReconciles).toBe(true)
     expect(json.volume.fetch.crawlableConfigsTotal).toBe(10)

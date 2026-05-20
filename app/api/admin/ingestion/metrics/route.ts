@@ -44,6 +44,11 @@ import {
   buildIngestionFunnelMetrics,
   FUNNEL_WINDOW_7D,
 } from '@/lib/admin/ingestionFunnelMetricsHelpers'
+import {
+  cohortQueryIsoCutoff,
+  fetchDetailFirstMetricsBaselineAt,
+} from '@/lib/admin/ingestionMetricsBaseline'
+import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { fetchFunnelLeaderboardConfigRows } from '@/lib/ingestion/acquisition/configCrawlStats'
 
 export const dynamic = 'force-dynamic'
@@ -126,10 +131,14 @@ export async function GET(request: NextRequest) {
   const nowMs = now.getTime()
   const iso24h = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
   const iso48h = new Date(nowMs - METRICS_HOURS * 60 * 60 * 1000).toISOString()
-  const isoFunnelCohort = new Date(nowMs - FUNNEL_COHORT_HOURS * 60 * 60 * 1000).toISOString()
-  const isoFunnelOrch = isoFunnelCohort
-
   try {
+    const detailFirstMetricsBaselineAt = await fetchDetailFirstMetricsBaselineAt(admin)
+    const isoFunnelCohort = cohortQueryIsoCutoff({
+      maxLookbackHours: FUNNEL_COHORT_HOURS,
+      nowMs,
+      metricsBaselineAt: detailFirstMetricsBaselineAt,
+    })
+    const isoFunnelOrch = isoFunnelCohort
     const statusTargets = [
       'needs_geocode',
       'needs_check',
@@ -553,6 +562,7 @@ export async function GET(request: NextRequest) {
       cohortRows: funnelCohortRows,
       configRows: funnelConfigRows,
       nowMs,
+      metricsBaselineAt: detailFirstMetricsBaselineAt,
     })
 
     const durationMsByHour = mapToSortedDurationAvg(agg.durationSumByHour, agg.durationCountByHour)
@@ -694,9 +704,16 @@ export async function GET(request: NextRequest) {
         ? Math.round(fetchRollup.externalFetchDurationMsSum / fetchRollup.externalFetchDurationSampleCount)
         : null
 
+    const detailFirstProof = evaluateDetailFirstProofProtocol({
+      metricsBaselineAt: detailFirstMetricsBaselineAt,
+      detailFirst: funnel['24h'].detailFirst,
+    })
+
     const body: IngestionMetricsResponse = {
       ok: true,
       generatedAt: now.toISOString(),
+      detailFirstMetricsBaselineAt,
+      detailFirstProof,
       backlog,
       geocodeEligibleBacklog,
       published24h,

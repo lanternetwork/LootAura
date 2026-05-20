@@ -263,4 +263,80 @@ describe('ingestionFunnelMetricsHelpers', () => {
     expect(funnel['24h'].detailFirst.fallbackByReason.spatial_lookup_failed).toBe(7)
     expect(funnel['24h'].detailFirst.fallbackByReason.fallback_unclassified).toBe(107)
   })
+
+  it('excludes orchestration and cohort rows before metrics baseline', () => {
+    const beforeBaseline = '2026-05-17T08:00:00.000Z'
+    const afterBaseline = '2026-05-17T14:00:00.000Z'
+    const baselineAt = '2026-05-17T12:00:00.000Z'
+
+    const rollup = rollupExternalIngestionForWindow(
+      [
+        orchRow(beforeBaseline, {
+          status: 'completed',
+          fetched: 50,
+          inserted: 1,
+          skipped: 49,
+          ystmDetailFirstAttempted: 40,
+          ystmDetailFirstSucceeded: 0,
+        }),
+        orchRow(afterBaseline, {
+          status: 'completed',
+          fetched: 10,
+          inserted: 2,
+          skipped: 8,
+          ystmDetailFirstAttempted: 4,
+          ystmDetailFirstSucceeded: 3,
+        }),
+      ],
+      24,
+      NOW,
+      baselineAt
+    )
+
+    expect(rollup.listingsDiscovered).toBe(10)
+    expect(rollup.detailFirstAttempted).toBe(4)
+    expect(rollup.detailFirstSucceeded).toBe(3)
+
+    const cohort = aggregateCohortFunnel(
+      [
+        {
+          created_at: beforeBaseline,
+          source_platform: 'external_page_source',
+          canonical_source_url: 'https://example.com/a',
+          source_url: 'https://yardsaletreasuremap.com/US/IL/Chicago/a/userlisting.html',
+          status: 'ready',
+          address_status: null,
+          geocode_method: null,
+          lat: 41,
+          lng: -87,
+          native_coord_failure_reason: null,
+          native_coord_attempts: null,
+          failure_reasons: [],
+          published_at: null,
+          is_duplicate: false,
+        },
+        {
+          created_at: afterBaseline,
+          source_platform: 'external_page_source',
+          canonical_source_url: 'https://example.com/b',
+          source_url: 'https://yardsaletreasuremap.com/US/IL/Chicago/b/userlisting.html',
+          status: 'ready',
+          address_status: null,
+          geocode_method: null,
+          lat: 41,
+          lng: -87,
+          native_coord_failure_reason: null,
+          native_coord_attempts: null,
+          failure_reasons: [],
+          published_at: null,
+          is_duplicate: false,
+        },
+      ],
+      24,
+      NOW,
+      baselineAt
+    )
+
+    expect(cohort.inserted).toBe(1)
+  })
 })

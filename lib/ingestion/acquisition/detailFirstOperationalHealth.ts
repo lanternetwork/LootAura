@@ -34,7 +34,10 @@ export type DetailFirstOperationalHealthInput = {
 export const DETAIL_FIRST_SLO_MIN_ATTEMPTS = 20
 
 /** Target from ≥90% ingestion plan: detail-first success rate floor. */
-export const DETAIL_FIRST_SUCCESS_RATE_WARNING = 0.8
+export const DETAIL_FIRST_SUCCESS_RATE_TARGET = 0.9
+
+/** Dashboard critical alert when post-baseline success rate is below target. */
+export const DETAIL_FIRST_SUCCESS_RATE_WARNING = DETAIL_FIRST_SUCCESS_RATE_TARGET
 
 /** Detail address should dominate once the detail-native parser is live. */
 export const DETAIL_FIRST_ADDRESS_FROM_DETAIL_WARNING = 0.5
@@ -57,7 +60,7 @@ export function evaluateDetailFirstOperationalHealth(
     alerts.push({
       level: 'critical',
       code: 'detail_first_success_rate_low',
-      message: `Detail-first success rate ${(successRate * 100).toFixed(1)}% is below ${DETAIL_FIRST_SUCCESS_RATE_WARNING * 100}% (${metrics.succeeded}/${attempted} ready).`,
+      message: `Detail-first success rate ${(successRate * 100).toFixed(1)}% is below ${DETAIL_FIRST_SUCCESS_RATE_TARGET * 100}% target (${metrics.succeeded}/${attempted} ready).`,
     })
   }
 

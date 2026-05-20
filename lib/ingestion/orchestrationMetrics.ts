@@ -85,6 +85,7 @@ export type ExternalIngestionOrchestrationNote = {
   ystmDetailFirstFallback?: number
   ystmDetailFirstFetchFailed?: number
   ystmDetailFirstFallbackByReason?: Record<string, number>
+  ystmDetailFirstInsertFailedByDbCode?: Record<string, number>
   ystmDetailFirstTopFallbackReason?: string | null
   ystmDetailFirstTopFallbackReasonPct?: number | null
   freshInsertReadyAtInsertRate?: number | null

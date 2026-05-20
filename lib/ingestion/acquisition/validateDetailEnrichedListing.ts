@@ -1,5 +1,9 @@
 import type { ExternalPageSourceListing } from '@/lib/ingestion/adapters/externalPageSource'
 import type { DetailFirstFieldProvenance } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
+import {
+  readYstmNativeCoordsFromListingRawPayload,
+  validateDetailFirstNativeCoords,
+} from '@/lib/ingestion/acquisition/detailFirstNativeCoords'
 import type { YstmDetailFirstFallbackReason } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
@@ -15,10 +19,17 @@ import {
 export type DetailEnrichedValidationResult =
   | {
       ok: true
+      mode: 'address'
       city: string
       state: string
       normalizedLine: string
       normalizedPublish: string
+    }
+  | {
+      ok: true
+      mode: 'native'
+      city: string
+      state: string
     }
   | { ok: false; reason: YstmDetailFirstFallbackReason }
 
@@ -45,12 +56,39 @@ function hasValidDatetime(start: unknown, end: unknown): boolean {
   return coerceIngestedDateToYyyyMmDd(start) != null || coerceIngestedDateToYyyyMmDd(end) != null
 }
 
+function tryNativeFirstValidation(
+  listing: ExternalPageSourceListing,
+  provenance: DetailFirstFieldProvenance
+): Extract<DetailEnrichedValidationResult, { ok: true; mode: 'native' }> | null {
+  if (provenance.addressRaw !== 'none') return null
+
+  const city = listing.city?.trim() ?? ''
+  const state = listing.state?.trim() ?? ''
+  if (!city || !state) return null
+
+  const nativeCoords = readYstmNativeCoordsFromListingRawPayload(listing.rawPayload)
+  if (!nativeCoords) return null
+
+  if (
+    !validateDetailFirstNativeCoords({
+      nativeCoords,
+      city,
+      state,
+      sourceUrl: listing.sourceUrl,
+    })
+  ) {
+    return null
+  }
+
+  return { ok: true, mode: 'native', city, state }
+}
+
 /**
  * Validate the detail-enriched listing (post-fetch merge), never the list seed alone.
  */
 export function validateDetailEnrichedListing(
   listing: ExternalPageSourceListing,
-  _provenance: DetailFirstFieldProvenance
+  provenance: DetailFirstFieldProvenance
 ): DetailEnrichedValidationResult {
   if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
     return { ok: false, reason: 'expired_after_detail' }
@@ -62,6 +100,12 @@ export function validateDetailEnrichedListing(
 
   if (!hasValidDatetime(listing.startDate, listing.endDate)) {
     return { ok: false, reason: 'invalid_dates' }
+  }
+
+  // Phase D: native coords before street publish validation (Hidden/placeholder address).
+  const nativeFirst = tryNativeFirstValidation(listing, provenance)
+  if (nativeFirst) {
+    return nativeFirst
   }
 
   const city = listing.city?.trim() ?? ''
@@ -85,7 +129,7 @@ export function validateDetailEnrichedListing(
     }
   }
 
-  return { ok: true, city, state, normalizedLine, normalizedPublish }
+  return { ok: true, mode: 'address', city, state, normalizedLine, normalizedPublish }
 }
 
 function normalizeAddressForMismatchCompare(raw: string | null | undefined): string | null {
@@ -110,6 +154,7 @@ export function detailFirstValidationTelemetry(
 ): Record<string, unknown> {
   return {
     detailFirstAddressFromDetailPage: provenance.addressRaw === 'detail_page',
+    detailFirstNativeCoordsOnly: provenance.addressRaw === 'none',
     detailFirstTitleFromDetailPage: provenance.title === 'detail_page',
     detailFirstDatesFromDetailPage:
       provenance.startDate === 'detail_page' || provenance.endDate === 'detail_page',

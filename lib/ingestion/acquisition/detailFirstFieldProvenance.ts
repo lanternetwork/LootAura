@@ -1,5 +1,9 @@
 import type { ExternalPageSourceListing } from '@/lib/ingestion/adapters/externalPageSource'
 import type { YstmDetailPageParsed } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
+import {
+  shouldSuppressListSeedAddressForDetailFirst,
+  ystmDetailChosenAddressSourceKey,
+} from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
 
 export type DetailFirstFieldSource = 'detail_page' | 'list_seed'
@@ -7,7 +11,7 @@ export type DetailFirstFieldSource = 'detail_page' | 'list_seed'
 export type DetailFirstFieldProvenance = {
   title: DetailFirstFieldSource
   description: DetailFirstFieldSource
-  addressRaw: DetailFirstFieldSource
+  addressRaw: DetailFirstFieldSource | 'none'
   city: DetailFirstFieldSource
   state: DetailFirstFieldSource
   startDate: DetailFirstFieldSource | 'none'
@@ -53,7 +57,11 @@ export function buildDetailFirstFieldProvenance(
 ): DetailFirstFieldProvenance {
   const title = pickDetailOrSeed(detailPage.title, listSeed.title)
   const description = pickDetailOrSeed(detailPage.description, listSeed.description)
-  const addressRaw = pickDetailOrSeed(detailPage.addressRaw, listSeed.addressRaw)
+  const addressRaw = shouldSuppressListSeedAddressForDetailFirst(detailPage)
+    ? hasText(detailPage.addressRaw)
+      ? { value: detailPage.addressRaw, source: 'detail_page' as const }
+      : { value: null, source: 'none' as const }
+    : pickDetailOrSeed(detailPage.addressRaw, listSeed.addressRaw)
   const city = pickDetailOrSeed(detailPage.city, listSeed.city)
   const state = pickDetailOrSeed(detailPage.state, listSeed.state)
   const startDate = pickDetailOrSeedDate(detailPage.startDate, listSeed.startDate)
@@ -72,9 +80,14 @@ export function buildDetailFirstFieldProvenance(
 
 export function chosenAddressSourceForDetailFirst(
   provenance: DetailFirstFieldProvenance,
-  listSeedDiagnostics: Record<string, unknown> | undefined
+  listSeedDiagnostics: Record<string, unknown> | undefined,
+  detailPage?: Pick<YstmDetailPageParsed, 'addressSource' | 'addressRaw' | 'nativeCoords'>
 ): string {
-  if (provenance.addressRaw === 'detail_page') {
+  const granular = ystmDetailChosenAddressSourceKey(detailPage?.addressSource)
+  if (granular) {
+    return granular
+  }
+  if (provenance.addressRaw === 'detail_page' && detailPage?.addressRaw?.trim()) {
     return 'ystm_detail_page'
   }
   const seedChosen = listSeedDiagnostics?.chosenAddressSource
@@ -84,7 +97,8 @@ export function chosenAddressSourceForDetailFirst(
 export function mergeIngestionDiagnosticsForDetailFirst(
   listSeed: ExternalPageSourceListing,
   provenance: DetailFirstFieldProvenance,
-  validatedListing: ExternalPageSourceListing
+  validatedListing: ExternalPageSourceListing,
+  detailPage?: Pick<YstmDetailPageParsed, 'addressSource' | 'addressRaw' | 'nativeCoords'>
 ): Record<string, unknown> {
   const seedDiag =
     typeof listSeed.rawPayload === 'object' && listSeed.rawPayload?.ingestionDiagnostics
@@ -93,7 +107,11 @@ export function mergeIngestionDiagnosticsForDetailFirst(
 
   return {
     ...seedDiag,
-    chosenAddressSource: chosenAddressSourceForDetailFirst(provenance, seedDiag),
+    chosenAddressSource: chosenAddressSourceForDetailFirst(provenance, seedDiag, detailPage),
+    detailFirstAddressSource: detailPage?.addressSource ?? null,
+    detailFirstNativeCoordsOnly: detailPage
+      ? shouldSuppressListSeedAddressForDetailFirst(detailPage)
+      : false,
     detailFirstValidated: true,
     detailFirstFieldProvenance: provenance,
     listSeedAddressRaw: listSeed.addressRaw ?? null,

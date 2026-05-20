@@ -37,6 +37,7 @@ function detailPage(overrides: Partial<YstmDetailPageParsed> = {}): YstmDetailPa
     imageUrls: [],
     nativeCoords: null,
     cityConflict: false,
+    addressSource: 'detail_dom',
     ...overrides,
   }
 }
@@ -67,20 +68,23 @@ describe('detailFirstFieldProvenance', () => {
 
   it('uses ystm_detail_page chosenAddressSource when detail supplies address', () => {
     const provenance = buildDetailFirstFieldProvenance(detailPage(), LIST_SEED)
-    expect(chosenAddressSourceForDetailFirst(provenance, { chosenAddressSource: 'slug' })).toBe(
-      'ystm_detail_page'
+    expect(chosenAddressSourceForDetailFirst(provenance, { chosenAddressSource: 'slug' }, detailPage())).toBe(
+      'ystm_detail_dom'
     )
   })
 
   it('records detail vs seed diagnostics on the enriched listing', () => {
     const provenance = buildDetailFirstFieldProvenance(detailPage(), LIST_SEED)
     const validatedListing = { ...LIST_SEED, addressRaw: detailPage().addressRaw }
+    const page = detailPage()
     const diagnostics = mergeIngestionDiagnosticsForDetailFirst(
       LIST_SEED,
       provenance,
-      validatedListing
+      validatedListing,
+      page
     )
-    expect(diagnostics.chosenAddressSource).toBe('ystm_detail_page')
+    expect(diagnostics.chosenAddressSource).toBe('ystm_detail_dom')
+    expect(diagnostics.detailFirstAddressSource).toBe('detail_dom')
     expect(diagnostics.listSeedAddressRaw).toBe('bad slug address')
     expect(diagnostics.validatedAddressRaw).toContain('4443 S St Louis Ave')
     expect(diagnostics.detailFirstValidated).toBe(true)

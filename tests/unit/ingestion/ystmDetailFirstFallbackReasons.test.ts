@@ -56,6 +56,18 @@ describe('reconcileDetailFirstFallbackReasonCounts', () => {
     reconcileDetailFirstFallbackReasonCounts(counts, 10)
     expect(counts).toEqual({ fetch_failed: 3, fallback_unclassified: 7 })
   })
+
+  it('does not treat publish_failed as a legacy fallback when reconciling', () => {
+    const counts: Record<string, number> = {
+      spatial_lookup_failed: 1,
+      publish_failed: 3,
+    }
+    reconcileDetailFirstFallbackReasonCounts(counts, 1)
+    expect(counts.spatial_lookup_failed).toBe(1)
+    expect(counts.publish_failed).toBe(3)
+    expect(counts.fallback_unclassified).toBeUndefined()
+    expect(sumDetailFirstFallbackReasonCounts(counts)).toBe(1)
+  })
 })
 
 describe('detailFirstOrchestrationFields regression', () => {
@@ -71,6 +83,7 @@ describe('detailFirstOrchestrationFields regression', () => {
         msToPublishedSamples: [],
         addressValidatedFromDetailPage: 0,
         addressValidatedFromListSeed: 0,
+        insertFailedByDbCode: {},
       },
       10
     )

@@ -7,7 +7,9 @@ import type { ExternalIngestionOrchestrationNote } from '@/lib/ingestion/orchest
 import {
   buildConfigYieldLeaderboards,
   summarizeFreshAcquisitionRates,
+  type ConfigYieldLeaderboardEntry,
 } from '@/lib/admin/configYieldLeaderboards'
+import { buildDetailFirstCaptureMetrics, type DetailFirstCaptureMetrics } from '@/lib/ingestion/acquisition/detailFirstCaptureGap'
 import type { ConfigCrawlStatsSnapshot } from '@/lib/ingestion/acquisition/configCrawlStats'
 import {
   mergeDetailFirstFallbackReasonCounts,
@@ -18,6 +20,8 @@ import {
   evaluateDetailFirstOperationalHealth,
   type DetailFirstOperationalHealth,
 } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import { funnelIsoCutoff } from '@/lib/admin/ingestionMetricsBaseline'
+import { mergeDetailFirstInsertFailedByDbCode } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 import {
   dedupeDenominatorFromAggregate,
   dedupeSkipCountFromAggregate,
@@ -123,22 +127,14 @@ export type IngestionFunnelDetailFirstMetrics = {
   addressFromDetailPage: number
   addressFromListSeed: number
   addressFromDetailPageRate: number | null
+  insertFailedByDbCode: Record<string, number>
   operationalHealth: DetailFirstOperationalHealth
 }
 
 export type { DetailFirstOperationalAlert, DetailFirstOperationalHealth } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 
-export type ConfigYieldLeaderboardEntry = {
-  city: string
-  state: string
-  windowFetched: number
-  windowSkippedExpired: number
-  windowFreshInserted: number
-  windowDupSkips: number
-  freshInsertYield: number | null
-  expiredDiscoveryRatio: number | null
-  skipRatio: number | null
-}
+export type { ConfigYieldLeaderboardEntry } from '@/lib/admin/configYieldLeaderboards'
+export type { DetailFirstCaptureMetrics } from '@/lib/ingestion/acquisition/detailFirstCaptureGap'
 
 export type IngestionFunnelWindowMetrics = {
   windowHours: number
@@ -151,10 +147,13 @@ export type IngestionFunnelWindowMetrics = {
   skippedExpired: number
   freshInserted: number
   detailFirst: IngestionFunnelDetailFirstMetrics
+  detailFirstCapture: DetailFirstCaptureMetrics
   configLeaderboards: {
     topFreshYield: ConfigYieldLeaderboardEntry[]
     topStale: ConfigYieldLeaderboardEntry[]
     topDuplicate: ConfigYieldLeaderboardEntry[]
+    topDetailFirstYield: ConfigYieldLeaderboardEntry[]
+    topParserVisibleGap: ConfigYieldLeaderboardEntry[]
   }
   bySourcePlatform: Record<string, IngestionFunnelPlatformBreakdown>
   ystm: IngestionFunnelPlatformBreakdown
@@ -204,6 +203,7 @@ export type ExternalIngestionRollup = {
   detailFirstFallbackByReason: Record<string, number>
   detailFirstAddressFromDetailPage: number
   detailFirstAddressFromListSeed: number
+  detailFirstInsertFailedByDbCode: Record<string, number>
 }
 
 function recomputeDuplicateHitsTotal(target: IngestionFunnelDuplicateHits): void {
@@ -356,9 +356,10 @@ export function accumulateClassifiedDuplicateHits(
 export function rollupExternalIngestionForWindow(
   rows: OrchestrationRunRow[],
   windowHours: number,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  metricsBaselineAt: string | null = null
 ): ExternalIngestionRollup {
-  const isoCutoff = new Date(nowMs - windowHours * 60 * 60 * 1000).toISOString()
+  const isoCutoff = funnelIsoCutoff({ windowHours, nowMs, metricsBaselineAt })
   const discoveredByHour = new Map<string, number>()
   const insertedByHour = new Map<string, number>()
   const skippedByHour = new Map<string, number>()
@@ -385,6 +386,7 @@ export function rollupExternalIngestionForWindow(
     detailFirstFallbackByReason: {},
     detailFirstAddressFromDetailPage: 0,
     detailFirstAddressFromListSeed: 0,
+    detailFirstInsertFailedByDbCode: {},
   }
 
   for (const row of rows) {
@@ -430,6 +432,10 @@ export function rollupExternalIngestionForWindow(
     )
     rollup.detailFirstAddressFromDetailPage += num(ext.detailFirstAddressFromDetailPage)
     rollup.detailFirstAddressFromListSeed += num(ext.detailFirstAddressFromListSeed)
+    mergeDetailFirstInsertFailedByDbCode(
+      rollup.detailFirstInsertFailedByDbCode,
+      ext.ystmDetailFirstInsertFailedByDbCode
+    )
 
     const k = hourFloorUtc(row.created_at)
     discoveredByHour.set(k, (discoveredByHour.get(k) ?? 0) + fetched)
@@ -479,9 +485,10 @@ export type CohortFunnelAggregate = {
 export function aggregateCohortFunnel(
   rows: IngestedSaleFunnelRow[],
   windowHours: number,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  metricsBaselineAt: string | null = null
 ): CohortFunnelAggregate {
-  const isoCutoff = new Date(nowMs - windowHours * 60 * 60 * 1000).toISOString()
+  const isoCutoff = funnelIsoCutoff({ windowHours, nowMs, metricsBaselineAt })
   const partition: Record<CohortPartition, number> = {
     published: 0,
     publish_failed: 0,
@@ -756,11 +763,21 @@ export function buildIngestionFunnelWindowMetrics(params: {
             (externalRollup.detailFirstAddressFromDetailPage / detailFirstAttempted) * 10000
           ) / 10000
         : null,
+    insertFailedByDbCode: { ...externalRollup.detailFirstInsertFailedByDbCode },
   }
   const detailFirst: IngestionFunnelDetailFirstMetrics = {
     ...detailFirstMetricsInput,
     operationalHealth: evaluateDetailFirstOperationalHealth(detailFirstMetricsInput),
   }
+
+  const detailFirstCapture = buildDetailFirstCaptureMetrics({
+    crawlerDiscovered: discovered,
+    duplicateSkipped,
+    freshInserted,
+    detailFirstAttempted,
+    detailFirstReady: detailFirstSucceeded,
+    detailFirstPublished,
+  })
 
   return {
     windowHours,
@@ -773,6 +790,7 @@ export function buildIngestionFunnelWindowMetrics(params: {
     skippedExpired,
     freshInserted,
     detailFirst,
+    detailFirstCapture,
     configLeaderboards: buildConfigYieldLeaderboards(configRows, nowMs),
     bySourcePlatform: cohort.bySourcePlatform,
     ystm: cohort.ystm,
@@ -795,13 +813,20 @@ export function buildIngestionFunnelMetrics(params: {
   cohortRows: IngestedSaleFunnelRow[]
   configRows?: ConfigCrawlStatsSnapshot[]
   nowMs?: number
+  metricsBaselineAt?: string | null
 }): { '24h': IngestionFunnelWindowMetrics; '7d': IngestionFunnelWindowMetrics } {
   const nowMs = params.nowMs ?? Date.now()
+  const metricsBaselineAt = params.metricsBaselineAt ?? null
   const build = (windowHours: number) =>
     buildIngestionFunnelWindowMetrics({
       windowHours,
-      externalRollup: rollupExternalIngestionForWindow(params.orchestrationRows, windowHours, nowMs),
-      cohort: aggregateCohortFunnel(params.cohortRows, windowHours, nowMs),
+      externalRollup: rollupExternalIngestionForWindow(
+        params.orchestrationRows,
+        windowHours,
+        nowMs,
+        metricsBaselineAt
+      ),
+      cohort: aggregateCohortFunnel(params.cohortRows, windowHours, nowMs, metricsBaselineAt),
       configRows: params.configRows,
       nowMs,
     })

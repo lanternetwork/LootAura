@@ -18,6 +18,10 @@ export type YstmDetailFirstFallbackReason =
   | 'canonical_collision'
   | 'publish_failed'
 
+/** Counted on metrics but not a legacy fallback (excluded from fallback reconciliation). */
+export const YSTM_DETAIL_FIRST_NON_FALLBACK_REJECTED_REASONS: ReadonlySet<YstmDetailFirstFallbackReason> =
+  new Set(['publish_failed'])
+
 export const YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER: YstmDetailFirstFallbackReason[] = [
   'fallback_unclassified',
   'spatial_lookup_failed',
@@ -55,13 +59,24 @@ export function mergeDetailFirstFallbackReasonCounts(
   }
 }
 
+export function isDetailFirstFallbackRejectedReason(
+  reason: string
+): reason is YstmDetailFirstFallbackReason {
+  return (
+    YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER.includes(reason as YstmDetailFirstFallbackReason) &&
+    !YSTM_DETAIL_FIRST_NON_FALLBACK_REJECTED_REASONS.has(reason as YstmDetailFirstFallbackReason)
+  )
+}
+
 export function sumDetailFirstFallbackReasonCounts(
   counts: DetailFirstFallbackReasonCounts | Record<string, number> | undefined
 ): number {
   if (!counts) return 0
   let total = 0
-  for (const count of Object.values(counts)) {
-    if (count && count > 0) total += count
+  for (const [reason, count] of Object.entries(counts)) {
+    if (!count || count <= 0) continue
+    if (!isDetailFirstFallbackRejectedReason(reason)) continue
+    total += count
   }
   return total
 }

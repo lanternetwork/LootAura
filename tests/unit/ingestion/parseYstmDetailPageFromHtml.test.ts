@@ -74,13 +74,31 @@ describe('parseYstmDetailPageFromHtml', () => {
     })
   })
 
-  it('returns null when detail page has no title or address', () => {
+  it('returns null when detail page has no title, address, or native coords', () => {
     const parsed = parseYstmDetailPageFromHtml({
       html: '<html><body><div class="listing"></div></body></html>',
-      sourceUrl: CHICAGO_URL,
+      sourceUrl:
+        'https://yardsaletreasuremap.com/US/Illinois/Chicago/Moving-Sale/999/userlisting.html',
       configCity: 'Chicago',
       configState: 'IL',
     })
     expect(parsed).toBeNull()
+  })
+
+  it('rejects Hidden #address and still parses title with native coords', () => {
+    const parsed = parseYstmDetailPageFromHtml({
+      html: readFileSync(
+        join(process.cwd(), 'tests/fixtures/ystm/detail-edgebrook-hidden.html'),
+        'utf8'
+      ),
+      sourceUrl:
+        'https://yardsaletreasuremap.com/US/Illinois/Chicago/Edgebrook/2441446/userlisting.html',
+      configCity: 'Chicago',
+      configState: 'IL',
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.addressRaw).toBeNull()
+    expect(parsed!.addressSource).toBeNull()
+    expect(parsed!.nativeCoords).toMatchObject({ lat: 41.99537, lng: -87.75367 })
   })
 })

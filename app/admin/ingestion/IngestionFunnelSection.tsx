@@ -3,10 +3,13 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 import { ResponsiveContainer, LineChart, Line, Tooltip } from 'recharts'
 import type {
+  DetailFirstProofEvaluation,
   IngestionFunnelMetrics,
   IngestionFunnelStage,
   IngestionFunnelWindowMetrics,
 } from '@/lib/admin/ingestionMetricsTypes'
+import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import type { DetailFirstProofStatus } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
 type Leaderboards = IngestionFunnelWindowMetrics['configLeaderboards']
@@ -26,6 +29,72 @@ const LAYER_COLOR: Record<string, string> = {
 function pct(v: number | null): string {
   if (v == null) return '—'
   return `${(v * 100).toFixed(1)}%`
+}
+
+const PROOF_STATUS_LABEL: Record<DetailFirstProofStatus, string> = {
+  pending_baseline: 'Pending baseline',
+  collecting: 'Collecting volume',
+  pass: 'Proof passed',
+  fail: 'Proof failed',
+}
+
+const PROOF_STATUS_STYLE: Record<DetailFirstProofStatus, string> = {
+  pending_baseline: 'border-slate-300 bg-slate-50 text-slate-900',
+  collecting: 'border-sky-300 bg-sky-50 text-sky-950',
+  pass: 'border-emerald-400 bg-emerald-50 text-emerald-950',
+  fail: 'border-red-400 bg-red-50 text-red-950',
+}
+
+function DetailFirstProofPanel({ proof }: { proof: DetailFirstProofEvaluation }) {
+  return (
+    <div
+      className={`rounded-md border p-3 text-sm ${PROOF_STATUS_STYLE[proof.status]}`}
+      role="region"
+      aria-label="Phase 3B post-deploy proof protocol"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold">Phase 3B proof protocol (post-deploy)</p>
+        <span className="rounded-full border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
+          {PROOF_STATUS_LABEL[proof.status]}
+        </span>
+      </div>
+      <p className="mt-2 text-xs opacity-90">{proof.summary}</p>
+      <p className="mt-1 text-xs opacity-80">Window: {proof.windowLabel}</p>
+      <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs">
+        <li>Deploy migrations 192–194 and this branch.</li>
+        <li>
+          Reset ingestion metrics window once (admin button above) after deploy.
+        </li>
+        <li>Run ingestion crawls until the sample-size check passes.</li>
+        <li>Confirm all required checklist rows pass on post-baseline 24h rollups.</li>
+      </ol>
+      <table className="mt-3 w-full text-left text-xs">
+        <thead>
+          <tr className="border-b border-current/30">
+            <th className="py-1 pr-2 font-medium">Check</th>
+            <th className="py-1 pr-2 font-medium">Actual</th>
+            <th className="py-1 pr-2 font-medium">Threshold</th>
+            <th className="py-1 font-medium">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {proof.checks.map((check) => (
+            <tr key={check.id} className="border-b border-current/15">
+              <td className="py-1 pr-2">
+                {check.label}
+                {!check.required && (
+                  <span className="ml-1 text-[10px] uppercase opacity-70">advisory</span>
+                )}
+              </td>
+              <td className="py-1 pr-2 font-mono tabular-nums">{check.actual}</td>
+              <td className="py-1 pr-2 opacity-80">{check.threshold}</td>
+              <td className="py-1 font-semibold">{check.pass ? 'Pass' : 'Fail'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 function formatHour(iso: string) {
@@ -109,12 +178,80 @@ function FunnelBar({ stage, maxCount }: { stage: IngestionFunnelStage; maxCount:
   )
 }
 
+function DetailFirstCapturePanel({
+  capture,
+}: {
+  capture: IngestionFunnelWindowMetrics['detailFirstCapture']
+}) {
+  return (
+    <div
+      className="rounded-md border border-indigo-200 bg-indigo-50/80 p-3 text-sm text-indigo-950"
+      role="region"
+      aria-label="Phase G parser vs visible capture"
+    >
+      <p className="font-semibold">Phase G — crawl volume (parser SLO vs visible capture)</p>
+      <p className="mt-1 text-xs text-indigo-900">
+        High discovery with low inserts usually means duplicate saturation, not parser failure.
+      </p>
+      {capture.parserSloMetVisibleCaptureLow && (
+        <p className="mt-2 rounded border border-amber-400 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-950">
+          Parser SLO met but visible capture under 1% — tune saturation / configs with parser-visible gap.
+        </p>
+      )}
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+        <div>
+          <dt className="text-xs text-indigo-800">Crawler discovered</dt>
+          <dd className="font-medium tabular-nums">{capture.crawlerDiscovered.toLocaleString()}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Detail-first ready</dt>
+          <dd className="font-medium tabular-nums">{capture.detailFirstReady.toLocaleString()}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Fresh inserted</dt>
+          <dd className="font-medium tabular-nums">{capture.freshInserted.toLocaleString()}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Parser success rate</dt>
+          <dd className="font-medium tabular-nums">{pct(capture.parserSuccessRate)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Visible capture rate</dt>
+          <dd className="font-medium tabular-nums">{pct(capture.visibleCaptureRate)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Parser − visible gap</dt>
+          <dd className="font-medium tabular-nums">{pct(capture.parserToVisibleGapRate)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Duplicate skipped</dt>
+          <dd className="font-medium tabular-nums">{capture.duplicateSkipped.toLocaleString()}</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
+
 function ConfigLeaderboardTables({ leaderboards }: { leaderboards: Leaderboards }) {
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <LeaderboardTable title="Top fresh-yield configs" rows={leaderboards.topFreshYield} valueKey="freshInsertYield" />
-      <LeaderboardTable title="Top stale configs (expired discovery)" rows={leaderboards.topStale} valueKey="expiredDiscoveryRatio" />
-      <LeaderboardTable title="Top duplicate configs" rows={leaderboards.topDuplicate} valueKey="windowDupSkips" />
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <LeaderboardTable title="Top fresh-yield configs" rows={leaderboards.topFreshYield} valueKey="freshInsertYield" />
+        <LeaderboardTable title="Top stale configs (expired discovery)" rows={leaderboards.topStale} valueKey="expiredDiscoveryRatio" />
+        <LeaderboardTable title="Top duplicate configs" rows={leaderboards.topDuplicate} valueKey="windowDupSkips" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <LeaderboardTable
+          title="Top detail-first yield (parser SLO by config)"
+          rows={leaderboards.topDetailFirstYield}
+          valueKey="detailFirstReadyRate"
+        />
+        <LeaderboardTable
+          title="Parser high / visible low (saturation gap)"
+          rows={leaderboards.topParserVisibleGap}
+          valueKey="parserToVisibleGap"
+        />
+      </div>
     </div>
   )
 }
@@ -126,7 +263,12 @@ function LeaderboardTable({
 }: {
   title: string
   rows: Leaderboards['topFreshYield']
-  valueKey: 'freshInsertYield' | 'expiredDiscoveryRatio' | 'windowDupSkips'
+  valueKey:
+    | 'freshInsertYield'
+    | 'expiredDiscoveryRatio'
+    | 'windowDupSkips'
+    | 'detailFirstReadyRate'
+    | 'parserToVisibleGap'
 }) {
   return (
     <div className="rounded-md border border-gray-200 bg-white p-3">
@@ -150,13 +292,19 @@ function LeaderboardTable({
                 </td>
                 <td className="py-1.5 pr-2 text-right tabular-nums">{row.windowFetched}</td>
                 <td className="py-1.5 text-right tabular-nums">
-                  {valueKey === 'windowDupSkips'
-                    ? row.windowDupSkips
-                    : pct(
-                        valueKey === 'freshInsertYield'
-                          ? row.freshInsertYield
-                          : row.expiredDiscoveryRatio
-                      )}
+                  {valueKey === 'windowDupSkips' ? (
+                    row.windowDupSkips
+                  ) : (
+                    pct(
+                      valueKey === 'freshInsertYield'
+                        ? row.freshInsertYield
+                        : valueKey === 'expiredDiscoveryRatio'
+                          ? row.expiredDiscoveryRatio
+                          : valueKey === 'detailFirstReadyRate'
+                            ? row.detailFirstReadyRate
+                            : row.parserToVisibleGap
+                    )
+                  )}
                 </td>
               </tr>
             ))}
@@ -167,7 +315,15 @@ function LeaderboardTable({
   )
 }
 
-function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics: IngestionFunnelWindowMetrics }) {
+function WindowPanel({
+  windowKey,
+  metrics,
+  detailFirstProof,
+}: {
+  windowKey: '24h' | '7d'
+  metrics: IngestionFunnelWindowMetrics
+  detailFirstProof?: DetailFirstProofEvaluation
+}) {
   const maxCount = Math.max(...metrics.stages.map((s) => s.count), 1)
   const rec = metrics.reconciliation
 
@@ -233,7 +389,15 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
         </div>
       </div>
 
+      {windowKey === '24h' ? (
+        <DetailFirstCapturePanel capture={metrics.detailFirstCapture} />
+      ) : null}
+
       <ConfigLeaderboardTables leaderboards={metrics.configLeaderboards} />
+
+      {windowKey === '24h' && detailFirstProof ? (
+        <DetailFirstProofPanel proof={detailFirstProof} />
+      ) : null}
 
       <div className="rounded-md border border-emerald-200 bg-emerald-50/70 p-3 text-sm">
         <p className="font-semibold text-emerald-950">YSTM detail-first READY (Phase 3B)</p>
@@ -281,7 +445,12 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
           </div>
           <div>
             <dt className="text-xs text-emerald-800">Detail-first success rate</dt>
-            <dd className="font-medium tabular-nums">{pct(metrics.detailFirst.providerGeocodeBypassRate)}</dd>
+            <dd className="font-medium tabular-nums">
+              {pct(metrics.detailFirst.providerGeocodeBypassRate)}
+              <span className="ml-1 font-normal text-emerald-800">
+                (target ≥{Math.round(DETAIL_FIRST_SUCCESS_RATE_TARGET * 100)}%)
+              </span>
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-emerald-800">Median ms → published</dt>
@@ -332,6 +501,32 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
             fallback_unclassified: {metrics.detailFirst.fallbackUnclassified.toLocaleString()} — detail-first
             fell back without a recorded reason (legacy crawl or missing code path)
           </p>
+        )}
+        {Object.values(metrics.detailFirst.insertFailedByDbCode ?? {}).some((n) => n > 0) && (
+          <div className="mt-3" role="region" aria-label="insert_failed DB codes">
+            <p className="text-xs font-medium text-emerald-900">insert_failed DB codes (Phase C)</p>
+            <dl className="mt-1 grid gap-1 text-xs sm:grid-cols-2">
+              {Object.entries(metrics.detailFirst.insertFailedByDbCode)
+                .filter(([, count]) => count > 0)
+                .sort((a, b) => b[1] - a[1])
+                .map(([code, count]) => (
+                  <div
+                    key={code}
+                    className="flex justify-between gap-2 rounded bg-emerald-50/80 px-2 py-1"
+                  >
+                    <dt className="font-mono text-emerald-900">{code}</dt>
+                    <dd className="tabular-nums font-medium">
+                      {count.toLocaleString()}
+                      {metrics.detailFirst.attempted > 0 && (
+                        <span className="ml-1 font-normal text-emerald-800">
+                          ({pct(count / metrics.detailFirst.attempted)})
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
         )}
         {metrics.detailFirst.attempted > 0 && (
           <div className="mt-3 overflow-x-auto">
@@ -465,7 +660,13 @@ function WindowPanel({ windowKey, metrics }: { windowKey: '24h' | '7d'; metrics:
   )
 }
 
-export default function IngestionFunnelSection({ funnel }: { funnel: IngestionFunnelMetrics }) {
+export default function IngestionFunnelSection({
+  funnel,
+  detailFirstProof,
+}: {
+  funnel: IngestionFunnelMetrics
+  detailFirstProof: DetailFirstProofEvaluation
+}) {
   const [windowKey, setWindowKey] = useState<'24h' | '7d'>('24h')
   const metrics = funnel[windowKey]
 
@@ -522,7 +723,11 @@ export default function IngestionFunnelSection({ funnel }: { funnel: IngestionFu
         </div>
       </div>
 
-      <WindowPanel windowKey={windowKey} metrics={metrics} />
+      <WindowPanel
+        windowKey={windowKey}
+        metrics={metrics}
+        detailFirstProof={detailFirstProof}
+      />
     </section>
   )
 }

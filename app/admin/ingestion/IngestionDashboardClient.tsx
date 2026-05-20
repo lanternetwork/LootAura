@@ -41,6 +41,7 @@ export default function IngestionDashboardClient() {
   const [loading, setLoading] = useState(true)
   const [snapshots, setSnapshots] = useState<SnapshotPoint[]>([])
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [baselineState, setBaselineState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   const load = useCallback(async () => {
     try {
@@ -143,6 +144,28 @@ export default function IngestionDashboardClient() {
       count: row.count,
     })) ?? []
 
+  const resetMetricsBaseline = useCallback(async () => {
+    setBaselineState('loading')
+    try {
+      const res = await fetch('/api/admin/ingestion/metrics/baseline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      const json = (await res.json()) as { ok?: boolean; message?: string }
+      if (!res.ok || !json.ok) {
+        throw new Error(json.message || `HTTP ${res.status}`)
+      }
+      setBaselineState('done')
+      await load()
+      window.setTimeout(() => setBaselineState('idle'), 2000)
+    } catch {
+      setBaselineState('error')
+      window.setTimeout(() => setBaselineState('idle'), 2000)
+    }
+  }, [load])
+
   const copyDiagnostics = useCallback(async () => {
     if (!data) return
     const environment =
@@ -174,6 +197,21 @@ export default function IngestionDashboardClient() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void resetMetricsBaseline()}
+              disabled={!data || baselineState === 'loading'}
+              className="rounded-md border border-emerald-400 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Exclude pre-baseline funnel noise so Phase 3B success rate reflects post-deploy code only"
+            >
+              {baselineState === 'loading'
+                ? 'Resetting…'
+                : baselineState === 'done'
+                  ? 'Baseline reset'
+                  : baselineState === 'error'
+                    ? 'Reset failed'
+                    : 'Reset ingestion metrics window'}
+            </button>
             <button
               type="button"
               onClick={() => void copyDiagnostics()}
@@ -239,7 +277,22 @@ export default function IngestionDashboardClient() {
               </div>
             )}
 
-            {data.funnel && <IngestionFunnelSection funnel={data.funnel} />}
+            {data.detailFirstMetricsBaselineAt && (
+              <p className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+                Funnel metrics window starts{' '}
+                <time dateTime={data.detailFirstMetricsBaselineAt}>
+                  {new Date(data.detailFirstMetricsBaselineAt).toLocaleString()}
+                </time>
+                . Pre-baseline detail-first attempts are excluded from Phase 3B rollups.
+              </p>
+            )}
+
+            {data.funnel && data.detailFirstProof && (
+              <IngestionFunnelSection
+                funnel={data.funnel}
+                detailFirstProof={data.detailFirstProof}
+              />
+            )}
 
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
               <MetricCard

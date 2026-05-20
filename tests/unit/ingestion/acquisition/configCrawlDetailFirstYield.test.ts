@@ -37,4 +37,20 @@ describe('config crawl detail-first yield (Phase 4)', () => {
     const weight = computeConfigCrawlScheduleWeight(stats, nowMs)
     expect(weight).toBeLessThanOrEqual(25)
   })
+
+  it('keeps moderate weight when saturated but detail-first proven at 90%', () => {
+    const stats = {
+      city: 'Louisville',
+      state: 'KY',
+      source_crawl_last_at: '2026-05-17T10:00:00.000Z',
+      source_crawl_window_fetched: 200,
+      source_crawl_window_skipped: 190,
+      source_crawl_window_fresh_inserted: 1,
+      source_crawl_window_detail_first_attempted: 50,
+      source_crawl_window_detail_first_succeeded: 46,
+    }
+    const weight = computeConfigCrawlScheduleWeight(stats, nowMs)
+    expect(weight).toBe(42)
+  })
 })
+

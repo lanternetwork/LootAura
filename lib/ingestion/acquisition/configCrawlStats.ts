@@ -1,6 +1,7 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import type { ExternalDuplicateSkipCounts } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
+import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 
 /** Rolling window for saturation / yield scoring. */
 export const CRAWL_STATS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
@@ -240,6 +241,13 @@ export function computeConfigCrawlScheduleWeight(stats: ConfigCrawlStatsSnapshot
     return 60
   }
   if (isConfigCrawlSaturated(stats, nowMs)) {
+    const provenDetailFirstRate = windowDetailFirstReadyRate(stats)
+    if (
+      provenDetailFirstRate != null &&
+      provenDetailFirstRate >= DETAIL_FIRST_SUCCESS_RATE_TARGET
+    ) {
+      return 42
+    }
     return 12
   }
   const ratio = windowSkipRatio(stats)

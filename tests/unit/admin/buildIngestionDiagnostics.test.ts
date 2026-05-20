@@ -147,10 +147,25 @@ describe('buildIngestionDiagnostics', () => {
           skippedExpired: 5,
           freshInserted: 15,
           detailFirst,
+          detailFirstCapture: {
+            crawlerDiscovered: 100,
+            duplicateSkipped: 10,
+            freshInserted: 15,
+            detailFirstAttempted: 4,
+            detailFirstReady: 2,
+            detailFirstPublished: 1,
+            parserSuccessRate: 0.5,
+            visibleCaptureRate: 0.15,
+            visiblePublishRate: 0.01,
+            parserToVisibleGapRate: 0.35,
+            parserSloMetVisibleCaptureLow: false,
+          },
           configLeaderboards: {
             topFreshYield: [],
             topStale: [],
             topDuplicate: [],
+            topDetailFirstYield: [],
+            topParserVisibleGap: [],
           },
           bySourcePlatform: {},
           ystm: {
@@ -181,6 +196,7 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('Environment: test-env')
     expect(md).toContain('Current bottleneck: none')
     expect(md).toContain('- detail-first metrics baseline: 2026-05-18T06:00:00.000Z')
+    expect(md).toContain('## Phase G — crawl volume (parser vs visible capture)')
     expect(md).toContain('## Phase 3B proof protocol')
     expect(md).toContain('### Proof checklist')
     expect(md).toContain('- duplicate/skipped: 10')

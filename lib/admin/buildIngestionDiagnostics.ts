@@ -105,7 +105,20 @@ export function buildIngestionDiagnostics(
     lines.push(proofCheckBullet(check))
   }
 
+  const capture = funnel.detailFirstCapture
   lines.push(
+    '',
+    '## Phase G — crawl volume (parser vs visible capture)',
+    bullet('crawler discovered', capture.crawlerDiscovered),
+    bullet('detail-first ready', capture.detailFirstReady),
+    bullet('fresh inserted', capture.freshInserted),
+    bullet('parser success rate', formatPct(capture.parserSuccessRate)),
+    bullet('visible capture rate', formatPct(capture.visibleCaptureRate)),
+    bullet('parser − visible gap', formatPct(capture.parserToVisibleGapRate)),
+    bullet(
+      'parser SLO met, visible capture low',
+      capture.parserSloMetVisibleCaptureLow ? 'yes' : 'no'
+    ),
     '',
     '## Phase 3B',
     bullet('attempted', df.attempted),

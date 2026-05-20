@@ -178,12 +178,80 @@ function FunnelBar({ stage, maxCount }: { stage: IngestionFunnelStage; maxCount:
   )
 }
 
+function DetailFirstCapturePanel({
+  capture,
+}: {
+  capture: IngestionFunnelWindowMetrics['detailFirstCapture']
+}) {
+  return (
+    <div
+      className="rounded-md border border-indigo-200 bg-indigo-50/80 p-3 text-sm text-indigo-950"
+      role="region"
+      aria-label="Phase G parser vs visible capture"
+    >
+      <p className="font-semibold">Phase G — crawl volume (parser SLO vs visible capture)</p>
+      <p className="mt-1 text-xs text-indigo-900">
+        High discovery with low inserts usually means duplicate saturation, not parser failure.
+      </p>
+      {capture.parserSloMetVisibleCaptureLow && (
+        <p className="mt-2 rounded border border-amber-400 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-950">
+          Parser SLO met but visible capture under 1% — tune saturation / configs with parser-visible gap.
+        </p>
+      )}
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+        <div>
+          <dt className="text-xs text-indigo-800">Crawler discovered</dt>
+          <dd className="font-medium tabular-nums">{capture.crawlerDiscovered.toLocaleString()}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Detail-first ready</dt>
+          <dd className="font-medium tabular-nums">{capture.detailFirstReady.toLocaleString()}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Fresh inserted</dt>
+          <dd className="font-medium tabular-nums">{capture.freshInserted.toLocaleString()}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Parser success rate</dt>
+          <dd className="font-medium tabular-nums">{pct(capture.parserSuccessRate)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Visible capture rate</dt>
+          <dd className="font-medium tabular-nums">{pct(capture.visibleCaptureRate)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Parser − visible gap</dt>
+          <dd className="font-medium tabular-nums">{pct(capture.parserToVisibleGapRate)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-indigo-800">Duplicate skipped</dt>
+          <dd className="font-medium tabular-nums">{capture.duplicateSkipped.toLocaleString()}</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
+
 function ConfigLeaderboardTables({ leaderboards }: { leaderboards: Leaderboards }) {
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <LeaderboardTable title="Top fresh-yield configs" rows={leaderboards.topFreshYield} valueKey="freshInsertYield" />
-      <LeaderboardTable title="Top stale configs (expired discovery)" rows={leaderboards.topStale} valueKey="expiredDiscoveryRatio" />
-      <LeaderboardTable title="Top duplicate configs" rows={leaderboards.topDuplicate} valueKey="windowDupSkips" />
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <LeaderboardTable title="Top fresh-yield configs" rows={leaderboards.topFreshYield} valueKey="freshInsertYield" />
+        <LeaderboardTable title="Top stale configs (expired discovery)" rows={leaderboards.topStale} valueKey="expiredDiscoveryRatio" />
+        <LeaderboardTable title="Top duplicate configs" rows={leaderboards.topDuplicate} valueKey="windowDupSkips" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <LeaderboardTable
+          title="Top detail-first yield (parser SLO by config)"
+          rows={leaderboards.topDetailFirstYield}
+          valueKey="detailFirstReadyRate"
+        />
+        <LeaderboardTable
+          title="Parser high / visible low (saturation gap)"
+          rows={leaderboards.topParserVisibleGap}
+          valueKey="parserToVisibleGap"
+        />
+      </div>
     </div>
   )
 }
@@ -195,7 +263,12 @@ function LeaderboardTable({
 }: {
   title: string
   rows: Leaderboards['topFreshYield']
-  valueKey: 'freshInsertYield' | 'expiredDiscoveryRatio' | 'windowDupSkips'
+  valueKey:
+    | 'freshInsertYield'
+    | 'expiredDiscoveryRatio'
+    | 'windowDupSkips'
+    | 'detailFirstReadyRate'
+    | 'parserToVisibleGap'
 }) {
   return (
     <div className="rounded-md border border-gray-200 bg-white p-3">
@@ -219,13 +292,19 @@ function LeaderboardTable({
                 </td>
                 <td className="py-1.5 pr-2 text-right tabular-nums">{row.windowFetched}</td>
                 <td className="py-1.5 text-right tabular-nums">
-                  {valueKey === 'windowDupSkips'
-                    ? row.windowDupSkips
-                    : pct(
-                        valueKey === 'freshInsertYield'
-                          ? row.freshInsertYield
-                          : row.expiredDiscoveryRatio
-                      )}
+                  {valueKey === 'windowDupSkips' ? (
+                    row.windowDupSkips
+                  ) : (
+                    pct(
+                      valueKey === 'freshInsertYield'
+                        ? row.freshInsertYield
+                        : valueKey === 'expiredDiscoveryRatio'
+                          ? row.expiredDiscoveryRatio
+                          : valueKey === 'detailFirstReadyRate'
+                            ? row.detailFirstReadyRate
+                            : row.parserToVisibleGap
+                    )
+                  )}
                 </td>
               </tr>
             ))}
@@ -309,6 +388,10 @@ function WindowPanel({
           <p className="mt-1 text-xs text-stone-600">Fresh inserted: {metrics.freshInserted.toLocaleString()}</p>
         </div>
       </div>
+
+      {windowKey === '24h' ? (
+        <DetailFirstCapturePanel capture={metrics.detailFirstCapture} />
+      ) : null}
 
       <ConfigLeaderboardTables leaderboards={metrics.configLeaderboards} />
 

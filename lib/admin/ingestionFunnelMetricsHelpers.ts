@@ -7,7 +7,9 @@ import type { ExternalIngestionOrchestrationNote } from '@/lib/ingestion/orchest
 import {
   buildConfigYieldLeaderboards,
   summarizeFreshAcquisitionRates,
+  type ConfigYieldLeaderboardEntry,
 } from '@/lib/admin/configYieldLeaderboards'
+import { buildDetailFirstCaptureMetrics, type DetailFirstCaptureMetrics } from '@/lib/ingestion/acquisition/detailFirstCaptureGap'
 import type { ConfigCrawlStatsSnapshot } from '@/lib/ingestion/acquisition/configCrawlStats'
 import {
   mergeDetailFirstFallbackReasonCounts,
@@ -131,17 +133,8 @@ export type IngestionFunnelDetailFirstMetrics = {
 
 export type { DetailFirstOperationalAlert, DetailFirstOperationalHealth } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 
-export type ConfigYieldLeaderboardEntry = {
-  city: string
-  state: string
-  windowFetched: number
-  windowSkippedExpired: number
-  windowFreshInserted: number
-  windowDupSkips: number
-  freshInsertYield: number | null
-  expiredDiscoveryRatio: number | null
-  skipRatio: number | null
-}
+export type { ConfigYieldLeaderboardEntry } from '@/lib/admin/configYieldLeaderboards'
+export type { DetailFirstCaptureMetrics } from '@/lib/ingestion/acquisition/detailFirstCaptureGap'
 
 export type IngestionFunnelWindowMetrics = {
   windowHours: number
@@ -154,10 +147,13 @@ export type IngestionFunnelWindowMetrics = {
   skippedExpired: number
   freshInserted: number
   detailFirst: IngestionFunnelDetailFirstMetrics
+  detailFirstCapture: DetailFirstCaptureMetrics
   configLeaderboards: {
     topFreshYield: ConfigYieldLeaderboardEntry[]
     topStale: ConfigYieldLeaderboardEntry[]
     topDuplicate: ConfigYieldLeaderboardEntry[]
+    topDetailFirstYield: ConfigYieldLeaderboardEntry[]
+    topParserVisibleGap: ConfigYieldLeaderboardEntry[]
   }
   bySourcePlatform: Record<string, IngestionFunnelPlatformBreakdown>
   ystm: IngestionFunnelPlatformBreakdown
@@ -774,6 +770,15 @@ export function buildIngestionFunnelWindowMetrics(params: {
     operationalHealth: evaluateDetailFirstOperationalHealth(detailFirstMetricsInput),
   }
 
+  const detailFirstCapture = buildDetailFirstCaptureMetrics({
+    crawlerDiscovered: discovered,
+    duplicateSkipped,
+    freshInserted,
+    detailFirstAttempted,
+    detailFirstReady: detailFirstSucceeded,
+    detailFirstPublished,
+  })
+
   return {
     windowHours,
     stages,
@@ -785,6 +790,7 @@ export function buildIngestionFunnelWindowMetrics(params: {
     skippedExpired,
     freshInserted,
     detailFirst,
+    detailFirstCapture,
     configLeaderboards: buildConfigYieldLeaderboards(configRows, nowMs),
     bySourcePlatform: cohort.bySourcePlatform,
     ystm: cohort.ystm,

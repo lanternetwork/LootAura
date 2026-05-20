@@ -15,7 +15,7 @@ vi.mock('@/lib/auth/adminGate', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown }) {
   const q: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'neq', 'is', 'or', 'not', 'order', 'limit', 'range']) {
+  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'order', 'limit', 'range']) {
     q[m] = vi.fn(() => q)
   }
   q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
@@ -81,5 +81,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.missingIngestion.missingIngestionNeverAttempted).toBe(0)
     expect(json.existingRefresh.ystmDetailIngestedTotal).toBe(0)
     expect(json.existingRefresh.neverSynced).toBe(0)
+    expect(json.catalogRepair.repairQueueTotal).toBe(0)
+    expect(json.catalogRepair.needsGeocode).toBe(0)
   })
 })

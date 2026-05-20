@@ -141,6 +141,25 @@ export default function YstmCoverageScoreboardSection() {
             </p>
           )}
 
+          <div className="mb-6 rounded-md border border-rose-200 bg-rose-50 p-4">
+            <h3 className="text-sm font-semibold text-rose-950">Catalog repair (Phase 5)</h3>
+            <p className="mt-1 text-xs text-rose-900">
+              Re-processes stuck YSTM ingested_sales (needs_check, publish_failed, coord gaps) via
+              detail-first refresh, then geocode and publish when eligible.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Repair queue" value={data.catalogRepair.repairQueueTotal} highlight />
+              <Metric label="Needs geocode" value={data.catalogRepair.needsGeocode} />
+              <Metric label="Publish failed" value={data.catalogRepair.publishFailed} />
+              <Metric label="Needs check" value={data.catalogRepair.needsCheck} />
+            </div>
+            <p className="mt-2 text-xs text-rose-800">
+              Published via repair (24h): {data.catalogRepair.repairedPublishedLast24h.toLocaleString()}{' '}
+              · ready unpublished: {data.catalogRepair.readyUnpublished.toLocaleString()} · repair
+              failed: {data.catalogRepair.repairFailed.toLocaleString()}
+            </p>
+          </div>
+
           <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
             <h3 className="text-sm font-semibold text-sky-950">Existing URL refresh (Phase 4)</h3>
             <p className="mt-1 text-xs text-sky-900">

@@ -14,6 +14,10 @@ import {
   type YstmSourceExpansionMetrics,
 } from '@/lib/admin/ystmSourceExpansionMetrics'
 import {
+  aggregateYstmCatalogRepair,
+  type YstmCatalogRepairAggregate,
+} from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairMetrics'
+import {
   aggregateYstmExistingUrlRefresh,
   type YstmExistingUrlRefreshAggregate,
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
@@ -49,6 +53,7 @@ export type YstmCoverageScoreboard = {
   sourceExpansion: YstmSourceExpansionMetrics
   missingIngestion: YstmCoverageMissingIngestionAggregate
   existingRefresh: YstmExistingUrlRefreshAggregate
+  catalogRepair: YstmCatalogRepairAggregate
 }
 
 type AuditRunRow = {
@@ -75,13 +80,14 @@ export async function buildYstmCoverageScoreboard(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<YstmCoverageScoreboard> {
   const now = new Date()
-  const [agg, publishedIndex, sourceExpansion, missingIngestion, existingRefresh, runsResult] =
+  const [agg, publishedIndex, sourceExpansion, missingIngestion, existingRefresh, catalogRepair, runsResult] =
     await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
     buildYstmSourceExpansionMetrics(admin, now.getTime()),
     aggregateYstmCoverageMissingIngestion(admin),
     aggregateYstmExistingUrlRefresh(admin, now.getTime()),
+    aggregateYstmCatalogRepair(admin, now.getTime()),
     fromBase(admin, 'ystm_coverage_audit_runs')
       .select(
         'completed_at, status, coverage_pct, valid_active_ystm_urls, published_visible_in_audit, list_pages_fetched, listing_urls_discovered, detail_pages_validated, config_cursor_after'
@@ -142,6 +148,7 @@ export async function buildYstmCoverageScoreboard(
     sourceExpansion,
     missingIngestion,
     existingRefresh,
+    catalogRepair,
   }
 }
 

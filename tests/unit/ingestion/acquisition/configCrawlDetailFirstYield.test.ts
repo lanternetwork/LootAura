@@ -43,9 +43,9 @@ describe('config crawl detail-first yield (Phase 4)', () => {
       city: 'Louisville',
       state: 'KY',
       source_crawl_last_at: '2026-05-17T10:00:00.000Z',
-      source_crawl_window_fetched: 200,
-      source_crawl_window_skipped: 190,
-      source_crawl_window_fresh_inserted: 1,
+      source_crawl_window_fetched: 15,
+      source_crawl_window_skipped: 180,
+      source_crawl_window_fresh_inserted: 0,
       source_crawl_window_detail_first_attempted: 50,
       source_crawl_window_detail_first_succeeded: 46,
     }

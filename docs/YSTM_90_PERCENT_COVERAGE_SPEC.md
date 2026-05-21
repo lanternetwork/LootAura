@@ -367,13 +367,13 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 
 **Default orchestration:**
 
-| Setting | Default | Cap |
-|---------|---------|-----|
-| `INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE` | 20 | 500 |
-| `INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS` | 45_000 | 240_000 |
+| Setting | Default (burn-in) | Cap |
+|---------|-----------------|-----|
+| `INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE` | 60 | 500 |
+| `INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS` | 120_000 | 240_000 |
 | `EXTERNAL_FETCH_DOMAIN_MIN_SPACING_MS` | 500 | 60_000 |
 | `INGESTION_ORCHESTRATION_MIN_MINUTES` (throttle) | 10 (adaptive) | — |
-| Adaptive max batch / budget | 40 configs / 120s | per `adaptiveThroughputConfig.ts` |
+| Adaptive max batch / budget | 60 configs / 120s | per `adaptiveThroughputConfig.ts` |
 
 **Work items**
 
@@ -383,6 +383,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 6.2 | Increase config batch and execution budget in stepwise production changes. |
 | 6.3 | Monitor fetch rollup: `budgetExitCount`, domain totals, configs processed per day. |
 | 6.4 | Accept high `duplicateExistingUrl` on mature cities — do not optimize away dedupe. |
+| 6.5 | **Code:** Repo burn-in orchestration defaults 60 configs / 120s budget; geocode 40 queue / concurrency 4; publish batch 200; adaptive max config batch 60. |
 
 **Exit criteria**
 

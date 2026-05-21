@@ -501,8 +501,10 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | 3 Missing ingest | `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS`, `MAX_SCANNED` | 48 (60), 160 (200) |
 | 4 Existing refresh | `CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS`, `MAX_SCANNED` | 32 (80), 120 (200) |
 | 5 Catalog repair | `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS`, `MAX_SCANNED` | 60 (100), 160 (250) |
+| 6 Main ingestion | `INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE`, `EXECUTION_BUDGET_MS`, `GEOCODE_CRON_QUEUE_BATCH`, `GEOCODE_CONCURRENCY` | 60 (500), 120000 (240000), 40 (100), 4 (5) |
 
 - Catalog-repair cron prioritizes **never-attempted** rows, then **`publish_failed`** before **`needs_check`**; watch `catalogRepairQueue` on the scoreboard (baseline **294**).
+- Main ingestion (`/api/cron/daily?mode=ingestion` every 2 min) uses Phase 6 burn-in; watch diagnostics for **fetch** bottleneck vs budget-driven exits.
 
 **Operational checks**
 

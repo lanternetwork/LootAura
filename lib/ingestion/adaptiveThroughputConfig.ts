@@ -47,7 +47,7 @@ export function loadAdaptiveCaps(): AdaptiveCaps {
   return {
     maxConfigBatch: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MAX_CONFIG_BATCH,
-      40,
+      60,
       INGESTION_ORCHESTRATION_HARD_CAPS.configBatchSize
     ),
     maxExecutionBudgetMs: parsePositiveIntEnv(

@@ -1,17 +1,18 @@
 /**
  * Canonical ingestion orchestration defaults (must match `app/api/cron/daily/route.ts` parsers).
  * Used for adaptive `normal` profile parity and metrics estimates.
+ * Burn-in values per docs/YSTM_90_PERCENT_COVERAGE_SPEC.md (Phase 6).
  */
 
 export const INGESTION_ORCHESTRATION_DEFAULTS = {
-  configBatchSize: 20,
-  executionBudgetMs: 45_000,
+  configBatchSize: 60,
+  executionBudgetMs: 120_000,
   minIntervalMinutes: 10,
   domainSpacingMs: 500,
-  geocodeBacklogBatchSize: 15,
-  geocodeCronQueueBatchSize: 20,
-  geocodeConcurrencyCeiling: 2,
-  publishBatchSize: 150,
+  geocodeBacklogBatchSize: 40,
+  geocodeCronQueueBatchSize: 40,
+  geocodeConcurrencyCeiling: 4,
+  publishBatchSize: 200,
 } as const
 
 export const INGESTION_ORCHESTRATION_HARD_CAPS = {

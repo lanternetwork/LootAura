@@ -15,6 +15,8 @@ const mockRun = vi.hoisted(() =>
       candidatePagesInvalid: 2,
       configsPromoted: 1,
       configsRepaired: 0,
+      placeholderRepairRepaired: 0,
+      placeholderRepairFailed: 0,
       configsRevalidated: 2,
       configsFailed: 0,
       placeholdersUnresolved: 0,

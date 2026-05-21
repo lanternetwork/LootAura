@@ -20,6 +20,10 @@ import {
   findPublishedIngestedSaleIdForDetailFirst,
   promoteExistingIngestedSaleForDetailFirst,
 } from '@/lib/ingestion/acquisition/promoteExistingIngestedSaleForDetailFirst'
+import {
+  markIngestedSaleExpiredFromYstmRefresh,
+  updateExistingIngestedSaleForDetailFirst,
+} from '@/lib/ingestion/acquisition/updateExistingIngestedSaleForDetailFirst'
 import { resolveDetailFirstMergedAddressRaw } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import {
   detailFirstValidationTelemetry,
@@ -318,6 +322,8 @@ export type YstmDetailFirstAttemptParams = {
   platform: string
   rowPayload: Record<string, unknown>
   pageIndex: number
+  /** Phase 4: refresh an existing ingested_sales row instead of insert. */
+  existingIngestedSaleId?: string
   telemetryContext?: Record<string, unknown>
   beforeDetailFetch?: (params: {
     detailUrl: string
@@ -328,7 +334,7 @@ export type YstmDetailFirstAttemptParams = {
 }
 
 export type YstmDetailFirstAttemptResult =
-  | { outcome: 'ready'; ingestedSaleId: string; published: boolean }
+  | { outcome: 'ready'; ingestedSaleId: string; published: boolean; markedExpired?: boolean }
   | {
       outcome: 'fallback'
       reason: YstmDetailFirstFallbackReason
@@ -457,6 +463,32 @@ export async function attemptYstmDetailFirstReady(
 
   const validation = validateDetailEnrichedListing(listing, provenance)
   if (!validation.ok) {
+    if (
+      params.existingIngestedSaleId &&
+      validation.reason === 'expired_after_detail'
+    ) {
+      const admin = getAdminDb()
+      const marked = await markIngestedSaleExpiredFromYstmRefresh(
+        admin,
+        params.existingIngestedSaleId
+      )
+      if (marked) {
+        metrics.succeeded = 1
+        finalizeDetailFirstAttemptMetrics(metrics)
+        emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstSucceeded, telem, {
+          refreshMarkedExpired: true,
+        })
+        return {
+          result: {
+            outcome: 'ready',
+            ingestedSaleId: params.existingIngestedSaleId,
+            published: false,
+            markedExpired: true,
+          },
+          metrics,
+        }
+      }
+    }
     recordDetailFirstFallback(metrics, validation.reason)
     finalizeDetailFirstAttemptMetrics(metrics)
     emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
@@ -573,51 +605,76 @@ export async function attemptYstmDetailFirstReady(
     rowPayload,
   })
 
-  const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
-    .insert(ingestRow)
-    .select('id')
-    .maybeSingle()
+  let ingestedSaleId: string | null = null
 
-  let ingestedSaleId = insertedRow?.id ? String(insertedRow.id) : null
-
-  if (!ingestedSaleId) {
-    const insertFailure = classifyDetailFirstInsertFailure(insErr)
-
-    if (insertFailure.reason === 'canonical_collision') {
-      const promoted = await promoteExistingIngestedSaleForDetailFirst(admin, {
-        sourceUrl: listing.sourceUrl,
-        row: ingestRow,
-      })
-      if (promoted?.id) {
-        ingestedSaleId = promoted.id
-      } else {
-        const publishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, listing.sourceUrl)
-        if (publishedId) {
-          ingestedSaleId = publishedId
-          metrics.succeeded = 1
-          finalizeDetailFirstAttemptMetrics(metrics)
-          return {
-            result: { outcome: 'ready', ingestedSaleId: publishedId, published: true },
-            metrics,
-          }
-        }
-      }
-    }
-
+  if (params.existingIngestedSaleId) {
+    const updated = await updateExistingIngestedSaleForDetailFirst(admin, {
+      ingestedSaleId: params.existingIngestedSaleId,
+      row: ingestRow,
+    })
+    ingestedSaleId = updated?.id ?? null
     if (!ingestedSaleId) {
-      recordDetailFirstInsertFailure(metrics, insertFailure)
+      recordDetailFirstFallback(metrics, 'insert_failed')
       finalizeDetailFirstAttemptMetrics(metrics)
       emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
-        rejectedReason: insertFailure.reason,
-        ...insertFailureTelemetryFields(insertFailure),
+        rejectedReason: 'insert_failed',
         ...validationTelemetry,
       })
       return {
-        result: buildDetailFirstFallbackResult(insertFailure.reason, {
+        result: buildDetailFirstFallbackResult('insert_failed', {
           detailEnrichedListing: listing,
           detailPageHtml: html,
         }),
         metrics,
+      }
+    }
+  } else {
+    const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
+      .insert(ingestRow)
+      .select('id')
+      .maybeSingle()
+
+    ingestedSaleId = insertedRow?.id ? String(insertedRow.id) : null
+
+    if (!ingestedSaleId) {
+      const insertFailure = classifyDetailFirstInsertFailure(insErr)
+
+      if (insertFailure.reason === 'canonical_collision') {
+        const promoted = await promoteExistingIngestedSaleForDetailFirst(admin, {
+          sourceUrl: listing.sourceUrl,
+          row: ingestRow,
+        })
+        if (promoted?.id) {
+          ingestedSaleId = promoted.id
+        } else {
+          const publishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, listing.sourceUrl)
+          if (publishedId) {
+            ingestedSaleId = publishedId
+            metrics.succeeded = 1
+            finalizeDetailFirstAttemptMetrics(metrics)
+            return {
+              result: { outcome: 'ready', ingestedSaleId: publishedId, published: true },
+              metrics,
+            }
+          }
+        }
+      }
+
+      if (!ingestedSaleId) {
+        recordDetailFirstInsertFailure(metrics, insertFailure)
+        finalizeDetailFirstAttemptMetrics(metrics)
+        emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstFallback, telem, {
+          rejectedReason: insertFailure.reason,
+          ...insertFailureTelemetryFields(insertFailure),
+          ...validationTelemetry,
+        })
+        return {
+          result: buildDetailFirstFallbackResult(insertFailure.reason, {
+            detailEnrichedListing: listing,
+            detailPageHtml: html,
+          }),
+          metrics,
+        }
       }
     }
   }

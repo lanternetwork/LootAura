@@ -26,7 +26,9 @@ import {
 } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
 import {
   evaluatePostDetailEnrichedDuplicateSkip,
+  parseYstmListRecrawlRefreshMaxPerPage,
   shouldDeferListSeedSoftDedupe,
+  shouldRefreshYstmDetailOnListRecrawl,
 } from '@/lib/ingestion/acquisition/detailFirstCrawlPolicy'
 import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
@@ -112,6 +114,9 @@ export interface ExternalPageSourcePersistSummary {
   detailFirstAddressFromListSeed: number
   detailFirstAddressFromDetailPageRate: number | null
   ystmDetailFirstInsertFailedByDbCode: Record<string, number>
+  /** Phase 6: existing YSTM detail URLs refreshed on list re-crawl (not duplicate-skipped). */
+  ystmListRecrawlRefreshAttempted: number
+  ystmListRecrawlRefreshSucceeded: number
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -1041,9 +1046,12 @@ export async function persistExternalPageSource(
     detailFirstAddressFromListSeed: 0,
     detailFirstAddressFromDetailPageRate: null,
     ystmDetailFirstInsertFailedByDbCode: {},
+    ystmListRecrawlRefreshAttempted: 0,
+    ystmListRecrawlRefreshSucceeded: 0,
   }
 
   const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
+  const listRecrawlRefreshMaxPerPage = parseYstmListRecrawlRefreshMaxPerPage()
   const detailFirstMetrics: YstmDetailFirstRunMetrics = emptyYstmDetailFirstRunMetrics()
 
   const bumpDuplicateKind = (counts: ExternalDuplicateSkipCounts, kind: keyof ExternalDuplicateSkipCounts) => {
@@ -1175,8 +1183,10 @@ export async function persistExternalPageSource(
     type DetailFirstCandidate = {
       listing: ExternalPageSourceListing
       rowPayload: Record<string, unknown>
+      existingIngestedSaleId?: string
     }
     const detailFirstCandidates: DetailFirstCandidate[] = []
+    let listRecrawlRefreshesQueued = 0
 
     const insertListingLegacy = async (
       listing: ExternalPageSourceListing,
@@ -1356,6 +1366,22 @@ export async function persistExternalPageSource(
         continue
       }
       if (existing?.id) {
+        if (
+          shouldRefreshYstmDetailOnListRecrawl(listing.sourceUrl, {
+            status: existing.status as string,
+            failure_reasons: existing.failure_reasons,
+          }) &&
+          listRecrawlRefreshesQueued < listRecrawlRefreshMaxPerPage
+        ) {
+          detailFirstCandidates.push({
+            listing,
+            rowPayload,
+            existingIngestedSaleId: String(existing.id),
+          })
+          listRecrawlRefreshesQueued += 1
+          summary.ystmListRecrawlRefreshAttempted += 1
+          continue
+        }
         duplicateUrlSkipped += 1
         const kind = isIngestedRowExpiredForDuplicate(
           existing.status as string,
@@ -1402,6 +1428,7 @@ export async function persistExternalPageSource(
           platform,
           rowPayload: candidate.rowPayload,
           pageIndex,
+          existingIngestedSaleId: candidate.existingIngestedSaleId,
           telemetryContext: telemBase,
           beforeDetailFetch: options?.beforePageFetch
             ? async ({ detailUrl, pageIndex: detailPageIndex, city, state }) => {
@@ -1417,8 +1444,16 @@ export async function persistExternalPageSource(
         mergeYstmDetailFirstMetrics(detailFirstMetrics, attemptMetrics)
 
         if (result.outcome === 'ready') {
-          summary.inserted += 1
-          summary.freshInserted += 1
+          if (candidate.existingIngestedSaleId) {
+            summary.ystmListRecrawlRefreshSucceeded += 1
+          } else {
+            summary.inserted += 1
+            summary.freshInserted += 1
+          }
+          return
+        }
+
+        if (candidate.existingIngestedSaleId) {
           return
         }
 
@@ -1569,6 +1604,8 @@ export async function persistExternalPageSource(
       ystmDetailFirstPublished: summary.ystmDetailFirstPublished,
       ystmDetailFirstFallback: summary.ystmDetailFirstFallback,
       ystmDetailFirstFetchFailed: summary.ystmDetailFirstFetchFailed,
+      ystmListRecrawlRefreshAttempted: summary.ystmListRecrawlRefreshAttempted,
+      ystmListRecrawlRefreshSucceeded: summary.ystmListRecrawlRefreshSucceeded,
       normalizationWarnings,
     })
   )

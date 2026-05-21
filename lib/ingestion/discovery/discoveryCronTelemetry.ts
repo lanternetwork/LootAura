@@ -11,6 +11,9 @@ export type DiscoveryCronTelemetry = {
   candidatePagesInvalid: number
   configsPromoted: number
   configsRepaired: number
+  /** Phase 2: configs that gained source_pages from placeholder repair pass. */
+  placeholderRepairRepaired: number
+  placeholderRepairFailed: number
   configsRevalidated: number
   configsFailed: number
   placeholdersUnresolved: number
@@ -36,6 +39,8 @@ export function createDiscoveryCronTelemetry(): DiscoveryCronTelemetry {
     candidatePagesInvalid: 0,
     configsPromoted: 0,
     configsRepaired: 0,
+    placeholderRepairRepaired: 0,
+    placeholderRepairFailed: 0,
     configsRevalidated: 0,
     configsFailed: 0,
     placeholdersUnresolved: 0,

@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockFrom = vi.fn()
 
-const { persistDnsLookup } = vi.hoisted(() => ({
-  persistDnsLookup: vi.fn(),
-}))
+const { persistDnsLookup, mockAttemptYstmDetailFirstReady, mockMergeYstmDetailFirstMetrics } =
+  vi.hoisted(() => ({
+    persistDnsLookup: vi.fn(),
+    mockAttemptYstmDetailFirstReady: vi.fn(),
+    mockMergeYstmDetailFirstMetrics: vi.fn(),
+  }))
 
 vi.mock('node:dns/promises', () => ({
   lookup: persistDnsLookup,
@@ -42,6 +45,33 @@ vi.mock('@/lib/ingestion/spatial/resolveSpatialCoordinates', () => ({
   pageHtmlEligibleForYstmNative: vi.fn().mockReturnValue(false),
 }))
 
+vi.mock('@/lib/ingestion/acquisition/ystmDetailFirstReady', () => ({
+  attemptYstmDetailFirstReady: mockAttemptYstmDetailFirstReady,
+  emptyYstmDetailFirstRunMetrics: () => ({
+    attempted: 0,
+    succeeded: 0,
+    published: 0,
+    fallback: 0,
+    fetchFailed: 0,
+    msToPublishedSamples: [],
+    rejectedByReason: {},
+    addressValidatedFromDetailPage: 0,
+    addressValidatedFromListSeed: 0,
+    insertFailedByDbCode: {},
+  }),
+  mergeYstmDetailFirstMetrics: mockMergeYstmDetailFirstMetrics,
+  parseYstmDetailFirstConcurrencyFromEnv: () => 4,
+  mapWithBoundedConcurrency: async (
+    items: unknown[],
+    _concurrency: number,
+    fn: (item: unknown, index: number) => Promise<void>
+  ) => {
+    for (let index = 0; index < items.length; index += 1) {
+      await fn(items[index], index)
+    }
+  },
+}))
+
 function ingestedSalesInsertChain() {
   return {
     select: vi.fn(() => ({
@@ -70,6 +100,8 @@ function htmlFetchResponse(html: string): Response {
 describe('persistExternalPageSource', () => {
   beforeEach(() => {
     persistDnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
+    mockAttemptYstmDetailFirstReady.mockReset()
+    mockMergeYstmDetailFirstMetrics.mockReset()
     mockFrom.mockReset()
     mockFrom.mockImplementation((table: string) => {
       if (table !== 'ingested_sales') {
@@ -117,6 +149,71 @@ describe('persistExternalPageSource', () => {
     expect(summary.errors).toBe(1)
     expect(summary.pagesProcessed).toBe(2)
     expect(summary.inserted).toBe(1)
+  })
+
+  it('refreshes existing YSTM detail URLs on list re-crawl instead of duplicate skip', async () => {
+    const emptyMetrics = {
+      attempted: 1,
+      succeeded: 1,
+      published: 0,
+      fallback: 0,
+      fetchFailed: 0,
+      msToPublishedSamples: [],
+      rejectedByReason: {},
+      addressValidatedFromDetailPage: 0,
+      addressValidatedFromListSeed: 0,
+      insertFailedByDbCode: {},
+    }
+    mockAttemptYstmDetailFirstReady
+      .mockResolvedValueOnce({
+        result: { outcome: 'ready', ingestedSaleId: 'new-ystm', published: false },
+        metrics: emptyMetrics,
+      })
+      .mockResolvedValueOnce({
+        result: { outcome: 'ready', ingestedSaleId: 'existing-ystm', published: true },
+        metrics: emptyMetrics,
+      })
+
+    const maybeSingle = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({
+        data: { id: 'existing-ystm', status: 'ready', failure_reasons: [] },
+        error: null,
+      })
+    mockFrom.mockImplementation(() => ({
+      ...ingestedSalesInsertChain(),
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle,
+        })),
+      })),
+    }))
+
+    const html = `
+      <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/200-B/2002/userlisting.html">A</a>
+      <a href="https://yardsaletreasuremap.com/US/Illinois/Chicago/200-B/2003/userlisting.html">B</a>
+    `
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(htmlFetchResponse(html))))
+
+    const { persistExternalPageSource } = await import('@/lib/ingestion/adapters/externalPageSource')
+    const summary = await persistExternalPageSource({
+      city: 'Chicago',
+      state: 'IL',
+      source_platform: 'external_page_source',
+      source_pages: ['https://yardsaletreasuremap.com/list'],
+    })
+
+    expect(summary.fetched).toBe(2)
+    expect(summary.inserted).toBe(1)
+    expect(summary.skipped).toBe(0)
+    expect(summary.ystmListRecrawlRefreshAttempted).toBe(1)
+    expect(summary.ystmListRecrawlRefreshSucceeded).toBe(1)
+    expect(mockAttemptYstmDetailFirstReady).toHaveBeenCalledTimes(2)
+    expect(mockAttemptYstmDetailFirstReady).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ existingIngestedSaleId: 'existing-ystm' })
+    )
   })
 
   it('treats duplicate source_url as skipped when row already exists', async () => {

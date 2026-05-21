@@ -33,6 +33,10 @@ import {
   promoteSourceDiscoveryResults,
   type IngestionCityConfigDiscoveryRow,
 } from '@/lib/ingestion/discovery/promoteSourceDiscoveryResults'
+import {
+  selectRevalidationConfigRows,
+  type RevalidationSelectionMode,
+} from '@/lib/ingestion/discovery/revalidationConfigSelection'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import {
   getVerifiedStateIndexEntries,
@@ -65,6 +69,8 @@ export type revalidateSourceDiscoveryConfigsArgs = {
   fetchHtml?: SourceDiscoveryFetchHtml
   telemetryContext?: Record<string, unknown>
   placeholderFailureExcludeThreshold?: number
+  /** Phase 2: prioritize empty `source_pages` configs, or repair only those rows. */
+  selectionMode?: RevalidationSelectionMode
 }
 
 export type RevalidationRecordAction =
@@ -329,6 +335,7 @@ export async function revalidateSourceDiscoveryConfigs(
     .select(
       'id, city, state, timezone, enabled, source_platform, source_pages, source_discovery_status, source_last_discovered_at, source_last_validated_at, source_last_failed_at, source_discovery_failure_reason, source_discovery_failure_count, source_crawl_excluded_at'
     )
+    .eq('enabled', true)
     .eq('source_platform', EXTERNAL_PAGE_SOURCE)
     .is('source_crawl_excluded_at', null)
 
@@ -342,7 +349,11 @@ export async function revalidateSourceDiscoveryConfigs(
     return { ok: false, dryRun, records, telemetry, error: loadError.message }
   }
 
-  const allRows = ((rows ?? []) as IngestionCityConfigDiscoveryRow[]).slice(0, maxConfigs)
+  const allRows = selectRevalidationConfigRows((rows ?? []) as IngestionCityConfigDiscoveryRow[], {
+    max: maxConfigs,
+    states: stateFilter,
+    mode: args.selectionMode,
+  })
   const indexEntryByState = new Map(
     getVerifiedStateIndexEntries(stateFilter).map((e) => [e.stateCode, e])
   )

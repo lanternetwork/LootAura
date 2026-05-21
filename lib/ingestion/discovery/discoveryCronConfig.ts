@@ -2,6 +2,7 @@ const DEFAULT_MAX_STATES = 3
 const DEFAULT_MAX_DISCOVERED = 80
 const DEFAULT_MAX_VALIDATION_FETCHES = 40
 const DEFAULT_MAX_REVALIDATION_CONFIGS = 40
+const DEFAULT_MAX_PLACEHOLDER_REPAIR_CONFIGS = 60
 const DEFAULT_LEASE_SECONDS = 300
 const DEFAULT_MAX_RUNTIME_MS = 240_000
 const DEFAULT_PLACEHOLDER_FAILURE_EXCLUDE_THRESHOLD = 1
@@ -18,6 +19,8 @@ export type DiscoveryCronBudgets = {
   maxDiscoveredPagesPerRun: number
   maxValidationFetchesPerRun: number
   maxRevalidationConfigsPerRun: number
+  /** Phase 2: bounded repair pass for enabled configs with empty source_pages. */
+  maxPlaceholderRepairConfigsPerRun: number
   leaseSeconds: number
   maxRuntimeMs: number
   placeholderFailureExcludeThreshold: number
@@ -39,6 +42,11 @@ export function parseDiscoveryCronBudgets(env: NodeJS.ProcessEnv = process.env):
     maxRevalidationConfigsPerRun: parsePositiveInt(
       env.CRON_DISCOVERY_MAX_REVALIDATION_CONFIGS,
       DEFAULT_MAX_REVALIDATION_CONFIGS,
+      200
+    ),
+    maxPlaceholderRepairConfigsPerRun: parsePositiveInt(
+      env.CRON_DISCOVERY_MAX_PLACEHOLDER_REPAIR_CONFIGS,
+      DEFAULT_MAX_PLACEHOLDER_REPAIR_CONFIGS,
       200
     ),
     leaseSeconds: parsePositiveInt(env.CRON_DISCOVERY_LEASE_SECONDS, DEFAULT_LEASE_SECONDS, 900),

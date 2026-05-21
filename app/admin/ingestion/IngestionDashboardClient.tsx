@@ -16,6 +16,7 @@ import {
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import IngestionFunnelSection from '@/app/admin/ingestion/IngestionFunnelSection'
+import YstmCoverageScoreboardSection from '@/app/admin/ingestion/YstmCoverageScoreboardSection'
 
 const POLL_MS = 5000
 const MAX_SNAPSHOT_POINTS = 360
@@ -256,6 +257,8 @@ export default function IngestionDashboardClient() {
 
         {data && (
           <>
+            <YstmCoverageScoreboardSection />
+
             {data.volume && (
               <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
                 <p className="text-sm font-medium text-indigo-900">

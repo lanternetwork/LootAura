@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
+import { INGESTION_ORCHESTRATION_DEFAULTS } from '@/lib/ingestion/ingestionOrchestrationDefaults'
 
 // Mock cron auth
 const mockAssertCronAuthorized = vi.fn()
@@ -1166,8 +1167,8 @@ describe('GET /api/cron/daily', () => {
       expect(mockGeocodePendingSales).toHaveBeenCalledTimes(1)
       expect(mockGeocodePendingSales).toHaveBeenCalledWith(
         expect.objectContaining({
-          batchSizeOverride: 15,
-          concurrencyCeilingOverride: 2,
+          batchSizeOverride: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+          concurrencyCeilingOverride: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
           telemetryContext: expect.any(Object),
         })
       )
@@ -1188,7 +1189,7 @@ describe('GET /api/cron/daily', () => {
       expect(mockGeocodePendingSales).toHaveBeenCalledWith(
         expect.objectContaining({
           batchSizeOverride: 100,
-          concurrencyCeilingOverride: 2,
+          concurrencyCeilingOverride: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
           telemetryContext: expect.any(Object),
         })
       )

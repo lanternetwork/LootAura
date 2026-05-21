@@ -15,7 +15,12 @@ import {
 import { promoteSourceDiscoveryResults } from '@/lib/ingestion/discovery/promoteSourceDiscoveryResults'
 import { revalidateSourceDiscoveryConfigs } from '@/lib/ingestion/discovery/revalidateSourceDiscoveryConfigs'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
-import { runSourceDiscoveryDryRun } from '@/lib/ingestion/discovery/sourceDiscovery'
+import type { ValidatedDiscoveryCandidate } from '@/lib/ingestion/discovery/sourceDiscovery'
+import { runYstmGraphEnumerationDiscovery } from '@/lib/ingestion/discovery/runYstmGraphEnumerationDiscovery'
+import {
+  listValidatedUnpromotedCandidates,
+  markSourcePageCandidatesPromoted,
+} from '@/lib/ingestion/discovery/ystmSourcePageCandidatesStore'
 import { generateOperationId, logger } from '@/lib/log'
 
 type AdminDb = ReturnType<typeof getAdminDb>
@@ -115,23 +120,38 @@ export async function runSourceDiscoveryCron(
 
   try {
     if (batch.states.length > 0 && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-      const discovery = await runSourceDiscoveryDryRun({
-        dryRun: true,
-        states: batch.states,
-        maxStatesPerRun: budgets.maxStatesPerRun,
-        maxDiscoveredPagesPerRun: budgets.maxDiscoveredPagesPerRun,
-        maxValidationFetchesPerRun: budgets.maxValidationFetchesPerRun,
+      const graph = await runYstmGraphEnumerationDiscovery(admin, {
+        stateCodes: batch.states,
+        budgets,
         telemetryContext,
       })
 
-      telemetry.statesScanned = discovery.statesScanned
-      telemetry.candidatePagesDiscovered = discovery.candidatePagesDiscovered
-      telemetry.candidatePagesValid = discovery.candidatePagesValid
-      telemetry.candidatePagesInvalid = discovery.candidatePagesInvalid
-      telemetry.phasesCompleted.push('discover')
+      telemetry.statesScanned = graph.telemetry.statesScanned
+      telemetry.candidatePagesDiscovered = graph.telemetry.candidatePagesDiscovered
+      telemetry.candidatePagesValid = graph.telemetry.candidatePagesValid
+      telemetry.candidatePagesInvalid = graph.telemetry.candidatePagesInvalid
+      telemetry.candidateRegistryUpserts = graph.telemetry.candidateRegistryUpserts
+      telemetry.graphEnumerationValidations = graph.telemetry.validationsAttempted
+      telemetry.graphEnumerationThrottled = graph.telemetry.throttleApplied
+      telemetry.phasesCompleted.push('graph_enumeration')
 
-      if (discovery.ok && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-        const promotable = discovery.candidates.filter((c) => c.validation.ok === true)
+      if (graph.ok && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+        const backlogRows = await listValidatedUnpromotedCandidates(admin, 500)
+        const backlogPromotable: ValidatedDiscoveryCandidate[] = backlogRows.map((row) => ({
+          city: typeof row.metadata?.city === 'string' ? row.metadata.city : row.city_slug ?? row.state,
+          state: row.state,
+          statePathSegment: row.state,
+          canonicalUrl: row.canonical_url,
+          sharedHubPage: row.metadata?.sharedHubPage === true,
+          cityPathSegment: row.city_slug ? `${row.city_slug}.html` : 'city.html',
+          validation: { ok: true as const, kind: 'valid_city_page' as const },
+        }))
+        const promotableByUrl = new Map<string, ValidatedDiscoveryCandidate>()
+        for (const c of [...graph.promotable, ...backlogPromotable]) {
+          promotableByUrl.set(c.canonicalUrl, c)
+        }
+        const promotable = [...promotableByUrl.values()]
+
         const promotion = await promoteSourceDiscoveryResults(admin, {
           dryRun: false,
           candidates: promotable,
@@ -141,6 +161,11 @@ export async function runSourceDiscoveryCron(
           telemetry.configsPromoted = promotion.telemetry.configsPromoted
           telemetry.configsRepaired += promotion.telemetry.configsRepaired
           telemetry.phasesCompleted.push('promote')
+          await markSourcePageCandidatesPromoted(
+            admin,
+            promotable.map((c) => c.canonicalUrl),
+            null
+          )
         } else {
           telemetry.degraded = true
           logger.warn('source discovery cron promotion degraded', {
@@ -150,7 +175,7 @@ export async function runSourceDiscoveryCron(
             ...telemetryContext,
           })
         }
-      } else if (!discovery.ok) {
+      } else if (!graph.ok) {
         telemetry.degraded = true
       }
     }

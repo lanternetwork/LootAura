@@ -279,6 +279,34 @@ export default function YstmCoverageScoreboardSection() {
             </p>
           </div>
 
+          <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">
+            <h3 className="text-sm font-semibold text-teal-950">YSTM graph enumeration</h3>
+            <p className="mt-1 text-xs text-teal-900">
+              Nationwide city/list registry build (evolved discovery cron). Feeds crawlable configs for
+              ingestion and coverage — not a separate publish path.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Catalog states" value={data.graphEnumeration.catalogStates} />
+              <Metric label="States w/ candidates" value={data.graphEnumeration.statesWithCandidates} />
+              <Metric label="Candidates total" value={data.graphEnumeration.candidatesDiscovered} highlight />
+              <Metric label="Pending validation" value={data.graphEnumeration.pendingValidation} />
+              <Metric label="Validated pages" value={data.graphEnumeration.validatedPages} />
+              <Metric label="Promoted candidates" value={data.graphEnumeration.promotedCandidates} />
+              <Metric label="Crawlable configs" value={data.graphEnumeration.sourceExpansion.crawlableConfigs} />
+              <Metric
+                label="No source pages"
+                value={data.graphEnumeration.sourceExpansion.configsWithoutSourcePages}
+                highlight
+              />
+            </div>
+            <p className="mt-2 text-xs text-teal-800">
+              Validations (24h): {data.graphEnumeration.validationsLast24h.toLocaleString()} · fetch fail
+              rate {Math.round(data.graphEnumeration.fetchFailureRate24h * 100)}% · block rate{' '}
+              {Math.round(data.graphEnumeration.blockRate24h * 100)}%
+              {data.graphEnumeration.throttleRecommended ? ' · throttle recommended' : ''}
+            </p>
+          </div>
+
           <div className="mb-6 rounded-md border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-sm font-semibold text-slate-900">Source expansion (Phase 2)</h3>
             <p className="mt-1 text-xs text-slate-600">

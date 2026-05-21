@@ -20,6 +20,10 @@ import {
   YSTM_COVERAGE_TARGET_PCT,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
 import {
+  buildYstmGraphEnumerationMetrics,
+  type YstmGraphEnumerationMetrics,
+} from '@/lib/admin/ystmGraphEnumerationMetrics'
+import {
   buildYstmSourceExpansionMetrics,
   type YstmSourceExpansionMetrics,
 } from '@/lib/admin/ystmSourceExpansionMetrics'
@@ -66,6 +70,7 @@ export type YstmCoverageScoreboard = {
   catalogRepair: YstmCatalogRepairAggregate
   pipelineBacklog: YstmCoveragePipelineBacklog
   sloAttainment: YstmCoverageSloAttainment
+  graphEnumeration: YstmGraphEnumerationMetrics
   operationalHealth: YstmCoverageOperationalHealth
 }
 
@@ -93,11 +98,12 @@ export async function buildYstmCoverageScoreboard(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<YstmCoverageScoreboard> {
   const now = new Date()
-  const [agg, publishedIndex, sourceExpansion, missingIngestion, existingRefresh, catalogRepair, runsResult] =
+  const [agg, publishedIndex, sourceExpansion, graphEnumeration, missingIngestion, existingRefresh, catalogRepair, runsResult] =
     await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
     buildYstmSourceExpansionMetrics(admin, now.getTime()),
+    buildYstmGraphEnumerationMetrics(admin, now.getTime()),
     aggregateYstmCoverageMissingIngestion(admin),
     aggregateYstmExistingUrlRefresh(admin, now.getTime()),
     aggregateYstmCatalogRepair(admin, now.getTime()),
@@ -192,6 +198,7 @@ export async function buildYstmCoverageScoreboard(
         }
       : null,
     sourceExpansion,
+    graphEnumeration,
     missingIngestion,
     existingRefresh,
     catalogRepair,

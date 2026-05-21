@@ -9,6 +9,9 @@ export type DiscoveryCronTelemetry = {
   candidatePagesDiscovered: number
   candidatePagesValid: number
   candidatePagesInvalid: number
+  candidateRegistryUpserts: number
+  graphEnumerationValidations: number
+  graphEnumerationThrottled: boolean
   configsPromoted: number
   configsRepaired: number
   /** Phase 2: configs that gained source_pages from placeholder repair pass. */
@@ -37,6 +40,9 @@ export function createDiscoveryCronTelemetry(): DiscoveryCronTelemetry {
     candidatePagesDiscovered: 0,
     candidatePagesValid: 0,
     candidatePagesInvalid: 0,
+    candidateRegistryUpserts: 0,
+    graphEnumerationValidations: 0,
+    graphEnumerationThrottled: false,
     configsPromoted: 0,
     configsRepaired: 0,
     placeholderRepairRepaired: 0,

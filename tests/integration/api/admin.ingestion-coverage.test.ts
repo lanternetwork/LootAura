@@ -15,7 +15,7 @@ vi.mock('@/lib/auth/adminGate', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown }) {
   const q: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'order', 'limit', 'range']) {
+  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'order', 'limit', 'range', 'gte']) {
     q[m] = vi.fn(() => q)
   }
   q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
@@ -84,6 +84,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.catalogRepair.repairQueueTotal).toBe(0)
     expect(json.catalogRepair.needsGeocode).toBe(0)
     expect(json.pipelineBacklog.missingValidUrls).toBe(0)
+    expect(json.graphEnumeration.catalogStates).toBeGreaterThan(0)
     expect(json.sloAttainment.consecutiveDaysAtTarget).toBe(0)
     expect(json.sloAttainment.programComplete).toBe(false)
     expect(json.operationalHealth.alerts.some((a: { code: string }) => a.code === 'coverage_no_audit_denominator')).toBe(

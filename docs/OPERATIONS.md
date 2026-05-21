@@ -470,6 +470,44 @@ Optional: `parser_version`, `source_type`. Malformed metadata **fails** harness 
 
 Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, `parser.source.failing`, `parser.source.recovered`, `parser.fixture.stale`).
 
+### YSTM 90% product coverage (Phases 1–5)
+
+**Goal:** At least **90%** of **valid-active** YSTM listing URLs in the coverage audit footprint are **map-visible** on LootAura (`coveragePct ≥ 90`). This is **not** the detail-first parser SLO. Full program: `docs/YSTM_90_PERCENT_COVERAGE_SPEC.md`.
+
+**Admin scoreboard:** `GET /api/admin/ingestion/ystm-coverage` (admin session). KPI fields: `validActiveYstmUrls`, `publishedVisibleInAuditFootprint`, `missingValidYstmUrls`, `coveragePct`.
+
+**Production prerequisites**
+
+1. Apply migrations **`196_ystm_coverage_audit_phase_1.sql`** through **`199_ystm_coverage_catalog_repair_phase_5.sql`**.
+2. Confirm `lootaura_v2.ystm_coverage_observations` receives rows after audit runs (empty table ⇒ coverage % is null until Phase 1 runs).
+3. Ensure crawlable `ingestion_city_configs` exist for `external_page_source` (discovery Phase 2).
+
+**Scheduled crons** (`vercel.json`, `Authorization: Bearer <CRON_SECRET>`)
+
+| UTC | Path | Phase |
+|-----|------|-------|
+| `0 4 * * *` | `/api/cron/discovery` | 2 — source expansion |
+| `0 6 * * *`, `0 18 * * *` | `/api/cron/ystm-coverage-audit` | 1 — build audit footprint |
+| `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 — publish missing URLs |
+| `0 10 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
+| `0 12 * * *` | `/api/cron/ystm-catalog-repair` | 5 — repair stuck ingest |
+
+**Default budgets (repo burn-in; override via env)**
+
+| Phase | Key variables | Defaults (cap) |
+|-------|---------------|----------------|
+| 1 Audit | `CRON_YSTM_COVERAGE_MAX_CONFIGS`, `MAX_LIST_FETCHES`, `MAX_DETAIL_VALIDATIONS`, `MAX_URLS_PER_LIST_PAGE` | 24 (40), 40 (80), 80 (120), 120 (200) |
+| 2 Discovery | `CRON_DISCOVERY_MAX_STATES_PER_RUN`, `MAX_DISCOVERED_PAGES`, `MAX_VALIDATION_FETCHES`, `MAX_PLACEHOLDER_REPAIR_CONFIGS` | 10 (15), 200 (500), 120 (200), 120 (200) |
+| 3 Missing ingest | `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS`, `MAX_SCANNED` | 48 (60), 160 (200) |
+| 4 Existing refresh | `CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS`, `MAX_SCANNED` | 32 (80), 120 (200) |
+| 5 Catalog repair | `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS`, `MAX_SCANNED` | 60 (100), 160 (250) |
+
+**Operational checks**
+
+- After deploy, manually invoke once: `GET /api/cron/ystm-coverage-audit` with cron auth; confirm JSON `listingUrlsDiscovered > 0` and SQL `valid_active_v` increases.
+- If `coveragePct` stays null with `valid_active_v = 0`, fix migrations/cron before tuning missing-ingest.
+- Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days.
+
 ### External source discovery — nationwide registry automation (Phase 4)
 
 **Purpose:** Keep `ingestion_city_configs` for `external_page_source` self-maintaining: discover new external source city list pages, validate, promote crawlable URLs, revalidate/repair stale rows, and mark unresolved placeholders failed without deleting rows or touching manual configs.
@@ -501,10 +539,11 @@ Placeholder policy: after discovery attempt, unresolved placeholders become `fai
 
 | Variable | Default | Cap | Role |
 |----------|---------|-----|------|
-| `CRON_DISCOVERY_MAX_STATES_PER_RUN` | 3 | 15 | State index batch size |
-| `CRON_DISCOVERY_MAX_DISCOVERED_PAGES` | 80 | 500 | City link cap per run |
-| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | 40 | 200 | Page validation fetch budget |
+| `CRON_DISCOVERY_MAX_STATES_PER_RUN` | 10 | 15 | State index batch size |
+| `CRON_DISCOVERY_MAX_DISCOVERED_PAGES` | 200 | 500 | City link cap per run |
+| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | 120 | 200 | Page validation fetch budget |
 | `CRON_DISCOVERY_MAX_REVALIDATION_CONFIGS` | 40 | 200 | Healing row budget |
+| `CRON_DISCOVERY_MAX_PLACEHOLDER_REPAIR_CONFIGS` | 120 | 200 | Empty `source_pages` repair per run |
 | `CRON_DISCOVERY_LEASE_SECONDS` | 300 | 900 | Overlap lock TTL |
 | `CRON_DISCOVERY_MAX_RUNTIME_MS` | 240000 | 300000 | Wall-clock cap (graceful degradation) |
 | `CRON_DISCOVERY_PLACEHOLDER_EXCLUDE_AFTER_FAILURES` | 1 | 5 | Failures before crawl exclusion |

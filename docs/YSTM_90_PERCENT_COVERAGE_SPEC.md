@@ -624,15 +624,37 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 
 ---
 
-## 16. Decision log (lead fill-in)
+## 16. Phase 0 completion checklist (G0 — fill before Phase 1 deploy)
+
+| Step | Action | Done |
+|------|--------|------|
+| G0.1 | Export `GET /api/admin/ingestion/ystm-coverage` while logged in as admin; save JSON with timestamp | [ ] |
+| G0.2 | Archive production ingestion diagnostics rollup (Phase G, funnel, acquisition) | [x] (2026-05-21 in Appendix A) |
+| G0.3 | Document production env overrides vs repo defaults (Vercel → table below) | [ ] |
+| G0.4 | Confirm detail-first proof **pass** on production | [x] |
+| G0.5 | Lead sign-off: program KPI = **`coveragePct` ≥ 90** only (not parser SLO / Phase G fresh insert) | [ ] |
+| G0.6 | Re-run SQL on `ystm_coverage_observations` after first audit (post–Phase 1 deploy) | [ ] |
+
+**Production env overrides (fill from Vercel):**
+
+| Variable | Production value | Repo default (burn-in) |
+|----------|------------------|-------------------------|
+| `CRON_YSTM_COVERAGE_MAX_CONFIGS` | | 24 |
+| `CRON_YSTM_COVERAGE_MAX_DETAIL_VALIDATIONS` | | 80 |
+| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | | 120 |
+| `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS` | | 48 |
+| (add others as needed) | | |
+
+## 17. Decision log (lead fill-in)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | | Target `daysToTarget` | |
 | | Minimum `validActiveYstmUrls` at G4 | |
 | | Approved env budget tier (staging/prod) | |
-| | Second daily cron for missing-ingest? Y/N | |
+| | Second daily cron for missing-ingest? Y/N (repo default: **Y** — 06+18 / 08+20 UTC) | |
 | | Code exception tickets opened | |
+| | Phase 0 G0 complete | |
 
 ---
 

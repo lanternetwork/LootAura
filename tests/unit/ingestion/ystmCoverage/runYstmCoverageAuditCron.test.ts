@@ -146,4 +146,31 @@ describe('runYstmCoverageAuditCron', () => {
       expect.objectContaining({ pageIndex: 1, adapter: 'ystm_coverage_audit' })
     )
   })
+
+  it('dedupes canonical URLs across source pages before observation upsert', async () => {
+    mockFetchHtml.mockImplementation(async (pageUrl: string) => {
+      return `<a href="${LISTING_A}">Sale A</a>`
+    })
+
+    const { runYstmCoverageAuditCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmCoverageAuditCron'
+    )
+
+    const result = await runYstmCoverageAuditCron({} as never, {
+      budgets: {
+        maxConfigsPerRun: 1,
+        maxListFetchesPerRun: 10,
+        maxDetailValidationsPerRun: 0,
+        maxUrlsPerListPage: 50,
+        leaseSeconds: 300,
+        maxRuntimeMs: 240_000,
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.telemetry.listingUrlsDiscovered).toBe(2)
+    expect(mockUpsertObservations).toHaveBeenCalledTimes(1)
+    expect(mockUpsertObservations.mock.calls[0]![0]).toHaveLength(1)
+    expect(mockUpsertObservations.mock.calls[0]![0]![0]!.canonicalUrl).toContain('listing.html')
+  })
 })

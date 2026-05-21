@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { INGESTION_ORCHESTRATION_DEFAULTS } from '@/lib/ingestion/ingestionOrchestrationDefaults'
 
 const mockGeocodePendingSales = vi.fn()
 const mockProcessGeocodeQueueBatch = vi.fn()
@@ -62,9 +63,9 @@ describe('runGeocodeCronPipeline', () => {
   it('runs native remediation before geocode backlog drain', async () => {
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
     await runGeocodeCronPipeline({
-      queueBatchSize: 20,
-      backlogBatchSize: 15,
-      concurrencyCeiling: 2,
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       telemetryContext: { jobType: 'cron.geocode' },
     })
 
@@ -72,16 +73,18 @@ describe('runGeocodeCronPipeline', () => {
       mockGeocodePendingSales.mock.invocationCallOrder[0]!
     )
     expect(mockRunNativeCoordinateRemediation).toHaveBeenCalledWith(
-      expect.objectContaining({ batchSizeOverride: 15 })
+      expect.objectContaining({
+        batchSizeOverride: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      })
     )
   })
 
   it('runs transient replay when 429 pressure is below threshold', async () => {
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
     const result = await runGeocodeCronPipeline({
-      queueBatchSize: 20,
-      backlogBatchSize: 15,
-      concurrencyCeiling: 2,
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       telemetryContext: { jobType: 'cron.geocode' },
     })
 
@@ -99,9 +102,9 @@ describe('runGeocodeCronPipeline', () => {
     mockRunNativeCoordinateRemediation.mockRejectedValue(new Error('claim rpc down'))
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
     const result = await runGeocodeCronPipeline({
-      queueBatchSize: 20,
-      backlogBatchSize: 15,
-      concurrencyCeiling: 2,
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       telemetryContext: { jobType: 'cron.geocode' },
     })
     expect(result.nativeCoord.error).toBe('claim rpc down')
@@ -112,9 +115,9 @@ describe('runGeocodeCronPipeline', () => {
     mockGeocodePendingSales.mockRejectedValue(new Error('claim rpc failed'))
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
     const result = await runGeocodeCronPipeline({
-      queueBatchSize: 20,
-      backlogBatchSize: 15,
-      concurrencyCeiling: 2,
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       telemetryContext: { jobType: 'cron.geocode' },
     })
 
@@ -127,9 +130,9 @@ describe('runGeocodeCronPipeline', () => {
     mockRunBoundedGeocodeDeadLetterReplay.mockRejectedValue(new Error('replay scan failed'))
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
     const result = await runGeocodeCronPipeline({
-      queueBatchSize: 20,
-      backlogBatchSize: 15,
-      concurrencyCeiling: 2,
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       telemetryContext: { jobType: 'cron.geocode' },
     })
 
@@ -151,9 +154,9 @@ describe('runGeocodeCronPipeline', () => {
 
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
     const result = await runGeocodeCronPipeline({
-      queueBatchSize: 20,
-      backlogBatchSize: 15,
-      concurrencyCeiling: 2,
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       telemetryContext: { jobType: 'cron.geocode' },
     })
 

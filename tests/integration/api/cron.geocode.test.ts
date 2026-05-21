@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
+import { INGESTION_ORCHESTRATION_DEFAULTS } from '@/lib/ingestion/ingestionOrchestrationDefaults'
 
 const { recordGeocodeCronOrchestrationRun } = vi.hoisted(() => ({
   recordGeocodeCronOrchestrationRun: vi.fn().mockResolvedValue(undefined),
@@ -91,9 +92,9 @@ describe('GET /api/cron/geocode', () => {
 
     expect(res.status).toBe(200)
     expect(mockRunGeocodeCronPipeline).toHaveBeenCalledWith({
-      queueBatchSize: 20,
-      backlogBatchSize: 15,
-      concurrencyCeiling: 2,
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       telemetryContext: expect.objectContaining({ jobType: 'cron.geocode' }),
     })
     expect(data.queue).toEqual({
@@ -110,8 +111,8 @@ describe('GET /api/cron/geocode', () => {
         queueProcessed: 3,
         rate429Count: 0,
         ok: true,
-        effectiveGeocodeQueueBatch: 20,
-        effectiveGeocodeConcurrency: 2,
+        effectiveGeocodeQueueBatch: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+        effectiveGeocodeConcurrency: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
       })
     )
   })

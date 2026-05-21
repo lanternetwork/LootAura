@@ -170,7 +170,8 @@ describe('runYstmCoverageAuditCron', () => {
     expect(result.ok).toBe(true)
     expect(result.telemetry.listingUrlsDiscovered).toBe(2)
     expect(mockUpsertObservations).toHaveBeenCalledTimes(1)
-    expect(mockUpsertObservations.mock.calls[0]![0]).toHaveLength(1)
-    expect(mockUpsertObservations.mock.calls[0]![0]![0]!.canonicalUrl).toContain('listing.html')
+    const listUpsertRows = mockUpsertObservations.mock.calls[0]![1] as Array<{ canonicalUrl: string }>
+    expect(listUpsertRows).toHaveLength(1)
+    expect(listUpsertRows[0]!.canonicalUrl).toContain('listing.html')
   })
 })

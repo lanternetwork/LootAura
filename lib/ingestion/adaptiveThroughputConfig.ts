@@ -47,7 +47,7 @@ export function loadAdaptiveCaps(): AdaptiveCaps {
   return {
     maxConfigBatch: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MAX_CONFIG_BATCH,
-      40,
+      60,
       INGESTION_ORCHESTRATION_HARD_CAPS.configBatchSize
     ),
     maxExecutionBudgetMs: parsePositiveIntEnv(
@@ -163,7 +163,7 @@ const NORMAL_GEOCODE: GeocodeKnobProfile = {
 }
 
 const ELEVATED_GEOCODE_BASE: GeocodeKnobProfile = {
-  backlogBatchSize: 40,
+  backlogBatchSize: 55,
   queueBatchSize: 75,
   concurrencyCeiling: 5,
 }
@@ -176,7 +176,7 @@ const RECOVERY_GEOCODE: GeocodeKnobProfile = {
 
 const CONSERVATIVE_PUBLISH: PublishKnobProfile = { batchSize: 100 }
 const NORMAL_PUBLISH: PublishKnobProfile = { batchSize: INGESTION_ORCHESTRATION_DEFAULTS.publishBatchSize }
-const ELEVATED_PUBLISH_BASE: PublishKnobProfile = { batchSize: 175 }
+const ELEVATED_PUBLISH_BASE: PublishKnobProfile = { batchSize: 225 }
 const RECOVERY_PUBLISH: PublishKnobProfile = { batchSize: 125 }
 
 function clampFetch(profile: FetchKnobProfile, caps: AdaptiveCaps): FetchKnobProfile {

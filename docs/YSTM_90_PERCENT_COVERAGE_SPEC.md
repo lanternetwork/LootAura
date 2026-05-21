@@ -219,6 +219,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 1.3 | Monitor `list_pages_fetched`, `listing_urls_discovered`, `detail_pages_validated` on `ystm_coverage_audit_runs`. |
 | 1.4 | Ensure `observationFootprintUrls` and `validActiveYstmUrls` trend up week-over-week. |
 | 1.5 | Optional: second daily audit window (additional `vercel.json` cron entry) if single run insufficient — requires deploy approval. |
+| 1.6 | **Code:** `metadataStr` list URL extraction; audit cron walks all `source_pages` (not only `pages[0]`). |
 
 **Exit criteria**
 
@@ -258,6 +259,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 2.4 | Track `crawlableConfigs`, `validatedDiscoveryConfigs`, `failedDiscoveryConfigs` on scoreboard. |
 | 2.5 | Prioritize high-YSTM-volume states/metros from Phase 0 `missingByState` if backlog is huge. |
 | 2.6 | Optional code: bulk import validated discovery rows — **only if** env tuning cannot drain 922 pending in acceptable calendar time. |
+| 2.7 | **Code:** Reject `{State}.html` state shells on promote/validate; nationwide placeholder repair each run; priority state catalog (IL, TX, CA, …); second daily discovery cron (16:00 UTC); revalidation burn-in 120/run. |
 
 **Exit criteria**
 
@@ -294,6 +296,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 3.3 | Track `missingIngestionPublished`, `missingIngestionFailed` daily. |
 | 3.4 | Optional second daily cron slot for missing-ingest while `coveragePct < 90`. |
 | 3.5 | Sample failures: fetch_failed, address_validation_failed, publish_failed — fix only systemic issues. |
+| 3.6 | **Code:** Missing-ingest queue orders **never-attempted** rows first (`missing_ingestion_attempted_at` nulls-first); burn-in 48 attempts / 160 scanned per run; dual cron 08:00 + 20:00 UTC. |
 
 **Exit criteria**
 
@@ -317,6 +320,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 |----|------|
 | 4.1 | Monitor `existingRefreshStale` (< 150 alert threshold at scale). |
 | 4.2 | Tune `CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS` / `MAX_SCANNED` if stale backlog grows during Phases 2–3. |
+| 4.3 | **Code:** Stale/never-synced rows first; **published** ingested rows prioritized within queue; burn-in 32 refresh / 120 scanned; dual cron 10:00 + 22:00 UTC. |
 
 **Exit criteria**
 
@@ -333,7 +337,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 
 **Cron:** `GET/POST /api/cron/ystm-catalog-repair` — default **12:00 UTC daily**.
 
-**Default budgets:** `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS` default 20, cap 100.
+**Default budgets:** `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS` default **60** (burn-in), cap 100; `MAX_SCANNED` default **160**, cap 250.
 
 **Work items**
 
@@ -343,6 +347,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 5.2 | Raise repair budgets while `catalogRepairQueue ≥ 75`. |
 | 5.3 | Triage top `publish_failed` / `failure_details` codes (sample from same-run publish failures in diagnostics). |
 | 5.4 | Code fix only for repeatable publish/geocode blockers. |
+| 5.5 | **Code:** Never-attempted first (`catalog_repair_attempted_at` nulls-first); status priority `publish_failed` → `needs_geocode` → `ready` → `needs_check`; burn-in 60/160; dual cron 12:00 + 14:00 UTC. |
 
 **Exit criteria**
 
@@ -362,13 +367,13 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 
 **Default orchestration:**
 
-| Setting | Default | Cap |
-|---------|---------|-----|
-| `INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE` | 20 | 500 |
-| `INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS` | 45_000 | 240_000 |
+| Setting | Default (burn-in) | Cap |
+|---------|-----------------|-----|
+| `INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE` | 60 | 500 |
+| `INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS` | 120_000 | 240_000 |
 | `EXTERNAL_FETCH_DOMAIN_MIN_SPACING_MS` | 500 | 60_000 |
 | `INGESTION_ORCHESTRATION_MIN_MINUTES` (throttle) | 10 (adaptive) | — |
-| Adaptive max batch / budget | 40 configs / 120s | per `adaptiveThroughputConfig.ts` |
+| Adaptive max batch / budget | 60 configs / 120s | per `adaptiveThroughputConfig.ts` |
 
 **Work items**
 
@@ -378,6 +383,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 6.2 | Increase config batch and execution budget in stepwise production changes. |
 | 6.3 | Monitor fetch rollup: `budgetExitCount`, domain totals, configs processed per day. |
 | 6.4 | Accept high `duplicateExistingUrl` on mature cities — do not optimize away dedupe. |
+| 6.5 | **Code:** Repo burn-in orchestration defaults 60 configs / 120s budget; geocode 40 queue / concurrency 4; publish batch 200; adaptive max config batch 60. |
 
 **Exit criteria**
 
@@ -453,6 +459,7 @@ CRON_DISCOVERY_MAX_STATES_PER_RUN=10
 CRON_DISCOVERY_MAX_DISCOVERED_PAGES=200
 CRON_DISCOVERY_MAX_VALIDATION_FETCHES=120
 CRON_DISCOVERY_MAX_PLACEHOLDER_REPAIR_CONFIGS=120
+CRON_DISCOVERY_MAX_REVALIDATION_CONFIGS=120
 ```
 
 ### 8.2 Coverage audit (Phase 1)
@@ -471,14 +478,22 @@ CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS=48
 CRON_YSTM_MISSING_INGEST_MAX_SCANNED=160
 ```
 
-### 8.4 Catalog repair (Phase 5)
+### 8.4 Existing URL refresh (Phase 4)
+
+```bash
+CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS=32
+CRON_YSTM_EXISTING_REFRESH_MAX_SCANNED=120
+CRON_YSTM_EXISTING_REFRESH_STALE_HOURS=12
+```
+
+### 8.5 Catalog repair (Phase 5)
 
 ```bash
 CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS=60
 CRON_YSTM_CATALOG_REPAIR_MAX_SCANNED=160
 ```
 
-### 8.5 Main ingestion (Phase 6)
+### 8.6 Main ingestion (Phase 6)
 
 ```bash
 INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE=60
@@ -500,13 +515,13 @@ INGEST_BATCH_SIZE=200
 |--------------|------|-------|
 | `*/2 * * * *` | `/api/cron/daily?mode=ingestion` | 6 |
 | `*/2 * * * *` | `/api/cron/geocode` | 5/6 |
-| `0 4 * * *` | `/api/cron/discovery` | 2 |
-| `0 6 * * *` | `/api/cron/ystm-coverage-audit` | 1 |
-| `0 8 * * *` | `/api/cron/ystm-missing-ingest` | 3 |
-| `0 10 * * *` | `/api/cron/ystm-existing-refresh` | 4 |
-| `0 12 * * *` | `/api/cron/ystm-catalog-repair` | 5 |
+| `0 4 * * *`, `0 16 * * *` | `/api/cron/discovery` | 2 |
+| `0 6 * * *`, `0 18 * * *` | `/api/cron/ystm-coverage-audit` | 1 |
+| `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 |
+| `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 |
+| `0 12 * * *`, `0 14 * * *` | `/api/cron/ystm-catalog-repair` | 5 |
 
-Source: `vercel.json`.
+Source: `vercel.json`. Scoreboard `sloAttainment` (Phase 7) derives the G4 hold streak from completed rows in `ystm_coverage_audit_runs`.
 
 ---
 
@@ -595,7 +610,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 | `publishedVisibleInAuditFootprint` (P) | **0** | Production SQL |
 | `missingValidYstmUrls` (M) | **0** | Production SQL (not actionable) |
 | `observationFootprintUrls` | **0** | Production SQL |
-| `publishedActiveLootAuraYstmUrls` (corpus) | **~299** (planning proxy) | PR #478 / prior prod analysis |
+| `publishedActiveLootAuraYstmUrls` (corpus) | **262** | Scoreboard `2026-05-21T14:09:12Z` (G0.1 JSON) |
 | `crawlableConfigs` | **62** | Diagnostics acquisition |
 | `pendingDiscoveryConfigs` | **922** | Diagnostics acquisition |
 | `validatedDiscoveryConfigs` | **54** | Diagnostics acquisition |
@@ -628,27 +643,44 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 
 | Step | Action | Done |
 |------|--------|------|
-| G0.1 | Export `GET /api/admin/ingestion/ystm-coverage` while logged in as admin; save JSON with timestamp | [ ] |
+| G0.1 | Export `GET /api/admin/ingestion/ystm-coverage` while logged in as admin; save JSON with timestamp | [x] (`docs/baselines/ystm-coverage-scoreboard-2026-05-21T1409Z.json`) |
 | G0.2 | Archive production ingestion diagnostics rollup (Phase G, funnel, acquisition) | [x] (2026-05-21 in Appendix A) |
-| G0.3 | Document production env overrides vs repo defaults (Vercel → table below) | [ ] |
+| G0.3 | Document production env overrides vs repo defaults (Vercel → table below) | [x] (all unset — repo burn-in defaults apply; not used in Vercel) |
 | G0.4 | Confirm detail-first proof **pass** on production | [x] |
-| G0.5 | Lead sign-off: program KPI = **`coveragePct` ≥ 90** only (not parser SLO / Phase G fresh insert) | [ ] |
-| G0.6 | Re-run SQL on `ystm_coverage_observations` after first audit (post–Phase 1 deploy) | [ ] |
+| G0.5 | Lead sign-off: program KPI = **`coveragePct` ≥ 90** only (not parser SLO / Phase G fresh insert) | [x] (2026-05-21) |
+| G0.6 | Re-run SQL on `ystm_coverage_observations` after first audit (post–Phase 1 deploy) | [ ] (run after merge/deploy) |
 
-**Production env overrides (fill from Vercel):**
+**G0.6 SQL (production, post–first audit):**
 
-| Variable | Production value | Repo default (burn-in) |
-|----------|------------------|-------------------------|
-| `CRON_YSTM_COVERAGE_MAX_CONFIGS` | | 24 |
-| `CRON_YSTM_COVERAGE_MAX_DETAIL_VALIDATIONS` | | 80 |
-| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | | 120 |
-| `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS` | | 48 |
-| (add others as needed) | | |
+```sql
+SELECT
+  COUNT(*) AS observation_footprint,
+  COUNT(*) FILTER (WHERE valid_active) AS valid_active_v,
+  COUNT(*) FILTER (WHERE lootaura_visible) AS published_visible_p,
+  COUNT(*) FILTER (WHERE valid_active AND NOT lootaura_visible) AS missing_valid_m
+FROM lootaura_v2.ystm_coverage_observations;
+```
+
+Expect `valid_active_v > 0` and `coveragePct` non-null on scoreboard after audits run.
+
+**Production env overrides:** None configured in Vercel and not planned — **repo burn-in defaults** from PR #479 apply in production after deploy.
+
+| Variable | Production (Vercel) | Repo default (burn-in) |
+|----------|---------------------|-------------------------|
+| `CRON_YSTM_COVERAGE_MAX_CONFIGS` | unset | 24 |
+| `CRON_YSTM_COVERAGE_MAX_LIST_FETCHES` | unset | 40 |
+| `CRON_YSTM_COVERAGE_MAX_DETAIL_VALIDATIONS` | unset | 80 |
+| `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS` | unset | 48 |
+| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | unset | 120 |
+| `CRON_DISCOVERY_MAX_STATES_PER_RUN` | unset | 10 |
 
 ## 17. Decision log (lead fill-in)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-05-21 | Phase 0 G0 complete; KPI = `coveragePct` ≥ 90 only | Lead agent approved; proceed Phase 1 |
+| 2026-05-21 | Phases 1–2 code on single PR; Phase 3 missing-ingest queue ordering | CI green on #481 |
+| 2026-05-21 | Phases 1–6 code complete on #481; Phase 7 monitoring (`sloAttainment`, G4 alerts) | CI green; deploy → G0.6 SQL |
 | | Target `daysToTarget` | |
 | | Minimum `validActiveYstmUrls` at G4 | |
 | | Approved env budget tier (staging/prod) | |

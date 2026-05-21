@@ -75,6 +75,7 @@ export async function fetchMissingIngestionCandidatePage(
     )
     .eq('ystm_valid_active', true)
     .eq('lootaura_visible', false)
+    .order('missing_ingestion_attempted_at', { ascending: true, nullsFirst: true })
     .order('canonical_url', { ascending: true })
     .range(offset, offset + params.scanLimit - 1)
   if (error) {

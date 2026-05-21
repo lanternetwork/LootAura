@@ -55,7 +55,7 @@ async function countRefreshQueueTotal(admin: ReturnType<typeof getAdminDb>): Pro
 
 /**
  * Loads a bounded page of external_page_source ingested rows for YSTM detail refresh.
- * Ordered by stale sync first (nulls first), then source_url for stable rotation.
+ * Ordered by stale sync first (nulls first), then published rows (coverage regression risk), then source_url.
  */
 export async function fetchExistingUrlRefreshCandidatePage(
   admin: ReturnType<typeof getAdminDb>,
@@ -79,6 +79,7 @@ export async function fetchExistingUrlRefreshCandidatePage(
     .eq('is_duplicate', false)
     .neq('status', 'expired')
     .order('last_source_sync_at', { ascending: true, nullsFirst: true })
+    .order('published_sale_id', { ascending: false, nullsFirst: false })
     .order('source_url', { ascending: true })
     .range(offset, offset + params.scanLimit - 1)
   if (error) {

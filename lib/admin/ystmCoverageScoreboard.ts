@@ -12,6 +12,10 @@ import {
   type YstmCoveragePipelineBacklog,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageOperationalHealth'
 import {
+  computeCoverageSloAttainment,
+  type YstmCoverageSloAttainment,
+} from '@/lib/ingestion/ystmCoverage/ystmCoverageSloAttainment'
+import {
   computeCoveragePct,
   YSTM_COVERAGE_TARGET_PCT,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
@@ -61,6 +65,7 @@ export type YstmCoverageScoreboard = {
   existingRefresh: YstmExistingUrlRefreshAggregate
   catalogRepair: YstmCatalogRepairAggregate
   pipelineBacklog: YstmCoveragePipelineBacklog
+  sloAttainment: YstmCoverageSloAttainment
   operationalHealth: YstmCoverageOperationalHealth
 }
 
@@ -138,6 +143,13 @@ export async function buildYstmCoverageScoreboard(
     existingRefresh,
   })
 
+  const sloAttainment = computeCoverageSloAttainment({
+    trend,
+    targetPct: YSTM_COVERAGE_TARGET_PCT,
+    currentCoveragePct: coveragePct,
+    currentValidActiveUrls: agg.validActiveYstmUrls,
+  })
+
   const operationalHealth = evaluateYstmCoverageOperationalHealth({
     targetPct: YSTM_COVERAGE_TARGET_PCT,
     coveragePct,
@@ -151,6 +163,9 @@ export async function buildYstmCoverageScoreboard(
     existingRefreshStale: existingRefresh.staleOver12h,
     configsWithoutSourcePages: sourceExpansion.configsWithoutSourcePages,
     crawlableConfigs: sourceExpansion.crawlableConfigs,
+    consecutiveDaysAtTarget: sloAttainment.consecutiveDaysAtTarget,
+    requiredConsecutiveDaysAtTarget: sloAttainment.requiredConsecutiveDays,
+    footprintMeetsProgramMinimum: sloAttainment.footprintMeetsProgramMinimum,
     nowMs: now.getTime(),
   })
 
@@ -181,6 +196,7 @@ export async function buildYstmCoverageScoreboard(
     existingRefresh,
     catalogRepair,
     pipelineBacklog,
+    sloAttainment,
     operationalHealth,
   }
 }

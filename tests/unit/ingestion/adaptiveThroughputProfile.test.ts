@@ -8,13 +8,13 @@ import {
 import { isAdaptiveThroughputEnabled, type AdaptiveCaps } from '@/lib/ingestion/adaptiveThroughputConfig'
 
 const testCaps: AdaptiveCaps = {
-  maxConfigBatch: 40,
+  maxConfigBatch: 60,
   maxExecutionBudgetMs: 120_000,
   minDomainSpacingMs: 400,
-  maxGeocodeBacklogBatch: 50,
+  maxGeocodeBacklogBatch: 55,
   maxGeocodeQueueBatch: 50,
   maxGeocodeConcurrency: 5,
-  maxPublishBatch: 200,
+  maxPublishBatch: 250,
   recoveryDwellRuns: 3,
   elevatedDwellRuns: 2,
 }

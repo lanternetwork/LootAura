@@ -73,4 +73,28 @@ describe('evaluateYstmCoverageOperationalHealth', () => {
     )
     expect(health.alerts.some((a) => a.code === 'coverage_audit_stale')).toBe(true)
   })
+
+  it('warns when coverage meets target but G4 hold streak is incomplete', () => {
+    const health = evaluateYstmCoverageOperationalHealth(
+      baseInput({
+        consecutiveDaysAtTarget: 3,
+        requiredConsecutiveDaysAtTarget: 14,
+        footprintMeetsProgramMinimum: true,
+      })
+    )
+    expect(health.alerts.some((a) => a.code === 'coverage_slo_hold_in_progress')).toBe(true)
+  })
+
+  it('warns when footprint is below program minimum at target coverage', () => {
+    const health = evaluateYstmCoverageOperationalHealth(
+      baseInput({
+        footprintMeetsProgramMinimum: false,
+        consecutiveDaysAtTarget: 14,
+        requiredConsecutiveDaysAtTarget: 14,
+      })
+    )
+    expect(health.alerts.some((a) => a.code === 'coverage_footprint_below_program_minimum')).toBe(
+      true
+    )
+  })
 })

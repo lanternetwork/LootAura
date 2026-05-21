@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom'
 import { deriveYardsaleTreasureMapCityPageUrl } from '@/lib/ingestion/ensureCityConfigFromListingSource'
 import { normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSource'
 import { normalizeIngestionCity } from '@/lib/ingestion/normalizeIngestionLocation'
+import { isYstmStateShellCityPageUrl } from '@/lib/ingestion/discovery/ystmCityListPageUrl'
 
 export type DiscoveryValidationResult =
   | { ok: true; kind: 'valid_city_page' }
@@ -70,6 +71,9 @@ export function validateDiscoveredCityPage(
   const canonical = deriveYardsaleTreasureMapCityPageUrl(args.pageUrl)
   if (!canonical) {
     return { ok: false, reason: 'not_canonical_city_page_url' }
+  }
+  if (isYstmStateShellCityPageUrl(canonical)) {
+    return { ok: false, reason: 'state_shell_not_city_page' }
   }
   if (normalizeSourcePages([args.pageUrl]).length === 0) {
     return { ok: false, reason: 'source_page_not_https' }

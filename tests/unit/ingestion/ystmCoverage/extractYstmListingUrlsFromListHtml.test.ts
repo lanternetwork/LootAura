@@ -25,4 +25,35 @@ describe('extractYstmListingUrlsFromListHtml', () => {
     const urls = extractYstmListingUrlsFromListHtml(html, 'https://yardsaletreasuremap.com/US/Texas/Austin/')
     expect(urls).toHaveLength(1)
   })
+
+  it('extracts listing URLs from metadataStr when anchors are absent', () => {
+    const detailUrl =
+      'https://yardsaletreasuremap.com/US/Illinois/Chicago/See-source-for-address-after-2026-05-06-09%3A00%3A00/38718697/userlisting.html?s=tl'
+    const html = `
+      <script>
+        metadataStr = '{"sales":[{"url":"${detailUrl}","address":"8559 S Maryland Ave, Chicago, IL"}]}';
+      </script>
+    `
+    const urls = extractYstmListingUrlsFromListHtml(
+      html,
+      'https://yardsaletreasuremap.com/US/Illinois/Chicago.html'
+    )
+    expect(urls).toHaveLength(1)
+    expect(urls[0]?.canonicalUrl).toContain('38718697/userlisting.html')
+    expect(urls[0]?.sourceUrl).toContain('s=tl')
+  })
+
+  it('merges metadataStr with anchors without duplicate canonical URLs', () => {
+    const html = `
+      <a href="/US/Illinois/Springfield/123-main-st/listing.html">Sale A</a>
+      <script>
+        metadataStr = '{"sales":[{"url":"https://yardsaletreasuremap.com/US/Illinois/Springfield/123-main-st/listing.html"}]}';
+      </script>
+    `
+    const urls = extractYstmListingUrlsFromListHtml(
+      html,
+      'https://yardsaletreasuremap.com/US/Illinois/Springfield/'
+    )
+    expect(urls).toHaveLength(1)
+  })
 })

@@ -108,6 +108,10 @@ describe('runSourceDiscoveryCron', () => {
     expect(discoveryMock).toHaveBeenCalledTimes(1)
     expect(promoteMock).toHaveBeenCalledTimes(1)
     expect(revalidateMock).toHaveBeenCalledTimes(2)
+    expect(revalidateMock.mock.calls[0]?.[1]).toMatchObject({
+      selectionMode: 'no_source_pages_only',
+    })
+    expect(revalidateMock.mock.calls[0]?.[1]).not.toHaveProperty('states')
     expect(releaseMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ markCompleted: true })

@@ -219,6 +219,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 1.3 | Monitor `list_pages_fetched`, `listing_urls_discovered`, `detail_pages_validated` on `ystm_coverage_audit_runs`. |
 | 1.4 | Ensure `observationFootprintUrls` and `validActiveYstmUrls` trend up week-over-week. |
 | 1.5 | Optional: second daily audit window (additional `vercel.json` cron entry) if single run insufficient — requires deploy approval. |
+| 1.6 | **Code (PR #481):** `metadataStr` list URL extraction; audit cron walks all `source_pages`. |
 
 **Exit criteria**
 
@@ -258,6 +259,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 2.4 | Track `crawlableConfigs`, `validatedDiscoveryConfigs`, `failedDiscoveryConfigs` on scoreboard. |
 | 2.5 | Prioritize high-YSTM-volume states/metros from Phase 0 `missingByState` if backlog is huge. |
 | 2.6 | Optional code: bulk import validated discovery rows — **only if** env tuning cannot drain 922 pending in acceptable calendar time. |
+| 2.7 | **Code:** Reject `{State}.html` state shells on promote/validate; nationwide placeholder repair each run; priority state catalog (IL, TX, CA, …); second daily discovery cron (16:00 UTC); revalidation burn-in 120/run. |
 
 **Exit criteria**
 
@@ -453,6 +455,7 @@ CRON_DISCOVERY_MAX_STATES_PER_RUN=10
 CRON_DISCOVERY_MAX_DISCOVERED_PAGES=200
 CRON_DISCOVERY_MAX_VALIDATION_FETCHES=120
 CRON_DISCOVERY_MAX_PLACEHOLDER_REPAIR_CONFIGS=120
+CRON_DISCOVERY_MAX_REVALIDATION_CONFIGS=120
 ```
 
 ### 8.2 Coverage audit (Phase 1)

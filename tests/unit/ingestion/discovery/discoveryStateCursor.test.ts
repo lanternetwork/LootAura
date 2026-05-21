@@ -26,10 +26,11 @@ describe('discoveryStateCursor', () => {
     expect(batch.states).toHaveLength(2)
   })
 
-  it('lists nationwide catalog with stable ordering', () => {
+  it('lists nationwide catalog with Phase 2 priority states first', () => {
     const codes = listNationwideDiscoveryStateCodes()
     expect(codes.length).toBeGreaterThan(40)
-    const sorted = [...codes].sort((a, b) => a.localeCompare(b))
-    expect(codes).toEqual(sorted)
+    expect(codes[0]).toBe('IL')
+    expect(codes.indexOf('TX')).toBeLessThan(codes.indexOf('WY'))
+    expect(new Set(codes).size).toBe(codes.length)
   })
 })

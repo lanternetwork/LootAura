@@ -158,25 +158,22 @@ export async function runSourceDiscoveryCron(
     if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
       const revalidationStates = batch.states.length > 0 ? batch.states : undefined
 
-      if (revalidationStates && revalidationStates.length > 0) {
-        const placeholderRepair = await revalidateSourceDiscoveryConfigs(admin, {
-          dryRun: false,
-          states: revalidationStates,
-          maxConfigsPerRun: budgets.maxPlaceholderRepairConfigsPerRun,
-          selectionMode: 'no_source_pages_only',
-          placeholderFailureExcludeThreshold: budgets.placeholderFailureExcludeThreshold,
-          telemetryContext: { ...telemetryContext, phase: 'placeholder_repair' },
-        })
-        if (placeholderRepair.ok) {
-          telemetry.placeholderRepairRepaired += placeholderRepair.telemetry.configsRepaired
-          telemetry.placeholderRepairFailed += placeholderRepair.telemetry.configsFailed
-          telemetry.configsRepaired += placeholderRepair.telemetry.configsRepaired
-          telemetry.configsFailed += placeholderRepair.telemetry.configsFailed
-          telemetry.placeholdersUnresolved += placeholderRepair.telemetry.placeholdersUnresolved
-          telemetry.phasesCompleted.push('placeholder_repair')
-        } else {
-          telemetry.degraded = true
-        }
+      const placeholderRepair = await revalidateSourceDiscoveryConfigs(admin, {
+        dryRun: false,
+        maxConfigsPerRun: budgets.maxPlaceholderRepairConfigsPerRun,
+        selectionMode: 'no_source_pages_only',
+        placeholderFailureExcludeThreshold: budgets.placeholderFailureExcludeThreshold,
+        telemetryContext: { ...telemetryContext, phase: 'placeholder_repair' },
+      })
+      if (placeholderRepair.ok) {
+        telemetry.placeholderRepairRepaired += placeholderRepair.telemetry.configsRepaired
+        telemetry.placeholderRepairFailed += placeholderRepair.telemetry.configsFailed
+        telemetry.configsRepaired += placeholderRepair.telemetry.configsRepaired
+        telemetry.configsFailed += placeholderRepair.telemetry.configsFailed
+        telemetry.placeholdersUnresolved += placeholderRepair.telemetry.placeholdersUnresolved
+        telemetry.phasesCompleted.push('placeholder_repair')
+      } else {
+        telemetry.degraded = true
       }
 
       const revalidation = await revalidateSourceDiscoveryConfigs(admin, {

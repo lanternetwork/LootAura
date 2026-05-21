@@ -46,6 +46,17 @@ describe('extractCityPageCandidatesFromStateIndexHtml', () => {
     expect(candidates).toHaveLength(1)
   })
 
+  it('rejects state shell .html URLs that mirror the state segment', () => {
+    const html = `<ul>
+      <li><a href='/US/Illinois/Illinois.html'>shell</a></li>
+      <li><a href='/US/Illinois/Oak-Lawn.html'>good</a></li>
+    </ul>`
+    const [entry] = getVerifiedStateIndexEntries(['IL'])
+    const candidates = extractCityPageCandidatesFromStateIndexHtml(html, entry)
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0]?.city).toBe('Oak Lawn')
+  })
+
   it('rejects listing detail URLs', () => {
     const html = `<ul>
       <li><a href='/US/Illinois/Chicago/123-Main-St/1/listing.html'>bad</a></li>

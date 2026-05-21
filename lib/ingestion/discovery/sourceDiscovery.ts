@@ -22,6 +22,7 @@ import {
   validateDiscoveredCityPage,
   type DiscoveryValidationResult,
 } from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
+import { isYstmStateShellCityPageUrl } from '@/lib/ingestion/discovery/ystmCityListPageUrl'
 import {
   createDiscoveryTelemetry,
   emitDiscoveryPageValidated,
@@ -108,6 +109,8 @@ function isCityListPageHref(href: string, statePathSegment: string): boolean {
   const citySeg = parts[2] ?? ''
   if (!/\.html?$/i.test(citySeg)) return false
   if (/(?:listing|userlisting)\.html$/i.test(citySeg)) return false
+  const absolute = new URL(href, EXTERNAL_SOURCE_LIST_ORIGIN).href
+  if (isYstmStateShellCityPageUrl(absolute)) return false
   return true
 }
 

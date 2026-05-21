@@ -8,7 +8,7 @@ describe('parseDiscoveryCronBudgets', () => {
       CRON_DISCOVERY_MAX_VALIDATION_FETCHES: '999',
     } as unknown as NodeJS.ProcessEnv)
     expect(budgets.maxStatesPerRun).toBe(25)
-    expect(budgets.maxValidationFetchesPerRun).toBe(2000)
+    expect(budgets.maxValidationFetchesPerRun).toBe(999)
   })
 
   it('defaults to graph enumeration burn-in budgets', () => {

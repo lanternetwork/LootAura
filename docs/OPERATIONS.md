@@ -489,7 +489,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | `0 4 * * *`, `0 16 * * *` | `/api/cron/discovery` | 2 — source expansion |
 | `0 6 * * *`, `0 18 * * *` | `/api/cron/ystm-coverage-audit` | 1 — build audit footprint |
 | `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 — publish missing URLs |
-| `0 10 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
+| `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
 | `0 12 * * *` | `/api/cron/ystm-catalog-repair` | 5 — repair stuck ingest |
 
 **Default budgets (repo burn-in; override via env)**
@@ -506,6 +506,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 - After deploy, manually invoke once: `GET /api/cron/ystm-coverage-audit` with cron auth; confirm JSON `listingUrlsDiscovered > 0` and SQL `valid_active_v` increases.
 - Missing-ingest cron scans **never-attempted** URLs first (`missing_ingestion_attempted_at` nulls-first) before failed retries; watch `missingIngestionNeverAttempted` on the scoreboard.
+- Existing-refresh cron prioritizes **stale/never-synced** rows, then **published** ingested sales; watch `existingRefreshStale` and `neverSynced` on the scoreboard.
 - If `coveragePct` stays null with `valid_active_v = 0`, fix migrations/cron before tuning missing-ingest.
 - Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days.
 

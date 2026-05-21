@@ -320,6 +320,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 |----|------|
 | 4.1 | Monitor `existingRefreshStale` (< 150 alert threshold at scale). |
 | 4.2 | Tune `CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS` / `MAX_SCANNED` if stale backlog grows during Phases 2–3. |
+| 4.3 | **Code:** Stale/never-synced rows first; **published** ingested rows prioritized within queue; burn-in 32 refresh / 120 scanned; dual cron 10:00 + 22:00 UTC. |
 
 **Exit criteria**
 
@@ -475,14 +476,22 @@ CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS=48
 CRON_YSTM_MISSING_INGEST_MAX_SCANNED=160
 ```
 
-### 8.4 Catalog repair (Phase 5)
+### 8.4 Existing URL refresh (Phase 4)
+
+```bash
+CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS=32
+CRON_YSTM_EXISTING_REFRESH_MAX_SCANNED=120
+CRON_YSTM_EXISTING_REFRESH_STALE_HOURS=12
+```
+
+### 8.5 Catalog repair (Phase 5)
 
 ```bash
 CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS=60
 CRON_YSTM_CATALOG_REPAIR_MAX_SCANNED=160
 ```
 
-### 8.5 Main ingestion (Phase 6)
+### 8.6 Main ingestion (Phase 6)
 
 ```bash
 INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE=60
@@ -507,7 +516,7 @@ INGEST_BATCH_SIZE=200
 | `0 4 * * *` | `/api/cron/discovery` | 2 |
 | `0 6 * * *` | `/api/cron/ystm-coverage-audit` | 1 |
 | `0 8 * * *` | `/api/cron/ystm-missing-ingest` | 3 |
-| `0 10 * * *` | `/api/cron/ystm-existing-refresh` | 4 |
+| `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 |
 | `0 12 * * *` | `/api/cron/ystm-catalog-repair` | 5 |
 
 Source: `vercel.json`.

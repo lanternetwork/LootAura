@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   evaluateYstmCoverageOperationalHealth,
   YSTM_COVERAGE_SLO_MIN_VALID_URLS,
-  YSTM_COVERAGE_TARGET_PCT,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageOperationalHealth'
+import { YSTM_COVERAGE_TARGET_PCT } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
 
 const nowMs = Date.parse('2026-05-20T12:00:00.000Z')
 

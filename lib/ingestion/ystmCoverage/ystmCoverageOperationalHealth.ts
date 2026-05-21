@@ -1,5 +1,3 @@
-import { YSTM_COVERAGE_TARGET_PCT } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
-
 export type YstmCoverageOperationalAlertLevel = 'warning' | 'critical'
 
 export type YstmCoverageOperationalAlert = {

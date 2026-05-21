@@ -54,6 +54,10 @@
     {
       "path": "/api/cron/ystm-catalog-repair",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/ystm-catalog-repair",
+      "schedule": "0 14 * * *"
     }
   ]
 }

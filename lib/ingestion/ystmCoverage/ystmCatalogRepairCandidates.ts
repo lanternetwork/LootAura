@@ -47,6 +47,24 @@ export function isEligibleForCatalogRepairRetry(
   return nowMs - attemptedMs >= failedRetryHours * 60 * 60 * 1000
 }
 
+/** Lower tier = higher priority (publish failures before large needs_check backlog). */
+const CATALOG_REPAIR_STATUS_PRIORITY: Record<string, number> = {
+  publish_failed: 0,
+  needs_geocode: 1,
+  ready: 2,
+  needs_check: 3,
+}
+
+export function compareCatalogRepairCandidatePriority(
+  a: Pick<YstmCatalogRepairCandidate, 'status' | 'ingestedSaleId'>,
+  b: Pick<YstmCatalogRepairCandidate, 'status' | 'ingestedSaleId'>
+): number {
+  const tierA = CATALOG_REPAIR_STATUS_PRIORITY[a.status] ?? 99
+  const tierB = CATALOG_REPAIR_STATUS_PRIORITY[b.status] ?? 99
+  if (tierA !== tierB) return tierA - tierB
+  return a.ingestedSaleId.localeCompare(b.ingestedSaleId)
+}
+
 export function isCatalogRepairCandidateRow(
   row: Pick<IngestedRow, 'source_url' | 'status' | 'published_sale_id'>
 ): boolean {
@@ -146,6 +164,8 @@ export async function fetchCatalogRepairCandidatePage(
   }
 
   const nextQueueOffset = examined === 0 ? params.queueOffset % queueTotal : offset
+
+  candidates.sort(compareCatalogRepairCandidatePriority)
 
   return {
     candidates,

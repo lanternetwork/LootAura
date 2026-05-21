@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compareCatalogRepairCandidatePriority,
   isCatalogRepairCandidateRow,
   isEligibleForCatalogRepairRetry,
 } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairCandidates'
@@ -38,6 +39,21 @@ describe('ystmCatalogRepairCandidates', () => {
         published_sale_id: 'sale-1',
       })
     ).toBe(false)
+  })
+
+  it('prioritizes publish_failed before needs_check', () => {
+    expect(
+      compareCatalogRepairCandidatePriority(
+        { status: 'publish_failed', ingestedSaleId: 'b' },
+        { status: 'needs_check', ingestedSaleId: 'a' }
+      )
+    ).toBeLessThan(0)
+    expect(
+      compareCatalogRepairCandidatePriority(
+        { status: 'needs_geocode', ingestedSaleId: 'a' },
+        { status: 'ready', ingestedSaleId: 'b' }
+      )
+    ).toBeLessThan(0)
   })
 
   it('retries failed repair outcomes after cooldown', () => {

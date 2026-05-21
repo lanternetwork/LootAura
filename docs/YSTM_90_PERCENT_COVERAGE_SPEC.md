@@ -337,7 +337,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 
 **Cron:** `GET/POST /api/cron/ystm-catalog-repair` — default **12:00 UTC daily**.
 
-**Default budgets:** `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS` default 20, cap 100.
+**Default budgets:** `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS` default **60** (burn-in), cap 100; `MAX_SCANNED` default **160**, cap 250.
 
 **Work items**
 
@@ -347,6 +347,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 5.2 | Raise repair budgets while `catalogRepairQueue ≥ 75`. |
 | 5.3 | Triage top `publish_failed` / `failure_details` codes (sample from same-run publish failures in diagnostics). |
 | 5.4 | Code fix only for repeatable publish/geocode blockers. |
+| 5.5 | **Code:** Never-attempted first (`catalog_repair_attempted_at` nulls-first); status priority `publish_failed` → `needs_geocode` → `ready` → `needs_check`; burn-in 60/160; dual cron 12:00 + 14:00 UTC. |
 
 **Exit criteria**
 
@@ -517,7 +518,7 @@ INGEST_BATCH_SIZE=200
 | `0 6 * * *` | `/api/cron/ystm-coverage-audit` | 1 |
 | `0 8 * * *` | `/api/cron/ystm-missing-ingest` | 3 |
 | `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 |
-| `0 12 * * *` | `/api/cron/ystm-catalog-repair` | 5 |
+| `0 12 * * *`, `0 14 * * *` | `/api/cron/ystm-catalog-repair` | 5 |
 
 Source: `vercel.json`.
 

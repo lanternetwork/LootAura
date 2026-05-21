@@ -490,7 +490,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | `0 6 * * *`, `0 18 * * *` | `/api/cron/ystm-coverage-audit` | 1 — build audit footprint |
 | `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 — publish missing URLs |
 | `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
-| `0 12 * * *` | `/api/cron/ystm-catalog-repair` | 5 — repair stuck ingest |
+| `0 12 * * *`, `0 14 * * *` | `/api/cron/ystm-catalog-repair` | 5 — repair stuck ingest |
 
 **Default budgets (repo burn-in; override via env)**
 
@@ -501,6 +501,8 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | 3 Missing ingest | `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS`, `MAX_SCANNED` | 48 (60), 160 (200) |
 | 4 Existing refresh | `CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS`, `MAX_SCANNED` | 32 (80), 120 (200) |
 | 5 Catalog repair | `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS`, `MAX_SCANNED` | 60 (100), 160 (250) |
+
+- Catalog-repair cron prioritizes **never-attempted** rows, then **`publish_failed`** before **`needs_check`**; watch `catalogRepairQueue` on the scoreboard (baseline **294**).
 
 **Operational checks**
 

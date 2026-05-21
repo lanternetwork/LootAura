@@ -296,6 +296,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 3.3 | Track `missingIngestionPublished`, `missingIngestionFailed` daily. |
 | 3.4 | Optional second daily cron slot for missing-ingest while `coveragePct < 90`. |
 | 3.5 | Sample failures: fetch_failed, address_validation_failed, publish_failed — fix only systemic issues. |
+| 3.6 | **Code:** Missing-ingest queue orders **never-attempted** rows first (`missing_ingestion_attempted_at` nulls-first); burn-in 48 attempts / 160 scanned per run; dual cron 08:00 + 20:00 UTC. |
 
 **Exit criteria**
 
@@ -654,6 +655,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-05-21 | Phase 0 G0 complete; KPI = `coveragePct` ≥ 90 only | Lead agent approved; proceed Phase 1 |
+| 2026-05-21 | Phases 1–2 code on single PR; Phase 3 missing-ingest queue ordering | CI green on #481 |
 | | Target `daysToTarget` | |
 | | Minimum `validActiveYstmUrls` at G4 | |
 | | Approved env budget tier (staging/prod) | |

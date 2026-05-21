@@ -505,6 +505,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 **Operational checks**
 
 - After deploy, manually invoke once: `GET /api/cron/ystm-coverage-audit` with cron auth; confirm JSON `listingUrlsDiscovered > 0` and SQL `valid_active_v` increases.
+- Missing-ingest cron scans **never-attempted** URLs first (`missing_ingestion_attempted_at` nulls-first) before failed retries; watch `missingIngestionNeverAttempted` on the scoreboard.
 - If `coveragePct` stays null with `valid_active_v = 0`, fix migrations/cron before tuning missing-ingest.
 - Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days.
 

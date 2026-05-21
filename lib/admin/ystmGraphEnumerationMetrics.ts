@@ -62,7 +62,7 @@ export async function buildYstmGraphEnumerationMetrics(
     validation_status: string
     validation_failure_reason: string | null
   }>
-  let validationsLast24h = recent.length
+  const validationsLast24h = recent.length
   let fetchFailures = 0
   let blocked = 0
   for (const row of recent) {

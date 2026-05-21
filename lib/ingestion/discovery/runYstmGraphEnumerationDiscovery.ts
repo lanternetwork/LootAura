@@ -1,4 +1,9 @@
-import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
+import {
+  EXTERNAL_FETCH_REASON,
+  fetchSafeExternalPageHtml,
+  hashHostForLog,
+  type ExternalFetchLogContext,
+} from '@/lib/ingestion/adapters/externalPageSafeFetch'
 import type { DiscoveryCronBudgets } from '@/lib/ingestion/discovery/discoveryCronConfig'
 import {
   extractCityPageCandidatesFromStateIndexHtml,
@@ -22,6 +27,21 @@ import {
 } from '@/lib/ingestion/discovery/ystmSourcePageCandidateStatus'
 import { getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+
+const GRAPH_ENUM_ADAPTER = 'ystm_graph_enumeration'
+
+function buildFetchContext(index: number, stateCode: string, city: string): ExternalFetchLogContext {
+  return {
+    component: 'ingestion/discovery/runYstmGraphEnumerationDiscovery',
+    operation: 'fetch_page',
+    adapter: GRAPH_ENUM_ADAPTER,
+    city,
+    state: stateCode,
+    pageIndex: index,
+    hostHash: hashHostForLog('yardsaletreasuremap.com'),
+    reason: EXTERNAL_FETCH_REASON.OK,
+  }
+}
 
 export type YstmGraphEnumerationTelemetry = {
   statesScanned: number
@@ -112,14 +132,11 @@ export async function runYstmGraphEnumerationDiscovery(
   )
 
   try {
-    const indexHtmlByState = await mapPool(stateEntries, args.budgets.indexFetchConcurrency, async (entry) => {
-      const html = await fetchHtml(entry.indexUrl, {
-        component: 'ingestion/discovery/runYstmGraphEnumerationDiscovery',
-        operation: 'fetch_state_index',
-        adapter: 'ystm_graph_enumeration',
-        city: 'discovery',
-        state: entry.stateCode,
-      })
+    const indexHtmlByState = await mapPool(stateEntries, args.budgets.indexFetchConcurrency, async (entry, idx) => {
+      const html = await fetchHtml(
+        entry.indexUrl,
+        buildFetchContext(idx, entry.stateCode, 'discovery')
+      )
       return { entry, html }
     })
 
@@ -158,7 +175,7 @@ export async function runYstmGraphEnumerationDiscovery(
       blockedCount: 0,
       plannedValidations: validationTargets.length,
     })
-    let maxValidations = Math.min(
+    const maxValidations = Math.min(
       args.budgets.maxValidationFetchesPerRun,
       throttle.effectiveMaxValidations
     )
@@ -167,17 +184,14 @@ export async function runYstmGraphEnumerationDiscovery(
 
     const validated: ValidatedDiscoveryCandidate[] = []
 
-    await mapPool(toValidate, concurrency, async (row) => {
+    await mapPool(toValidate, concurrency, async (row, idx) => {
       telemetry.validationsAttempted += 1
       const discoveredRow = rowToDiscovered(row)
       try {
-        const html = await fetchHtml(row.canonical_url, {
-          component: 'ingestion/discovery/runYstmGraphEnumerationDiscovery',
-          operation: 'validate_candidate',
-          adapter: 'ystm_graph_enumeration',
-          city: discoveredRow.city,
-          state: discoveredRow.state,
-        })
+        const html = await fetchHtml(
+          row.canonical_url,
+          buildFetchContext(idx, discoveredRow.state, discoveredRow.city)
+        )
         const validation = validateDiscoveredCityPage({
           html,
           pageUrl: row.canonical_url,

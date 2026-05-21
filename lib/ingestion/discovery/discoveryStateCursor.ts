@@ -1,10 +1,28 @@
 import { getVerifiedStateIndexEntries } from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 
-/** Sorted USPS codes for fair nationwide progression. */
+/** High-volume states first for Phase 2 source expansion (round-robin still applies within catalog). */
+export const YSTM_DISCOVERY_PRIORITY_STATE_CODES = [
+  'IL',
+  'TX',
+  'CA',
+  'FL',
+  'OH',
+  'PA',
+  'NY',
+  'GA',
+  'NC',
+  'MI',
+] as const
+
+/** Sorted USPS codes for fair nationwide progression; priority states lead the catalog. */
 export function listNationwideDiscoveryStateCodes(): string[] {
-  return getVerifiedStateIndexEntries()
+  const all = getVerifiedStateIndexEntries()
     .map((e) => e.stateCode)
     .sort((a, b) => a.localeCompare(b))
+  const prioritySet = new Set<string>(YSTM_DISCOVERY_PRIORITY_STATE_CODES)
+  const priority = YSTM_DISCOVERY_PRIORITY_STATE_CODES.filter((code) => all.includes(code))
+  const rest = all.filter((code) => !prioritySet.has(code))
+  return [...priority, ...rest]
 }
 
 export type StateBatchSelection = {

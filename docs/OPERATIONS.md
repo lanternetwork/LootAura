@@ -486,7 +486,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 | UTC | Path | Phase |
 |-----|------|-------|
-| `0 4 * * *` | `/api/cron/discovery` | 2 — source expansion |
+| `0 4 * * *`, `0 16 * * *` | `/api/cron/discovery` | 2 — source expansion |
 | `0 6 * * *`, `0 18 * * *` | `/api/cron/ystm-coverage-audit` | 1 — build audit footprint |
 | `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 — publish missing URLs |
 | `0 10 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
@@ -497,7 +497,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | Phase | Key variables | Defaults (cap) |
 |-------|---------------|----------------|
 | 1 Audit | `CRON_YSTM_COVERAGE_MAX_CONFIGS`, `MAX_LIST_FETCHES`, `MAX_DETAIL_VALIDATIONS`, `MAX_URLS_PER_LIST_PAGE` | 24 (40), 40 (80), 80 (120), 120 (200) |
-| 2 Discovery | `CRON_DISCOVERY_MAX_STATES_PER_RUN`, `MAX_DISCOVERED_PAGES`, `MAX_VALIDATION_FETCHES`, `MAX_PLACEHOLDER_REPAIR_CONFIGS` | 10 (15), 200 (500), 120 (200), 120 (200) |
+| 2 Discovery | `CRON_DISCOVERY_MAX_STATES_PER_RUN`, `MAX_DISCOVERED_PAGES`, `MAX_VALIDATION_FETCHES`, `MAX_REVALIDATION_CONFIGS`, `MAX_PLACEHOLDER_REPAIR_CONFIGS` | 10 (15), 200 (500), 120 (200), 120 (200), 120 (200) |
 | 3 Missing ingest | `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS`, `MAX_SCANNED` | 48 (60), 160 (200) |
 | 4 Existing refresh | `CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS`, `MAX_SCANNED` | 32 (80), 120 (200) |
 | 5 Catalog repair | `CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS`, `MAX_SCANNED` | 60 (100), 160 (250) |

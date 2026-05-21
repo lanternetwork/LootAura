@@ -15,6 +15,7 @@ import {
   hashDiscoveryUrl,
   type DiscoveryPromotionTelemetry,
 } from '@/lib/ingestion/discovery/sourceDiscoveryTelemetry'
+import { isYstmStateShellCityPageUrl } from '@/lib/ingestion/discovery/ystmCityListPageUrl'
 import { logger } from '@/lib/log'
 
 const EXTERNAL_PAGE_SOURCE = 'external_page_source'
@@ -223,6 +224,20 @@ export async function promoteSourceDiscoveryResults(
         state: loc.state,
         action: 'skipped',
         reason: 'non_canonical_url',
+        sharedHubPage: candidate.sharedHubPage,
+        canonicalUrlHash: urlHash,
+      })
+      telemetry.skipped += 1
+      continue
+    }
+
+    if (isYstmStateShellCityPageUrl(canonical)) {
+      telemetry.validationsFailed += 1
+      records.push({
+        city: loc.city,
+        state: loc.state,
+        action: 'skipped',
+        reason: 'state_shell_not_city_page',
         sharedHubPage: candidate.sharedHubPage,
         canonicalUrlHash: urlHash,
       })

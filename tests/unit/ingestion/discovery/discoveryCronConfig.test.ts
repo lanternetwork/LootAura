@@ -18,5 +18,6 @@ describe('parseDiscoveryCronBudgets', () => {
     expect(budgets.maxValidationFetchesPerRun).toBe(120)
     expect(budgets.maxRuntimeMs).toBe(240_000)
     expect(budgets.maxPlaceholderRepairConfigsPerRun).toBe(120)
+    expect(budgets.maxRevalidationConfigsPerRun).toBe(120)
   })
 })

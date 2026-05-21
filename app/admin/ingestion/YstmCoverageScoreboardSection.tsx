@@ -9,6 +9,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  ReferenceLine,
 } from 'recharts'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 
@@ -101,6 +102,23 @@ export default function YstmCoverageScoreboardSection() {
 
       {data && (
         <>
+          {!data.operationalHealth.healthy && data.operationalHealth.alerts.length > 0 && (
+            <div className="mb-4 space-y-2">
+              {data.operationalHealth.alerts.map((alert) => (
+                <p
+                  key={alert.code}
+                  className={`rounded border px-3 py-2 text-sm font-medium ${
+                    alert.level === 'critical'
+                      ? 'border-red-500 bg-red-100 text-red-950'
+                      : 'border-amber-500 bg-amber-100 text-amber-950'
+                  }`}
+                >
+                  {alert.level === 'critical' ? 'Critical' : 'Warning'}: {alert.message}
+                </p>
+              ))}
+            </div>
+          )}
+
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Coverage</p>
@@ -140,6 +158,31 @@ export default function YstmCoverageScoreboardSection() {
               {data.lastRun.configCursorAfter}
             </p>
           )}
+
+          <div className="mb-6 rounded-md border border-indigo-200 bg-indigo-50 p-4">
+            <h3 className="text-sm font-semibold text-indigo-950">Pipeline backlog (Phase 7 SLO)</h3>
+            <p className="mt-1 text-xs text-indigo-900">
+              Work queues that must drain for coverage to reach {data.targetPct}% — distinct from crawl
+              discovered/skipped counts.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Metric
+                label="Missing valid YSTM"
+                value={data.pipelineBacklog.missingValidUrls}
+                highlight
+              />
+              <Metric
+                label="Missing ingest queue"
+                value={data.pipelineBacklog.missingIngestionQueue}
+              />
+              <Metric
+                label="Never attempted"
+                value={data.pipelineBacklog.missingIngestionNeverAttempted}
+              />
+              <Metric label="Catalog repair" value={data.pipelineBacklog.catalogRepairQueue} />
+              <Metric label="Stale refresh" value={data.pipelineBacklog.existingRefreshStale} />
+            </div>
+          </div>
 
           <div className="mb-6 rounded-md border border-rose-200 bg-rose-50 p-4">
             <h3 className="text-sm font-semibold text-rose-950">Catalog repair (Phase 5)</h3>
@@ -227,6 +270,12 @@ export default function YstmCoverageScoreboardSection() {
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                   <Tooltip />
+                  <ReferenceLine
+                    y={data.targetPct}
+                    stroke="#b45309"
+                    strokeDasharray="4 4"
+                    label={{ value: `${data.targetPct}% target`, position: 'insideTopRight', fontSize: 10 }}
+                  />
                   <Line type="monotone" dataKey="coverage" stroke="#047857" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>

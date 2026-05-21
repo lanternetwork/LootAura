@@ -6,6 +6,12 @@ import {
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import { loadLootAuraPublishedYstmIndex } from '@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex'
 import {
+  buildYstmCoveragePipelineBacklog,
+  evaluateYstmCoverageOperationalHealth,
+  type YstmCoverageOperationalHealth,
+  type YstmCoveragePipelineBacklog,
+} from '@/lib/ingestion/ystmCoverage/ystmCoverageOperationalHealth'
+import {
   computeCoveragePct,
   YSTM_COVERAGE_TARGET_PCT,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
@@ -54,6 +60,8 @@ export type YstmCoverageScoreboard = {
   missingIngestion: YstmCoverageMissingIngestionAggregate
   existingRefresh: YstmExistingUrlRefreshAggregate
   catalogRepair: YstmCatalogRepairAggregate
+  pipelineBacklog: YstmCoveragePipelineBacklog
+  operationalHealth: YstmCoverageOperationalHealth
 }
 
 type AuditRunRow = {
@@ -123,6 +131,29 @@ export async function buildYstmCoverageScoreboard(
     }))
     .reverse()
 
+  const pipelineBacklog = buildYstmCoveragePipelineBacklog({
+    missingValidYstmUrls: agg.missingValidYstmUrls,
+    missingIngestion,
+    catalogRepair,
+    existingRefresh,
+  })
+
+  const operationalHealth = evaluateYstmCoverageOperationalHealth({
+    targetPct: YSTM_COVERAGE_TARGET_PCT,
+    coveragePct,
+    validActiveYstmUrls: agg.validActiveYstmUrls,
+    missingValidYstmUrls: agg.missingValidYstmUrls,
+    lastAuditAt: last?.completed_at ?? null,
+    trend,
+    missingIngestionQueue: missingIngestion.missingQueueTotal,
+    missingIngestionNeverAttempted: missingIngestion.missingIngestionNeverAttempted,
+    catalogRepairQueue: catalogRepair.repairQueueTotal,
+    existingRefreshStale: existingRefresh.staleOver12h,
+    configsWithoutSourcePages: sourceExpansion.configsWithoutSourcePages,
+    crawlableConfigs: sourceExpansion.crawlableConfigs,
+    nowMs: now.getTime(),
+  })
+
   return {
     targetPct: YSTM_COVERAGE_TARGET_PCT,
     generatedAt: now.toISOString(),
@@ -149,6 +180,8 @@ export async function buildYstmCoverageScoreboard(
     missingIngestion,
     existingRefresh,
     catalogRepair,
+    pipelineBacklog,
+    operationalHealth,
   }
 }
 

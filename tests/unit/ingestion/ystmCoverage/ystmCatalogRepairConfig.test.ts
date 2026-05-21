@@ -4,7 +4,7 @@ import { parseYstmCatalogRepairBudgets } from '@/lib/ingestion/ystmCoverage/ystm
 describe('parseYstmCatalogRepairBudgets', () => {
   it('parses env overrides with caps', () => {
     const budgets = parseYstmCatalogRepairBudgets({
-      CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS: '99',
+      CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS: '999',
       CRON_YSTM_CATALOG_REPAIR_MAX_SCANNED: '999',
     } as unknown as NodeJS.ProcessEnv)
     expect(budgets.maxRepairsPerRun).toBe(100)

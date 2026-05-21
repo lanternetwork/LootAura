@@ -216,49 +216,55 @@ export async function runYstmCoverageAuditCron(
         continue
       }
 
-      const pageUrl = pages[0]!
-      try {
-        const html = await fetchSafeExternalPageHtml(pageUrl, {
-          city: config.city,
-          state: config.state,
-          pageIndex: 0,
-          adapter: 'ystm_coverage_audit',
-        })
-        listPagesFetched += 1
-        const extracted = extractYstmListingUrlsFromListHtml(html, pageUrl).slice(
-          0,
-          budgets.maxUrlsPerListPage
-        )
-        listingUrlsDiscovered += extracted.length
+      for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+        if (listPagesFetched >= budgets.maxListFetchesPerRun) break
+        if (Date.now() - startedMs >= budgets.maxRuntimeMs) break
 
-        for (const item of extracted) {
-          const visible = publishedIndex.visibleCanonicalUrls.has(item.canonicalUrl)
-          listOnlyUpserts.push({
-            canonicalUrl: item.canonicalUrl,
-            state: config.state,
+        const pageUrl = pages[pageIndex]!
+        try {
+          const html = await fetchSafeExternalPageHtml(pageUrl, {
             city: config.city,
-            configKey: buildConfigKey(config.city, config.state),
-            ystmValidActive: false,
-            ystmInvalidReason: null,
-            lootauraVisible: visible,
-            listSeenAt,
-            detailCheckedAt: null,
+            state: config.state,
+            pageIndex,
+            adapter: 'ystm_coverage_audit',
           })
-          detailQueue.push({
-            canonicalUrl: item.canonicalUrl,
-            sourceUrl: item.sourceUrl,
+          listPagesFetched += 1
+          const extracted = extractYstmListingUrlsFromListHtml(html, pageUrl).slice(
+            0,
+            budgets.maxUrlsPerListPage
+          )
+          listingUrlsDiscovered += extracted.length
+
+          for (const item of extracted) {
+            const visible = publishedIndex.visibleCanonicalUrls.has(item.canonicalUrl)
+            listOnlyUpserts.push({
+              canonicalUrl: item.canonicalUrl,
+              state: config.state,
+              city: config.city,
+              configKey: buildConfigKey(config.city, config.state),
+              ystmValidActive: false,
+              ystmInvalidReason: null,
+              lootauraVisible: visible,
+              listSeenAt,
+              detailCheckedAt: null,
+            })
+            detailQueue.push({
+              canonicalUrl: item.canonicalUrl,
+              sourceUrl: item.sourceUrl,
+              city: config.city,
+              state: config.state,
+              configKey: buildConfigKey(config.city, config.state),
+            })
+          }
+        } catch (err) {
+          logger.warn('YSTM coverage audit list fetch failed', {
+            ...logContext,
             city: config.city,
             state: config.state,
-            configKey: buildConfigKey(config.city, config.state),
+            pageIndex,
+            message: err instanceof Error ? err.message : String(err),
           })
         }
-      } catch (err) {
-        logger.warn('YSTM coverage audit list fetch failed', {
-          ...logContext,
-          city: config.city,
-          state: config.state,
-          message: err instanceof Error ? err.message : String(err),
-        })
       }
 
       cursor = (cursor + 1) % catalogSize

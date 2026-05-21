@@ -219,6 +219,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 1.3 | Monitor `list_pages_fetched`, `listing_urls_discovered`, `detail_pages_validated` on `ystm_coverage_audit_runs`. |
 | 1.4 | Ensure `observationFootprintUrls` and `validActiveYstmUrls` trend up week-over-week. |
 | 1.5 | Optional: second daily audit window (additional `vercel.json` cron entry) if single run insufficient — requires deploy approval. |
+| 1.6 | **Code (PR #479):** `extractYstmListingUrlsFromListHtml` reads `metadataStr` sales URLs; audit cron fetches **all** `source_pages` per config (not only `pages[0]`). |
 
 **Exit criteria**
 
@@ -632,7 +633,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 | G0.2 | Archive production ingestion diagnostics rollup (Phase G, funnel, acquisition) | [x] (2026-05-21 in Appendix A) |
 | G0.3 | Document production env overrides vs repo defaults (Vercel → table below) | [x] (all unset — repo burn-in defaults apply; not used in Vercel) |
 | G0.4 | Confirm detail-first proof **pass** on production | [x] |
-| G0.5 | Lead sign-off: program KPI = **`coveragePct` ≥ 90** only (not parser SLO / Phase G fresh insert) | [ ] |
+| G0.5 | Lead sign-off: program KPI = **`coveragePct` ≥ 90** only (not parser SLO / Phase G fresh insert) | [x] (2026-05-21) |
 | G0.6 | Re-run SQL on `ystm_coverage_observations` after first audit (post–Phase 1 deploy) | [ ] |
 
 **Production env overrides:** None configured in Vercel and not planned — **repo burn-in defaults** from PR #479 apply in production after deploy.
@@ -650,6 +651,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-05-21 | Phase 0 G0 complete; KPI = `coveragePct` ≥ 90 only | Lead agent approved; proceed Phase 1 |
 | | Target `daysToTarget` | |
 | | Minimum `validActiveYstmUrls` at G4 | |
 | | Approved env budget tier (staging/prod) | |

@@ -595,7 +595,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 | `publishedVisibleInAuditFootprint` (P) | **0** | Production SQL |
 | `missingValidYstmUrls` (M) | **0** | Production SQL (not actionable) |
 | `observationFootprintUrls` | **0** | Production SQL |
-| `publishedActiveLootAuraYstmUrls` (corpus) | **~299** (planning proxy) | PR #478 / prior prod analysis |
+| `publishedActiveLootAuraYstmUrls` (corpus) | **262** | Scoreboard `2026-05-21T14:09:12Z` (G0.1 JSON) |
 | `crawlableConfigs` | **62** | Diagnostics acquisition |
 | `pendingDiscoveryConfigs` | **922** | Diagnostics acquisition |
 | `validatedDiscoveryConfigs` | **54** | Diagnostics acquisition |
@@ -628,22 +628,23 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 
 | Step | Action | Done |
 |------|--------|------|
-| G0.1 | Export `GET /api/admin/ingestion/ystm-coverage` while logged in as admin; save JSON with timestamp | [ ] |
+| G0.1 | Export `GET /api/admin/ingestion/ystm-coverage` while logged in as admin; save JSON with timestamp | [x] (`docs/baselines/ystm-coverage-scoreboard-2026-05-21T1409Z.json`) |
 | G0.2 | Archive production ingestion diagnostics rollup (Phase G, funnel, acquisition) | [x] (2026-05-21 in Appendix A) |
-| G0.3 | Document production env overrides vs repo defaults (Vercel → table below) | [ ] |
+| G0.3 | Document production env overrides vs repo defaults (Vercel → table below) | [x] (all unset — repo burn-in defaults apply; not used in Vercel) |
 | G0.4 | Confirm detail-first proof **pass** on production | [x] |
 | G0.5 | Lead sign-off: program KPI = **`coveragePct` ≥ 90** only (not parser SLO / Phase G fresh insert) | [ ] |
 | G0.6 | Re-run SQL on `ystm_coverage_observations` after first audit (post–Phase 1 deploy) | [ ] |
 
-**Production env overrides (fill from Vercel):**
+**Production env overrides:** None configured in Vercel and not planned — **repo burn-in defaults** from PR #479 apply in production after deploy.
 
-| Variable | Production value | Repo default (burn-in) |
-|----------|------------------|-------------------------|
-| `CRON_YSTM_COVERAGE_MAX_CONFIGS` | | 24 |
-| `CRON_YSTM_COVERAGE_MAX_DETAIL_VALIDATIONS` | | 80 |
-| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | | 120 |
-| `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS` | | 48 |
-| (add others as needed) | | |
+| Variable | Production (Vercel) | Repo default (burn-in) |
+|----------|---------------------|-------------------------|
+| `CRON_YSTM_COVERAGE_MAX_CONFIGS` | unset | 24 |
+| `CRON_YSTM_COVERAGE_MAX_LIST_FETCHES` | unset | 40 |
+| `CRON_YSTM_COVERAGE_MAX_DETAIL_VALIDATIONS` | unset | 80 |
+| `CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS` | unset | 48 |
+| `CRON_DISCOVERY_MAX_VALIDATION_FETCHES` | unset | 120 |
+| `CRON_DISCOVERY_MAX_STATES_PER_RUN` | unset | 10 |
 
 ## 17. Decision log (lead fill-in)
 

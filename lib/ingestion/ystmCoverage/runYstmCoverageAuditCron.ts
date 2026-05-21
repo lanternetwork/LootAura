@@ -64,6 +64,17 @@ function buildConfigKey(city: string, state: string): string {
   return `${state}|${city}`
 }
 
+/** Postgres upsert rejects duplicate conflict keys within a single INSERT batch. */
+function dedupeDetailQueueByCanonical<
+  T extends { canonicalUrl: string },
+>(items: T[]): T[] {
+  const byCanonical = new Map<string, T>()
+  for (const item of items) {
+    byCanonical.set(item.canonicalUrl, item)
+  }
+  return [...byCanonical.values()]
+}
+
 async function insertAuditRun(
   admin: ReturnType<typeof getAdminDb>,
   row: Record<string, unknown>
@@ -273,12 +284,15 @@ export async function runYstmCoverageAuditCron(
 
     configCursorAfter = cursor
 
-    if (listOnlyUpserts.length > 0) {
-      await upsertYstmCoverageObservations(admin, listOnlyUpserts)
+    const dedupedListUpserts = dedupeDetailQueueByCanonical(listOnlyUpserts)
+    const dedupedDetailQueue = dedupeDetailQueueByCanonical(detailQueue)
+
+    if (dedupedListUpserts.length > 0) {
+      await upsertYstmCoverageObservations(admin, dedupedListUpserts)
     }
 
     const detailCheckedAt = new Date().toISOString()
-    for (const item of detailQueue) {
+    for (const item of dedupedDetailQueue) {
       if (detailPagesValidated >= budgets.maxDetailValidationsPerRun) break
       if (Date.now() - startedMs >= budgets.maxRuntimeMs) break
 

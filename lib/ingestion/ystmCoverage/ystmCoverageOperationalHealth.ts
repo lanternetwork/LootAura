@@ -32,6 +32,9 @@ export type YstmCoverageOperationalHealthInput = {
   existingRefreshStale: number
   configsWithoutSourcePages: number
   crawlableConfigs: number
+  consecutiveDaysAtTarget?: number
+  requiredConsecutiveDaysAtTarget?: number
+  footprintMeetsProgramMinimum?: boolean
   nowMs?: number
 }
 
@@ -115,6 +118,31 @@ export function evaluateYstmCoverageOperationalHealth(
       code: 'coverage_below_target',
       message: `Coverage ${input.coveragePct.toFixed(1)}% is below ${targetPct}% target (${input.missingValidYstmUrls} valid YSTM URLs still missing on LootAura).`,
     })
+  } else if (
+    input.coveragePct != null &&
+    input.coveragePct >= targetPct &&
+    valid >= YSTM_COVERAGE_SLO_MIN_VALID_URLS
+  ) {
+    const requiredDays = input.requiredConsecutiveDaysAtTarget
+    const streak = input.consecutiveDaysAtTarget
+    if (
+      requiredDays != null &&
+      streak != null &&
+      streak < requiredDays
+    ) {
+      alerts.push({
+        level: 'warning',
+        code: 'coverage_slo_hold_in_progress',
+        message: `Coverage meets ${targetPct}% but only ${streak}/${requiredDays} consecutive UTC days at target (G4 requires ${requiredDays} days).`,
+      })
+    }
+    if (input.footprintMeetsProgramMinimum === false) {
+      alerts.push({
+        level: 'warning',
+        code: 'coverage_footprint_below_program_minimum',
+        message: `Audit footprint has ${valid} valid active URLs — nationwide G4 sign-off typically requires a larger footprint (see scoreboard program minimum).`,
+      })
+    }
   }
 
   const trendPoints = input.trend.filter((p) => p.coveragePct != null)

@@ -84,6 +84,8 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.catalogRepair.repairQueueTotal).toBe(0)
     expect(json.catalogRepair.needsGeocode).toBe(0)
     expect(json.pipelineBacklog.missingValidUrls).toBe(0)
+    expect(json.sloAttainment.consecutiveDaysAtTarget).toBe(0)
+    expect(json.sloAttainment.programComplete).toBe(false)
     expect(json.operationalHealth.alerts.some((a: { code: string }) => a.code === 'coverage_no_audit_denominator')).toBe(
       true
     )

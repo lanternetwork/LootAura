@@ -470,7 +470,7 @@ Optional: `parser_version`, `source_type`. Malformed metadata **fails** harness 
 
 Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, `parser.source.failing`, `parser.source.recovered`, `parser.fixture.stale`).
 
-### YSTM 90% product coverage (Phases 1–5)
+### YSTM 90% product coverage (Phases 1–7)
 
 **Goal:** At least **90%** of **valid-active** YSTM listing URLs in the coverage audit footprint are **map-visible** on LootAura (`coveragePct ≥ 90`). This is **not** the detail-first parser SLO. Full program: `docs/YSTM_90_PERCENT_COVERAGE_SPEC.md`.
 
@@ -512,7 +512,27 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 - Missing-ingest cron scans **never-attempted** URLs first (`missing_ingestion_attempted_at` nulls-first) before failed retries; watch `missingIngestionNeverAttempted` on the scoreboard.
 - Existing-refresh cron prioritizes **stale/never-synced** rows, then **published** ingested sales; watch `existingRefreshStale` and `neverSynced` on the scoreboard.
 - If `coveragePct` stays null with `valid_active_v = 0`, fix migrations/cron before tuning missing-ingest.
-- Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days.
+- Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days (see Phase 7 below).
+
+**Phase 7 — SLO attainment and steady state (G4)**
+
+- **Program KPI:** `coveragePct ≥ 90` on the admin scoreboard (`sloAttainment` tracks consecutive UTC days at target).
+- **G4 complete when:** `sloAttainment.programComplete` is true — **14** consecutive days at target (last audit per UTC day), current `validActiveYstmUrls ≥ 5000`, and current coverage at target.
+- **Weekly lead review:** coverage %, trend chart, pipeline backlog, `sloAttainment.consecutiveDaysAtTarget`, source expansion counts.
+- **G0.6 post-deploy:** re-run footprint SQL on `lootaura_v2.ystm_coverage_observations` after the first production audit (see spec Appendix A).
+
+**Suggested steady-state env (after G4 — ratchet down burn-in via Vercel)**
+
+| Phase | Variables | Steady-state starting point |
+|-------|-----------|----------------------------|
+| 1 Audit | `CRON_YSTM_COVERAGE_*` | 8 configs, 12 list fetches, 24 detail validations (single daily window optional) |
+| 2 Discovery | `CRON_DISCOVERY_*` | 3 states, 80 discovered, 40 validations per run |
+| 3 Missing ingest | `CRON_YSTM_MISSING_INGEST_*` | 12 attempts, 48 scanned |
+| 4 Existing refresh | `CRON_YSTM_EXISTING_REFRESH_*` | 16 attempts, 80 scanned |
+| 5 Catalog repair | `CRON_YSTM_CATALOG_REPAIR_*` | 30 attempts, 80 scanned |
+| 6 Main ingestion | orchestration / geocode | 20 configs, 60s budget, geocode queue 15, concurrency 2 |
+
+Do not change production env until G4 is signed off; repo burn-in defaults remain until then.
 
 ### External source discovery — nationwide registry automation (Phase 4)
 

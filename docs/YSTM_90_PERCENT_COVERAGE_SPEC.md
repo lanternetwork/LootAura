@@ -515,13 +515,13 @@ INGEST_BATCH_SIZE=200
 |--------------|------|-------|
 | `*/2 * * * *` | `/api/cron/daily?mode=ingestion` | 6 |
 | `*/2 * * * *` | `/api/cron/geocode` | 5/6 |
-| `0 4 * * *` | `/api/cron/discovery` | 2 |
-| `0 6 * * *` | `/api/cron/ystm-coverage-audit` | 1 |
-| `0 8 * * *` | `/api/cron/ystm-missing-ingest` | 3 |
+| `0 4 * * *`, `0 16 * * *` | `/api/cron/discovery` | 2 |
+| `0 6 * * *`, `0 18 * * *` | `/api/cron/ystm-coverage-audit` | 1 |
+| `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 |
 | `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 |
 | `0 12 * * *`, `0 14 * * *` | `/api/cron/ystm-catalog-repair` | 5 |
 
-Source: `vercel.json`.
+Source: `vercel.json`. Scoreboard `sloAttainment` (Phase 7) derives the G4 hold streak from completed rows in `ystm_coverage_audit_runs`.
 
 ---
 
@@ -648,7 +648,20 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 | G0.3 | Document production env overrides vs repo defaults (Vercel → table below) | [x] (all unset — repo burn-in defaults apply; not used in Vercel) |
 | G0.4 | Confirm detail-first proof **pass** on production | [x] |
 | G0.5 | Lead sign-off: program KPI = **`coveragePct` ≥ 90** only (not parser SLO / Phase G fresh insert) | [x] (2026-05-21) |
-| G0.6 | Re-run SQL on `ystm_coverage_observations` after first audit (post–Phase 1 deploy) | [ ] |
+| G0.6 | Re-run SQL on `ystm_coverage_observations` after first audit (post–Phase 1 deploy) | [ ] (run after merge/deploy) |
+
+**G0.6 SQL (production, post–first audit):**
+
+```sql
+SELECT
+  COUNT(*) AS observation_footprint,
+  COUNT(*) FILTER (WHERE valid_active) AS valid_active_v,
+  COUNT(*) FILTER (WHERE lootaura_visible) AS published_visible_p,
+  COUNT(*) FILTER (WHERE valid_active AND NOT lootaura_visible) AS missing_valid_m
+FROM lootaura_v2.ystm_coverage_observations;
+```
+
+Expect `valid_active_v > 0` and `coveragePct` non-null on scoreboard after audits run.
 
 **Production env overrides:** None configured in Vercel and not planned — **repo burn-in defaults** from PR #479 apply in production after deploy.
 
@@ -667,6 +680,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 |------|----------|-----------|
 | 2026-05-21 | Phase 0 G0 complete; KPI = `coveragePct` ≥ 90 only | Lead agent approved; proceed Phase 1 |
 | 2026-05-21 | Phases 1–2 code on single PR; Phase 3 missing-ingest queue ordering | CI green on #481 |
+| 2026-05-21 | Phases 1–6 code complete on #481; Phase 7 monitoring (`sloAttainment`, G4 alerts) | CI green; deploy → G0.6 SQL |
 | | Target `daysToTarget` | |
 | | Minimum `validActiveYstmUrls` at G4 | |
 | | Approved env budget tier (staging/prod) | |

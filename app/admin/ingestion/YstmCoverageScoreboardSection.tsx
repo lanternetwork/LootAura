@@ -151,6 +151,42 @@ export default function YstmCoverageScoreboardSection() {
             </div>
           </div>
 
+          <div
+            className={`mb-6 rounded-md border p-4 ${
+              data.sloAttainment.programComplete
+                ? 'border-emerald-400 bg-emerald-100'
+                : 'border-indigo-300 bg-indigo-50'
+            }`}
+          >
+            <h3 className="text-sm font-semibold text-indigo-950">Phase 7 — G4 program completion</h3>
+            <p className="mt-1 text-xs text-indigo-900">
+              Requires {data.sloAttainment.requiredConsecutiveDays} consecutive UTC days with coverage ≥
+              {data.targetPct}% (last audit of each day), current footprint ≥
+              {data.sloAttainment.programMinFootprint.toLocaleString()} valid-active URLs, and no critical
+              coverage alerts.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-4 text-sm">
+              <p>
+                <span className="font-medium">Hold streak:</span>{' '}
+                {data.sloAttainment.consecutiveDaysAtTarget} /{' '}
+                {data.sloAttainment.requiredConsecutiveDays} days
+              </p>
+              <p>
+                <span className="font-medium">Footprint:</span>{' '}
+                {data.sloAttainment.footprintMeetsProgramMinimum ? 'meets' : 'below'} program minimum (
+                {data.validActiveYstmUrls.toLocaleString()} valid-active)
+              </p>
+              <p>
+                <span className="font-medium">Status:</span>{' '}
+                {data.sloAttainment.programComplete
+                  ? 'Program complete (G4)'
+                  : data.sloAttainment.latestDayQualifies
+                    ? 'At target today — sustain hold'
+                    : 'Not at target on latest audit day'}
+              </p>
+            </div>
+          </div>
+
           {data.lastRun && (
             <p className="mb-4 text-xs text-gray-600">
               Last audit: {data.lastRun.listPagesFetched} list pages · {data.lastRun.listingUrlsDiscovered}{' '}

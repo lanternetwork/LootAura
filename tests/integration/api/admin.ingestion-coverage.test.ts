@@ -15,16 +15,17 @@ vi.mock('@/lib/auth/adminGate', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'order', 'limit', 'range', 'gte']) {
+  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'ilike', 'order', 'limit', 'range', 'gte']) {
     q[m] = vi.fn(() => q)
   }
   q.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
     Promise.resolve(result).then((r) => {
       if (onFulfilled == null) return r
-      if (typeof r.count === 'number') {
-        return onFulfilled({ count: r.count, data: r.data ?? null, error: r.error ?? null })
-      }
-      return onFulfilled(r)
+      return onFulfilled({
+        count: typeof r.count === 'number' ? r.count : null,
+        data: r.data ?? null,
+        error: r.error ?? null,
+      })
     }, onRejected)
   return q
 }

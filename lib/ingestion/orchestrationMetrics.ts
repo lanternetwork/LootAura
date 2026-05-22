@@ -120,6 +120,7 @@ export type DiscoveryCronOrchestrationNote = {
   degraded?: boolean
   statesScanned?: number
   catalogSize?: number
+  stateBatchPlanned?: number
   stateCursorBefore?: number
   stateCursorAfter?: number
   overlapPrevented?: boolean

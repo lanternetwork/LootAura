@@ -43,6 +43,65 @@ function isRuntimeBudgetExceeded(startedAtMs: number, maxRuntimeMs: number): boo
   return Date.now() - startedAtMs >= maxRuntimeMs
 }
 
+async function promoteValidatedRegistryCandidates(
+  admin: AdminDb,
+  args: {
+    graphPromotable: ValidatedDiscoveryCandidate[]
+    telemetry: DiscoveryCronTelemetry
+    telemetryContext: Record<string, unknown>
+  }
+): Promise<void> {
+  const backlogRows = await listValidatedUnpromotedCandidates(admin, 500)
+  const backlogPromotable: ValidatedDiscoveryCandidate[] = backlogRows.map((row) => ({
+    city: typeof row.metadata?.city === 'string' ? row.metadata.city : row.city_slug ?? row.state,
+    state: row.state,
+    statePathSegment: row.state,
+    canonicalUrl: row.canonical_url,
+    sharedHubPage: row.metadata?.sharedHubPage === true,
+    cityPathSegment: row.city_slug ? `${row.city_slug}.html` : 'city.html',
+    validation: { ok: true as const, kind: 'valid_city_page' as const },
+  }))
+  const promotableByUrl = new Map<string, ValidatedDiscoveryCandidate>()
+  for (const c of [...args.graphPromotable, ...backlogPromotable]) {
+    promotableByUrl.set(c.canonicalUrl, c)
+  }
+  const promotable = [...promotableByUrl.values()]
+  if (promotable.length === 0) return
+
+  const promotion = await promoteSourceDiscoveryResults(admin, {
+    dryRun: false,
+    candidates: promotable,
+    telemetryContext: args.telemetryContext,
+  })
+  if (promotion.ok) {
+    args.telemetry.configsPromoted += promotion.telemetry.configsPromoted
+    args.telemetry.configsRepaired += promotion.telemetry.configsRepaired
+    if (!args.telemetry.phasesCompleted.includes('promote')) {
+      args.telemetry.phasesCompleted.push('promote')
+    }
+    const promotionMarks = promotion.records
+      .filter(
+        (record): record is typeof record & { configId: string } =>
+          (record.action === 'inserted' || record.action === 'updated') &&
+          typeof record.configId === 'string' &&
+          record.configId.length > 0
+      )
+      .map((record) => ({
+        canonicalUrl: record.canonicalUrl,
+        promotedConfigId: record.configId,
+      }))
+    await markSourcePageCandidatesPromoted(admin, promotionMarks)
+  } else {
+    args.telemetry.degraded = true
+    logger.warn('source discovery cron promotion degraded', {
+      component: 'ingestion/discovery/runSourceDiscoveryCron',
+      operation: 'promote',
+      message: promotion.error,
+      ...args.telemetryContext,
+    })
+  }
+}
+
 async function loadRegistryAggregateCounts(admin: AdminDb): Promise<{
   crawlableConfigCount: number
   failedConfigCount: number
@@ -116,6 +175,7 @@ export async function runSourceDiscoveryCron(
 
   const batch = pickDiscoveryStateBatch(lease.stateCursor, budgets.maxStatesPerRun)
   telemetry.catalogSize = batch.catalogSize
+  telemetry.stateBatchPlanned = batch.states.length
   telemetry.stateCursorAfter = batch.nextCursor
 
   try {
@@ -130,83 +190,10 @@ export async function runSourceDiscoveryCron(
         maxStatesPerRun: budgets.maxStatesPerRun,
         ...telemetryContext,
       })
-    } else if (isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-      telemetry.graphEnumerationSkippedReason = 'runtime_budget'
-      telemetry.degraded = true
     }
 
-    if (batch.states.length > 0 && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-      const graph = await runYstmGraphEnumerationDiscovery(admin, {
-        stateCodes: batch.states,
-        budgets,
-        telemetryContext,
-      })
-
-      telemetry.statesScanned = graph.telemetry.statesScanned
-      telemetry.candidatePagesDiscovered = graph.telemetry.candidatePagesDiscovered
-      telemetry.candidatePagesValid = graph.telemetry.candidatePagesValid
-      telemetry.candidatePagesInvalid = graph.telemetry.candidatePagesInvalid
-      telemetry.candidateRegistryUpserts = graph.telemetry.candidateRegistryUpserts
-      telemetry.graphEnumerationValidations = graph.telemetry.validationsAttempted
-      telemetry.graphEnumerationThrottled = graph.telemetry.throttleApplied
-      telemetry.phasesCompleted.push('graph_enumeration')
-
-      if (graph.ok && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-        const backlogRows = await listValidatedUnpromotedCandidates(admin, 500)
-        const backlogPromotable: ValidatedDiscoveryCandidate[] = backlogRows.map((row) => ({
-          city: typeof row.metadata?.city === 'string' ? row.metadata.city : row.city_slug ?? row.state,
-          state: row.state,
-          statePathSegment: row.state,
-          canonicalUrl: row.canonical_url,
-          sharedHubPage: row.metadata?.sharedHubPage === true,
-          cityPathSegment: row.city_slug ? `${row.city_slug}.html` : 'city.html',
-          validation: { ok: true as const, kind: 'valid_city_page' as const },
-        }))
-        const promotableByUrl = new Map<string, ValidatedDiscoveryCandidate>()
-        for (const c of [...graph.promotable, ...backlogPromotable]) {
-          promotableByUrl.set(c.canonicalUrl, c)
-        }
-        const promotable = [...promotableByUrl.values()]
-
-        const promotion = await promoteSourceDiscoveryResults(admin, {
-          dryRun: false,
-          candidates: promotable,
-          telemetryContext,
-        })
-        if (promotion.ok) {
-          telemetry.configsPromoted = promotion.telemetry.configsPromoted
-          telemetry.configsRepaired += promotion.telemetry.configsRepaired
-          telemetry.phasesCompleted.push('promote')
-          const promotionMarks = promotion.records
-            .filter(
-              (record): record is typeof record & { configId: string } =>
-                (record.action === 'inserted' || record.action === 'updated') &&
-                typeof record.configId === 'string' &&
-                record.configId.length > 0
-            )
-            .map((record) => ({
-              canonicalUrl: record.canonicalUrl,
-              promotedConfigId: record.configId,
-            }))
-          await markSourcePageCandidatesPromoted(admin, promotionMarks)
-        } else {
-          telemetry.degraded = true
-          logger.warn('source discovery cron promotion degraded', {
-            component: 'ingestion/discovery/runSourceDiscoveryCron',
-            operation: 'promote',
-            message: promotion.error,
-            ...telemetryContext,
-          })
-        }
-      } else if (!graph.ok) {
-        telemetry.degraded = true
-        telemetry.graphEnumerationSkippedReason = 'graph_enumeration_failed'
-      }
-    }
-
+    // Placeholder repair first: drains empty source_pages even when graph enumeration uses the runtime budget.
     if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-      const revalidationStates = batch.states.length > 0 ? batch.states : undefined
-
       const placeholderRepair = await revalidateSourceDiscoveryConfigs(admin, {
         dryRun: false,
         maxConfigsPerRun: budgets.maxPlaceholderRepairConfigsPerRun,
@@ -224,6 +211,57 @@ export async function runSourceDiscoveryCron(
       } else {
         telemetry.degraded = true
       }
+    } else {
+      telemetry.degraded = true
+      telemetry.graphEnumerationSkippedReason = 'runtime_budget'
+    }
+
+    // Backlog promote before graph: registry → crawlable configs even when graph uses the full runtime budget.
+    if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      await promoteValidatedRegistryCandidates(admin, {
+        graphPromotable: [],
+        telemetry,
+        telemetryContext,
+      })
+    }
+
+    let graphPromotable: ValidatedDiscoveryCandidate[] = []
+
+    if (batch.states.length > 0 && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      const graph = await runYstmGraphEnumerationDiscovery(admin, {
+        stateCodes: batch.states,
+        budgets,
+        telemetryContext,
+      })
+
+      telemetry.statesScanned = graph.telemetry.statesScanned
+      telemetry.candidatePagesDiscovered = graph.telemetry.candidatePagesDiscovered
+      telemetry.candidatePagesValid = graph.telemetry.candidatePagesValid
+      telemetry.candidatePagesInvalid = graph.telemetry.candidatePagesInvalid
+      telemetry.candidateRegistryUpserts = graph.telemetry.candidateRegistryUpserts
+      telemetry.graphEnumerationValidations = graph.telemetry.validationsAttempted
+      telemetry.graphEnumerationThrottled = graph.telemetry.throttleApplied
+      telemetry.phasesCompleted.push('graph_enumeration')
+
+      if (graph.ok) {
+        graphPromotable = graph.promotable
+      } else {
+        telemetry.degraded = true
+        telemetry.graphEnumerationSkippedReason = 'graph_enumeration_failed'
+      }
+    }
+
+    // Promote validated registry backlog even when graph enumeration failed or was skipped (footprint phase).
+    if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      await promoteValidatedRegistryCandidates(admin, {
+        graphPromotable,
+        telemetry,
+        telemetryContext,
+      })
+    }
+
+    if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      const revalidationStates = batch.states.length > 0 ? batch.states : undefined
 
       const revalidation = await revalidateSourceDiscoveryConfigs(admin, {
         dryRun: false,

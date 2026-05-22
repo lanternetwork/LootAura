@@ -21,10 +21,12 @@
 
 ## Day 0–1 (blocking)
 
-1. Confirm PR #484 + migration `200` live in production.
-2. Run one manual discovery cron (`POST /api/cron/discovery` with `CRON_SECRET`).
-3. If last discovery shows `0 states` and `phases none` for **>24h** after deploy: inspect `ingestion_orchestration_runs` (`mode=discovery_cron`) and `ingestion_discovery_state` (`key=source_discovery_nationwide`). See [supabase/operations/ystm-one-week-sprint-verification.sql](../supabase/operations/ystm-one-week-sprint-verification.sql).
-4. **Do not** clear post-deploy metrics window until discovery is fixed.
+1. Confirm PR #484 + migration `200` + sprint prep (#486) deployed to production.
+2. Deploy discovery phase fix (placeholder repair before graph enumeration) when merged.
+3. Run one manual discovery cron (`POST /api/cron/discovery` with `CRON_SECRET`).
+4. Verify last discovery: `stateBatchPlanned > 0`, `phasesCompleted` includes `placeholder_repair` and ideally `graph_enumeration`; registry candidates trending up.
+5. If `statesScanned` stays 0 with `stateBatchPlanned > 0`: inspect orchestration notes (`graphEnumerationSkippedReason`) and [supabase/operations/ystm-one-week-sprint-verification.sql](../supabase/operations/ystm-one-week-sprint-verification.sql).
+6. **Do not** clear post-deploy metrics window until discovery is healthy.
 
 ---
 
@@ -39,13 +41,46 @@ Production is expected to run with **no `CRON_*` / `INGESTION_*` overrides in Ve
 | Graph enumeration / discovery | 4×/day UTC 02/08/14/20 | 10 states, 1000 candidates, 500 validations, 120 placeholder repair (`discoveryCronConfig.ts`) |
 | Coverage audit | 2×/day | 24 configs, 40 list fetches, 80 detail validations (`ystmCoverageAuditConfig.ts`) |
 | Missing ingest | 2×/day | 48 attempts, 160 scanned (`ystmCoverageMissingIngestionConfig.ts`) |
-| Catalog repair | 2×/day | 60 attempts, 160 scanned (`ystmCatalogRepairConfig.ts`) |
+| Catalog repair | 2×/day | 80 attempts, 200 scanned (`ystmCatalogRepairConfig.ts`) |
 | Existing refresh | 2×/day | 32 attempts, 120 scanned (`ystmExistingUrlRefreshConfig.ts`) |
 | Main ingestion | every 2 min | batch 60, budget 120s (`ingestionOrchestrationDefaults.ts`) |
 
 **YSTM safety:** If graph panel block rate **>1%** for 24h, pause manual discovery triggers and investigate before any code-default increase.
 
 **Optional later (not week-1):** Lead-approved PR to bump `DEFAULT_*` in config modules only if gates stall with discovery healthy.
+
+---
+
+## Days 2–7 (footprint + closure, same PR deploy)
+
+No new Vercel env. Let 4×/day discovery + 2×/day repair/audit crons run on repo defaults.
+
+| Day | Focus | Pass signal |
+|-----|--------|-------------|
+| **2** | Registry + placeholder | `candidatesDiscovered > 0`; last discovery includes `placeholder_repair` |
+| **3** | Crawlable trend | `crawlableConfigs` up vs Day 0; `no source_pages` down |
+| **4** | Audit V | `validActiveYstmUrls` rising (target ≥150 pending, ≥300 by Day 7) |
+| **5** | Catalog repair drain | `catalogRepair` queue &lt; 200 and falling |
+| **6** | Missing ingest | `missingValidYstmUrls` stable or down as V grows |
+| **7** | Gate review | All three Week-1 greens or document blockers for code-default PR |
+
+**Code in this sprint branch:**
+
+- Discovery: `placeholder_repair` → **registry backlog promote** → `graph_enumeration` → promote new graph candidates → `revalidate`
+- Registry backlog promote also runs when graph fails or is skipped
+- Catalog repair cron repo defaults **80 attempts / 200 scanned** per run (still no Vercel env)
+
+---
+
+## Phase: closure (catalog repair + visibility)
+
+| Pipeline | Sprint repo default | Gate target |
+|----------|---------------------|-------------|
+| Catalog repair (2×/day) | 80 repairs, 200 scanned | Queue **&lt; 100** |
+| Missing ingest (2×/day) | 48 / 160 (unchanged) | Never-attempted not growing with V |
+| Coverage audit (2×/day) | 24 / 40 / 80 (unchanged) | **V ≥ 300** by Day 7 |
+
+Prioritize **catalog repair queue** in daily checks until under 100.
 
 ---
 

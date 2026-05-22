@@ -13,8 +13,8 @@ describe('parseYstmCatalogRepairBudgets', () => {
 
   it('defaults to burn-in catalog repair budgets', () => {
     const budgets = parseYstmCatalogRepairBudgets({} as unknown as NodeJS.ProcessEnv)
-    expect(budgets.maxRepairsPerRun).toBe(60)
-    expect(budgets.maxCandidatesScannedPerRun).toBe(160)
+    expect(budgets.maxRepairsPerRun).toBe(80)
+    expect(budgets.maxCandidatesScannedPerRun).toBe(200)
     expect(budgets.failedRetryHours).toBe(6)
     expect(budgets.maxRuntimeMs).toBe(240_000)
   })

@@ -131,6 +131,21 @@ export async function runYstmGraphEnumerationDiscovery(
     args.budgets.maxStatesPerRun
   )
 
+  if (args.stateCodes.length > 0 && stateEntries.length === 0) {
+    logger.warn('ystm graph enumeration: no resolvable state index entries for batch', {
+      component: 'ingestion/discovery/runYstmGraphEnumerationDiscovery',
+      operation: 'resolve_state_entries',
+      stateCodes: args.stateCodes,
+      ...args.telemetryContext,
+    })
+    return {
+      ok: false,
+      promotable: [],
+      telemetry,
+      error: 'no_resolved_state_index_entries',
+    }
+  }
+
   try {
     const indexHtmlByState = await mapPool(stateEntries, args.budgets.indexFetchConcurrency, async (entry, idx) => {
       const html = await fetchHtml(

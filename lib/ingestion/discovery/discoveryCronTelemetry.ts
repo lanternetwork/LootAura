@@ -6,6 +6,8 @@ export type DiscoveryCronTelemetry = {
   stateCursorBefore: number
   stateCursorAfter: number
   catalogSize: number
+  /** States selected for this run before graph enumeration resolves index entries. */
+  stateBatchPlanned: number
   candidatePagesDiscovered: number
   candidatePagesValid: number
   candidatePagesInvalid: number
@@ -39,6 +41,7 @@ export function createDiscoveryCronTelemetry(): DiscoveryCronTelemetry {
     stateCursorBefore: 0,
     stateCursorAfter: 0,
     catalogSize: 0,
+    stateBatchPlanned: 0,
     candidatePagesDiscovered: 0,
     candidatePagesValid: 0,
     candidatePagesInvalid: 0,

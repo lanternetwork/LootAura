@@ -124,7 +124,7 @@ describe('runSourceDiscoveryCron', () => {
     })
   })
 
-  it('runs discover → promote → revalidate and advances cursor', async () => {
+  it('runs placeholder repair → graph enumeration → promote → revalidate', async () => {
     const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
     const result = await runSourceDiscoveryCron({} as never, {
       budgets: {
@@ -142,12 +142,18 @@ describe('runSourceDiscoveryCron', () => {
     })
 
     expect(result.skipped).toBe(false)
-    expect(graphEnumerationMock).toHaveBeenCalledTimes(1)
-    expect(promoteMock).toHaveBeenCalledTimes(1)
     expect(revalidateMock).toHaveBeenCalledTimes(2)
     expect(revalidateMock.mock.calls[0]?.[1]).toMatchObject({
       selectionMode: 'no_source_pages_only',
     })
+    expect(graphEnumerationMock).toHaveBeenCalledTimes(1)
+    expect(promoteMock).toHaveBeenCalledTimes(1)
+    const placeholderCallOrder = revalidateMock.mock.invocationCallOrder[0] ?? 0
+    const graphCallOrder = graphEnumerationMock.mock.invocationCallOrder[0] ?? 0
+    expect(placeholderCallOrder).toBeLessThan(graphCallOrder)
+    const promoteCallOrder = promoteMock.mock.invocationCallOrder[0] ?? 0
+    // Empty backlog: early promote is a no-op; graph candidates promote after graph.
+    expect(promoteCallOrder).toBeGreaterThan(graphCallOrder)
     expect(revalidateMock.mock.calls[0]?.[1]).not.toHaveProperty('states')
     expect(releaseMock).toHaveBeenCalledWith(
       expect.anything(),
@@ -174,6 +180,89 @@ describe('runSourceDiscoveryCron', () => {
     expect(result.telemetry.overlapPrevented).toBe(true)
     expect(graphEnumerationMock).not.toHaveBeenCalled()
     expect(promoteMock).not.toHaveBeenCalled()
+  })
+
+  it('promotes registry backlog before graph enumeration when backlog exists', async () => {
+    listBacklogMock.mockResolvedValue([
+      {
+        state: 'TX',
+        city_slug: 'dallas',
+        canonical_url: 'https://yardsaletreasuremap.com/US/Texas/dallas.html',
+        metadata: { city: 'Dallas', sharedHubPage: false },
+      },
+    ])
+
+    const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
+    await runSourceDiscoveryCron({} as never, {
+      budgets: {
+        maxStatesPerRun: 2,
+        maxDiscoveredPagesPerRun: 10,
+        maxValidationFetchesPerRun: 10,
+        maxRevalidationConfigsPerRun: 10,
+        maxPlaceholderRepairConfigsPerRun: 10,
+        indexFetchConcurrency: 2,
+        validationFetchConcurrency: 2,
+        leaseSeconds: 120,
+        maxRuntimeMs: 60_000,
+        placeholderFailureExcludeThreshold: 1,
+      },
+    })
+
+    expect(promoteMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      graphEnumerationMock.mock.invocationCallOrder[0]!
+    )
+    expect(promoteMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('promotes registry backlog when graph enumeration fails', async () => {
+    graphEnumerationMock.mockResolvedValueOnce({
+      ok: false,
+      promotable: [],
+      telemetry: {
+        statesScanned: 0,
+        candidatePagesDiscovered: 0,
+        candidateRegistryUpserts: 0,
+        candidatePagesValid: 0,
+        candidatePagesInvalid: 0,
+        validationsAttempted: 0,
+        fetchFailures: 1,
+        blockedCount: 0,
+        throttleApplied: false,
+        throttleReasons: [],
+        backlogValidationsProcessed: 0,
+      },
+      error: 'fetch_failed',
+    })
+    listBacklogMock.mockResolvedValueOnce([
+      {
+        state: 'TX',
+        city_slug: 'austin',
+        canonical_url: 'https://yardsaletreasuremap.com/US/Texas/austin.html',
+        metadata: { city: 'Austin', sharedHubPage: false },
+      },
+    ])
+
+    const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
+    const result = await runSourceDiscoveryCron({} as never, {
+      budgets: {
+        maxStatesPerRun: 2,
+        maxDiscoveredPagesPerRun: 10,
+        maxValidationFetchesPerRun: 10,
+        maxRevalidationConfigsPerRun: 10,
+        maxPlaceholderRepairConfigsPerRun: 10,
+        indexFetchConcurrency: 2,
+        validationFetchConcurrency: 2,
+        leaseSeconds: 120,
+        maxRuntimeMs: 60_000,
+        placeholderFailureExcludeThreshold: 1,
+      },
+    })
+
+    expect(result.telemetry.phasesCompleted).toContain('graph_enumeration')
+    expect(result.telemetry.phasesCompleted).toContain('promote')
+    expect(promoteMock).toHaveBeenCalledTimes(1)
+    const promoted = promoteMock.mock.calls[0]![1] as { candidates: Array<{ canonicalUrl: string }> }
+    expect(promoted.candidates.some((c) => c.canonicalUrl.includes('austin.html'))).toBe(true)
   })
 
   it('bounds discovery to configured state batch size', async () => {

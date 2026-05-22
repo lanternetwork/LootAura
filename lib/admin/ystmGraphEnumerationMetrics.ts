@@ -11,6 +11,7 @@ export type YstmGraphEnumerationLastRun = {
   degraded: boolean
   statesScanned: number
   catalogSize: number | null
+  stateBatchPlanned: number | null
   discoveryLatencyMs: number
   configsPromoted: number
   candidatePagesDiscovered: number
@@ -57,6 +58,7 @@ function parseLastDiscoveryRun(row: {
     degraded: notes.degraded === true,
     statesScanned: notes.statesScanned ?? 0,
     catalogSize: notes.catalogSize ?? null,
+    stateBatchPlanned: notes.stateBatchPlanned ?? null,
     discoveryLatencyMs: row.duration_ms ?? 0,
     configsPromoted: notes.configsPromoted,
     candidatePagesDiscovered: notes.candidatePagesDiscovered,

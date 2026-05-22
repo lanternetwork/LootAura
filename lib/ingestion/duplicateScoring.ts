@@ -69,6 +69,12 @@ export type SoftDuplicateCandidateRow = {
   image_source_url: string | null
   source_url?: string | null
   canonical_source_url?: string | null
+  /** Phase 8 soft-dedupe safety (optional on fetch). */
+  sale_instance_key?: string | null
+  source_listing_id?: string | null
+  source_location_hash?: string | null
+  status?: string | null
+  failure_reasons?: unknown
 }
 
 export type DuplicateScoringIncoming = {

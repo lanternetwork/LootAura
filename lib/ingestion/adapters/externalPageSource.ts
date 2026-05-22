@@ -49,6 +49,7 @@ import {
   mustClassifyViaYstmDetailFirstBeforeUrlSkip,
   shouldQueueYstmListRecrawlRefresh,
 } from '@/lib/ingestion/acquisition/detailFirstCrawlPolicy'
+import { readYstmNativeCoordsFromListingRawPayload } from '@/lib/ingestion/acquisition/detailFirstNativeCoords'
 import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
 import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
@@ -283,6 +284,13 @@ function epochSecondsToIsoDate(value: number): string | null {
   const m = d.getUTCMonth() + 1
   const day = d.getUTCDate()
   return `${y}-${pad2(m)}-${pad2(day)}`
+}
+
+function nativeCoordsForSoftDedupeProbe(
+  listing: ExternalPageSourceListing
+): { lat: number | null; lng: number | null } {
+  const native = readYstmNativeCoordsFromListingRawPayload(listing.rawPayload)
+  return { lat: native?.lat ?? null, lng: native?.lng ?? null }
 }
 
 function cleanDescriptionText(
@@ -1593,6 +1601,7 @@ export async function persistExternalPageSource(
       }
 
       if (!shouldDeferListSeedSoftDedupe(listing.sourceUrl)) {
+        const listNativeCoords = nativeCoordsForSoftDedupeProbe(listing)
         const scoredDup = await evaluatePostDetailEnrichedDuplicateSkip(admin, platform, {
           title: listing.title,
           city: listing.city,
@@ -1603,6 +1612,8 @@ export async function persistExternalPageSource(
           externalId: (listing.rawPayload.externalId as string | null) ?? null,
           imageSourceUrl: listing.imageSourceUrl,
           sourceUrl: listing.sourceUrl,
+          lat: listNativeCoords.lat,
+          lng: listNativeCoords.lng,
         })
         if (scoredDup.skip) {
           summary.duplicateScoredSkipped += 1
@@ -1667,6 +1678,7 @@ export async function persistExternalPageSource(
         const fallbackDetailHtml =
           result.outcome === 'fallback' ? result.detailPageHtml : undefined
 
+        const fallbackNativeCoords = nativeCoordsForSoftDedupeProbe(fallbackListing)
         const postDetailDup = await evaluatePostDetailEnrichedDuplicateSkip(admin, platform, {
           title: fallbackListing.title,
           city: fallbackListing.city,
@@ -1677,6 +1689,8 @@ export async function persistExternalPageSource(
           externalId: (fallbackListing.rawPayload.externalId as string | null) ?? null,
           imageSourceUrl: fallbackListing.imageSourceUrl,
           sourceUrl: fallbackListing.sourceUrl,
+          lat: fallbackNativeCoords.lat,
+          lng: fallbackNativeCoords.lng,
         })
         if (postDetailDup.skip) {
           summary.duplicateScoredSkipped += 1

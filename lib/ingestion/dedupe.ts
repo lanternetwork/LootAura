@@ -8,6 +8,15 @@ import {
   type SoftDuplicateCandidateRow,
   type SoftDuplicateEvaluation,
 } from '@/lib/ingestion/duplicateScoring'
+import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import {
+  recordIngestedSaleSoftDedupeSuppression,
+  suppressionReasonFromEvaluation,
+} from '@/lib/ingestion/identity/recordSoftDedupeSuppression'
+import {
+  evaluateSoftDedupeSuppressionSafety,
+  type SoftDedupeSafetyIncoming,
+} from '@/lib/ingestion/identity/softDedupeSafety'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
@@ -197,7 +206,7 @@ async function fetchSoftAddressCandidates(
   const { min, max } = softFetchDateBounds(dateStart)
   const { data, error } = await fromBase(admin, 'ingested_sales')
     .select(
-      'id, date_start, date_end, title, source_platform, external_id, lat, lng, image_source_url, source_url, canonical_source_url'
+      'id, date_start, date_end, title, source_platform, external_id, lat, lng, image_source_url, source_url, canonical_source_url, sale_instance_key, source_listing_id, source_location_hash, status, failure_reasons'
     )
     .eq('normalized_address', normalizedAddress)
     .not('date_start', 'is', null)
@@ -226,6 +235,78 @@ export type ExternalListDuplicateProbe = {
   externalId: string | null
   imageSourceUrl: string | null
   sourceUrl: string
+  lat?: number | null
+  lng?: number | null
+}
+
+function buildSoftDedupeSafetyIncoming(
+  platform: string,
+  probe: ExternalListDuplicateProbe,
+  normalizedAddress: string
+): SoftDedupeSafetyIncoming {
+  const identity = computeYstmSaleInstanceIdentity({
+    sourcePlatform: platform,
+    sourceUrl: probe.sourceUrl,
+    state: probe.state,
+    city: probe.city,
+    normalizedAddress,
+    dateStart: probe.startDate,
+    dateEnd: probe.endDate ?? null,
+    title: probe.title,
+    description: null,
+    imageSourceUrl: probe.imageSourceUrl,
+    lat: probe.lat ?? null,
+    lng: probe.lng ?? null,
+    rawPayload: null,
+  })
+  return {
+    dateStart: probe.startDate,
+    dateEnd: probe.endDate ?? null,
+    sourceUrl: probe.sourceUrl,
+    externalId: probe.externalId,
+    state: probe.state,
+    city: probe.city,
+    normalizedAddress,
+    lat: probe.lat ?? null,
+    lng: probe.lng ?? null,
+    saleInstanceKey: identity?.sale_instance_key ?? null,
+    sourceLocationHash: identity?.source_location_hash ?? null,
+  }
+}
+
+function buildSoftDedupeSafetyIncomingFromProcessed(
+  sourceUrl: string,
+  processed: ProcessedIngestedSale,
+  context?: DedupeTelemetryContext
+): SoftDedupeSafetyIncoming {
+  const identity = computeYstmSaleInstanceIdentity({
+    sourcePlatform: context?.sourcePlatform ?? 'unknown',
+    sourceUrl,
+    state: processed.state,
+    city: processed.city,
+    normalizedAddress: processed.normalizedAddress,
+    dateStart: processed.dateStart,
+    dateEnd: processed.dateEnd,
+    title: context?.normalizedTitle ?? null,
+    description: null,
+    imageSourceUrl: context?.imageSourceUrl ?? null,
+    lat: processed.lat,
+    lng: processed.lng,
+    rawPayload: null,
+  })
+  return {
+    dateStart: processed.dateStart,
+    dateEnd: processed.dateEnd,
+    sourceUrl,
+    externalId: context?.externalId?.trim() || null,
+    state: processed.state,
+    city: processed.city,
+    normalizedAddress: processed.normalizedAddress,
+    lat: processed.lat,
+    lng: processed.lng,
+    saleInstanceKey: identity?.sale_instance_key ?? null,
+    sourceLocationHash: identity?.source_location_hash ?? null,
+  }
 }
 
 /**
@@ -260,13 +341,50 @@ export async function evaluateDuplicateSkipForExternalListListing(
     sourcePlatform: platform,
     externalId: probe.externalId?.trim() || null,
     imageSourceUrl: probe.imageSourceUrl,
-    lat: null,
-    lng: null,
+    lat: probe.lat ?? null,
+    lng: probe.lng ?? null,
   }
 
   const rows = await fetchSoftAddressCandidates(admin, normalizedAddress, probe.startDate)
   const evaluation = evaluateSoftDuplicateAgainstCandidates(incoming, rows)
   if (evaluation.suppress && evaluation.winner) {
+    const safetyIncoming = buildSoftDedupeSafetyIncoming(platform, probe, normalizedAddress)
+    const safety = evaluateSoftDedupeSuppressionSafety(safetyIncoming, evaluation.winner)
+    if (!safety.allowSuppress) {
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.ingestion.duplicateScoringDecision, {
+          matchType: 'soft_date_window',
+          duplicateDecision: false,
+          candidateCount: rows.length,
+          duplicateConfidence: evaluation.confidence,
+          scoreBucket: scoreBucketFromScore(evaluation.bestScore),
+          tieBreakId: evaluation.tieBreakId,
+          sourcePlatform: platform,
+          context: 'external_list_insert_skip_safety_blocked',
+          safetyBlockedReasons: safety.blockedReasons,
+        })
+      )
+      return {
+        skip: false,
+        duplicateOfId: null,
+        evaluation,
+        skipKind: null,
+      }
+    }
+
+    const skipKind = 'duplicate_cross_city_page' as const
+    const suppressionReason = suppressionReasonFromEvaluation(evaluation, skipKind)
+    await recordIngestedSaleSoftDedupeSuppression(admin, {
+      context: 'external_list_insert_skip',
+      sourcePlatform: platform,
+      sourceUrl: probe.sourceUrl,
+      duplicateOfId: evaluation.winner.id,
+      evaluation,
+      suppressionReason,
+      incomingSaleInstanceKey: safetyIncoming.saleInstanceKey ?? null,
+      matchedSaleInstanceKey: evaluation.winner.sale_instance_key ?? null,
+    })
+
     emitObservabilityRecord(
       buildTelemetryRecord(ObservabilityEvents.ingestion.duplicateScoringDecision, {
         matchType: 'soft_date_window',
@@ -277,13 +395,16 @@ export async function evaluateDuplicateSkipForExternalListListing(
         tieBreakId: evaluation.tieBreakId,
         sourcePlatform: platform,
         context: 'external_list_insert_skip',
+        suppressionReason,
+        incomingSaleInstanceKey: safetyIncoming.saleInstanceKey ?? null,
+        matchedSaleInstanceKey: evaluation.winner.sale_instance_key ?? null,
       })
     )
     return {
       skip: true,
       duplicateOfId: evaluation.winner.id,
       evaluation,
-      skipKind: 'duplicate_cross_city_page',
+      skipKind,
     }
   }
   return {
@@ -374,6 +495,48 @@ export async function findIngestedSaleMatch(
   const evaluation = evaluateSoftDuplicateAgainstCandidates(incoming, softCandidates)
 
   if (evaluation.suppress && evaluation.winner) {
+    const safetyIncoming = buildSoftDedupeSafetyIncomingFromProcessed(sourceUrl, processed, context)
+    const safety = evaluateSoftDedupeSuppressionSafety(safetyIncoming, evaluation.winner)
+    if (!safety.allowSuppress) {
+      emitDedupeDecision({
+        processed,
+        matchType: 'soft_date_window',
+        duplicateDecision: false,
+        candidateCount: softCandidates.length,
+        dateDeltaBucket: 'not_applicable',
+        sourcePlatform: context?.sourcePlatform,
+        duplicateConfidence: evaluation.confidence,
+        scoreBucket: scoreBucketFromScore(evaluation.bestScore),
+        tieBreakId: evaluation.tieBreakId,
+      })
+      emitObservabilityRecord(
+        buildTelemetryRecord(ObservabilityEvents.ingestion.duplicateScoringDecision, {
+          matchType: 'soft_date_window',
+          duplicateDecision: false,
+          candidateCount: softCandidates.length,
+          duplicateConfidence: evaluation.confidence,
+          scoreBucket: scoreBucketFromScore(evaluation.bestScore),
+          tieBreakId: evaluation.tieBreakId,
+          sourcePlatform: context?.sourcePlatform || 'unknown',
+          context: 'ingested_sale_soft_match_safety_blocked',
+          safetyBlockedReasons: safety.blockedReasons,
+        })
+      )
+      return { match: null, meta: { softScoringRejected: true } }
+    }
+
+    const suppressionReason = suppressionReasonFromEvaluation(evaluation, null)
+    await recordIngestedSaleSoftDedupeSuppression(admin, {
+      context: 'ingested_sale_soft_match',
+      sourcePlatform: context?.sourcePlatform || 'unknown',
+      sourceUrl,
+      duplicateOfId: evaluation.winner.id,
+      evaluation,
+      suppressionReason,
+      incomingSaleInstanceKey: safetyIncoming.saleInstanceKey ?? null,
+      matchedSaleInstanceKey: evaluation.winner.sale_instance_key ?? null,
+    })
+
     const dayDelta = Math.round(
       (new Date(`${evaluation.winner.date_start}T00:00:00.000Z`).getTime() -
         new Date(`${processed.dateStart}T00:00:00.000Z`).getTime()) /

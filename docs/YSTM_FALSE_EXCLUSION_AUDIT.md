@@ -163,6 +163,28 @@ Non-YSTM URLs and superseded rows keep the prior URL-only skip path.
 - `mustClassifyViaYstmDetailFirstBeforeUrlSkip` in `detailFirstCrawlPolicy.ts`
 - `externalPageSource.ts` list loop
 
+## Phase 8 — soft dedupe safety
+
+Weak address/title scoring can no longer suppress when identity signals disagree:
+
+| Block reason | Trigger |
+|--------------|---------|
+| `date_start_beyond_3_day_tolerance` | Start dates >3 calendar days apart |
+| `date_windows_no_overlap` | Sale windows do not overlap within tolerance |
+| `source_listing_id_materially_different` | YSTM listing id (or external id) mismatch |
+| `sale_instance_key_mismatch` | Distinct `sale_instance_key` on both sides |
+| `coordinate_bucket_materially_different` | Location hash / geo bucket mismatch |
+| `expired_winner_valid_incoming_coords` | Expired ingested row + valid native coords on incoming |
+
+Every allowed suppression is persisted on `ingested_sale_soft_dedupe_suppressions` with score, breakdown, `duplicate_of_ingested_sale_id`, and sale-instance keys.
+
+### Code
+
+- `lib/ingestion/identity/softDedupeSafety.ts`
+- `lib/ingestion/identity/recordSoftDedupeSuppression.ts`
+- `lib/ingestion/dedupe.ts` (list skip + `findIngestedSaleMatch`)
+- Migration `204_ystm_soft_dedupe_suppression_evidence_phase_8.sql`
+
 ## Later phases
 
-Phases 8–10 add soft dedupe hardening, shadow mode, and constraints.
+Phases 9–10 add shadow mode and schema constraints.

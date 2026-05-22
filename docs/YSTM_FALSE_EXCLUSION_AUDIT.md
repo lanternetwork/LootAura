@@ -46,6 +46,31 @@ On each admin load of **YSTM nationwide coverage** (`buildYstmCoverageScoreboard
 - `lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport.ts`
 - Migration `201_ystm_false_exclusion_trace_phase_1.sql`
 
+## Phase 2 — crawl skip taxonomy (observability)
+
+External crawl records **sub-reasons** on each skip path without changing suppression behavior.
+
+### Categories
+
+| Category | Examples | Dashboard |
+|----------|----------|-----------|
+| **Benign** | `url_match_same_dates`, `url_match_refresh_queued`, `soft_dedupe_exact_address_date` | Informational |
+| **Suspicious** | `url_match_dates_changed`, `url_match_location_changed`, `soft_dedupe_cross_city`, `gated_false_positive` | Alert when share ≥15% of classified skips (n≥20) |
+| **Operational** | `url_match_expired_row`, `invalid_detail_payload`, `publish_failed` | Expected pipeline state |
+
+### Where it appears
+
+- Orchestration notes: `crawlSkipSubReasons`, `crawlSkipSuspicious`, `crawlSkipBenign` (daily external ingest)
+- Admin ingestion dashboard: **Crawl skip taxonomy (Phase 2)** section
+- Diagnostics export: `## Phase 2 — crawl skip taxonomy (24h)`
+
+### Code
+
+- `lib/ingestion/acquisition/externalCrawlSkipTaxonomy.ts` — sub-reason enum + classifiers
+- `lib/ingestion/adapters/externalPageSource.ts` — per-listing telemetry on skip paths
+- `lib/admin/crawlSkipTaxonomyMetrics.ts` — 24h rollup from orchestration runs
+- `lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth.ts` — suspicious-share alerts
+
 ## Later phases
 
-Phase 2 adds skip sub-reason telemetry on crawl. Phases 3+ introduce sale-instance identity and remove URL-only suppression.
+Phases 3+ introduce sale-instance identity and remove URL-only suppression.

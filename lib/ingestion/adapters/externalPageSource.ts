@@ -25,6 +25,15 @@ import {
   type ExternalDuplicateSkipCounts,
 } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
 import {
+  bumpCrawlSkipSubReason,
+  classifyDetailFirstFallbackSkip,
+  classifyExistingUrlSkip,
+  classifySoftDedupeListSkip,
+  emptyExternalCrawlSkipSubReasonCounts,
+  type ExternalCrawlSkipSubReason,
+  type ExternalCrawlSkipSubReasonCounts,
+} from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
+import {
   evaluatePostDetailEnrichedDuplicateSkip,
   parseYstmListRecrawlRefreshMaxPerPage,
   shouldDeferListSeedSoftDedupe,
@@ -117,6 +126,8 @@ export interface ExternalPageSourcePersistSummary {
   /** Phase 6: existing YSTM detail URLs refreshed on list re-crawl (not duplicate-skipped). */
   ystmListRecrawlRefreshAttempted: number
   ystmListRecrawlRefreshSucceeded: number
+  /** Phase 2: skip sub-reason counts for this config persist pass. */
+  crawlSkipSubReasons: ExternalCrawlSkipSubReasonCounts
 }
 
 export type ExternalPageSourcePersistOptions = {
@@ -1048,6 +1059,7 @@ export async function persistExternalPageSource(
     ystmDetailFirstInsertFailedByDbCode: {},
     ystmListRecrawlRefreshAttempted: 0,
     ystmListRecrawlRefreshSucceeded: 0,
+    crawlSkipSubReasons: emptyExternalCrawlSkipSubReasonCounts(),
   }
 
   const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
@@ -1061,6 +1073,12 @@ export async function persistExternalPageSource(
     if (kind === 'duplicate_cross_city_page') summary.duplicateCrossCityPage += 1
     if (kind === 'duplicate_canonical_collision') summary.duplicateCanonicalCollision += 1
     if (kind === 'duplicate_expired_row') summary.duplicateExpiredRow += 1
+  }
+  const recordCrawlSkip = (reason: ExternalCrawlSkipSubReason, alsoCountAsListingSkip = true) => {
+    bumpCrawlSkipSubReason(summary.crawlSkipSubReasons, reason)
+    if (alsoCountAsListingSkip) {
+      summary.skipped += 1
+    }
   }
   const duplicateKinds = emptyExternalDuplicateSkipCounts()
 
@@ -1328,14 +1346,14 @@ export async function persistExternalPageSource(
 
       if (isSaleWindowExpiredAtDiscovery(listing.startDate, listing.endDate)) {
         summary.skippedExpired += 1
-        summary.skipped += 1
+        recordCrawlSkip('url_match_expired_row')
         continue
       }
 
       const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
 
       const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
-        .select('id, status, failure_reasons')
+        .select('id, status, failure_reasons, date_start, date_end, normalized_address')
         .eq('source_url', listing.sourceUrl)
         .maybeSingle()
 
@@ -1380,6 +1398,7 @@ export async function persistExternalPageSource(
           })
           listRecrawlRefreshesQueued += 1
           summary.ystmListRecrawlRefreshAttempted += 1
+          recordCrawlSkip('url_match_refresh_queued', false)
           continue
         }
         duplicateUrlSkipped += 1
@@ -1390,6 +1409,20 @@ export async function persistExternalPageSource(
           ? 'duplicate_expired_row'
           : 'duplicate_existing_url'
         bumpDuplicateKind(duplicateKinds, kind)
+        const subReason = classifyExistingUrlSkip({
+          listingStartDate: listing.startDate ?? null,
+          listingEndDate: listing.endDate ?? null,
+          listingAddressRaw: listing.addressRaw,
+          existing: {
+            status: existing.status as string,
+            failure_reasons: existing.failure_reasons,
+            date_start: (existing as { date_start?: string | null }).date_start ?? null,
+            date_end: (existing as { date_end?: string | null }).date_end ?? null,
+            normalized_address:
+              (existing as { normalized_address?: string | null }).normalized_address ?? null,
+          },
+        })
+        recordCrawlSkip(subReason, false)
         continue
       }
 
@@ -1408,6 +1441,10 @@ export async function persistExternalPageSource(
         if (scoredDup.skip) {
           summary.duplicateScoredSkipped += 1
           bumpDuplicateKind(duplicateKinds, scoredDup.skipKind ?? 'duplicate_cross_city_page')
+          recordCrawlSkip(
+            classifySoftDedupeListSkip(scoredDup.evaluation ?? { suppress: true }),
+            false
+          )
           continue
         }
       }
@@ -1478,7 +1515,15 @@ export async function persistExternalPageSource(
         if (postDetailDup.skip) {
           summary.duplicateScoredSkipped += 1
           bumpDuplicateKind(duplicateKinds, postDetailDup.skipKind ?? 'duplicate_cross_city_page')
+          recordCrawlSkip(
+            classifySoftDedupeListSkip(postDetailDup.evaluation ?? { suppress: true }),
+            false
+          )
           return
+        }
+
+        if (result.outcome === 'fallback' && result.reason) {
+          recordCrawlSkip(classifyDetailFirstFallbackSkip(result.reason), false)
         }
 
         await insertListingLegacy(fallbackListing, candidate.rowPayload, fallbackDetailHtml)

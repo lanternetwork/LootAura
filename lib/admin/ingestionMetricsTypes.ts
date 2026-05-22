@@ -2,6 +2,7 @@ import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelp
 import type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import type {
   ConfigYieldLeaderboardEntry,
+  CrawlSkipTaxonomyRollup,
   IngestionFunnelDuplicateHits,
   IngestionFunnelFreshRates,
   IngestionFunnelPlatformBreakdown,
@@ -10,11 +11,13 @@ import type {
   IngestionFunnelTopDropoff,
   IngestionFunnelWindowMetrics,
 } from '@/lib/admin/ingestionFunnelMetricsHelpers'
+import type { DetailFirstOperationalAlert } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 
 export type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 
 export type {
   ConfigYieldLeaderboardEntry,
+  CrawlSkipTaxonomyRollup,
   IngestionFunnelDuplicateHits,
   IngestionFunnelFreshRates,
   IngestionFunnelPlatformBreakdown,
@@ -80,6 +83,8 @@ export interface IngestionVolumeFetchMetrics {
   fetchFailureRate: number | null
   averageExternalFetchDurationMs: number | null
   budgetExitCount24h: number
+  crawlSkipTaxonomy24h: CrawlSkipTaxonomyRollup
+  crawlSkipTaxonomyAlerts: DetailFirstOperationalAlert[]
 }
 
 export interface IngestionVolumeAddressLifecycleMetrics {

@@ -3,6 +3,11 @@ import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/i
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import {
+  CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING,
+  CRAWL_SKIP_TAXONOMY_MIN_SAMPLES,
+} from '@/lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth'
+import { EXTERNAL_CRAWL_SKIP_SUB_REASONS } from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
 import type { DetailFirstProofCheck } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 
@@ -102,6 +107,50 @@ export function buildIngestionDiagnostics(
     bullet('fresh inserted', funnel.freshInserted),
     bullet('published', stageCount(stages, 'published')),
     bullet('publish failed', stageCount(stages, 'publish_failed')),
+    '',
+    '## Phase 2 — crawl skip taxonomy (24h)',
+    bullet(
+      'classified skips',
+      vol.fetch.crawlSkipTaxonomy24h?.total ?? 0
+    ),
+    bullet('benign', vol.fetch.crawlSkipTaxonomy24h?.benign ?? 0),
+    bullet('suspicious', vol.fetch.crawlSkipTaxonomy24h?.suspicious ?? 0),
+    bullet('operational', vol.fetch.crawlSkipTaxonomy24h?.operational ?? 0),
+    bullet(
+      'suspicious share',
+      formatPct(vol.fetch.crawlSkipTaxonomy24h?.suspiciousShare ?? null)
+    ),
+    bullet(
+      'alert threshold',
+      `≥${(CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING * 100).toFixed(0)}% suspicious when n≥${CRAWL_SKIP_TAXONOMY_MIN_SAMPLES}`
+    ),
+    '',
+    '### Crawl skip sub-reasons (top)',
+  ]
+
+  const crawlSubReasons = EXTERNAL_CRAWL_SKIP_SUB_REASONS.map((r) => ({
+    reason: r,
+    count: vol.fetch.crawlSkipTaxonomy24h?.subReasons?.[r] ?? 0,
+  }))
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12)
+  if (crawlSubReasons.length === 0) {
+    lines.push(bullet('(none)', '—'))
+  } else {
+    for (const row of crawlSubReasons) {
+      lines.push(bullet(row.reason, formatCount(row.count)))
+    }
+  }
+
+  if ((vol.fetch.crawlSkipTaxonomyAlerts ?? []).length > 0) {
+    lines.push('', '### Crawl skip taxonomy alerts')
+    for (const alert of vol.fetch.crawlSkipTaxonomyAlerts ?? []) {
+      lines.push(bullet(`${alert.level}: ${alert.code}`, alert.message))
+    }
+  }
+
+  lines.push(
     '',
     '## Phase 3B proof protocol',
     bullet('status', data.detailFirstProof.status),

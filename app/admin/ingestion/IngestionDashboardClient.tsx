@@ -17,6 +17,7 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
+import CrawlSkipTaxonomySection from '@/app/admin/ingestion/CrawlSkipTaxonomySection'
 import IngestionFunnelSection from '@/app/admin/ingestion/IngestionFunnelSection'
 import YstmCoverageScoreboardSection from '@/app/admin/ingestion/YstmCoverageScoreboardSection'
 
@@ -331,6 +332,10 @@ export default function IngestionDashboardClient() {
                 funnel={data.funnel}
                 detailFirstProof={data.detailFirstProof}
               />
+            )}
+
+            {data.volume?.fetch && (
+              <CrawlSkipTaxonomySection fetch={data.volume.fetch} />
             )}
 
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">

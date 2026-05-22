@@ -75,6 +75,32 @@ describe('ingestionFunnelMetricsHelpers', () => {
     expect(funnel['24h'].duplicateHits.duplicate_cross_city_page).toBe(0)
   })
 
+  it('rolls up crawl skip sub-reasons from orchestration notes', () => {
+    const created = '2026-05-17T11:00:00.000Z'
+    const rollup = rollupExternalIngestionForWindow(
+      [
+        orchRow(created, {
+          status: 'completed',
+          fetched: 10,
+          inserted: 1,
+          skipped: 8,
+          invalid: 1,
+          crawlSkipSubReasons: {
+            url_match_same_dates: 5,
+            url_match_dates_changed: 2,
+            url_match_expired_row: 1,
+          },
+        }),
+      ],
+      24,
+      NOW
+    )
+    expect(rollup.crawlSkipTaxonomy.total).toBe(8)
+    expect(rollup.crawlSkipTaxonomy.benign).toBe(5)
+    expect(rollup.crawlSkipTaxonomy.suspicious).toBe(2)
+    expect(rollup.crawlSkipTaxonomy.operational).toBe(1)
+  })
+
   it('partitions cohort rows to sum inserted', () => {
     const created = '2026-05-17T10:00:00.000Z'
     const cohort = aggregateCohortFunnel(

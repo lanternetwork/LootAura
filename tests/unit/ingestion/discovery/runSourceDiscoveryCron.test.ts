@@ -152,7 +152,8 @@ describe('runSourceDiscoveryCron', () => {
     const graphCallOrder = graphEnumerationMock.mock.invocationCallOrder[0] ?? 0
     expect(placeholderCallOrder).toBeLessThan(graphCallOrder)
     const promoteCallOrder = promoteMock.mock.invocationCallOrder[0] ?? 0
-    expect(promoteCallOrder).toBeLessThan(graphCallOrder)
+    // Empty backlog: early promote is a no-op; graph candidates promote after graph.
+    expect(promoteCallOrder).toBeGreaterThan(graphCallOrder)
     expect(revalidateMock.mock.calls[0]?.[1]).not.toHaveProperty('states')
     expect(releaseMock).toHaveBeenCalledWith(
       expect.anything(),

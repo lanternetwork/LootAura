@@ -27,6 +27,18 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     bullet('missingValidYstmUrls', data.missingValidYstmUrls),
     bullet('lastAuditAt', data.lastAuditAt ?? '—'),
     '',
+    '### False-exclusion audit (Phase 1)',
+    bullet('missing traced', data.falseExclusionAudit.tracedCount),
+    bullet(
+      'top buckets',
+      Object.entries(data.falseExclusionAudit.byPrimaryBucket)
+        .filter(([, n]) => n > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([k, n]) => `${k}=${n}`)
+        .join(', ') || 'none'
+    ),
+    '',
     '### Week-1 sprint gates',
     ...gates.gates.map((g) => `- [${g.status.toUpperCase()}] ${g.label}: ${g.detail}`),
     bullet('all gates pass', gates.allPass ? 'yes' : 'no'),

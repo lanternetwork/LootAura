@@ -420,10 +420,35 @@ describe('buildIngestionDiagnostics', () => {
         },
       },
       operationalHealth: { healthy: true, alerts: [] },
+      falseExclusionAudit: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        missingValidCount: 7,
+        tracedCount: 7,
+        byPrimaryBucket: {
+          never_crawled: 0,
+          crawl_not_yet_rotated: 3,
+          url_duplicate_suppressed: 1,
+          url_reuse_suspected: 0,
+          soft_dedupe_suppressed: 0,
+          expired_false_positive: 0,
+          gated_false_positive: 0,
+          detail_first_fallback: 1,
+          address_validation_failed: 0,
+          spatial_lookup_failed: 0,
+          insert_failed: 0,
+          publish_failed: 1,
+          repair_pending: 1,
+          repair_failed: 0,
+          published_not_visible: 0,
+          unknown: 0,
+        },
+        traces: [],
+      },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
     expect(md).toContain('## YSTM nationwide coverage')
+    expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
   })
 })

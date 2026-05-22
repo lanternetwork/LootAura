@@ -35,6 +35,8 @@ import {
   aggregateYstmExistingUrlRefresh,
   type YstmExistingUrlRefreshAggregate,
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
+import { buildFalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
+import type { FalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type YstmCoverageTrendPoint = {
@@ -72,6 +74,7 @@ export type YstmCoverageScoreboard = {
   sloAttainment: YstmCoverageSloAttainment
   graphEnumeration: YstmGraphEnumerationMetrics
   operationalHealth: YstmCoverageOperationalHealth
+  falseExclusionAudit: FalseExclusionAuditReport
 }
 
 type AuditRunRow = {
@@ -98,8 +101,17 @@ export async function buildYstmCoverageScoreboard(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<YstmCoverageScoreboard> {
   const now = new Date()
-  const [agg, publishedIndex, sourceExpansion, graphEnumeration, missingIngestion, existingRefresh, catalogRepair, runsResult] =
-    await Promise.all([
+  const [
+    agg,
+    publishedIndex,
+    sourceExpansion,
+    graphEnumeration,
+    missingIngestion,
+    existingRefresh,
+    catalogRepair,
+    falseExclusionAudit,
+    runsResult,
+  ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
     buildYstmSourceExpansionMetrics(admin, now.getTime()),
@@ -107,6 +119,7 @@ export async function buildYstmCoverageScoreboard(
     aggregateYstmCoverageMissingIngestion(admin),
     aggregateYstmExistingUrlRefresh(admin, now.getTime()),
     aggregateYstmCatalogRepair(admin, now.getTime()),
+    buildFalseExclusionAuditReport(admin, now),
     fromBase(admin, 'ystm_coverage_audit_runs')
       .select(
         'completed_at, status, coverage_pct, valid_active_ystm_urls, published_visible_in_audit, list_pages_fetched, listing_urls_discovered, detail_pages_validated, config_cursor_after'
@@ -205,6 +218,7 @@ export async function buildYstmCoverageScoreboard(
     pipelineBacklog,
     sloAttainment,
     operationalHealth,
+    falseExclusionAudit,
   }
 }
 

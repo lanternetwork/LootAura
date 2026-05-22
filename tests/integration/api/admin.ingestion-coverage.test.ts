@@ -92,5 +92,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.operationalHealth.alerts.some((a: { code: string }) => a.code === 'coverage_no_audit_denominator')).toBe(
       true
     )
+    expect(json.falseExclusionAudit.tracedCount).toBe(0)
+    expect(json.falseExclusionAudit.missingValidCount).toBe(0)
   })
 })

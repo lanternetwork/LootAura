@@ -230,6 +230,72 @@ export default function YstmCoverageScoreboardSection() {
             </p>
           )}
 
+          <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
+            <h3 className="text-sm font-semibold text-violet-950">
+              False-exclusion audit (Phase 1)
+            </h3>
+            <p className="mt-1 text-xs text-violet-900">
+              Every missing valid YSTM URL is traced to a primary bucket (replay queue). Refreshed on
+              each scoreboard load; persisted on coverage observations.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Traced missing"
+                value={data.falseExclusionAudit.tracedCount}
+                highlight
+              />
+              <Metric
+                label="Never attempted (ingest)"
+                value={data.pipelineBacklog.missingIngestionNeverAttempted}
+              />
+            </div>
+            {Object.entries(data.falseExclusionAudit.byPrimaryBucket)
+              .filter(([, n]) => n > 0)
+              .sort((a, b) => b[1] - a[1])
+              .length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-left text-xs text-violet-950">
+                  <thead>
+                    <tr className="border-b border-violet-200">
+                      <th className="py-1 pr-4 font-medium">Primary bucket</th>
+                      <th className="py-1 font-medium">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(data.falseExclusionAudit.byPrimaryBucket)
+                      .filter(([, n]) => n > 0)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([bucket, count]) => (
+                        <tr key={bucket} className="border-b border-violet-100">
+                          <td className="py-1 pr-4 font-mono">{bucket}</td>
+                          <td className="py-1 tabular-nums">{count.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {data.falseExclusionAudit.traces.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-medium text-violet-950">
+                  Sample traces ({data.falseExclusionAudit.traces.length} shown)
+                </summary>
+                <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto text-xs text-violet-900">
+                  {data.falseExclusionAudit.traces.map((t) => (
+                    <li key={t.canonicalUrl} className="rounded border border-violet-100 bg-white p-2">
+                      <p className="font-mono break-all">{t.canonicalUrl}</p>
+                      <p>
+                        <span className="font-semibold">{t.primaryBucket}</span>
+                        {t.secondaryTags.length > 0 ? ` · ${t.secondaryTags.join(', ')}` : ''}
+                      </p>
+                      <p className="text-violet-800">{t.summary}</p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+
           <div className="mb-6 rounded-md border border-indigo-200 bg-indigo-50 p-4">
             <h3 className="text-sm font-semibold text-indigo-950">Pipeline backlog (Phase 7 SLO)</h3>
             <p className="mt-1 text-xs text-indigo-900">

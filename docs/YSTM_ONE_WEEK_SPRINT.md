@@ -41,7 +41,7 @@ Production is expected to run with **no `CRON_*` / `INGESTION_*` overrides in Ve
 | Graph enumeration / discovery | 4×/day UTC 02/08/14/20 | 10 states, 1000 candidates, 500 validations, 120 placeholder repair (`discoveryCronConfig.ts`) |
 | Coverage audit | 2×/day | 24 configs, 40 list fetches, 80 detail validations (`ystmCoverageAuditConfig.ts`) |
 | Missing ingest | 2×/day | 48 attempts, 160 scanned (`ystmCoverageMissingIngestionConfig.ts`) |
-| Catalog repair | 2×/day | 60 attempts, 160 scanned (`ystmCatalogRepairConfig.ts`) |
+| Catalog repair | 2×/day | 80 attempts, 200 scanned (`ystmCatalogRepairConfig.ts`) |
 | Existing refresh | 2×/day | 32 attempts, 120 scanned (`ystmExistingUrlRefreshConfig.ts`) |
 | Main ingestion | every 2 min | batch 60, budget 120s (`ingestionOrchestrationDefaults.ts`) |
 

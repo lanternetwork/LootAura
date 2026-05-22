@@ -454,6 +454,7 @@ describe('buildIngestionDiagnostics', () => {
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
     expect(md).toContain('## YSTM nationwide coverage')
+    expect(md).toContain('### Sale-instance identity (Phase 3)')
     expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
   })

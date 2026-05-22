@@ -4,7 +4,7 @@
  * Scheduled external source discovery, promotion, and registry self-healing.
  * Auth: CRON_SECRET Bearer only. Aggregate JSON response (no raw URLs/HTML).
  *
- * Schedule: vercel.json (default daily 04:00 UTC). Tune CRON_DISCOVERY_* env vars.
+ * Schedule: vercel.json (default 02:00, 08:00, 14:00, 20:00 UTC). Tune CRON_DISCOVERY_* env vars.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -82,6 +82,10 @@ async function runDiscoveryCron(request: NextRequest) {
       note: {
         ok: result.ok,
         skipped: result.skipped,
+        degraded: t.degraded,
+        statesScanned: t.statesScanned,
+        graphEnumerationThrottled: t.graphEnumerationThrottled,
+        phasesCompleted: t.phasesCompleted,
         configsPromoted: t.configsPromoted,
         configsRepaired: t.configsRepaired,
         configsRevalidated: t.configsRevalidated,

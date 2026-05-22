@@ -161,11 +161,18 @@ export async function runSourceDiscoveryCron(
           telemetry.configsPromoted = promotion.telemetry.configsPromoted
           telemetry.configsRepaired += promotion.telemetry.configsRepaired
           telemetry.phasesCompleted.push('promote')
-          await markSourcePageCandidatesPromoted(
-            admin,
-            promotable.map((c) => c.canonicalUrl),
-            null
-          )
+          const promotionMarks = promotion.records
+            .filter(
+              (record): record is typeof record & { configId: string } =>
+                (record.action === 'inserted' || record.action === 'updated') &&
+                typeof record.configId === 'string' &&
+                record.configId.length > 0
+            )
+            .map((record) => ({
+              canonicalUrl: record.canonicalUrl,
+              promotedConfigId: record.configId,
+            }))
+          await markSourcePageCandidatesPromoted(admin, promotionMarks)
         } else {
           telemetry.degraded = true
           logger.warn('source discovery cron promotion degraded', {

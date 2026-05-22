@@ -105,6 +105,13 @@ describe('runSourceDiscoveryCron', () => {
     promoteMock.mockResolvedValue({
       ok: true,
       telemetry: { configsPromoted: 2, configsRepaired: 1 },
+      records: [
+        {
+          canonicalUrl: 'https://yardsaletreasuremap.com/TX/austin.html',
+          configId: 'cfg-1',
+          action: 'updated',
+        },
+      ],
     })
     revalidateMock.mockResolvedValue({
       ok: true,

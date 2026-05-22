@@ -106,19 +106,26 @@ export async function updateSourcePageCandidateValidation(
 
 export async function markSourcePageCandidatesPromoted(
   admin: ReturnType<typeof getAdminDb>,
-  canonicalUrls: string[],
-  promotedConfigId: string | null
+  marks: Array<{ canonicalUrl: string; promotedConfigId: string | null }>
 ): Promise<void> {
-  if (canonicalUrls.length === 0) return
+  if (marks.length === 0) return
   const now = new Date().toISOString()
-  const { error } = await fromBase(admin, 'ystm_source_page_candidates')
-    .update({
-      promoted_at: now,
-      promoted_config_id: promotedConfigId,
-      last_seen_at: now,
-    })
-    .in('canonical_url', canonicalUrls)
-  if (error) throw new Error(error.message)
+  const byConfigId = new Map<string | null, string[]>()
+  for (const mark of marks) {
+    const urls = byConfigId.get(mark.promotedConfigId) ?? []
+    urls.push(mark.canonicalUrl)
+    byConfigId.set(mark.promotedConfigId, urls)
+  }
+  for (const [promotedConfigId, canonicalUrls] of byConfigId) {
+    const { error } = await fromBase(admin, 'ystm_source_page_candidates')
+      .update({
+        promoted_at: now,
+        promoted_config_id: promotedConfigId,
+        last_seen_at: now,
+      })
+      .in('canonical_url', canonicalUrls)
+    if (error) throw new Error(error.message)
+  }
 }
 
 export async function listValidatedUnpromotedCandidates(

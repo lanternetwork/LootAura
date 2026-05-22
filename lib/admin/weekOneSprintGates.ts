@@ -28,7 +28,8 @@ export function evaluateWeekOneSprintGates(
   const discoveryWorks =
     ge.candidatesDiscovered > 0 &&
     (last?.statesScanned ?? 0) > 0 &&
-    (last?.phasesCompleted?.includes('graph_enumeration') ?? false)
+    (last?.phasesCompleted?.includes('graph_enumeration') ?? false) &&
+    (last?.phasesCompleted?.includes('placeholder_repair') ?? false)
 
   const crawlable = data.sourceExpansion.crawlableConfigs
   const noSource = data.sourceExpansion.configsWithoutSourcePages
@@ -46,7 +47,10 @@ export function evaluateWeekOneSprintGates(
       id: 'discovery_last_run',
       label: 'Last discovery scanned states',
       status:
-        last && last.statesScanned > 0 && last.phasesCompleted.includes('graph_enumeration')
+        last &&
+        last.statesScanned > 0 &&
+        last.phasesCompleted.includes('graph_enumeration') &&
+        last.phasesCompleted.includes('placeholder_repair')
           ? 'pass'
           : last?.skipped
             ? 'pending'
@@ -86,7 +90,7 @@ export function evaluateWeekOneSprintGates(
       label: 'Discovery pipeline (composite)',
       status: discoveryWorks ? 'pass' : 'fail',
       detail: discoveryWorks
-        ? 'registry + last run graph_enumeration'
+        ? 'registry + graph_enumeration + placeholder_repair on last run'
         : 'fix discovery (repo defaults; no Vercel env ramp)',
     },
   ]

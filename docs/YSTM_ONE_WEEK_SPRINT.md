@@ -51,6 +51,23 @@ Production is expected to run with **no `CRON_*` / `INGESTION_*` overrides in Ve
 
 ---
 
+## Days 2–7 (footprint + closure, same PR deploy)
+
+No new Vercel env. Let 4×/day discovery + 2×/day repair/audit crons run on repo defaults.
+
+| Day | Focus | Pass signal |
+|-----|--------|-------------|
+| **2** | Registry + placeholder | `candidatesDiscovered > 0`; last discovery includes `placeholder_repair` |
+| **3** | Crawlable trend | `crawlableConfigs` up vs Day 0; `no source_pages` down |
+| **4** | Audit V | `validActiveYstmUrls` rising (target ≥150 pending, ≥300 by Day 7) |
+| **5** | Catalog repair drain | `catalogRepair` queue &lt; 200 and falling |
+| **6** | Missing ingest | `missingValidYstmUrls` stable or down as V grows |
+| **7** | Gate review | All three Week-1 greens or document blockers for code-default PR |
+
+**Code in this sprint branch:** discovery promotes validated registry backlog even when graph enumeration fails or is skipped (configs can advance without a successful index pass in the same run).
+
+---
+
 ## Daily 15-minute check
 
 1. Admin → Ingestion → **YSTM nationwide coverage** → **Week-1 sprint gates** (PASS/FAIL).

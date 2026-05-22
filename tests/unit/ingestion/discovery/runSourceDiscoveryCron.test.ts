@@ -179,6 +179,57 @@ describe('runSourceDiscoveryCron', () => {
     expect(promoteMock).not.toHaveBeenCalled()
   })
 
+  it('promotes registry backlog when graph enumeration fails', async () => {
+    graphEnumerationMock.mockResolvedValueOnce({
+      ok: false,
+      promotable: [],
+      telemetry: {
+        statesScanned: 0,
+        candidatePagesDiscovered: 0,
+        candidateRegistryUpserts: 0,
+        candidatePagesValid: 0,
+        candidatePagesInvalid: 0,
+        validationsAttempted: 0,
+        fetchFailures: 1,
+        blockedCount: 0,
+        throttleApplied: false,
+        throttleReasons: [],
+        backlogValidationsProcessed: 0,
+      },
+      error: 'fetch_failed',
+    })
+    listBacklogMock.mockResolvedValueOnce([
+      {
+        state: 'TX',
+        city_slug: 'austin',
+        canonical_url: 'https://yardsaletreasuremap.com/US/Texas/austin.html',
+        metadata: { city: 'Austin', sharedHubPage: false },
+      },
+    ])
+
+    const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
+    const result = await runSourceDiscoveryCron({} as never, {
+      budgets: {
+        maxStatesPerRun: 2,
+        maxDiscoveredPagesPerRun: 10,
+        maxValidationFetchesPerRun: 10,
+        maxRevalidationConfigsPerRun: 10,
+        maxPlaceholderRepairConfigsPerRun: 10,
+        indexFetchConcurrency: 2,
+        validationFetchConcurrency: 2,
+        leaseSeconds: 120,
+        maxRuntimeMs: 60_000,
+        placeholderFailureExcludeThreshold: 1,
+      },
+    })
+
+    expect(result.telemetry.phasesCompleted).toContain('graph_enumeration')
+    expect(result.telemetry.phasesCompleted).toContain('promote')
+    expect(promoteMock).toHaveBeenCalledTimes(1)
+    const promoted = promoteMock.mock.calls[0]![1] as { candidates: Array<{ canonicalUrl: string }> }
+    expect(promoted.candidates.some((c) => c.canonicalUrl.includes('austin.html'))).toBe(true)
+  })
+
   it('bounds discovery to configured state batch size', async () => {
     const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
     await runSourceDiscoveryCron({} as never, {

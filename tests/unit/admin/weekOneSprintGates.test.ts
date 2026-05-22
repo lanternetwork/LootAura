@@ -178,7 +178,7 @@ describe('evaluateWeekOneSprintGates', () => {
             candidatePagesValid: 150,
             graphEnumerationSkippedReason: null,
             graphEnumerationThrottled: false,
-            phasesCompleted: ['graph_enumeration', 'promote'],
+            phasesCompleted: ['placeholder_repair', 'graph_enumeration', 'promote'],
           },
         },
       })

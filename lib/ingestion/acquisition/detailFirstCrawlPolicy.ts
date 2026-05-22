@@ -1,4 +1,9 @@
 import { isIngestedRowExpiredForDuplicate } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
+import {
+  classifyYstmUrlReuseFromListSeed,
+  isPriorityYstmUrlReuseRefresh,
+  type YstmUrlReuseEventKind,
+} from '@/lib/ingestion/identity/classifyYstmUrlReuseEvent'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import {
   evaluateDuplicateSkipForExternalListListing,
@@ -41,6 +46,70 @@ export function shouldRefreshYstmDetailOnListRecrawl(
     return false
   }
   return true
+}
+
+export type YstmListRecrawlExistingRow = {
+  status: string | null | undefined
+  failure_reasons: unknown
+  date_start: string | null
+  date_end: string | null
+  normalized_address: string | null
+}
+
+/**
+ * Phase 5: classify URL reuse before refresh vs duplicate skip.
+ */
+export function classifyYstmUrlReuseForListRecrawl(
+  listing: {
+    startDate: string | null | undefined
+    endDate: string | null | undefined
+    addressRaw: string | null | undefined
+  },
+  existing: YstmListRecrawlExistingRow
+): YstmUrlReuseEventKind {
+  return classifyYstmUrlReuseFromListSeed({
+    listingStartDate: listing.startDate ?? null,
+    listingEndDate: listing.endDate ?? null,
+    listingAddressRaw: listing.addressRaw ?? null,
+    existing: {
+      status: String(existing.status ?? ''),
+      failure_reasons: existing.failure_reasons,
+      date_start: existing.date_start,
+      date_end: existing.date_end,
+      normalized_address: existing.normalized_address,
+    },
+  })
+}
+
+/** URL-reuse new events bypass the per-page refresh cap (false-exclusion fix). */
+export function shouldQueueYstmListRecrawlRefresh(input: {
+  sourceUrl: string
+  existing: YstmListRecrawlExistingRow
+  listing: {
+    startDate: string | null | undefined
+    endDate: string | null | undefined
+    addressRaw: string | null | undefined
+  }
+  refreshesQueued: number
+  maxPerPage: number
+}): { queue: boolean; urlReuseEvent: YstmUrlReuseEventKind; priority: boolean } {
+  if (!isYstmDetailListingUrl(input.sourceUrl)) {
+    return { queue: false, urlReuseEvent: 'expire_old_row', priority: false }
+  }
+
+  const urlReuseEvent = classifyYstmUrlReuseForListRecrawl(input.listing, input.existing)
+  const priority = isPriorityYstmUrlReuseRefresh(urlReuseEvent)
+
+  if (priority) {
+    return { queue: true, urlReuseEvent, priority: true }
+  }
+
+  if (!shouldRefreshYstmDetailOnListRecrawl(input.sourceUrl, input.existing)) {
+    return { queue: false, urlReuseEvent, priority: false }
+  }
+
+  const queue = input.refreshesQueued < input.maxPerPage
+  return { queue, urlReuseEvent, priority: false }
 }
 
 /**

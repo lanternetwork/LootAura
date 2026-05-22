@@ -52,6 +52,11 @@ import {
   saleInstanceIdentityDbColumns,
 } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
 import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
+import { classifyYstmUrlReuseFromListSeed } from '@/lib/ingestion/identity/classifyYstmUrlReuseEvent'
+import {
+  planYstmUrlReuseSupersessionOnDetailRefresh,
+  supersedePublishedSaleForUrlReuse,
+} from '@/lib/ingestion/identity/ystmUrlReuseSupersession'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
@@ -632,9 +637,60 @@ export async function attemptYstmDetailFirstReady(
   let ingestedSaleId: string | null = null
 
   if (params.existingIngestedSaleId) {
+    const { data: priorRow } = await fromBase(admin, 'ingested_sales')
+      .select(
+        'id, sale_instance_key, published_sale_id, date_start, date_end, status, failure_reasons, normalized_address'
+      )
+      .eq('id', params.existingIngestedSaleId)
+      .maybeSingle()
+
+    const supersessionPatch = priorRow?.id
+      ? planYstmUrlReuseSupersessionOnDetailRefresh({
+          prior: {
+            id: String(priorRow.id),
+            sale_instance_key: (priorRow as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+            published_sale_id:
+              (priorRow as { published_sale_id?: string | null }).published_sale_id ?? null,
+            date_start: (priorRow as { date_start?: string | null }).date_start ?? null,
+            date_end: (priorRow as { date_end?: string | null }).date_end ?? null,
+            status: String((priorRow as { status?: string }).status ?? ''),
+            failure_reasons: (priorRow as { failure_reasons?: unknown }).failure_reasons,
+            normalized_address:
+              (priorRow as { normalized_address?: string | null }).normalized_address ?? null,
+          },
+          nextSaleInstanceKey: (ingestRow.sale_instance_key as string | null) ?? null,
+          listingStartDate: listing.startDate ?? null,
+          listingEndDate: listing.endDate ?? null,
+          listingAddressRaw: listing.addressRaw,
+        })
+      : null
+
+    if (supersessionPatch) {
+      Object.assign(ingestRow, supersessionPatch)
+      await supersedePublishedSaleForUrlReuse(admin, supersessionPatch.superseded_sale_id)
+    }
+
+    const reviveExpiredUrlReuse =
+      priorRow?.id != null &&
+      (supersessionPatch != null ||
+        classifyYstmUrlReuseFromListSeed({
+          listingStartDate: listing.startDate ?? null,
+          listingEndDate: listing.endDate ?? null,
+          listingAddressRaw: listing.addressRaw,
+          existing: {
+            status: String((priorRow as { status?: string }).status ?? ''),
+            failure_reasons: (priorRow as { failure_reasons?: unknown }).failure_reasons,
+            date_start: (priorRow as { date_start?: string | null }).date_start ?? null,
+            date_end: (priorRow as { date_end?: string | null }).date_end ?? null,
+            normalized_address:
+              (priorRow as { normalized_address?: string | null }).normalized_address ?? null,
+          },
+        }) === 'new_event_same_url')
+
     const updated = await updateExistingIngestedSaleForDetailFirst(admin, {
       ingestedSaleId: params.existingIngestedSaleId,
       row: ingestRow,
+      reviveExpiredUrlReuse,
     })
     ingestedSaleId = updated?.id ?? null
     if (!ingestedSaleId) {

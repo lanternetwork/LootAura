@@ -108,6 +108,30 @@ Migration `203_ystm_ingested_sale_source_urls_phase_4.sql` adds `ingested_sale_s
 - `lib/ingestion/identity/recordIngestedSaleSourceUrl.ts`
 - `lib/admin/sourceUrlAliasMetrics.ts`
 
+## Phase 5 — date-aware URL reuse (behavior)
+
+When list crawl sees an existing `source_url`, classify reuse **before** duplicate skip:
+
+| Event | Action |
+|-------|--------|
+| Same dates (±3d) / same location | Routine bounded detail refresh |
+| Materially different dates or location | **Priority** detail refresh (bypasses per-page refresh cap) |
+| Expired row + active listing dates | Priority refresh (new event) |
+
+On detail-first refresh, when `sale_instance_key` changes (or list classification is `new_event_same_url`) and a published sale exists:
+
+- Set `superseded_sale_id` / `superseded_reason` on `ingested_sales`
+- End prior `sales.ends_at` (hide old pin)
+- Clear `published_sale_id` so publish creates the new visible instance
+
+`UNIQUE(source_url)` unchanged (Phase 10).
+
+### Code
+
+- `lib/ingestion/identity/classifyYstmUrlReuseEvent.ts`
+- `lib/ingestion/identity/ystmUrlReuseSupersession.ts`
+- `lib/ingestion/acquisition/detailFirstCrawlPolicy.ts` (`shouldQueueYstmListRecrawlRefresh`)
+
 ## Later phases
 
-Phases 5–10 change crawl gates, date-aware URL reuse, and constraints.
+Phases 6–10 add full classifier, crawl gate reorder, and constraints.

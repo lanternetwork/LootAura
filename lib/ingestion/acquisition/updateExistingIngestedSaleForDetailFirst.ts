@@ -10,13 +10,15 @@ export async function updateExistingIngestedSaleForDetailFirst(
   input: {
     ingestedSaleId: string
     row: DetailFirstIngestedSaleWriteRow
+    /** Phase 5: allow replacing an expired row when YSTM reuses the URL for a new active event. */
+    reviveExpiredUrlReuse?: boolean
   }
 ): Promise<{ id: string } | null> {
   const id = input.ingestedSaleId.trim()
   if (!id) return null
 
   const now = new Date().toISOString()
-  const { data, error } = await fromBase(admin, 'ingested_sales')
+  let q = fromBase(admin, 'ingested_sales')
     .update({
       ...input.row,
       last_source_sync_at: now,
@@ -25,9 +27,10 @@ export async function updateExistingIngestedSaleForDetailFirst(
     })
     .eq('id', id)
     .eq('is_duplicate', false)
-    .neq('status', 'expired')
-    .select('id, published_sale_id')
-    .maybeSingle()
+  if (!input.reviveExpiredUrlReuse) {
+    q = q.neq('status', 'expired')
+  }
+  const { data, error } = await q.select('id, published_sale_id').maybeSingle()
 
   if (error || !data?.id) {
     return null

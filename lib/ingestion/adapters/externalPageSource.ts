@@ -42,7 +42,7 @@ import {
   evaluatePostDetailEnrichedDuplicateSkip,
   parseYstmListRecrawlRefreshMaxPerPage,
   shouldDeferListSeedSoftDedupe,
-  shouldRefreshYstmDetailOnListRecrawl,
+  shouldQueueYstmListRecrawlRefresh,
 } from '@/lib/ingestion/acquisition/detailFirstCrawlPolicy'
 import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
@@ -1386,7 +1386,9 @@ export async function persistExternalPageSource(
       const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
 
       const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
-        .select('id, status, failure_reasons, date_start, date_end, normalized_address')
+        .select(
+          'id, status, failure_reasons, date_start, date_end, normalized_address, sale_instance_key, published_sale_id, superseded_by_ingested_sale_id'
+        )
         .eq('source_url', listing.sourceUrl)
         .maybeSingle()
 
@@ -1417,26 +1419,52 @@ export async function persistExternalPageSource(
         continue
       }
       if (existing?.id) {
+        if ((existing as { superseded_by_ingested_sale_id?: string | null }).superseded_by_ingested_sale_id) {
+          duplicateUrlSkipped += 1
+          bumpDuplicateKind(duplicateKinds, 'duplicate_existing_url')
+          recordCrawlSkip('url_match_superseded_row', false)
+          continue
+        }
+
         await recordIngestedSaleSourceUrl(admin, {
           ingestedSaleId: String(existing.id),
           sourcePlatform: platform,
           sourceUrl: listing.sourceUrl,
         })
-        if (
-          shouldRefreshYstmDetailOnListRecrawl(listing.sourceUrl, {
+
+        const refreshDecision = shouldQueueYstmListRecrawlRefresh({
+          sourceUrl: listing.sourceUrl,
+          existing: {
             status: existing.status as string,
             failure_reasons: existing.failure_reasons,
-          }) &&
-          listRecrawlRefreshesQueued < listRecrawlRefreshMaxPerPage
-        ) {
+            date_start: (existing as { date_start?: string | null }).date_start ?? null,
+            date_end: (existing as { date_end?: string | null }).date_end ?? null,
+            normalized_address:
+              (existing as { normalized_address?: string | null }).normalized_address ?? null,
+          },
+          listing: {
+            startDate: listing.startDate,
+            endDate: listing.endDate,
+            addressRaw: listing.addressRaw,
+          },
+          refreshesQueued: listRecrawlRefreshesQueued,
+          maxPerPage: listRecrawlRefreshMaxPerPage,
+        })
+
+        if (refreshDecision.queue) {
           detailFirstCandidates.push({
             listing,
             rowPayload,
             existingIngestedSaleId: String(existing.id),
           })
-          listRecrawlRefreshesQueued += 1
+          if (!refreshDecision.priority) {
+            listRecrawlRefreshesQueued += 1
+          }
           summary.ystmListRecrawlRefreshAttempted += 1
-          recordCrawlSkip('url_match_refresh_queued', false)
+          recordCrawlSkip(
+            refreshDecision.priority ? 'url_match_dates_changed' : 'url_match_refresh_queued',
+            false
+          )
           continue
         }
         duplicateUrlSkipped += 1

@@ -151,6 +151,8 @@ describe('runSourceDiscoveryCron', () => {
     const placeholderCallOrder = revalidateMock.mock.invocationCallOrder[0] ?? 0
     const graphCallOrder = graphEnumerationMock.mock.invocationCallOrder[0] ?? 0
     expect(placeholderCallOrder).toBeLessThan(graphCallOrder)
+    const promoteCallOrder = promoteMock.mock.invocationCallOrder[0] ?? 0
+    expect(promoteCallOrder).toBeLessThan(graphCallOrder)
     expect(revalidateMock.mock.calls[0]?.[1]).not.toHaveProperty('states')
     expect(releaseMock).toHaveBeenCalledWith(
       expect.anything(),
@@ -177,6 +179,38 @@ describe('runSourceDiscoveryCron', () => {
     expect(result.telemetry.overlapPrevented).toBe(true)
     expect(graphEnumerationMock).not.toHaveBeenCalled()
     expect(promoteMock).not.toHaveBeenCalled()
+  })
+
+  it('promotes registry backlog before graph enumeration when backlog exists', async () => {
+    listBacklogMock.mockResolvedValue([
+      {
+        state: 'TX',
+        city_slug: 'dallas',
+        canonical_url: 'https://yardsaletreasuremap.com/US/Texas/dallas.html',
+        metadata: { city: 'Dallas', sharedHubPage: false },
+      },
+    ])
+
+    const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
+    await runSourceDiscoveryCron({} as never, {
+      budgets: {
+        maxStatesPerRun: 2,
+        maxDiscoveredPagesPerRun: 10,
+        maxValidationFetchesPerRun: 10,
+        maxRevalidationConfigsPerRun: 10,
+        maxPlaceholderRepairConfigsPerRun: 10,
+        indexFetchConcurrency: 2,
+        validationFetchConcurrency: 2,
+        leaseSeconds: 120,
+        maxRuntimeMs: 60_000,
+        placeholderFailureExcludeThreshold: 1,
+      },
+    })
+
+    expect(promoteMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      graphEnumerationMock.mock.invocationCallOrder[0]!
+    )
+    expect(promoteMock).toHaveBeenCalledTimes(2)
   })
 
   it('promotes registry backlog when graph enumeration fails', async () => {

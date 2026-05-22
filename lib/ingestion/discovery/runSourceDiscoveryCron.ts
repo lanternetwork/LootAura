@@ -74,9 +74,11 @@ async function promoteValidatedRegistryCandidates(
     telemetryContext: args.telemetryContext,
   })
   if (promotion.ok) {
-    args.telemetry.configsPromoted = promotion.telemetry.configsPromoted
+    args.telemetry.configsPromoted += promotion.telemetry.configsPromoted
     args.telemetry.configsRepaired += promotion.telemetry.configsRepaired
-    args.telemetry.phasesCompleted.push('promote')
+    if (!args.telemetry.phasesCompleted.includes('promote')) {
+      args.telemetry.phasesCompleted.push('promote')
+    }
     const promotionMarks = promotion.records
       .filter(
         (record): record is typeof record & { configId: string } =>
@@ -212,6 +214,15 @@ export async function runSourceDiscoveryCron(
     } else {
       telemetry.degraded = true
       telemetry.graphEnumerationSkippedReason = 'runtime_budget'
+    }
+
+    // Backlog promote before graph: registry → crawlable configs even when graph uses the full runtime budget.
+    if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      await promoteValidatedRegistryCandidates(admin, {
+        graphPromotable: [],
+        telemetry,
+        telemetryContext,
+      })
     }
 
     let graphPromotable: ValidatedDiscoveryCandidate[] = []

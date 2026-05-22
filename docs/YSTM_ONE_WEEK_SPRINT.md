@@ -64,7 +64,23 @@ No new Vercel env. Let 4×/day discovery + 2×/day repair/audit crons run on rep
 | **6** | Missing ingest | `missingValidYstmUrls` stable or down as V grows |
 | **7** | Gate review | All three Week-1 greens or document blockers for code-default PR |
 
-**Code in this sprint branch:** discovery promotes validated registry backlog even when graph enumeration fails or is skipped (configs can advance without a successful index pass in the same run).
+**Code in this sprint branch:**
+
+- Discovery: `placeholder_repair` → **registry backlog promote** → `graph_enumeration` → promote new graph candidates → `revalidate`
+- Registry backlog promote also runs when graph fails or is skipped
+- Catalog repair cron repo defaults **80 attempts / 200 scanned** per run (still no Vercel env)
+
+---
+
+## Phase: closure (catalog repair + visibility)
+
+| Pipeline | Sprint repo default | Gate target |
+|----------|---------------------|-------------|
+| Catalog repair (2×/day) | 80 repairs, 200 scanned | Queue **&lt; 100** |
+| Missing ingest (2×/day) | 48 / 160 (unchanged) | Never-attempted not growing with V |
+| Coverage audit (2×/day) | 24 / 40 / 80 (unchanged) | **V ≥ 300** by Day 7 |
+
+Prioritize **catalog repair queue** in daily checks until under 100.
 
 ---
 

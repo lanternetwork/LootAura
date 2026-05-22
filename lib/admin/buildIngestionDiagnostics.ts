@@ -1,5 +1,7 @@
+import { buildYstmCoverageDiagnostics } from '@/lib/admin/buildYstmCoverageDiagnostics'
 import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
 import type { DetailFirstProofCheck } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
@@ -9,6 +11,8 @@ export type BuildIngestionDiagnosticsOptions = {
   environment?: string
   /** ISO timestamp for the export header; defaults to metrics.generatedAt */
   copiedAt?: string
+  /** When set, appends YSTM coverage scoreboard + week-1 sprint gates. */
+  ystmCoverage?: YstmCoverageMetricsResponse | null
 }
 
 function stageCount(stages: IngestionFunnelStage[], id: IngestionFunnelStageId): number {
@@ -285,6 +289,10 @@ export function buildIngestionDiagnostics(
     bullet('inserted/hour', hourly.listingsInsertedPerHour),
     bullet('published/hour', hourly.publishSucceededPerHour)
   )
+
+  if (options.ystmCoverage?.ok) {
+    lines.push('', buildYstmCoverageDiagnostics(options.ystmCoverage))
+  }
 
   return lines.join('\n')
 }

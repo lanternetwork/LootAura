@@ -29,6 +29,8 @@ export type DiscoveryCronTelemetry = {
   staleLockRecovered: boolean
   degraded: boolean
   phasesCompleted: string[]
+  /** Set when graph enumeration did not run (empty batch, runtime budget, or graph failure). */
+  graphEnumerationSkippedReason?: string
 }
 
 export function createDiscoveryCronTelemetry(): DiscoveryCronTelemetry {

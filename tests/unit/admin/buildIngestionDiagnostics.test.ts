@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 
 function stage(id: string, count: number) {
@@ -219,5 +220,66 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('- saturation: 0.0%')
     expect(md).toContain('- geocode failed: 0')
     expect(md).toContain('- percentage: —')
+  })
+
+  it('appends YSTM coverage section when ystmCoverage is provided', async () => {
+    const { evaluateWeekOneSprintGates } = await import('@/lib/admin/weekOneSprintGates')
+    const data = {
+      ok: true,
+      generatedAt: '2026-05-22T00:00:00Z',
+      funnel: { '24h': { stages: [], detailFirst: {}, ystm: {}, topDropoff: null } },
+      volume: { bottleneck: 'none', hourlyRates: {}, geocode: {}, fetch: {}, acquisition: {}, addressLifecycle: {}, imageEnrichment: {} },
+    } as unknown as IngestionMetricsResponse
+
+    const ystmCoverage = {
+      ok: true,
+      generatedAt: '2026-05-22T00:00:00Z',
+      validActiveYstmUrls: 78,
+      missingValidYstmUrls: 7,
+      publishedVisibleInAuditFootprint: 71,
+      coveragePct: 91,
+      lastAuditAt: null,
+      sourceExpansion: { crawlableConfigs: 62, configsWithoutSourcePages: 922, pendingDiscoveryConfigs: 0, validatedDiscoveryConfigs: 0 },
+      catalogRepair: { repairQueueTotal: 269 },
+      graphEnumeration: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        catalogStates: 51,
+        statesWithCandidates: 0,
+        statesRemaining: 51,
+        candidatesDiscovered: 0,
+        validatedPages: 0,
+        pendingValidation: 0,
+        invalidPagesByStatus: {},
+        promotedCandidates: 0,
+        configsPromotedLastRun: 0,
+        validationsLast24h: 0,
+        fetchFailureRate24h: 0,
+        blockRate24h: 0,
+        throttleRecommended: false,
+        lastDiscoveryRun: null,
+        sourceExpansion: { crawlableConfigs: 62, configsWithoutSourcePages: 922 },
+      },
+      pipelineBacklog: {
+        missingValidUrls: 7,
+        missingIngestionQueue: 7,
+        missingIngestionNeverAttempted: 3,
+        catalogRepairQueue: 269,
+        existingRefreshStale: 144,
+      },
+      sloAttainment: {
+        consecutiveDaysAtTarget: 1,
+        requiredConsecutiveDays: 14,
+        programMinFootprint: 5000,
+        footprintMeetsProgramMinimum: false,
+        latestDayQualifies: false,
+        programComplete: false,
+      },
+    } as YstmCoverageMetricsResponse
+
+    evaluateWeekOneSprintGates(ystmCoverage)
+
+    const md = buildIngestionDiagnostics(data, { ystmCoverage })
+    expect(md).toContain('## YSTM nationwide coverage')
+    expect(md).toContain('### Week-1 sprint gates')
   })
 })

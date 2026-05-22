@@ -37,6 +37,7 @@ import {
   computeYstmSaleInstanceIdentity,
   saleInstanceIdentityDbColumns,
 } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
 import {
   evaluatePostDetailEnrichedDuplicateSkip,
   parseYstmListRecrawlRefreshMaxPerPage,
@@ -1357,6 +1358,16 @@ export async function persistExternalPageSource(
         await publishReadyIngestedSaleById(String(insertedRow.id))
       }
 
+      if (insertedRow?.id) {
+        await recordIngestedSaleSourceUrl(admin, {
+          ingestedSaleId: String(insertedRow.id),
+          sourcePlatform: platform,
+          sourceUrl: listing.sourceUrl,
+          sourceListingId: saleInstanceIdentity.source_listing_id,
+          payloadHash: saleInstanceIdentity.source_payload_hash,
+        })
+      }
+
       summary.inserted += 1
       summary.freshInserted += 1
     }
@@ -1406,6 +1417,11 @@ export async function persistExternalPageSource(
         continue
       }
       if (existing?.id) {
+        await recordIngestedSaleSourceUrl(admin, {
+          ingestedSaleId: String(existing.id),
+          sourcePlatform: platform,
+          sourceUrl: listing.sourceUrl,
+        })
         if (
           shouldRefreshYstmDetailOnListRecrawl(listing.sourceUrl, {
             status: existing.status as string,

@@ -36,6 +36,9 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
       data.saleInstanceIdentity.sampleCollisionKeys.join(', ') || 'none'
     ),
     '',
+    '### Source URL alias history (Phase 4)',
+    bullet('alias rows', data.sourceUrlAlias.totalAliasRows),
+    '',
     '### False-exclusion audit (Phase 1)',
     bullet('missing traced', data.falseExclusionAudit.tracedCount),
     bullet(

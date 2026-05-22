@@ -450,11 +450,13 @@ describe('buildIngestionDiagnostics', () => {
         keyCollisionGroups: 2,
         sampleCollisionKeys: ['external_page_source:TX|austin|addr:2026-05-10|2026-05-12:123'],
       },
+      sourceUrlAlias: { totalAliasRows: 42 },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
     expect(md).toContain('## YSTM nationwide coverage')
     expect(md).toContain('### Sale-instance identity (Phase 3)')
+    expect(md).toContain('### Source URL alias history (Phase 4)')
     expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
   })

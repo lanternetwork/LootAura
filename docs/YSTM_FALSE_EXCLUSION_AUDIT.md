@@ -92,6 +92,22 @@ Migration `202_ystm_sale_instance_identity_phase_3.sql` adds identity columns on
 - `lib/ingestion/identity/ystmSourceListingId.ts`
 - `lib/admin/saleInstanceIdentityMetrics.ts`
 
+## Phase 4 — source URL alias history (observability)
+
+Migration `203_ystm_ingested_sale_source_urls_phase_4.sql` adds `ingested_sale_source_urls`:
+
+- One row per `(ingested_sale_id, canonical_source_url)`; revisits update `last_seen_at`
+- Fields: `source_platform`, `source_url`, `canonical_source_url`, `source_listing_id`, `payload_hash`, `is_current`
+
+**Population:** `recordIngestedSaleSourceUrl` on new inserts (`externalPageSource`, detail-first) and when list crawl sees an existing `source_url` row (timestamp refresh only).
+
+**No** change to `UNIQUE(source_url)` on `ingested_sales` (Phase 10).
+
+### Code
+
+- `lib/ingestion/identity/recordIngestedSaleSourceUrl.ts`
+- `lib/admin/sourceUrlAliasMetrics.ts`
+
 ## Later phases
 
-Phases 4+ add URL alias history; Phases 5–10 change crawl gates and constraints.
+Phases 5–10 change crawl gates, date-aware URL reuse, and constraints.

@@ -41,6 +41,10 @@ import {
   loadSaleInstanceIdentityMetrics,
   type SaleInstanceIdentityMetrics,
 } from '@/lib/admin/saleInstanceIdentityMetrics'
+import {
+  loadSourceUrlAliasMetrics,
+  type SourceUrlAliasMetrics,
+} from '@/lib/admin/sourceUrlAliasMetrics'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type YstmCoverageTrendPoint = {
@@ -80,6 +84,7 @@ export type YstmCoverageScoreboard = {
   operationalHealth: YstmCoverageOperationalHealth
   falseExclusionAudit: FalseExclusionAuditReport
   saleInstanceIdentity: SaleInstanceIdentityMetrics
+  sourceUrlAlias: SourceUrlAliasMetrics
 }
 
 type AuditRunRow = {
@@ -116,6 +121,7 @@ export async function buildYstmCoverageScoreboard(
     catalogRepair,
     falseExclusionAudit,
     saleInstanceIdentity,
+    sourceUrlAlias,
     runsResult,
   ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
@@ -127,6 +133,7 @@ export async function buildYstmCoverageScoreboard(
     aggregateYstmCatalogRepair(admin, now.getTime()),
     buildFalseExclusionAuditReport(admin, now),
     loadSaleInstanceIdentityMetrics(),
+    loadSourceUrlAliasMetrics(),
     fromBase(admin, 'ystm_coverage_audit_runs')
       .select(
         'completed_at, status, coverage_pct, valid_active_ystm_urls, published_visible_in_audit, list_pages_fetched, listing_urls_discovered, detail_pages_validated, config_cursor_after'
@@ -227,6 +234,7 @@ export async function buildYstmCoverageScoreboard(
     operationalHealth,
     falseExclusionAudit,
     saleInstanceIdentity,
+    sourceUrlAlias,
   }
 }
 

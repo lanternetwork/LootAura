@@ -255,6 +255,17 @@ export default function YstmCoverageScoreboardSection() {
             )}
           </div>
 
+          <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">
+            <h3 className="text-sm font-semibold text-teal-950">Source URL alias history (Phase 4)</h3>
+            <p className="mt-1 text-xs text-teal-900">
+              Append-only URL rows per ingested sale for reuse tracking. Does not relax source_url
+              uniqueness yet.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Alias rows" value={data.sourceUrlAlias.totalAliasRows} />
+            </div>
+          </div>
+
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">
               False-exclusion audit (Phase 1)

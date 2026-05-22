@@ -147,6 +147,7 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       keyCollisionGroups: 0,
       sampleCollisionKeys: [],
     },
+    sourceUrlAlias: { totalAliasRows: 0 },
     ...overrides,
   }
 }

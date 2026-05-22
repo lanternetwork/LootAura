@@ -51,6 +51,7 @@ import {
   computeYstmSaleInstanceIdentity,
   saleInstanceIdentityDbColumns,
 } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
@@ -673,6 +674,13 @@ export async function attemptYstmDetailFirstReady(
           const publishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, listing.sourceUrl)
           if (publishedId) {
             ingestedSaleId = publishedId
+            await recordIngestedSaleSourceUrl(admin, {
+              ingestedSaleId: publishedId,
+              sourcePlatform: params.platform,
+              sourceUrl: listing.sourceUrl,
+              sourceListingId: (ingestRow.source_listing_id as string | null) ?? null,
+              payloadHash: (ingestRow.source_payload_hash as string | null) ?? null,
+            })
             metrics.succeeded = 1
             finalizeDetailFirstAttemptMetrics(metrics)
             return {
@@ -706,6 +714,14 @@ export async function attemptYstmDetailFirstReady(
   emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstSucceeded, telem, {
     resolutionSource: spatial.resolutionSource,
     ...validationTelemetry,
+  })
+
+  await recordIngestedSaleSourceUrl(admin, {
+    ingestedSaleId,
+    sourcePlatform: params.platform,
+    sourceUrl: listing.sourceUrl,
+    sourceListingId: (ingestRow.source_listing_id as string | null) ?? null,
+    payloadHash: (ingestRow.source_payload_hash as string | null) ?? null,
   })
 
   const publishResult = await publishReadyIngestedSaleById(ingestedSaleId)

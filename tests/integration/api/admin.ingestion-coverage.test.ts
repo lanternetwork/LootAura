@@ -66,6 +66,8 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
           })
         case 'ingested_sales':
           return thenableQuery({ data: [], count: 0 })
+        case 'ingested_sale_source_urls':
+          return thenableQuery({ data: [], count: 0 })
         default:
           return thenableQuery({ data: [] })
       }
@@ -103,5 +105,6 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.falseExclusionAudit.missingValidCount).toBe(0)
     expect(json.saleInstanceIdentity.ystmRowsWithKey).toBe(0)
     expect(json.saleInstanceIdentity.keyCollisionGroups).toBe(0)
+    expect(json.sourceUrlAlias.totalAliasRows).toBe(0)
   })
 })

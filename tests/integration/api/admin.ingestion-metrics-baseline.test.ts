@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
-const mockUpsert = vi.hoisted(() => vi.fn())
+const mockUpdate = vi.hoisted(() => vi.fn())
+const mockInsert = vi.hoisted(() => vi.fn())
 const mockFromBase = vi.hoisted(() => vi.fn())
 const mockGetAdminDb = vi.hoisted(() => vi.fn(() => ({})))
 
@@ -17,10 +18,23 @@ vi.mock('@/lib/auth/adminGate', () => ({
 describe('POST /api/admin/ingestion/metrics/baseline', () => {
   beforeEach(() => {
     vi.resetModules()
-    mockUpsert.mockReset()
+    mockUpdate.mockReset()
+    mockInsert.mockReset()
     mockFromBase.mockReset()
+    mockUpdate.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: { detail_first_metrics_baseline_at: '2026-05-22T01:00:00.000Z' },
+            error: null,
+          }),
+        }),
+      }),
+    })
+    mockInsert.mockResolvedValue({ error: null })
     mockFromBase.mockReturnValue({
-      upsert: mockUpsert.mockResolvedValue({ error: null }),
+      update: mockUpdate,
+      insert: mockInsert,
     })
   })
 
@@ -40,13 +54,8 @@ describe('POST /api/admin/ingestion/metrics/baseline', () => {
     const json = (await res.json()) as { ok: boolean; detailFirstMetricsBaselineAt: string }
     expect(json.ok).toBe(true)
     expect(json.detailFirstMetricsBaselineAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-    expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: 'detail_first_metrics_baseline',
-        detail_first_metrics_baseline_at: json.detailFirstMetricsBaselineAt,
-      }),
-      { onConflict: 'key' }
-    )
+    expect(mockUpdate).toHaveBeenCalled()
+    expect(mockInsert).not.toHaveBeenCalled()
   })
 
   it('returns forbidden for non-admin', async () => {

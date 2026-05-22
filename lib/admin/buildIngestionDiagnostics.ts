@@ -158,8 +158,8 @@ export function buildIngestionDiagnostics(
     bullet('window', data.detailFirstProof.windowLabel),
     bullet('summary', data.detailFirstProof.summary),
     '',
-    '### Proof checklist',
-  ]
+    '### Proof checklist'
+  )
 
   for (const check of data.detailFirstProof.checks) {
     lines.push(proofCheckBullet(check))

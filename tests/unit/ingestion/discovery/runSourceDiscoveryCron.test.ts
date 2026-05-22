@@ -124,7 +124,7 @@ describe('runSourceDiscoveryCron', () => {
     })
   })
 
-  it('runs discover → promote → revalidate and advances cursor', async () => {
+  it('runs placeholder repair → graph enumeration → promote → revalidate', async () => {
     const { runSourceDiscoveryCron } = await import('@/lib/ingestion/discovery/runSourceDiscoveryCron')
     const result = await runSourceDiscoveryCron({} as never, {
       budgets: {
@@ -142,12 +142,15 @@ describe('runSourceDiscoveryCron', () => {
     })
 
     expect(result.skipped).toBe(false)
-    expect(graphEnumerationMock).toHaveBeenCalledTimes(1)
-    expect(promoteMock).toHaveBeenCalledTimes(1)
     expect(revalidateMock).toHaveBeenCalledTimes(2)
     expect(revalidateMock.mock.calls[0]?.[1]).toMatchObject({
       selectionMode: 'no_source_pages_only',
     })
+    expect(graphEnumerationMock).toHaveBeenCalledTimes(1)
+    expect(promoteMock).toHaveBeenCalledTimes(1)
+    const placeholderCallOrder = revalidateMock.mock.invocationCallOrder[0] ?? 0
+    const graphCallOrder = graphEnumerationMock.mock.invocationCallOrder[0] ?? 0
+    expect(placeholderCallOrder).toBeLessThan(graphCallOrder)
     expect(revalidateMock.mock.calls[0]?.[1]).not.toHaveProperty('states')
     expect(releaseMock).toHaveBeenCalledWith(
       expect.anything(),

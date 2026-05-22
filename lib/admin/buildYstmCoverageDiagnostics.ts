@@ -54,6 +54,7 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
       bullet('skipped', last.skipped ? 'yes' : 'no'),
       bullet('skipReason', last.skipReason ?? '—'),
       bullet('catalogSize', last.catalogSize ?? '—'),
+      bullet('stateBatchPlanned', last.stateBatchPlanned ?? '—'),
       bullet('statesScanned', last.statesScanned),
       bullet('configsPromoted', last.configsPromoted),
       bullet('phasesCompleted', last.phasesCompleted.join(', ') || 'none'),

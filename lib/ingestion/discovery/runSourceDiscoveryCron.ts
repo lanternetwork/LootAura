@@ -116,6 +116,7 @@ export async function runSourceDiscoveryCron(
 
   const batch = pickDiscoveryStateBatch(lease.stateCursor, budgets.maxStatesPerRun)
   telemetry.catalogSize = batch.catalogSize
+  telemetry.stateBatchPlanned = batch.states.length
   telemetry.stateCursorAfter = batch.nextCursor
 
   try {
@@ -130,9 +131,30 @@ export async function runSourceDiscoveryCron(
         maxStatesPerRun: budgets.maxStatesPerRun,
         ...telemetryContext,
       })
-    } else if (isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
-      telemetry.graphEnumerationSkippedReason = 'runtime_budget'
+    }
+
+    // Placeholder repair first: drains empty source_pages even when graph enumeration uses the runtime budget.
+    if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      const placeholderRepair = await revalidateSourceDiscoveryConfigs(admin, {
+        dryRun: false,
+        maxConfigsPerRun: budgets.maxPlaceholderRepairConfigsPerRun,
+        selectionMode: 'no_source_pages_only',
+        placeholderFailureExcludeThreshold: budgets.placeholderFailureExcludeThreshold,
+        telemetryContext: { ...telemetryContext, phase: 'placeholder_repair' },
+      })
+      if (placeholderRepair.ok) {
+        telemetry.placeholderRepairRepaired += placeholderRepair.telemetry.configsRepaired
+        telemetry.placeholderRepairFailed += placeholderRepair.telemetry.configsFailed
+        telemetry.configsRepaired += placeholderRepair.telemetry.configsRepaired
+        telemetry.configsFailed += placeholderRepair.telemetry.configsFailed
+        telemetry.placeholdersUnresolved += placeholderRepair.telemetry.placeholdersUnresolved
+        telemetry.phasesCompleted.push('placeholder_repair')
+      } else {
+        telemetry.degraded = true
+      }
+    } else {
       telemetry.degraded = true
+      telemetry.graphEnumerationSkippedReason = 'runtime_budget'
     }
 
     if (batch.states.length > 0 && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
@@ -206,24 +228,6 @@ export async function runSourceDiscoveryCron(
 
     if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
       const revalidationStates = batch.states.length > 0 ? batch.states : undefined
-
-      const placeholderRepair = await revalidateSourceDiscoveryConfigs(admin, {
-        dryRun: false,
-        maxConfigsPerRun: budgets.maxPlaceholderRepairConfigsPerRun,
-        selectionMode: 'no_source_pages_only',
-        placeholderFailureExcludeThreshold: budgets.placeholderFailureExcludeThreshold,
-        telemetryContext: { ...telemetryContext, phase: 'placeholder_repair' },
-      })
-      if (placeholderRepair.ok) {
-        telemetry.placeholderRepairRepaired += placeholderRepair.telemetry.configsRepaired
-        telemetry.placeholderRepairFailed += placeholderRepair.telemetry.configsFailed
-        telemetry.configsRepaired += placeholderRepair.telemetry.configsRepaired
-        telemetry.configsFailed += placeholderRepair.telemetry.configsFailed
-        telemetry.placeholdersUnresolved += placeholderRepair.telemetry.placeholdersUnresolved
-        telemetry.phasesCompleted.push('placeholder_repair')
-      } else {
-        telemetry.degraded = true
-      }
 
       const revalidation = await revalidateSourceDiscoveryConfigs(admin, {
         dryRun: false,

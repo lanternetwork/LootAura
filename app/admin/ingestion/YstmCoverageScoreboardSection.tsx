@@ -363,6 +363,9 @@ export default function YstmCoverageScoreboardSection() {
                     : 'failed'}
                 {data.graphEnumeration.lastDiscoveryRun.degraded ? ' (degraded)' : ''} ·{' '}
                 {data.graphEnumeration.lastDiscoveryRun.statesScanned} states
+                {data.graphEnumeration.lastDiscoveryRun.stateBatchPlanned != null
+                  ? ` (batch ${data.graphEnumeration.lastDiscoveryRun.stateBatchPlanned})`
+                  : ''}
                 {data.graphEnumeration.lastDiscoveryRun.catalogSize != null
                   ? ` / catalog ${data.graphEnumeration.lastDiscoveryRun.catalogSize}`
                   : ''}{' '}

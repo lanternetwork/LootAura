@@ -21,10 +21,12 @@
 
 ## Day 0–1 (blocking)
 
-1. Confirm PR #484 + migration `200` live in production.
-2. Run one manual discovery cron (`POST /api/cron/discovery` with `CRON_SECRET`).
-3. If last discovery shows `0 states` and `phases none` for **>24h** after deploy: inspect `ingestion_orchestration_runs` (`mode=discovery_cron`) and `ingestion_discovery_state` (`key=source_discovery_nationwide`). See [supabase/operations/ystm-one-week-sprint-verification.sql](../supabase/operations/ystm-one-week-sprint-verification.sql).
-4. **Do not** clear post-deploy metrics window until discovery is fixed.
+1. Confirm PR #484 + migration `200` + sprint prep (#486) deployed to production.
+2. Deploy discovery phase fix (placeholder repair before graph enumeration) when merged.
+3. Run one manual discovery cron (`POST /api/cron/discovery` with `CRON_SECRET`).
+4. Verify last discovery: `stateBatchPlanned > 0`, `phasesCompleted` includes `placeholder_repair` and ideally `graph_enumeration`; registry candidates trending up.
+5. If `statesScanned` stays 0 with `stateBatchPlanned > 0`: inspect orchestration notes (`graphEnumerationSkippedReason`) and [supabase/operations/ystm-one-week-sprint-verification.sql](../supabase/operations/ystm-one-week-sprint-verification.sql).
+6. **Do not** clear post-deploy metrics window until discovery is healthy.
 
 ---
 

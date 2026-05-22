@@ -66,11 +66,12 @@ describe('crawlSkipTaxonomyOperationalHealth', () => {
       ...emptyCrawlSkipTaxonomyRollup(),
       subReasons: {
         ...emptyCrawlSkipTaxonomyRollup().subReasons,
-        url_match_dates_changed: 10,
-        url_match_same_dates: 5,
+        url_match_dates_changed: 14,
+        url_match_same_dates: 6,
       },
     })
-    expect(suspiciousCrawlSkipSubReasons(rollup.subReasons)).toBe(10)
+    expect(rollup.total).toBeGreaterThanOrEqual(20)
+    expect(suspiciousCrawlSkipSubReasons(rollup.subReasons)).toBe(14)
     const health = evaluateCrawlSkipTaxonomyOperationalHealth(rollup)
     expect(health.healthy).toBe(false)
     expect(health.alerts.some((a) => a.code === 'crawl_skip_suspicious_share_elevated')).toBe(true)

@@ -6,6 +6,16 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import type { YstmCatalogRepairAggregate } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairStore'
 import type { YstmCoverageMissingIngestionAggregate } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import type { YstmExistingUrlRefreshAggregate } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
+import {
+  FALSE_EXCLUSION_TRACE_BUCKETS,
+  type FalseExclusionTraceBucket,
+} from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+
+function emptyFalseExclusionBuckets(): Record<FalseExclusionTraceBucket, number> {
+  return Object.fromEntries(
+    FALSE_EXCLUSION_TRACE_BUCKETS.map((b) => [b, 0])
+  ) as Record<FalseExclusionTraceBucket, number>
+}
 
 const sourceExpansionFixture: YstmSourceExpansionMetrics = {
   generatedAt: '2026-05-22T00:00:00Z',
@@ -124,6 +134,13 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
     },
     graphEnumeration: graphEnumerationFixture,
     operationalHealth: { healthy: false, alerts: [] },
+    falseExclusionAudit: {
+      generatedAt: '2026-05-22T00:00:00Z',
+      missingValidCount: 7,
+      tracedCount: 7,
+      byPrimaryBucket: emptyFalseExclusionBuckets(),
+      traces: [],
+    },
     ...overrides,
   }
 }

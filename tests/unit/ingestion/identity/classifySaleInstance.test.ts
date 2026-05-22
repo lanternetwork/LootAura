@@ -3,6 +3,7 @@ import {
   classifySaleInstance,
   isPrioritySaleInstanceDecision,
 } from '@/lib/ingestion/identity/classifySaleInstance'
+import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
 
 const LISTING_URL =
   'https://yardsaletreasuremap.com/US/Texas/Austin/Austin.html/961002738/listing.html'
@@ -25,8 +26,20 @@ describe('classifySaleInstance', () => {
   })
 
   it('prefers sale_instance_key match over URL-only history', () => {
-    const key =
-      'external_page_source:TX|austin|123 main st:2026-06-01|2026-06-02:961002738'
+    const identity = computeYstmSaleInstanceIdentity({
+      sourcePlatform: 'external_page_source',
+      sourceUrl: LISTING_URL,
+      state: 'TX',
+      city: 'Austin',
+      normalizedAddress: '123 Main St',
+      dateStart: '2026-06-02',
+      dateEnd: '2026-06-03',
+      title: 'Garage Sale',
+      description: 'Stuff',
+    })!
+    const key = identity.sale_instance_key!
+    const contentHash = identity.source_content_hash!
+
     const result = classifySaleInstance({
       sourcePlatform: 'external_page_source',
       sourceUrl: LISTING_URL,
@@ -41,9 +54,9 @@ describe('classifySaleInstance', () => {
         {
           id: 'by-url',
           sale_instance_key: key,
-          source_content_hash: 'hash-a',
-          date_start: '2026-06-01',
-          date_end: '2026-06-02',
+          source_content_hash: contentHash,
+          date_start: '2026-06-02',
+          date_end: '2026-06-03',
           normalized_address: '123 main st',
           status: 'ready',
           failure_reasons: [],
@@ -53,9 +66,9 @@ describe('classifySaleInstance', () => {
         {
           id: 'by-key',
           sale_instance_key: key,
-          source_content_hash: 'hash-a',
-          date_start: '2026-06-01',
-          date_end: '2026-06-02',
+          source_content_hash: contentHash,
+          date_start: '2026-06-02',
+          date_end: '2026-06-03',
           status: 'ready',
           failure_reasons: [],
         },

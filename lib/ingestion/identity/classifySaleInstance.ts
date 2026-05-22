@@ -430,7 +430,8 @@ export function classifySaleInstance(input: ClassifySaleInstanceInput): Classify
     })
   }
 
-  const urlRow = input.existingRowsBySourceUrl.find((r) => r.id && isActiveCandidate(r))
+  // URL history includes expired rows so YSTM URL reuse can revive prior events (Phase 5/6).
+  const urlRow = input.existingRowsBySourceUrl.find((r) => r.id?.trim())
   if (urlRow) {
     return classifyAgainstUrlRow(input, identity, urlRow)
   }

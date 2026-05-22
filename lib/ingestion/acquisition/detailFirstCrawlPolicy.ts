@@ -142,6 +142,13 @@ export function shouldQueueYstmListRecrawlRefresh(input: {
 }
 
 /**
+ * Phase 7: YSTM detail listings must be classified from detail HTML before URL-only duplicate skip.
+ */
+export function mustClassifyViaYstmDetailFirstBeforeUrlSkip(sourceUrl: string): boolean {
+  return isYstmDetailListingUrl(sourceUrl)
+}
+
+/**
  * List-parse soft dedupe uses slug/nearby addresses that detail-first would replace.
  * Defer until after detail HTML is merged (detail-first path or legacy fallback insert).
  */

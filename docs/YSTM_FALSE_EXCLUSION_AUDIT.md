@@ -152,6 +152,17 @@ On detail-first refresh, when `sale_instance_key` changes (or list classificatio
 
 - `lib/ingestion/identity/classifySaleInstance.ts`
 
+## Phase 7 — crawl gate reorder (YSTM detail-first before URL skip)
+
+For YSTM **detail** listing URLs, list crawl no longer applies URL-only duplicate skip when the per-page refresh budget is exhausted. Those rows are deferred to **detail-first** so `classifySaleInstance` runs on authoritative detail HTML before any suppress decision.
+
+Non-YSTM URLs and superseded rows keep the prior URL-only skip path.
+
+### Code
+
+- `mustClassifyViaYstmDetailFirstBeforeUrlSkip` in `detailFirstCrawlPolicy.ts`
+- `externalPageSource.ts` list loop
+
 ## Later phases
 
-Phases 7–10 add crawl gate reorder, soft dedupe hardening, shadow mode, and constraints.
+Phases 8–10 add soft dedupe hardening, shadow mode, and constraints.

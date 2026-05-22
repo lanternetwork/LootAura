@@ -46,6 +46,7 @@ import {
   evaluatePostDetailEnrichedDuplicateSkip,
   parseYstmListRecrawlRefreshMaxPerPage,
   shouldDeferListSeedSoftDedupe,
+  mustClassifyViaYstmDetailFirstBeforeUrlSkip,
   shouldQueueYstmListRecrawlRefresh,
 } from '@/lib/ingestion/acquisition/detailFirstCrawlPolicy'
 import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
@@ -1518,6 +1519,54 @@ export async function persistExternalPageSource(
           )
           continue
         }
+
+        if (mustClassifyViaYstmDetailFirstBeforeUrlSkip(listing.sourceUrl)) {
+          const gateClassification = classifySaleInstance({
+            sourcePlatform: platform,
+            sourceUrl: listing.sourceUrl,
+            state: listing.state,
+            city: listing.city,
+            normalizedAddress:
+              (existing as { normalized_address?: string | null }).normalized_address ?? null,
+            dateStart: listing.startDate ?? null,
+            dateEnd: listing.endDate ?? null,
+            existingRowsBySourceUrl: [
+              {
+                id: String(existing.id),
+                sale_instance_key:
+                  (existing as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+                date_start: (existing as { date_start?: string | null }).date_start ?? null,
+                date_end: (existing as { date_end?: string | null }).date_end ?? null,
+                normalized_address:
+                  (existing as { normalized_address?: string | null }).normalized_address ?? null,
+                status: existing.status as string,
+                failure_reasons: existing.failure_reasons,
+              },
+            ],
+            existingRowsBySaleInstanceKey: [],
+            existingRowsByAddressDate: [],
+          })
+          emitObservabilityRecord(
+            buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceClassified, {
+              ...telemBase,
+              adapter: ADAPTER_ID,
+              parserVersion: PARSER_VERSION_ROW,
+              pageIndex,
+              pageHostHash,
+              phase: 'list_recrawl_detail_first_gate',
+              ...saleInstanceClassificationTelemetry(gateClassification),
+            })
+          )
+          detailFirstCandidates.push({
+            listing,
+            rowPayload,
+            existingIngestedSaleId: String(existing.id),
+          })
+          summary.ystmListRecrawlRefreshAttempted += 1
+          recordCrawlSkip('url_match_refresh_queued', false)
+          continue
+        }
+
         duplicateUrlSkipped += 1
         const kind = isIngestedRowExpiredForDuplicate(
           existing.status as string,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  mustClassifyViaYstmDetailFirstBeforeUrlSkip,
   parseYstmListRecrawlRefreshMaxPerPage,
   shouldDeferListSeedSoftDedupe,
   shouldQueueYstmListRecrawlRefresh,
@@ -10,6 +11,17 @@ const YSTM_DETAIL =
   'https://yardsaletreasuremap.com/US/Illinois/Chicago/100-A/1001/userlisting.html'
 
 describe('detailFirstCrawlPolicy', () => {
+  it('requires detail-first classification before URL-only skip for YSTM detail URLs', () => {
+    expect(
+      mustClassifyViaYstmDetailFirstBeforeUrlSkip(
+        'https://yardsaletreasuremap.com/US/Illinois/Chicago/100-A/1001/userlisting.html'
+      )
+    ).toBe(true)
+    expect(mustClassifyViaYstmDetailFirstBeforeUrlSkip('https://example.com/city/list')).toBe(
+      false
+    )
+  })
+
   it('defers list-seed soft dedupe for YSTM detail listing URLs', () => {
     expect(shouldDeferListSeedSoftDedupe(YSTM_DETAIL)).toBe(true)
     expect(shouldDeferListSeedSoftDedupe('https://yardsaletreasuremap.com/US/Illinois/Chicago')).toBe(

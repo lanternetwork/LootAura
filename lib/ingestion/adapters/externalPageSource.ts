@@ -1363,8 +1363,8 @@ export async function persistExternalPageSource(
           ingestedSaleId: String(insertedRow.id),
           sourcePlatform: platform,
           sourceUrl: listing.sourceUrl,
-          sourceListingId: saleInstanceIdentity.source_listing_id,
-          payloadHash: saleInstanceIdentity.source_payload_hash,
+          sourceListingId: saleInstanceIdentity?.source_listing_id ?? null,
+          payloadHash: saleInstanceIdentity?.source_payload_hash ?? null,
         })
       }
 

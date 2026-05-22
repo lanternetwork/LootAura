@@ -246,7 +246,7 @@ describe('buildIngestionDiagnostics', () => {
     const data = {
       ok: true,
       generatedAt: '2026-05-22T00:00:00Z',
-      detailFirstProof: evaluateDetailFirstProofProtocol({ detailFirst }),
+      detailFirstProof: evaluateDetailFirstProofProtocol({ metricsBaselineAt: null, detailFirst }),
       backlog: 0,
       geocodeEligibleBacklog: 0,
       published24h: 0,

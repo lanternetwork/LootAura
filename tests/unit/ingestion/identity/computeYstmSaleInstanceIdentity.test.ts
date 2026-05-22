@@ -7,8 +7,9 @@ import {
 } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
 import { extractYstmSourceListingId } from '@/lib/ingestion/identity/ystmSourceListingId'
 
+/** Hub-style path (≥6 segments) required by parseYstmListingPathParts. */
 const LISTING_URL =
-  'https://yardsaletreasuremap.com/US/Texas/Austin/961002738/listing.html'
+  'https://yardsaletreasuremap.com/US/Texas/Austin/Austin.html/961002738/listing.html'
 
 describe('ystmSourceListingId', () => {
   it('extracts numeric listing segment from YSTM detail URL', () => {
@@ -85,7 +86,8 @@ describe('computeYstmSaleInstanceIdentity', () => {
   })
 
   it('uses content hash fallback when listing id missing', () => {
-    const url = 'https://yardsaletreasuremap.com/US/Texas/Austin/no-id-segment/listing.html'
+    const url =
+      'https://yardsaletreasuremap.com/US/Texas/Austin/Austin.html/no-id-segment/listing.html'
     const key = buildSaleInstanceKey({
       sourcePlatform: 'external_page_source',
       locationBucket: normalizeLocationBucket({

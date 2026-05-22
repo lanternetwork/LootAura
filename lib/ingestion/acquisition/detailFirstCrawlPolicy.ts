@@ -91,11 +91,11 @@ export function classifyYstmUrlReuseForListRecrawl(
     existingSourceListingId: input.existing.source_listing_id ?? null,
     existingSourceContentHash: input.existing.source_content_hash ?? null,
     existing: {
-      status: String(existing.status ?? ''),
-      failure_reasons: existing.failure_reasons,
-      date_start: existing.date_start,
-      date_end: existing.date_end,
-      normalized_address: existing.normalized_address,
+      status: String(input.existing.status ?? ''),
+      failure_reasons: input.existing.failure_reasons,
+      date_start: input.existing.date_start,
+      date_end: input.existing.date_end,
+      normalized_address: input.existing.normalized_address,
     },
   })
 }

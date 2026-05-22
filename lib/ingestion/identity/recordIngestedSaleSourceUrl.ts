@@ -1,7 +1,9 @@
 import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
 import { extractYstmSourceListingId } from '@/lib/ingestion/identity/ystmSourceListingId'
 import { logger } from '@/lib/log'
-import { fromBase, type AdminDb } from '@/lib/supabase/clients'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+
+type AdminDb = ReturnType<typeof getAdminDb>
 
 export type RecordIngestedSaleSourceUrlInput = {
   ingestedSaleId: string

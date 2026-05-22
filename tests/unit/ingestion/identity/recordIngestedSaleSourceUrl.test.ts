@@ -23,7 +23,7 @@ describe('recordIngestedSaleSourceUrl', () => {
   })
 
   it('inserts a new alias row when none exists', async () => {
-    const insert = vi.fn(() => ({ error: null }))
+    const insert = vi.fn((_row: Record<string, unknown>) => ({ error: null }))
     mockFromBase.mockImplementation((_admin, table: string) => {
       if (table === 'ingested_sale_source_urls') {
         return {
@@ -52,7 +52,7 @@ describe('recordIngestedSaleSourceUrl', () => {
   })
 
   it('updates last_seen when alias already exists', async () => {
-    const update = vi.fn(() => ({
+    const update = vi.fn((_patch: Record<string, unknown>) => ({
       eq: vi.fn(() => ({ error: null })),
     }))
     mockFromBase.mockImplementation((_admin, table: string) => {

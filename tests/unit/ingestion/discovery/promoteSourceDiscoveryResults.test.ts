@@ -79,7 +79,12 @@ function createTableApi(store: Store) {
         source_discovery_failure_reason: (payload.source_discovery_failure_reason as string) ?? null,
       }
       store.rows.push(row)
-      return Promise.resolve({ error: null })
+      const result = { data: { id: row.id }, error: null as null }
+      const insertChain = {
+        select: () => insertChain,
+        single: () => Promise.resolve(result),
+      }
+      return insertChain
     },
     update: (patch: Record<string, unknown>) => ({
       eq: (col: string, val: unknown) => {

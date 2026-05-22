@@ -116,6 +116,10 @@ export type ExternalIngestionOrchestrationNote = {
 export type DiscoveryCronOrchestrationNote = {
   ok: boolean
   skipped: boolean
+  degraded?: boolean
+  statesScanned?: number
+  graphEnumerationThrottled?: boolean
+  phasesCompleted?: string[]
   configsPromoted: number
   configsRepaired: number
   configsRevalidated: number

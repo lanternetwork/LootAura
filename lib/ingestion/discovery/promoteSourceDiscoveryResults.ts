@@ -42,6 +42,8 @@ export type IngestionCityConfigDiscoveryRow = {
 export type PromotedConfigRecord = {
   city: string
   state: string
+  canonicalUrl: string
+  configId?: string
   action: 'inserted' | 'updated' | 'skipped'
   reason?: string
   sharedHubPage: boolean
@@ -196,6 +198,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'invalid_city_or_state',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1
@@ -210,6 +213,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'validation_not_promotable',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1
@@ -225,6 +229,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'non_canonical_url',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1
@@ -239,6 +244,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'state_shell_not_city_page',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1
@@ -255,6 +261,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'manual_protected',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1
@@ -270,6 +277,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'timezone_unresolved',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1
@@ -297,6 +305,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'already_current',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1
@@ -317,6 +326,8 @@ export async function promoteSourceDiscoveryResults(
       records.push({
         city: loc.city,
         state: loc.state,
+        canonicalUrl: candidate.canonicalUrl,
+        configId: existing?.id,
         action: existing ? 'updated' : 'inserted',
         sharedHubPage: candidate.sharedHubPage,
         canonicalUrlHash: urlHash,
@@ -360,19 +371,24 @@ export async function promoteSourceDiscoveryResults(
         records.push({
           city: loc.city,
           state: loc.state,
+          canonicalUrl: candidate.canonicalUrl,
+          configId: existing.id,
           action: 'updated',
           sharedHubPage: candidate.sharedHubPage,
           canonicalUrlHash: urlHash,
         })
       } else {
-        const { error: insertError } = await fromBase(admin, 'ingestion_city_configs').insert({
-          city: loc.city,
-          state: loc.state,
-          timezone,
-          enabled: true,
-          source_platform: EXTERNAL_PAGE_SOURCE,
-          ...patch,
-        })
+        const { data: insertedRow, error: insertError } = await fromBase(admin, 'ingestion_city_configs')
+          .insert({
+            city: loc.city,
+            state: loc.state,
+            timezone,
+            enabled: true,
+            source_platform: EXTERNAL_PAGE_SOURCE,
+            ...patch,
+          })
+          .select('id')
+          .single()
 
         if (insertError) {
           if (insertError.code === '23505') {
@@ -380,6 +396,7 @@ export async function promoteSourceDiscoveryResults(
             records.push({
               city: loc.city,
               state: loc.state,
+              canonicalUrl: candidate.canonicalUrl,
               action: 'skipped',
               reason: 'unique_conflict',
               sharedHubPage: candidate.sharedHubPage,
@@ -390,8 +407,13 @@ export async function promoteSourceDiscoveryResults(
           throw new Error(insertError.message)
         }
 
+        const insertedId = (insertedRow as { id: string } | null)?.id
+        if (!insertedId) {
+          throw new Error('insert_missing_config_id')
+        }
+
         const inserted: IngestionCityConfigDiscoveryRow = {
-          id: 'inserted',
+          id: insertedId,
           city: loc.city,
           state: loc.state,
           timezone,
@@ -410,6 +432,8 @@ export async function promoteSourceDiscoveryResults(
         records.push({
           city: loc.city,
           state: loc.state,
+          canonicalUrl: candidate.canonicalUrl,
+          configId: insertedId,
           action: 'inserted',
           sharedHubPage: candidate.sharedHubPage,
           canonicalUrlHash: urlHash,
@@ -427,6 +451,7 @@ export async function promoteSourceDiscoveryResults(
         city: loc.city,
         state: loc.state,
         message,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
         ...args.telemetryContext,
       })
@@ -436,6 +461,7 @@ export async function promoteSourceDiscoveryResults(
         action: 'skipped',
         reason: 'promotion_error',
         sharedHubPage: candidate.sharedHubPage,
+        canonicalUrl: candidate.canonicalUrl,
         canonicalUrlHash: urlHash,
       })
       telemetry.skipped += 1

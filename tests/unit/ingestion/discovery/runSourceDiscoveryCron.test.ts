@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const discoveryMock = vi.fn()
+const graphEnumerationMock = vi.fn()
 const promoteMock = vi.fn()
 const revalidateMock = vi.fn()
 const acquireMock = vi.fn()
 const releaseMock = vi.fn()
 const emitMock = vi.fn()
+const listBacklogMock = vi.fn()
+const markPromotedMock = vi.fn()
 
-vi.mock('@/lib/ingestion/discovery/sourceDiscovery', () => ({
-  runSourceDiscoveryDryRun: (...args: unknown[]) => discoveryMock(...args),
+vi.mock('@/lib/ingestion/discovery/runYstmGraphEnumerationDiscovery', () => ({
+  runYstmGraphEnumerationDiscovery: (...args: unknown[]) => graphEnumerationMock(...args),
+}))
+
+vi.mock('@/lib/ingestion/discovery/ystmSourcePageCandidatesStore', () => ({
+  listValidatedUnpromotedCandidates: (...args: unknown[]) => listBacklogMock(...args),
+  markSourcePageCandidatesPromoted: (...args: unknown[]) => markPromotedMock(...args),
 }))
 
 vi.mock('@/lib/ingestion/discovery/promoteSourceDiscoveryResults', () => ({
@@ -66,17 +73,45 @@ describe('runSourceDiscoveryCron', () => {
       stateCursor: 2,
     })
     releaseMock.mockResolvedValue(undefined)
-    discoveryMock.mockResolvedValue({
+    listBacklogMock.mockResolvedValue([])
+    markPromotedMock.mockResolvedValue(undefined)
+    graphEnumerationMock.mockResolvedValue({
       ok: true,
-      statesScanned: 2,
-      candidatePagesDiscovered: 5,
-      candidatePagesValid: 4,
-      candidatePagesInvalid: 1,
-      candidates: [{ validation: { ok: true, kind: 'valid_city_page' } }],
+      promotable: [
+        {
+          city: 'Austin',
+          state: 'TX',
+          statePathSegment: 'TX',
+          canonicalUrl: 'https://yardsaletreasuremap.com/TX/austin.html',
+          sharedHubPage: false,
+          cityPathSegment: 'austin.html',
+          validation: { ok: true, kind: 'valid_city_page' },
+        },
+      ],
+      telemetry: {
+        statesScanned: 2,
+        candidatePagesDiscovered: 5,
+        candidateRegistryUpserts: 3,
+        candidatePagesValid: 4,
+        candidatePagesInvalid: 1,
+        validationsAttempted: 5,
+        fetchFailures: 0,
+        blockedCount: 0,
+        throttleApplied: false,
+        throttleReasons: [],
+        backlogValidationsProcessed: 5,
+      },
     })
     promoteMock.mockResolvedValue({
       ok: true,
       telemetry: { configsPromoted: 2, configsRepaired: 1 },
+      records: [
+        {
+          canonicalUrl: 'https://yardsaletreasuremap.com/TX/austin.html',
+          configId: 'cfg-1',
+          action: 'updated',
+        },
+      ],
     })
     revalidateMock.mockResolvedValue({
       ok: true,
@@ -98,6 +133,8 @@ describe('runSourceDiscoveryCron', () => {
         maxValidationFetchesPerRun: 10,
         maxRevalidationConfigsPerRun: 10,
         maxPlaceholderRepairConfigsPerRun: 10,
+        indexFetchConcurrency: 2,
+        validationFetchConcurrency: 2,
         leaseSeconds: 120,
         maxRuntimeMs: 60_000,
         placeholderFailureExcludeThreshold: 1,
@@ -105,7 +142,7 @@ describe('runSourceDiscoveryCron', () => {
     })
 
     expect(result.skipped).toBe(false)
-    expect(discoveryMock).toHaveBeenCalledTimes(1)
+    expect(graphEnumerationMock).toHaveBeenCalledTimes(1)
     expect(promoteMock).toHaveBeenCalledTimes(1)
     expect(revalidateMock).toHaveBeenCalledTimes(2)
     expect(revalidateMock.mock.calls[0]?.[1]).toMatchObject({
@@ -117,7 +154,7 @@ describe('runSourceDiscoveryCron', () => {
       expect.objectContaining({ markCompleted: true })
     )
     expect(result.telemetry.configsPromoted).toBe(2)
-    expect(result.telemetry.phasesCompleted).toContain('discover')
+    expect(result.telemetry.phasesCompleted).toContain('graph_enumeration')
     expect(result.telemetry.phasesCompleted).toContain('promote')
     expect(result.telemetry.phasesCompleted).toContain('placeholder_repair')
     expect(result.telemetry.phasesCompleted).toContain('revalidate')
@@ -135,7 +172,7 @@ describe('runSourceDiscoveryCron', () => {
     const result = await runSourceDiscoveryCron({} as never, {})
     expect(result.skipped).toBe(true)
     expect(result.telemetry.overlapPrevented).toBe(true)
-    expect(discoveryMock).not.toHaveBeenCalled()
+    expect(graphEnumerationMock).not.toHaveBeenCalled()
     expect(promoteMock).not.toHaveBeenCalled()
   })
 
@@ -148,13 +185,18 @@ describe('runSourceDiscoveryCron', () => {
         maxValidationFetchesPerRun: 10,
         maxRevalidationConfigsPerRun: 5,
         maxPlaceholderRepairConfigsPerRun: 5,
+        indexFetchConcurrency: 2,
+        validationFetchConcurrency: 2,
         leaseSeconds: 120,
         maxRuntimeMs: 60_000,
         placeholderFailureExcludeThreshold: 1,
       },
     })
-    const discoveryArgs = discoveryMock.mock.calls[0]![0] as { states?: string[]; maxStatesPerRun: number }
-    expect(discoveryArgs.maxStatesPerRun).toBe(2)
-    expect(discoveryArgs.states?.length).toBeLessThanOrEqual(2)
+    const graphArgs = graphEnumerationMock.mock.calls[0]![1] as {
+      stateCodes: string[]
+      budgets: { maxStatesPerRun: number }
+    }
+    expect(graphArgs.budgets.maxStatesPerRun).toBe(2)
+    expect(graphArgs.stateCodes.length).toBeLessThanOrEqual(2)
   })
 })

@@ -486,7 +486,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 | UTC | Path | Phase |
 |-----|------|-------|
-| `0 4 * * *`, `0 16 * * *` | `/api/cron/discovery` | 2 — source expansion |
+| `0 2 * * *`, `0 8 * * *`, `0 14 * * *`, `0 20 * * *` | `/api/cron/discovery` | Graph enumeration (source expansion) |
 | `0 6 * * *`, `0 18 * * *` | `/api/cron/ystm-coverage-audit` | 1 — build audit footprint |
 | `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 — publish missing URLs |
 | `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |

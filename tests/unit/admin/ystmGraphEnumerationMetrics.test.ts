@@ -46,8 +46,11 @@ describe('buildYstmGraphEnumerationMetrics', () => {
                 discovery_cron: {
                   ok: true,
                   skipped: false,
+                  skipReason: null,
                   degraded: false,
                   statesScanned: 10,
+                  catalogSize: 51,
+                  graphEnumerationSkippedReason: null,
                   graphEnumerationThrottled: false,
                   phasesCompleted: ['graph_enumeration', 'promote'],
                   configsPromoted: 5,
@@ -78,9 +81,11 @@ describe('buildYstmGraphEnumerationMetrics', () => {
       ok: true,
       skipped: false,
       statesScanned: 10,
+      catalogSize: 51,
       discoveryLatencyMs: 45000,
       configsPromoted: 5,
       phasesCompleted: ['graph_enumeration', 'promote'],
+      graphEnumerationSkippedReason: null,
     })
   })
 })

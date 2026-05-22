@@ -1,0 +1,63 @@
+# YSTM one-week sprint (footprint + closure)
+
+**Duration:** ≤7 calendar days  
+**Product KPI (unchanged):** `coveragePct ≥ 90%` on large audit footprint — **not** achievable in one week; this sprint maximizes **footprint, registry fill, and repair drain** so the multi-week G4 program starts from a real baseline.
+
+**Authoritative specs:** [YSTM_90_PERCENT_COVERAGE_SPEC.md](./YSTM_90_PERCENT_COVERAGE_SPEC.md), [YSTM_GRAPH_ENUMERATION_SPEC.md](./YSTM_GRAPH_ENUMERATION_SPEC.md)
+
+---
+
+## Week-1 exit criteria (three greens)
+
+| Gate | Target | Scoreboard / diagnostics |
+|------|--------|---------------------------|
+| **Discovery works** | Last discovery: `statesScanned > 0`, `phasesCompleted` includes `graph_enumeration`, registry `candidatesDiscovered > 0` | YSTM coverage → graph enumeration panel |
+| **Footprint** | `crawlableConfigs ≥ 200`, `configsWithoutSourcePages < 600` | Source expansion / acquisition |
+| **Closure** | `catalogRepair` queue `< 100`, `validActiveYstmUrls ≥ 300` | Pipeline backlog + audit V |
+
+**Do not** treat high `coveragePct` on small V (e.g. 91% on 78 URLs) as sprint success.
+
+---
+
+## Day 0–1 (blocking)
+
+1. Confirm PR #484 + migration `200` live in production.
+2. Run one manual discovery cron (`POST /api/cron/discovery` with `CRON_SECRET`).
+3. If last discovery shows `0 states` and `phases none` for **>24h** after deploy: inspect `ingestion_orchestration_runs` (`mode=discovery_cron`) and `ingestion_discovery_state` (`key=source_discovery_nationwide`). See [supabase/operations/ystm-one-week-sprint-verification.sql](../supabase/operations/ystm-one-week-sprint-verification.sql).
+4. **Do not** clear post-deploy metrics window until discovery is fixed.
+
+---
+
+## Throughput (no new Vercel env vars)
+
+Production is expected to run with **no `CRON_*` / `INGESTION_*` overrides in Vercel** (same as the 90% coverage program). The sprint uses **repo burn-in defaults** already wired in `*Config.ts` parsers and `vercel.json` cron schedules.
+
+**Do not add Vercel env vars for this sprint.** If throughput is still insufficient after discovery is fixed, raise budgets via a **code default PR** (change `DEFAULT_*` constants), not platform env.
+
+| Pipeline | Schedule (`vercel.json`) | Effective budget (unset env → repo default) |
+|----------|--------------------------|-----------------------------------------------|
+| Graph enumeration / discovery | 4×/day UTC 02/08/14/20 | 10 states, 1000 candidates, 500 validations, 120 placeholder repair (`discoveryCronConfig.ts`) |
+| Coverage audit | 2×/day | 24 configs, 40 list fetches, 80 detail validations (`ystmCoverageAuditConfig.ts`) |
+| Missing ingest | 2×/day | 48 attempts, 160 scanned (`ystmCoverageMissingIngestionConfig.ts`) |
+| Catalog repair | 2×/day | 60 attempts, 160 scanned (`ystmCatalogRepairConfig.ts`) |
+| Existing refresh | 2×/day | 32 attempts, 120 scanned (`ystmExistingUrlRefreshConfig.ts`) |
+| Main ingestion | every 2 min | batch 60, budget 120s (`ingestionOrchestrationDefaults.ts`) |
+
+**YSTM safety:** If graph panel block rate **>1%** for 24h, pause manual discovery triggers and investigate before any code-default increase.
+
+**Optional later (not week-1):** Lead-approved PR to bump `DEFAULT_*` in config modules only if gates stall with discovery healthy.
+
+---
+
+## Daily 15-minute check
+
+1. Admin → Ingestion → **YSTM nationwide coverage** → **Week-1 sprint gates** (PASS/FAIL).
+2. **Copy diagnostics** (includes coverage scoreboard when loaded).
+3. Red flags: candidates still 0 after Day 2; crawlable flat 3 days; V stuck ~78 after Day 4.
+
+---
+
+## Deferred past week 1
+
+- G4 fourteen-day hold, V ≥ 5000, sustained nationwide 90% claim
+- New bulk backfill pipelines (unless registry still empty Day 3)

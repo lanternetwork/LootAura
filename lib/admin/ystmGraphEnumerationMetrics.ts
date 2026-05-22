@@ -7,12 +7,15 @@ export type YstmGraphEnumerationLastRun = {
   completedAt: string
   ok: boolean
   skipped: boolean
+  skipReason: string | null
   degraded: boolean
   statesScanned: number
+  catalogSize: number | null
   discoveryLatencyMs: number
   configsPromoted: number
   candidatePagesDiscovered: number
   candidatePagesValid: number
+  graphEnumerationSkippedReason: string | null
   graphEnumerationThrottled: boolean
   phasesCompleted: string[]
 }
@@ -50,12 +53,15 @@ function parseLastDiscoveryRun(row: {
     completedAt: row.created_at,
     ok: notes.ok,
     skipped: notes.skipped,
+    skipReason: notes.skipReason ?? null,
     degraded: notes.degraded === true,
     statesScanned: notes.statesScanned ?? 0,
+    catalogSize: notes.catalogSize ?? null,
     discoveryLatencyMs: row.duration_ms ?? 0,
     configsPromoted: notes.configsPromoted,
     candidatePagesDiscovered: notes.candidatePagesDiscovered,
     candidatePagesValid: notes.candidatePagesValid,
+    graphEnumerationSkippedReason: notes.graphEnumerationSkippedReason ?? null,
     graphEnumerationThrottled: notes.graphEnumerationThrottled === true,
     phasesCompleted: notes.phasesCompleted ?? [],
   }

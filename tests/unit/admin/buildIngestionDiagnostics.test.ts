@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 
 function stage(id: string, count: number) {
@@ -219,5 +220,210 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('- saturation: 0.0%')
     expect(md).toContain('- geocode failed: 0')
     expect(md).toContain('- percentage: —')
+  })
+
+  it('appends YSTM coverage section when ystmCoverage is provided', () => {
+    const detailFirst = {
+      attempted: 0,
+      succeeded: 0,
+      published: 0,
+      fallback: 0,
+      fetchFailed: 0,
+      freshInsertReadyAtInsertRate: null,
+      medianMsToPublished: null,
+      providerGeocodeBypassRate: null,
+      fallbackByReason: {},
+      topFallbackReason: null,
+      topFallbackReasonPct: null,
+      fallbackUnclassified: 0,
+      fallbackReasonAccounted: 0,
+      addressFromDetailPage: 0,
+      addressFromListSeed: 0,
+      addressFromDetailPageRate: null,
+      insertFailedByDbCode: {},
+      operationalHealth: { healthy: true, alerts: [] },
+    }
+    const data = {
+      ok: true,
+      generatedAt: '2026-05-22T00:00:00Z',
+      detailFirstProof: evaluateDetailFirstProofProtocol({ metricsBaselineAt: null, detailFirst }),
+      backlog: 0,
+      geocodeEligibleBacklog: 0,
+      published24h: 0,
+      claimed24h: 0,
+      geocodeTouches24h: 0,
+      failureBreakdown: {
+        needs_check: 0,
+        publish_failed: 0,
+        expired: 0,
+        ready: 0,
+        publishing: 0,
+      },
+      funnel: {
+        '24h': {
+          stages: [],
+          skippedExpired: 0,
+          freshInserted: 0,
+          detailFirst,
+          detailFirstCapture: {
+            crawlerDiscovered: 0,
+            detailFirstReady: 0,
+            freshInserted: 0,
+            parserSuccessRate: null,
+            visibleCaptureRate: null,
+            parserToVisibleGapRate: null,
+            parserSloMetVisibleCaptureLow: false,
+          },
+          ystm: {
+            discovered: 0,
+            duplicate_skipped: 0,
+            inserted: 0,
+            uniqueCanonicalUrls: 0,
+            published: 0,
+          },
+          topDropoff: null,
+        },
+        '7d': {} as IngestionMetricsResponse['funnel']['7d'],
+      },
+      volume: {
+        bottleneck: 'none',
+        hourlyRates: {
+          sourcePagesFetchedPerHour: 0,
+          configsProcessedPerHour: 0,
+          listingsDiscoveredPerHour: 0,
+          listingsInsertedPerHour: 0,
+          listingsSkippedPerHour: 0,
+          insertYieldPerHour: null,
+          saturationRatePerHour: null,
+          geocodeSucceededPerHour: 0,
+          geocodeRetryableFailedPerHour: 0,
+          geocodeTerminalFailedPerHour: 0,
+          publishAttemptedPerHour: 0,
+          publishSucceededPerHour: 0,
+          publishFailedPerHour: 0,
+          reconciliationProcessedPerHour: 0,
+        },
+        acquisition: {
+          crawlableConfigs: 0,
+          pendingDiscoveryConfigs: 0,
+          validatedDiscoveryConfigs: 0,
+        },
+        fetch: { insertYield24h: 0, saturationRate24h: 0 },
+        geocode: { needsGeocodeCount: 0, rate429Count24h: 0 },
+        addressLifecycle: { enrichmentBacklog: 0 },
+        imageEnrichment: { backlog: 0 },
+      },
+      timeseries: {} as IngestionMetricsResponse['timeseries'],
+      orchestrationVisibility: {} as IngestionMetricsResponse['orchestrationVisibility'],
+    } as unknown as IngestionMetricsResponse
+
+    const ystmCoverage = {
+      ok: true,
+      targetPct: 90,
+      generatedAt: '2026-05-22T00:00:00Z',
+      validActiveYstmUrls: 78,
+      missingValidYstmUrls: 7,
+      publishedActiveLootAuraYstmUrls: 0,
+      publishedVisibleInAuditFootprint: 71,
+      coveragePct: 91,
+      lastAuditAt: null,
+      lastAuditStatus: null,
+      observationFootprintUrls: 0,
+      missingByState: {},
+      missingByMetro: {},
+      trend: [],
+      lastRun: null,
+      sourceExpansion: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        enabledExternalConfigs: 0,
+        crawlableConfigs: 62,
+        configsSkippedNoSourcePages: 0,
+        configsSkippedInvalidUrls: 0,
+        configsSkippedCrawlExcluded: 0,
+        pendingDiscoveryConfigs: 0,
+        validatedDiscoveryConfigs: 0,
+        failedDiscoveryConfigs: 0,
+        saturatedConfigs: 0,
+        configsWithRecentInsert: 0,
+        configsWithoutSourcePages: 922,
+      },
+      missingIngestion: {
+        missingQueueTotal: 7,
+        missingIngestionAttempted: 0,
+        missingIngestionPublished: 0,
+        missingIngestionIngested: 0,
+        missingIngestionFailed: 0,
+        missingIngestionSkippedVisible: 0,
+        missingIngestionSkippedExisting: 0,
+        missingIngestionNeverAttempted: 3,
+      },
+      existingRefresh: {
+        externalIngestedTotal: 0,
+        ystmDetailIngestedTotal: 0,
+        syncedLast24h: 0,
+        neverSynced: 0,
+        staleOver12h: 144,
+      },
+      catalogRepair: {
+        repairQueueTotal: 269,
+        needsGeocode: 0,
+        readyUnpublished: 0,
+        publishFailed: 0,
+        needsCheck: 0,
+        repairedPublishedLast24h: 0,
+        repairFailed: 0,
+      },
+      pipelineBacklog: {
+        missingValidUrls: 7,
+        missingIngestionQueue: 7,
+        missingIngestionNeverAttempted: 3,
+        catalogRepairQueue: 269,
+        existingRefreshStale: 144,
+      },
+      sloAttainment: {
+        consecutiveDaysAtTarget: 1,
+        requiredConsecutiveDays: 14,
+        programMinFootprint: 5000,
+        footprintMeetsProgramMinimum: false,
+        latestDayQualifies: false,
+        programComplete: false,
+      },
+      graphEnumeration: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        catalogStates: 51,
+        statesWithCandidates: 0,
+        statesRemaining: 51,
+        candidatesDiscovered: 0,
+        validatedPages: 0,
+        pendingValidation: 0,
+        invalidPagesByStatus: {},
+        promotedCandidates: 0,
+        configsPromotedLastRun: 0,
+        validationsLast24h: 0,
+        fetchFailureRate24h: 0,
+        blockRate24h: 0,
+        throttleRecommended: false,
+        lastDiscoveryRun: null,
+        sourceExpansion: {
+          generatedAt: '2026-05-22T00:00:00Z',
+          enabledExternalConfigs: 0,
+          crawlableConfigs: 62,
+          configsSkippedNoSourcePages: 0,
+          configsSkippedInvalidUrls: 0,
+          configsSkippedCrawlExcluded: 0,
+          pendingDiscoveryConfigs: 0,
+          validatedDiscoveryConfigs: 0,
+          failedDiscoveryConfigs: 0,
+          saturatedConfigs: 0,
+          configsWithRecentInsert: 0,
+          configsWithoutSourcePages: 922,
+        },
+      },
+      operationalHealth: { healthy: true, alerts: [] },
+    } as YstmCoverageMetricsResponse
+
+    const md = buildIngestionDiagnostics(data, { ystmCoverage })
+    expect(md).toContain('## YSTM nationwide coverage')
+    expect(md).toContain('### Week-1 sprint gates')
   })
 })

@@ -1,7 +1,8 @@
 # YSTM 90% Coverage — Lead Analysis Specification
 
 **Status:** Draft for lead review  
-**Last updated:** 2026-05-21  
+**Last updated:** 2026-05-22  
+**One-week sprint runbook:** [YSTM_ONE_WEEK_SPRINT.md](./YSTM_ONE_WEEK_SPRINT.md)  
 **Owner:** Ingestion / acquisition  
 **Primary metric:** `YSTM_COVERAGE_TARGET_PCT` = **90%** (`lib/ingestion/ystmCoverage/ystmCoverageValidity.ts`)
 
@@ -655,9 +656,9 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 ```sql
 SELECT
   COUNT(*) AS observation_footprint,
-  COUNT(*) FILTER (WHERE valid_active) AS valid_active_v,
-  COUNT(*) FILTER (WHERE lootaura_visible) AS published_visible_p,
-  COUNT(*) FILTER (WHERE valid_active AND NOT lootaura_visible) AS missing_valid_m
+  COUNT(*) FILTER (WHERE ystm_valid_active) AS valid_active_v,
+  COUNT(*) FILTER (WHERE ystm_valid_active AND lootaura_visible) AS published_visible_p,
+  COUNT(*) FILTER (WHERE ystm_valid_active AND NOT lootaura_visible) AS missing_valid_m
 FROM lootaura_v2.ystm_coverage_observations;
 ```
 

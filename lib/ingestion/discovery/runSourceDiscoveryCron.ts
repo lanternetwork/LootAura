@@ -119,6 +119,22 @@ export async function runSourceDiscoveryCron(
   telemetry.stateCursorAfter = batch.nextCursor
 
   try {
+    if (batch.states.length === 0 && batch.catalogSize > 0) {
+      telemetry.degraded = true
+      telemetry.graphEnumerationSkippedReason = 'empty_state_batch'
+      logger.warn('discovery cron empty state batch with non-empty catalog', {
+        component: 'ingestion/discovery/runSourceDiscoveryCron',
+        operation: 'pick_state_batch',
+        catalogSize: batch.catalogSize,
+        stateCursorBefore: lease.stateCursor,
+        maxStatesPerRun: budgets.maxStatesPerRun,
+        ...telemetryContext,
+      })
+    } else if (isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      telemetry.graphEnumerationSkippedReason = 'runtime_budget'
+      telemetry.degraded = true
+    }
+
     if (batch.states.length > 0 && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
       const graph = await runYstmGraphEnumerationDiscovery(admin, {
         stateCodes: batch.states,
@@ -184,6 +200,7 @@ export async function runSourceDiscoveryCron(
         }
       } else if (!graph.ok) {
         telemetry.degraded = true
+        telemetry.graphEnumerationSkippedReason = 'graph_enumeration_failed'
       }
     }
 

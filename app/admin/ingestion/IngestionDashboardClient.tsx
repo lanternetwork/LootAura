@@ -14,6 +14,7 @@ import {
   CartesianGrid,
 } from 'recharts'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
 import IngestionFunnelSection from '@/app/admin/ingestion/IngestionFunnelSection'
@@ -185,9 +186,23 @@ export default function IngestionDashboardClient() {
       process.env.NEXT_PUBLIC_VERCEL_ENV ??
       process.env.NODE_ENV ??
       (typeof window !== 'undefined' ? window.location.hostname : 'unknown')
+    let ystmCoverage: YstmCoverageMetricsResponse | null = null
+    try {
+      const covRes = await fetch('/api/admin/ingestion/ystm-coverage', { credentials: 'include' })
+      const covJson = (await covRes.json()) as YstmCoverageMetricsResponse & {
+        ok?: boolean
+        message?: string
+      }
+      if (covRes.ok && covJson.ok) {
+        ystmCoverage = covJson
+      }
+    } catch {
+      /* coverage section omitted when fetch fails */
+    }
     const text = buildIngestionDiagnostics(data, {
       environment,
       copiedAt: new Date().toISOString(),
+      ystmCoverage,
     })
     try {
       await copyTextToClipboard(text)

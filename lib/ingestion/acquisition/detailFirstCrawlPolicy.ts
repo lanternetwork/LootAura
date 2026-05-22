@@ -49,28 +49,47 @@ export function shouldRefreshYstmDetailOnListRecrawl(
 }
 
 export type YstmListRecrawlExistingRow = {
+  id: string
   status: string | null | undefined
   failure_reasons: unknown
   date_start: string | null
   date_end: string | null
   normalized_address: string | null
+  sale_instance_key?: string | null
+  source_listing_id?: string | null
+  source_content_hash?: string | null
 }
 
 /**
- * Phase 5: classify URL reuse before refresh vs duplicate skip.
+ * Phase 5/6: classify URL reuse before refresh vs duplicate skip (identity-first).
  */
 export function classifyYstmUrlReuseForListRecrawl(
-  listing: {
-    startDate: string | null | undefined
-    endDate: string | null | undefined
-    addressRaw: string | null | undefined
-  },
-  existing: YstmListRecrawlExistingRow
+  input: {
+    sourcePlatform: string
+    sourceUrl: string
+    state?: string | null
+    city?: string | null
+    listing: {
+      startDate: string | null | undefined
+      endDate: string | null | undefined
+      addressRaw: string | null | undefined
+    }
+    existing: YstmListRecrawlExistingRow
+  }
 ): YstmUrlReuseEventKind {
   return classifyYstmUrlReuseFromListSeed({
-    listingStartDate: listing.startDate ?? null,
-    listingEndDate: listing.endDate ?? null,
-    listingAddressRaw: listing.addressRaw ?? null,
+    sourcePlatform: input.sourcePlatform,
+    sourceUrl: input.sourceUrl,
+    state: input.state ?? null,
+    city: input.city ?? null,
+    normalizedAddress: input.existing.normalized_address,
+    listingStartDate: input.listing.startDate ?? null,
+    listingEndDate: input.listing.endDate ?? null,
+    listingAddressRaw: input.listing.addressRaw ?? null,
+    existingIngestedSaleId: input.existing.id,
+    existingSaleInstanceKey: input.existing.sale_instance_key ?? null,
+    existingSourceListingId: input.existing.source_listing_id ?? null,
+    existingSourceContentHash: input.existing.source_content_hash ?? null,
     existing: {
       status: String(existing.status ?? ''),
       failure_reasons: existing.failure_reasons,
@@ -83,7 +102,10 @@ export function classifyYstmUrlReuseForListRecrawl(
 
 /** URL-reuse new events bypass the per-page refresh cap (false-exclusion fix). */
 export function shouldQueueYstmListRecrawlRefresh(input: {
+  sourcePlatform: string
   sourceUrl: string
+  state?: string | null
+  city?: string | null
   existing: YstmListRecrawlExistingRow
   listing: {
     startDate: string | null | undefined
@@ -97,7 +119,14 @@ export function shouldQueueYstmListRecrawlRefresh(input: {
     return { queue: false, urlReuseEvent: 'expire_old_row', priority: false }
   }
 
-  const urlReuseEvent = classifyYstmUrlReuseForListRecrawl(input.listing, input.existing)
+  const urlReuseEvent = classifyYstmUrlReuseForListRecrawl({
+    sourcePlatform: input.sourcePlatform,
+    sourceUrl: input.sourceUrl,
+    state: input.state,
+    city: input.city,
+    listing: input.listing,
+    existing: input.existing,
+  })
   const priority = isPriorityYstmUrlReuseRefresh(urlReuseEvent)
 
   if (priority) {

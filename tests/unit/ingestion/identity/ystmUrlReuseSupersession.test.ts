@@ -14,6 +14,9 @@ describe('planYstmUrlReuseSupersessionOnDetailRefresh', () => {
         failure_reasons: [],
         normalized_address: '123 main st',
       },
+      sourcePlatform: 'external_page_source',
+      sourceUrl:
+        'https://yardsaletreasuremap.com/US/Texas/Austin/Austin.html/961002738/listing.html',
       nextSaleInstanceKey: 'external_page_source:TX|austin|addr:2026-07-10|2026-07-11:111',
       listingStartDate: '2026-07-10',
       listingEndDate: '2026-07-11',
@@ -41,6 +44,9 @@ describe('planYstmUrlReuseSupersessionOnDetailRefresh', () => {
         failure_reasons: [],
         normalized_address: '123 main st',
       },
+      sourcePlatform: 'external_page_source',
+      sourceUrl:
+        'https://yardsaletreasuremap.com/US/Texas/Austin/Austin.html/961002738/listing.html',
       nextSaleInstanceKey: 'external_page_source:TX|austin|addr:2026-06-01|2026-06-02:111',
       listingStartDate: '2026-06-02',
       listingEndDate: '2026-06-03',

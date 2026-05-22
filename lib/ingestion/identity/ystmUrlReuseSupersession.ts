@@ -1,10 +1,9 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import {
-  classifyYstmUrlReuseFromListSeed,
-  saleInstanceKeysMateriallyDiffer,
-  type YstmUrlReuseListSeedContext,
-} from '@/lib/ingestion/identity/classifyYstmUrlReuseEvent'
+  classifySaleInstance,
+  shouldSupersedePublishedSaleForDecision,
+} from '@/lib/ingestion/identity/classifySaleInstance'
 
 export const YSTM_URL_REUSE_SUPERSESSION_REASON = 'url_reuse_new_event' as const
 
@@ -32,7 +31,12 @@ export type YstmUrlReuseSupersessionPatch = {
  */
 export function planYstmUrlReuseSupersessionOnDetailRefresh(input: {
   prior: PriorIngestedSaleForUrlReuse
+  sourcePlatform: string
+  sourceUrl: string
+  state?: string | null
+  city?: string | null
   nextSaleInstanceKey: string | null
+  nextSourceContentHash?: string | null
   listingStartDate: string | null
   listingEndDate: string | null
   listingAddressRaw: string | null
@@ -42,24 +46,45 @@ export function planYstmUrlReuseSupersessionOnDetailRefresh(input: {
   const priorPublished = input.prior.published_sale_id?.trim() || null
   if (!priorPublished) return null
 
-  const keyDiffers = saleInstanceKeysMateriallyDiffer(
-    input.prior.sale_instance_key,
-    input.nextSaleInstanceKey
-  )
-  const listEvent = classifyYstmUrlReuseFromListSeed({
-    listingStartDate: input.listingStartDate,
-    listingEndDate: input.listingEndDate,
-    listingAddressRaw: input.listingAddressRaw,
-    existing: {
-      status: input.prior.status,
-      failure_reasons: input.prior.failure_reasons,
-      date_start: input.prior.date_start,
-      date_end: input.prior.date_end,
-      normalized_address: input.prior.normalized_address,
-    },
-  } satisfies YstmUrlReuseListSeedContext)
+  const classification = classifySaleInstance({
+    sourcePlatform: input.sourcePlatform,
+    sourceUrl: input.sourceUrl,
+    state: input.state ?? null,
+    city: input.city ?? null,
+    normalizedAddress: input.prior.normalized_address,
+    dateStart: input.listingStartDate,
+    dateEnd: input.listingEndDate,
+    identity: input.nextSaleInstanceKey
+      ? {
+          source_listing_id: null,
+          sale_instance_key: input.nextSaleInstanceKey,
+          sale_instance_fingerprint: null,
+          source_payload_hash: null,
+          source_content_hash: input.nextSourceContentHash ?? null,
+          source_schedule_hash: null,
+          source_location_hash: null,
+          source_url_first_seen_at: seenAt,
+          source_url_last_seen_at: seenAt,
+        }
+      : null,
+    existingRowsBySourceUrl: [
+      {
+        id: input.prior.id,
+        sale_instance_key: input.prior.sale_instance_key,
+        source_content_hash: null,
+        date_start: input.prior.date_start,
+        date_end: input.prior.date_end,
+        normalized_address: input.prior.normalized_address,
+        status: input.prior.status,
+        failure_reasons: input.prior.failure_reasons,
+      },
+    ],
+    existingRowsBySaleInstanceKey: [],
+    existingRowsByAddressDate: [],
+    seenAtIso: seenAt,
+  })
 
-  if (!keyDiffers && listEvent !== 'new_event_same_url') {
+  if (!shouldSupersedePublishedSaleForDecision(classification.decision)) {
     return null
   }
 

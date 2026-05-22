@@ -40,6 +40,7 @@ export const ObservabilityEvents = {
     ystmDetailFirstFallback: 'ingestion.ystm_detail_first.fallback',
     ystmDetailFirstFetchFailed: 'ingestion.ystm_detail_first.fetch_failed',
     ystmDetailFirstRejectedReason: 'ingestion.ystm_detail_first.rejected_reason',
+    saleInstanceClassified: 'ingestion.sale_instance.classified',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

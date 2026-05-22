@@ -1,10 +1,8 @@
+import type { ExistingUrlSkipContext } from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
 import {
-  CRAWL_SKIP_DATE_TOLERANCE_DAYS,
-  type ExistingUrlSkipContext,
-} from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
-import { calendarDaysBetweenUtc } from '@/lib/ingestion/duplicateScoring'
-import { isIngestedRowExpiredForDuplicate } from '@/lib/ingestion/acquisition/ingestedRowExpired'
-import { isSaleWindowExpiredAtDiscovery } from '@/lib/ingestion/saleWindowDates'
+  classifySaleInstance,
+  type SaleInstanceDecision,
+} from '@/lib/ingestion/identity/classifySaleInstance'
 
 export type YstmUrlReuseEventKind =
   | 'same_event_no_op'
@@ -16,65 +14,80 @@ export type YstmUrlReuseEventKind =
 export type YstmUrlReuseListSeedContext = ExistingUrlSkipContext & {
   listingStartDate: string | null
   listingEndDate: string | null
+  sourcePlatform: string
+  sourceUrl: string
+  state?: string | null
+  city?: string | null
+  normalizedAddress?: string | null
+  existingIngestedSaleId: string
+  existingSaleInstanceKey?: string | null
+  existingSourceListingId?: string | null
+  existingSourceContentHash?: string | null
 }
 
-function normalizeAddressLine(raw: string | null | undefined): string | null {
-  if (!raw?.trim()) return null
-  return raw.toLowerCase().replace(/\s+/g, ' ').trim()
-}
-
-function datesBeyondTolerance(
-  listingStart: string | null,
-  existingStart: string | null
-): boolean {
-  if (!listingStart?.trim() || !existingStart?.trim()) return false
-  const dayDelta = calendarDaysBetweenUtc(listingStart.trim(), existingStart.trim())
-  return dayDelta > CRAWL_SKIP_DATE_TOLERANCE_DAYS
+function mapSaleInstanceDecisionToUrlReuseEvent(
+  decision: SaleInstanceDecision
+): YstmUrlReuseEventKind {
+  switch (decision) {
+    case 'same_event_no_change':
+      return 'same_event_no_op'
+    case 'same_event_updated':
+      return 'same_event_update'
+    case 'new_event_same_url':
+      return 'new_event_same_url'
+    case 'stale_event_expired':
+      return 'expire_old_row'
+    default:
+      return 'ambiguous'
+  }
 }
 
 /**
- * Phase 5: classify list-seed observation when source_url already exists.
- * Drives priority detail refresh and supersession (not URL-only skip).
+ * Phase 5 list-seed URL reuse event (delegates to Phase 6 classifier).
  */
 export function classifyYstmUrlReuseFromListSeed(
   ctx: YstmUrlReuseListSeedContext
 ): YstmUrlReuseEventKind {
-  const existingExpired = isIngestedRowExpiredForDuplicate(
-    ctx.existing.status,
-    ctx.existing.failure_reasons
-  )
-  const listingExpired = isSaleWindowExpiredAtDiscovery(
-    ctx.listingStartDate,
-    ctx.listingEndDate
-  )
+  const result = classifySaleInstance({
+    sourcePlatform: ctx.sourcePlatform,
+    sourceUrl: ctx.sourceUrl,
+    state: ctx.state ?? null,
+    city: ctx.city ?? null,
+    normalizedAddress: ctx.normalizedAddress ?? ctx.existing.normalized_address ?? null,
+    dateStart: ctx.listingStartDate,
+    dateEnd: ctx.listingEndDate,
+    existingRowsBySourceUrl: [
+      {
+        id: ctx.existingIngestedSaleId,
+        source_url: ctx.sourceUrl,
+        source_listing_id: ctx.existingSourceListingId ?? null,
+        sale_instance_key: ctx.existingSaleInstanceKey ?? null,
+        source_content_hash: ctx.existingSourceContentHash ?? null,
+        date_start: ctx.existing.date_start,
+        date_end: ctx.existing.date_end,
+        normalized_address: ctx.existing.normalized_address,
+        status: ctx.existing.status,
+        failure_reasons: ctx.existing.failure_reasons,
+      },
+    ],
+    existingRowsBySaleInstanceKey: ctx.existingSaleInstanceKey
+      ? [
+          {
+            id: ctx.existingIngestedSaleId,
+            sale_instance_key: ctx.existingSaleInstanceKey,
+            source_listing_id: ctx.existingSourceListingId ?? null,
+            date_start: ctx.existing.date_start,
+            date_end: ctx.existing.date_end,
+            normalized_address: ctx.existing.normalized_address,
+            status: ctx.existing.status,
+            failure_reasons: ctx.existing.failure_reasons,
+          },
+        ]
+      : [],
+    existingRowsByAddressDate: [],
+  })
 
-  if (existingExpired && !listingExpired) {
-    return 'new_event_same_url'
-  }
-
-  if (existingExpired && listingExpired) {
-    return 'expire_old_row'
-  }
-
-  if (datesBeyondTolerance(ctx.listingStartDate, ctx.existing.date_start)) {
-    return 'new_event_same_url'
-  }
-
-  const listingAddr = normalizeAddressLine(ctx.listingAddressRaw)
-  const existingAddr = normalizeAddressLine(ctx.existing.normalized_address)
-  if (listingAddr && existingAddr && listingAddr !== existingAddr) {
-    return 'new_event_same_url'
-  }
-
-  if (listingAddr && existingAddr && listingAddr === existingAddr) {
-    return 'same_event_update'
-  }
-
-  if (ctx.listingStartDate?.trim() && ctx.existing.date_start?.trim()) {
-    return 'same_event_update'
-  }
-
-  return 'ambiguous'
+  return mapSaleInstanceDecisionToUrlReuseEvent(result.decision)
 }
 
 export function isPriorityYstmUrlReuseRefresh(event: YstmUrlReuseEventKind): boolean {

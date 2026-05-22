@@ -132,6 +132,26 @@ On detail-first refresh, when `sale_instance_key` changes (or list classificatio
 - `lib/ingestion/identity/ystmUrlReuseSupersession.ts`
 - `lib/ingestion/acquisition/detailFirstCrawlPolicy.ts` (`shouldQueueYstmListRecrawlRefresh`)
 
+## Phase 6 — sale-instance classifier
+
+`classifySaleInstance` is the identity-first decision engine (not URL-only):
+
+| Priority | Signal |
+|----------|--------|
+| 1 | `sale_instance_key` |
+| 2 | `source_listing_id` + overlapping dates |
+| 3 | Normalized address + overlapping dates |
+| 4 | Location bucket + coordinates + dates |
+| 5 | `source_url` history (existing row at URL) |
+
+**Decisions:** `same_event_no_change`, `same_event_updated`, `new_event_same_url`, `new_event_new_url`, `stale_event_expired`, `invalid_event`, `ambiguous_requires_review`.
+
+**Wiring:** Phase 5 list refresh and detail-first supersession delegate to this module. Emits `ingestion.sale_instance.classified` telemetry on list recrawl and detail-first refresh.
+
+### Code
+
+- `lib/ingestion/identity/classifySaleInstance.ts`
+
 ## Later phases
 
-Phases 6–10 add full classifier, crawl gate reorder, and constraints.
+Phases 7–10 add crawl gate reorder, soft dedupe hardening, shadow mode, and constraints.

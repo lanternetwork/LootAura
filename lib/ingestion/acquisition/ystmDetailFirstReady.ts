@@ -52,7 +52,11 @@ import {
   saleInstanceIdentityDbColumns,
 } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
 import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
-import { classifyYstmUrlReuseFromListSeed } from '@/lib/ingestion/identity/classifyYstmUrlReuseEvent'
+import {
+  classifySaleInstance,
+  saleInstanceClassificationTelemetry,
+  shouldReviveExpiredRowForSaleInstanceDecision,
+} from '@/lib/ingestion/identity/classifySaleInstance'
 import {
   planYstmUrlReuseSupersessionOnDetailRefresh,
   supersedePublishedSaleForUrlReuse,
@@ -644,21 +648,84 @@ export async function attemptYstmDetailFirstReady(
       .eq('id', params.existingIngestedSaleId)
       .maybeSingle()
 
-    const supersessionPatch = priorRow?.id
+    const priorCandidate = priorRow?.id
+      ? {
+          id: String(priorRow.id),
+          sale_instance_key: (priorRow as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+          published_sale_id:
+            (priorRow as { published_sale_id?: string | null }).published_sale_id ?? null,
+          date_start: (priorRow as { date_start?: string | null }).date_start ?? null,
+          date_end: (priorRow as { date_end?: string | null }).date_end ?? null,
+          status: String((priorRow as { status?: string }).status ?? ''),
+          failure_reasons: (priorRow as { failure_reasons?: unknown }).failure_reasons,
+          normalized_address:
+            (priorRow as { normalized_address?: string | null }).normalized_address ?? null,
+        }
+      : null
+
+    const saleInstanceClassification = priorCandidate
+      ? classifySaleInstance({
+          sourcePlatform: params.platform,
+          sourceUrl: listing.sourceUrl,
+          state,
+          city,
+          normalizedAddress: normalizedLine,
+          dateStart: listing.startDate ?? null,
+          dateEnd: listing.endDate ?? null,
+          timeStart: scheduleFields.time_start,
+          timeEnd: scheduleFields.time_end,
+          title: listing.title,
+          description: listing.description,
+          imageSourceUrl: listing.imageSourceUrl,
+          lat: spatial.lat,
+          lng: spatial.lng,
+          rawPayload: rowPayload,
+          existingRowsBySourceUrl: [
+            {
+              id: priorCandidate.id,
+              sale_instance_key: priorCandidate.sale_instance_key,
+              source_content_hash:
+                (priorRow as { source_content_hash?: string | null }).source_content_hash ?? null,
+              date_start: priorCandidate.date_start,
+              date_end: priorCandidate.date_end,
+              normalized_address: priorCandidate.normalized_address,
+              status: priorCandidate.status,
+              failure_reasons: priorCandidate.failure_reasons,
+            },
+          ],
+          existingRowsBySaleInstanceKey: priorCandidate.sale_instance_key
+            ? [
+                {
+                  id: priorCandidate.id,
+                  sale_instance_key: priorCandidate.sale_instance_key,
+                  date_start: priorCandidate.date_start,
+                  date_end: priorCandidate.date_end,
+                  normalized_address: priorCandidate.normalized_address,
+                  status: priorCandidate.status,
+                  failure_reasons: priorCandidate.failure_reasons,
+                },
+              ]
+            : [],
+          existingRowsByAddressDate: [],
+        })
+      : null
+
+    if (saleInstanceClassification) {
+      emitDetailFirstEvent(ObservabilityEvents.ingestion.saleInstanceClassified, telem, {
+        ...saleInstanceClassificationTelemetry(saleInstanceClassification),
+        existingIngestedSaleId: params.existingIngestedSaleId,
+      })
+    }
+
+    const supersessionPatch = priorCandidate
       ? planYstmUrlReuseSupersessionOnDetailRefresh({
-          prior: {
-            id: String(priorRow.id),
-            sale_instance_key: (priorRow as { sale_instance_key?: string | null }).sale_instance_key ?? null,
-            published_sale_id:
-              (priorRow as { published_sale_id?: string | null }).published_sale_id ?? null,
-            date_start: (priorRow as { date_start?: string | null }).date_start ?? null,
-            date_end: (priorRow as { date_end?: string | null }).date_end ?? null,
-            status: String((priorRow as { status?: string }).status ?? ''),
-            failure_reasons: (priorRow as { failure_reasons?: unknown }).failure_reasons,
-            normalized_address:
-              (priorRow as { normalized_address?: string | null }).normalized_address ?? null,
-          },
+          prior: priorCandidate,
+          sourcePlatform: params.platform,
+          sourceUrl: listing.sourceUrl,
+          state,
+          city,
           nextSaleInstanceKey: (ingestRow.sale_instance_key as string | null) ?? null,
+          nextSourceContentHash: (ingestRow.source_content_hash as string | null) ?? null,
           listingStartDate: listing.startDate ?? null,
           listingEndDate: listing.endDate ?? null,
           listingAddressRaw: listing.addressRaw,
@@ -671,21 +738,8 @@ export async function attemptYstmDetailFirstReady(
     }
 
     const reviveExpiredUrlReuse =
-      priorRow?.id != null &&
-      (supersessionPatch != null ||
-        classifyYstmUrlReuseFromListSeed({
-          listingStartDate: listing.startDate ?? null,
-          listingEndDate: listing.endDate ?? null,
-          listingAddressRaw: listing.addressRaw,
-          existing: {
-            status: String((priorRow as { status?: string }).status ?? ''),
-            failure_reasons: (priorRow as { failure_reasons?: unknown }).failure_reasons,
-            date_start: (priorRow as { date_start?: string | null }).date_start ?? null,
-            date_end: (priorRow as { date_end?: string | null }).date_end ?? null,
-            normalized_address:
-              (priorRow as { normalized_address?: string | null }).normalized_address ?? null,
-          },
-        }) === 'new_event_same_url')
+      saleInstanceClassification != null &&
+      shouldReviveExpiredRowForSaleInstanceDecision(saleInstanceClassification.decision)
 
     const updated = await updateExistingIngestedSaleForDetailFirst(admin, {
       ingestedSaleId: params.existingIngestedSaleId,

@@ -37,6 +37,10 @@ import {
   computeYstmSaleInstanceIdentity,
   saleInstanceIdentityDbColumns,
 } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import {
+  classifySaleInstance,
+  saleInstanceClassificationTelemetry,
+} from '@/lib/ingestion/identity/classifySaleInstance'
 import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
 import {
   evaluatePostDetailEnrichedDuplicateSkip,
@@ -1433,14 +1437,24 @@ export async function persistExternalPageSource(
         })
 
         const refreshDecision = shouldQueueYstmListRecrawlRefresh({
+          sourcePlatform: platform,
           sourceUrl: listing.sourceUrl,
+          state: listing.state,
+          city: listing.city,
           existing: {
+            id: String(existing.id),
             status: existing.status as string,
             failure_reasons: existing.failure_reasons,
             date_start: (existing as { date_start?: string | null }).date_start ?? null,
             date_end: (existing as { date_end?: string | null }).date_end ?? null,
             normalized_address:
               (existing as { normalized_address?: string | null }).normalized_address ?? null,
+            sale_instance_key:
+              (existing as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+            source_listing_id:
+              (existing as { source_listing_id?: string | null }).source_listing_id ?? null,
+            source_content_hash:
+              (existing as { source_content_hash?: string | null }).source_content_hash ?? null,
           },
           listing: {
             startDate: listing.startDate,
@@ -1452,6 +1466,43 @@ export async function persistExternalPageSource(
         })
 
         if (refreshDecision.queue) {
+          const listClassification = classifySaleInstance({
+            sourcePlatform: platform,
+            sourceUrl: listing.sourceUrl,
+            state: listing.state,
+            city: listing.city,
+            normalizedAddress:
+              (existing as { normalized_address?: string | null }).normalized_address ?? null,
+            dateStart: listing.startDate ?? null,
+            dateEnd: listing.endDate ?? null,
+            existingRowsBySourceUrl: [
+              {
+                id: String(existing.id),
+                sale_instance_key:
+                  (existing as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+                date_start: (existing as { date_start?: string | null }).date_start ?? null,
+                date_end: (existing as { date_end?: string | null }).date_end ?? null,
+                normalized_address:
+                  (existing as { normalized_address?: string | null }).normalized_address ?? null,
+                status: existing.status as string,
+                failure_reasons: existing.failure_reasons,
+              },
+            ],
+            existingRowsBySaleInstanceKey: [],
+            existingRowsByAddressDate: [],
+          })
+          emitObservabilityRecord(
+            buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceClassified, {
+              ...telemBase,
+              adapter: ADAPTER_ID,
+              parserVersion: PARSER_VERSION_ROW,
+              pageIndex,
+              pageHostHash,
+              phase: 'list_recrawl',
+              ...saleInstanceClassificationTelemetry(listClassification),
+            })
+          )
+
           detailFirstCandidates.push({
             listing,
             rowPayload,

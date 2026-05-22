@@ -40,6 +40,7 @@ describe('detailFirstCrawlPolicy', () => {
 
   it('queues priority URL-reuse refresh even when per-page cap is reached', () => {
     const existing = {
+      id: 'ing-1',
       status: 'ready',
       failure_reasons: [],
       date_start: '2026-06-01',
@@ -47,6 +48,7 @@ describe('detailFirstCrawlPolicy', () => {
       normalized_address: '123 main st',
     }
     const atCap = shouldQueueYstmListRecrawlRefresh({
+      sourcePlatform: 'external_page_source',
       sourceUrl: YSTM_DETAIL,
       existing,
       listing: {
@@ -62,6 +64,7 @@ describe('detailFirstCrawlPolicy', () => {
     expect(atCap.urlReuseEvent).toBe('new_event_same_url')
 
     const routine = shouldQueueYstmListRecrawlRefresh({
+      sourcePlatform: 'external_page_source',
       sourceUrl: YSTM_DETAIL,
       existing,
       listing: {
@@ -76,8 +79,10 @@ describe('detailFirstCrawlPolicy', () => {
     expect(routine.priority).toBe(false)
 
     const expiredPrior = shouldQueueYstmListRecrawlRefresh({
+      sourcePlatform: 'external_page_source',
       sourceUrl: YSTM_DETAIL,
       existing: {
+        id: 'ing-expired',
         status: 'expired',
         failure_reasons: ['sale_expired'],
         date_start: '2026-01-01',

@@ -15,6 +15,7 @@ import {
 } from 'recharts'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
+import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
 import IngestionFunnelSection from '@/app/admin/ingestion/IngestionFunnelSection'
 import YstmCoverageScoreboardSection from '@/app/admin/ingestion/YstmCoverageScoreboardSection'
 
@@ -189,22 +190,7 @@ export default function IngestionDashboardClient() {
       copiedAt: new Date().toISOString(),
     })
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.setAttribute('readonly', '')
-        textarea.style.position = 'fixed'
-        textarea.style.left = '-9999px'
-        document.body.appendChild(textarea)
-        textarea.select()
-        const copied = document.execCommand('copy')
-        document.body.removeChild(textarea)
-        if (!copied) {
-          throw new Error('Clipboard unavailable in this browser')
-        }
-      }
+      await copyTextToClipboard(text)
       setCopyState('copied')
       window.setTimeout(() => setCopyState('idle'), 2000)
     } catch (e) {

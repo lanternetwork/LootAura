@@ -82,6 +82,13 @@ export function buildIngestionDiagnostics(
       'detail-first metrics baseline',
       data.detailFirstMetricsBaselineAt ?? 'not set (full 24h/7d windows)'
     ),
+    bullet('metrics generated at', data.generatedAt),
+    '',
+    '## Live backlog',
+    bullet('ingested_sales backlog', data.backlog),
+    bullet('geocode eligible backlog', data.geocodeEligibleBacklog),
+    bullet('published (24h)', data.published24h),
+    bullet('claimed (24h)', data.claimed24h),
     '',
     '## Funnel (24h)',
     bullet('discovered', stageCount(stages, 'discovered')),
@@ -127,7 +134,7 @@ export function buildIngestionDiagnostics(
     bullet('fallback to legacy', df.fallback),
     bullet('detail fetch failed', df.fetchFailed),
     bullet(
-      'success rate',
+      'detail-first success rate',
       `${formatPct(df.providerGeocodeBypassRate)} (target ≥${(DETAIL_FIRST_SUCCESS_RATE_TARGET * 100).toFixed(0)}%)`
     ),
     bullet('address from detail page', formatCount(df.addressFromDetailPage)),

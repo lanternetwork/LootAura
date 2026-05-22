@@ -1,6 +1,89 @@
 import { describe, expect, it } from 'vitest'
+import type { YstmGraphEnumerationMetrics } from '@/lib/admin/ystmGraphEnumerationMetrics'
+import type { YstmSourceExpansionMetrics } from '@/lib/admin/ystmSourceExpansionMetrics'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
+import type { YstmCatalogRepairAggregate } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairStore'
+import type { YstmCoverageMissingIngestionAggregate } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+import type { YstmExistingUrlRefreshAggregate } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
+
+const sourceExpansionFixture: YstmSourceExpansionMetrics = {
+  generatedAt: '2026-05-22T00:00:00Z',
+  enabledExternalConfigs: 1000,
+  crawlableConfigs: 62,
+  configsSkippedNoSourcePages: 0,
+  configsSkippedInvalidUrls: 0,
+  configsSkippedCrawlExcluded: 0,
+  pendingDiscoveryConfigs: 0,
+  validatedDiscoveryConfigs: 54,
+  failedDiscoveryConfigs: 0,
+  saturatedConfigs: 0,
+  configsWithRecentInsert: 0,
+  configsWithoutSourcePages: 922,
+}
+
+const missingIngestionFixture: YstmCoverageMissingIngestionAggregate = {
+  missingQueueTotal: 7,
+  missingIngestionAttempted: 4,
+  missingIngestionPublished: 1,
+  missingIngestionIngested: 2,
+  missingIngestionFailed: 0,
+  missingIngestionSkippedVisible: 0,
+  missingIngestionSkippedExisting: 0,
+  missingIngestionNeverAttempted: 3,
+}
+
+const existingRefreshFixture: YstmExistingUrlRefreshAggregate = {
+  externalIngestedTotal: 756,
+  ystmDetailIngestedTotal: 700,
+  syncedLast24h: 50,
+  neverSynced: 10,
+  staleOver12h: 144,
+}
+
+const catalogRepairFixture: YstmCatalogRepairAggregate = {
+  repairQueueTotal: 269,
+  needsGeocode: 80,
+  readyUnpublished: 40,
+  publishFailed: 42,
+  needsCheck: 50,
+  repairedPublishedLast24h: 5,
+  repairFailed: 2,
+}
+
+const graphEnumerationFixture: YstmGraphEnumerationMetrics = {
+  generatedAt: '2026-05-22T00:00:00Z',
+  catalogStates: 51,
+  statesWithCandidates: 0,
+  statesRemaining: 51,
+  candidatesDiscovered: 0,
+  validatedPages: 0,
+  pendingValidation: 0,
+  invalidPagesByStatus: {},
+  promotedCandidates: 0,
+  configsPromotedLastRun: 28,
+  validationsLast24h: 0,
+  fetchFailureRate24h: 0,
+  blockRate24h: 0,
+  throttleRecommended: false,
+  lastDiscoveryRun: {
+    completedAt: '2026-05-21T08:00:00Z',
+    ok: true,
+    skipped: false,
+    skipReason: null,
+    degraded: false,
+    statesScanned: 0,
+    catalogSize: 51,
+    discoveryLatencyMs: 1200,
+    configsPromoted: 28,
+    candidatePagesDiscovered: 0,
+    candidatePagesValid: 0,
+    graphEnumerationSkippedReason: 'empty_state_batch',
+    graphEnumerationThrottled: false,
+    phasesCompleted: [],
+  },
+  sourceExpansion: sourceExpansionFixture,
+}
 
 function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {}): YstmCoverageMetricsResponse {
   return {
@@ -19,18 +102,10 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
     missingByMetro: {},
     trend: [],
     lastRun: null,
-    sourceExpansion: {
-      crawlableConfigs: 62,
-      configsWithoutSourcePages: 922,
-      pendingDiscoveryConfigs: 0,
-      validatedDiscoveryConfigs: 54,
-    },
-    missingIngestion: {
-      missingIngestionQueue: 7,
-      missingIngestionNeverAttempted: 3,
-    },
-    existingRefresh: { staleOver12h: 144, refreshQueueTotal: 144 },
-    catalogRepair: { repairQueueTotal: 269 },
+    sourceExpansion: sourceExpansionFixture,
+    missingIngestion: missingIngestionFixture,
+    existingRefresh: existingRefreshFixture,
+    catalogRepair: catalogRepairFixture,
     pipelineBacklog: {
       missingValidUrls: 7,
       missingIngestionQueue: 7,
@@ -46,42 +121,7 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       latestDayQualifies: false,
       programComplete: false,
     },
-    graphEnumeration: {
-      generatedAt: '2026-05-22T00:00:00Z',
-      catalogStates: 51,
-      statesWithCandidates: 0,
-      statesRemaining: 51,
-      candidatesDiscovered: 0,
-      validatedPages: 0,
-      pendingValidation: 0,
-      invalidPagesByStatus: {},
-      promotedCandidates: 0,
-      configsPromotedLastRun: 28,
-      validationsLast24h: 0,
-      fetchFailureRate24h: 0,
-      blockRate24h: 0,
-      throttleRecommended: false,
-      lastDiscoveryRun: {
-        completedAt: '2026-05-21T08:00:00Z',
-        ok: true,
-        skipped: false,
-        skipReason: null,
-        degraded: false,
-        statesScanned: 0,
-        catalogSize: 51,
-        discoveryLatencyMs: 1200,
-        configsPromoted: 28,
-        candidatePagesDiscovered: 0,
-        candidatePagesValid: 0,
-        graphEnumerationSkippedReason: 'empty_state_batch',
-        graphEnumerationThrottled: false,
-        phasesCompleted: [],
-      },
-      sourceExpansion: {
-        crawlableConfigs: 62,
-        configsWithoutSourcePages: 922,
-      },
-    },
+    graphEnumeration: graphEnumerationFixture,
     operationalHealth: { healthy: false, alerts: [] },
     ...overrides,
   }
@@ -101,12 +141,16 @@ describe('evaluateWeekOneSprintGates', () => {
       minimalScoreboard({
         validActiveYstmUrls: 350,
         sourceExpansion: {
+          ...sourceExpansionFixture,
           crawlableConfigs: 250,
           configsWithoutSourcePages: 400,
           pendingDiscoveryConfigs: 10,
           validatedDiscoveryConfigs: 100,
         },
-        catalogRepair: { repairQueueTotal: 50 },
+        catalogRepair: {
+          ...catalogRepairFixture,
+          repairQueueTotal: 50,
+        },
         pipelineBacklog: {
           missingValidUrls: 20,
           missingIngestionQueue: 20,
@@ -115,7 +159,7 @@ describe('evaluateWeekOneSprintGates', () => {
           existingRefreshStale: 30,
         },
         graphEnumeration: {
-          ...minimalScoreboard().graphEnumeration,
+          ...graphEnumerationFixture,
           candidatesDiscovered: 5000,
           statesWithCandidates: 25,
           lastDiscoveryRun: {

@@ -28,40 +28,24 @@
 
 ---
 
-## Vercel env (apply after Day 0 green; hold 48h if block rate >1%)
+## Throughput (no new Vercel env vars)
 
-Set in production (values are sprint caps; repo defaults remain lower until unset):
+Production is expected to run with **no `CRON_*` / `INGESTION_*` overrides in Vercel** (same as the 90% coverage program). The sprint uses **repo burn-in defaults** already wired in `*Config.ts` parsers and `vercel.json` cron schedules.
 
-```bash
-# Discovery (4×/day — vercel.json)
-CRON_DISCOVERY_MAX_STATES_PER_RUN=20
-CRON_DISCOVERY_MAX_DISCOVERED_PAGES=3000
-CRON_DISCOVERY_MAX_VALIDATION_FETCHES=1500
-CRON_DISCOVERY_VALIDATION_FETCH_CONCURRENCY=8
-CRON_DISCOVERY_MAX_PLACEHOLDER_REPAIR_CONFIGS=200
+**Do not add Vercel env vars for this sprint.** If throughput is still insufficient after discovery is fixed, raise budgets via a **code default PR** (change `DEFAULT_*` constants), not platform env.
 
-# Catalog repair (2×/day) — priority while queue ≥ 75
-CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS=100
-CRON_YSTM_CATALOG_REPAIR_MAX_SCANNED=200
+| Pipeline | Schedule (`vercel.json`) | Effective budget (unset env → repo default) |
+|----------|--------------------------|-----------------------------------------------|
+| Graph enumeration / discovery | 4×/day UTC 02/08/14/20 | 10 states, 1000 candidates, 500 validations, 120 placeholder repair (`discoveryCronConfig.ts`) |
+| Coverage audit | 2×/day | 24 configs, 40 list fetches, 80 detail validations (`ystmCoverageAuditConfig.ts`) |
+| Missing ingest | 2×/day | 48 attempts, 160 scanned (`ystmCoverageMissingIngestionConfig.ts`) |
+| Catalog repair | 2×/day | 60 attempts, 160 scanned (`ystmCatalogRepairConfig.ts`) |
+| Existing refresh | 2×/day | 32 attempts, 120 scanned (`ystmExistingUrlRefreshConfig.ts`) |
+| Main ingestion | every 2 min | batch 60, budget 120s (`ingestionOrchestrationDefaults.ts`) |
 
-# Coverage audit (2×/day) — enable when crawlable ≥ 150
-CRON_YSTM_COVERAGE_MAX_CONFIGS=24
-CRON_YSTM_COVERAGE_MAX_LIST_FETCHES=40
-CRON_YSTM_COVERAGE_MAX_DETAIL_VALIDATIONS=80
-CRON_YSTM_COVERAGE_MAX_URLS_PER_LIST_PAGE=120
+**YSTM safety:** If graph panel block rate **>1%** for 24h, pause manual discovery triggers and investigate before any code-default increase.
 
-# Missing ingest + refresh (burn-in max)
-CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS=96
-CRON_YSTM_MISSING_INGEST_MAX_SCANNED=320
-CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS=48
-CRON_YSTM_EXISTING_REFRESH_MAX_SCANNED=160
-
-# Ingestion (when crawlable ≥ 200)
-INGESTION_ORCHESTRATION_CONFIG_BATCH_SIZE=60
-INGESTION_ORCHESTRATION_EXECUTION_BUDGET_MS=120000
-```
-
-Rollback: snapshot env before apply; revert all `CRON_*` / `INGESTION_*` overrides if YSTM block rate >1% for 24h.
+**Optional later (not week-1):** Lead-approved PR to bump `DEFAULT_*` in config modules only if gates stall with discovery healthy.
 
 ---
 

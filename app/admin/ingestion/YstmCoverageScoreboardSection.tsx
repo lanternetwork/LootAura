@@ -108,7 +108,8 @@ export default function YstmCoverageScoreboardSection() {
             <div className="mb-4 rounded-md border border-violet-200 bg-violet-50 p-4">
               <h3 className="text-sm font-semibold text-violet-950">Week-1 sprint gates</h3>
               <p className="mt-1 text-xs text-violet-900">
-                Footprint + discovery + repair targets for the one-week sprint. G4 hold is not evaluated here.
+                Footprint + discovery + repair targets for the one-week sprint (repo burn-in budgets; no new
+                Vercel env). G4 hold is not evaluated here.
               </p>
               <ul className="mt-3 space-y-2 text-sm">
                 {sprintGates.gates.map((gate) => (

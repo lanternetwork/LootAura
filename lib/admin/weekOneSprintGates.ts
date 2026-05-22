@@ -87,7 +87,7 @@ export function evaluateWeekOneSprintGates(
       status: discoveryWorks ? 'pass' : 'fail',
       detail: discoveryWorks
         ? 'registry + last run graph_enumeration'
-        : 'fix discovery before scaling env',
+        : 'fix discovery (repo defaults; no Vercel env ramp)',
     },
   ]
 

@@ -48,18 +48,33 @@ export async function setDetailFirstMetricsBaselineNow(
   at: Date = new Date()
 ): Promise<string> {
   const iso = at.toISOString()
-  const { error } = await fromBase(admin, 'ingestion_orchestration_state').upsert(
-    {
-      key: DETAIL_FIRST_METRICS_BASELINE_STATE_KEY,
-      cursor: 0,
+  const { data: updated, error: updateError } = await fromBase(admin, 'ingestion_orchestration_state')
+    .update({
       detail_first_metrics_baseline_at: iso,
       updated_at: iso,
-    },
-    { onConflict: 'key' }
-  )
+    })
+    .eq('key', DETAIL_FIRST_METRICS_BASELINE_STATE_KEY)
+    .select('detail_first_metrics_baseline_at')
+    .maybeSingle()
 
-  if (error) {
-    throw new Error(error.message)
+  if (updateError) {
+    throw new Error(updateError.message)
+  }
+
+  const updatedAt = updated?.detail_first_metrics_baseline_at
+  if (typeof updatedAt === 'string' && updatedAt.trim()) {
+    return updatedAt
+  }
+
+  const { error: insertError } = await fromBase(admin, 'ingestion_orchestration_state').insert({
+    key: DETAIL_FIRST_METRICS_BASELINE_STATE_KEY,
+    cursor: 0,
+    detail_first_metrics_baseline_at: iso,
+    updated_at: iso,
+  })
+
+  if (insertError) {
+    throw new Error(insertError.message)
   }
 
   return iso

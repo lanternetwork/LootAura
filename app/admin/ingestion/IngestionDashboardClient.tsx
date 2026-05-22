@@ -42,7 +42,9 @@ export default function IngestionDashboardClient() {
   const [loading, setLoading] = useState(true)
   const [snapshots, setSnapshots] = useState<SnapshotPoint[]>([])
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [copyError, setCopyError] = useState<string | null>(null)
   const [baselineState, setBaselineState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [baselineError, setBaselineError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -147,6 +149,7 @@ export default function IngestionDashboardClient() {
 
   const resetMetricsBaseline = useCallback(async () => {
     setBaselineState('loading')
+    setBaselineError(null)
     try {
       const res = await fetch('/api/admin/ingestion/metrics/baseline', {
         method: 'POST',
@@ -154,21 +157,29 @@ export default function IngestionDashboardClient() {
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       })
-      const json = (await res.json()) as { ok?: boolean; message?: string }
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        message?: string
+        error?: string
+        detailFirstMetricsBaselineAt?: string
+      }
       if (!res.ok || !json.ok) {
-        throw new Error(json.message || `HTTP ${res.status}`)
+        throw new Error(json.message || json.error || `HTTP ${res.status}`)
       }
       setBaselineState('done')
       await load()
-      window.setTimeout(() => setBaselineState('idle'), 2000)
-    } catch {
+      window.setTimeout(() => setBaselineState('idle'), 3000)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setBaselineError(message)
       setBaselineState('error')
-      window.setTimeout(() => setBaselineState('idle'), 2000)
+      window.setTimeout(() => setBaselineState('idle'), 5000)
     }
   }, [load])
 
   const copyDiagnostics = useCallback(async () => {
     if (!data) return
+    setCopyError(null)
     const environment =
       process.env.NEXT_PUBLIC_VERCEL_ENV ??
       process.env.NODE_ENV ??
@@ -178,12 +189,29 @@ export default function IngestionDashboardClient() {
       copiedAt: new Date().toISOString(),
     })
     try {
-      await navigator.clipboard.writeText(text)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        const copied = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        if (!copied) {
+          throw new Error('Clipboard unavailable in this browser')
+        }
+      }
       setCopyState('copied')
       window.setTimeout(() => setCopyState('idle'), 2000)
-    } catch {
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setCopyError(message)
       setCopyState('error')
-      window.setTimeout(() => setCopyState('idle'), 2000)
+      window.setTimeout(() => setCopyState('idle'), 5000)
     }
   }, [data])
 
@@ -201,22 +229,22 @@ export default function IngestionDashboardClient() {
             <button
               type="button"
               onClick={() => void resetMetricsBaseline()}
-              disabled={!data || baselineState === 'loading'}
+              disabled={loading || baselineState === 'loading'}
               className="rounded-md border border-emerald-400 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-              title="Exclude pre-baseline funnel noise so Phase 3B success rate reflects post-deploy code only"
+              title="Sets post-deploy baseline to now: 24h funnel, Phase 3B proof, and Phase G counts restart from this moment. Crawlable/pending config totals are live registry counts and do not zero out."
             >
               {baselineState === 'loading'
                 ? 'Resetting…'
                 : baselineState === 'done'
-                  ? 'Baseline reset'
+                  ? 'Metrics window cleared'
                   : baselineState === 'error'
                     ? 'Reset failed'
-                    : 'Reset ingestion metrics window'}
+                    : 'Clear post-deploy metrics window'}
             </button>
             <button
               type="button"
               onClick={() => void copyDiagnostics()}
-              disabled={!data}
+              disabled={!data || loading}
               className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 shadow-sm hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {copyState === 'copied'
@@ -225,6 +253,13 @@ export default function IngestionDashboardClient() {
                   ? 'Copy failed'
                   : 'Copy diagnostics'}
             </button>
+            {(baselineError || copyError) && (
+              <p className="w-full text-sm text-red-700" role="alert">
+                {baselineError ? `Clear metrics: ${baselineError}` : null}
+                {baselineError && copyError ? ' · ' : null}
+                {copyError ? `Copy: ${copyError}` : null}
+              </p>
+            )}
             <Link
               href="/admin/tools"
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"

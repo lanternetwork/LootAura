@@ -63,7 +63,7 @@ function DetailFirstProofPanel({ proof }: { proof: DetailFirstProofEvaluation })
       <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs">
         <li>Deploy migrations 192–194 and this branch.</li>
         <li>
-          Reset ingestion metrics window once (admin button above) after deploy.
+          Clear post-deploy metrics window once (admin button above) after deploy.
         </li>
         <li>Run ingestion crawls until the sample-size check passes.</li>
         <li>Confirm all required checklist rows pass on post-baseline 24h rollups.</li>

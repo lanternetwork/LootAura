@@ -4,7 +4,7 @@
  */
 
 import { calendarDaysBetweenUtc } from '@/lib/ingestion/duplicateScoring'
-import { isIngestedRowExpiredForDuplicate } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
+import { isIngestedRowExpiredForDuplicate } from '@/lib/ingestion/acquisition/ingestedRowExpired'
 
 /** Default date tolerance aligned with soft-dedupe / sale-instance spec (±3 days). */
 export const CRAWL_SKIP_DATE_TOLERANCE_DAYS = 3

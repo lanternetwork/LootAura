@@ -47,6 +47,10 @@ import {
   type SpatialCoordinateResolution,
 } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
+import {
+  computeYstmSaleInstanceIdentity,
+  saleInstanceIdentityDbColumns,
+} from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
@@ -158,6 +162,24 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
   const dateStart = coerceIngestedDateToYyyyMmDd(input.listing.startDate)
   const dateEnd = coerceIngestedDateToYyyyMmDd(input.listing.endDate)
 
+  const saleInstanceIdentity = computeYstmSaleInstanceIdentity({
+    sourcePlatform: input.platform,
+    sourceUrl: input.listing.sourceUrl,
+    state: input.state,
+    city: input.city,
+    normalizedAddress: input.normalizedLine,
+    dateStart,
+    dateEnd,
+    timeStart: input.scheduleFields.time_start,
+    timeEnd: input.scheduleFields.time_end,
+    title: input.listing.title,
+    description: input.listing.description,
+    imageSourceUrl: input.listing.imageSourceUrl,
+    lat: input.spatial.lat,
+    lng: input.spatial.lng,
+    rawPayload: input.rowPayload,
+  })
+
   return {
     source_platform: input.platform,
     source_url: input.listing.sourceUrl,
@@ -206,6 +228,7 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
             ingestStatus: 'ready',
           }
     ),
+    ...saleInstanceIdentityDbColumns(saleInstanceIdentity),
   }
 }
 

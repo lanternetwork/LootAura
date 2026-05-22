@@ -29,6 +29,8 @@ export type FalseExclusionIngestedRowSnapshot = {
   date_start: string | null
   date_end: string | null
   catalog_repair_outcome: string | null
+  source_listing_id: string | null
+  sale_instance_key: string | null
 }
 
 export type FalseExclusionConfigSnapshot = {
@@ -99,6 +101,8 @@ function buildEvidence(input: ClassifyFalseExclusionInput): FalseExclusionTraceE
           published_sale_id: ingested.published_sale_id,
         })
       : false,
+    sourceListingId: ingested?.source_listing_id ?? null,
+    saleInstanceKey: ingested?.sale_instance_key ?? null,
   }
 }
 

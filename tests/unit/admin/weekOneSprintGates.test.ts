@@ -141,6 +141,12 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       byPrimaryBucket: emptyFalseExclusionBuckets(),
       traces: [],
     },
+    saleInstanceIdentity: {
+      ystmRowsWithKey: 0,
+      ystmActiveRowsWithKey: 0,
+      keyCollisionGroups: 0,
+      sampleCollisionKeys: [],
+    },
     ...overrides,
   }
 }

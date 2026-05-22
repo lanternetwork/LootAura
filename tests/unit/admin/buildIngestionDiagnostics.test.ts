@@ -444,6 +444,12 @@ describe('buildIngestionDiagnostics', () => {
         },
         traces: [],
       },
+      saleInstanceIdentity: {
+        ystmRowsWithKey: 120,
+        ystmActiveRowsWithKey: 95,
+        keyCollisionGroups: 2,
+        sampleCollisionKeys: ['external_page_source:TX|austin|addr:2026-05-10|2026-05-12:123'],
+      },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })

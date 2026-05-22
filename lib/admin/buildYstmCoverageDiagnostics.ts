@@ -27,6 +27,15 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     bullet('missingValidYstmUrls', data.missingValidYstmUrls),
     bullet('lastAuditAt', data.lastAuditAt ?? '—'),
     '',
+    '### Sale-instance identity (Phase 3)',
+    bullet('YSTM rows with sale_instance_key', data.saleInstanceIdentity.ystmRowsWithKey),
+    bullet('active rows with key', data.saleInstanceIdentity.ystmActiveRowsWithKey),
+    bullet('key collision groups', data.saleInstanceIdentity.keyCollisionGroups),
+    bullet(
+      'sample collision keys',
+      data.saleInstanceIdentity.sampleCollisionKeys.join(', ') || 'none'
+    ),
+    '',
     '### False-exclusion audit (Phase 1)',
     bullet('missing traced', data.falseExclusionAudit.tracedCount),
     bullet(

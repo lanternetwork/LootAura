@@ -71,6 +71,27 @@ External crawl records **sub-reasons** on each skip path without changing suppre
 - `lib/admin/crawlSkipTaxonomyMetrics.ts` — 24h rollup from orchestration runs
 - `lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth.ts` — suspicious-share alerts
 
+## Phase 3 — sale-instance identity schema (observability)
+
+Migration `202_ystm_sale_instance_identity_phase_3.sql` adds identity columns on `ingested_sales`:
+
+- `source_listing_id`, `sale_instance_key`, `sale_instance_fingerprint`
+- Content/schedule/location/payload hashes
+- `source_url_first_seen_at` / `source_url_last_seen_at`
+- Supersession placeholders (`supersedes_*`, `superseded_*`) for Phase 5+
+
+**Key formula (YSTM detail URLs):** `platform:state|city|address:dateStart|dateEnd:listingId` (content-hash tail when listing id missing). Title is never used alone.
+
+**Population:** New inserts via `externalPageSource` and detail-first paths call `computeYstmSaleInstanceIdentity` — **no dedupe or URL-uniqueness change** until Phase 5–10.
+
+**Admin:** YSTM scoreboard section **Sale-instance identity (Phase 3)** shows rows with keys and collision groups.
+
+### Code
+
+- `lib/ingestion/identity/computeYstmSaleInstanceIdentity.ts`
+- `lib/ingestion/identity/ystmSourceListingId.ts`
+- `lib/admin/saleInstanceIdentityMetrics.ts`
+
 ## Later phases
 
-Phases 3+ introduce sale-instance identity and remove URL-only suppression.
+Phases 4+ add URL alias history; Phases 5–10 change crawl gates and constraints.

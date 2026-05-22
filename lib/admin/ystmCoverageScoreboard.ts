@@ -37,6 +37,10 @@ import {
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
 import { buildFalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
 import type { FalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+import {
+  loadSaleInstanceIdentityMetrics,
+  type SaleInstanceIdentityMetrics,
+} from '@/lib/admin/saleInstanceIdentityMetrics'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type YstmCoverageTrendPoint = {
@@ -75,6 +79,7 @@ export type YstmCoverageScoreboard = {
   graphEnumeration: YstmGraphEnumerationMetrics
   operationalHealth: YstmCoverageOperationalHealth
   falseExclusionAudit: FalseExclusionAuditReport
+  saleInstanceIdentity: SaleInstanceIdentityMetrics
 }
 
 type AuditRunRow = {
@@ -110,6 +115,7 @@ export async function buildYstmCoverageScoreboard(
     existingRefresh,
     catalogRepair,
     falseExclusionAudit,
+    saleInstanceIdentity,
     runsResult,
   ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
@@ -120,6 +126,7 @@ export async function buildYstmCoverageScoreboard(
     aggregateYstmExistingUrlRefresh(admin, now.getTime()),
     aggregateYstmCatalogRepair(admin, now.getTime()),
     buildFalseExclusionAuditReport(admin, now),
+    loadSaleInstanceIdentityMetrics(),
     fromBase(admin, 'ystm_coverage_audit_runs')
       .select(
         'completed_at, status, coverage_pct, valid_active_ystm_urls, published_visible_in_audit, list_pages_fetched, listing_urls_discovered, detail_pages_validated, config_cursor_after'
@@ -219,6 +226,7 @@ export async function buildYstmCoverageScoreboard(
     sloAttainment,
     operationalHealth,
     falseExclusionAudit,
+    saleInstanceIdentity,
   }
 }
 

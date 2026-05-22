@@ -51,6 +51,8 @@ export type FalseExclusionTraceEvidence = {
   missingIngestionFailureReason: string | null
   visibleInPublishedIndex: boolean
   catalogRepairEligible: boolean
+  sourceListingId: string | null
+  saleInstanceKey: string | null
 }
 
 export type FalseExclusionUrlTrace = {

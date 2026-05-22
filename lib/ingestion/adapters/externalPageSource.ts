@@ -34,6 +34,10 @@ import {
   type ExternalCrawlSkipSubReasonCounts,
 } from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
 import {
+  computeYstmSaleInstanceIdentity,
+  saleInstanceIdentityDbColumns,
+} from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import {
   evaluatePostDetailEnrichedDuplicateSkip,
   parseYstmListRecrawlRefreshMaxPerPage,
   shouldDeferListSeedSoftDedupe,
@@ -1273,6 +1277,23 @@ export async function persistExternalPageSource(
           ? { detailPageLegacyFallback: true, detailPageParsed: true }
           : {}),
       }
+      const saleInstanceIdentity = computeYstmSaleInstanceIdentity({
+        sourcePlatform: platform,
+        sourceUrl: listing.sourceUrl,
+        state: listing.state,
+        city: listing.city,
+        normalizedAddress: normalizedLine,
+        dateStart: listing.startDate ?? null,
+        dateEnd: listing.endDate ?? null,
+        timeStart: scheduleFields.time_start,
+        timeEnd: scheduleFields.time_end,
+        title: listing.title,
+        description: listing.description,
+        imageSourceUrl: listing.imageSourceUrl,
+        lat: insertLat,
+        lng: insertLng,
+        rawPayload: legacyRowPayload,
+      })
 
       const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
         .insert({
@@ -1305,6 +1326,7 @@ export async function persistExternalPageSource(
           duplicate_of: null,
           ...addressLifecycleFieldsForDb(addressLifecycle),
           ...spatialInsertFields,
+          ...saleInstanceIdentityDbColumns(saleInstanceIdentity),
         })
         .select('id')
         .maybeSingle()

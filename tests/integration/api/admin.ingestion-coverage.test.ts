@@ -13,13 +13,19 @@ vi.mock('@/lib/auth/adminGate', () => ({
   assertAdminOrThrow: vi.fn(),
 }))
 
-function thenableQuery(result: { data?: unknown; error?: unknown }) {
+function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
   for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'order', 'limit', 'range', 'gte']) {
     q[m] = vi.fn(() => q)
   }
-  q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
-    Promise.resolve(result).then(onFulfilled, onRejected)
+  q.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+    Promise.resolve(result).then((r) => {
+      if (onFulfilled == null) return r
+      if (typeof r.count === 'number') {
+        return onFulfilled({ count: r.count, data: r.data ?? null, error: r.error ?? null })
+      }
+      return onFulfilled(r)
+    }, onRejected)
   return q
 }
 
@@ -58,7 +64,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
             ],
           })
         case 'ingested_sales':
-          return thenableQuery({ data: [] })
+          return thenableQuery({ data: [], count: 0 })
         default:
           return thenableQuery({ data: [] })
       }
@@ -94,5 +100,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     )
     expect(json.falseExclusionAudit.tracedCount).toBe(0)
     expect(json.falseExclusionAudit.missingValidCount).toBe(0)
+    expect(json.saleInstanceIdentity.ystmRowsWithKey).toBe(0)
+    expect(json.saleInstanceIdentity.keyCollisionGroups).toBe(0)
   })
 })

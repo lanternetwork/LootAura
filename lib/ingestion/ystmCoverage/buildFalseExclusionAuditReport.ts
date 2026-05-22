@@ -67,7 +67,7 @@ async function loadIngestedByUrls(
     const slice = urls.slice(i, i + chunkSize)
     const { data, error } = await fromBase(admin, 'ingested_sales')
       .select(
-        'id, source_url, status, published_sale_id, is_duplicate, address_status, failure_reasons, date_start, date_end, catalog_repair_outcome'
+        'id, source_url, status, published_sale_id, is_duplicate, address_status, failure_reasons, date_start, date_end, catalog_repair_outcome, source_listing_id, sale_instance_key'
       )
       .in('source_url', slice)
     if (error) throw new Error(error.message)
@@ -83,6 +83,8 @@ async function loadIngestedByUrls(
         date_start: string | null
         date_end: string | null
         catalog_repair_outcome: string | null
+        source_listing_id: string | null
+        sale_instance_key: string | null
       }
       map.set(r.source_url, {
         id: r.id,
@@ -94,6 +96,8 @@ async function loadIngestedByUrls(
         date_start: r.date_start,
         date_end: r.date_end,
         catalog_repair_outcome: r.catalog_repair_outcome,
+        source_listing_id: r.source_listing_id,
+        sale_instance_key: r.sale_instance_key,
       })
     }
   }

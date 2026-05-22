@@ -230,6 +230,31 @@ export default function YstmCoverageScoreboardSection() {
             </p>
           )}
 
+          <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
+            <h3 className="text-sm font-semibold text-sky-950">Sale-instance identity (Phase 3)</h3>
+            <p className="mt-1 text-xs text-sky-900">
+              New YSTM inserts populate sale_instance_key and hashes (observability only — dedupe still
+              uses source_url until later phases).
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Rows with key" value={data.saleInstanceIdentity.ystmRowsWithKey} />
+              <Metric
+                label="Active rows with key"
+                value={data.saleInstanceIdentity.ystmActiveRowsWithKey}
+              />
+              <Metric
+                label="Key collision groups"
+                value={data.saleInstanceIdentity.keyCollisionGroups}
+                highlight={data.saleInstanceIdentity.keyCollisionGroups > 0}
+              />
+            </div>
+            {data.saleInstanceIdentity.sampleCollisionKeys.length > 0 && (
+              <p className="mt-2 text-xs font-mono text-sky-900">
+                Sample collisions: {data.saleInstanceIdentity.sampleCollisionKeys.join(' · ')}
+              </p>
+            )}
+          </div>
+
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">
               False-exclusion audit (Phase 1)
@@ -289,6 +314,11 @@ export default function YstmCoverageScoreboardSection() {
                         {t.secondaryTags.length > 0 ? ` · ${t.secondaryTags.join(', ')}` : ''}
                       </p>
                       <p className="text-violet-800">{t.summary}</p>
+                      {t.evidence.saleInstanceKey && (
+                        <p className="mt-1 font-mono text-[10px] text-violet-700">
+                          sale_instance_key: {t.evidence.saleInstanceKey}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

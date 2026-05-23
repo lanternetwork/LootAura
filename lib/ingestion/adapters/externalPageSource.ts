@@ -53,6 +53,10 @@ import {
 } from '@/lib/ingestion/identity/shadowSaleInstanceReplay'
 import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
 import {
+  isYstmSaleInstanceClassifierEnforcementEnabled,
+  resolveYstmEnforcedExistingUrlCrawlAction,
+} from '@/lib/ingestion/identity/ystmSaleInstanceClassifierEnforcement'
+import {
   evaluatePostDetailEnrichedDuplicateSkip,
   parseYstmListRecrawlRefreshMaxPerPage,
   shouldDeferListSeedSoftDedupe,
@@ -1547,6 +1551,68 @@ export async function persistExternalPageSource(
             ...shadowSaleInstanceTelemetry(shadowComparison),
           })
         )
+
+        if (
+          isYstmSaleInstanceClassifierEnforcementEnabled() &&
+          mustClassifyViaYstmDetailFirstBeforeUrlSkip(listing.sourceUrl)
+        ) {
+          const enforced = resolveYstmEnforcedExistingUrlCrawlAction({
+            sourcePlatform: platform,
+            sourceUrl: listing.sourceUrl,
+            state: listing.state,
+            city: listing.city,
+            normalizedAddress: listNormalizedAddress,
+            dateStart: listing.startDate ?? null,
+            dateEnd: listing.endDate ?? null,
+            addressRaw: listing.addressRaw,
+            title: listing.title,
+            description: listing.description,
+            existing: {
+              id: String(existing.id),
+              source_url: listing.sourceUrl,
+              sale_instance_key:
+                (existing as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+              source_listing_id:
+                (existing as { source_listing_id?: string | null }).source_listing_id ?? null,
+              source_content_hash:
+                (existing as { source_content_hash?: string | null }).source_content_hash ?? null,
+              date_start: (existing as { date_start?: string | null }).date_start ?? null,
+              date_end: (existing as { date_end?: string | null }).date_end ?? null,
+              normalized_address: listNormalizedAddress,
+              status: existing.status as string,
+              failure_reasons: existing.failure_reasons,
+            },
+            existingUrlCandidates,
+          })
+          emitObservabilityRecord(
+            buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceClassified, {
+              ...telemBase,
+              adapter: ADAPTER_ID,
+              parserVersion: PARSER_VERSION_ROW,
+              pageIndex,
+              pageHostHash,
+              phase: 'list_recrawl_classifier_enforce',
+              classifierEnforced: true,
+              ...saleInstanceClassificationTelemetry(enforced.classification),
+            })
+          )
+
+          if (enforced.action.kind === 'queue_detail_first') {
+            detailFirstCandidates.push({
+              listing,
+              rowPayload,
+              existingIngestedSaleId: enforced.action.existingIngestedSaleId,
+            })
+            summary.ystmListRecrawlRefreshAttempted += 1
+            recordCrawlSkip(enforced.action.crawlSkipSubReason, false)
+            continue
+          }
+
+          duplicateUrlSkipped += 1
+          bumpDuplicateKind(duplicateKinds, enforced.action.duplicateKind)
+          recordCrawlSkip(enforced.action.crawlSkipSubReason, false)
+          continue
+        }
 
         const refreshDecision = shouldQueueYstmListRecrawlRefresh({
           sourcePlatform: platform,

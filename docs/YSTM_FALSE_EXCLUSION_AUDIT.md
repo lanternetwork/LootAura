@@ -323,3 +323,19 @@ Expanded unit/integration coverage for identity, collision resolution, shadow re
 - `lib/admin/evaluateYstmSaleInstanceRolloutGates.ts`
 - `app/admin/ingestion/YstmCoverageScoreboardSection.tsx`
 - `lib/admin/buildYstmCoverageDiagnostics.ts`
+
+## Stage D — classifier enforcement (opt-in)
+
+When `INGESTION_YSTM_SALE_INSTANCE_CLASSIFIER_ENFORCE=true`, YSTM list crawl uses `classifySaleInstance` outcomes (with sale-instance key index) instead of the legacy URL-only duplicate skip path. Default is **off** — no behavior change until rollout gates pass and ops enables the flag.
+
+| Classifier decision | List-crawl action |
+|---------------------|-------------------|
+| `new_event_same_url`, `same_event_updated`, `ambiguous_requires_review` | Queue detail-first |
+| `same_event_no_change`, `stale_event_expired`, `invalid_event` | Duplicate skip (benign / operational sub-reasons) |
+
+Shadow replay + Phase 13 rollout gates should be green before enabling in production.
+
+### Code
+
+- `lib/ingestion/identity/ystmSaleInstanceClassifierEnforcement.ts`
+- `lib/ingestion/adapters/externalPageSource.ts` (`list_recrawl_classifier_enforce` telemetry phase)

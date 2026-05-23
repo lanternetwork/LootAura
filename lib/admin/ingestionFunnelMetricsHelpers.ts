@@ -20,6 +20,12 @@ import {
   evaluateDetailFirstOperationalHealth,
   type DetailFirstOperationalHealth,
 } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+import {
+  accumulateCrawlSkipFromExternalNote,
+  emptyCrawlSkipTaxonomyRollup,
+  finalizeCrawlSkipTaxonomyRollup,
+  type CrawlSkipTaxonomyRollup,
+} from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import { funnelIsoCutoff } from '@/lib/admin/ingestionMetricsBaseline'
 import { mergeDetailFirstInsertFailedByDbCode } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 import {
@@ -157,6 +163,7 @@ export type IngestionFunnelWindowMetrics = {
   }
   bySourcePlatform: Record<string, IngestionFunnelPlatformBreakdown>
   ystm: IngestionFunnelPlatformBreakdown
+  crawlSkipTaxonomy: CrawlSkipTaxonomyRollup
   sparklines: {
     discoveredByHour: HourCountSeries
     insertedByHour: HourCountSeries
@@ -181,6 +188,8 @@ export type IngestedSaleFunnelRow = {
   is_duplicate: boolean | null
 }
 
+export type { CrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
+
 export type ExternalIngestionRollup = {
   listingsDiscovered: number
   listingsInserted: number
@@ -204,6 +213,7 @@ export type ExternalIngestionRollup = {
   detailFirstAddressFromDetailPage: number
   detailFirstAddressFromListSeed: number
   detailFirstInsertFailedByDbCode: Record<string, number>
+  crawlSkipTaxonomy: CrawlSkipTaxonomyRollup
 }
 
 function recomputeDuplicateHitsTotal(target: IngestionFunnelDuplicateHits): void {
@@ -387,6 +397,7 @@ export function rollupExternalIngestionForWindow(
     detailFirstAddressFromDetailPage: 0,
     detailFirstAddressFromListSeed: 0,
     detailFirstInsertFailedByDbCode: {},
+    crawlSkipTaxonomy: emptyCrawlSkipTaxonomyRollup(),
   }
 
   for (const row of rows) {
@@ -436,6 +447,7 @@ export function rollupExternalIngestionForWindow(
       rollup.detailFirstInsertFailedByDbCode,
       ext.ystmDetailFirstInsertFailedByDbCode
     )
+    accumulateCrawlSkipFromExternalNote(rollup.crawlSkipTaxonomy, ext)
 
     const k = hourFloorUtc(row.created_at)
     discoveredByHour.set(k, (discoveredByHour.get(k) ?? 0) + fetched)
@@ -447,6 +459,7 @@ export function rollupExternalIngestionForWindow(
     rollup.detailFirstFallbackByReason,
     rollup.detailFirstFallback
   )
+  rollup.crawlSkipTaxonomy = finalizeCrawlSkipTaxonomyRollup(rollup.crawlSkipTaxonomy)
 
   return rollup
 }
@@ -794,6 +807,7 @@ export function buildIngestionFunnelWindowMetrics(params: {
     configLeaderboards: buildConfigYieldLeaderboards(configRows, nowMs),
     bySourcePlatform: cohort.bySourcePlatform,
     ystm: cohort.ystm,
+    crawlSkipTaxonomy: externalRollup.crawlSkipTaxonomy,
     sparklines: {
       discoveredByHour: [...externalRollup.discoveredByHour.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))

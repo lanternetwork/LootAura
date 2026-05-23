@@ -80,6 +80,10 @@ import { mergeDetailFirstInsertFailedByDbCode } from '@/lib/ingestion/acquisitio
 import { mergeDetailFirstFallbackReasonCounts } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import { freshAcquisitionOrchestrationFields } from '@/lib/ingestion/acquisition/freshAcquisitionOrchestrationFields'
 import {
+  emptyExternalCrawlSkipSubReasonCounts,
+  mergeCrawlSkipSubReasonCounts,
+} from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
+import {
   buildYieldAwareCrawlPlan,
   type CrawlConfigRow,
 } from '@/lib/ingestion/acquisition/yieldAwareCrawlSchedule'
@@ -705,6 +709,7 @@ async function runIngestionOrchestration(
         detailFirstAddressFromDetailPage: 0,
         detailFirstAddressFromListSeed: 0,
         ystmDetailFirstInsertFailedByDbCode: {} as Record<string, number>,
+        crawlSkipSubReasons: emptyExternalCrawlSkipSubReasonCounts(),
       }
 
       const externalRows = ((enabledCities || []) as ExternalConfigRow[]).filter(
@@ -854,6 +859,10 @@ async function runIngestionOrchestration(
         totals.duplicateCrossCityPage += s.duplicateCrossCityPage ?? 0
         totals.duplicateCanonicalCollision += s.duplicateCanonicalCollision ?? 0
         totals.duplicateExpiredRow += s.duplicateExpiredRow ?? 0
+        mergeCrawlSkipSubReasonCounts(
+          totals.crawlSkipSubReasons,
+          s.crawlSkipSubReasons ?? emptyExternalCrawlSkipSubReasonCounts()
+        )
         totals.ystmDetailFirstAttempted += s.ystmDetailFirstAttempted ?? 0
         totals.ystmDetailFirstSucceeded += s.ystmDetailFirstSucceeded ?? 0
         totals.ystmDetailFirstPublished += s.ystmDetailFirstPublished ?? 0

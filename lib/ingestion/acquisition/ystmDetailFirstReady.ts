@@ -16,10 +16,7 @@ import {
   insertFailureTelemetryFields,
 } from '@/lib/ingestion/acquisition/classifyDetailFirstInsertFailure'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
-import {
-  findPublishedIngestedSaleIdForDetailFirst,
-  promoteExistingIngestedSaleForDetailFirst,
-} from '@/lib/ingestion/acquisition/promoteExistingIngestedSaleForDetailFirst'
+import { resolveIngestedSaleInsertCollision } from '@/lib/ingestion/identity/resolveIngestedSaleInsertCollision'
 import {
   markIngestedSaleExpiredFromYstmRefresh,
   updateExistingIngestedSaleForDetailFirst,
@@ -47,6 +44,20 @@ import {
   type SpatialCoordinateResolution,
 } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
+import {
+  computeYstmSaleInstanceIdentity,
+  saleInstanceIdentityDbColumns,
+} from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
+import {
+  classifySaleInstance,
+  saleInstanceClassificationTelemetry,
+  shouldReviveExpiredRowForSaleInstanceDecision,
+} from '@/lib/ingestion/identity/classifySaleInstance'
+import {
+  planYstmUrlReuseSupersessionOnDetailRefresh,
+  supersedePublishedSaleForUrlReuse,
+} from '@/lib/ingestion/identity/ystmUrlReuseSupersession'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
@@ -158,6 +169,24 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
   const dateStart = coerceIngestedDateToYyyyMmDd(input.listing.startDate)
   const dateEnd = coerceIngestedDateToYyyyMmDd(input.listing.endDate)
 
+  const saleInstanceIdentity = computeYstmSaleInstanceIdentity({
+    sourcePlatform: input.platform,
+    sourceUrl: input.listing.sourceUrl,
+    state: input.state,
+    city: input.city,
+    normalizedAddress: input.normalizedLine,
+    dateStart,
+    dateEnd,
+    timeStart: input.scheduleFields.time_start,
+    timeEnd: input.scheduleFields.time_end,
+    title: input.listing.title,
+    description: input.listing.description,
+    imageSourceUrl: input.listing.imageSourceUrl,
+    lat: input.spatial.lat,
+    lng: input.spatial.lng,
+    rawPayload: input.rowPayload,
+  })
+
   return {
     source_platform: input.platform,
     source_url: input.listing.sourceUrl,
@@ -206,6 +235,7 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
             ingestStatus: 'ready',
           }
     ),
+    ...saleInstanceIdentityDbColumns(saleInstanceIdentity),
   }
 }
 
@@ -608,9 +638,110 @@ export async function attemptYstmDetailFirstReady(
   let ingestedSaleId: string | null = null
 
   if (params.existingIngestedSaleId) {
+    const { data: priorRow } = await fromBase(admin, 'ingested_sales')
+      .select(
+        'id, sale_instance_key, published_sale_id, date_start, date_end, status, failure_reasons, normalized_address'
+      )
+      .eq('id', params.existingIngestedSaleId)
+      .maybeSingle()
+
+    const priorCandidate = priorRow?.id
+      ? {
+          id: String(priorRow.id),
+          sale_instance_key: (priorRow as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+          published_sale_id:
+            (priorRow as { published_sale_id?: string | null }).published_sale_id ?? null,
+          date_start: (priorRow as { date_start?: string | null }).date_start ?? null,
+          date_end: (priorRow as { date_end?: string | null }).date_end ?? null,
+          status: String((priorRow as { status?: string }).status ?? ''),
+          failure_reasons: (priorRow as { failure_reasons?: unknown }).failure_reasons,
+          normalized_address:
+            (priorRow as { normalized_address?: string | null }).normalized_address ?? null,
+        }
+      : null
+
+    const saleInstanceClassification = priorCandidate
+      ? classifySaleInstance({
+          sourcePlatform: params.platform,
+          sourceUrl: listing.sourceUrl,
+          state,
+          city,
+          normalizedAddress: normalizedLine,
+          dateStart: listing.startDate ?? null,
+          dateEnd: listing.endDate ?? null,
+          timeStart: scheduleFields.time_start,
+          timeEnd: scheduleFields.time_end,
+          title: listing.title,
+          description: listing.description,
+          imageSourceUrl: listing.imageSourceUrl,
+          lat: spatial.lat,
+          lng: spatial.lng,
+          rawPayload: rowPayload,
+          existingRowsBySourceUrl: [
+            {
+              id: priorCandidate.id,
+              sale_instance_key: priorCandidate.sale_instance_key,
+              source_content_hash:
+                (priorRow as { source_content_hash?: string | null }).source_content_hash ?? null,
+              date_start: priorCandidate.date_start,
+              date_end: priorCandidate.date_end,
+              normalized_address: priorCandidate.normalized_address,
+              status: priorCandidate.status,
+              failure_reasons: priorCandidate.failure_reasons,
+            },
+          ],
+          existingRowsBySaleInstanceKey: priorCandidate.sale_instance_key
+            ? [
+                {
+                  id: priorCandidate.id,
+                  sale_instance_key: priorCandidate.sale_instance_key,
+                  date_start: priorCandidate.date_start,
+                  date_end: priorCandidate.date_end,
+                  normalized_address: priorCandidate.normalized_address,
+                  status: priorCandidate.status,
+                  failure_reasons: priorCandidate.failure_reasons,
+                },
+              ]
+            : [],
+          existingRowsByAddressDate: [],
+        })
+      : null
+
+    if (saleInstanceClassification) {
+      emitDetailFirstEvent(ObservabilityEvents.ingestion.saleInstanceClassified, telem, {
+        ...saleInstanceClassificationTelemetry(saleInstanceClassification),
+        existingIngestedSaleId: params.existingIngestedSaleId,
+      })
+    }
+
+    const supersessionPatch = priorCandidate
+      ? planYstmUrlReuseSupersessionOnDetailRefresh({
+          prior: priorCandidate,
+          sourcePlatform: params.platform,
+          sourceUrl: listing.sourceUrl,
+          state,
+          city,
+          nextSaleInstanceKey: (ingestRow.sale_instance_key as string | null) ?? null,
+          nextSourceContentHash: (ingestRow.source_content_hash as string | null) ?? null,
+          listingStartDate: listing.startDate ?? null,
+          listingEndDate: listing.endDate ?? null,
+          listingAddressRaw: listing.addressRaw,
+        })
+      : null
+
+    if (supersessionPatch) {
+      Object.assign(ingestRow, supersessionPatch)
+      await supersedePublishedSaleForUrlReuse(admin, supersessionPatch.superseded_sale_id)
+    }
+
+    const reviveExpiredUrlReuse =
+      saleInstanceClassification != null &&
+      shouldReviveExpiredRowForSaleInstanceDecision(saleInstanceClassification.decision)
+
     const updated = await updateExistingIngestedSaleForDetailFirst(admin, {
       ingestedSaleId: params.existingIngestedSaleId,
       row: ingestRow,
+      reviveExpiredUrlReuse,
     })
     ingestedSaleId = updated?.id ?? null
     if (!ingestedSaleId) {
@@ -640,23 +771,27 @@ export async function attemptYstmDetailFirstReady(
       const insertFailure = classifyDetailFirstInsertFailure(insErr)
 
       if (insertFailure.reason === 'canonical_collision') {
-        const promoted = await promoteExistingIngestedSaleForDetailFirst(admin, {
+        const resolved = await resolveIngestedSaleInsertCollision(admin, {
           sourceUrl: listing.sourceUrl,
           row: ingestRow,
         })
-        if (promoted?.id) {
-          ingestedSaleId = promoted.id
-        } else {
-          const publishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, listing.sourceUrl)
-          if (publishedId) {
-            ingestedSaleId = publishedId
-            metrics.succeeded = 1
-            finalizeDetailFirstAttemptMetrics(metrics)
-            return {
-              result: { outcome: 'ready', ingestedSaleId: publishedId, published: true },
-              metrics,
-            }
+        if (resolved?.publishedMatch) {
+          await recordIngestedSaleSourceUrl(admin, {
+            ingestedSaleId: resolved.id,
+            sourcePlatform: params.platform,
+            sourceUrl: listing.sourceUrl,
+            sourceListingId: (ingestRow.source_listing_id as string | null) ?? null,
+            payloadHash: (ingestRow.source_payload_hash as string | null) ?? null,
+          })
+          metrics.succeeded = 1
+          finalizeDetailFirstAttemptMetrics(metrics)
+          return {
+            result: { outcome: 'ready', ingestedSaleId: resolved.id, published: true },
+            metrics,
           }
+        }
+        if (resolved?.id) {
+          ingestedSaleId = resolved.id
         }
       }
 
@@ -683,6 +818,14 @@ export async function attemptYstmDetailFirstReady(
   emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstSucceeded, telem, {
     resolutionSource: spatial.resolutionSource,
     ...validationTelemetry,
+  })
+
+  await recordIngestedSaleSourceUrl(admin, {
+    ingestedSaleId,
+    sourcePlatform: params.platform,
+    sourceUrl: listing.sourceUrl,
+    sourceListingId: (ingestRow.source_listing_id as string | null) ?? null,
+    payloadHash: (ingestRow.source_payload_hash as string | null) ?? null,
   })
 
   const publishResult = await publishReadyIngestedSaleById(ingestedSaleId)

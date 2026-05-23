@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import type { YstmGraphEnumerationMetrics } from '@/lib/admin/ystmGraphEnumerationMetrics'
 import type { YstmSourceExpansionMetrics } from '@/lib/admin/ystmSourceExpansionMetrics'
+import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import type { YstmCatalogRepairAggregate } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairStore'
 import type { YstmCoverageMissingIngestionAggregate } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import type { YstmExistingUrlRefreshAggregate } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
+import {
+  FALSE_EXCLUSION_TRACE_BUCKETS,
+  type FalseExclusionTraceBucket,
+} from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+
+function emptyFalseExclusionBuckets(): Record<FalseExclusionTraceBucket, number> {
+  return Object.fromEntries(
+    FALSE_EXCLUSION_TRACE_BUCKETS.map((b) => [b, 0])
+  ) as Record<FalseExclusionTraceBucket, number>
+}
 
 const sourceExpansionFixture: YstmSourceExpansionMetrics = {
   generatedAt: '2026-05-22T00:00:00Z',
@@ -124,6 +135,51 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
     },
     graphEnumeration: graphEnumerationFixture,
     operationalHealth: { healthy: false, alerts: [] },
+    falseExclusionAudit: {
+      generatedAt: '2026-05-22T00:00:00Z',
+      missingValidCount: 7,
+      tracedCount: 7,
+      byPrimaryBucket: emptyFalseExclusionBuckets(),
+      traces: [],
+    },
+    saleInstanceIdentity: {
+      ystmRowsWithKey: 0,
+      ystmActiveRowsWithKey: 0,
+      keyCollisionGroups: 0,
+      sampleCollisionKeys: [],
+    },
+    sourceUrlAlias: { totalAliasRows: 0 },
+    saleInstanceShadowReplay: {
+      generatedAt: '2026-05-22T00:00:00Z',
+      replayedCount: 7,
+      oldSuppressCount: 4,
+      newSuppressCount: 1,
+      wouldPublishCount: 3,
+      divergenceOldSuppressNewPublishCount: 2,
+      ambiguousCount: 0,
+      sampleDivergences: [],
+    },
+    falseExclusionSaleIdentity: {
+      generatedAt: '2026-05-22T00:00:00Z',
+      missingValidYstmUrls: 7,
+      missingNeverAttempted: 3,
+      urlMatchSameDates: 0,
+      urlMatchDatesChanged: 0,
+      urlReuseDetected: 0,
+      newEventSameUrl: 0,
+      sameEventUpdated: 0,
+      softDedupeSuppressed: 0,
+      suspiciousSuppressions: 0,
+      ambiguousRequiresReview: 0,
+      saleInstanceKeyCollisions: 0,
+      duplicateVisibleSaleClusters24h: 0,
+      duplicateVisibleSameAddressDate24h: 0,
+      coverageMatchMethodCounts: {},
+      coverageWithoutMatchMethod: 0,
+      crawlSkipTaxonomy24h: emptyCrawlSkipTaxonomyRollup(),
+      healthy: true,
+      alerts: [],
+    },
     ...overrides,
   }
 }

@@ -35,6 +35,22 @@ import {
   aggregateYstmExistingUrlRefresh,
   type YstmExistingUrlRefreshAggregate,
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
+import { buildFalseExclusionAuditReport, listMissingValidObservations } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
+import type { FalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+import { buildSaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
+import type { SaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
+import {
+  loadSaleInstanceIdentityMetrics,
+  type SaleInstanceIdentityMetrics,
+} from '@/lib/admin/saleInstanceIdentityMetrics'
+import {
+  buildYstmFalseExclusionSaleIdentityDashboard,
+  type YstmFalseExclusionSaleIdentityDashboard,
+} from '@/lib/admin/ystmFalseExclusionSaleIdentityDashboard'
+import {
+  loadSourceUrlAliasMetrics,
+  type SourceUrlAliasMetrics,
+} from '@/lib/admin/sourceUrlAliasMetrics'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type YstmCoverageTrendPoint = {
@@ -72,6 +88,11 @@ export type YstmCoverageScoreboard = {
   sloAttainment: YstmCoverageSloAttainment
   graphEnumeration: YstmGraphEnumerationMetrics
   operationalHealth: YstmCoverageOperationalHealth
+  falseExclusionAudit: FalseExclusionAuditReport
+  saleInstanceShadowReplay: SaleInstanceShadowReplayReport
+  saleInstanceIdentity: SaleInstanceIdentityMetrics
+  sourceUrlAlias: SourceUrlAliasMetrics
+  falseExclusionSaleIdentity: YstmFalseExclusionSaleIdentityDashboard
 }
 
 type AuditRunRow = {
@@ -98,8 +119,21 @@ export async function buildYstmCoverageScoreboard(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<YstmCoverageScoreboard> {
   const now = new Date()
-  const [agg, publishedIndex, sourceExpansion, graphEnumeration, missingIngestion, existingRefresh, catalogRepair, runsResult] =
-    await Promise.all([
+  const missingRows = await listMissingValidObservations(admin)
+  const [
+    agg,
+    publishedIndex,
+    sourceExpansion,
+    graphEnumeration,
+    missingIngestion,
+    existingRefresh,
+    catalogRepair,
+    falseExclusionAudit,
+    saleInstanceShadowReplay,
+    saleInstanceIdentity,
+    sourceUrlAlias,
+    runsResult,
+  ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
     buildYstmSourceExpansionMetrics(admin, now.getTime()),
@@ -107,6 +141,10 @@ export async function buildYstmCoverageScoreboard(
     aggregateYstmCoverageMissingIngestion(admin),
     aggregateYstmExistingUrlRefresh(admin, now.getTime()),
     aggregateYstmCatalogRepair(admin, now.getTime()),
+    buildFalseExclusionAuditReport(admin, now, missingRows),
+    buildSaleInstanceShadowReplayReport(admin, missingRows, now),
+    loadSaleInstanceIdentityMetrics(),
+    loadSourceUrlAliasMetrics(),
     fromBase(admin, 'ystm_coverage_audit_runs')
       .select(
         'completed_at, status, coverage_pct, valid_active_ystm_urls, published_visible_in_audit, list_pages_fetched, listing_urls_discovered, detail_pages_validated, config_cursor_after'
@@ -175,6 +213,17 @@ export async function buildYstmCoverageScoreboard(
     nowMs: now.getTime(),
   })
 
+  const falseExclusionSaleIdentity = await buildYstmFalseExclusionSaleIdentityDashboard(
+    admin,
+    {
+      missingValidYstmUrls: agg.missingValidYstmUrls,
+      missingNeverAttempted: missingIngestion.missingIngestionNeverAttempted,
+      saleInstanceIdentity,
+      saleInstanceShadowReplay,
+    },
+    now
+  )
+
   return {
     targetPct: YSTM_COVERAGE_TARGET_PCT,
     generatedAt: now.toISOString(),
@@ -205,6 +254,11 @@ export async function buildYstmCoverageScoreboard(
     pipelineBacklog,
     sloAttainment,
     operationalHealth,
+    falseExclusionAudit,
+    saleInstanceShadowReplay,
+    saleInstanceIdentity,
+    sourceUrlAlias,
+    falseExclusionSaleIdentity,
   }
 }
 

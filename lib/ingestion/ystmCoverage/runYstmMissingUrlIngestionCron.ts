@@ -27,6 +27,7 @@ import {
   recordYstmCoverageMissingIngestionOutcome,
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+import { findPrimaryIngestedSaleBySourceUrl, pickPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
@@ -57,28 +58,22 @@ async function hasNonDuplicateIngestedSale(
   admin: ReturnType<typeof getAdminDb>,
   canonicalUrl: string
 ): Promise<boolean> {
-  const { data, error } = await fromBase(admin, 'ingested_sales')
-    .select('id')
-    .eq('source_url', canonicalUrl)
-    .eq('is_duplicate', false)
-    .limit(1)
-    .maybeSingle()
-  if (error) {
-    throw new Error(error.message)
-  }
-  if (data?.id) return true
+  const primary = await findPrimaryIngestedSaleBySourceUrl(admin, canonicalUrl, 'id, is_duplicate')
+  if (primary?.id && !primary.is_duplicate) return true
 
   const canon = canonicalSourceUrl(canonicalUrl)
   const { data: byCanon, error: canonErr } = await fromBase(admin, 'ingested_sales')
-    .select('id')
+    .select('id, superseded_by_ingested_sale_id, is_duplicate')
     .eq('canonical_source_url', canon)
-    .eq('is_duplicate', false)
-    .limit(1)
-    .maybeSingle()
+    .order('id', { ascending: true })
+    .limit(50)
   if (canonErr) {
     throw new Error(canonErr.message)
   }
-  return Boolean(byCanon?.id)
+  const canonPrimary = pickPrimaryIngestedSaleBySourceUrl(
+    (byCanon ?? []) as Array<{ id: string; superseded_by_ingested_sale_id?: string | null; is_duplicate?: boolean }>
+  )
+  return Boolean(canonPrimary?.id && !canonPrimary.is_duplicate)
 }
 
 export async function runYstmMissingUrlIngestionCron(

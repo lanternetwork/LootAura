@@ -2,6 +2,12 @@ import {
   createEmptyDedupeDecisionAggregate,
   type DedupeDecisionAggregate,
 } from '@/lib/ingestion/dedupe'
+import {
+  failureReasonList,
+  isIngestedRowExpiredForDuplicate,
+} from '@/lib/ingestion/acquisition/ingestedRowExpired'
+
+export { failureReasonList, isIngestedRowExpiredForDuplicate }
 
 /** Classified duplicate / skip reason at external list crawl time. */
 export type ExternalDuplicateSkipKind =
@@ -46,15 +52,3 @@ export function createEmptyExternalPersistDedupeTelemetry(): ExternalPersistDedu
   }
 }
 
-export function failureReasonList(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return []
-  return raw.filter((r): r is string => typeof r === 'string')
-}
-
-export function isIngestedRowExpiredForDuplicate(
-  status: string | null | undefined,
-  failureReasons: unknown
-): boolean {
-  if (status === 'expired') return true
-  return failureReasonList(failureReasons).includes('sale_expired')
-}

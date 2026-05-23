@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
+import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
@@ -420,10 +421,78 @@ describe('buildIngestionDiagnostics', () => {
         },
       },
       operationalHealth: { healthy: true, alerts: [] },
+      falseExclusionAudit: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        missingValidCount: 7,
+        tracedCount: 7,
+        byPrimaryBucket: {
+          never_crawled: 0,
+          crawl_not_yet_rotated: 3,
+          url_duplicate_suppressed: 1,
+          url_reuse_suspected: 0,
+          soft_dedupe_suppressed: 0,
+          expired_false_positive: 0,
+          gated_false_positive: 0,
+          detail_first_fallback: 1,
+          address_validation_failed: 0,
+          spatial_lookup_failed: 0,
+          insert_failed: 0,
+          publish_failed: 1,
+          repair_pending: 1,
+          repair_failed: 0,
+          published_not_visible: 0,
+          unknown: 0,
+        },
+        traces: [],
+      },
+      saleInstanceIdentity: {
+        ystmRowsWithKey: 120,
+        ystmActiveRowsWithKey: 95,
+        keyCollisionGroups: 2,
+        sampleCollisionKeys: ['external_page_source:TX|austin|addr:2026-05-10|2026-05-12:123'],
+      },
+      sourceUrlAlias: { totalAliasRows: 42 },
+      saleInstanceShadowReplay: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        replayedCount: 7,
+        oldSuppressCount: 4,
+        newSuppressCount: 1,
+        wouldPublishCount: 3,
+        divergenceOldSuppressNewPublishCount: 2,
+        ambiguousCount: 0,
+        sampleDivergences: [],
+      },
+      falseExclusionSaleIdentity: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        missingValidYstmUrls: 7,
+        missingNeverAttempted: 3,
+        urlMatchSameDates: 0,
+        urlMatchDatesChanged: 0,
+        urlReuseDetected: 0,
+        newEventSameUrl: 0,
+        sameEventUpdated: 0,
+        softDedupeSuppressed: 0,
+        suspiciousSuppressions: 0,
+        ambiguousRequiresReview: 0,
+        saleInstanceKeyCollisions: 2,
+        duplicateVisibleSaleClusters24h: 0,
+        duplicateVisibleSameAddressDate24h: 0,
+        coverageMatchMethodCounts: { sale_instance_key: 71 },
+        coverageWithoutMatchMethod: 7,
+        crawlSkipTaxonomy24h: emptyCrawlSkipTaxonomyRollup(),
+        healthy: true,
+        alerts: [],
+      },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
     expect(md).toContain('## YSTM nationwide coverage')
+    expect(md).toContain('### Sale-instance identity (Phase 3)')
+    expect(md).toContain('### Source URL alias history (Phase 4)')
+    expect(md).toContain('### Sale-instance shadow replay (Phase 9)')
+    expect(md).toContain('### YSTM false exclusion / sale identity (Phase 13)')
+    expect(md).toContain('### Sale-instance rollout gates (Phase 14)')
+    expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
   })
 })

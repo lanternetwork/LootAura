@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
+import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 
 const POLL_MS = 30_000
 
@@ -83,6 +84,7 @@ export default function YstmCoverageScoreboardSection() {
   const missingStateRows = Object.entries(data?.missingByState ?? {}).sort((a, b) => b[1] - a[1])
   const missingMetroRows = Object.entries(data?.missingByMetro ?? {}).sort((a, b) => b[1] - a[1])
   const sprintGates = data ? evaluateWeekOneSprintGates(data) : null
+  const rolloutGates = data ? evaluateYstmSaleInstanceRolloutGates(data) : null
 
   return (
     <section className="mb-8 rounded-lg border border-emerald-300 bg-white p-6 shadow-sm">
@@ -133,6 +135,45 @@ export default function YstmCoverageScoreboardSection() {
               </ul>
               <p className="mt-2 text-xs text-violet-800">
                 Runbook: <code className="text-xs">docs/YSTM_ONE_WEEK_SPRINT.md</code>
+              </p>
+            </div>
+          )}
+
+          {rolloutGates && (
+            <div className="mb-4 rounded-md border border-slate-300 bg-slate-50 p-4">
+              <h3 className="text-sm font-semibold text-slate-950">
+                Sale-instance rollout gates (Phase 14)
+              </h3>
+              <p className="mt-1 text-xs text-slate-800">
+                Program readiness before classifier enforcement (Stage D). Observability (Stage A) must
+                pass first; enforcement gates block URL-only skip removal until green.
+              </p>
+              <p className="mt-2 text-xs font-medium text-slate-900">
+                Observability ready: {rolloutGates.observabilityReady ? 'yes' : 'no'} · Enforcement
+                ready: {rolloutGates.enforcementReady ? 'yes' : 'no'}
+              </p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {rolloutGates.gates.map((gate) => (
+                  <li
+                    key={gate.id}
+                    className={`flex flex-wrap items-start justify-between gap-2 rounded border px-3 py-2 ${
+                      gate.status === 'pass'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-950'
+                        : gate.status === 'pending'
+                          ? 'border-amber-300 bg-amber-50 text-amber-950'
+                          : 'border-red-300 bg-red-50 text-red-950'
+                    }`}
+                  >
+                    <span className="font-medium">
+                      [{gate.stage}] {gate.status === 'pass' ? 'PASS' : gate.status === 'pending' ? 'PENDING' : 'FAIL'}:{' '}
+                      {gate.label}
+                    </span>
+                    <span className="text-xs tabular-nums">{gate.detail}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-slate-700">
+                Runbook: <code className="text-xs">docs/YSTM_FALSE_EXCLUSION_AUDIT.md</code> (Phase 14)
               </p>
             </div>
           )}
@@ -229,6 +270,270 @@ export default function YstmCoverageScoreboardSection() {
               {data.lastRun.configCursorAfter}
             </p>
           )}
+
+          <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
+            <h3 className="text-sm font-semibold text-sky-950">Sale-instance identity (Phase 3)</h3>
+            <p className="mt-1 text-xs text-sky-900">
+              New YSTM inserts populate sale_instance_key and hashes (observability only — dedupe still
+              uses source_url until later phases).
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Rows with key" value={data.saleInstanceIdentity.ystmRowsWithKey} />
+              <Metric
+                label="Active rows with key"
+                value={data.saleInstanceIdentity.ystmActiveRowsWithKey}
+              />
+              <Metric
+                label="Key collision groups"
+                value={data.saleInstanceIdentity.keyCollisionGroups}
+                highlight={data.saleInstanceIdentity.keyCollisionGroups > 0}
+              />
+            </div>
+            {data.saleInstanceIdentity.sampleCollisionKeys.length > 0 && (
+              <p className="mt-2 text-xs font-mono text-sky-900">
+                Sample collisions: {data.saleInstanceIdentity.sampleCollisionKeys.join(' · ')}
+              </p>
+            )}
+          </div>
+
+          <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">
+            <h3 className="text-sm font-semibold text-teal-950">Source URL alias history (Phase 4)</h3>
+            <p className="mt-1 text-xs text-teal-900">
+              Append-only URL rows per ingested sale for reuse tracking. Does not relax source_url
+              uniqueness yet.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Alias rows" value={data.sourceUrlAlias.totalAliasRows} />
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
+            <h3 className="text-sm font-semibold text-sky-950">Sale-instance shadow replay (Phase 9)</h3>
+            <p className="mt-1 text-xs text-sky-900">
+              Every missing valid YSTM URL is replayed through the legacy URL gate and the new
+              classifier. Outcomes are persisted for lead review before enforcement changes.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Replayed" value={data.saleInstanceShadowReplay.replayedCount} />
+              <Metric
+                label="Legacy would suppress"
+                value={data.saleInstanceShadowReplay.oldSuppressCount}
+              />
+              <Metric
+                label="New would publish"
+                value={data.saleInstanceShadowReplay.wouldPublishCount}
+                highlight={data.saleInstanceShadowReplay.wouldPublishCount > 0}
+              />
+              <Metric
+                label="Old suppress → new publish"
+                value={data.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount}
+                highlight={
+                  data.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount > 0
+                }
+              />
+            </div>
+            {data.saleInstanceShadowReplay.sampleDivergences.length > 0 && (
+              <ul className="mt-3 space-y-1 text-xs text-sky-950">
+                {data.saleInstanceShadowReplay.sampleDivergences.map((d) => (
+                  <li key={d.canonicalUrl} className="font-mono">
+                    {d.canonicalUrl} — {d.oldDecision} → {d.newDecision}
+                    {d.wouldPublish ? ' (would publish)' : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4">
+            <h3 className="text-sm font-semibold text-amber-950">
+              YSTM false exclusion / sale identity (Phase 13)
+            </h3>
+            <p className="mt-1 text-xs text-amber-900">
+              Unified operational view: missing coverage, URL reuse, classifier shadow outcomes,
+              soft-dedupe suppressions, instance-key collisions, and duplicate-visible guardrails.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Missing valid YSTM URLs"
+                value={data.falseExclusionSaleIdentity.missingValidYstmUrls}
+                highlight={data.falseExclusionSaleIdentity.missingValidYstmUrls > 0}
+              />
+              <Metric
+                label="Never attempted"
+                value={data.falseExclusionSaleIdentity.missingNeverAttempted}
+              />
+              <Metric
+                label="URL match same dates"
+                value={data.falseExclusionSaleIdentity.urlMatchSameDates}
+              />
+              <Metric
+                label="URL match dates changed"
+                value={data.falseExclusionSaleIdentity.urlMatchDatesChanged}
+              />
+              <Metric
+                label="URL reuse detected"
+                value={data.falseExclusionSaleIdentity.urlReuseDetected}
+              />
+              <Metric
+                label="New event same URL"
+                value={data.falseExclusionSaleIdentity.newEventSameUrl}
+              />
+              <Metric
+                label="Same event updated"
+                value={data.falseExclusionSaleIdentity.sameEventUpdated}
+              />
+              <Metric
+                label="Soft dedupe suppressed (24h)"
+                value={data.falseExclusionSaleIdentity.softDedupeSuppressed}
+              />
+              <Metric
+                label="Suspicious suppressions (24h)"
+                value={data.falseExclusionSaleIdentity.suspiciousSuppressions}
+                highlight={data.falseExclusionSaleIdentity.suspiciousSuppressions > 0}
+              />
+              <Metric
+                label="Ambiguous (review)"
+                value={data.falseExclusionSaleIdentity.ambiguousRequiresReview}
+                highlight={data.falseExclusionSaleIdentity.ambiguousRequiresReview > 0}
+              />
+              <Metric
+                label="Instance key collisions"
+                value={data.falseExclusionSaleIdentity.saleInstanceKeyCollisions}
+                highlight={data.falseExclusionSaleIdentity.saleInstanceKeyCollisions > 0}
+              />
+              <Metric
+                label="Coverage rows w/o match_method"
+                value={data.falseExclusionSaleIdentity.coverageWithoutMatchMethod}
+                highlight={data.falseExclusionSaleIdentity.coverageWithoutMatchMethod > 0}
+              />
+              <Metric
+                label="Duplicate visible clusters"
+                value={data.falseExclusionSaleIdentity.duplicateVisibleSaleClusters24h}
+                highlight={
+                  data.falseExclusionSaleIdentity.duplicateVisibleSaleClusters24h >= 3
+                }
+              />
+              <Metric
+                label="Extra visible dup rows"
+                value={data.falseExclusionSaleIdentity.duplicateVisibleSameAddressDate24h}
+              />
+            </div>
+            {Object.keys(data.falseExclusionSaleIdentity.coverageMatchMethodCounts).length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-left text-xs text-amber-950">
+                  <thead>
+                    <tr className="border-b border-amber-200">
+                      <th className="py-1 pr-4 font-medium">Coverage match_method</th>
+                      <th className="py-1 font-medium">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(data.falseExclusionSaleIdentity.coverageMatchMethodCounts)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([method, count]) => (
+                        <tr key={method} className="border-b border-amber-100">
+                          <td className="py-1 pr-4 font-mono">{method}</td>
+                          <td className="py-1 tabular-nums">{count.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {data.falseExclusionSaleIdentity.alerts.length > 0 && (
+              <ul className="mt-3 space-y-1 text-xs text-amber-950">
+                {data.falseExclusionSaleIdentity.alerts.map((a) => (
+                  <li key={a.code}>
+                    <span
+                      className={
+                        a.level === 'critical'
+                          ? 'font-semibold text-red-800'
+                          : 'font-semibold text-amber-900'
+                      }
+                    >
+                      [{a.level}]
+                    </span>{' '}
+                    {a.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-amber-800">
+              Healthy: {data.falseExclusionSaleIdentity.healthy ? 'yes' : 'no'} · generated{' '}
+              {new Date(data.falseExclusionSaleIdentity.generatedAt).toLocaleString()}
+            </p>
+          </div>
+
+          <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
+            <h3 className="text-sm font-semibold text-violet-950">
+              False-exclusion audit (Phase 1)
+            </h3>
+            <p className="mt-1 text-xs text-violet-900">
+              Every missing valid YSTM URL is traced to a primary bucket (replay queue). Refreshed on
+              each scoreboard load; persisted on coverage observations.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Traced missing"
+                value={data.falseExclusionAudit.tracedCount}
+                highlight
+              />
+              <Metric
+                label="Never attempted (ingest)"
+                value={data.pipelineBacklog.missingIngestionNeverAttempted}
+              />
+            </div>
+            {Object.entries(data.falseExclusionAudit.byPrimaryBucket)
+              .filter(([, n]) => n > 0)
+              .sort((a, b) => b[1] - a[1])
+              .length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-left text-xs text-violet-950">
+                  <thead>
+                    <tr className="border-b border-violet-200">
+                      <th className="py-1 pr-4 font-medium">Primary bucket</th>
+                      <th className="py-1 font-medium">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(data.falseExclusionAudit.byPrimaryBucket)
+                      .filter(([, n]) => n > 0)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([bucket, count]) => (
+                        <tr key={bucket} className="border-b border-violet-100">
+                          <td className="py-1 pr-4 font-mono">{bucket}</td>
+                          <td className="py-1 tabular-nums">{count.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {data.falseExclusionAudit.traces.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-medium text-violet-950">
+                  Sample traces ({data.falseExclusionAudit.traces.length} shown)
+                </summary>
+                <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto text-xs text-violet-900">
+                  {data.falseExclusionAudit.traces.map((t) => (
+                    <li key={t.canonicalUrl} className="rounded border border-violet-100 bg-white p-2">
+                      <p className="font-mono break-all">{t.canonicalUrl}</p>
+                      <p>
+                        <span className="font-semibold">{t.primaryBucket}</span>
+                        {t.secondaryTags.length > 0 ? ` · ${t.secondaryTags.join(', ')}` : ''}
+                      </p>
+                      <p className="text-violet-800">{t.summary}</p>
+                      {t.evidence.saleInstanceKey && (
+                        <p className="mt-1 font-mono text-[10px] text-violet-700">
+                          sale_instance_key: {t.evidence.saleInstanceKey}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
 
           <div className="mb-6 rounded-md border border-indigo-200 bg-indigo-50 p-4">
             <h3 className="text-sm font-semibold text-indigo-950">Pipeline backlog (Phase 7 SLO)</h3>

@@ -76,7 +76,9 @@ function ingestedSalesInsertChain() {
   return {
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        order: vi.fn(() => ({
+          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        })),
       })),
     })),
     insert: vi.fn(() => ({
@@ -85,6 +87,14 @@ function ingestedSalesInsertChain() {
       })),
     })),
   }
+}
+
+function sourceUrlListSelect(limit: ReturnType<typeof vi.fn>) {
+  return vi.fn(() => ({
+    eq: vi.fn(() => ({
+      order: vi.fn(() => ({ limit })),
+    })),
+  }))
 }
 
 const listHtml =
@@ -174,20 +184,23 @@ describe('persistExternalPageSource', () => {
         metrics: emptyMetrics,
       })
 
-    const maybeSingle = vi
+    const limit = vi
       .fn()
-      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: [], error: null })
       .mockResolvedValueOnce({
-        data: { id: 'existing-ystm', status: 'ready', failure_reasons: [] },
+        data: [
+          {
+            id: 'existing-ystm',
+            status: 'ready',
+            failure_reasons: [],
+            superseded_by_ingested_sale_id: null,
+          },
+        ],
         error: null,
       })
     mockFrom.mockImplementation(() => ({
       ...ingestedSalesInsertChain(),
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle,
-        })),
-      })),
+      select: sourceUrlListSelect(limit),
     }))
 
     const html = `
@@ -217,17 +230,23 @@ describe('persistExternalPageSource', () => {
   })
 
   it('treats duplicate source_url as skipped when row already exists', async () => {
-    const maybeSingle = vi
+    const limit = vi
       .fn()
-      .mockResolvedValueOnce({ data: null, error: null })
-      .mockResolvedValueOnce({ data: { id: 'existing' }, error: null })
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 'existing',
+            status: 'ready',
+            failure_reasons: [],
+            superseded_by_ingested_sale_id: null,
+          },
+        ],
+        error: null,
+      })
     mockFrom.mockImplementation(() => ({
       ...ingestedSalesInsertChain(),
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle,
-        })),
-      })),
+      select: sourceUrlListSelect(limit),
     }))
 
     const html = `
@@ -272,11 +291,9 @@ describe('persistExternalPageSource', () => {
       })),
     }))
     mockFrom.mockImplementation(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        })),
-      })),
+      select: sourceUrlListSelect(
+        vi.fn().mockResolvedValue({ data: [], error: null })
+      ),
       insert,
     }))
 

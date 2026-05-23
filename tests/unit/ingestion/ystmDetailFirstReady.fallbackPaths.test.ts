@@ -119,17 +119,52 @@ function mockHappyInsert() {
   }))
 }
 
-function mockPublishedLookupNoRow() {
-  const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
-  const limit = vi.fn(() => ({ maybeSingle }))
-  const not = vi.fn(() => ({ limit }))
-  const eqChain = {
-    eq: vi.fn(function (this: unknown) {
+function ingestedSalesSelectChain(options?: {
+  sourceUrlRows?: Array<Record<string, unknown>>
+}) {
+  const sourceUrlRows = options?.sourceUrlRows ?? []
+  return vi.fn(() => ({
+    eq: vi.fn((column: string) => {
+      if (column === 'source_url') {
+        return {
+          order: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue({ data: sourceUrlRows, error: null }),
+          })),
+          eq: vi.fn(() => ({
+            not: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              })),
+            })),
+          })),
+        }
+      }
+      if (column === 'source_platform') {
+        return {
+          eq: vi.fn(() => ({
+            is: vi.fn(() => ({
+              order: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                })),
+              })),
+            })),
+          })),
+        }
+      }
+      const eqChain = {
+        eq: vi.fn(function (this: unknown) {
+          return eqChain
+        }),
+        not: vi.fn(() => ({
+          limit: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          })),
+        })),
+      }
       return eqChain
     }),
-    not,
-  }
-  return { select: vi.fn(() => eqChain) }
+  }))
 }
 
 function mockInsertUniqueViolationNoRecovery() {
@@ -145,20 +180,14 @@ function mockInsertUniqueViolationNoRecovery() {
         }),
       })),
     })),
+    select: ingestedSalesSelectChain(),
     update: vi.fn(() => ({
       eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          is: vi.fn(() => ({
-            in: vi.fn(() => ({
-              select: vi.fn(() => ({
-                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-              })),
-            })),
-          })),
+        select: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         })),
       })),
     })),
-    ...mockPublishedLookupNoRow(),
   }))
 }
 
@@ -175,16 +204,21 @@ function mockInsertUniqueViolationWithPromote(promotedId: string) {
         }),
       })),
     })),
+    select: ingestedSalesSelectChain({
+      sourceUrlRows: [
+        {
+          id: promotedId,
+          status: 'needs_geocode',
+          published_sale_id: null,
+          is_duplicate: false,
+          superseded_by_ingested_sale_id: null,
+        },
+      ],
+    }),
     update: vi.fn(() => ({
       eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          is: vi.fn(() => ({
-            in: vi.fn(() => ({
-              select: vi.fn(() => ({
-                maybeSingle: vi.fn().mockResolvedValue({ data: { id: promotedId }, error: null }),
-              })),
-            })),
-          })),
+        select: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: { id: promotedId }, error: null }),
         })),
       })),
     })),

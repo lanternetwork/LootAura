@@ -35,6 +35,7 @@ import {
   fetchAcquisitionRegistrySummary,
   mapHourlyRateSeries,
 } from '@/lib/admin/acquisitionMetricsHelpers'
+import { evaluateCrawlSkipTaxonomyOperationalHealth } from '@/lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth'
 import { ADDRESS_STATUSES } from '@/lib/ingestion/address/addressLifecycleTypes'
 import type { ImageEnrichmentFailureReason } from '@/lib/ingestion/imageEnrichmentWorker'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
@@ -564,6 +565,10 @@ export async function GET(request: NextRequest) {
       nowMs,
       metricsBaselineAt: detailFirstMetricsBaselineAt,
     })
+    const crawlSkipTaxonomy24h = funnel['24h'].crawlSkipTaxonomy
+    const crawlSkipTaxonomyAlerts = evaluateCrawlSkipTaxonomyOperationalHealth(
+      crawlSkipTaxonomy24h
+    ).alerts
 
     const durationMsByHour = mapToSortedDurationAvg(agg.durationSumByHour, agg.durationCountByHour)
     const rate429ByHourSeries = mapToSortedSeries(agg.rate429Hourly)
@@ -785,6 +790,8 @@ export async function GET(request: NextRequest) {
           fetchFailureRate: computeRate(fetchRollup.fetchErrors, fetchRollup.fetchDenominator),
           averageExternalFetchDurationMs,
           budgetExitCount24h: fetchRollup.budgetExitCount,
+          crawlSkipTaxonomy24h,
+          crawlSkipTaxonomyAlerts,
         },
         addressLifecycle: addressLifecycleMetrics,
         imageEnrichment: imageEnrichmentMetrics,

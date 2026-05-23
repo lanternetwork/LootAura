@@ -87,10 +87,8 @@ describe('runYstmMissingUrlIngestionCron', () => {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                limit: vi.fn(() => ({
-                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-                })),
+              order: vi.fn(() => ({
+                limit: vi.fn().mockResolvedValue({ data: [], error: null }),
               })),
             })),
           })),

@@ -79,6 +79,11 @@ export type ExternalIngestionOrchestrationNote = {
   duplicateCrossCityPage?: number
   duplicateCanonicalCollision?: number
   duplicateExpiredRow?: number
+  /** Phase 2: classified crawl skip sub-reasons (benign vs suspicious). */
+  crawlSkipSubReasons?: Record<string, number>
+  crawlSkipSuspicious?: number
+  crawlSkipBenign?: number
+  crawlSkipSubReasonTotal?: number
   ystmDetailFirstAttempted?: number
   ystmDetailFirstSucceeded?: number
   ystmDetailFirstPublished?: number

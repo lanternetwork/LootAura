@@ -13,13 +13,20 @@ vi.mock('@/lib/auth/adminGate', () => ({
   assertAdminOrThrow: vi.fn(),
 }))
 
-function thenableQuery(result: { data?: unknown; error?: unknown }) {
+function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'order', 'limit', 'range', 'gte']) {
+  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'ilike', 'order', 'limit', 'range', 'gte']) {
     q[m] = vi.fn(() => q)
   }
-  q.then = (onFulfilled: (v: typeof result) => unknown, onRejected?: (e: unknown) => unknown) =>
-    Promise.resolve(result).then(onFulfilled, onRejected)
+  q.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+    Promise.resolve(result).then((r) => {
+      if (onFulfilled == null) return r
+      return onFulfilled({
+        count: typeof r.count === 'number' ? r.count : null,
+        data: r.data ?? null,
+        error: r.error ?? null,
+      })
+    }, onRejected)
   return q
 }
 
@@ -58,7 +65,18 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
             ],
           })
         case 'ingested_sales':
+          return thenableQuery({ data: [], count: 0 })
+        case 'ingested_sale_source_urls':
+          return thenableQuery({ data: [], count: 0 })
+        case 'ingestion_orchestration_runs':
           return thenableQuery({ data: [] })
+        case 'ingested_sale_soft_dedupe_suppressions':
+          return thenableQuery({ data: [], count: 0 })
+        case 'ystm_sale_instance_shadow_replays':
+          return {
+            ...thenableQuery({ data: [] }),
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          }
         default:
           return thenableQuery({ data: [] })
       }
@@ -92,5 +110,14 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.operationalHealth.alerts.some((a: { code: string }) => a.code === 'coverage_no_audit_denominator')).toBe(
       true
     )
+    expect(json.falseExclusionAudit.tracedCount).toBe(0)
+    expect(json.falseExclusionAudit.missingValidCount).toBe(0)
+    expect(json.saleInstanceIdentity.ystmRowsWithKey).toBe(0)
+    expect(json.saleInstanceIdentity.keyCollisionGroups).toBe(0)
+    expect(json.sourceUrlAlias.totalAliasRows).toBe(0)
+    expect(json.saleInstanceShadowReplay.replayedCount).toBe(0)
+    expect(json.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount).toBe(0)
+    expect(json.falseExclusionSaleIdentity.missingValidYstmUrls).toBe(0)
+    expect(json.falseExclusionSaleIdentity.healthy).toBe(true)
   })
 })

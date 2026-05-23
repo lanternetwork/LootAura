@@ -1,3 +1,4 @@
+import { findPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type DetailFirstIngestedSaleWriteRow = Record<string, unknown>
@@ -16,12 +17,19 @@ export async function promoteExistingIngestedSaleForDetailFirst(
   const sourceUrl = input.sourceUrl.trim()
   if (!sourceUrl) return null
 
+  const primary = await findPrimaryIngestedSaleBySourceUrl(admin, sourceUrl, 'id, status, published_sale_id, is_duplicate')
+  if (
+    !primary?.id ||
+    primary.is_duplicate ||
+    primary.published_sale_id ||
+    !['needs_geocode', 'needs_check', 'ready', 'publish_failed'].includes(String(primary.status))
+  ) {
+    return null
+  }
+
   const { data, error } = await fromBase(admin, 'ingested_sales')
     .update(input.row)
-    .eq('source_url', sourceUrl)
-    .eq('is_duplicate', false)
-    .is('published_sale_id', null)
-    .in('status', ['needs_geocode', 'needs_check', 'ready', 'publish_failed'])
+    .eq('id', primary.id)
     .select('id')
     .maybeSingle()
 

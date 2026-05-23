@@ -1,7 +1,11 @@
-import type { ExternalCrawlSkipSubReason } from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
-import { classifyExistingUrlSkip } from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
-import type { DuplicateKind } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
-import { isIngestedRowExpiredForDuplicate } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
+import {
+  classifyExistingUrlSkip,
+  type ExternalCrawlSkipSubReason,
+} from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
+import {
+  isIngestedRowExpiredForDuplicate,
+  type ExternalDuplicateSkipKind,
+} from '@/lib/ingestion/acquisition/duplicateSkipKinds'
 import {
   classifySaleInstance,
   isPrioritySaleInstanceDecision,
@@ -22,7 +26,7 @@ export type YstmEnforcedExistingUrlCrawlAction =
     }
   | {
       kind: 'duplicate_skip'
-      duplicateKind: DuplicateKind
+      duplicateKind: ExternalDuplicateSkipKind
       crawlSkipSubReason: ExternalCrawlSkipSubReason
     }
 
@@ -104,7 +108,7 @@ function crawlSkipSubReasonForClassification(
 function duplicateKindForClassification(
   result: ClassifySaleInstanceResult,
   existing: ResolveYstmEnforcedExistingUrlCrawlActionInput['existing']
-): DuplicateKind {
+): ExternalDuplicateSkipKind {
   if (isIngestedRowExpiredForDuplicate(String(existing.status ?? ''), existing.failure_reasons)) {
     return 'duplicate_expired_row'
   }

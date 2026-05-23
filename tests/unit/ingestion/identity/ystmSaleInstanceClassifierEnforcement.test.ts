@@ -10,11 +10,11 @@ const LISTING_URL =
 
 describe('ystmSaleInstanceClassifierEnforcement', () => {
   it('is disabled unless env is true', () => {
-    expect(isYstmSaleInstanceClassifierEnforcementEnabled({})).toBe(false)
+    expect(isYstmSaleInstanceClassifierEnforcementEnabled({} as unknown as NodeJS.ProcessEnv)).toBe(false)
     expect(
       isYstmSaleInstanceClassifierEnforcementEnabled({
         INGESTION_YSTM_SALE_INSTANCE_CLASSIFIER_ENFORCE: 'true',
-      })
+      } as unknown as NodeJS.ProcessEnv)
     ).toBe(true)
   })
 

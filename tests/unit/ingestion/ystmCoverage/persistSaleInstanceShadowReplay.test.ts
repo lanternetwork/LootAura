@@ -31,6 +31,7 @@ describe('persistSaleInstanceShadowReplays', () => {
           reasonCodes: ['url_reuse'],
           oldSkipSubReason: 'url_match_dates_changed',
           divergenceKind: 'old_suppress_new_publish',
+          matchedIngestedSaleId: 'ing-1',
           saleInstanceKey: 'key-1',
         },
       },

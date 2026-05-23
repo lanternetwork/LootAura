@@ -255,7 +255,6 @@ export async function runBackfillYstmSaleInstanceIdentity(
     logger.info('ystm_sale_instance_identity_backfill_batch', {
       component: 'ingestion/identity/backfillYstmSaleInstanceIdentity',
       operation: logOp,
-      dryRun,
       batchProcessed: chunk.length,
       ...metrics,
     })

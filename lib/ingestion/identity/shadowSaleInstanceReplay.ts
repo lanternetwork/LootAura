@@ -1,5 +1,7 @@
-import type { ExternalCrawlSkipSubReason } from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
-import { classifyExistingUrlSkip } from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
+import {
+  classifyExistingUrlSkip,
+  type ExternalCrawlSkipSubReason,
+} from '@/lib/ingestion/acquisition/externalCrawlSkipTaxonomy'
 import {
   classifySaleInstance,
   type ClassifySaleInstanceResult,

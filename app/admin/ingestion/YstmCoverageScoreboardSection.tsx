@@ -17,6 +17,27 @@ import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSa
 
 const POLL_MS = 30_000
 
+/** Per click — keeps server work under maxDuration; user can run again until gate passes. */
+const BACKFILL_BATCH_SIZE = 50
+const BACKFILL_MAX_ROWS = 250
+
+type BackfillSummary = {
+  processed: number
+  rowsBackfilled: number
+  aliasesRecorded: number
+  skipped: number
+  keyCollisions: number
+  ambiguousRows: number
+  dryRun: boolean
+  lastProcessedId: string | null
+}
+
+type BackfillUiState =
+  | { kind: 'idle' }
+  | { kind: 'running' }
+  | { kind: 'done'; summary: BackfillSummary; at: string }
+  | { kind: 'error'; message: string; at: string }
+
 function formatPct(value: number | null): string {
   if (value == null) return '—'
   return `${value.toFixed(1)}%`
@@ -50,6 +71,7 @@ export default function YstmCoverageScoreboardSection() {
   const [data, setData] = useState<YstmCoverageMetricsResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [backfillUi, setBackfillUi] = useState<BackfillUiState>({ kind: 'idle' })
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +94,44 @@ export default function YstmCoverageScoreboardSection() {
     }
   }, [])
 
+  const runIdentityBackfill = useCallback(async () => {
+    setBackfillUi({ kind: 'running' })
+    try {
+      const res = await fetch('/api/admin/ingested-sales/backfill-sale-instance-identity', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchSize: BACKFILL_BATCH_SIZE,
+          dryRun: false,
+          maxRows: BACKFILL_MAX_ROWS,
+        }),
+      })
+      const json = (await res.json()) as {
+        ok?: boolean
+        summary?: BackfillSummary
+        message?: string
+        code?: string
+      }
+      if (!res.ok || !json.ok || !json.summary) {
+        const detail =
+          json.message ||
+          (typeof json.code === 'string' ? json.code : null) ||
+          res.statusText ||
+          `HTTP ${res.status}`
+        throw new Error(detail)
+      }
+      setBackfillUi({ kind: 'done', summary: json.summary, at: new Date().toISOString() })
+      await load()
+    } catch (e) {
+      setBackfillUi({
+        kind: 'error',
+        message: e instanceof Error ? e.message : String(e),
+        at: new Date().toISOString(),
+      })
+    }
+  }, [load])
+
   useEffect(() => {
     void load()
     const id = window.setInterval(() => void load(), POLL_MS)
@@ -90,6 +150,10 @@ export default function YstmCoverageScoreboardSection() {
   const missingMetroRows = Object.entries(data?.missingByMetro ?? {}).sort((a, b) => b[1] - a[1])
   const sprintGates = data ? evaluateWeekOneSprintGates(data) : null
   const rolloutGates = data ? evaluateYstmSaleInstanceRolloutGates(data) : null
+  const activeKeyPct =
+    data && data.publishedActiveLootAuraYstmUrls > 0
+      ? (data.saleInstanceIdentity.ystmActiveRowsWithKey / data.publishedActiveLootAuraYstmUrls) * 100
+      : null
 
   return (
     <section className="mb-8 rounded-lg border border-emerald-300 bg-white p-6 shadow-sm">
@@ -299,6 +363,48 @@ export default function YstmCoverageScoreboardSection() {
                 Sample collisions: {data.saleInstanceIdentity.sampleCollisionKeys.join(' · ')}
               </p>
             )}
+            <div className="mt-4 rounded-md border border-sky-300 bg-white p-3">
+              <p className="text-xs text-sky-950">
+                Phase 12 backfill fills <code className="text-[11px]">sale_instance_key</code> on existing
+                YSTM rows. Rollout gate target: ≥95% of published-active rows (
+                {activeKeyPct != null ? `${activeKeyPct.toFixed(1)}% now` : '—'}). Each run processes up to{' '}
+                {BACKFILL_MAX_ROWS.toLocaleString()} rows — click again until the percentage stops rising.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void runIdentityBackfill()}
+                  disabled={backfillUi.kind === 'running'}
+                  className="rounded-md border border-sky-600 bg-sky-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {backfillUi.kind === 'running' ? 'Running backfill…' : 'Run identity backfill'}
+                </button>
+                {backfillUi.kind === 'running' && (
+                  <p className="text-xs text-sky-800">This may take 1–2 minutes. Do not close the tab.</p>
+                )}
+              </div>
+              {backfillUi.kind === 'done' && (
+                <div className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-950">
+                  <p className="font-medium">Backfill batch completed ({formatWhen(backfillUi.at)})</p>
+                  <p className="mt-1">
+                    Processed {backfillUi.summary.processed.toLocaleString()} · backfilled{' '}
+                    {backfillUi.summary.rowsBackfilled.toLocaleString()} · skipped{' '}
+                    {backfillUi.summary.skipped.toLocaleString()} · collisions{' '}
+                    {backfillUi.summary.keyCollisions.toLocaleString()} · ambiguous{' '}
+                    {backfillUi.summary.ambiguousRows.toLocaleString()}
+                  </p>
+                  {backfillUi.summary.rowsBackfilled === 0 && (
+                    <p className="mt-1">No rows left without a key in this pass — you may be done.</p>
+                  )}
+                </div>
+              )}
+              {backfillUi.kind === 'error' && (
+                <div className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900">
+                  <p className="font-medium">Backfill failed ({formatWhen(backfillUi.at)})</p>
+                  <p className="mt-1">{backfillUi.message}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">

@@ -17,6 +17,13 @@ describe('ystmSourceListingId', () => {
   })
 })
 
+describe('canonicalDateWindow', () => {
+  it('normalizes open-ended windows', () => {
+    expect(canonicalDateWindow('2026-06-01', null)).toBe('2026-06-01|open')
+    expect(canonicalDateWindow(null, null)).toBe('nodate|open')
+  })
+})
+
 describe('computeYstmSaleInstanceIdentity', () => {
   it('returns null for non-YSTM URLs', () => {
     expect(

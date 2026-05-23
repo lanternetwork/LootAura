@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
+import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 
 const POLL_MS = 30_000
 
@@ -83,6 +84,7 @@ export default function YstmCoverageScoreboardSection() {
   const missingStateRows = Object.entries(data?.missingByState ?? {}).sort((a, b) => b[1] - a[1])
   const missingMetroRows = Object.entries(data?.missingByMetro ?? {}).sort((a, b) => b[1] - a[1])
   const sprintGates = data ? evaluateWeekOneSprintGates(data) : null
+  const rolloutGates = data ? evaluateYstmSaleInstanceRolloutGates(data) : null
 
   return (
     <section className="mb-8 rounded-lg border border-emerald-300 bg-white p-6 shadow-sm">
@@ -133,6 +135,45 @@ export default function YstmCoverageScoreboardSection() {
               </ul>
               <p className="mt-2 text-xs text-violet-800">
                 Runbook: <code className="text-xs">docs/YSTM_ONE_WEEK_SPRINT.md</code>
+              </p>
+            </div>
+          )}
+
+          {rolloutGates && (
+            <div className="mb-4 rounded-md border border-slate-300 bg-slate-50 p-4">
+              <h3 className="text-sm font-semibold text-slate-950">
+                Sale-instance rollout gates (Phase 14)
+              </h3>
+              <p className="mt-1 text-xs text-slate-800">
+                Program readiness before classifier enforcement (Stage D). Observability (Stage A) must
+                pass first; enforcement gates block URL-only skip removal until green.
+              </p>
+              <p className="mt-2 text-xs font-medium text-slate-900">
+                Observability ready: {rolloutGates.observabilityReady ? 'yes' : 'no'} · Enforcement
+                ready: {rolloutGates.enforcementReady ? 'yes' : 'no'}
+              </p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {rolloutGates.gates.map((gate) => (
+                  <li
+                    key={gate.id}
+                    className={`flex flex-wrap items-start justify-between gap-2 rounded border px-3 py-2 ${
+                      gate.status === 'pass'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-950'
+                        : gate.status === 'pending'
+                          ? 'border-amber-300 bg-amber-50 text-amber-950'
+                          : 'border-red-300 bg-red-50 text-red-950'
+                    }`}
+                  >
+                    <span className="font-medium">
+                      [{gate.stage}] {gate.status === 'pass' ? 'PASS' : gate.status === 'pending' ? 'PENDING' : 'FAIL'}:{' '}
+                      {gate.label}
+                    </span>
+                    <span className="text-xs tabular-nums">{gate.detail}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-slate-700">
+                Runbook: <code className="text-xs">docs/YSTM_FALSE_EXCLUSION_AUDIT.md</code> (Phase 14)
               </p>
             </div>
           )}

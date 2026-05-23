@@ -1,5 +1,6 @@
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
+import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 
 function bullet(label: string, value: string | number): string {
   return `- ${label}: ${typeof value === 'number' ? value.toLocaleString('en-US') : value}`
@@ -17,6 +18,7 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
   const ge = data.graphEnumeration
   const last = ge.lastDiscoveryRun
   const gates = evaluateWeekOneSprintGates(data)
+  const rolloutGates = evaluateYstmSaleInstanceRolloutGates(data)
 
   const lines: string[] = [
     '## YSTM nationwide coverage',
@@ -106,6 +108,13 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     '### Week-1 sprint gates',
     ...gates.gates.map((g) => `- [${g.status.toUpperCase()}] ${g.label}: ${g.detail}`),
     bullet('all gates pass', gates.allPass ? 'yes' : 'no'),
+    '',
+    '### Sale-instance rollout gates (Phase 14)',
+    bullet('observability ready (Stage A)', rolloutGates.observabilityReady ? 'yes' : 'no'),
+    bullet('enforcement ready (Stage D)', rolloutGates.enforcementReady ? 'yes' : 'no'),
+    ...rolloutGates.gates.map(
+      (g) => `- [${g.status.toUpperCase()}] [${g.stage}] ${g.label}: ${g.detail}`
+    ),
     '',
     '### Graph enumeration',
     bullet('catalogStates', ge.catalogStates),

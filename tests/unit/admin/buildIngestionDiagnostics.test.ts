@@ -491,6 +491,7 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('### Source URL alias history (Phase 4)')
     expect(md).toContain('### Sale-instance shadow replay (Phase 9)')
     expect(md).toContain('### YSTM false exclusion / sale identity (Phase 13)')
+    expect(md).toContain('### Sale-instance rollout gates (Phase 14)')
     expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
   })

@@ -291,6 +291,35 @@ Unified admin scoreboard section aggregating replay-queue metrics, 24h crawl-ski
 - `app/admin/ingestion/YstmCoverageScoreboardSection.tsx`
 - `lib/admin/buildYstmCoverageDiagnostics.ts`
 
-## Later phases
+## Phase 14 — testing and rollout gates
 
-Phase 14 adds expanded testing and rollout gates.
+Expanded unit/integration coverage for identity, collision resolution, shadow replay persistence, and classifier edge cases. Admin scoreboard shows **Sale-instance rollout gates** (Stages A–D) derived from the Phase 13 dashboard and shadow replay metrics.
+
+### Rollout gates (scoreboard)
+
+| Gate | Stage | Meaning |
+|------|-------|---------|
+| Missing URLs traced | A | Phase 1 false-exclusion trace covers replay queue |
+| Shadow replay drained | A | All missing valid URLs replayed (Phase 9) |
+| No shadow divergence | D | Zero legacy-suppress → new-publish rows before enforcement |
+| Active rows with key | C | ≥95% of published-active YSTM rows have `sale_instance_key` |
+| No key collisions | C | No active `sale_instance_key` collision groups |
+| Coverage `match_method` | B | Missing valid-active rows have audit match metadata |
+| Duplicate-visible SLO | D | Address+date clusters &lt;0.5% of published-active YSTM |
+| Ambiguous bounded | D | ≤5% of replayed rows are `ambiguous_requires_review` |
+| Dashboard healthy | A | Phase 13 panel has no operational alerts |
+
+`enforcementReady` is true only when all Stage B–D gates pass.
+
+### Tests added
+
+- `lib/admin/evaluateYstmSaleInstanceRolloutGates.ts` + unit tests
+- `tests/unit/ingestion/identity/resolveIngestedSaleInsertCollision.test.ts`
+- `tests/unit/ingestion/ystmCoverage/persistSaleInstanceShadowReplay.test.ts`
+- Extended `classifySaleInstance.test.ts` (same-event update, ambiguous)
+
+### Code
+
+- `lib/admin/evaluateYstmSaleInstanceRolloutGates.ts`
+- `app/admin/ingestion/YstmCoverageScoreboardSection.tsx`
+- `lib/admin/buildYstmCoverageDiagnostics.ts`

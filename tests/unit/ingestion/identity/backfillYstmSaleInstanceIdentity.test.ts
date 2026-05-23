@@ -51,23 +51,53 @@ describe('assessYstmBackfillRowQuality', () => {
   })
 })
 
-describe('runBackfillYstmSaleInstanceIdentity', () => {
-  it('dry-run computes identity without writing', async () => {
-    mockFromBase.mockImplementation((_admin, table: string) => {
-      if (table === 'ingested_sales') {
+function ingestedSalesBackfillMock(options: {
+  rows: ReturnType<typeof makeRow>[]
+  collisionOwnerId?: string | null
+}) {
+  return {
+    select: vi.fn((cols: string) => {
+      if (cols === 'id') {
         return {
-          select: vi.fn(() => ({
+          eq: vi.fn(() => ({
             eq: vi.fn(() => ({
               is: vi.fn(() => ({
-                not: vi.fn(() => ({
-                  order: vi.fn(() => ({
-                    limit: vi.fn(async () => ({ data: [makeRow()], error: null })),
+                neq: vi.fn(() => ({
+                  limit: vi.fn(() => ({
+                    maybeSingle: vi.fn().mockResolvedValue({
+                      data: options.collisionOwnerId ? { id: options.collisionOwnerId } : null,
+                      error: null,
+                    }),
                   })),
                 })),
               })),
             })),
           })),
         }
+      }
+      return {
+        eq: vi.fn(() => ({
+          is: vi.fn(() => ({
+            not: vi.fn(() => ({
+              order: vi.fn(() => ({
+                limit: vi.fn(async () => ({ data: options.rows, error: null })),
+              })),
+            })),
+          })),
+        })),
+      }
+    }),
+    update: vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    })),
+  }
+}
+
+describe('runBackfillYstmSaleInstanceIdentity', () => {
+  it('dry-run computes identity without writing', async () => {
+    mockFromBase.mockImplementation((_admin, table: string) => {
+      if (table === 'ingested_sales') {
+        return ingestedSalesBackfillMock({ rows: [makeRow()] })
       }
       return {}
     })
@@ -87,36 +117,7 @@ describe('runBackfillYstmSaleInstanceIdentity', () => {
   it('skips rows when an active sale_instance_key is already owned', async () => {
     mockFromBase.mockImplementation((_admin, table: string) => {
       if (table === 'ingested_sales') {
-        return {
-          select: vi.fn((cols: string) => {
-            if (cols === 'id') {
-              return {
-                eq: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    is: vi.fn(() => ({
-                      neq: vi.fn(() => ({
-                        limit: vi.fn(() => ({
-                          maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'other-row' }, error: null }),
-                        })),
-                      })),
-                    })),
-                  })),
-                })),
-              }
-            }
-            return {
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  not: vi.fn(() => ({
-                    order: vi.fn(() => ({
-                      limit: vi.fn(async () => ({ data: [makeRow()], error: null })),
-                    })),
-                  })),
-                })),
-              })),
-            }
-          }),
-        }
+        return ingestedSalesBackfillMock({ rows: [makeRow()], collisionOwnerId: 'other-row' })
       }
       return {}
     })

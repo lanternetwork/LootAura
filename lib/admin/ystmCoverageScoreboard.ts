@@ -35,8 +35,9 @@ import {
   aggregateYstmExistingUrlRefresh,
   type YstmExistingUrlRefreshAggregate,
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
-import { buildFalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
-import type { FalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+import { buildFalseExclusionAuditReport, listMissingValidObservations } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
+import { buildSaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
+import type { SaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
 import {
   loadSaleInstanceIdentityMetrics,
   type SaleInstanceIdentityMetrics,
@@ -83,6 +84,7 @@ export type YstmCoverageScoreboard = {
   graphEnumeration: YstmGraphEnumerationMetrics
   operationalHealth: YstmCoverageOperationalHealth
   falseExclusionAudit: FalseExclusionAuditReport
+  saleInstanceShadowReplay: SaleInstanceShadowReplayReport
   saleInstanceIdentity: SaleInstanceIdentityMetrics
   sourceUrlAlias: SourceUrlAliasMetrics
 }
@@ -111,6 +113,7 @@ export async function buildYstmCoverageScoreboard(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<YstmCoverageScoreboard> {
   const now = new Date()
+  const missingRows = await listMissingValidObservations(admin)
   const [
     agg,
     publishedIndex,
@@ -120,6 +123,7 @@ export async function buildYstmCoverageScoreboard(
     existingRefresh,
     catalogRepair,
     falseExclusionAudit,
+    saleInstanceShadowReplay,
     saleInstanceIdentity,
     sourceUrlAlias,
     runsResult,
@@ -131,7 +135,8 @@ export async function buildYstmCoverageScoreboard(
     aggregateYstmCoverageMissingIngestion(admin),
     aggregateYstmExistingUrlRefresh(admin, now.getTime()),
     aggregateYstmCatalogRepair(admin, now.getTime()),
-    buildFalseExclusionAuditReport(admin, now),
+    buildFalseExclusionAuditReport(admin, now, missingRows),
+    buildSaleInstanceShadowReplayReport(admin, missingRows, now),
     loadSaleInstanceIdentityMetrics(),
     loadSourceUrlAliasMetrics(),
     fromBase(admin, 'ystm_coverage_audit_runs')
@@ -233,6 +238,7 @@ export async function buildYstmCoverageScoreboard(
     sloAttainment,
     operationalHealth,
     falseExclusionAudit,
+    saleInstanceShadowReplay,
     saleInstanceIdentity,
     sourceUrlAlias,
   }

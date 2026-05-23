@@ -41,6 +41,7 @@ export const ObservabilityEvents = {
     ystmDetailFirstFetchFailed: 'ingestion.ystm_detail_first.fetch_failed',
     ystmDetailFirstRejectedReason: 'ingestion.ystm_detail_first.rejected_reason',
     saleInstanceClassified: 'ingestion.sale_instance.classified',
+    saleInstanceShadowCompared: 'ingestion.sale_instance.shadow_compared',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

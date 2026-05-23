@@ -41,6 +41,10 @@ import {
   classifySaleInstance,
   saleInstanceClassificationTelemetry,
 } from '@/lib/ingestion/identity/classifySaleInstance'
+import {
+  compareShadowSaleInstanceDecisions,
+  shadowSaleInstanceTelemetry,
+} from '@/lib/ingestion/identity/shadowSaleInstanceReplay'
 import { recordIngestedSaleSourceUrl } from '@/lib/ingestion/identity/recordIngestedSaleSourceUrl'
 import {
   evaluatePostDetailEnrichedDuplicateSkip,
@@ -1400,7 +1404,7 @@ export async function persistExternalPageSource(
 
       const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
         .select(
-          'id, status, failure_reasons, date_start, date_end, normalized_address, sale_instance_key, published_sale_id, superseded_by_ingested_sale_id'
+          'id, status, failure_reasons, date_start, date_end, normalized_address, sale_instance_key, published_sale_id, superseded_by_ingested_sale_id, source_listing_id, source_content_hash, lat, lng'
         )
         .eq('source_url', listing.sourceUrl)
         .maybeSingle()
@@ -1444,6 +1448,54 @@ export async function persistExternalPageSource(
           sourcePlatform: platform,
           sourceUrl: listing.sourceUrl,
         })
+
+        const listNormalizedAddress =
+          (existing as { normalized_address?: string | null }).normalized_address ??
+          (listing.addressRaw
+            ? listing.addressRaw.toLowerCase().replace(/\s+/g, ' ').trim()
+            : null)
+        const shadowComparison = compareShadowSaleInstanceDecisions(
+          {
+            sourcePlatform: platform,
+            sourceUrl: listing.sourceUrl,
+            state: listing.state,
+            city: listing.city,
+            normalizedAddress: listNormalizedAddress,
+            dateStart: listing.startDate ?? null,
+            dateEnd: listing.endDate ?? null,
+          },
+          {
+            id: String(existing.id),
+            source_url: listing.sourceUrl,
+            status: existing.status as string,
+            failure_reasons: existing.failure_reasons,
+            date_start: (existing as { date_start?: string | null }).date_start ?? null,
+            date_end: (existing as { date_end?: string | null }).date_end ?? null,
+            normalized_address: listNormalizedAddress,
+            lat: (existing as { lat?: number | null }).lat ?? null,
+            lng: (existing as { lng?: number | null }).lng ?? null,
+            source_listing_id:
+              (existing as { source_listing_id?: string | null }).source_listing_id ?? null,
+            sale_instance_key:
+              (existing as { sale_instance_key?: string | null }).sale_instance_key ?? null,
+            source_content_hash:
+              (existing as { source_content_hash?: string | null }).source_content_hash ?? null,
+            superseded_by_ingested_sale_id:
+              (existing as { superseded_by_ingested_sale_id?: string | null })
+                .superseded_by_ingested_sale_id ?? null,
+          }
+        )
+        emitObservabilityRecord(
+          buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceShadowCompared, {
+            ...telemBase,
+            adapter: ADAPTER_ID,
+            parserVersion: PARSER_VERSION_ROW,
+            pageIndex,
+            pageHostHash,
+            phase: 'list_recrawl',
+            ...shadowSaleInstanceTelemetry(shadowComparison),
+          })
+        )
 
         const refreshDecision = shouldQueueYstmListRecrawlRefresh({
           sourcePlatform: platform,

@@ -451,12 +451,23 @@ describe('buildIngestionDiagnostics', () => {
         sampleCollisionKeys: ['external_page_source:TX|austin|addr:2026-05-10|2026-05-12:123'],
       },
       sourceUrlAlias: { totalAliasRows: 42 },
+      saleInstanceShadowReplay: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        replayedCount: 7,
+        oldSuppressCount: 4,
+        newSuppressCount: 1,
+        wouldPublishCount: 3,
+        divergenceOldSuppressNewPublishCount: 2,
+        ambiguousCount: 0,
+        sampleDivergences: [],
+      },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
     expect(md).toContain('## YSTM nationwide coverage')
     expect(md).toContain('### Sale-instance identity (Phase 3)')
     expect(md).toContain('### Source URL alias history (Phase 4)')
+    expect(md).toContain('### Sale-instance shadow replay (Phase 9)')
     expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
   })

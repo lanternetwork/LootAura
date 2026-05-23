@@ -148,6 +148,16 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       sampleCollisionKeys: [],
     },
     sourceUrlAlias: { totalAliasRows: 0 },
+    saleInstanceShadowReplay: {
+      generatedAt: '2026-05-22T00:00:00Z',
+      replayedCount: 7,
+      oldSuppressCount: 4,
+      newSuppressCount: 1,
+      wouldPublishCount: 3,
+      divergenceOldSuppressNewPublishCount: 2,
+      ambiguousCount: 0,
+      sampleDivergences: [],
+    },
     ...overrides,
   }
 }

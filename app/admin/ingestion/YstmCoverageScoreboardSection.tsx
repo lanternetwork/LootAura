@@ -266,6 +266,43 @@ export default function YstmCoverageScoreboardSection() {
             </div>
           </div>
 
+          <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
+            <h3 className="text-sm font-semibold text-sky-950">Sale-instance shadow replay (Phase 9)</h3>
+            <p className="mt-1 text-xs text-sky-900">
+              Every missing valid YSTM URL is replayed through the legacy URL gate and the new
+              classifier. Outcomes are persisted for lead review before enforcement changes.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Replayed" value={data.saleInstanceShadowReplay.replayedCount} />
+              <Metric
+                label="Legacy would suppress"
+                value={data.saleInstanceShadowReplay.oldSuppressCount}
+              />
+              <Metric
+                label="New would publish"
+                value={data.saleInstanceShadowReplay.wouldPublishCount}
+                highlight={data.saleInstanceShadowReplay.wouldPublishCount > 0}
+              />
+              <Metric
+                label="Old suppress → new publish"
+                value={data.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount}
+                highlight={
+                  data.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount > 0
+                }
+              />
+            </div>
+            {data.saleInstanceShadowReplay.sampleDivergences.length > 0 && (
+              <ul className="mt-3 space-y-1 text-xs text-sky-950">
+                {data.saleInstanceShadowReplay.sampleDivergences.map((d) => (
+                  <li key={d.canonicalUrl} className="font-mono">
+                    {d.canonicalUrl} — {d.oldDecision} → {d.newDecision}
+                    {d.wouldPublish ? ' (would publish)' : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">
               False-exclusion audit (Phase 1)

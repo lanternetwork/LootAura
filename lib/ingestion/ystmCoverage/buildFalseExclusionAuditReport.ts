@@ -31,7 +31,7 @@ function emptyBucketCounts(): Record<FalseExclusionTraceBucket, number> {
   ) as Record<FalseExclusionTraceBucket, number>
 }
 
-async function listMissingValidObservations(
+export async function listMissingValidObservations(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<MissingObservationRow[]> {
   const out: MissingObservationRow[] = []
@@ -156,10 +156,11 @@ async function loadConfigsForObservations(
  */
 export async function buildFalseExclusionAuditReport(
   admin: ReturnType<typeof getAdminDb>,
-  now: Date = new Date()
+  now: Date = new Date(),
+  preloadedMissingRows?: MissingObservationRow[]
 ): Promise<FalseExclusionAuditReport> {
   const nowIso = now.toISOString()
-  const missingRows = await listMissingValidObservations(admin)
+  const missingRows = preloadedMissingRows ?? (await listMissingValidObservations(admin))
   const urls = missingRows.map((r) => r.canonical_url)
   const [ingestedByUrl, configByKey, publishedIndex] = await Promise.all([
     loadIngestedByUrls(admin, urls),

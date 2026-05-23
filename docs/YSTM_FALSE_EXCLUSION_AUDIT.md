@@ -187,4 +187,24 @@ Every allowed suppression is persisted on `ingested_sale_soft_dedupe_suppression
 
 ## Later phases
 
-Phases 9–10 add shadow mode and schema constraints.
+Phases 10–14 add schema constraints, coverage audit alignment, backfill, dashboard, and testing.
+
+## Phase 9 — sale-instance shadow mode
+
+Replay every `missingValidYstmUrls` row through:
+
+| Path | Behavior modeled |
+|------|------------------|
+| **Legacy URL gate** | `source_url` exists → duplicate skip (`oldWouldSuppress`) |
+| **New classifier** | `classifySaleInstance` decision + publish/revive signals |
+
+Telemetry fields: `oldDecision`, `newDecision`, `wouldPublish`, `wouldCreateNewInstance`, `wouldSuppress` (legacy), `newWouldSuppress`, `confidence`, `reasonCodes`.
+
+**Persisted:** `ystm_sale_instance_shadow_replays` (upsert per canonical URL). **Live crawl:** `ingestion.sale_instance.shadow_compared` on list recrawl when an existing URL row is seen (no behavior change).
+
+### Code
+
+- `lib/ingestion/identity/shadowSaleInstanceReplay.ts`
+- `lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport.ts`
+- Admin scoreboard section + diagnostics export
+- Migration `205_ystm_sale_instance_shadow_replay_phase_9.sql`

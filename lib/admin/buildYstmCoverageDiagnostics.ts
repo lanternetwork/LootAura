@@ -51,6 +51,17 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
         .join(', ') || 'none'
     ),
     '',
+    '### Sale-instance shadow replay (Phase 9)',
+    bullet('replayed missing URLs', data.saleInstanceShadowReplay.replayedCount),
+    bullet('legacy would suppress', data.saleInstanceShadowReplay.oldSuppressCount),
+    bullet('new would suppress', data.saleInstanceShadowReplay.newSuppressCount),
+    bullet('new would publish', data.saleInstanceShadowReplay.wouldPublishCount),
+    bullet(
+      'old suppress → new publish',
+      data.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount
+    ),
+    bullet('ambiguous (new)', data.saleInstanceShadowReplay.ambiguousCount),
+    '',
     '### Week-1 sprint gates',
     ...gates.gates.map((g) => `- [${g.status.toUpperCase()}] ${g.label}: ${g.detail}`),
     bullet('all gates pass', gates.allPass ? 'yes' : 'no'),

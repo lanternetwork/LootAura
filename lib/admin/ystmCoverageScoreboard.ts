@@ -36,6 +36,7 @@ import {
   type YstmExistingUrlRefreshAggregate,
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
 import { buildFalseExclusionAuditReport, listMissingValidObservations } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
+import type { FalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { buildSaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
 import type { SaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
 import {

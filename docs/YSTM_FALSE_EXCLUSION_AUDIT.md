@@ -185,10 +185,6 @@ Every allowed suppression is persisted on `ingested_sale_soft_dedupe_suppression
 - `lib/ingestion/dedupe.ts` (list skip + `findIngestedSaleMatch`)
 - Migration `204_ystm_soft_dedupe_suppression_evidence_phase_8.sql`
 
-## Later phases
-
-Phases 10–14 add schema constraints, coverage audit alignment, backfill, dashboard, and testing.
-
 ## Phase 9 — sale-instance shadow mode
 
 Replay every `missingValidYstmUrls` row through:
@@ -208,3 +204,24 @@ Telemetry fields: `oldDecision`, `newDecision`, `wouldPublish`, `wouldCreateNewI
 - `lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport.ts`
 - Admin scoreboard section + diagnostics export
 - Migration `205_ystm_sale_instance_shadow_replay_phase_9.sql`
+
+## Phase 10 — schema constraint migration
+
+`source_url` is no longer globally unique on `ingested_sales`. Active sale instances are enforced by:
+
+```text
+UNIQUE(source_platform, sale_instance_key)
+WHERE superseded_by_ingested_sale_id IS NULL
+```
+
+Duplicate active keys are superseded in migration before the partial unique index is created. Lookups by `source_url` use the primary non-superseded row (deterministic smallest id).
+
+### Code
+
+- `supabase/migrations/206_ystm_schema_constraints_phase_10.sql`
+- `lib/ingestion/identity/ingestedSaleSourceUrlLookup.ts`
+- `lib/ingestion/identity/resolveIngestedSaleInsertCollision.ts`
+
+## Later phases
+
+Phases 11–14 add coverage audit alignment, backfill, dashboard, and testing.

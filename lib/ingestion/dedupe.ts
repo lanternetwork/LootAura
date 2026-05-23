@@ -9,6 +9,7 @@ import {
   type SoftDuplicateEvaluation,
 } from '@/lib/ingestion/duplicateScoring'
 import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import { findPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import {
   recordIngestedSaleSoftDedupeSuppression,
   suppressionReasonFromEvaluation,
@@ -422,11 +423,8 @@ export async function findIngestedSaleMatch(
 ): Promise<{ match: IngestedSaleMatch | null; meta: { softScoringRejected?: boolean } }> {
   const admin = getAdminDb()
 
-  const bySource = await fromBase(admin, 'ingested_sales')
-    .select('id')
-    .eq('source_url', sourceUrl)
-    .maybeSingle()
-  if (bySource.data?.id) {
+  const bySource = await findPrimaryIngestedSaleBySourceUrl(admin, sourceUrl, 'id')
+  if (bySource?.id) {
     emitDedupeDecision({
       processed,
       matchType: 'source_url',
@@ -438,7 +436,7 @@ export async function findIngestedSaleMatch(
     })
     return {
       match: {
-        id: bySource.data.id,
+        id: bySource.id,
         matchType: 'source_url',
         duplicateConfidence: 'exact_duplicate',
         suppressAsDuplicate: false,

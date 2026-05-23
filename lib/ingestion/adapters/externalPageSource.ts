@@ -42,6 +42,12 @@ import {
   saleInstanceClassificationTelemetry,
 } from '@/lib/ingestion/identity/classifySaleInstance'
 import {
+  listIngestedSalesBySourceUrl,
+  pickPrimaryIngestedSaleBySourceUrl,
+  type IngestedSaleSourceUrlLookupRow,
+} from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
+import { resolveIngestedSaleInsertCollision } from '@/lib/ingestion/identity/resolveIngestedSaleInsertCollision'
+import {
   compareShadowSaleInstanceDecisions,
   shadowSaleInstanceTelemetry,
 } from '@/lib/ingestion/identity/shadowSaleInstanceReplay'
@@ -77,6 +83,26 @@ import { ObservabilityEvents } from '@/lib/observability/events'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v3'
+const INGESTED_SALE_SOURCE_URL_SELECT =
+  'id, status, failure_reasons, date_start, date_end, normalized_address, sale_instance_key, published_sale_id, superseded_by_ingested_sale_id, source_listing_id, source_content_hash, lat, lng, source_url'
+
+function mapIngestedSaleSourceUrlRow(row: IngestedSaleSourceUrlLookupRow) {
+  return {
+    id: String(row.id),
+    source_url: row.source_url ?? null,
+    sale_instance_key: row.sale_instance_key ?? null,
+    source_listing_id: row.source_listing_id ?? null,
+    source_content_hash: row.source_content_hash ?? null,
+    date_start: row.date_start ?? null,
+    date_end: row.date_end ?? null,
+    normalized_address: row.normalized_address ?? null,
+    lat: row.lat ?? null,
+    lng: row.lng ?? null,
+    status: row.status ?? null,
+    failure_reasons: row.failure_reasons,
+    superseded_by_ingested_sale_id: row.superseded_by_ingested_sale_id ?? null,
+  }
+}
 
 export interface ExternalPageSourceIngestionConfig {
   city: string
@@ -1313,44 +1339,65 @@ export async function persistExternalPageSource(
         rawPayload: legacyRowPayload,
       })
 
+      const insertRow = {
+        source_platform: platform,
+        source_url: listing.sourceUrl,
+        external_id: (listing.rawPayload.externalId as string | null) ?? null,
+        title: listing.title,
+        description: listing.description,
+        address_raw: listing.addressRaw,
+        normalized_address: normalizedLine,
+        city: listing.city,
+        state: listing.state,
+        zip_code: null,
+        lat: insertLat,
+        lng: insertLng,
+        date_start: listing.startDate ?? null,
+        date_end: listing.endDate ?? null,
+        time_start: scheduleFields.time_start,
+        time_end: scheduleFields.time_end,
+        date_source: scheduleFields.date_source,
+        time_source: ingestedSaleTimeSourceForDb(scheduleFields.time_source),
+        image_source_url: listing.imageSourceUrl,
+        raw_text: null,
+        raw_payload: legacyRowPayload,
+        status: insertStatus,
+        failure_reasons: [],
+        parser_version: PARSER_VERSION_ROW,
+        parse_confidence: insertStatus === 'needs_geocode' ? 'high' : 'low',
+        is_duplicate: false,
+        duplicate_of: null,
+        ...addressLifecycleFieldsForDb(addressLifecycle),
+        ...spatialInsertFields,
+        ...saleInstanceIdentityDbColumns(saleInstanceIdentity),
+      }
+
       const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
-        .insert({
-          source_platform: platform,
-          source_url: listing.sourceUrl,
-          external_id: (listing.rawPayload.externalId as string | null) ?? null,
-          title: listing.title,
-          description: listing.description,
-          address_raw: listing.addressRaw,
-          normalized_address: normalizedLine,
-          city: listing.city,
-          state: listing.state,
-          zip_code: null,
-          lat: insertLat,
-          lng: insertLng,
-          date_start: listing.startDate ?? null,
-          date_end: listing.endDate ?? null,
-          time_start: scheduleFields.time_start,
-          time_end: scheduleFields.time_end,
-          date_source: scheduleFields.date_source,
-          time_source: ingestedSaleTimeSourceForDb(scheduleFields.time_source),
-          image_source_url: listing.imageSourceUrl,
-          raw_text: null,
-          raw_payload: legacyRowPayload,
-          status: insertStatus,
-          failure_reasons: [],
-          parser_version: PARSER_VERSION_ROW,
-          parse_confidence: insertStatus === 'needs_geocode' ? 'high' : 'low',
-          is_duplicate: false,
-          duplicate_of: null,
-          ...addressLifecycleFieldsForDb(addressLifecycle),
-          ...spatialInsertFields,
-          ...saleInstanceIdentityDbColumns(saleInstanceIdentity),
-        })
+        .insert(insertRow)
         .select('id')
         .maybeSingle()
 
       if (insErr) {
         if (/duplicate key|unique constraint|23505/i.test(insErr.message)) {
+          const resolved = await resolveIngestedSaleInsertCollision(admin, {
+            sourceUrl: listing.sourceUrl,
+            row: insertRow,
+          })
+          if (resolved?.id) {
+            if (insertStatus === 'ready') {
+              await publishReadyIngestedSaleById(resolved.id)
+            }
+            await recordIngestedSaleSourceUrl(admin, {
+              ingestedSaleId: resolved.id,
+              sourcePlatform: platform,
+              sourceUrl: listing.sourceUrl,
+              sourceListingId: saleInstanceIdentity?.source_listing_id ?? null,
+              payloadHash: saleInstanceIdentity?.source_payload_hash ?? null,
+            })
+            summary.inserted += 1
+            summary.freshInserted += 1
+            return
+          }
           duplicateConstraintSkipped += 1
           bumpDuplicateKind(duplicateKinds, 'duplicate_canonical_collision')
           return
@@ -1402,18 +1449,18 @@ export async function persistExternalPageSource(
 
       const rowPayload = buildRowRawPayload(listing, pageIndex, pageHostHash)
 
-      const { data: existing, error: selErr } = await fromBase(admin, 'ingested_sales')
-        .select(
-          'id, status, failure_reasons, date_start, date_end, normalized_address, sale_instance_key, published_sale_id, superseded_by_ingested_sale_id, source_listing_id, source_content_hash, lat, lng'
+      let urlHistoryRows: IngestedSaleSourceUrlLookupRow[] = []
+      try {
+        urlHistoryRows = await listIngestedSalesBySourceUrl(
+          admin,
+          listing.sourceUrl,
+          INGESTED_SALE_SOURCE_URL_SELECT
         )
-        .eq('source_url', listing.sourceUrl)
-        .maybeSingle()
-
-      if (selErr) {
+      } catch (selErr) {
         summary.errors += 1
         logger.error(
           'External page source: source_url lookup failed',
-          new Error(selErr.message),
+          selErr instanceof Error ? selErr : new Error(String(selErr)),
           {
             component: 'ingestion/adapters/externalPageSource',
             operation: 'dedupe_lookup',
@@ -1435,6 +1482,10 @@ export async function persistExternalPageSource(
         )
         continue
       }
+
+      const existing = pickPrimaryIngestedSaleBySourceUrl(urlHistoryRows)
+      const existingUrlCandidates = urlHistoryRows.map(mapIngestedSaleSourceUrlRow)
+
       if (existing?.id) {
         if ((existing as { superseded_by_ingested_sale_id?: string | null }).superseded_by_ingested_sale_id) {
           duplicateUrlSkipped += 1
@@ -1536,19 +1587,7 @@ export async function persistExternalPageSource(
               (existing as { normalized_address?: string | null }).normalized_address ?? null,
             dateStart: listing.startDate ?? null,
             dateEnd: listing.endDate ?? null,
-            existingRowsBySourceUrl: [
-              {
-                id: String(existing.id),
-                sale_instance_key:
-                  (existing as { sale_instance_key?: string | null }).sale_instance_key ?? null,
-                date_start: (existing as { date_start?: string | null }).date_start ?? null,
-                date_end: (existing as { date_end?: string | null }).date_end ?? null,
-                normalized_address:
-                  (existing as { normalized_address?: string | null }).normalized_address ?? null,
-                status: existing.status as string,
-                failure_reasons: existing.failure_reasons,
-              },
-            ],
+            existingRowsBySourceUrl: existingUrlCandidates,
             existingRowsBySaleInstanceKey: [],
             existingRowsByAddressDate: [],
           })
@@ -1590,19 +1629,7 @@ export async function persistExternalPageSource(
               (existing as { normalized_address?: string | null }).normalized_address ?? null,
             dateStart: listing.startDate ?? null,
             dateEnd: listing.endDate ?? null,
-            existingRowsBySourceUrl: [
-              {
-                id: String(existing.id),
-                sale_instance_key:
-                  (existing as { sale_instance_key?: string | null }).sale_instance_key ?? null,
-                date_start: (existing as { date_start?: string | null }).date_start ?? null,
-                date_end: (existing as { date_end?: string | null }).date_end ?? null,
-                normalized_address:
-                  (existing as { normalized_address?: string | null }).normalized_address ?? null,
-                status: existing.status as string,
-                failure_reasons: existing.failure_reasons,
-              },
-            ],
+            existingRowsBySourceUrl: existingUrlCandidates,
             existingRowsBySaleInstanceKey: [],
             existingRowsByAddressDate: [],
           })

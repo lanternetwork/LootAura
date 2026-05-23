@@ -16,10 +16,7 @@ import {
   insertFailureTelemetryFields,
 } from '@/lib/ingestion/acquisition/classifyDetailFirstInsertFailure'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
-import {
-  findPublishedIngestedSaleIdForDetailFirst,
-  promoteExistingIngestedSaleForDetailFirst,
-} from '@/lib/ingestion/acquisition/promoteExistingIngestedSaleForDetailFirst'
+import { resolveIngestedSaleInsertCollision } from '@/lib/ingestion/identity/resolveIngestedSaleInsertCollision'
 import {
   markIngestedSaleExpiredFromYstmRefresh,
   updateExistingIngestedSaleForDetailFirst,
@@ -774,30 +771,27 @@ export async function attemptYstmDetailFirstReady(
       const insertFailure = classifyDetailFirstInsertFailure(insErr)
 
       if (insertFailure.reason === 'canonical_collision') {
-        const promoted = await promoteExistingIngestedSaleForDetailFirst(admin, {
+        const resolved = await resolveIngestedSaleInsertCollision(admin, {
           sourceUrl: listing.sourceUrl,
           row: ingestRow,
         })
-        if (promoted?.id) {
-          ingestedSaleId = promoted.id
-        } else {
-          const publishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, listing.sourceUrl)
-          if (publishedId) {
-            ingestedSaleId = publishedId
-            await recordIngestedSaleSourceUrl(admin, {
-              ingestedSaleId: publishedId,
-              sourcePlatform: params.platform,
-              sourceUrl: listing.sourceUrl,
-              sourceListingId: (ingestRow.source_listing_id as string | null) ?? null,
-              payloadHash: (ingestRow.source_payload_hash as string | null) ?? null,
-            })
-            metrics.succeeded = 1
-            finalizeDetailFirstAttemptMetrics(metrics)
-            return {
-              result: { outcome: 'ready', ingestedSaleId: publishedId, published: true },
-              metrics,
-            }
+        if (resolved?.publishedMatch) {
+          await recordIngestedSaleSourceUrl(admin, {
+            ingestedSaleId: resolved.id,
+            sourcePlatform: params.platform,
+            sourceUrl: listing.sourceUrl,
+            sourceListingId: (ingestRow.source_listing_id as string | null) ?? null,
+            payloadHash: (ingestRow.source_payload_hash as string | null) ?? null,
+          })
+          metrics.succeeded = 1
+          finalizeDetailFirstAttemptMetrics(metrics)
+          return {
+            result: { outcome: 'ready', ingestedSaleId: resolved.id, published: true },
+            metrics,
           }
+        }
+        if (resolved?.id) {
+          ingestedSaleId = resolved.id
         }
       }
 

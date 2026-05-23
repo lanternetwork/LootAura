@@ -54,9 +54,13 @@ function coverageObservationsChain(rows: unknown[]) {
 }
 
 function salesChain(rows: unknown[]) {
-  const range = vi.fn().mockResolvedValue({ data: rows, error: null })
+  const q: Record<string, ReturnType<typeof vi.fn>> = {}
+  for (const m of ['eq', 'is', 'or']) {
+    q[m] = vi.fn(() => q)
+  }
+  q.range = vi.fn().mockResolvedValue({ data: rows, error: null })
   return {
-    select: vi.fn(() => ({ range })),
+    select: vi.fn(() => q),
   }
 }
 

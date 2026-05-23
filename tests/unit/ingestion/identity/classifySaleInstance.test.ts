@@ -162,7 +162,7 @@ describe('classifySaleInstance', () => {
       sourceUrl: LISTING_URL,
       state: 'TX',
       city: 'Austin',
-      normalizedAddress: '123 Main St',
+      normalizedAddress: null,
       dateStart: null,
       dateEnd: null,
       existingRowsBySourceUrl: [

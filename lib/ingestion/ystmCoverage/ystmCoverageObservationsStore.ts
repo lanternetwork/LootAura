@@ -1,6 +1,8 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import type { YstmCoverageInvalidReason } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
 
+import type { YstmCoverageFootprintMatchMethod } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
+
 export type YstmCoverageObservationUpsert = {
   canonicalUrl: string
   state: string
@@ -11,6 +13,11 @@ export type YstmCoverageObservationUpsert = {
   lootauraVisible: boolean
   listSeenAt: string
   detailCheckedAt: string | null
+  sourceListingId?: string | null
+  saleInstanceKey?: string | null
+  matchedIngestedSaleId?: string | null
+  matchedSaleId?: string | null
+  matchMethod?: YstmCoverageFootprintMatchMethod | null
 }
 
 export async function upsertYstmCoverageObservations(
@@ -29,6 +36,11 @@ export async function upsertYstmCoverageObservations(
     lootaura_visible: r.lootauraVisible,
     last_list_seen_at: r.listSeenAt,
     last_detail_checked_at: r.detailCheckedAt,
+    source_listing_id: r.sourceListingId ?? null,
+    sale_instance_key: r.saleInstanceKey ?? null,
+    matched_ingested_sale_id: r.matchedIngestedSaleId ?? null,
+    matched_sale_id: r.matchedSaleId ?? null,
+    match_method: r.matchMethod ?? null,
     updated_at: now,
   }))
 

@@ -222,6 +222,27 @@ Duplicate active keys are superseded in migration before the partial unique inde
 - `lib/ingestion/identity/ingestedSaleSourceUrlLookup.ts`
 - `lib/ingestion/identity/resolveIngestedSaleInsertCollision.ts`
 
+## Phase 11 — coverage audit alignment
+
+Coverage audit `lootaura_visible` is determined by **sale instance**, not URL alone. Observations store identity and match metadata:
+
+| Column | Purpose |
+|--------|---------|
+| `source_listing_id`, `sale_instance_key` | YSTM identity from detail parse |
+| `matched_ingested_sale_id`, `matched_sale_id` | Visible LootAura footprint hit |
+| `match_method` | `sale_instance_key`, `source_listing_id_date_overlap`, `source_url_alias`, `source_url_visible`, `normalized_address_date` |
+
+Match order: sale instance key → listing id + overlapping dates → URL alias (with instance agreement) → direct URL (with instance agreement when identity known) → address/date fallback.
+
+Stale published rows at a reused URL no longer count as covered when the active YSTM event has a different `sale_instance_key`.
+
+### Code
+
+- `supabase/migrations/207_ystm_coverage_audit_instance_match_phase_11.sql`
+- `lib/ingestion/ystmCoverage/loadYstmCoverageLootAuraMatchIndex.ts`
+- `lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint.ts`
+- `lib/ingestion/ystmCoverage/runYstmCoverageAuditCron.ts`
+
 ## Later phases
 
-Phases 11–14 add coverage audit alignment, backfill, dashboard, and testing.
+Phases 12–14 add backfill, dashboard metrics, and expanded testing.

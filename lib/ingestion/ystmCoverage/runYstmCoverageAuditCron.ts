@@ -12,7 +12,9 @@ import {
   upsertYstmCoverageObservations,
   type YstmCoverageObservationUpsert,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
-import { loadLootAuraPublishedYstmIndex } from '@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex'
+import { loadYstmCoverageLootAuraMatchIndex } from '@/lib/ingestion/ystmCoverage/loadYstmCoverageLootAuraMatchIndex'
+import { matchYstmCoverageLootAuraFootprint } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
+import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
 import {
   classifyFetchErrorForCoverage,
   classifyYstmDetailAsValidActive,
@@ -62,6 +64,61 @@ function sortConfigsDeterministic(rows: ExternalCityConfigRow[]): ExternalCityCo
 
 function buildConfigKey(city: string, state: string): string {
   return `${state}|${city}`
+}
+
+function buildListFootprintMatch(
+  matchIndex: Awaited<ReturnType<typeof loadYstmCoverageLootAuraMatchIndex>>,
+  canonicalUrl: string
+) {
+  return matchYstmCoverageLootAuraFootprint(matchIndex, {
+    canonicalUrl,
+    saleInstanceKey: null,
+    sourceListingId: null,
+    normalizedAddress: null,
+    dateStart: null,
+    dateEnd: null,
+    identity: null,
+  })
+}
+
+function buildDetailFootprintMatch(
+  matchIndex: Awaited<ReturnType<typeof loadYstmCoverageLootAuraMatchIndex>>,
+  input: {
+    canonicalUrl: string
+    sourceUrl: string
+    state: string
+    city: string
+    parsed: import('@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml').YstmDetailPageParsed | null
+  }
+) {
+  const normalizedAddress = input.parsed?.addressRaw
+    ? input.parsed.addressRaw.toLowerCase().replace(/\s+/g, ' ').trim()
+    : null
+  const identity = computeYstmSaleInstanceIdentity({
+    sourcePlatform: 'external_page_source',
+    sourceUrl: input.sourceUrl,
+    state: input.state,
+    city: input.city,
+    normalizedAddress,
+    dateStart: input.parsed?.startDate ?? null,
+    dateEnd: input.parsed?.endDate ?? null,
+    title: input.parsed?.title ?? null,
+    description: input.parsed?.description ?? null,
+    imageSourceUrl: null,
+    lat: input.parsed?.nativeCoords?.lat ?? null,
+    lng: input.parsed?.nativeCoords?.lng ?? null,
+    rawPayload: null,
+  })
+
+  return matchYstmCoverageLootAuraFootprint(matchIndex, {
+    canonicalUrl: input.canonicalUrl,
+    saleInstanceKey: identity?.sale_instance_key ?? null,
+    sourceListingId: identity?.source_listing_id ?? null,
+    normalizedAddress,
+    dateStart: input.parsed?.startDate ?? null,
+    dateEnd: input.parsed?.endDate ?? null,
+    identity,
+  })
 }
 
 /** Postgres upsert rejects duplicate conflict keys within a single INSERT batch. */
@@ -138,7 +195,7 @@ export async function runYstmCoverageAuditCron(
   let runId: string | null = null
 
   try {
-    const publishedIndex = await loadLootAuraPublishedYstmIndex(admin)
+    const matchIndex = await loadYstmCoverageLootAuraMatchIndex(admin)
     const { data: configData, error: configError } = await fromBase(admin, 'ingestion_city_configs')
       .select('city, state, source_platform, source_pages, source_crawl_excluded_at')
       .eq('enabled', true)
@@ -155,7 +212,7 @@ export async function runYstmCoverageAuditCron(
       status: 'running',
       config_cursor_before: configCursorBefore,
       config_cursor_after: configCursorBefore,
-      lootaura_published_active_total: publishedIndex.publishedActiveTotal,
+      lootaura_published_active_total: matchIndex.publishedActiveTotal,
     })
 
     if (catalogSize === 0) {
@@ -192,7 +249,7 @@ export async function runYstmCoverageAuditCron(
           detailPagesValidated: 0,
           validActiveYstmUrls: agg.validActiveYstmUrls,
           publishedVisibleInAudit: agg.publishedVisibleInAudit,
-          lootauraPublishedActiveTotal: publishedIndex.publishedActiveTotal,
+          lootauraPublishedActiveTotal: matchIndex.publishedActiveTotal,
           missingValidYstmUrls: agg.missingValidYstmUrls,
           coveragePct,
           observationCount: agg.observationCount,
@@ -247,7 +304,7 @@ export async function runYstmCoverageAuditCron(
           listingUrlsDiscovered += extracted.length
 
           for (const item of extracted) {
-            const visible = publishedIndex.visibleCanonicalUrls.has(item.canonicalUrl)
+            const listMatch = buildListFootprintMatch(matchIndex, item.canonicalUrl)
             listOnlyUpserts.push({
               canonicalUrl: item.canonicalUrl,
               state: config.state,
@@ -255,9 +312,14 @@ export async function runYstmCoverageAuditCron(
               configKey: buildConfigKey(config.city, config.state),
               ystmValidActive: false,
               ystmInvalidReason: null,
-              lootauraVisible: visible,
+              lootauraVisible: listMatch.lootauraVisible,
               listSeenAt,
               detailCheckedAt: null,
+              sourceListingId: listMatch.sourceListingId,
+              saleInstanceKey: listMatch.saleInstanceKey,
+              matchedIngestedSaleId: listMatch.matchedIngestedSaleId,
+              matchedSaleId: listMatch.matchedSaleId,
+              matchMethod: listMatch.matchMethod,
             })
             detailQueue.push({
               canonicalUrl: item.canonicalUrl,
@@ -298,7 +360,8 @@ export async function runYstmCoverageAuditCron(
 
       let ystmValidActive = false
       let ystmInvalidReason: YstmCoverageInvalidReason | null = null
-      const lootauraVisible = publishedIndex.visibleCanonicalUrls.has(item.canonicalUrl)
+      let parsed: import('@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml').YstmDetailPageParsed | null =
+        null
 
       try {
         const html = await fetchSafeExternalPageHtml(item.sourceUrl, {
@@ -307,7 +370,7 @@ export async function runYstmCoverageAuditCron(
           pageIndex: 0,
           adapter: 'ystm_coverage_audit',
         })
-        const parsed = parseYstmDetailPageFromHtml({
+        parsed = parseYstmDetailPageFromHtml({
           html,
           sourceUrl: item.sourceUrl,
           configCity: item.city,
@@ -325,6 +388,14 @@ export async function runYstmCoverageAuditCron(
         detailPagesValidated += 1
       }
 
+      const footprintMatch = buildDetailFootprintMatch(matchIndex, {
+        canonicalUrl: item.canonicalUrl,
+        sourceUrl: item.sourceUrl,
+        state: item.state,
+        city: item.city,
+        parsed,
+      })
+
       await upsertYstmCoverageObservations(admin, [
         {
           canonicalUrl: item.canonicalUrl,
@@ -333,9 +404,14 @@ export async function runYstmCoverageAuditCron(
           configKey: item.configKey,
           ystmValidActive,
           ystmInvalidReason,
-          lootauraVisible,
+          lootauraVisible: footprintMatch.lootauraVisible,
           listSeenAt,
           detailCheckedAt,
+          sourceListingId: footprintMatch.sourceListingId,
+          saleInstanceKey: footprintMatch.saleInstanceKey,
+          matchedIngestedSaleId: footprintMatch.matchedIngestedSaleId,
+          matchedSaleId: footprintMatch.matchedSaleId,
+          matchMethod: footprintMatch.matchMethod,
         },
       ])
     }
@@ -354,7 +430,7 @@ export async function runYstmCoverageAuditCron(
       detail_pages_validated: detailPagesValidated,
       valid_active_ystm_urls: agg.validActiveYstmUrls,
       published_visible_in_audit: agg.publishedVisibleInAudit,
-      lootaura_published_active_total: publishedIndex.publishedActiveTotal,
+      lootaura_published_active_total: matchIndex.publishedActiveTotal,
       missing_valid_ystm_urls: agg.missingValidYstmUrls,
       coverage_pct: coveragePct,
       missing_by_state: agg.missingByState,
@@ -379,7 +455,7 @@ export async function runYstmCoverageAuditCron(
         detailPagesValidated,
         validActiveYstmUrls: agg.validActiveYstmUrls,
         publishedVisibleInAudit: agg.publishedVisibleInAudit,
-        lootauraPublishedActiveTotal: publishedIndex.publishedActiveTotal,
+        lootauraPublishedActiveTotal: matchIndex.publishedActiveTotal,
         missingValidYstmUrls: agg.missingValidYstmUrls,
         coveragePct,
         observationCount: agg.observationCount,

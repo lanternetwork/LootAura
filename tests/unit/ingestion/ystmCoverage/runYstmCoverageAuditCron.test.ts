@@ -17,8 +17,8 @@ vi.mock('@/lib/ingestion/adapters/externalPageSafeFetch', () => ({
   fetchSafeExternalPageHtml: mockFetchHtml,
 }))
 
-vi.mock('@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex', () => ({
-  loadLootAuraPublishedYstmIndex: mockLoadPublishedIndex,
+vi.mock('@/lib/ingestion/ystmCoverage/loadYstmCoverageLootAuraMatchIndex', () => ({
+  loadYstmCoverageLootAuraMatchIndex: mockLoadPublishedIndex,
 }))
 
 vi.mock('@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore', () => ({
@@ -73,6 +73,11 @@ describe('runYstmCoverageAuditCron', () => {
     mockLoadPublishedIndex.mockResolvedValue({
       publishedActiveTotal: 0,
       visibleCanonicalUrls: new Set<string>(),
+      visibleByCanonicalUrl: new Map(),
+      visibleAliasByCanonical: new Map(),
+      bySaleInstanceKey: new Map(),
+      bySourceListingId: new Map(),
+      byNormalizedAddress: new Map(),
     })
     mockUpsertObservations.mockResolvedValue(undefined)
     mockAggregateObservations.mockResolvedValue({

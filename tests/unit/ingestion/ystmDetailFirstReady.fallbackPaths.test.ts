@@ -130,6 +130,13 @@ function ingestedSalesSelectChain(options?: {
           order: vi.fn(() => ({
             limit: vi.fn().mockResolvedValue({ data: sourceUrlRows, error: null }),
           })),
+          eq: vi.fn(() => ({
+            not: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              })),
+            })),
+          })),
         }
       }
       if (column === 'source_platform') {

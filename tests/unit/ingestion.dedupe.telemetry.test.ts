@@ -42,10 +42,13 @@ function processedBase(overrides: Partial<ProcessedIngestedSale> = {}): Processe
 }
 
 function sourceLookupRow(id: string | null) {
+  const rows = id ? [{ id }] : []
   return {
     select: () => ({
       eq: () => ({
-        maybeSingle: async () => ({ data: id ? { id } : null }),
+        order: () => ({
+          limit: async () => ({ data: rows, error: null }),
+        }),
       }),
     }),
   }

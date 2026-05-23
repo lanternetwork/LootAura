@@ -58,6 +58,7 @@ function salesChain(rows: unknown[]) {
   for (const m of ['eq', 'is', 'or']) {
     q[m] = vi.fn(() => q)
   }
+  q.order = vi.fn(() => q)
   q.range = vi.fn().mockResolvedValue({ data: rows, error: null })
   return {
     select: vi.fn(() => q),

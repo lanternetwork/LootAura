@@ -56,7 +56,12 @@ export default function YstmCoverageScoreboardSection() {
       const res = await fetch('/api/admin/ingestion/ystm-coverage', { credentials: 'include' })
       const json = (await res.json()) as YstmCoverageMetricsResponse & { code?: string; message?: string }
       if (!res.ok || !json.ok) {
-        throw new Error(json.message || `HTTP ${res.status}`)
+        const detail =
+          json.message ||
+          (typeof json.code === 'string' ? json.code : null) ||
+          res.statusText ||
+          `HTTP ${res.status}`
+        throw new Error(detail)
       }
       setData(json)
       setError(null)

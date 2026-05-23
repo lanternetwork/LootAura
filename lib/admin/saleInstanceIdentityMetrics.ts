@@ -25,7 +25,7 @@ export async function loadSaleInstanceIdentityMetrics(): Promise<SaleInstanceIde
     .select('id', { count: 'exact', head: true })
     .not('sale_instance_key', 'is', null)
     .is('superseded_by_ingested_sale_id', null)
-    .not('status', 'eq', 'expired')
+    .neq('status', 'expired')
     .ilike('source_url', YSTM_URL_LIKE)
   if (activeErr) throw new Error(activeErr.message)
 

@@ -97,7 +97,9 @@ async function loadVisibleYstmSales(
   for (;;) {
     let q = fromBase(admin, 'sales').select('id, external_source_url, lat, lng')
     q = applyPhase4PublicPublishedSaleReadFilters(q, { now })
-    const { data, error } = await q.range(from, from + pageSize - 1)
+    const { data, error } = await q
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
     if (error) throw new Error(error.message)
 
     const chunk = (data ?? []) as VisibleSaleRow[]

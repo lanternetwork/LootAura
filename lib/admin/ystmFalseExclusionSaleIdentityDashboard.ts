@@ -159,7 +159,9 @@ async function loadDuplicateVisibleAddressDateClusters(
   for (;;) {
     let q = fromBase(admin, 'sales').select('id, external_source_url, lat, lng')
     q = applyPhase4PublicPublishedSaleReadFilters(q, { now })
-    const { data, error } = await q.range(from, from + pageSize - 1)
+    const { data, error } = await q
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
     if (error) throw new Error(error.message)
 
     const chunk = (data ?? []) as Array<{
@@ -176,10 +178,12 @@ async function loadDuplicateVisibleAddressDateClusters(
       })
       .map((s) => s.id)
 
-    if (saleIds.length > 0) {
+    const inChunkSize = 100
+    for (let i = 0; i < saleIds.length; i += inChunkSize) {
+      const saleIdSlice = saleIds.slice(i, i + inChunkSize)
       const { data: ingested, error: ingErr } = await fromBase(admin, 'ingested_sales')
         .select('published_sale_id, normalized_address, date_start')
-        .in('published_sale_id', saleIds)
+        .in('published_sale_id', saleIdSlice)
       if (ingErr) throw new Error(ingErr.message)
 
       for (const row of ingested ?? []) {

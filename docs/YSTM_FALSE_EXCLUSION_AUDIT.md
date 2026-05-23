@@ -245,4 +245,27 @@ Stale published rows at a reused URL no longer count as covered when the active 
 
 ## Later phases
 
-Phases 12–14 add backfill, dashboard metrics, and expanded testing.
+Phases 13–14 add dashboard metrics and expanded testing.
+
+## Phase 12 — sale-instance identity backfill
+
+Bounded backfill for existing `ingested_sales` rows missing `sale_instance_key`:
+
+- Derives `source_listing_id`, content/schedule/location hashes, and `sale_instance_key`
+- Records `ingested_sale_source_urls` alias rows
+- Detects active-key collisions and URL reuse conflicts (metrics only; does not supersede)
+
+### Run
+
+- Admin: `POST /api/admin/ingested-sales/backfill-sale-instance-identity` with `{ "batchSize": 100, "dryRun": false, "maxRows": 5000 }`
+- CLI: `npm run backfill:ystm-sale-instance-identity:dry` then `npm run backfill:ystm-sale-instance-identity`
+
+### Metrics
+
+`rowsBackfilled`, `missingDate`, `missingLocation`, `keyCollisions`, `urlReuseConflicts`, `ambiguousRows`
+
+### Code
+
+- `lib/ingestion/identity/backfillYstmSaleInstanceIdentity.ts`
+- `lib/ingestion/identity/remediateYstmSaleInstanceIdentityBacklog.ts`
+- `app/api/admin/ingested-sales/backfill-sale-instance-identity/route.ts`

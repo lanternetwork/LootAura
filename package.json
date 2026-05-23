@@ -46,7 +46,9 @@
     "remediate:ingested-location-casing:dry": "tsx scripts/remediate-ingested-location-casing.ts --dry-run",
     "remediate:ingested-location-casing": "tsx scripts/remediate-ingested-location-casing.ts --execute",
     "backfill:sale-listing-ends:dry": "tsx scripts/backfill-sale-listing-ends.ts --dry-run",
-    "backfill:sale-listing-ends": "tsx scripts/backfill-sale-listing-ends.ts --execute"
+    "backfill:sale-listing-ends": "tsx scripts/backfill-sale-listing-ends.ts --execute",
+    "backfill:ystm-sale-instance-identity:dry": "tsx scripts/backfill-ystm-sale-instance-identity.ts --dry-run",
+    "backfill:ystm-sale-instance-identity": "tsx scripts/backfill-ystm-sale-instance-identity.ts --execute"
   },
   "dependencies": {
     "@react-email/components": "^0.0.19",

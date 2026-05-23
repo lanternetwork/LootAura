@@ -2,6 +2,7 @@ import {
   type CrawlSkipTaxonomyRollup,
 } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import { rollupExternalIngestionForWindow } from '@/lib/admin/ingestionFunnelMetricsHelpers'
+import type { OrchestrationRunRow } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import type { SaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
 import type { SaleInstanceIdentityMetrics } from '@/lib/admin/saleInstanceIdentityMetrics'
 import { evaluateCrawlSkipTaxonomyOperationalHealth } from '@/lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth'
@@ -58,7 +59,7 @@ async function loadCrawlSkipTaxonomy24h(
   if (error) throw new Error(error.message)
 
   const rollup = rollupExternalIngestionForWindow(
-    (data ?? []) as Array<{ created_at: string; mode: string; notes: unknown }>,
+    (data ?? []) as OrchestrationRunRow[],
     WINDOW_HOURS,
     nowMs
   )

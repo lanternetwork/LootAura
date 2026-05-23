@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { YstmGraphEnumerationMetrics } from '@/lib/admin/ystmGraphEnumerationMetrics'
 import type { YstmSourceExpansionMetrics } from '@/lib/admin/ystmSourceExpansionMetrics'
+import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import type { YstmCatalogRepairAggregate } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairStore'
@@ -175,14 +176,7 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       duplicateVisibleSameAddressDate24h: 0,
       coverageMatchMethodCounts: {},
       coverageWithoutMatchMethod: 0,
-      crawlSkipTaxonomy24h: {
-        subReasons: {},
-        suspicious: 0,
-        benign: 0,
-        operational: 0,
-        total: 0,
-        suspiciousShare: null,
-      },
+      crawlSkipTaxonomy24h: emptyCrawlSkipTaxonomyRollup(),
       healthy: true,
       alerts: [],
     },

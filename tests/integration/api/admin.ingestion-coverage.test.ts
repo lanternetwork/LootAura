@@ -68,8 +68,15 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
           return thenableQuery({ data: [], count: 0 })
         case 'ingested_sale_source_urls':
           return thenableQuery({ data: [], count: 0 })
+        case 'ingestion_orchestration_runs':
+          return thenableQuery({ data: [] })
+        case 'ingested_sale_soft_dedupe_suppressions':
+          return thenableQuery({ data: [], count: 0 })
         case 'ystm_sale_instance_shadow_replays':
-          return { upsert: vi.fn().mockResolvedValue({ error: null }) }
+          return {
+            ...thenableQuery({ data: [] }),
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          }
         default:
           return thenableQuery({ data: [] })
       }
@@ -110,5 +117,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.sourceUrlAlias.totalAliasRows).toBe(0)
     expect(json.saleInstanceShadowReplay.replayedCount).toBe(0)
     expect(json.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount).toBe(0)
+    expect(json.falseExclusionSaleIdentity.missingValidYstmUrls).toBe(0)
+    expect(json.falseExclusionSaleIdentity.healthy).toBe(true)
   })
 })

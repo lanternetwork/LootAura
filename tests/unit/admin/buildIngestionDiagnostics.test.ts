@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
+import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
@@ -478,14 +479,7 @@ describe('buildIngestionDiagnostics', () => {
         duplicateVisibleSameAddressDate24h: 0,
         coverageMatchMethodCounts: { sale_instance_key: 71 },
         coverageWithoutMatchMethod: 7,
-        crawlSkipTaxonomy24h: {
-          subReasons: {},
-          suspicious: 0,
-          benign: 0,
-          operational: 0,
-          total: 0,
-          suspiciousShare: null,
-        },
+        crawlSkipTaxonomy24h: emptyCrawlSkipTaxonomyRollup(),
         healthy: true,
         alerts: [],
       },

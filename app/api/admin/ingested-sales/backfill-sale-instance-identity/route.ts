@@ -7,6 +7,8 @@ import {
 import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
+/** Backfill can process many rows; default Vercel limit is too low for maxRows 5000. */
+export const maxDuration = 300
 
 export async function POST(request: NextRequest) {
   try {

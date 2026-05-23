@@ -83,6 +83,13 @@ function softLookupRows(
     lat: null as number | null,
     lng: null as number | null,
     image_source_url: r.image_source_url ?? null,
+    source_url: null,
+    canonical_source_url: null,
+    sale_instance_key: null,
+    source_listing_id: null,
+    source_location_hash: null,
+    status: null,
+    failure_reasons: null,
   }))
   return {
     select: () => ({
@@ -98,7 +105,12 @@ function softLookupRows(
         }),
       }),
     }),
+    insert: vi.fn().mockResolvedValue({ error: null }),
   }
+}
+
+function suppressionEvidenceInsert() {
+  return { insert: vi.fn().mockResolvedValue({ error: null }) }
 }
 
 describe('findIngestedSaleMatch telemetry', () => {
@@ -158,6 +170,7 @@ describe('findIngestedSaleMatch telemetry', () => {
       .mockReturnValueOnce(
         softLookupRows([{ id: 'soft-match-id', date_start: '2026-05-11', external_id: '42' }])
       )
+      .mockReturnValueOnce(suppressionEvidenceInsert())
 
     const { findIngestedSaleMatch } = await import('@/lib/ingestion/dedupe')
     // Use a long enough normalized address so weak-address scoring does not raise the suppress bar above the fixture score.

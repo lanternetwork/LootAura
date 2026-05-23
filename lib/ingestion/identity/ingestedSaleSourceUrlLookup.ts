@@ -5,6 +5,7 @@ export type IngestedSaleSourceUrlLookupRow = ExistingIngestedSaleCandidate & {
   published_sale_id?: string | null
   source_content_hash?: string | null
   source_listing_id?: string | null
+  is_duplicate?: boolean
 }
 
 function comparePrimaryIngestedSaleRow(
@@ -46,7 +47,7 @@ export async function listIngestedSalesBySourceUrl(
     throw new Error(error.message)
   }
 
-  return (data ?? []) as IngestedSaleSourceUrlLookupRow[]
+  return ((data ?? []) as unknown) as IngestedSaleSourceUrlLookupRow[]
 }
 
 export async function findPrimaryIngestedSaleBySourceUrl(

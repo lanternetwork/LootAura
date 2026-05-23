@@ -44,6 +44,10 @@ import {
   type SaleInstanceIdentityMetrics,
 } from '@/lib/admin/saleInstanceIdentityMetrics'
 import {
+  buildYstmFalseExclusionSaleIdentityDashboard,
+  type YstmFalseExclusionSaleIdentityDashboard,
+} from '@/lib/admin/ystmFalseExclusionSaleIdentityDashboard'
+import {
   loadSourceUrlAliasMetrics,
   type SourceUrlAliasMetrics,
 } from '@/lib/admin/sourceUrlAliasMetrics'
@@ -88,6 +92,7 @@ export type YstmCoverageScoreboard = {
   saleInstanceShadowReplay: SaleInstanceShadowReplayReport
   saleInstanceIdentity: SaleInstanceIdentityMetrics
   sourceUrlAlias: SourceUrlAliasMetrics
+  falseExclusionSaleIdentity: YstmFalseExclusionSaleIdentityDashboard
 }
 
 type AuditRunRow = {
@@ -208,6 +213,17 @@ export async function buildYstmCoverageScoreboard(
     nowMs: now.getTime(),
   })
 
+  const falseExclusionSaleIdentity = await buildYstmFalseExclusionSaleIdentityDashboard(
+    admin,
+    {
+      missingValidYstmUrls: agg.missingValidYstmUrls,
+      missingNeverAttempted: missingIngestion.missingIngestionNeverAttempted,
+      saleInstanceIdentity,
+      saleInstanceShadowReplay,
+    },
+    now
+  )
+
   return {
     targetPct: YSTM_COVERAGE_TARGET_PCT,
     generatedAt: now.toISOString(),
@@ -242,6 +258,7 @@ export async function buildYstmCoverageScoreboard(
     saleInstanceShadowReplay,
     saleInstanceIdentity,
     sourceUrlAlias,
+    falseExclusionSaleIdentity,
   }
 }
 

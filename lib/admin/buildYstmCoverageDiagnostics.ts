@@ -62,6 +62,47 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     ),
     bullet('ambiguous (new)', data.saleInstanceShadowReplay.ambiguousCount),
     '',
+    '### YSTM false exclusion / sale identity (Phase 13)',
+    bullet('healthy', data.falseExclusionSaleIdentity.healthy ? 'yes' : 'no'),
+    bullet('missing valid YSTM URLs', data.falseExclusionSaleIdentity.missingValidYstmUrls),
+    bullet('never attempted', data.falseExclusionSaleIdentity.missingNeverAttempted),
+    bullet('URL match same dates (24h)', data.falseExclusionSaleIdentity.urlMatchSameDates),
+    bullet('URL match dates changed (24h)', data.falseExclusionSaleIdentity.urlMatchDatesChanged),
+    bullet('URL reuse detected', data.falseExclusionSaleIdentity.urlReuseDetected),
+    bullet('new event same URL', data.falseExclusionSaleIdentity.newEventSameUrl),
+    bullet('same event updated', data.falseExclusionSaleIdentity.sameEventUpdated),
+    bullet('soft dedupe suppressed (24h)', data.falseExclusionSaleIdentity.softDedupeSuppressed),
+    bullet('suspicious suppressions (24h)', data.falseExclusionSaleIdentity.suspiciousSuppressions),
+    bullet('ambiguous requires review', data.falseExclusionSaleIdentity.ambiguousRequiresReview),
+    bullet('sale instance key collisions', data.falseExclusionSaleIdentity.saleInstanceKeyCollisions),
+    bullet(
+      'coverage rows without match_method',
+      data.falseExclusionSaleIdentity.coverageWithoutMatchMethod
+    ),
+    bullet(
+      'coverage match_method breakdown',
+      Object.entries(data.falseExclusionSaleIdentity.coverageMatchMethodCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `${k}=${n}`)
+        .join(', ') || 'none'
+    ),
+    bullet(
+      'duplicate visible address+date clusters',
+      data.falseExclusionSaleIdentity.duplicateVisibleSaleClusters24h
+    ),
+    bullet(
+      'extra visible duplicate rows',
+      data.falseExclusionSaleIdentity.duplicateVisibleSameAddressDate24h
+    ),
+    ...(data.falseExclusionSaleIdentity.alerts.length > 0
+      ? [
+          bullet(
+            'alerts',
+            data.falseExclusionSaleIdentity.alerts.map((a) => `${a.level}:${a.code}`).join('; ')
+          ),
+        ]
+      : []),
+    '',
     '### Week-1 sprint gates',
     ...gates.gates.map((g) => `- [${g.status.toUpperCase()}] ${g.label}: ${g.detail}`),
     bullet('all gates pass', gates.allPass ? 'yes' : 'no'),

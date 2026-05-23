@@ -461,6 +461,34 @@ describe('buildIngestionDiagnostics', () => {
         ambiguousCount: 0,
         sampleDivergences: [],
       },
+      falseExclusionSaleIdentity: {
+        generatedAt: '2026-05-22T00:00:00Z',
+        missingValidYstmUrls: 7,
+        missingNeverAttempted: 3,
+        urlMatchSameDates: 0,
+        urlMatchDatesChanged: 0,
+        urlReuseDetected: 0,
+        newEventSameUrl: 0,
+        sameEventUpdated: 0,
+        softDedupeSuppressed: 0,
+        suspiciousSuppressions: 0,
+        ambiguousRequiresReview: 0,
+        saleInstanceKeyCollisions: 2,
+        duplicateVisibleSaleClusters24h: 0,
+        duplicateVisibleSameAddressDate24h: 0,
+        coverageMatchMethodCounts: { sale_instance_key: 71 },
+        coverageWithoutMatchMethod: 7,
+        crawlSkipTaxonomy24h: {
+          subReasons: {},
+          suspicious: 0,
+          benign: 0,
+          operational: 0,
+          total: 0,
+          suspiciousShare: null,
+        },
+        healthy: true,
+        alerts: [],
+      },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
@@ -468,6 +496,7 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('### Sale-instance identity (Phase 3)')
     expect(md).toContain('### Source URL alias history (Phase 4)')
     expect(md).toContain('### Sale-instance shadow replay (Phase 9)')
+    expect(md).toContain('### YSTM false exclusion / sale identity (Phase 13)')
     expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
   })

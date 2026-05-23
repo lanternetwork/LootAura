@@ -303,6 +303,126 @@ export default function YstmCoverageScoreboardSection() {
             )}
           </div>
 
+          <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4">
+            <h3 className="text-sm font-semibold text-amber-950">
+              YSTM false exclusion / sale identity (Phase 13)
+            </h3>
+            <p className="mt-1 text-xs text-amber-900">
+              Unified operational view: missing coverage, URL reuse, classifier shadow outcomes,
+              soft-dedupe suppressions, instance-key collisions, and duplicate-visible guardrails.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Missing valid YSTM URLs"
+                value={data.falseExclusionSaleIdentity.missingValidYstmUrls}
+                highlight={data.falseExclusionSaleIdentity.missingValidYstmUrls > 0}
+              />
+              <Metric
+                label="Never attempted"
+                value={data.falseExclusionSaleIdentity.missingNeverAttempted}
+              />
+              <Metric
+                label="URL match same dates"
+                value={data.falseExclusionSaleIdentity.urlMatchSameDates}
+              />
+              <Metric
+                label="URL match dates changed"
+                value={data.falseExclusionSaleIdentity.urlMatchDatesChanged}
+              />
+              <Metric
+                label="URL reuse detected"
+                value={data.falseExclusionSaleIdentity.urlReuseDetected}
+              />
+              <Metric
+                label="New event same URL"
+                value={data.falseExclusionSaleIdentity.newEventSameUrl}
+              />
+              <Metric
+                label="Same event updated"
+                value={data.falseExclusionSaleIdentity.sameEventUpdated}
+              />
+              <Metric
+                label="Soft dedupe suppressed (24h)"
+                value={data.falseExclusionSaleIdentity.softDedupeSuppressed}
+              />
+              <Metric
+                label="Suspicious suppressions (24h)"
+                value={data.falseExclusionSaleIdentity.suspiciousSuppressions}
+                highlight={data.falseExclusionSaleIdentity.suspiciousSuppressions > 0}
+              />
+              <Metric
+                label="Ambiguous (review)"
+                value={data.falseExclusionSaleIdentity.ambiguousRequiresReview}
+                highlight={data.falseExclusionSaleIdentity.ambiguousRequiresReview > 0}
+              />
+              <Metric
+                label="Instance key collisions"
+                value={data.falseExclusionSaleIdentity.saleInstanceKeyCollisions}
+                highlight={data.falseExclusionSaleIdentity.saleInstanceKeyCollisions > 0}
+              />
+              <Metric
+                label="Coverage rows w/o match_method"
+                value={data.falseExclusionSaleIdentity.coverageWithoutMatchMethod}
+                highlight={data.falseExclusionSaleIdentity.coverageWithoutMatchMethod > 0}
+              />
+              <Metric
+                label="Duplicate visible clusters"
+                value={data.falseExclusionSaleIdentity.duplicateVisibleSaleClusters24h}
+                highlight={
+                  data.falseExclusionSaleIdentity.duplicateVisibleSaleClusters24h >= 3
+                }
+              />
+              <Metric
+                label="Extra visible dup rows"
+                value={data.falseExclusionSaleIdentity.duplicateVisibleSameAddressDate24h}
+              />
+            </div>
+            {Object.keys(data.falseExclusionSaleIdentity.coverageMatchMethodCounts).length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-left text-xs text-amber-950">
+                  <thead>
+                    <tr className="border-b border-amber-200">
+                      <th className="py-1 pr-4 font-medium">Coverage match_method</th>
+                      <th className="py-1 font-medium">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(data.falseExclusionSaleIdentity.coverageMatchMethodCounts)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([method, count]) => (
+                        <tr key={method} className="border-b border-amber-100">
+                          <td className="py-1 pr-4 font-mono">{method}</td>
+                          <td className="py-1 tabular-nums">{count.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {data.falseExclusionSaleIdentity.alerts.length > 0 && (
+              <ul className="mt-3 space-y-1 text-xs text-amber-950">
+                {data.falseExclusionSaleIdentity.alerts.map((a) => (
+                  <li key={a.code}>
+                    <span
+                      className={
+                        a.level === 'critical'
+                          ? 'font-semibold text-red-800'
+                          : 'font-semibold text-amber-900'
+                      }
+                    >
+                      [{a.level}]
+                    </span>{' '}
+                    {a.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-amber-800">
+              Healthy: {data.falseExclusionSaleIdentity.healthy ? 'yes' : 'no'} · generated{' '}
+              {new Date(data.falseExclusionSaleIdentity.generatedAt).toLocaleString()}
+            </p>
+          </div>
+
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">
               False-exclusion audit (Phase 1)

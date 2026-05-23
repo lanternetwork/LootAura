@@ -243,10 +243,6 @@ Stale published rows at a reused URL no longer count as covered when the active 
 - `lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint.ts`
 - `lib/ingestion/ystmCoverage/runYstmCoverageAuditCron.ts`
 
-## Later phases
-
-Phases 13–14 add dashboard metrics and expanded testing.
-
 ## Phase 12 — sale-instance identity backfill
 
 Bounded backfill for existing `ingested_sales` rows missing `sale_instance_key`:
@@ -269,3 +265,32 @@ Bounded backfill for existing `ingested_sales` rows missing `sale_instance_key`:
 - `lib/ingestion/identity/backfillYstmSaleInstanceIdentity.ts`
 - `lib/ingestion/identity/remediateYstmSaleInstanceIdentityBacklog.ts`
 - `app/api/admin/ingested-sales/backfill-sale-instance-identity/route.ts`
+
+## Phase 13 — false exclusion / sale identity dashboard
+
+Unified admin scoreboard section aggregating replay-queue metrics, 24h crawl-skip taxonomy, shadow classifier counts, soft-dedupe suppressions, coverage `match_method` breakdown, and duplicate-visible address+date clusters.
+
+### Where it appears
+
+- Admin ingestion → **YSTM nationwide coverage** → **YSTM false exclusion / sale identity (Phase 13)**
+- API field: `falseExclusionSaleIdentity` on `GET /api/admin/ingestion/ystm-coverage`
+- Diagnostics export: `### YSTM false exclusion / sale identity (Phase 13)`
+
+### Alerts (non-blocking)
+
+- Shadow divergence: legacy suppress → new classifier would publish
+- Suspicious crawl-skip share ≥15% (when n≥20 classified skips)
+- Elevated URL reuse skips (`url_match_dates_changed` + `url_match_expired_row`)
+- Duplicate-visible clusters ≥3 (same normalized address + `date_start`)
+- All missing valid-active rows lack `match_method` (re-run coverage audit after Phase 11)
+
+### Code
+
+- `lib/admin/ystmFalseExclusionSaleIdentityDashboard.ts`
+- `lib/admin/ystmCoverageScoreboard.ts` (wires dashboard on scoreboard build)
+- `app/admin/ingestion/YstmCoverageScoreboardSection.tsx`
+- `lib/admin/buildYstmCoverageDiagnostics.ts`
+
+## Later phases
+
+Phase 14 adds expanded testing and rollout gates.

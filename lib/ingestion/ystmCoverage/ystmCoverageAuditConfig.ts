@@ -1,10 +1,10 @@
-/** Burn-in defaults per docs/YSTM_90_PERCENT_COVERAGE_SPEC.md (Phase 1). */
-const DEFAULT_MAX_CONFIGS = 24
-const DEFAULT_MAX_LIST_FETCHES = 40
-const DEFAULT_MAX_DETAIL_VALIDATIONS = 80
-const DEFAULT_MAX_URLS_PER_LIST_PAGE = 120
+/** Production-safe nationwide defaults; env vars remain optional overrides. */
+const DEFAULT_MAX_CONFIGS = 40
+const DEFAULT_MAX_LIST_FETCHES = 80
+const DEFAULT_MAX_DETAIL_VALIDATIONS = 120
+const DEFAULT_MAX_URLS_PER_LIST_PAGE = 200
 const DEFAULT_LEASE_SECONDS = 300
-const DEFAULT_MAX_RUNTIME_MS = 240_000
+const DEFAULT_MAX_RUNTIME_MS = 300_000
 
 function parsePositiveInt(raw: string | undefined, fallback: number, cap: number): number {
   if (raw === undefined || raw === '') return fallback

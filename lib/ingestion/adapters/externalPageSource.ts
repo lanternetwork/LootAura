@@ -67,6 +67,7 @@ import { readYstmNativeCoordsFromListingRawPayload } from '@/lib/ingestion/acqui
 import { detailScheduleFieldsForListing } from '@/lib/ingestion/acquisition/detailFirstFieldProvenance'
 import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
 import { detailFirstOrchestrationFields } from '@/lib/ingestion/acquisition/detailFirstOrchestrationFields'
+import { mergeListingImageUrlsIntoRowPayload } from '@/lib/ingestion/acquisition/mergeListingImageUrlsIntoRowPayload'
 import {
   attemptYstmDetailFirstReady,
   emptyYstmDetailFirstRunMetrics,
@@ -1317,14 +1318,17 @@ export async function persistExternalPageSource(
       }
 
       const scheduleFields = detailScheduleFieldsForListing(listing)
-      const legacyRowPayload = {
-        ...rowPayload,
-        ...(typeof listing.rawPayload === 'object' &&
-        listing.rawPayload &&
-        (listing.rawPayload as { detailPageParsed?: boolean }).detailPageParsed
-          ? { detailPageLegacyFallback: true, detailPageParsed: true }
-          : {}),
-      }
+      const legacyRowPayload = mergeListingImageUrlsIntoRowPayload(
+        {
+          ...rowPayload,
+          ...(typeof listing.rawPayload === 'object' &&
+          listing.rawPayload &&
+          (listing.rawPayload as { detailPageParsed?: boolean }).detailPageParsed
+            ? { detailPageLegacyFallback: true, detailPageParsed: true }
+            : {}),
+        },
+        listing
+      )
       const saleInstanceIdentity = computeYstmSaleInstanceIdentity({
         sourcePlatform: platform,
         sourceUrl: listing.sourceUrl,

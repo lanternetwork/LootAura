@@ -1,6 +1,6 @@
 /**
  * Phase 2: external crawl skip sub-reasons (observability only).
- * @see docs/YSTM_FALSE_EXCLUSION_AUDIT.md
+ * @see docs/EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md
  */
 
 import { calendarDaysBetweenUtc } from '@/lib/ingestion/duplicateScoring'

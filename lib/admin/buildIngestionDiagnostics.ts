@@ -16,7 +16,7 @@ export type BuildIngestionDiagnosticsOptions = {
   environment?: string
   /** ISO timestamp for the export header; defaults to metrics.generatedAt */
   copiedAt?: string
-  /** When set, appends YSTM coverage scoreboard + week-1 sprint gates. */
+  /** When set, appends external marketplace coverage scoreboard + week-1 sprint gates. */
   ystmCoverage?: YstmCoverageMetricsResponse | null
 }
 
@@ -306,7 +306,7 @@ export function buildIngestionDiagnostics(
     bullet('pending configs', vol.acquisition.pendingDiscoveryConfigs),
     bullet('crawlable configs', vol.acquisition.crawlableConfigs),
     '',
-    '## YSTM Breakdown',
+    '## External source breakdown',
     bullet('discovered', ystm.discovered),
     bullet('duplicate/skipped', ystm.duplicate_skipped),
     bullet('inserted', ystm.inserted),

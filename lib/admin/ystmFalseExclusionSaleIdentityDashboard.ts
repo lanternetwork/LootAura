@@ -255,7 +255,7 @@ function evaluateAlerts(input: {
     alerts.push({
       level: 'warning',
       code: 'duplicate_visible_clusters',
-      message: `${input.duplicateVisibleClusters} visible address+date clusters have multiple published YSTM pins (duplicate-visible guardrail).`,
+      message: `${input.duplicateVisibleClusters} visible address+date clusters have multiple published external-source pins (duplicate-visible guardrail).`,
     })
   }
 

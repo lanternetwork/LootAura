@@ -12,7 +12,7 @@ function formatPct(value: number | null): string {
 }
 
 /**
- * Markdown block for YSTM coverage scoreboard (clipboard / support).
+ * Markdown block for external marketplace coverage scoreboard (clipboard / support).
  */
 export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse): string {
   const ge = data.graphEnumeration
@@ -21,7 +21,7 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
   const rolloutGates = evaluateYstmSaleInstanceRolloutGates(data)
 
   const lines: string[] = [
-    '## YSTM nationwide coverage',
+    '## External marketplace nationwide coverage',
     bullet('generatedAt', data.generatedAt),
     bullet('coveragePct', formatPct(data.coveragePct)),
     bullet('validActiveYstmUrls (V)', data.validActiveYstmUrls),
@@ -30,7 +30,7 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     bullet('lastAuditAt', data.lastAuditAt ?? '—'),
     '',
     '### Sale-instance identity (Phase 3)',
-    bullet('YSTM rows with sale_instance_key', data.saleInstanceIdentity.ystmRowsWithKey),
+    bullet('external-source rows with sale_instance_key', data.saleInstanceIdentity.ystmRowsWithKey),
     bullet('active rows with key', data.saleInstanceIdentity.ystmActiveRowsWithKey),
     bullet('key collision groups', data.saleInstanceIdentity.keyCollisionGroups),
     bullet(
@@ -64,9 +64,9 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     ),
     bullet('ambiguous (new)', data.saleInstanceShadowReplay.ambiguousCount),
     '',
-    '### YSTM false exclusion / sale identity (Phase 13)',
+    '### External source false exclusion / sale identity (Phase 13)',
     bullet('healthy', data.falseExclusionSaleIdentity.healthy ? 'yes' : 'no'),
-    bullet('missing valid YSTM URLs', data.falseExclusionSaleIdentity.missingValidYstmUrls),
+    bullet('missing valid external listing URLs', data.falseExclusionSaleIdentity.missingValidYstmUrls),
     bullet('never attempted', data.falseExclusionSaleIdentity.missingNeverAttempted),
     bullet('URL match same dates (24h)', data.falseExclusionSaleIdentity.urlMatchSameDates),
     bullet('URL match dates changed (24h)', data.falseExclusionSaleIdentity.urlMatchDatesChanged),

@@ -38,7 +38,7 @@ export function urlSuggestsNonListingPhoto(urlString: string): string | null {
   const haystack = `${host} ${psh}`.toLowerCase()
   const base = lastPathSegmentLower(u)
 
-  // --- YSTM / Yard Sale Treasure Map: site chrome and branding (host + path) ---
+  // --- External listing host: site chrome and branding (host + path) ---
   const isYstmHost = /(?:^|\.)yardsaletreasuremap\.(?:com|net|org)$/i.test(host)
 
   if (isYstmHost) {

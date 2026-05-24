@@ -16,7 +16,7 @@ export type CoverageMissingObservationRow = {
 
 function titleFromListingUrl(url: string): string {
   const parsed = parseYstmListingPathParts(url)
-  if (!parsed?.addressSlugSegment) return 'YSTM yard sale'
+  if (!parsed?.addressSlugSegment) return 'External listing yard sale'
   return parsed.addressSlugSegment.replace(/-/g, ' ')
 }
 

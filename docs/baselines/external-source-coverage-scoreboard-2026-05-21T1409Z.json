@@ -67,7 +67,7 @@
       {
         "level": "warning",
         "code": "coverage_no_audit_denominator",
-        "message": "No valid active YSTM URLs in the coverage audit footprint yet — run the coverage audit cron or expand source pages."
+        "message": "No valid active external listing URLs in the coverage audit footprint yet — run the coverage audit cron or expand source pages."
       }
     ]
   }

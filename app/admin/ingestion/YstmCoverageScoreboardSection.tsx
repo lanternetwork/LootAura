@@ -159,10 +159,10 @@ export default function YstmCoverageScoreboardSection() {
     <section className="mb-8 rounded-lg border border-emerald-300 bg-white p-6 shadow-sm">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-emerald-950">YSTM nationwide coverage</h2>
+          <h2 className="text-xl font-semibold text-emerald-950">External marketplace nationwide coverage</h2>
           <p className="mt-1 max-w-3xl text-sm text-gray-600">
-            Product goal: published active LootAura YSTM sales visible on the map ÷ valid active YSTM sales from
-            bounded audits. Not crawl discovered/skipped counts.
+            Product goal: published active LootAura external-source sales visible on the map ÷ valid active external
+            listings from bounded audits. Not crawl discovered/skipped counts.
           </p>
         </div>
         <p className="text-xs text-gray-500">Last audit: {formatWhen(data?.lastAuditAt ?? null)}</p>
@@ -203,7 +203,7 @@ export default function YstmCoverageScoreboardSection() {
                 ))}
               </ul>
               <p className="mt-2 text-xs text-violet-800">
-                Runbook: <code className="text-xs">docs/YSTM_ONE_WEEK_SPRINT.md</code>
+                Runbook: <code className="text-xs">docs/EXTERNAL_SOURCE_ONE_WEEK_SPRINT.md</code>
               </p>
             </div>
           )}
@@ -242,7 +242,7 @@ export default function YstmCoverageScoreboardSection() {
                 ))}
               </ul>
               <p className="mt-2 text-xs text-slate-700">
-                Runbook: <code className="text-xs">docs/YSTM_FALSE_EXCLUSION_AUDIT.md</code> (Phase 14)
+                Runbook: <code className="text-xs">docs/EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md</code> (Phase 14)
               </p>
             </div>
           )}
@@ -271,7 +271,7 @@ export default function YstmCoverageScoreboardSection() {
               <p className="mt-1 text-xs text-emerald-900">Target {data.targetPct}%</p>
             </div>
             <div className="rounded-md border border-gray-200 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-600">Valid active YSTM (audit)</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-600">Valid active external listings (audit)</p>
               <p className="mt-1 text-2xl font-semibold">{data.validActiveYstmUrls.toLocaleString()}</p>
               <p className="mt-1 text-xs text-gray-500">
                 Footprint {data.observationFootprintUrls.toLocaleString()} URLs observed
@@ -289,7 +289,7 @@ export default function YstmCoverageScoreboardSection() {
               </p>
             </div>
             <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-amber-900">Missing valid YSTM</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-amber-900">Missing valid external listings</p>
               <p className="mt-1 text-2xl font-semibold text-amber-950">
                 {data.missingValidYstmUrls.toLocaleString()}
               </p>
@@ -343,7 +343,7 @@ export default function YstmCoverageScoreboardSection() {
           <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
             <h3 className="text-sm font-semibold text-sky-950">Sale-instance identity (Phase 3)</h3>
             <p className="mt-1 text-xs text-sky-900">
-              New YSTM inserts populate sale_instance_key and hashes (observability only — dedupe still
+              New external-source inserts populate sale_instance_key and hashes (observability only — dedupe still
               uses source_url until later phases).
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -366,7 +366,7 @@ export default function YstmCoverageScoreboardSection() {
             <div className="mt-4 rounded-md border border-sky-300 bg-white p-3">
               <p className="text-xs text-sky-950">
                 Phase 12 backfill fills <code className="text-[11px]">sale_instance_key</code> on existing
-                YSTM rows. Rollout gate target: ≥95% of published-active rows (
+                external-source rows. Rollout gate target: ≥95% of published-active rows (
                 {activeKeyPct != null ? `${activeKeyPct.toFixed(1)}% now` : '—'}). Each run processes up to{' '}
                 {BACKFILL_MAX_ROWS.toLocaleString()} rows — click again until the percentage stops rising.
               </p>
@@ -421,7 +421,7 @@ export default function YstmCoverageScoreboardSection() {
           <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
             <h3 className="text-sm font-semibold text-sky-950">Sale-instance shadow replay (Phase 9)</h3>
             <p className="mt-1 text-xs text-sky-900">
-              Every missing valid YSTM URL is replayed through the legacy URL gate and the new
+              Every missing valid external listing URL is replayed through the legacy URL gate and the new
               classifier. Outcomes are persisted for lead review before enforcement changes.
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -457,7 +457,7 @@ export default function YstmCoverageScoreboardSection() {
 
           <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4">
             <h3 className="text-sm font-semibold text-amber-950">
-              YSTM false exclusion / sale identity (Phase 13)
+              External source false exclusion / sale identity (Phase 13)
             </h3>
             <p className="mt-1 text-xs text-amber-900">
               Unified operational view: missing coverage, URL reuse, classifier shadow outcomes,
@@ -465,7 +465,7 @@ export default function YstmCoverageScoreboardSection() {
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Metric
-                label="Missing valid YSTM URLs"
+                label="Missing valid external listings URLs"
                 value={data.falseExclusionSaleIdentity.missingValidYstmUrls}
                 highlight={data.falseExclusionSaleIdentity.missingValidYstmUrls > 0}
               />
@@ -580,7 +580,7 @@ export default function YstmCoverageScoreboardSection() {
               False-exclusion audit (Phase 1)
             </h3>
             <p className="mt-1 text-xs text-violet-900">
-              Every missing valid YSTM URL is traced to a primary bucket (replay queue). Refreshed on
+              Every missing valid external listing URL is traced to a primary bucket (replay queue). Refreshed on
               each scoreboard load; persisted on coverage observations.
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -654,7 +654,7 @@ export default function YstmCoverageScoreboardSection() {
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <Metric
-                label="Missing valid YSTM"
+                label="Missing valid external listings"
                 value={data.pipelineBacklog.missingValidUrls}
                 highlight
               />
@@ -674,7 +674,7 @@ export default function YstmCoverageScoreboardSection() {
           <div className="mb-6 rounded-md border border-rose-200 bg-rose-50 p-4">
             <h3 className="text-sm font-semibold text-rose-950">Catalog repair (Phase 5)</h3>
             <p className="mt-1 text-xs text-rose-900">
-              Re-processes stuck YSTM ingested_sales (needs_check, publish_failed, coord gaps) via
+              Re-processes stuck external-source ingested_sales (needs_check, publish_failed, coord gaps) via
               detail-first refresh, then geocode and publish when eligible.
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -693,11 +693,11 @@ export default function YstmCoverageScoreboardSection() {
           <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
             <h3 className="text-sm font-semibold text-sky-950">Existing URL refresh (Phase 4)</h3>
             <p className="mt-1 text-xs text-sky-900">
-              Re-fetches YSTM detail pages for known ingested_sales to sync dates, content, and publish state.
+              Re-fetches external listing detail pages for known ingested_sales to sync dates, content, and publish state.
               Stale threshold defaults to 12h since last source sync.
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Metric label="YSTM ingested corpus" value={data.existingRefresh.ystmDetailIngestedTotal} />
+              <Metric label="External-source ingested corpus" value={data.existingRefresh.ystmDetailIngestedTotal} />
               <Metric label="Stale (&gt;12h)" value={data.existingRefresh.staleOver12h} highlight />
               <Metric label="Synced last 24h" value={data.existingRefresh.syncedLast24h} />
               <Metric label="Never synced" value={data.existingRefresh.neverSynced} />
@@ -707,7 +707,7 @@ export default function YstmCoverageScoreboardSection() {
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">Missing URL ingestion (Phase 3)</h3>
             <p className="mt-1 text-xs text-violet-900">
-              Daily cron ingests valid YSTM URLs from the coverage audit footprint via detail-first + publish.
+              Daily cron ingests valid external listing URLs from the coverage audit footprint via detail-first + publish.
               Queue rotates by canonical URL offset.
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -731,7 +731,7 @@ export default function YstmCoverageScoreboardSection() {
           </div>
 
           <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">
-            <h3 className="text-sm font-semibold text-teal-950">YSTM graph enumeration</h3>
+            <h3 className="text-sm font-semibold text-teal-950">External source graph enumeration</h3>
             <p className="mt-1 text-xs text-teal-900">
               Nationwide city/list registry build (evolved discovery cron). Feeds crawlable configs for
               ingestion and coverage — not a separate publish path.

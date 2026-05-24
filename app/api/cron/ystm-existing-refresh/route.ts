@@ -1,7 +1,7 @@
 /**
  * GET/POST /api/cron/ystm-existing-refresh
  *
- * Bounded refresh of known YSTM ingested_sales (Phase 4).
+ * Bounded refresh of known external-source ingested_sales (Phase 4).
  * Auth: CRON_SECRET Bearer only. Aggregate JSON (no raw URLs/HTML).
  */
 

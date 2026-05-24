@@ -1,7 +1,7 @@
 /**
  * GET/POST /api/cron/ystm-coverage-audit
  *
- * Bounded YSTM product-coverage audit (Phase 1 scoreboard denominator).
+ * Bounded external marketplace product-coverage audit (Phase 1 scoreboard denominator).
  * Auth: CRON_SECRET Bearer only. Aggregate JSON (no raw URLs/HTML).
  */
 

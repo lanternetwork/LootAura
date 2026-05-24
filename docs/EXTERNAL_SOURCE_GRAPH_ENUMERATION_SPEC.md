@@ -1,7 +1,7 @@
-# YSTM Nationwide Graph Enumeration
+# external marketplace Nationwide Graph Enumeration
 
 **Status:** Implemented on PR #484 (Phases 0–7)  
-**Program KPI:** `coveragePct >= 90%` — see `docs/YSTM_90_PERCENT_COVERAGE_SPEC.md`
+**Program KPI:** `coveragePct >= 90%` — see `docs/EXTERNAL_SOURCE_COVERAGE_SPEC.md`
 
 ## Objective
 
@@ -32,7 +32,7 @@ Aliases: `YSTM_GRAPH_ENUMERATION_*` env vars (same parsers).
 
 ## Admin visibility (Phase 7)
 
-YSTM Coverage scoreboard → **YSTM graph enumeration** panel (`graphEnumeration` on `/api/admin/ingestion/ystm-coverage`).
+external marketplace Coverage scoreboard → **external marketplace graph enumeration** panel (`graphEnumeration` on `/api/admin/ingestion/ystm-coverage`).
 
 | Field | Source |
 |-------|--------|

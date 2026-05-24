@@ -1,8 +1,8 @@
-# YSTM 90% Coverage — Lead Analysis Specification
+# external marketplace 90% Coverage — Lead Analysis Specification
 
 **Status:** Draft for lead review  
 **Last updated:** 2026-05-22  
-**One-week sprint runbook:** [YSTM_ONE_WEEK_SPRINT.md](./YSTM_ONE_WEEK_SPRINT.md)  
+**One-week sprint runbook:** [EXTERNAL_SOURCE_ONE_WEEK_SPRINT.md](./EXTERNAL_SOURCE_ONE_WEEK_SPRINT.md)  
 **Owner:** Ingestion / acquisition  
 **Primary metric:** `YSTM_COVERAGE_TARGET_PCT` = **90%** (`lib/ingestion/ystmCoverage/ystmCoverageValidity.ts`)
 
@@ -10,11 +10,11 @@
 
 ## 1. Executive summary
 
-LootAura’s YSTM HTML parsers and detail-first pipeline are **production-ready** (parser SLO ≥90%, detail-first ready rate ~100% in recent 24h rollups). The gap to the product goal — **90% of valid-active YSTM garage sales visible on LootAura** — is **not** a parsing problem. It is an **acquisition footprint and throughput** problem:
+LootAura’s external marketplace HTML parsers and detail-first pipeline are **production-ready** (parser SLO ≥90%, detail-first ready rate ~100% in recent 24h rollups). The gap to the product goal — **90% of valid-active external marketplace garage sales visible on LootAura** — is **not** a parsing problem. It is an **acquisition footprint and throughput** problem:
 
-- Only a **small fraction** of YSTM city list pages are crawlable configs today (~62 crawlable vs ~922 discovery pending).
+- Only a **small fraction** of external marketplace city list pages are crawlable configs today (~62 crawlable vs ~922 discovery pending).
 - Coverage-specific crons run **once per day** with **tight per-run budgets** (e.g. 12 missing-ingest attempts/day).
-- General ingestion is **fetch-bound**; bulk list crawl mostly hits **duplicates** (expected once corpus overlaps YSTM).
+- General ingestion is **fetch-bound**; bulk list crawl mostly hits **duplicates** (expected once corpus overlaps external marketplace).
 - “Visible” requires **published** `sales` rows with **lat/lng** on the public read path, not merely `ingested_sales` rows.
 
 This spec defines **phased operational and configuration work** (minimal code unless gaps are proven) to move the **coverage SLO** from current production levels to **≥90%**, using existing Phase 1–7 pipelines.
@@ -25,7 +25,7 @@ This spec defines **phased operational and configuration work** (minimal code un
 
 ### 2.1 User-visible goal
 
-> **90% of sales that are valid and active on YSTM are also visible on LootAura** (map/list/API), for the audited footprint.
+> **90% of sales that are valid and active on external marketplace are also visible on LootAura** (map/list/API), for the audited footprint.
 
 ### 2.2 Baseline (production signals, 2026-05-21)
 
@@ -37,20 +37,20 @@ This spec defines **phased operational and configuration work** (minimal code un
 | Ingestion bottleneck | **fetch** | Per-run budgets / domain pacing, not geocode/publish theory |
 | Funnel fresh inserts | ~40 / 24h | Bulk crawl adds little net-new inventory |
 
-### 2.3 YSTM HTML layers (confirmed compatible)
+### 2.3 external marketplace HTML layers (confirmed compatible)
 
 | Layer | Example URL | Ingestion use |
 |-------|-------------|---------------|
-| US index | `https://yardsaletreasuremap.com/US/` | **Not scraped**; static USPS catalog drives state list |
-| State directory | `https://yardsaletreasuremap.com/US/Illinois/` | Discovery → city `.html` candidates |
-| City list | `https://yardsaletreasuremap.com/US/Illinois/Chicago.html` | List crawl + `metadataStr` + `sale_url` discovery |
+| US index | `https://external-listing-host.example/US/` | **Not scraped**; static USPS catalog drives state list |
+| State directory | `https://external-listing-host.example/US/Illinois/` | Discovery → city `.html` candidates |
+| City list | `https://external-listing-host.example/US/Illinois/Chicago.html` | List crawl + `metadataStr` + `sale_url` discovery |
 | Listing detail | `…/listing.html`, `…/userlisting.html` | Detail-first → ingest → geocode → publish |
 
 **Trap URL:** `/US/{State}.html` (shell, no city links) — code must use **`/US/{State}/`** only (`sourceStateIndexCatalog.ts`).
 
 ### 2.4 Root cause (one sentence)
 
-We do not **observe**, **ingest**, and **publish** enough distinct valid-active YSTM listing URLs per day relative to the URLs YSTM exposes nationwide, because **city config footprint and cron budgets are far below catalog scale**.
+We do not **observe**, **ingest**, and **publish** enough distinct valid-active external marketplace listing URLs per day relative to the URLs external marketplace exposes nationwide, because **city config footprint and cron budgets are far below catalog scale**.
 
 ---
 
@@ -62,8 +62,8 @@ We do not **observe**, **ingest**, and **publish** enough distinct valid-active 
 coveragePct = publishedVisibleInAudit / validActiveYstmUrls × 100
 ```
 
-- **`validActiveYstmUrls`:** Count of YSTM detail URLs classified as valid-active in `ystm_coverage_observations` (see `classifyYstmDetailAsValidActive`).
-- **`publishedVisibleInAudit`:** Subset of those URLs present in `loadLootAuraPublishedYstmIndex` (published, active, Phase 4 public filters, **non-null lat/lng**, canonical YSTM detail URL).
+- **`validActiveYstmUrls`:** Count of external marketplace detail URLs classified as valid-active in `ystm_coverage_observations` (see `classifyYstmDetailAsValidActive`).
+- **`publishedVisibleInAudit`:** Subset of those URLs present in `loadLootAuraPublishedYstmIndex` (published, active, Phase 4 public filters, **non-null lat/lng**, canonical external marketplace detail URL).
 - **Target:** `coveragePct ≥ 90` (`YSTM_COVERAGE_TARGET_PCT`).
 - **Scoreboard:** `GET /api/admin/ingestion/ystm-coverage` → `buildYstmCoverageScoreboard`.
 
@@ -73,7 +73,7 @@ coveragePct = publishedVisibleInAudit / validActiveYstmUrls × 100
 
 | Metric | Formula | Why it misleads |
 |--------|---------|-----------------|
-| Phase G visible capture | `freshInserted / crawlerDiscovered` | High duplicate skip when corpus ≈ YSTM |
+| Phase G visible capture | `freshInserted / crawlerDiscovered` | High duplicate skip when corpus ≈ external marketplace |
 | Detail-first parser SLO | `detailFirstReady / detailFirstAttempted` | Already ≥90%; measures parse quality only |
 | Crawl discovered count | List URLs seen per run | Does not imply map-visible publish |
 
@@ -121,7 +121,7 @@ Alerts: `lib/ingestion/ystmCoverage/ystmCoverageOperationalHealth.ts`.
                                 ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ Phase 4: Existing URL refresh (ystm-existing-refresh, daily 10:00 UTC)   │
-│   Re-sync known ingested YSTM URLs (parity / anti-regression)            │
+│   Re-sync known ingested external marketplace URLs (parity / anti-regression)            │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 ▼
                     Published map-visible sales (coverage numerator)
@@ -152,7 +152,7 @@ Alerts: `lib/ingestion/ystmCoverage/ystmCoverageOperationalHealth.ts`.
 - Environment and schedule tuning for existing crons.
 - Operational runbooks, monitoring, and phase gates.
 - Targeted code fixes **only** where telemetry proves a blocker (e.g. systematic `publish_failed`, wrong `source_pages` URL shape).
-- Footprint expansion until crawlable configs approximate YSTM city catalog scale.
+- Footprint expansion until crawlable configs approximate external marketplace city catalog scale.
 
 ### 5.2 Out of scope
 
@@ -180,7 +180,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 
 | ID | Task | Owner |
 |----|------|-------|
-| 0.1 | Export admin YSTM Coverage scoreboard JSON (`/api/admin/ingestion/ystm-coverage`) and archive snapshot | Ops / eng |
+| 0.1 | Export admin external marketplace Coverage scoreboard JSON (`/api/admin/ingestion/ystm-coverage`) and archive snapshot | Ops / eng |
 | 0.2 | Record ingestion diagnostics rollup (Phase G, funnel, acquisition registry, fetch bottleneck) | Ops / eng |
 | 0.3 | Document current env overrides vs defaults (discovery, coverage, missing-ingest, orchestration) | Ops |
 | 0.4 | Confirm detail-first proof status = **pass** (`detailFirstProofProtocol`) | Eng |
@@ -198,7 +198,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 
 ### Phase 1 — Coverage audit footprint (observe the gap)
 
-**Goal:** Grow `ystm_coverage_observations` so `validActiveYstmUrls` reflects a large, rotating sample of YSTM inventory.
+**Goal:** Grow `ystm_coverage_observations` so `validActiveYstmUrls` reflects a large, rotating sample of external marketplace inventory.
 
 **Cron:** `GET/POST /api/cron/ystm-coverage-audit` — default **06:00 UTC daily** (`vercel.json`).
 
@@ -228,7 +228,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 - [ ] No `coverage_audit_stale` alert for 7 consecutive days.
 - [ ] `missingValidYstmUrls` queue is populated and stable (not zero because audit never ran).
 
-**Risks:** YSTM rate limiting on list/detail fetch; increase `EXTERNAL_FETCH` pacing before raising concurrency.
+**Risks:** external marketplace rate limiting on list/detail fetch; increase `EXTERNAL_FETCH` pacing before raising concurrency.
 
 **Dependencies:** Phase 2 must add crawlable configs; audit only rotates **crawlable** configs.
 
@@ -258,13 +258,13 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 | 2.2 | Run placeholder repair pass (`maxPlaceholderRepairConfigsPerRun`) until `configsWithoutSourcePages` < 100 alert threshold. |
 | 2.3 | Verify promoted configs use **`/US/{State}/{City}.html`** URLs, not `.html` state shells. |
 | 2.4 | Track `crawlableConfigs`, `validatedDiscoveryConfigs`, `failedDiscoveryConfigs` on scoreboard. |
-| 2.5 | Prioritize high-YSTM-volume states/metros from Phase 0 `missingByState` if backlog is huge. |
+| 2.5 | Prioritize high-external marketplace-volume states/metros from Phase 0 `missingByState` if backlog is huge. |
 | 2.6 | Optional code: bulk import validated discovery rows — **only if** env tuning cannot drain 922 pending in acceptable calendar time. |
 | 2.7 | **Code:** Reject `{State}.html` state shells on promote/validate; nationwide placeholder repair each run; priority state catalog (IL, TX, CA, …); second daily discovery cron (16:00 UTC); revalidation burn-in 120/run. |
 
 **Exit criteria**
 
-- [ ] `crawlableConfigs ≥ 500` (interim); target **≥ 2_000** for nationwide representativeness (lead to set final number from YSTM catalog count).
+- [ ] `crawlableConfigs ≥ 500` (interim); target **≥ 2_000** for nationwide representativeness (lead to set final number from external marketplace catalog count).
 - [ ] `pendingDiscoveryConfigs` < 100 or draining >100/week.
 - [ ] `configsWithoutSourcePages` < 100.
 - [ ] No increase in `failedDiscoveryConfigs` without triage.
@@ -311,7 +311,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 
 ### Phase 4 — Existing URL refresh (hold parity)
 
-**Goal:** Prevent coverage **regression** on already-ingested YSTM URLs; keep dates/content/publish state current.
+**Goal:** Prevent coverage **regression** on already-ingested external marketplace URLs; keep dates/content/publish state current.
 
 **Cron:** `GET/POST /api/cron/ystm-existing-refresh` — default **10:00 UTC daily**.
 
@@ -389,7 +389,7 @@ Phases are **sequential for governance** but **overlap in execution** where diff
 **Exit criteria**
 
 - [ ] Diagnostics no longer report **fetch** as primary bottleneck OR fetch exits are budget-driven with planned caps documented.
-- [ ] `configsWithRecentInsert` increases in high-YSTM metros as footprint expands.
+- [ ] `configsWithRecentInsert` increases in high-external marketplace metros as footprint expands.
 
 **Dependencies:** Phase 2 crawlable configs.
 
@@ -531,7 +531,7 @@ Source: `vercel.json`. Scoreboard `sloAttainment` (Phase 7) derives the G4 hold 
 | Gate | When | Approver | Evidence |
 |------|------|----------|----------|
 | G0 | Phase 0 complete | Lead | Baseline scoreboard + diagnostics snapshot |
-| G1 | Phase 2 staging budget trial | Lead | 7-day discovery telemetry, no YSTM block |
+| G1 | Phase 2 staging budget trial | Lead | 7-day discovery telemetry, no external marketplace block |
 | G2 | Production budget increase | Lead | G1 + rollback plan |
 | G3 | Interim coverage ≥ 70% | Lead | 2 consecutive audit runs |
 | G4 | Program complete ≥ 90% | Lead | Phase 7 exit criteria |
@@ -544,7 +544,7 @@ Source: `vercel.json`. Scoreboard `sloAttainment` (Phase 7) derives the G4 hold 
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| YSTM HTTP throttling / blocking | Phases 1–3 stall | Respect domain spacing; step budget increases; monitor fetch errors |
+| external marketplace HTTP throttling / blocking | Phases 1–3 stall | Respect domain spacing; step budget increases; monitor fetch errors |
 | Denominator grows faster than numerator | Coverage % flat or drops | Phase 2 before aggressive Phase 1 scaling; track ratio not just % |
 | `publish_failed` systemic issue | Missing ingest succeeds but not visible | Phase 5 triage + targeted code fix |
 | False confidence from small `V` | Premature “90%” | Enforce `validActiveYstmUrls` minimum in Phase 7 |
@@ -563,7 +563,7 @@ Code changes are **out of default scope**. Open a ticket only if telemetry shows
 | Validation rejects real city pages | `sourceDiscoveryValidator.ts` |
 | Wrong URL promoted (`Illinois.html` vs `Illinois/`) | discovery promotion / catalog repair |
 | `publish_failed` cluster with single DB/code | publish worker / geocode gates |
-| `gated_only` spike | address resolver / YSTM DOM change |
+| `gated_only` spike | address resolver / external marketplace DOM change |
 
 ---
 
@@ -600,7 +600,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 ]
 ```
 
-**Interpretation:** Coverage SLO is **not yet measurable** (`coverage_denominator_sparse` / `coverage_no_audit_denominator`). `missing_valid_m = 0` means **no audit footprint**, not “nothing missing on YSTM.” Phase 1 audit + Phase 2 footprint must run before 3/7/14-day publish math uses §7.
+**Interpretation:** Coverage SLO is **not yet measurable** (`coverage_denominator_sparse` / `coverage_no_audit_denominator`). `missing_valid_m = 0` means **no audit footprint**, not “nothing missing on external marketplace.” Phase 1 audit + Phase 2 footprint must run before 3/7/14-day publish math uses §7.
 
 **Other confirmed sources:** Production Ingestion Diagnostics `2026-05-21T11:03:55.233Z`; acquisition registry in same rollup; PR #478 planning snapshot for nationwide published corpus (~299).
 
@@ -636,7 +636,7 @@ Adjust weeks using §7 throughput model and approved daily publish target.
 - `docs/INGESTION_FINAL_ALIGNED_SPEC.md` — lifecycle / publish DoD
 - `docs/ingestion-v1-architecture.md` — adapter-only configured pages
 - `docs/OPERATIONS.md` — discovery Phase 4, reconciliation, public visibility Phase 4
-- Admin UI: Ingestion dashboard → YSTM Coverage scoreboard
+- Admin UI: Ingestion dashboard → external marketplace Coverage scoreboard
 
 ---
 

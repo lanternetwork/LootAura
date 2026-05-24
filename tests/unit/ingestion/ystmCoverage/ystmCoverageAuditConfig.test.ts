@@ -11,12 +11,12 @@ describe('parseYstmCoverageAuditBudgets', () => {
     expect(budgets.maxDetailValidationsPerRun).toBe(120)
   })
 
-  it('defaults to burn-in coverage audit budgets', () => {
+  it('defaults to production nationwide coverage audit budgets', () => {
     const budgets = parseYstmCoverageAuditBudgets({} as unknown as NodeJS.ProcessEnv)
-    expect(budgets.maxConfigsPerRun).toBe(24)
-    expect(budgets.maxListFetchesPerRun).toBe(40)
-    expect(budgets.maxDetailValidationsPerRun).toBe(80)
-    expect(budgets.maxUrlsPerListPage).toBe(120)
-    expect(budgets.maxRuntimeMs).toBe(240_000)
+    expect(budgets.maxConfigsPerRun).toBe(40)
+    expect(budgets.maxListFetchesPerRun).toBe(80)
+    expect(budgets.maxDetailValidationsPerRun).toBe(120)
+    expect(budgets.maxUrlsPerListPage).toBe(200)
+    expect(budgets.maxRuntimeMs).toBe(300_000)
   })
 })

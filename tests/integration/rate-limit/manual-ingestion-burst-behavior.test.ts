@@ -2,7 +2,7 @@
  * Behavioral checks for MANUAL_INGESTION_* policies (same limits as list/upload routes).
  * Uses in-memory rate limit store (no Redis in typical test env).
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
@@ -17,6 +17,16 @@ const manualIngestionPolicies = [
 ] as const
 
 describe('MANUAL_INGESTION burst / hourly (parity with ingested-sales list + upload)', () => {
+  beforeEach(() => {
+    // Pin time away from 30s window boundaries so burst counters cannot reset mid-loop.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-19T12:00:07.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('allows at least 4 POSTs to upload path within 30s (regression vs old ADMIN_TOOLS 3/30s)', async () => {
     const wrapped = withRateLimit(
       async () => NextResponse.json({ ok: true }),

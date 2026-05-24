@@ -12,6 +12,7 @@ import { getAdminDb } from '@/lib/supabase/clients'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const maxDuration = 300
 
 function existingRefreshCronJsonBody(result: Awaited<ReturnType<typeof runYstmExistingUrlRefreshCron>>) {
   const t = result.telemetry

@@ -202,6 +202,8 @@ describe('parseYstmDetailListingFromHtml', () => {
 
 describe('attemptYstmDetailFirstReady', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-19T12:00:00.000Z'))
     mockFetchExternalPageSource.mockReset()
     mockLookupSpatialCoordinates.mockReset()
     mockClassifySpatialFailure.mockReset()
@@ -217,6 +219,10 @@ describe('attemptYstmDetailFirstReady', () => {
         })),
       })),
     }))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('falls back when detail fetch fails', async () => {

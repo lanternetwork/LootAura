@@ -11,11 +11,11 @@ describe('parseYstmCatalogRepairBudgets', () => {
     expect(budgets.maxCandidatesScannedPerRun).toBe(250)
   })
 
-  it('defaults to burn-in catalog repair budgets', () => {
+  it('defaults to production nationwide catalog repair budgets', () => {
     const budgets = parseYstmCatalogRepairBudgets({} as unknown as NodeJS.ProcessEnv)
-    expect(budgets.maxRepairsPerRun).toBe(80)
-    expect(budgets.maxCandidatesScannedPerRun).toBe(200)
+    expect(budgets.maxRepairsPerRun).toBe(100)
+    expect(budgets.maxCandidatesScannedPerRun).toBe(250)
     expect(budgets.failedRetryHours).toBe(6)
-    expect(budgets.maxRuntimeMs).toBe(240_000)
+    expect(budgets.maxRuntimeMs).toBe(300_000)
   })
 })

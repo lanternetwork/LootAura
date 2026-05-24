@@ -1,13 +1,13 @@
-/** Graph enumeration burn-in per YSTM nationwide graph enumeration spec (Phase 4). */
-const DEFAULT_MAX_STATES = 10
-const DEFAULT_MAX_DISCOVERED = 1000
-const DEFAULT_MAX_VALIDATION_FETCHES = 500
-const DEFAULT_MAX_REVALIDATION_CONFIGS = 120
-const DEFAULT_MAX_PLACEHOLDER_REPAIR_CONFIGS = 120
+/** Production-safe nationwide defaults; env vars remain optional overrides. */
+const DEFAULT_MAX_STATES = 15
+const DEFAULT_MAX_DISCOVERED = 2000
+const DEFAULT_MAX_VALIDATION_FETCHES = 1000
+const DEFAULT_MAX_REVALIDATION_CONFIGS = 200
+const DEFAULT_MAX_PLACEHOLDER_REPAIR_CONFIGS = 200
 const DEFAULT_INDEX_FETCH_CONCURRENCY = 2
 const DEFAULT_VALIDATION_FETCH_CONCURRENCY = 4
 const DEFAULT_LEASE_SECONDS = 300
-const DEFAULT_MAX_RUNTIME_MS = 240_000
+const DEFAULT_MAX_RUNTIME_MS = 300_000
 const DEFAULT_PLACEHOLDER_FAILURE_EXCLUDE_THRESHOLD = 1
 
 function parsePositiveInt(raw: string | undefined, fallback: number, cap: number): number {

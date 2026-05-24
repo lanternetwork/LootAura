@@ -11,14 +11,14 @@ describe('parseDiscoveryCronBudgets', () => {
     expect(budgets.maxValidationFetchesPerRun).toBe(999)
   })
 
-  it('defaults to graph enumeration burn-in budgets', () => {
+  it('defaults to production nationwide discovery budgets', () => {
     const budgets = parseDiscoveryCronBudgets({} as unknown as NodeJS.ProcessEnv)
-    expect(budgets.maxStatesPerRun).toBe(10)
-    expect(budgets.maxDiscoveredPagesPerRun).toBe(1000)
-    expect(budgets.maxValidationFetchesPerRun).toBe(500)
+    expect(budgets.maxStatesPerRun).toBe(15)
+    expect(budgets.maxDiscoveredPagesPerRun).toBe(2000)
+    expect(budgets.maxValidationFetchesPerRun).toBe(1000)
     expect(budgets.validationFetchConcurrency).toBe(4)
-    expect(budgets.maxRuntimeMs).toBe(240_000)
-    expect(budgets.maxPlaceholderRepairConfigsPerRun).toBe(120)
-    expect(budgets.maxRevalidationConfigsPerRun).toBe(120)
+    expect(budgets.maxRuntimeMs).toBe(300_000)
+    expect(budgets.maxPlaceholderRepairConfigsPerRun).toBe(200)
+    expect(budgets.maxRevalidationConfigsPerRun).toBe(200)
   })
 })

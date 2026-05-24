@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   evaluateCoverageBootstrapExitCriteria,
   evaluateCoverageBootstrapFetchPressureDisable,
+  isCoverageBootstrapSchemaUnavailable,
 } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 
 describe('coverageBootstrapNationwideMode', () => {
@@ -40,5 +41,26 @@ describe('coverageBootstrapNationwideMode', () => {
   it('flags fetch pressure above 5%', () => {
     expect(evaluateCoverageBootstrapFetchPressureDisable(5.1)).toBe(true)
     expect(evaluateCoverageBootstrapFetchPressureDisable(5)).toBe(false)
+  })
+
+  it('detects missing bootstrap columns from PostgREST errors', () => {
+    expect(
+      isCoverageBootstrapSchemaUnavailable({
+        code: 'PGRST204',
+        message: "Could not find the 'coverage_bootstrap_enabled' column",
+      })
+    ).toBe(true)
+    expect(
+      isCoverageBootstrapSchemaUnavailable({
+        code: '42703',
+        message: 'column coverage_bootstrap_enabled does not exist',
+      })
+    ).toBe(true)
+    expect(
+      isCoverageBootstrapSchemaUnavailable({
+        code: 'PGRST204',
+        message: 'Could not find the moderation_status column',
+      })
+    ).toBe(false)
   })
 })

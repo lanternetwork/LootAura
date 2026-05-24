@@ -47,6 +47,40 @@ function parseDisabledReason(raw: string | null): CoverageBootstrapDisabledReaso
   return null
 }
 
+const COVERAGE_BOOTSTRAP_DISABLED_STATE: CoverageBootstrapState = {
+  enabled: false,
+  enabledAt: null,
+  disabledAt: null,
+  disabledReason: null,
+}
+
+function combinedPostgrestErrorFields(error: unknown): string {
+  if (!error || typeof error !== 'object') return ''
+  const e = error as { message?: unknown; details?: unknown; hint?: unknown }
+  return [e.message, e.details, e.hint]
+    .filter((v): v is string => typeof v === 'string' && v.length > 0)
+    .join('\n')
+}
+
+function postgrestErrorCode(error: unknown): string {
+  if (!error || typeof error !== 'object') return ''
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' ? code : ''
+}
+
+/** True when migration 208 columns are not yet on the connected database. */
+export function isCoverageBootstrapSchemaUnavailable(error: unknown): boolean {
+  const text = combinedPostgrestErrorFields(error).toLowerCase()
+  if (!text.includes('coverage_bootstrap')) {
+    return false
+  }
+  const code = postgrestErrorCode(error)
+  if (code === 'PGRST204' || code === '42703' || code === 'PGRST301') {
+    return true
+  }
+  return false
+}
+
 export async function fetchCoverageBootstrapState(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<CoverageBootstrapState> {
@@ -58,6 +92,13 @@ export async function fetchCoverageBootstrapState(
     .maybeSingle()
 
   if (error) {
+    if (isCoverageBootstrapSchemaUnavailable(error)) {
+      logger.warn('coverage bootstrap state unavailable; treating as disabled', {
+        component: 'ingestion/coverageBootstrapNationwideMode',
+        code: postgrestErrorCode(error),
+      })
+      return COVERAGE_BOOTSTRAP_DISABLED_STATE
+    }
     throw new Error(error.message)
   }
 

@@ -470,9 +470,9 @@ Optional: `parser_version`, `source_type`. Malformed metadata **fails** harness 
 
 Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, `parser.source.failing`, `parser.source.recovered`, `parser.fixture.stale`).
 
-### YSTM 90% product coverage (Phases 1–7)
+### external marketplace 90% product coverage (Phases 1–7)
 
-**Goal:** At least **90%** of **valid-active** YSTM listing URLs in the coverage audit footprint are **map-visible** on LootAura (`coveragePct ≥ 90`). This is **not** the detail-first parser SLO. Full program: `docs/YSTM_90_PERCENT_COVERAGE_SPEC.md`.
+**Goal:** At least **90%** of **valid-active** external marketplace listing URLs in the coverage audit footprint are **map-visible** on LootAura (`coveragePct ≥ 90`). This is **not** the detail-first parser SLO. Full program: `docs/EXTERNAL_SOURCE_COVERAGE_SPEC.md`.
 
 **Admin scoreboard:** `GET /api/admin/ingestion/ystm-coverage` (admin session). KPI fields: `validActiveYstmUrls`, `publishedVisibleInAuditFootprint`, `missingValidYstmUrls`, `coveragePct`.
 

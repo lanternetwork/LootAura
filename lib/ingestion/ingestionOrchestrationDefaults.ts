@@ -1,7 +1,7 @@
 /**
  * Canonical ingestion orchestration defaults (must match `app/api/cron/daily/route.ts` parsers).
  * Used for adaptive `normal` profile parity and metrics estimates.
- * Burn-in values per docs/YSTM_90_PERCENT_COVERAGE_SPEC.md (Phase 6).
+ * Burn-in values per docs/EXTERNAL_SOURCE_COVERAGE_SPEC.md (Phase 6).
  */
 
 export const INGESTION_ORCHESTRATION_DEFAULTS = {

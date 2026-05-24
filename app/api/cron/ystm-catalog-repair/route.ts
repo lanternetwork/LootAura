@@ -1,7 +1,7 @@
 /**
  * GET/POST /api/cron/ystm-catalog-repair
  *
- * Bounded repair for known YSTM ingested_sales backlog (Phase 5).
+ * Bounded repair for known external-source ingested_sales backlog (Phase 5).
  * Auth: CRON_SECRET Bearer only. Aggregate JSON (no raw URLs/HTML).
  */
 

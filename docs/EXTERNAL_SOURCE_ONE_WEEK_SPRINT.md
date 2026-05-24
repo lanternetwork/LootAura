@@ -1,9 +1,9 @@
-# YSTM one-week sprint (footprint + closure)
+# external marketplace one-week sprint (footprint + closure)
 
 **Duration:** ≤7 calendar days  
 **Product KPI (unchanged):** `coveragePct ≥ 90%` on large audit footprint — **not** achievable in one week; this sprint maximizes **footprint, registry fill, and repair drain** so the multi-week G4 program starts from a real baseline.
 
-**Authoritative specs:** [YSTM_90_PERCENT_COVERAGE_SPEC.md](./YSTM_90_PERCENT_COVERAGE_SPEC.md), [YSTM_GRAPH_ENUMERATION_SPEC.md](./YSTM_GRAPH_ENUMERATION_SPEC.md)
+**Authoritative specs:** [EXTERNAL_SOURCE_COVERAGE_SPEC.md](./EXTERNAL_SOURCE_COVERAGE_SPEC.md), [EXTERNAL_SOURCE_GRAPH_ENUMERATION_SPEC.md](./EXTERNAL_SOURCE_GRAPH_ENUMERATION_SPEC.md)
 
 ---
 
@@ -11,7 +11,7 @@
 
 | Gate | Target | Scoreboard / diagnostics |
 |------|--------|---------------------------|
-| **Discovery works** | Last discovery: `statesScanned > 0`, `phasesCompleted` includes `graph_enumeration`, registry `candidatesDiscovered > 0` | YSTM coverage → graph enumeration panel |
+| **Discovery works** | Last discovery: `statesScanned > 0`, `phasesCompleted` includes `graph_enumeration`, registry `candidatesDiscovered > 0` | external marketplace coverage → graph enumeration panel |
 | **Footprint** | `crawlableConfigs ≥ 200`, `configsWithoutSourcePages < 600` | Source expansion / acquisition |
 | **Closure** | `catalogRepair` queue `< 100`, `validActiveYstmUrls ≥ 300` | Pipeline backlog + audit V |
 
@@ -45,7 +45,7 @@ Production is expected to run with **no `CRON_*` / `INGESTION_*` overrides in Ve
 | Existing refresh | 2×/day | 32 attempts, 120 scanned (`ystmExistingUrlRefreshConfig.ts`) |
 | Main ingestion | every 2 min | batch 60, budget 120s (`ingestionOrchestrationDefaults.ts`) |
 
-**YSTM safety:** If graph panel block rate **>1%** for 24h, pause manual discovery triggers and investigate before any code-default increase.
+**external marketplace safety:** If graph panel block rate **>1%** for 24h, pause manual discovery triggers and investigate before any code-default increase.
 
 **Optional later (not week-1):** Lead-approved PR to bump `DEFAULT_*` in config modules only if gates stall with discovery healthy.
 
@@ -86,7 +86,7 @@ Prioritize **catalog repair queue** in daily checks until under 100.
 
 ## Daily 15-minute check
 
-1. Admin → Ingestion → **YSTM nationwide coverage** → **Week-1 sprint gates** (PASS/FAIL).
+1. Admin → Ingestion → **external marketplace nationwide coverage** → **Week-1 sprint gates** (PASS/FAIL).
 2. **Copy diagnostics** (includes coverage scoreboard when loaded).
 3. Red flags: candidates still 0 after Day 2; crawlable flat 3 days; V stuck ~78 after Day 4.
 

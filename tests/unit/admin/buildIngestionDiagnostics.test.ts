@@ -486,7 +486,7 @@ describe('buildIngestionDiagnostics', () => {
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
-    expect(md).toContain('## YSTM nationwide coverage')
+    expect(md).toContain('## External marketplace nationwide coverage')
     expect(md).toContain('### Sale-instance identity (Phase 3)')
     expect(md).toContain('### Source URL alias history (Phase 4)')
     expect(md).toContain('### Sale-instance shadow replay (Phase 9)')

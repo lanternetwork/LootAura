@@ -400,7 +400,7 @@ function WindowPanel({
       ) : null}
 
       <div className="rounded-md border border-emerald-200 bg-emerald-50/70 p-3 text-sm">
-        <p className="font-semibold text-emerald-950">YSTM detail-first READY (Phase 3B)</p>
+        <p className="font-semibold text-emerald-950">External listing detail-first READY (Phase 3B)</p>
         {!metrics.detailFirst.operationalHealth.healthy &&
           metrics.detailFirst.operationalHealth.alerts.length > 0 && (
             <div className="mt-2 space-y-1">
@@ -632,7 +632,7 @@ function WindowPanel({
       </div>
 
       <div className="rounded-md border border-violet-200 bg-violet-50/60 p-3 text-sm">
-        <p className="font-semibold text-violet-950">YSTM detail breakdown</p>
+        <p className="font-semibold text-violet-950">External listing detail breakdown</p>
         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
           <div>
             <dt className="text-xs text-violet-800">Discovered (crawler)</dt>

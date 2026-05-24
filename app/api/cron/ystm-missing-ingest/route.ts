@@ -1,7 +1,7 @@
 /**
  * GET/POST /api/cron/ystm-missing-ingest
  *
- * Bounded ingestion for valid YSTM URLs missing from LootAura (Phase 3).
+ * Bounded ingestion for valid external listing URLs missing from LootAura (Phase 3).
  * Auth: CRON_SECRET Bearer only. Aggregate JSON (no raw URLs/HTML).
  */
 

@@ -377,7 +377,7 @@ export default function IngestionDashboardClient() {
                 label="Address enrichment"
                 value={data.volume.addressLifecycle.enrichmentBacklog}
               />
-              <MetricCard label="Image backlog (YSTM)" value={data.volume.imageEnrichment.backlog} />
+              <MetricCard label="Image backlog (external source)" value={data.volume.imageEnrichment.backlog} />
               <MetricCard label="With image" value={data.volume.imageEnrichment.hasImage} />
               <MetricCard label="Published 24h" value={data.published24h} />
               <MetricCard label="Claimed 24h (runs)" value={data.claimed24h} />
@@ -487,7 +487,7 @@ export default function IngestionDashboardClient() {
               <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
                 <h2 className="mb-3 text-lg font-semibold">Image enrichment (D2.5)</h2>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <dt className="text-gray-500">YSTM backlog</dt>
+                  <dt className="text-gray-500">External-source backlog</dt>
                   <dd className="font-medium tabular-nums">{data.volume.imageEnrichment.backlog}</dd>
                   <dt className="text-gray-500">Rows with image</dt>
                   <dd className="font-medium tabular-nums">{data.volume.imageEnrichment.hasImage}</dd>

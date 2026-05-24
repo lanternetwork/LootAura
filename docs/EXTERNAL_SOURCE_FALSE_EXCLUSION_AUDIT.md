@@ -1,6 +1,6 @@
-# YSTM false-exclusion audit (Phase 1)
+# external marketplace false-exclusion audit (Phase 1)
 
-Ground-truth tracing for **valid active YSTM URLs** that are not visible in the coverage audit footprint.
+Ground-truth tracing for **valid active external marketplace URLs** that are not visible in the coverage audit footprint.
 
 ## Replay queue
 
@@ -20,9 +20,9 @@ Each missing URL gets **exactly one** primary bucket:
 | `never_crawled` | No crawlable config or never crawled |
 | `crawl_not_yet_rotated` | Config crawlable; listing not ingested yet |
 | `url_duplicate_suppressed` | Skipped as existing URL / duplicate path |
-| `url_reuse_suspected` | Expired ingested row but YSTM still valid-active |
+| `url_reuse_suspected` | Expired ingested row but external marketplace still valid-active |
 | `soft_dedupe_suppressed` | `ingested_sales.is_duplicate` |
-| `expired_false_positive` | Marked expired while YSTM valid-active |
+| `expired_false_positive` | Marked expired while external marketplace valid-active |
 | `gated_false_positive` | Address-gated row |
 | `detail_first_fallback` | Missing-ingest detail-first fallback |
 | `address_validation_failed` | Missing-ingest validation failure |
@@ -38,7 +38,7 @@ Secondary tags (`false_exclusion_secondary_tags`) add context without changing t
 
 ## When traces run
 
-On each admin load of **YSTM nationwide coverage** (`buildYstmCoverageScoreboard`), all missing valid URLs are traced, persisted on `ystm_coverage_observations`, and summarized in `falseExclusionAudit` on the API response.
+On each admin load of **external marketplace nationwide coverage** (`buildYstmCoverageScoreboard`), all missing valid URLs are traced, persisted on `ystm_coverage_observations`, and summarized in `falseExclusionAudit` on the API response.
 
 ## Code
 
@@ -80,11 +80,11 @@ Migration `202_ystm_sale_instance_identity_phase_3.sql` adds identity columns on
 - `source_url_first_seen_at` / `source_url_last_seen_at`
 - Supersession placeholders (`supersedes_*`, `superseded_*`) for Phase 5+
 
-**Key formula (YSTM detail URLs):** `platform:state|city|address:dateStart|dateEnd:listingId` (content-hash tail when listing id missing). Title is never used alone.
+**Key formula (external marketplace detail URLs):** `platform:state|city|address:dateStart|dateEnd:listingId` (content-hash tail when listing id missing). Title is never used alone.
 
 **Population:** New inserts via `externalPageSource` and detail-first paths call `computeYstmSaleInstanceIdentity` — **no dedupe or URL-uniqueness change** until Phase 5–10.
 
-**Admin:** YSTM scoreboard section **Sale-instance identity (Phase 3)** shows rows with keys and collision groups.
+**Admin:** external marketplace scoreboard section **Sale-instance identity (Phase 3)** shows rows with keys and collision groups.
 
 ### Code
 
@@ -152,11 +152,11 @@ On detail-first refresh, when `sale_instance_key` changes (or list classificatio
 
 - `lib/ingestion/identity/classifySaleInstance.ts`
 
-## Phase 7 — crawl gate reorder (YSTM detail-first before URL skip)
+## Phase 7 — crawl gate reorder (external marketplace detail-first before URL skip)
 
-For YSTM **detail** listing URLs, list crawl no longer applies URL-only duplicate skip when the per-page refresh budget is exhausted. Those rows are deferred to **detail-first** so `classifySaleInstance` runs on authoritative detail HTML before any suppress decision.
+For external marketplace **detail** listing URLs, list crawl no longer applies URL-only duplicate skip when the per-page refresh budget is exhausted. Those rows are deferred to **detail-first** so `classifySaleInstance` runs on authoritative detail HTML before any suppress decision.
 
-Non-YSTM URLs and superseded rows keep the prior URL-only skip path.
+Non-external marketplace URLs and superseded rows keep the prior URL-only skip path.
 
 ### Code
 
@@ -171,7 +171,7 @@ Weak address/title scoring can no longer suppress when identity signals disagree
 |--------------|---------|
 | `date_start_beyond_3_day_tolerance` | Start dates >3 calendar days apart |
 | `date_windows_no_overlap` | Sale windows do not overlap within tolerance |
-| `source_listing_id_materially_different` | YSTM listing id (or external id) mismatch |
+| `source_listing_id_materially_different` | external marketplace listing id (or external id) mismatch |
 | `sale_instance_key_mismatch` | Distinct `sale_instance_key` on both sides |
 | `coordinate_bucket_materially_different` | Location hash / geo bucket mismatch |
 | `expired_winner_valid_incoming_coords` | Expired ingested row + valid native coords on incoming |
@@ -228,13 +228,13 @@ Coverage audit `lootaura_visible` is determined by **sale instance**, not URL al
 
 | Column | Purpose |
 |--------|---------|
-| `source_listing_id`, `sale_instance_key` | YSTM identity from detail parse |
+| `source_listing_id`, `sale_instance_key` | external marketplace identity from detail parse |
 | `matched_ingested_sale_id`, `matched_sale_id` | Visible LootAura footprint hit |
 | `match_method` | `sale_instance_key`, `source_listing_id_date_overlap`, `source_url_alias`, `source_url_visible`, `normalized_address_date` |
 
 Match order: sale instance key → listing id + overlapping dates → URL alias (with instance agreement) → direct URL (with instance agreement when identity known) → address/date fallback.
 
-Stale published rows at a reused URL no longer count as covered when the active YSTM event has a different `sale_instance_key`.
+Stale published rows at a reused URL no longer count as covered when the active external marketplace event has a different `sale_instance_key`.
 
 ### Code
 
@@ -272,9 +272,9 @@ Unified admin scoreboard section aggregating replay-queue metrics, 24h crawl-ski
 
 ### Where it appears
 
-- Admin ingestion → **YSTM nationwide coverage** → **YSTM false exclusion / sale identity (Phase 13)**
+- Admin ingestion → **external marketplace nationwide coverage** → **external marketplace false exclusion / sale identity (Phase 13)**
 - API field: `falseExclusionSaleIdentity` on `GET /api/admin/ingestion/ystm-coverage`
-- Diagnostics export: `### YSTM false exclusion / sale identity (Phase 13)`
+- Diagnostics export: `### external marketplace false exclusion / sale identity (Phase 13)`
 
 ### Alerts (non-blocking)
 
@@ -302,10 +302,10 @@ Expanded unit/integration coverage for identity, collision resolution, shadow re
 | Missing URLs traced | A | Phase 1 false-exclusion trace covers replay queue |
 | Shadow replay drained | A | All missing valid URLs replayed (Phase 9) |
 | No shadow divergence | D | Zero legacy-suppress → new-publish rows before enforcement |
-| Active rows with key | C | ≥95% of published-active YSTM rows have `sale_instance_key` |
+| Active rows with key | C | ≥95% of published-active external marketplace rows have `sale_instance_key` |
 | No key collisions | C | No active `sale_instance_key` collision groups |
 | Coverage `match_method` | B | Missing valid-active rows have audit match metadata |
-| Duplicate-visible SLO | D | Address+date clusters &lt;0.5% of published-active YSTM |
+| Duplicate-visible SLO | D | Address+date clusters &lt;0.5% of published-active external marketplace |
 | Ambiguous bounded | D | ≤5% of replayed rows are `ambiguous_requires_review` |
 | Dashboard healthy | A | Phase 13 panel has no operational alerts |
 
@@ -326,7 +326,7 @@ Expanded unit/integration coverage for identity, collision resolution, shadow re
 
 ## Stage D — classifier enforcement (opt-in)
 
-When `INGESTION_YSTM_SALE_INSTANCE_CLASSIFIER_ENFORCE=true`, YSTM list crawl uses `classifySaleInstance` outcomes (with sale-instance key index) instead of the legacy URL-only duplicate skip path. Default is **off** — no behavior change until rollout gates pass and ops enables the flag.
+When `INGESTION_YSTM_SALE_INSTANCE_CLASSIFIER_ENFORCE=true`, external marketplace list crawl uses `classifySaleInstance` outcomes (with sale-instance key index) instead of the legacy URL-only duplicate skip path. Default is **off** — no behavior change until rollout gates pass and ops enables the flag.
 
 | Classifier decision | List-crawl action |
 |---------------------|-------------------|

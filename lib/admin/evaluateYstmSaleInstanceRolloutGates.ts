@@ -90,7 +90,7 @@ export function evaluateYstmSaleInstanceRolloutGates(
     },
     {
       id: 'identity_active_key_coverage',
-      label: 'Active YSTM rows with sale_instance_key',
+      label: 'Active external-source rows with sale_instance_key',
       stage: 'C',
       status: gateStatus(
         identityBackfillReady,

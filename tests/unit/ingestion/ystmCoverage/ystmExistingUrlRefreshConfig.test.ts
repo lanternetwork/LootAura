@@ -11,11 +11,11 @@ describe('parseYstmExistingUrlRefreshBudgets', () => {
     expect(budgets.maxCandidatesScannedPerRun).toBe(200)
   })
 
-  it('defaults to burn-in existing URL refresh budgets', () => {
+  it('defaults to production nationwide existing URL refresh budgets', () => {
     const budgets = parseYstmExistingUrlRefreshBudgets({} as unknown as NodeJS.ProcessEnv)
-    expect(budgets.maxRefreshesPerRun).toBe(32)
-    expect(budgets.maxCandidatesScannedPerRun).toBe(120)
+    expect(budgets.maxRefreshesPerRun).toBe(80)
+    expect(budgets.maxCandidatesScannedPerRun).toBe(200)
     expect(budgets.staleSyncHours).toBe(12)
-    expect(budgets.maxRuntimeMs).toBe(240_000)
+    expect(budgets.maxRuntimeMs).toBe(300_000)
   })
 })

@@ -38,6 +38,11 @@ type BackfillUiState =
   | { kind: 'done'; summary: BackfillSummary; at: string }
   | { kind: 'error'; message: string; at: string }
 
+type BootstrapUiState =
+  | { kind: 'idle' }
+  | { kind: 'running' }
+  | { kind: 'error'; message: string }
+
 function formatPct(value: number | null): string {
   if (value == null) return '—'
   return `${value.toFixed(1)}%`
@@ -72,6 +77,7 @@ export default function YstmCoverageScoreboardSection() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [backfillUi, setBackfillUi] = useState<BackfillUiState>({ kind: 'idle' })
+  const [bootstrapUi, setBootstrapUi] = useState<BootstrapUiState>({ kind: 'idle' })
 
   const load = useCallback(async () => {
     try {
@@ -132,6 +138,40 @@ export default function YstmCoverageScoreboardSection() {
     }
   }, [load])
 
+  const toggleCoverageBootstrap = useCallback(
+    async (enabled: boolean) => {
+      if (
+        enabled &&
+        !window.confirm(
+          'Enable nationwide coverage bootstrap? This increases audit/ingest/repair throughput and may dip coverage % while the audit footprint grows. Auto-disables when exit criteria are met.'
+        )
+      ) {
+        return
+      }
+      setBootstrapUi({ kind: 'running' })
+      try {
+        const res = await fetch('/api/admin/ingestion/coverage-bootstrap', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        })
+        const json = (await res.json()) as { ok?: boolean; message?: string; code?: string }
+        if (!res.ok || !json.ok) {
+          throw new Error(json.message || json.code || `HTTP ${res.status}`)
+        }
+        setBootstrapUi({ kind: 'idle' })
+        await load()
+      } catch (e) {
+        setBootstrapUi({
+          kind: 'error',
+          message: e instanceof Error ? e.message : String(e),
+        })
+      }
+    },
+    [load]
+  )
+
   useEffect(() => {
     void load()
     const id = window.setInterval(() => void load(), POLL_MS)
@@ -175,6 +215,74 @@ export default function YstmCoverageScoreboardSection() {
 
       {data && (
         <>
+          <div
+            className={`mb-4 rounded-md border p-4 ${
+              data.coverageBootstrap.enabled
+                ? 'border-amber-400 bg-amber-50'
+                : 'border-slate-200 bg-slate-50'
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-950">Nationwide coverage bootstrap</h3>
+                <p className="mt-1 text-xs text-slate-700">
+                  Temporary catch-up mode: metro-priority audit, post-audit missing-ingest/repair, higher code
+                  budgets. Stored in DB — no Vercel env changes. Auto-disables when exit criteria are met (≥24h
+                  enabled).
+                </p>
+                <p className="mt-2 text-xs text-slate-600">
+                  Status:{' '}
+                  <span className="font-semibold">{data.coverageBootstrap.enabled ? 'ON' : 'OFF'}</span>
+                  {data.coverageBootstrap.enabledAt && (
+                    <> · enabled {formatWhen(data.coverageBootstrap.enabledAt)}</>
+                  )}
+                  {!data.coverageBootstrap.enabled && data.coverageBootstrap.disabledAt && (
+                    <>
+                      {' '}
+                      · disabled {formatWhen(data.coverageBootstrap.disabledAt)}
+                      {data.coverageBootstrap.disabledReason
+                        ? ` (${data.coverageBootstrap.disabledReason})`
+                        : ''}
+                    </>
+                  )}
+                </p>
+                {data.coverageBootstrap.enabled && (
+                  <p className="mt-1 text-xs text-slate-600">
+                    Exit preview:{' '}
+                    {data.coverageBootstrap.exitCriteriaPreview.met
+                      ? 'criteria met — will auto-disable on next scoreboard/audit check'
+                      : data.coverageBootstrap.exitCriteriaPreview.reasons.slice(0, 3).join('; ') ||
+                        'pending'}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {data.coverageBootstrap.enabled ? (
+                  <button
+                    type="button"
+                    disabled={bootstrapUi.kind === 'running'}
+                    onClick={() => void toggleCoverageBootstrap(false)}
+                    className="rounded border border-slate-400 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    Disable bootstrap
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={bootstrapUi.kind === 'running'}
+                    onClick={() => void toggleCoverageBootstrap(true)}
+                    className="rounded border border-amber-600 bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    Enable nationwide bootstrap
+                  </button>
+                )}
+              </div>
+            </div>
+            {bootstrapUi.kind === 'error' && (
+              <p className="mt-2 text-xs text-red-700">{bootstrapUi.message}</p>
+            )}
+          </div>
+
           {sprintGates && (
             <div className="mb-4 rounded-md border border-violet-200 bg-violet-50 p-4">
               <h3 className="text-sm font-semibold text-violet-950">Week-1 sprint gates</h3>

@@ -1,7 +1,8 @@
-/** Production-safe nationwide defaults; env vars remain optional overrides. */
-const DEFAULT_MAX_REPAIRS_PER_RUN = 100
-const DEFAULT_MAX_CANDIDATES_SCANNED = 250
-const DEFAULT_FAILED_RETRY_HOURS = 6
+import {
+  BOOTSTRAP_COVERAGE_CATALOG_REPAIR,
+  STEADY_COVERAGE_CATALOG_REPAIR,
+} from '@/lib/ingestion/ystmCoverage/coverageBudgetProfiles'
+
 const DEFAULT_LEASE_SECONDS = 300
 const DEFAULT_MAX_RUNTIME_MS = 300_000
 
@@ -30,23 +31,25 @@ export type YstmCatalogRepairBudgets = {
 }
 
 export function parseYstmCatalogRepairBudgets(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  bootstrapEnabled = false
 ): YstmCatalogRepairBudgets {
+  const profile = bootstrapEnabled ? BOOTSTRAP_COVERAGE_CATALOG_REPAIR : STEADY_COVERAGE_CATALOG_REPAIR
   return {
     maxRepairsPerRun: parsePositiveInt(
       env.CRON_YSTM_CATALOG_REPAIR_MAX_ATTEMPTS,
-      DEFAULT_MAX_REPAIRS_PER_RUN,
-      100
+      profile.maxRepairsPerRun,
+      profile.maxRepairsCap
     ),
     maxCandidatesScannedPerRun: parsePositiveInt(
       env.CRON_YSTM_CATALOG_REPAIR_MAX_SCANNED,
-      DEFAULT_MAX_CANDIDATES_SCANNED,
-      250
+      profile.maxCandidatesScannedPerRun,
+      profile.maxCandidatesScannedCap
     ),
     failedRetryHours: parsePositiveInt(
       env.CRON_YSTM_CATALOG_REPAIR_FAILED_RETRY_HOURS,
-      DEFAULT_FAILED_RETRY_HOURS,
-      72
+      profile.failedRetryHours,
+      profile.failedRetryHoursCap
     ),
     leaseSeconds: parsePositiveInt(env.CRON_YSTM_CATALOG_REPAIR_LEASE_SECONDS, DEFAULT_LEASE_SECONDS, 900),
     maxRuntimeMs: parsePositiveInt(

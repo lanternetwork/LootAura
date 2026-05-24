@@ -70,6 +70,15 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
           return thenableQuery({ data: [], count: 0 })
         case 'ingestion_orchestration_runs':
           return thenableQuery({ data: [] })
+        case 'ingestion_orchestration_state':
+          return thenableQuery({
+            data: {
+              coverage_bootstrap_enabled: false,
+              coverage_bootstrap_enabled_at: null,
+              coverage_bootstrap_disabled_at: null,
+              coverage_bootstrap_disabled_reason: null,
+            },
+          })
         case 'ingested_sale_soft_dedupe_suppressions':
           return thenableQuery({ data: [], count: 0 })
         case 'ystm_sale_instance_shadow_replays':
@@ -118,6 +127,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.saleInstanceShadowReplay.replayedCount).toBe(0)
     expect(json.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount).toBe(0)
     expect(json.falseExclusionSaleIdentity.missingValidYstmUrls).toBe(0)
+    expect(json.coverageBootstrap.enabled).toBe(false)
     expect(json.falseExclusionSaleIdentity.healthy).toBe(true)
   })
 })

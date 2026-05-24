@@ -1,4 +1,5 @@
 import {
+  INGESTION_ORCHESTRATION_BOOTSTRAP_DEFAULTS,
   INGESTION_ORCHESTRATION_DEFAULTS,
   INGESTION_ORCHESTRATION_HARD_CAPS,
   parseExternalFetchDomainMinSpacingMsFromEnv,
@@ -42,32 +43,33 @@ function parsePositiveIntEnv(raw: string | undefined, fallback: number, max: num
   return Math.min(parsed, max)
 }
 
-export function loadAdaptiveCaps(): AdaptiveCaps {
-  const d = INGESTION_ORCHESTRATION_DEFAULTS
+export function loadAdaptiveCaps(options?: { bootstrapNationwide?: boolean }): AdaptiveCaps {
+  const bootstrap = options?.bootstrapNationwide === true
+  const d = bootstrap ? INGESTION_ORCHESTRATION_BOOTSTRAP_DEFAULTS : INGESTION_ORCHESTRATION_DEFAULTS
   return {
     maxConfigBatch: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MAX_CONFIG_BATCH,
-      60,
+      d.configBatchSize,
       INGESTION_ORCHESTRATION_HARD_CAPS.configBatchSize
     ),
     maxExecutionBudgetMs: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MAX_EXECUTION_BUDGET_MS,
-      120_000,
+      d.executionBudgetMs,
       INGESTION_ORCHESTRATION_HARD_CAPS.executionBudgetMs
     ),
     minDomainSpacingMs: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MIN_DOMAIN_SPACING_MS,
-      400,
+      bootstrap ? 300 : 400,
       d.domainSpacingMs
     ),
     maxGeocodeBacklogBatch: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MAX_GEOCODE_BATCH,
-      50,
+      d.geocodeBacklogBatchSize,
       INGESTION_ORCHESTRATION_HARD_CAPS.geocodeBacklogBatchSize
     ),
     maxGeocodeQueueBatch: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MAX_GEOCODE_BATCH,
-      50,
+      d.geocodeCronQueueBatchSize,
       INGESTION_ORCHESTRATION_HARD_CAPS.geocodeCronQueueBatchSize
     ),
     maxGeocodeConcurrency: parsePositiveIntEnv(
@@ -77,7 +79,7 @@ export function loadAdaptiveCaps(): AdaptiveCaps {
     ),
     maxPublishBatch: parsePositiveIntEnv(
       process.env.INGESTION_ADAPTIVE_MAX_PUBLISH_BATCH,
-      200,
+      d.publishBatchSize,
       INGESTION_ORCHESTRATION_HARD_CAPS.publishBatchSize
     ),
     recoveryDwellRuns: parsePositiveIntEnv(process.env.INGESTION_ADAPTIVE_RECOVERY_DWELL_RUNS, 3, 24),
@@ -86,21 +88,21 @@ export function loadAdaptiveCaps(): AdaptiveCaps {
 }
 
 /** Static envelope when adaptive is disabled — env overrides preserved, profile always normal. */
-export function buildStaticThroughputEnvelope() {
+export function buildStaticThroughputEnvelope(bootstrapEnabled = false) {
   return {
     fetch: {
-      configBatchSize: parseIngestionOrchestrationConfigBatchSizeFromEnv(),
-      executionBudgetMs: parseIngestionOrchestrationExecutionBudgetMsFromEnv(),
-      minIntervalMinutes: parseIngestionOrchestrationMinMinutesFromEnv(),
-      domainSpacingMs: parseExternalFetchDomainMinSpacingMsFromEnv(),
+      configBatchSize: parseIngestionOrchestrationConfigBatchSizeFromEnv(bootstrapEnabled),
+      executionBudgetMs: parseIngestionOrchestrationExecutionBudgetMsFromEnv(bootstrapEnabled),
+      minIntervalMinutes: parseIngestionOrchestrationMinMinutesFromEnv(bootstrapEnabled),
+      domainSpacingMs: parseExternalFetchDomainMinSpacingMsFromEnv(bootstrapEnabled),
     },
     geocode: {
-      backlogBatchSize: parseGeocodeBacklogBatchSizeFromEnv(),
-      queueBatchSize: parseGeocodeCronQueueBatchFromEnv(),
-      concurrencyCeiling: parseGeocodeConcurrencyCeilingFromEnv(),
+      backlogBatchSize: parseGeocodeBacklogBatchSizeFromEnv(bootstrapEnabled),
+      queueBatchSize: parseGeocodeCronQueueBatchFromEnv(bootstrapEnabled),
+      concurrencyCeiling: parseGeocodeConcurrencyCeilingFromEnv(bootstrapEnabled),
     },
     publish: {
-      batchSize: parsePublishBatchSizeFromEnv(),
+      batchSize: parsePublishBatchSizeFromEnv(bootstrapEnabled),
     },
   }
 }
@@ -129,11 +131,14 @@ const CONSERVATIVE_FETCH: FetchKnobProfile = {
   domainSpacingMs: 875,
 }
 
-const NORMAL_FETCH: FetchKnobProfile = {
-  configBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.configBatchSize,
-  executionBudgetMs: INGESTION_ORCHESTRATION_DEFAULTS.executionBudgetMs,
-  minIntervalMinutes: INGESTION_ORCHESTRATION_DEFAULTS.minIntervalMinutes,
-  domainSpacingMs: INGESTION_ORCHESTRATION_DEFAULTS.domainSpacingMs,
+function normalFetchProfile(bootstrapNationwide: boolean): FetchKnobProfile {
+  const d = bootstrapNationwide ? INGESTION_ORCHESTRATION_BOOTSTRAP_DEFAULTS : INGESTION_ORCHESTRATION_DEFAULTS
+  return {
+    configBatchSize: d.configBatchSize,
+    executionBudgetMs: d.executionBudgetMs,
+    minIntervalMinutes: d.minIntervalMinutes,
+    domainSpacingMs: d.domainSpacingMs,
+  }
 }
 
 const ELEVATED_FETCH_BASE: FetchKnobProfile = {
@@ -156,10 +161,13 @@ const CONSERVATIVE_GEOCODE: GeocodeKnobProfile = {
   concurrencyCeiling: 2,
 }
 
-const NORMAL_GEOCODE: GeocodeKnobProfile = {
-  backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
-  queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
-  concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
+function normalGeocodeProfile(bootstrapNationwide: boolean): GeocodeKnobProfile {
+  const d = bootstrapNationwide ? INGESTION_ORCHESTRATION_BOOTSTRAP_DEFAULTS : INGESTION_ORCHESTRATION_DEFAULTS
+  return {
+    backlogBatchSize: d.geocodeBacklogBatchSize,
+    queueBatchSize: d.geocodeCronQueueBatchSize,
+    concurrencyCeiling: d.geocodeConcurrencyCeiling,
+  }
 }
 
 const ELEVATED_GEOCODE_BASE: GeocodeKnobProfile = {
@@ -175,7 +183,10 @@ const RECOVERY_GEOCODE: GeocodeKnobProfile = {
 }
 
 const CONSERVATIVE_PUBLISH: PublishKnobProfile = { batchSize: 100 }
-const NORMAL_PUBLISH: PublishKnobProfile = { batchSize: INGESTION_ORCHESTRATION_DEFAULTS.publishBatchSize }
+function normalPublishProfile(bootstrapNationwide: boolean): PublishKnobProfile {
+  const d = bootstrapNationwide ? INGESTION_ORCHESTRATION_BOOTSTRAP_DEFAULTS : INGESTION_ORCHESTRATION_DEFAULTS
+  return { batchSize: d.publishBatchSize }
+}
 const ELEVATED_PUBLISH_BASE: PublishKnobProfile = { batchSize: 225 }
 const RECOVERY_PUBLISH: PublishKnobProfile = { batchSize: 125 }
 
@@ -217,8 +228,10 @@ function clampPublish(profile: PublishKnobProfile, caps: AdaptiveCaps): PublishK
 export function knobsForSubsystemProfile(
   subsystem: AdaptiveSubsystem,
   profile: AdaptiveSubsystemProfile,
-  caps: AdaptiveCaps
+  caps: AdaptiveCaps,
+  options?: { bootstrapNationwide?: boolean }
 ): FetchKnobProfile | GeocodeKnobProfile | PublishKnobProfile {
+  const bootstrap = options?.bootstrapNationwide === true
   if (subsystem === 'fetch') {
     const base =
       profile === 'conservative'
@@ -227,7 +240,7 @@ export function knobsForSubsystemProfile(
           ? ELEVATED_FETCH_BASE
           : profile === 'recovery'
             ? RECOVERY_FETCH
-            : NORMAL_FETCH
+            : normalFetchProfile(bootstrap)
     return clampFetch(base, caps)
   }
   if (subsystem === 'geocode') {
@@ -238,7 +251,7 @@ export function knobsForSubsystemProfile(
           ? ELEVATED_GEOCODE_BASE
           : profile === 'recovery'
             ? RECOVERY_GEOCODE
-            : NORMAL_GEOCODE
+            : normalGeocodeProfile(bootstrap)
     return clampGeocode(base, caps)
   }
   const base =
@@ -248,6 +261,6 @@ export function knobsForSubsystemProfile(
         ? ELEVATED_PUBLISH_BASE
         : profile === 'recovery'
           ? RECOVERY_PUBLISH
-          : NORMAL_PUBLISH
+          : normalPublishProfile(bootstrap)
   return clampPublish(base, caps)
 }

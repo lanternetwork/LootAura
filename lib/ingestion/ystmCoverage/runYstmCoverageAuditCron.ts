@@ -1,11 +1,17 @@
 import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 import { normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSource'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
+import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import {
   parseYstmCoverageAuditBudgets,
   YSTM_COVERAGE_AUDIT_STATE_KEY,
   type YstmCoverageAuditBudgets,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageAuditConfig'
+import { runPostAuditCoverageReconcile } from '@/lib/ingestion/ystmCoverage/runPostAuditCoverageReconcile'
+import {
+  buildYstmCoverageAuditConfigOrder,
+  type YstmCoverageAuditSelectionMode,
+} from '@/lib/ingestion/ystmCoverage/selectYstmCoverageAuditConfigs'
 import { extractYstmListingUrlsFromListHtml } from '@/lib/ingestion/ystmCoverage/extractYstmListingUrlsFromListHtml'
 import {
   aggregateYstmCoverageObservations,
@@ -35,6 +41,8 @@ import { logger } from '@/lib/log'
 export type YstmCoverageAuditCronTelemetry = {
   skipped: boolean
   skipReason: string | null
+  bootstrapNationwide: boolean
+  auditSelectionMode: YstmCoverageAuditSelectionMode | null
   configCursorBefore: number
   configCursorAfter: number
   listPagesFetched: number
@@ -47,19 +55,12 @@ export type YstmCoverageAuditCronTelemetry = {
   coveragePct: number | null
   observationCount: number
   overlapPrevented: boolean
+  postAuditReconcile: Awaited<ReturnType<typeof runPostAuditCoverageReconcile>> | null
 }
 
 export type YstmCoverageAuditCronResult = {
   ok: boolean
   telemetry: YstmCoverageAuditCronTelemetry
-}
-
-function sortConfigsDeterministic(rows: ExternalCityConfigRow[]): ExternalCityConfigRow[] {
-  return [...rows].sort((a, b) => {
-    const ak = `${a.state || ''}|${a.city || ''}`.toLowerCase()
-    const bk = `${b.state || ''}|${b.city || ''}`.toLowerCase()
-    return ak.localeCompare(bk)
-  })
 }
 
 function buildConfigKey(city: string, state: string): string {
@@ -156,11 +157,36 @@ async function completeAuditRun(
   }
 }
 
+function emptyAuditTelemetry(
+  partial: Partial<YstmCoverageAuditCronTelemetry> & Pick<YstmCoverageAuditCronTelemetry, 'skipped' | 'skipReason'>
+): YstmCoverageAuditCronTelemetry {
+  return {
+    bootstrapNationwide: false,
+    auditSelectionMode: null,
+    configCursorBefore: 0,
+    configCursorAfter: 0,
+    listPagesFetched: 0,
+    listingUrlsDiscovered: 0,
+    detailPagesValidated: 0,
+    validActiveYstmUrls: 0,
+    publishedVisibleInAudit: 0,
+    lootauraPublishedActiveTotal: 0,
+    missingValidYstmUrls: 0,
+    coveragePct: null,
+    observationCount: 0,
+    overlapPrevented: false,
+    postAuditReconcile: null,
+    ...partial,
+  }
+}
+
 export async function runYstmCoverageAuditCron(
   admin: ReturnType<typeof getAdminDb>,
-  options?: { budgets?: YstmCoverageAuditBudgets }
+  options?: { budgets?: YstmCoverageAuditBudgets; bootstrapEnabled?: boolean }
 ): Promise<YstmCoverageAuditCronResult> {
-  const budgets = options?.budgets ?? parseYstmCoverageAuditBudgets()
+  const bootstrapEnabled =
+    options?.bootstrapEnabled ?? (await fetchCoverageBootstrapEnabled(admin))
+  const budgets = options?.budgets ?? parseYstmCoverageAuditBudgets(process.env, bootstrapEnabled)
   const logContext = { component: 'ingestion/ystmCoverage/runYstmCoverageAuditCron' }
   const startedMs = Date.now()
 
@@ -168,22 +194,14 @@ export async function runYstmCoverageAuditCron(
   if (!lease.acquired) {
     return {
       ok: true,
-      telemetry: {
+      telemetry: emptyAuditTelemetry({
         skipped: true,
         skipReason: lease.reason ?? 'active_lease',
+        bootstrapNationwide: bootstrapEnabled,
         configCursorBefore: lease.cursor,
         configCursorAfter: lease.cursor,
-        listPagesFetched: 0,
-        listingUrlsDiscovered: 0,
-        detailPagesValidated: 0,
-        validActiveYstmUrls: 0,
-        publishedVisibleInAudit: 0,
-        lootauraPublishedActiveTotal: 0,
-        missingValidYstmUrls: 0,
-        coveragePct: null,
-        observationCount: 0,
         overlapPrevented: true,
-      },
+      }),
     }
   }
 
@@ -193,6 +211,7 @@ export async function runYstmCoverageAuditCron(
   let detailPagesValidated = 0
   let configCursorAfter = configCursorBefore
   let runId: string | null = null
+  let auditSelectionMode: YstmCoverageAuditSelectionMode | null = null
 
   try {
     const matchIndex = await loadYstmCoverageLootAuraMatchIndex(admin)
@@ -205,8 +224,16 @@ export async function runYstmCoverageAuditCron(
     }
 
     const partition = partitionCrawlableExternalCityConfigs((configData ?? []) as ExternalCityConfigRow[])
-    const sorted = sortConfigsDeterministic(partition.crawlable)
-    const catalogSize = sorted.length
+    const observationAggForOrder = await aggregateYstmCoverageObservations(admin)
+    const configOrder = buildYstmCoverageAuditConfigOrder({
+      crawlableConfigs: partition.crawlable,
+      observationAgg: observationAggForOrder,
+      bootstrapEnabled,
+      cursorBefore: configCursorBefore,
+    })
+    const orderedConfigs = configOrder.orderedConfigs
+    auditSelectionMode = configOrder.selectionMode
+    const catalogSize = configOrder.catalogSize
 
     runId = await insertAuditRun(admin, {
       status: 'running',
@@ -237,24 +264,26 @@ export async function runYstmCoverageAuditCron(
         nextCursor: 0,
         markCompleted: true,
       })
+      const postAuditReconcile = bootstrapEnabled
+        ? await runPostAuditCoverageReconcile(admin, { bootstrapEnabled: true })
+        : null
       return {
         ok: true,
-        telemetry: {
+        telemetry: emptyAuditTelemetry({
           skipped: false,
           skipReason: 'no_crawlable_configs',
+          bootstrapNationwide: bootstrapEnabled,
+          auditSelectionMode,
           configCursorBefore,
           configCursorAfter: 0,
-          listPagesFetched: 0,
-          listingUrlsDiscovered: 0,
-          detailPagesValidated: 0,
           validActiveYstmUrls: agg.validActiveYstmUrls,
           publishedVisibleInAudit: agg.publishedVisibleInAudit,
           lootauraPublishedActiveTotal: matchIndex.publishedActiveTotal,
           missingValidYstmUrls: agg.missingValidYstmUrls,
           coveragePct,
           observationCount: agg.observationCount,
-          overlapPrevented: false,
-        },
+          postAuditReconcile,
+        }),
       }
     }
 
@@ -269,17 +298,18 @@ export async function runYstmCoverageAuditCron(
     const listOnlyUpserts: YstmCoverageObservationUpsert[] = []
 
     let configsProcessed = 0
-    let cursor = configCursorBefore % catalogSize
+    let orderIndex = 0
 
     while (
       configsProcessed < budgets.maxConfigsPerRun &&
+      orderIndex < orderedConfigs.length &&
       listPagesFetched < budgets.maxListFetchesPerRun &&
       Date.now() - startedMs < budgets.maxRuntimeMs
     ) {
-      const config = sorted[cursor]!
+      const config = orderedConfigs[orderIndex]!
+      orderIndex += 1
       const pages = normalizeSourcePages(config.source_pages)
       if (pages.length === 0) {
-        cursor = (cursor + 1) % catalogSize
         configsProcessed += 1
         continue
       }
@@ -340,11 +370,10 @@ export async function runYstmCoverageAuditCron(
         }
       }
 
-      cursor = (cursor + 1) % catalogSize
       configsProcessed += 1
     }
 
-    configCursorAfter = cursor
+    configCursorAfter = catalogSize > 0 ? (configCursorBefore + configsProcessed) % catalogSize : 0
 
     const dedupedListUpserts = dedupeDetailQueueByCanonical(listOnlyUpserts)
     const dedupedDetailQueue = dedupeDetailQueueByCanonical(detailQueue)
@@ -443,11 +472,17 @@ export async function runYstmCoverageAuditCron(
       markCompleted: true,
     })
 
+    const postAuditReconcile = bootstrapEnabled
+      ? await runPostAuditCoverageReconcile(admin, { bootstrapEnabled: true })
+      : null
+
     return {
       ok: true,
-      telemetry: {
+      telemetry: emptyAuditTelemetry({
         skipped: false,
         skipReason: null,
+        bootstrapNationwide: bootstrapEnabled,
+        auditSelectionMode,
         configCursorBefore,
         configCursorAfter,
         listPagesFetched,
@@ -459,8 +494,8 @@ export async function runYstmCoverageAuditCron(
         missingValidYstmUrls: agg.missingValidYstmUrls,
         coveragePct,
         observationCount: agg.observationCount,
-        overlapPrevented: false,
-      },
+        postAuditReconcile,
+      }),
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

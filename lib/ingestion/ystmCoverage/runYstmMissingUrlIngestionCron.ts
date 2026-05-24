@@ -18,6 +18,7 @@ import {
   fetchMissingIngestionCandidatePage,
   isEligibleForMissingIngestionRetry,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageMissingCandidates'
+import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import {
   parseYstmCoverageMissingIngestionBudgets,
   YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY,
@@ -78,9 +79,11 @@ async function hasNonDuplicateIngestedSale(
 
 export async function runYstmMissingUrlIngestionCron(
   admin: ReturnType<typeof getAdminDb>,
-  options?: { budgets?: YstmCoverageMissingIngestionBudgets }
+  options?: { budgets?: YstmCoverageMissingIngestionBudgets; bootstrapEnabled?: boolean }
 ): Promise<YstmMissingUrlIngestionCronResult> {
-  const budgets = options?.budgets ?? parseYstmCoverageMissingIngestionBudgets()
+  const bootstrapEnabled =
+    options?.bootstrapEnabled ?? (await fetchCoverageBootstrapEnabled(admin))
+  const budgets = options?.budgets ?? parseYstmCoverageMissingIngestionBudgets(process.env, bootstrapEnabled)
   const logContext = { component: 'ingestion/ystmCoverage/runYstmMissingUrlIngestionCron' }
   const startedMs = Date.now()
   const emptyMetrics = emptyYstmDetailFirstRunMetrics()

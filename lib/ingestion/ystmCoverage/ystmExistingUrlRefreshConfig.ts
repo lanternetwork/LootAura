@@ -1,7 +1,8 @@
-/** Production-safe nationwide defaults; env vars remain optional overrides. */
-const DEFAULT_MAX_REFRESHES_PER_RUN = 80
-const DEFAULT_MAX_CANDIDATES_SCANNED = 200
-const DEFAULT_STALE_SYNC_HOURS = 12
+import {
+  BOOTSTRAP_COVERAGE_EXISTING_REFRESH,
+  STEADY_COVERAGE_EXISTING_REFRESH,
+} from '@/lib/ingestion/ystmCoverage/coverageBudgetProfiles'
+
 const DEFAULT_LEASE_SECONDS = 300
 const DEFAULT_MAX_RUNTIME_MS = 300_000
 
@@ -23,23 +24,25 @@ export type YstmExistingUrlRefreshBudgets = {
 }
 
 export function parseYstmExistingUrlRefreshBudgets(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  bootstrapEnabled = false
 ): YstmExistingUrlRefreshBudgets {
+  const profile = bootstrapEnabled ? BOOTSTRAP_COVERAGE_EXISTING_REFRESH : STEADY_COVERAGE_EXISTING_REFRESH
   return {
     maxRefreshesPerRun: parsePositiveInt(
       env.CRON_YSTM_EXISTING_REFRESH_MAX_ATTEMPTS,
-      DEFAULT_MAX_REFRESHES_PER_RUN,
-      80
+      profile.maxRefreshesPerRun,
+      profile.maxRefreshesCap
     ),
     maxCandidatesScannedPerRun: parsePositiveInt(
       env.CRON_YSTM_EXISTING_REFRESH_MAX_SCANNED,
-      DEFAULT_MAX_CANDIDATES_SCANNED,
-      200
+      profile.maxCandidatesScannedPerRun,
+      profile.maxCandidatesScannedCap
     ),
     staleSyncHours: parsePositiveInt(
       env.CRON_YSTM_EXISTING_REFRESH_STALE_HOURS,
-      DEFAULT_STALE_SYNC_HOURS,
-      168
+      profile.staleSyncHours,
+      profile.staleSyncHoursCap
     ),
     leaseSeconds: parsePositiveInt(env.CRON_YSTM_EXISTING_REFRESH_LEASE_SECONDS, DEFAULT_LEASE_SECONDS, 900),
     maxRuntimeMs: parsePositiveInt(

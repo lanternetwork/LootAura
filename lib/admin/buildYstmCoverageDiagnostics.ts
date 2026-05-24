@@ -28,6 +28,12 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     bullet('publishedVisibleInAudit', data.publishedVisibleInAuditFootprint),
     bullet('missingValidYstmUrls', data.missingValidYstmUrls),
     bullet('lastAuditAt', data.lastAuditAt ?? '—'),
+    bullet(
+      'coverage bootstrap',
+      data.coverageBootstrap.enabled
+        ? `on (enabled at: ${data.coverageBootstrap.enabledAt ?? '—'})`
+        : `off${data.coverageBootstrap.disabledReason ? ` (${data.coverageBootstrap.disabledReason})` : ''}`
+    ),
     '',
     '### Sale-instance identity (Phase 3)',
     bullet('external-source rows with sale_instance_key', data.saleInstanceIdentity.ystmRowsWithKey),

@@ -14,6 +14,7 @@ import {
   fetchExistingUrlRefreshCandidatePage,
   isEligibleForExistingUrlRefresh,
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshCandidates'
+import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import {
   parseYstmExistingUrlRefreshBudgets,
   YSTM_COVERAGE_EXISTING_REFRESH_STATE_KEY,
@@ -47,9 +48,11 @@ export type YstmExistingUrlRefreshCronResult = {
 
 export async function runYstmExistingUrlRefreshCron(
   admin: ReturnType<typeof getAdminDb>,
-  options?: { budgets?: YstmExistingUrlRefreshBudgets }
+  options?: { budgets?: YstmExistingUrlRefreshBudgets; bootstrapEnabled?: boolean }
 ): Promise<YstmExistingUrlRefreshCronResult> {
-  const budgets = options?.budgets ?? parseYstmExistingUrlRefreshBudgets()
+  const bootstrapEnabled =
+    options?.bootstrapEnabled ?? (await fetchCoverageBootstrapEnabled(admin))
+  const budgets = options?.budgets ?? parseYstmExistingUrlRefreshBudgets(process.env, bootstrapEnabled)
   const logContext = { component: 'ingestion/ystmCoverage/runYstmExistingUrlRefreshCron' }
   const startedMs = Date.now()
   const detailFirstMetrics = emptyYstmDetailFirstRunMetrics()

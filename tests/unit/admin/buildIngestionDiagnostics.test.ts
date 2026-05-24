@@ -483,6 +483,13 @@ describe('buildIngestionDiagnostics', () => {
         healthy: true,
         alerts: [],
       },
+      coverageBootstrap: {
+        enabled: false,
+        enabledAt: null,
+        disabledAt: null,
+        disabledReason: null,
+        exitCriteriaPreview: { met: false, reasons: [] },
+      },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })

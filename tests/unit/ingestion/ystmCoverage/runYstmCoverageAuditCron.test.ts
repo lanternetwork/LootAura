@@ -31,6 +31,18 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: mockFromBase,
 }))
 
+vi.mock('@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode', () => ({
+  fetchCoverageBootstrapEnabled: vi.fn().mockResolvedValue(false),
+}))
+
+vi.mock('@/lib/ingestion/ystmCoverage/runPostAuditCoverageReconcile', () => ({
+  runPostAuditCoverageReconcile: vi.fn().mockResolvedValue({
+    ran: false,
+    missingIngest: null,
+    catalogRepair: null,
+  }),
+}))
+
 const PAGE_A = 'https://yardsaletreasuremap.com/US/Illinois/Springfield/page-a.html'
 const PAGE_B = 'https://yardsaletreasuremap.com/US/Illinois/Springfield/page-b.html'
 const LISTING_A = 'https://yardsaletreasuremap.com/US/Illinois/Springfield/100-main-st/9001/listing.html'

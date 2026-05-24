@@ -17,8 +17,10 @@ import {
 } from '@/lib/ingestion/orchestrationMetrics'
 import {
   ADAPTIVE_METRICS_STALE_MS,
+  loadAdaptiveCaps,
   type AdaptiveCaps,
 } from '@/lib/ingestion/adaptiveThroughputConfig'
+import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import {
   parseAdaptiveDwellFromNotes,
   resolveAdaptiveThroughput,
@@ -305,9 +307,15 @@ export async function resolveAdaptiveThroughputForCron(
   caps?: AdaptiveCaps,
   options?: LoadAdaptivePressureSignalsOptions
 ) {
+  const bootstrapNationwide = await fetchCoverageBootstrapEnabled(getAdminDb())
   const [signals, previousDwell] = await Promise.all([
     loadAdaptivePressureSignals(Date.now(), options),
     loadAdaptiveDwellState(),
   ])
-  return resolveAdaptiveThroughput({ signals, previousDwell, caps })
+  return resolveAdaptiveThroughput({
+    signals,
+    previousDwell,
+    caps: caps ?? loadAdaptiveCaps({ bootstrapNationwide }),
+    bootstrapNationwide,
+  })
 }

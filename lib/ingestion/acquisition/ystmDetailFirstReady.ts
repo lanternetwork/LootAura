@@ -21,6 +21,7 @@ import {
   markIngestedSaleExpiredFromYstmRefresh,
   updateExistingIngestedSaleForDetailFirst,
 } from '@/lib/ingestion/acquisition/updateExistingIngestedSaleForDetailFirst'
+import { mergeListingImageUrlsIntoRowPayload } from '@/lib/ingestion/acquisition/mergeListingImageUrlsIntoRowPayload'
 import { resolveDetailFirstMergedAddressRaw } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 import {
   detailFirstValidationTelemetry,
@@ -616,12 +617,15 @@ export async function attemptYstmDetailFirstReady(
 
   const admin = getAdminDb()
   const scheduleFields = detailScheduleFieldsForListing(listing)
-  const rowPayload = {
-    ...params.rowPayload,
-    detailFirstReady: true,
-    detailFirstResolution: spatial.resolutionSource,
-    ...(nativeFirst ? { detailFirstNativeCoordsOnly: true } : {}),
-  }
+  const rowPayload = mergeListingImageUrlsIntoRowPayload(
+    {
+      ...params.rowPayload,
+      detailFirstReady: true,
+      detailFirstResolution: spatial.resolutionSource,
+      ...(nativeFirst ? { detailFirstNativeCoordsOnly: true } : {}),
+    },
+    listing
+  )
   const ingestRow = buildDetailFirstIngestedSaleInsertRow({
     platform: params.platform,
     listing,

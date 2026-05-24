@@ -327,6 +327,57 @@ describe('attemptYstmDetailFirstReady', () => {
     )
   })
 
+  it('persists raw_payload.imageUrls from detail-parsed listing on insert', async () => {
+    const { attemptYstmDetailFirstReady } = await import(
+      '@/lib/ingestion/acquisition/ystmDetailFirstReady'
+    )
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'ready-row-images' }, error: null }),
+      })),
+    }))
+    mockFrom.mockImplementation(() => ({ insert: insertSpy }))
+    const nativeFixture = readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-with-native-coords.html'),
+      'utf8'
+    )
+    const html = nativeFixture.replace(
+      '</body>',
+      `<script>const mediaStr = '{"baseUrl":"https://gsf.tlstatic.com/image/base","media":["a.jpeg","b.jpeg"]}';</script></body>`
+    )
+    mockFetchExternalPageSource.mockResolvedValue(html)
+    mockLookupSpatialCoordinates.mockResolvedValue({
+      lat: 41.81225221,
+      lng: -87.71115022,
+      coordinate_precision: 'provider_native',
+      geocode_method: 'ystm_provider_native',
+      geocode_confidence: 'high',
+      resolutionSource: 'ystm_native_html',
+    })
+    mockPublishReady.mockResolvedValue({ ok: true, publishedSaleId: 'sale-1' })
+
+    await attemptYstmDetailFirstReady({
+      config: CONFIG,
+      listSeed: LIST_SEED,
+      platform: 'external_page_source',
+      rowPayload: { pageIndex: 0 },
+      pageIndex: 0,
+    })
+
+    expect(insertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image_source_url: 'https://gsf.tlstatic.com/image/base/a.jpeg',
+        raw_payload: expect.objectContaining({
+          detailFirstReady: true,
+          imageUrls: [
+            'https://gsf.tlstatic.com/image/base/a.jpeg',
+            'https://gsf.tlstatic.com/image/base/b.jpeg',
+          ],
+        }),
+      })
+    )
+  })
+
   it('inserts ready and publishes when detail validation passes', async () => {
     const { attemptYstmDetailFirstReady } = await import(
       '@/lib/ingestion/acquisition/ystmDetailFirstReady'

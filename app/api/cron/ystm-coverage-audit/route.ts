@@ -33,6 +33,9 @@ function auditCronJsonBody(result: Awaited<ReturnType<typeof runYstmCoverageAudi
     coveragePct: t.coveragePct,
     observationCount: t.observationCount,
     overlapPrevented: t.overlapPrevented,
+    bootstrapNationwide: t.bootstrapNationwide,
+    auditSelectionMode: t.auditSelectionMode,
+    postAuditReconcile: t.postAuditReconcile,
   }
 }
 

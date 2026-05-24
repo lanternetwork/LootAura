@@ -51,6 +51,12 @@ import {
   loadSourceUrlAliasMetrics,
   type SourceUrlAliasMetrics,
 } from '@/lib/admin/sourceUrlAliasMetrics'
+import {
+  evaluateCoverageBootstrapExitCriteria,
+  fetchCoverageBootstrapState,
+  maybeAutoDisableCoverageBootstrap,
+  type CoverageBootstrapState,
+} from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type YstmCoverageTrendPoint = {
@@ -93,6 +99,9 @@ export type YstmCoverageScoreboard = {
   saleInstanceIdentity: SaleInstanceIdentityMetrics
   sourceUrlAlias: SourceUrlAliasMetrics
   falseExclusionSaleIdentity: YstmFalseExclusionSaleIdentityDashboard
+  coverageBootstrap: CoverageBootstrapState & {
+    exitCriteriaPreview: { met: boolean; reasons: string[] }
+  }
 }
 
 type AuditRunRow = {
@@ -224,6 +233,32 @@ export async function buildYstmCoverageScoreboard(
     now
   )
 
+  let coverageBootstrap = await fetchCoverageBootstrapState(admin)
+  const exitCriteriaPreview = evaluateCoverageBootstrapExitCriteria({
+    coveragePct,
+    missingValidYstmUrls: agg.missingValidYstmUrls,
+    validActiveYstmUrls: agg.validActiveYstmUrls,
+    catalogRepairQueue: catalogRepair.repairQueueTotal,
+    fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
+    blockRate24h: graphEnumeration.blockRate24h,
+    enabledAt: coverageBootstrap.enabledAt,
+    nowMs: now.getTime(),
+  })
+
+  if (coverageBootstrap.enabled) {
+    await maybeAutoDisableCoverageBootstrap(admin, {
+      coveragePct,
+      missingValidYstmUrls: agg.missingValidYstmUrls,
+      validActiveYstmUrls: agg.validActiveYstmUrls,
+      catalogRepairQueue: catalogRepair.repairQueueTotal,
+      fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
+      blockRate24h: graphEnumeration.blockRate24h,
+      enabledAt: coverageBootstrap.enabledAt,
+      nowMs: now.getTime(),
+    })
+    coverageBootstrap = await fetchCoverageBootstrapState(admin)
+  }
+
   return {
     targetPct: YSTM_COVERAGE_TARGET_PCT,
     generatedAt: now.toISOString(),
@@ -259,6 +294,10 @@ export async function buildYstmCoverageScoreboard(
     saleInstanceIdentity,
     sourceUrlAlias,
     falseExclusionSaleIdentity,
+    coverageBootstrap: {
+      ...coverageBootstrap,
+      exitCriteriaPreview,
+    },
   }
 }
 

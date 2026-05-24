@@ -19,4 +19,10 @@ describe('parseYstmCoverageAuditBudgets', () => {
     expect(budgets.maxUrlsPerListPage).toBe(200)
     expect(budgets.maxRuntimeMs).toBe(300_000)
   })
+
+  it('uses bootstrap profile when bootstrapEnabled is true', () => {
+    const budgets = parseYstmCoverageAuditBudgets({} as unknown as NodeJS.ProcessEnv, true)
+    expect(budgets.maxConfigsPerRun).toBe(80)
+    expect(budgets.maxDetailValidationsPerRun).toBe(300)
+  })
 })

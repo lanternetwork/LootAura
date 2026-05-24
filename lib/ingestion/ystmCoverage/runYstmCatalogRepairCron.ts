@@ -14,6 +14,7 @@ import {
   fetchCatalogRepairCandidatePage,
   isEligibleForCatalogRepairRetry,
 } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairCandidates'
+import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import {
   parseYstmCatalogRepairBudgets,
   YSTM_COVERAGE_CATALOG_REPAIR_STATE_KEY,
@@ -74,9 +75,11 @@ function mapFollowUpToOutcome(
 
 export async function runYstmCatalogRepairCron(
   admin: ReturnType<typeof getAdminDb>,
-  options?: { budgets?: YstmCatalogRepairBudgets }
+  options?: { budgets?: YstmCatalogRepairBudgets; bootstrapEnabled?: boolean }
 ): Promise<YstmCatalogRepairCronResult> {
-  const budgets = options?.budgets ?? parseYstmCatalogRepairBudgets()
+  const bootstrapEnabled =
+    options?.bootstrapEnabled ?? (await fetchCoverageBootstrapEnabled(admin))
+  const budgets = options?.budgets ?? parseYstmCatalogRepairBudgets(process.env, bootstrapEnabled)
   const logContext = { component: 'ingestion/ystmCoverage/runYstmCatalogRepairCron' }
   const startedMs = Date.now()
   const detailFirstMetrics = emptyYstmDetailFirstRunMetrics()

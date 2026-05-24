@@ -8,6 +8,10 @@ const mockFollowUp = vi.hoisted(() => vi.fn())
 const mockRecordOutcome = vi.hoisted(() => vi.fn())
 const mockMarkVisible = vi.hoisted(() => vi.fn())
 
+vi.mock('@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode', () => ({
+  fetchCoverageBootstrapEnabled: vi.fn().mockResolvedValue(false),
+}))
+
 vi.mock('@/lib/ingestion/ingestionOrchestrationLease', () => ({
   acquireIngestionOrchestrationLease: mockAcquireLease,
   releaseIngestionOrchestrationLease: mockReleaseLease,

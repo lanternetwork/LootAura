@@ -15,9 +15,14 @@ vi.mock('@/lib/auth/adminGate', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
+  const maybeSingleResult = {
+    data: Array.isArray(result.data) ? (result.data[0] ?? null) : (result.data ?? null),
+    error: result.error ?? null,
+  }
   for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'ilike', 'order', 'limit', 'range', 'gte']) {
     q[m] = vi.fn(() => q)
   }
+  q.maybeSingle = vi.fn(() => Promise.resolve(maybeSingleResult))
   q.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
     Promise.resolve(result).then((r) => {
       if (onFulfilled == null) return r
@@ -70,6 +75,15 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
           return thenableQuery({ data: [], count: 0 })
         case 'ingestion_orchestration_runs':
           return thenableQuery({ data: [] })
+        case 'ingestion_orchestration_state':
+          return thenableQuery({
+            data: {
+              coverage_bootstrap_enabled: false,
+              coverage_bootstrap_enabled_at: null,
+              coverage_bootstrap_disabled_at: null,
+              coverage_bootstrap_disabled_reason: null,
+            },
+          })
         case 'ingested_sale_soft_dedupe_suppressions':
           return thenableQuery({ data: [], count: 0 })
         case 'ystm_sale_instance_shadow_replays':
@@ -118,6 +132,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.saleInstanceShadowReplay.replayedCount).toBe(0)
     expect(json.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount).toBe(0)
     expect(json.falseExclusionSaleIdentity.missingValidYstmUrls).toBe(0)
+    expect(json.coverageBootstrap.enabled).toBe(false)
     expect(json.falseExclusionSaleIdentity.healthy).toBe(true)
   })
 })

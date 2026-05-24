@@ -1,8 +1,8 @@
-/** Production-safe nationwide defaults; env vars remain optional overrides. */
-const DEFAULT_MAX_CONFIGS = 40
-const DEFAULT_MAX_LIST_FETCHES = 80
-const DEFAULT_MAX_DETAIL_VALIDATIONS = 120
-const DEFAULT_MAX_URLS_PER_LIST_PAGE = 200
+import {
+  BOOTSTRAP_COVERAGE_AUDIT,
+  STEADY_COVERAGE_AUDIT,
+} from '@/lib/ingestion/ystmCoverage/coverageBudgetProfiles'
+
 const DEFAULT_LEASE_SECONDS = 300
 const DEFAULT_MAX_RUNTIME_MS = 300_000
 
@@ -24,23 +24,31 @@ export type YstmCoverageAuditBudgets = {
   maxRuntimeMs: number
 }
 
-export function parseYstmCoverageAuditBudgets(env: NodeJS.ProcessEnv = process.env): YstmCoverageAuditBudgets {
+export function parseYstmCoverageAuditBudgets(
+  env: NodeJS.ProcessEnv = process.env,
+  bootstrapEnabled = false
+): YstmCoverageAuditBudgets {
+  const profile = bootstrapEnabled ? BOOTSTRAP_COVERAGE_AUDIT : STEADY_COVERAGE_AUDIT
   return {
-    maxConfigsPerRun: parsePositiveInt(env.CRON_YSTM_COVERAGE_MAX_CONFIGS, DEFAULT_MAX_CONFIGS, 40),
+    maxConfigsPerRun: parsePositiveInt(
+      env.CRON_YSTM_COVERAGE_MAX_CONFIGS,
+      profile.maxConfigsPerRun,
+      profile.maxConfigsCap
+    ),
     maxListFetchesPerRun: parsePositiveInt(
       env.CRON_YSTM_COVERAGE_MAX_LIST_FETCHES,
-      DEFAULT_MAX_LIST_FETCHES,
-      80
+      profile.maxListFetchesPerRun,
+      profile.maxListFetchesCap
     ),
     maxDetailValidationsPerRun: parsePositiveInt(
       env.CRON_YSTM_COVERAGE_MAX_DETAIL_VALIDATIONS,
-      DEFAULT_MAX_DETAIL_VALIDATIONS,
-      120
+      profile.maxDetailValidationsPerRun,
+      profile.maxDetailValidationsCap
     ),
     maxUrlsPerListPage: parsePositiveInt(
       env.CRON_YSTM_COVERAGE_MAX_URLS_PER_LIST_PAGE,
-      DEFAULT_MAX_URLS_PER_LIST_PAGE,
-      200
+      profile.maxUrlsPerListPage,
+      profile.maxUrlsPerListPageCap
     ),
     leaseSeconds: parsePositiveInt(env.CRON_YSTM_COVERAGE_LEASE_SECONDS, DEFAULT_LEASE_SECONDS, 900),
     maxRuntimeMs: parsePositiveInt(env.CRON_YSTM_COVERAGE_MAX_RUNTIME_MS, DEFAULT_MAX_RUNTIME_MS, 300_000),

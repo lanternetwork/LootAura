@@ -1,7 +1,8 @@
-/** Production-safe nationwide defaults; env vars remain optional overrides. */
-const DEFAULT_MAX_ATTEMPTS_PER_RUN = 60
-const DEFAULT_MAX_CANDIDATES_SCANNED = 200
-const DEFAULT_FAILED_RETRY_HOURS = 6
+import {
+  BOOTSTRAP_COVERAGE_MISSING_INGEST,
+  STEADY_COVERAGE_MISSING_INGEST,
+} from '@/lib/ingestion/ystmCoverage/coverageBudgetProfiles'
+
 const DEFAULT_LEASE_SECONDS = 300
 const DEFAULT_MAX_RUNTIME_MS = 300_000
 
@@ -23,23 +24,25 @@ export type YstmCoverageMissingIngestionBudgets = {
 }
 
 export function parseYstmCoverageMissingIngestionBudgets(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  bootstrapEnabled = false
 ): YstmCoverageMissingIngestionBudgets {
+  const profile = bootstrapEnabled ? BOOTSTRAP_COVERAGE_MISSING_INGEST : STEADY_COVERAGE_MISSING_INGEST
   return {
     maxAttemptsPerRun: parsePositiveInt(
       env.CRON_YSTM_MISSING_INGEST_MAX_ATTEMPTS,
-      DEFAULT_MAX_ATTEMPTS_PER_RUN,
-      60
+      profile.maxAttemptsPerRun,
+      profile.maxAttemptsCap
     ),
     maxCandidatesScannedPerRun: parsePositiveInt(
       env.CRON_YSTM_MISSING_INGEST_MAX_SCANNED,
-      DEFAULT_MAX_CANDIDATES_SCANNED,
-      200
+      profile.maxCandidatesScannedPerRun,
+      profile.maxCandidatesScannedCap
     ),
     failedRetryHours: parsePositiveInt(
       env.CRON_YSTM_MISSING_INGEST_FAILED_RETRY_HOURS,
-      DEFAULT_FAILED_RETRY_HOURS,
-      72
+      profile.failedRetryHours,
+      profile.failedRetryHoursCap
     ),
     leaseSeconds: parsePositiveInt(env.CRON_YSTM_MISSING_INGEST_LEASE_SECONDS, DEFAULT_LEASE_SECONDS, 900),
     maxRuntimeMs: parsePositiveInt(

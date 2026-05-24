@@ -476,6 +476,8 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 **Admin scoreboard:** `GET /api/admin/ingestion/ystm-coverage` (admin session). KPI fields: `validActiveYstmUrls`, `publishedVisibleInAuditFootprint`, `missingValidYstmUrls`, `coveragePct`.
 
+**Nationwide bootstrap (temporary catch-up):** Toggle from the ingestion dashboard (`POST /api/admin/ingestion/coverage-bootstrap` with `{ "enabled": true | false }`). State is stored in `ingestion_orchestration_state` key `coverage_bootstrap_nationwide` (migration `208_coverage_bootstrap_nationwide.sql`) — no new Vercel env vars. When enabled: higher code budgets, metro-priority audit, post-audit missing-ingest/repair chain, extra hourly missing-ingest and 3h catalog-repair crons in `vercel.json`. Auto-disables when exit criteria are met (≥90% coverage, missing ≤25, repair queue &lt;50, V≥3000, fetch/block ≤2%, enabled ≥24h) or fetch failure &gt;5%.
+
 **Production prerequisites**
 
 1. Apply migrations **`196_ystm_coverage_audit_phase_1.sql`** through **`199_ystm_coverage_catalog_repair_phase_5.sql`**.

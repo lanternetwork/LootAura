@@ -250,12 +250,14 @@ export function resolveAdaptiveThroughput(params: {
   signals: AdaptivePressureSignals
   previousDwell: AdaptiveDwellState | null
   caps?: AdaptiveCaps
+  bootstrapNationwide?: boolean
 }): {
   envelope: AdaptiveThroughputEnvelope
   note: AdaptiveThroughputNoteFields
 } {
+  const bootstrapNationwide = params.bootstrapNationwide === true
   if (!isAdaptiveThroughputEnabled()) {
-    const staticEnv = buildStaticThroughputEnvelope()
+    const staticEnv = buildStaticThroughputEnvelope(bootstrapNationwide)
     return {
       envelope: staticEnv,
       note: buildNoteFromEnvelope(staticEnv, {
@@ -268,7 +270,7 @@ export function resolveAdaptiveThroughput(params: {
     }
   }
 
-  const caps = params.caps ?? loadAdaptiveCaps()
+  const caps = params.caps ?? loadAdaptiveCaps({ bootstrapNationwide })
   const prev = params.previousDwell ?? emptyDwell()
   const signals = params.signals
 
@@ -304,10 +306,11 @@ export function resolveAdaptiveThroughput(params: {
     publish: publishH.profile,
   }
 
+  const knobOptions = { bootstrapNationwide }
   const envelope: AdaptiveThroughputEnvelope = {
-    fetch: knobsForSubsystemProfile('fetch', subsystemProfiles.fetch, caps) as FetchKnobProfile,
-    geocode: knobsForSubsystemProfile('geocode', subsystemProfiles.geocode, caps) as GeocodeKnobProfile,
-    publish: knobsForSubsystemProfile('publish', subsystemProfiles.publish, caps) as PublishKnobProfile,
+    fetch: knobsForSubsystemProfile('fetch', subsystemProfiles.fetch, caps, knobOptions) as FetchKnobProfile,
+    geocode: knobsForSubsystemProfile('geocode', subsystemProfiles.geocode, caps, knobOptions) as GeocodeKnobProfile,
+    publish: knobsForSubsystemProfile('publish', subsystemProfiles.publish, caps, knobOptions) as PublishKnobProfile,
   }
 
   const pressureSignals = [

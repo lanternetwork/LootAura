@@ -158,6 +158,13 @@ function minimalCoverage(
       healthy: true,
       alerts: [],
     },
+    coverageBootstrap: {
+      enabled: false,
+      enabledAt: null,
+      disabledAt: null,
+      disabledReason: null,
+      exitCriteriaPreview: { met: false, reasons: [] },
+    },
     ...overrides,
   }
 }

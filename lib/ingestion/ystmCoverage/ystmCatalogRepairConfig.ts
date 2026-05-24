@@ -1,9 +1,9 @@
-/** Burn-in defaults per docs/YSTM_90_PERCENT_COVERAGE_SPEC.md (Phase 5). Sprint week-1 closure bump (repo only, no Vercel env). */
-const DEFAULT_MAX_REPAIRS_PER_RUN = 80
-const DEFAULT_MAX_CANDIDATES_SCANNED = 200
+/** Production-safe nationwide defaults; env vars remain optional overrides. */
+const DEFAULT_MAX_REPAIRS_PER_RUN = 100
+const DEFAULT_MAX_CANDIDATES_SCANNED = 250
 const DEFAULT_FAILED_RETRY_HOURS = 6
 const DEFAULT_LEASE_SECONDS = 300
-const DEFAULT_MAX_RUNTIME_MS = 240_000
+const DEFAULT_MAX_RUNTIME_MS = 300_000
 
 function parsePositiveInt(raw: string | undefined, fallback: number, cap: number): number {
   if (raw === undefined || raw === '') return fallback

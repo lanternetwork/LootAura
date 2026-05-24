@@ -12,6 +12,7 @@ import { getAdminDb } from '@/lib/supabase/clients'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const maxDuration = 300
 
 function catalogRepairCronJsonBody(result: Awaited<ReturnType<typeof runYstmCatalogRepairCron>>) {
   const t = result.telemetry

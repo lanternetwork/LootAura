@@ -15,6 +15,7 @@ import { getAdminDb } from '@/lib/supabase/clients'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const maxDuration = 300
 
 function discoveryCronJsonBody(result: Awaited<ReturnType<typeof runSourceDiscoveryCron>>) {
   const t = result.telemetry

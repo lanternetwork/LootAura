@@ -102,7 +102,21 @@
     "qs": "^6.15.2",
     "uuid": "^11.1.1",
     "ws": "^8.20.1",
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "esbuild": "^0.25.0",
+    "protocol-buffers-schema": "^3.6.1",
+    "eslint-plugin-vitest": {
+      "minimatch": "^9.0.7"
+    },
+    "@fastify/otel": {
+      "brace-expansion": "^5.0.6"
+    },
+    "glob": {
+      "brace-expansion": "^5.0.6"
+    },
+    "vite": {
+      "esbuild": "^0.25.0"
+    }
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",

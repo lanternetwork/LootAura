@@ -11,11 +11,11 @@ describe('parseYstmCoverageMissingIngestionBudgets', () => {
     expect(budgets.maxCandidatesScannedPerRun).toBe(200)
   })
 
-  it('defaults to burn-in missing-ingest budgets', () => {
+  it('defaults to production nationwide missing-ingest budgets', () => {
     const budgets = parseYstmCoverageMissingIngestionBudgets({} as unknown as NodeJS.ProcessEnv)
-    expect(budgets.maxAttemptsPerRun).toBe(48)
-    expect(budgets.maxCandidatesScannedPerRun).toBe(160)
+    expect(budgets.maxAttemptsPerRun).toBe(60)
+    expect(budgets.maxCandidatesScannedPerRun).toBe(200)
     expect(budgets.failedRetryHours).toBe(6)
-    expect(budgets.maxRuntimeMs).toBe(240_000)
+    expect(budgets.maxRuntimeMs).toBe(300_000)
   })
 })

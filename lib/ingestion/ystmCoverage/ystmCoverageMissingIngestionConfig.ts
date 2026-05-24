@@ -1,9 +1,9 @@
-/** Burn-in defaults per docs/YSTM_90_PERCENT_COVERAGE_SPEC.md (Phase 3). */
-const DEFAULT_MAX_ATTEMPTS_PER_RUN = 48
-const DEFAULT_MAX_CANDIDATES_SCANNED = 160
+/** Production-safe nationwide defaults; env vars remain optional overrides. */
+const DEFAULT_MAX_ATTEMPTS_PER_RUN = 60
+const DEFAULT_MAX_CANDIDATES_SCANNED = 200
 const DEFAULT_FAILED_RETRY_HOURS = 6
 const DEFAULT_LEASE_SECONDS = 300
-const DEFAULT_MAX_RUNTIME_MS = 240_000
+const DEFAULT_MAX_RUNTIME_MS = 300_000
 
 function parsePositiveInt(raw: string | undefined, fallback: number, cap: number): number {
   if (raw === undefined || raw === '') return fallback

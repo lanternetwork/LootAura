@@ -15,9 +15,14 @@ vi.mock('@/lib/auth/adminGate', () => ({
 
 function thenableQuery(result: { data?: unknown; error?: unknown; count?: number | null }) {
   const q: Record<string, unknown> = {}
+  const maybeSingleResult = {
+    data: Array.isArray(result.data) ? (result.data[0] ?? null) : (result.data ?? null),
+    error: result.error ?? null,
+  }
   for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'ilike', 'order', 'limit', 'range', 'gte']) {
     q[m] = vi.fn(() => q)
   }
+  q.maybeSingle = vi.fn(() => Promise.resolve(maybeSingleResult))
   q.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
     Promise.resolve(result).then((r) => {
       if (onFulfilled == null) return r

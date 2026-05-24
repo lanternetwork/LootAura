@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import {
-  evaluateCoverageBootstrapExitCriteria,
   fetchCoverageBootstrapState,
   setCoverageBootstrapEnabled,
   type CoverageBootstrapDisabledReason,

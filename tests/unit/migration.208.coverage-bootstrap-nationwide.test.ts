@@ -10,6 +10,6 @@ describe('migration 208 coverage bootstrap nationwide', () => {
     )
     expect(sql).toContain('coverage_bootstrap_enabled')
     expect(sql).toContain('coverage_bootstrap_nationwide')
-    expect(sql).toContain("coverage_bootstrap_enabled = false")
+    expect(sql).toContain("VALUES ('coverage_bootstrap_nationwide', 0, false)")
   })
 })

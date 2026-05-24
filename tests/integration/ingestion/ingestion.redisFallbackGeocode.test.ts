@@ -237,6 +237,22 @@ vi.mock('@/lib/ingestion/orchestrationMetrics', () => ({
   recordGeocodeCronOrchestrationRun: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/ingestion/adaptiveThroughputSignals', () => ({
+  resolveAdaptiveThroughputForCron: vi.fn().mockResolvedValue({
+    envelope: {
+      fetch: {
+        configBatchSize: 60,
+        executionBudgetMs: 120_000,
+        minIntervalMinutes: 10,
+        domainSpacingMs: 500,
+      },
+      geocode: { backlogBatchSize: 40, queueBatchSize: 40, concurrencyCeiling: 4 },
+      publish: { batchSize: 200 },
+    },
+    note: {},
+  }),
+}))
+
 vi.mock('@/lib/ingestion/geocodePipelineLease', () => ({
   runWithGeocodePipelineLease: async <T,>({ execute }: { execute: () => Promise<T> }) => ({
     ok: true,

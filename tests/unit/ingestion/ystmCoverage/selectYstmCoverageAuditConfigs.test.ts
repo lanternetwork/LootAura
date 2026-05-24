@@ -9,7 +9,6 @@ function config(city: string, state: string): ExternalCityConfigRow {
     source_platform: 'external_page_source',
     source_pages: ['https://example.com/list.html'],
     source_crawl_excluded_at: null,
-    enabled: true,
   }
 }
 

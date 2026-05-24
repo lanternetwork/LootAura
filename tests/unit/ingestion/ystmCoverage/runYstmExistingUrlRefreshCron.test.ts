@@ -6,6 +6,10 @@ const mockFetchPage = vi.hoisted(() => vi.fn())
 const mockAttemptDetailFirst = vi.hoisted(() => vi.fn())
 const mockMarkVisible = vi.hoisted(() => vi.fn())
 
+vi.mock('@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode', () => ({
+  fetchCoverageBootstrapEnabled: vi.fn().mockResolvedValue(false),
+}))
+
 vi.mock('@/lib/ingestion/ingestionOrchestrationLease', () => ({
   acquireIngestionOrchestrationLease: mockAcquireLease,
   releaseIngestionOrchestrationLease: mockReleaseLease,

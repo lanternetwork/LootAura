@@ -59,6 +59,7 @@ export function planYstmUrlReuseSupersessionOnDetailRefresh(input: {
           source_listing_id: null,
           sale_instance_key: input.nextSaleInstanceKey,
           sale_instance_fingerprint: null,
+          canonical_sale_instance_key: null,
           source_payload_hash: null,
           source_content_hash: input.nextSourceContentHash ?? null,
           source_schedule_hash: null,

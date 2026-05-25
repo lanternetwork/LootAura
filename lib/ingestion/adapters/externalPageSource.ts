@@ -85,11 +85,8 @@ import {
 } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
-import {
-  ESNET_SOURCE_PLATFORM,
-  isEsnetIngestEnabled,
-  parserVersionForEsnetPlatform,
-} from '@/lib/ingestion/estatesalesnet/constants'
+import { ESNET_SOURCE_PLATFORM, parserVersionForEsnetPlatform } from '@/lib/ingestion/estatesalesnet/constants'
+import { fetchEsnetIngestEnabled } from '@/lib/ingestion/estatesalesnet/esnetOrchestrationState'
 import { computeEsnetSaleInstanceIdentity } from '@/lib/ingestion/estatesalesnet/computeEsnetSaleInstanceIdentity'
 import {
   isEstatesalesNetIngestionConfig,
@@ -196,6 +193,8 @@ export type ExternalPageSourcePersistOptions = {
   }) => Promise<void> | void
   /** Merged into structured telemetry (requestId, correlationId, etc.) — no PII. */
   telemetryContext?: Record<string, unknown>
+  /** When set by ES.net ingest lane, skips a second DB read of `esnet_ingest_enabled`. */
+  esnetIngestEnabled?: boolean
 }
 
 /** HTTPS-only list URLs for server-side fetch (SSRF-safe layer). */
@@ -1172,18 +1171,22 @@ export async function persistExternalPageSource(
   const platform = config.source_platform || ADAPTER_ID
   const parserVersion = parserVersionForEsnetPlatform(platform)
 
-  if (platform === ESNET_SOURCE_PLATFORM && !isEsnetIngestEnabled()) {
-    logger.info('ES.net ingest disabled; skipping config', {
-      component: 'ingestion/adapters/externalPageSource',
-      operation: 'persist_config_skipped',
-      city: config.city,
-      state: config.state,
-      adapter: ADAPTER_ID,
-    })
-    return summary
-  }
-
   const admin = getAdminDb()
+
+  if (platform === ESNET_SOURCE_PLATFORM) {
+    const ingestEnabled =
+      options?.esnetIngestEnabled ?? (await fetchEsnetIngestEnabled(admin))
+    if (!ingestEnabled) {
+      logger.info('ES.net ingest disabled; skipping config', {
+        component: 'ingestion/adapters/externalPageSource',
+        operation: 'persist_config_skipped',
+        city: config.city,
+        state: config.state,
+        adapter: ADAPTER_ID,
+      })
+      return summary
+    }
+  }
 
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
     const pageUrl = pages[pageIndex]

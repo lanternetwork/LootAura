@@ -17,7 +17,7 @@ import { revalidateSourceDiscoveryConfigs } from '@/lib/ingestion/discovery/reva
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import type { ValidatedDiscoveryCandidate } from '@/lib/ingestion/discovery/sourceDiscovery'
 import { runYstmGraphEnumerationDiscovery } from '@/lib/ingestion/discovery/runYstmGraphEnumerationDiscovery'
-import { isEsnetIngestEnabled } from '@/lib/ingestion/estatesalesnet/constants'
+import { shouldRunEsnetDiscoveryThisInvocation } from '@/lib/ingestion/estatesalesnet/esnetDiscoveryCadence'
 import { runEsnetGraphEnumerationDiscovery } from '@/lib/ingestion/estatesalesnet/discovery/runEsnetGraphEnumerationDiscovery'
 import {
   listValidatedUnpromotedCandidates,
@@ -254,7 +254,7 @@ export async function runSourceDiscoveryCron(
     }
 
     if (
-      isEsnetIngestEnabled() &&
+      shouldRunEsnetDiscoveryThisInvocation() &&
       batch.states.length > 0 &&
       !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)
     ) {
@@ -309,10 +309,7 @@ export async function runSourceDiscoveryCron(
       }
     }
 
-    if (
-      isEsnetIngestEnabled() &&
-      !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)
-    ) {
+    if (shouldRunEsnetDiscoveryThisInvocation() && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
       const esnetRevalidation = await revalidateSourceDiscoveryConfigs(admin, {
         dryRun: false,
         states: batch.states.length > 0 ? batch.states : undefined,

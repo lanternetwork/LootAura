@@ -9,6 +9,7 @@ Implementation specification for adding EstateSales.NET (`estatesales_net`) as p
 - **Phase 2:** Detail enrichment via SSR NGRX — **8/8** (capture doc, shared NGRX extract, detail parser, merge, enrichment fetch, persist queue, tests, code map below)
 - **Phase 3:** Nationwide discovery and operational scaling — **5/5**
 - **Phase 4:** Operations burn-in — **6/6**
+- **Phase 5:** DB runtime control + provider cadence — **8/8**
 
 ## Principles
 
@@ -16,6 +17,7 @@ Implementation specification for adding EstateSales.NET (`estatesales_net`) as p
 2. **Reuse** publish worker, geocode, repair, refresh, audit, address lifecycle, sale-instance identity.
 3. **List-first:** parse `NGRX_STATE` on metro pages; no headless browser by default.
 4. **Retain observations** when publish is suppressed cross-provider; do not hard-drop provider rows.
+5. **No Vercel env toggles** for ES.net operations — runtime control is DB-backed via admin UI.
 
 ## Provider identity
 
@@ -26,41 +28,57 @@ Implementation specification for adding EstateSales.NET (`estatesales_net`) as p
 | Canonical URL | `https://www.estatesales.net/{STATE}/{City}/{ZIP}/{SALE_ID}` |
 | List `parser_version` | `estatesales_net_list_v1` |
 
-## Bootstrap
+## Runtime control (DB)
 
-Shared orchestration columns (migration 208) with a **provider-scoped** state key:
+Two independent keys in `ingestion_orchestration_state` (migration **211**):
 
-```text
-coverage_bootstrap_estatesales_net
-```
+| Key | Purpose | Auto-disable |
+|-----|---------|--------------|
+| `esnet_ingest_enabled` | Provider list/detail persist + ingest lane | **Never** — admin only |
+| `esnet_bootstrap_enabled` | Temporary burst crawl budgets | **Yes** — exit criteria in `esnetCoverageBootstrapExit.ts` |
 
-Do not couple ES.net exit criteria to YSTM `coverage_bootstrap_nationwide` until burn-in completes.
+Legacy key `coverage_bootstrap_estatesales_net` (migration 209) is read as a bootstrap fallback only.
 
-## Feature flag
+Admin API: `POST /api/admin/ingestion/coverage-bootstrap` with `{ "enabled": boolean, "target": "ingest" | "bootstrap" | "nationwide" }`.
 
-List ingest runs only when:
+## Provider cadence (code defaults)
 
-```text
-ESNET_INGEST_ENABLED=true
-```
+ES.net does **not** use YSTM `*/2` ingest cadence or `INGESTION_ORCHESTRATION_*` env budgets.
 
-No new Vercel/GitHub env vars are required in this PR; operators set the flag when ready.
+| Lane | Normal | Bootstrap burst |
+|------|--------|-----------------|
+| Ingest min interval | 360 min | 120 min |
+| Config batch | 18 | 45 |
+| Execution budget | 90s | 150s |
+| Domain spacing | 800ms | 500ms |
+
+Discovery runs on shared `/api/cron/discovery` at **02/08/14/20 UTC** only (`esnetDiscoveryCadence.ts`) — ~4×/day, not every cron tick.
+
+Metro list crawl order uses `esnetAdaptiveRefreshPolicy.ts` (sale-window tiers: daily → 12h → 4h → 2h active; expired metros skipped).
 
 ## Code map
 
 | Module | Role |
 |--------|------|
-| `lib/ingestion/estatesalesnet/constants.ts` | Platform id, parser versions, ingest gate |
+| `lib/ingestion/estatesalesnet/constants.ts` | Platform id, parser versions |
+| `lib/ingestion/estatesalesnet/esnetOrchestrationState.ts` | DB ingest + bootstrap state |
+| `lib/ingestion/estatesalesnet/esnetIngestionOrchestrationDefaults.ts` | Code-only ingest budgets |
+| `lib/ingestion/estatesalesnet/esnetIngestCadence.ts` | Ingest lane throttle (`esnet_ingest_lane`) |
+| `lib/ingestion/estatesalesnet/esnetDiscoveryCadence.ts` | Discovery hour gating |
+| `lib/ingestion/estatesalesnet/esnetAdaptiveRefreshPolicy.ts` | Sale-window crawl prioritization |
 | `lib/ingestion/estatesalesnet/parseEsnetNgrxListHtml.ts` | NGRX list parser |
-| `lib/ingestion/estatesalesnet/parseEsnetNgrxDetailHtml.ts` | NGRX detail parser (Phase 2) |
-| `lib/ingestion/estatesalesnet/attemptEsnetDetailEnrichment.ts` | Fetch detail HTML + merge |
-| `lib/ingestion/estatesalesnet/computeEsnetSaleInstanceIdentity.ts` | Sale-instance fields |
-| `lib/ingestion/estatesalesnet/esnetHosts.ts` | Host / URL helpers |
-| `lib/ingestion/estatesalesnet/coverageBootstrapEstatesalesNet.ts` | Bootstrap state key |
-| `lib/ingestion/estatesalesnet/discovery/runEsnetGraphEnumerationDiscovery.ts` | Nationwide metro discovery |
+| `lib/ingestion/estatesalesnet/parseEsnetNgrxDetailHtml.ts` | NGRX detail parser |
 | `lib/ingestion/estatesalesnet/runEsnetPlatformIngestionCronBatch.ts` | Daily cron ingest lane |
-| `lib/ingestion/estatesalesnet/esnetCoverageBootstrapExit.ts` | Bootstrap exit criteria |
+| `lib/ingestion/estatesalesnet/esnetCoverageBootstrapExit.ts` | Bootstrap-only auto-disable |
 | `lib/ingestion/adapters/externalPageSource.ts` | Routes parse + identity for `estatesales_net` |
+
+## Operator checklist
+
+1. Apply migrations **209**, **210**, **211**.
+2. Let discovery seed `ingestion_city_configs` with `source_platform=estatesales_net`.
+3. Enable **provider ingestion** from the ingestion dashboard (`target: ingest`) — no deploy.
+4. Optionally enable **burst bootstrap** (`target: bootstrap`) for higher crawl budgets.
+5. Monitor scoreboard fields `esnetIngest` / `esnetBootstrap` and daily telemetry (`esnetInserted`, detail enrichment counters).
 
 ## Phase 2 (complete)
 
@@ -70,36 +88,21 @@ REST `esnetApiClient.ts` remains deferred until `/api/saleDetails` is confirmed 
 
 ## Phase 3 (complete)
 
-| # | Deliverable | Module / notes |
-|---|-------------|----------------|
-| 1 | Nationwide metro discovery from `https://www.estatesales.net/{STATE}` | `discovery/extractEsnetCityPageCandidates.ts`, `runEsnetGraphEnumerationDiscovery.ts` |
-| 2 | Promote `estatesales_net` configs (never overwrites `manual`) | `promoteSourceDiscoveryResults({ sourcePlatform: 'estatesales_net' })` |
-| 3 | Daily cron ES.net ingest lane (bootstrap-aware budgets) | `runEsnetPlatformIngestionCronBatch.ts`, `app/api/cron/daily/route.ts` |
-| 4 | Provider bootstrap exit criteria (decoupled from YSTM nationwide) | `esnetCoverageBootstrapExit.ts`, migration `210` |
-| 5 | Ops notes | Discovery key `source_discovery_estatesales_net`; enable bootstrap via `coverage_bootstrap_estatesales_net` row |
-
-**Operator checklist**
-
-1. Apply migrations `209` + `210`.
-2. Set `ESNET_INGEST_ENABLED=true` when ready (no new GitHub/Vercel secrets).
-3. Optionally enable `coverage_bootstrap_estatesales_net` in `ingestion_orchestration_state` for higher crawl budgets.
-4. Let discovery cron populate `ingestion_city_configs` with `source_platform=estatesales_net` before expecting ingest volume.
+Nationwide metro discovery from state indexes, promotion, daily cron lane, discovery orchestration key `source_discovery_estatesales_net`.
 
 ## Phase 4 (complete)
 
-| # | Deliverable | Module / notes |
-|---|-------------|----------------|
-| 1 | Admin toggle for `coverage_bootstrap_estatesales_net` | `POST /api/admin/ingestion/coverage-bootstrap` body `{ "enabled", "provider": "estatesales_net" }` |
-| 2 | Scoreboard panel + diagnostics export | `esnetCoverageBootstrap` on `GET /api/admin/ingestion/ystm-coverage` |
-| 3 | Auto-disable bootstrap when exit criteria met | `maybeAutoDisableEsnetCoverageBootstrap` after daily ES.net ingest + scoreboard load |
-| 4 | ES.net discovery revalidation lane | `revalidateSourceDiscoveryConfigs({ sourcePlatform: 'estatesales_net' })` in discovery cron |
-| 5 | Platform adapters for revalidation | `lib/ingestion/discovery/revalidationPlatformAdapters.ts` |
-| 6 | Operator notes | Revalidation runs when `ESNET_INGEST_ENABLED=true`; nationwide coverage audit remains YSTM-only until a dedicated ES.net audit phase |
+Admin bootstrap panel, ES.net discovery revalidation, platform adapters, scoreboard telemetry.
 
-**Burn-in checklist**
+## Phase 5 (complete)
 
-1. Merge PR and apply migrations `209` + `210`.
-2. Let discovery seed ES.net metro configs (graph enumeration + revalidation).
-3. Set `ESNET_INGEST_ENABLED=true` in production when ready.
-4. Enable ES.net bootstrap from the ingestion dashboard if higher crawl budgets are needed.
-5. Monitor `esnetCoverageBootstrap.crawlableConfigCount` and daily ingest telemetry (`esnetInserted`, detail enrichment counters).
+| # | Deliverable |
+|---|-------------|
+| 1 | Remove `ESNET_INGEST_ENABLED` env gating |
+| 2 | `esnet_ingest_enabled` + `esnet_bootstrap_enabled` DB keys (migration 211) |
+| 3 | Admin UI: separate ingest vs bootstrap toggles |
+| 4 | Ingest/bootstrap never auto-disable (bootstrap exit only) |
+| 5 | ES.net-specific ingest budgets + cadence throttle |
+| 6 | Discovery 4×/day hour gating |
+| 7 | Adaptive metro refresh policy |
+| 8 | Docs + tests |

@@ -79,6 +79,7 @@ export default function YstmCoverageScoreboardSection() {
   const [backfillUi, setBackfillUi] = useState<BackfillUiState>({ kind: 'idle' })
   const [bootstrapUi, setBootstrapUi] = useState<BootstrapUiState>({ kind: 'idle' })
   const [esnetBootstrapUi, setEsnetBootstrapUi] = useState<BootstrapUiState>({ kind: 'idle' })
+  const [esnetIngestUi, setEsnetIngestUi] = useState<BootstrapUiState>({ kind: 'idle' })
 
   const load = useCallback(async () => {
     try {
@@ -139,15 +140,25 @@ export default function YstmCoverageScoreboardSection() {
     }
   }, [load])
 
-  const toggleCoverageBootstrap = useCallback(
-    async (enabled: boolean, provider: 'nationwide' | 'estatesales_net' = 'nationwide') => {
-      const setUi = provider === 'estatesales_net' ? setEsnetBootstrapUi : setBootstrapUi
+  const toggleProviderRuntime = useCallback(
+    async (
+      enabled: boolean,
+      target: 'nationwide' | 'ingest' | 'bootstrap' = 'nationwide'
+    ) => {
+      const setUi =
+        target === 'ingest'
+          ? setEsnetIngestUi
+          : target === 'bootstrap'
+            ? setEsnetBootstrapUi
+            : setBootstrapUi
       if (
         enabled &&
         !window.confirm(
-          provider === 'estatesales_net'
-            ? 'Enable EstateSales.NET coverage bootstrap? Raises ES.net daily ingest budgets. Requires ESNET_INGEST_ENABLED=true. Auto-disables when provider exit criteria are met.'
-            : 'Enable nationwide coverage bootstrap? This increases audit/ingest/repair throughput and may dip coverage % while the audit footprint grows. Auto-disables when exit criteria are met.'
+          target === 'ingest'
+            ? 'Enable EstateSales.NET provider ingestion? Persists list/detail observations when configs exist. Stored in DB — no deploy or Vercel env change.'
+            : target === 'bootstrap'
+              ? 'Enable EstateSales.NET burst bootstrap? Raises ingest budgets temporarily. Auto-disables when exit criteria are met; provider ingestion stays on.'
+              : 'Enable nationwide coverage bootstrap? This increases audit/ingest/repair throughput and may dip coverage % while the audit footprint grows. Auto-disables when exit criteria are met.'
         )
       ) {
         return
@@ -158,7 +169,7 @@ export default function YstmCoverageScoreboardSection() {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enabled, provider }),
+          body: JSON.stringify({ enabled, target }),
         })
         const json = (await res.json()) as { ok?: boolean; message?: string; code?: string }
         if (!res.ok || !json.ok) {
@@ -265,7 +276,7 @@ export default function YstmCoverageScoreboardSection() {
                   <button
                     type="button"
                     disabled={bootstrapUi.kind === 'running'}
-                    onClick={() => void toggleCoverageBootstrap(false)}
+                    onClick={() => void toggleProviderRuntime(false, 'nationwide')}
                     className="rounded border border-slate-400 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50"
                   >
                     Disable bootstrap
@@ -274,7 +285,7 @@ export default function YstmCoverageScoreboardSection() {
                   <button
                     type="button"
                     disabled={bootstrapUi.kind === 'running'}
-                    onClick={() => void toggleCoverageBootstrap(true)}
+                    onClick={() => void toggleProviderRuntime(true, 'nationwide')}
                     className="rounded border border-amber-600 bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
                   >
                     Enable nationwide bootstrap
@@ -289,51 +300,86 @@ export default function YstmCoverageScoreboardSection() {
 
           <div
             className={`mb-4 rounded-md border p-4 ${
-              data.esnetCoverageBootstrap.enabled
-                ? 'border-sky-400 bg-sky-50'
-                : 'border-slate-200 bg-slate-50'
+              data.esnetIngest.enabled ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50'
             }`}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-slate-950">EstateSales.NET ingest bootstrap</h3>
+                <h3 className="text-sm font-semibold text-slate-950">EstateSales.NET provider ingestion</h3>
                 <p className="mt-1 text-xs text-slate-700">
-                  Provider-scoped crawl budgets for <code className="text-xs">estatesales_net</code> configs
-                  (decoupled from nationwide bootstrap). List ingest still requires{' '}
-                  <code className="text-xs">ESNET_INGEST_ENABLED=true</code>.
+                  DB key <code className="text-xs">esnet_ingest_enabled</code>. Controls list persist and detail
+                  enrichment for <code className="text-xs">estatesales_net</code> configs. Never auto-disables —
+                  turn off manually from the dashboard.
                 </p>
                 <p className="mt-2 text-xs text-slate-600">
-                  Status:{' '}
-                  <span className="font-semibold">
-                    {data.esnetCoverageBootstrap.enabled ? 'ON' : 'OFF'}
-                  </span>
+                  Status: <span className="font-semibold">{data.esnetIngest.enabled ? 'ON' : 'OFF'}</span>
                   {' · '}
-                  ingest gate:{' '}
-                  <span className="font-semibold">
-                    {data.esnetCoverageBootstrap.ingestGateEnabled ? 'enabled' : 'disabled'}
-                  </span>
+                  crawlable configs: {data.esnetIngest.crawlableConfigCount.toLocaleString()}
                   {' · '}
-                  crawlable configs: {data.esnetCoverageBootstrap.crawlableConfigCount.toLocaleString()}
-                  {data.esnetCoverageBootstrap.enabledAt && (
-                    <> · enabled {formatWhen(data.esnetCoverageBootstrap.enabledAt)}</>
+                  ingest cadence: ~{data.esnetIngest.ingestMinIntervalMinutes} min between passes
+                  {data.esnetIngest.enabledAt && <> · enabled {formatWhen(data.esnetIngest.enabledAt)}</>}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {data.esnetIngest.enabled ? (
+                  <button
+                    type="button"
+                    disabled={esnetIngestUi.kind === 'running'}
+                    onClick={() => void toggleProviderRuntime(false, 'ingest')}
+                    className="rounded border border-slate-400 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    Disable ES.net ingestion
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={esnetIngestUi.kind === 'running'}
+                    onClick={() => void toggleProviderRuntime(true, 'ingest')}
+                    className="rounded border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    Enable ES.net ingestion
+                  </button>
+                )}
+              </div>
+            </div>
+            {esnetIngestUi.kind === 'error' && (
+              <p className="mt-2 text-xs text-red-700">{esnetIngestUi.message}</p>
+            )}
+          </div>
+
+          <div
+            className={`mb-4 rounded-md border p-4 ${
+              data.esnetBootstrap.enabled ? 'border-sky-400 bg-sky-50' : 'border-slate-200 bg-slate-50'
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-950">EstateSales.NET burst bootstrap</h3>
+                <p className="mt-1 text-xs text-slate-700">
+                  DB key <code className="text-xs">esnet_bootstrap_enabled</code>. Temporary higher ingest budgets
+                  only — does not disable discovery or provider ingestion when it auto-exits.
+                </p>
+                <p className="mt-2 text-xs text-slate-600">
+                  Status: <span className="font-semibold">{data.esnetBootstrap.enabled ? 'ON' : 'OFF'}</span>
+                  {data.esnetBootstrap.enabledAt && (
+                    <> · enabled {formatWhen(data.esnetBootstrap.enabledAt)}</>
                   )}
                 </p>
-                {data.esnetCoverageBootstrap.enabled && (
+                {data.esnetBootstrap.enabled && (
                   <p className="mt-1 text-xs text-slate-600">
                     Exit preview:{' '}
-                    {data.esnetCoverageBootstrap.exitCriteriaPreview.met
-                      ? 'criteria met — will auto-disable on next ingest/scoreboard check'
-                      : data.esnetCoverageBootstrap.exitCriteriaPreview.reasons.slice(0, 3).join('; ') ||
-                        'pending'}
+                    {data.esnetBootstrap.exitCriteriaPreview.met
+                      ? 'criteria met — bootstrap will auto-disable on next check'
+                      : data.esnetBootstrap.exitCriteriaPreview.reasons.slice(0, 3).join('; ') || 'pending'}
                   </p>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {data.esnetCoverageBootstrap.enabled ? (
+                {data.esnetBootstrap.enabled ? (
                   <button
                     type="button"
                     disabled={esnetBootstrapUi.kind === 'running'}
-                    onClick={() => void toggleCoverageBootstrap(false, 'estatesales_net')}
+                    onClick={() => void toggleProviderRuntime(false, 'bootstrap')}
                     className="rounded border border-slate-400 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50"
                   >
                     Disable ES.net bootstrap
@@ -342,7 +388,7 @@ export default function YstmCoverageScoreboardSection() {
                   <button
                     type="button"
                     disabled={esnetBootstrapUi.kind === 'running'}
-                    onClick={() => void toggleCoverageBootstrap(true, 'estatesales_net')}
+                    onClick={() => void toggleProviderRuntime(true, 'bootstrap')}
                     className="rounded border border-sky-600 bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
                   >
                     Enable ES.net bootstrap

@@ -35,13 +35,19 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
         : `off${data.coverageBootstrap.disabledReason ? ` (${data.coverageBootstrap.disabledReason})` : ''}`
     ),
     bullet(
-      'ES.net ingest bootstrap',
-      data.esnetCoverageBootstrap.enabled
-        ? `on (enabled at: ${data.esnetCoverageBootstrap.enabledAt ?? '—'})`
-        : `off${data.esnetCoverageBootstrap.disabledReason ? ` (${data.esnetCoverageBootstrap.disabledReason})` : ''}`
+      'ES.net provider ingestion (DB)',
+      data.esnetIngest.enabled
+        ? `on (enabled at: ${data.esnetIngest.enabledAt ?? '—'})`
+        : `off${data.esnetIngest.disabledReason ? ` (${data.esnetIngest.disabledReason})` : ''}`
     ),
-    bullet('ES.net crawlable configs', data.esnetCoverageBootstrap.crawlableConfigCount),
-    bullet('ES.net ingest gate (ESNET_INGEST_ENABLED)', data.esnetCoverageBootstrap.ingestGateEnabled ? 'true' : 'false'),
+    bullet('ES.net crawlable configs', data.esnetIngest.crawlableConfigCount),
+    bullet('ES.net ingest cadence (min)', data.esnetIngest.ingestMinIntervalMinutes),
+    bullet(
+      'ES.net burst bootstrap (DB)',
+      data.esnetBootstrap.enabled
+        ? `on (enabled at: ${data.esnetBootstrap.enabledAt ?? '—'})`
+        : `off${data.esnetBootstrap.disabledReason ? ` (${data.esnetBootstrap.disabledReason})` : ''}`
+    ),
     '',
     '### Sale-instance identity (Phase 3)',
     bullet('external-source rows with sale_instance_key', data.saleInstanceIdentity.ystmRowsWithKey),

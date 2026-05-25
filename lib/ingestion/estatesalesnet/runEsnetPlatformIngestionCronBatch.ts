@@ -3,16 +3,24 @@ import {
   persistExternalPageSource,
   type ExternalPageSourcePersistSummary,
 } from '@/lib/ingestion/adapters/externalPageSource'
-import { fetchEsnetCoverageBootstrapEnabled } from '@/lib/ingestion/estatesalesnet/coverageBootstrapEstatesalesNet'
+import { buildEsnetAdaptiveCrawlPlan } from '@/lib/ingestion/estatesalesnet/esnetAdaptiveRefreshPolicy'
+import { ESNET_SOURCE_PLATFORM } from '@/lib/ingestion/estatesalesnet/constants'
+import {
+  evaluateEsnetIngestCadence,
+  recordEsnetIngestCadenceCompleted,
+} from '@/lib/ingestion/estatesalesnet/esnetIngestCadence'
+import {
+  parseEsnetIngestConfigBatchSize,
+  parseEsnetIngestExecutionBudgetMs,
+} from '@/lib/ingestion/estatesalesnet/esnetIngestionOrchestrationDefaults'
 import {
   countEsnetCrawlableIngestionConfigs,
   maybeAutoDisableEsnetCoverageBootstrap,
 } from '@/lib/ingestion/estatesalesnet/esnetCoverageBootstrapExit'
-import { ESNET_SOURCE_PLATFORM, isEsnetIngestEnabled } from '@/lib/ingestion/estatesalesnet/constants'
 import {
-  buildYieldAwareCrawlPlan,
-  type CrawlConfigRow,
-} from '@/lib/ingestion/acquisition/yieldAwareCrawlSchedule'
+  fetchEsnetBootstrapEnabled,
+  fetchEsnetIngestEnabled,
+} from '@/lib/ingestion/estatesalesnet/esnetOrchestrationState'
 import {
   emptyExternalCrawlSkipSubReasonCounts,
   mergeCrawlSkipSubReasonCounts,
@@ -21,10 +29,6 @@ import {
   partitionCrawlableCityConfigsByPlatform,
   type ExternalCityConfigRow,
 } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
-import {
-  parseIngestionOrchestrationConfigBatchSizeFromEnv,
-  parseIngestionOrchestrationExecutionBudgetMsFromEnv,
-} from '@/lib/ingestion/ingestionOrchestrationDefaults'
 import { getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
@@ -83,24 +87,34 @@ function emptyTotals(): ExternalPageSourcePersistSummary {
 }
 
 /**
- * Bounded ES.net list ingest pass for daily cron (gated by `ESNET_INGEST_ENABLED`).
- * Uses provider-scoped bootstrap orchestration defaults when enabled in DB.
+ * Bounded ES.net list ingest pass for daily cron.
+ * Gated by DB `esnet_ingest_enabled`; burst budgets from `esnet_bootstrap_enabled` only.
  */
 export async function runEsnetPlatformIngestionCronBatch(
   args: EsnetIngestionCronBatchArgs
 ): Promise<EsnetIngestionCronBatchResult> {
-  if (!isEsnetIngestEnabled()) {
+  const adminDb = getAdminDb()
+  const ingestEnabled = await fetchEsnetIngestEnabled(adminDb)
+  if (!ingestEnabled) {
     return { skipped: true, skipReason: 'esnet_ingest_disabled', summary: null }
   }
 
-  const adminDb = getAdminDb()
-  const bootstrapEnabled = await fetchEsnetCoverageBootstrapEnabled(adminDb)
-  const executionBudgetMs = parseIngestionOrchestrationExecutionBudgetMsFromEnv(bootstrapEnabled)
-  const batchSize = parseIngestionOrchestrationConfigBatchSizeFromEnv(bootstrapEnabled)
+  const bootstrapEnabled = await fetchEsnetBootstrapEnabled(adminDb)
+  const cadence = await evaluateEsnetIngestCadence({ bootstrapEnabled, admin: adminDb })
+  if (!cadence.shouldRun) {
+    return {
+      skipped: true,
+      skipReason: cadence.skipReason ?? 'esnet_ingest_cadence_throttle',
+      summary: null,
+    }
+  }
+
+  const executionBudgetMs = parseEsnetIngestExecutionBudgetMs(bootstrapEnabled)
+  const batchSize = parseEsnetIngestConfigBatchSize(bootstrapEnabled)
 
   const esnetRows = args.enabledRows.filter((row) => row.source_platform === ESNET_SOURCE_PLATFORM)
   const crawlablePartition = partitionCrawlableCityConfigsByPlatform(esnetRows, ESNET_SOURCE_PLATFORM)
-  const plannedRows = buildYieldAwareCrawlPlan(crawlablePartition.crawlable as CrawlConfigRow[])
+  const plannedRows = await buildEsnetAdaptiveCrawlPlan(adminDb, crawlablePartition.crawlable)
   const totalConfigs = plannedRows.length
   if (totalConfigs === 0) {
     return { skipped: true, skipReason: 'no_crawlable_esnet_configs', summary: null }
@@ -114,6 +128,7 @@ export async function runEsnetPlatformIngestionCronBatch(
     component: 'ingestion/estatesalesnet/runEsnetPlatformIngestionCronBatch',
     operation: 'batch_start',
     bootstrapEnabled,
+    ingestMinIntervalMinutes: cadence.minIntervalMinutes,
     totalConfigs,
     boundedConfigs: boundedRows.length,
     configsCrawlable: crawlablePartition.configsCrawlable,
@@ -135,6 +150,7 @@ export async function runEsnetPlatformIngestionCronBatch(
       {
         telemetryContext: args.telemetryContext,
         beforePageFetch: args.beforePageFetch,
+        esnetIngestEnabled: true,
       }
     )
 
@@ -156,6 +172,8 @@ export async function runEsnetPlatformIngestionCronBatch(
     totals.esnetDetailEnrichmentFetchFailed += s.esnetDetailEnrichmentFetchFailed ?? 0
     totals.esnetDetailEnrichmentParseFailed += s.esnetDetailEnrichmentParseFailed ?? 0
   }
+
+  await recordEsnetIngestCadenceCompleted(adminDb)
 
   let bootstrapAutoDisabled = false
   if (bootstrapEnabled) {

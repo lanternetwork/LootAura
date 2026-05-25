@@ -1,7 +1,7 @@
 import {
-  fetchEsnetCoverageBootstrapState,
-  setEsnetCoverageBootstrapEnabled,
-} from '@/lib/ingestion/estatesalesnet/coverageBootstrapEstatesalesNet'
+  fetchEsnetBootstrapState,
+  setEsnetBootstrapEnabled,
+} from '@/lib/ingestion/estatesalesnet/esnetOrchestrationState'
 import type {
   CoverageBootstrapDisabledReason,
   CoverageBootstrapExitEvaluation,
@@ -53,7 +53,7 @@ export async function maybeAutoDisableEsnetCoverageBootstrap(
   admin: ReturnType<typeof getAdminDb>,
   snapshot: EsnetCoverageBootstrapExitSnapshot
 ): Promise<{ disabled: boolean; reasons: string[] }> {
-  const state = await fetchEsnetCoverageBootstrapState(admin)
+  const state = await fetchEsnetBootstrapState(admin)
   if (!state.enabled) {
     return { disabled: false, reasons: [] }
   }
@@ -68,7 +68,7 @@ export async function maybeAutoDisableEsnetCoverageBootstrap(
     return { disabled: false, reasons: evaluation.reasons }
   }
 
-  await setEsnetCoverageBootstrapEnabled(admin, {
+  await setEsnetBootstrapEnabled(admin, {
     enabled: false,
     reason: 'exit_criteria' satisfies CoverageBootstrapDisabledReason,
     at: new Date(snapshot.nowMs ?? Date.now()),

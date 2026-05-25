@@ -1,15 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { isEsnetIngestEnabled, parserVersionForEsnetPlatform } from '@/lib/ingestion/estatesalesnet/constants'
+import { parserVersionForEsnetPlatform } from '@/lib/ingestion/estatesalesnet/constants'
 
-describe('estatesalesnet constants', () => {
-  it('defaults ingest flag to disabled', () => {
-    expect(isEsnetIngestEnabled({} as unknown as NodeJS.ProcessEnv)).toBe(false)
-    expect(
-      isEsnetIngestEnabled({ ESNET_INGEST_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)
-    ).toBe(true)
-  })
-
-  it('uses list parser version for esnet platform', () => {
+describe('estatesalesnet/constants', () => {
+  it('selects list vs detail parser versions', () => {
     expect(parserVersionForEsnetPlatform('estatesales_net')).toBe('estatesales_net_list_v1')
     expect(parserVersionForEsnetPlatform('estatesales_net', { detailEnriched: true })).toBe(
       'estatesales_net_detail_v1'

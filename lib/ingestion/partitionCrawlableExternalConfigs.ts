@@ -17,11 +17,12 @@ export type PartitionCrawlableExternalConfigsResult = {
 }
 
 /**
- * Splits enabled external_page_source configs into crawlable rows (≥1 HTTPS list URL)
+ * Splits enabled configs for a source platform into crawlable rows (≥1 HTTPS list URL)
  * vs placeholders skipped at load time (empty pages vs non-HTTPS-only entries).
  */
-export function partitionCrawlableExternalCityConfigs(
-  rows: ExternalCityConfigRow[]
+export function partitionCrawlableCityConfigsByPlatform(
+  rows: ExternalCityConfigRow[],
+  sourcePlatform: string
 ): PartitionCrawlableExternalConfigsResult {
   const crawlable: ExternalCityConfigRow[] = []
   let configsSkippedNoSourcePages = 0
@@ -29,7 +30,7 @@ export function partitionCrawlableExternalCityConfigs(
   let configsSkippedCrawlExcluded = 0
 
   for (const row of rows) {
-    if (row.source_platform !== 'external_page_source') {
+    if (row.source_platform !== sourcePlatform) {
       continue
     }
     if (row.source_crawl_excluded_at != null && row.source_crawl_excluded_at !== '') {
@@ -55,4 +56,11 @@ export function partitionCrawlableExternalCityConfigs(
     configsSkippedInvalidUrls,
     configsSkippedCrawlExcluded,
   }
+}
+
+/** Splits enabled `external_page_source` configs into crawlable rows. */
+export function partitionCrawlableExternalCityConfigs(
+  rows: ExternalCityConfigRow[]
+): PartitionCrawlableExternalConfigsResult {
+  return partitionCrawlableCityConfigsByPlatform(rows, 'external_page_source')
 }

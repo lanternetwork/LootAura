@@ -18,6 +18,7 @@ describe('parser regression fixtures (external_page_source)', () => {
     ['external_page_source', 'with_sorted_images'],
     ['craigslist', 'result_row_listing'],
     ['estate_sales_net', 'table_row_listing'],
+    ['estate_sales_net', 'ngrx_metro_louisville'],
     ['facebook_external', 'og_and_shared_link'],
     ['external_page_source', 'empty_extraction_state_mismatch'],
     ['external_page_source', 'malformed_listing_href'],

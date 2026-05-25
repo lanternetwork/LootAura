@@ -57,6 +57,17 @@ import {
   maybeAutoDisableCoverageBootstrap,
   type CoverageBootstrapState,
 } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
+import {
+  countEsnetCrawlableIngestionConfigs,
+  evaluateEsnetCoverageBootstrapExitCriteria,
+  maybeAutoDisableEsnetCoverageBootstrap,
+} from '@/lib/ingestion/estatesalesnet/esnetCoverageBootstrapExit'
+import {
+  fetchEsnetBootstrapState,
+  fetchEsnetIngestState,
+  type EsnetProviderRuntimeState,
+} from '@/lib/ingestion/estatesalesnet/esnetOrchestrationState'
+import { parseEsnetIngestMinIntervalMinutes } from '@/lib/ingestion/estatesalesnet/esnetIngestionOrchestrationDefaults'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type YstmCoverageTrendPoint = {
@@ -100,6 +111,13 @@ export type YstmCoverageScoreboard = {
   sourceUrlAlias: SourceUrlAliasMetrics
   falseExclusionSaleIdentity: YstmFalseExclusionSaleIdentityDashboard
   coverageBootstrap: CoverageBootstrapState & {
+    exitCriteriaPreview: { met: boolean; reasons: string[] }
+  }
+  esnetIngest: EsnetProviderRuntimeState & {
+    crawlableConfigCount: number
+    ingestMinIntervalMinutes: number
+  }
+  esnetBootstrap: EsnetProviderRuntimeState & {
     exitCriteriaPreview: { met: boolean; reasons: string[] }
   }
 }
@@ -259,6 +277,25 @@ export async function buildYstmCoverageScoreboard(
     coverageBootstrap = await fetchCoverageBootstrapState(admin)
   }
 
+  const esnetCrawlableConfigCount = await countEsnetCrawlableIngestionConfigs(admin)
+  const esnetIngest = await fetchEsnetIngestState(admin)
+  let esnetBootstrap = await fetchEsnetBootstrapState(admin)
+  const esnetExitCriteriaPreview = evaluateEsnetCoverageBootstrapExitCriteria({
+    crawlableConfigCount: esnetCrawlableConfigCount,
+    fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
+    enabledAt: esnetBootstrap.enabledAt,
+    nowMs: now.getTime(),
+  })
+
+  if (esnetBootstrap.enabled) {
+    await maybeAutoDisableEsnetCoverageBootstrap(admin, {
+      crawlableConfigCount: esnetCrawlableConfigCount,
+      fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
+      nowMs: now.getTime(),
+    })
+    esnetBootstrap = await fetchEsnetBootstrapState(admin)
+  }
+
   return {
     targetPct: YSTM_COVERAGE_TARGET_PCT,
     generatedAt: now.toISOString(),
@@ -297,6 +334,15 @@ export async function buildYstmCoverageScoreboard(
     coverageBootstrap: {
       ...coverageBootstrap,
       exitCriteriaPreview,
+    },
+    esnetIngest: {
+      ...esnetIngest,
+      crawlableConfigCount: esnetCrawlableConfigCount,
+      ingestMinIntervalMinutes: parseEsnetIngestMinIntervalMinutes(esnetBootstrap.enabled),
+    },
+    esnetBootstrap: {
+      ...esnetBootstrap,
+      exitCriteriaPreview: esnetExitCriteriaPreview,
     },
   }
 }

@@ -165,6 +165,21 @@ function minimalCoverage(
       disabledReason: null,
       exitCriteriaPreview: { met: false, reasons: [] },
     },
+    esnetIngest: {
+      enabled: false,
+      enabledAt: null,
+      disabledAt: null,
+      disabledReason: null,
+      crawlableConfigCount: 0,
+      ingestMinIntervalMinutes: 360,
+    },
+    esnetBootstrap: {
+      enabled: false,
+      enabledAt: null,
+      disabledAt: null,
+      disabledReason: null,
+      exitCriteriaPreview: { met: false, reasons: [] },
+    },
     ...overrides,
   }
 }

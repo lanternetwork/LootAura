@@ -82,6 +82,11 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
               coverage_bootstrap_enabled_at: null,
               coverage_bootstrap_disabled_at: null,
               coverage_bootstrap_disabled_reason: null,
+              provider_ingest_enabled: false,
+              provider_ingest_enabled_at: null,
+              provider_ingest_disabled_at: null,
+              provider_ingest_disabled_reason: null,
+              last_completed_at: null,
             },
           })
         case 'ingested_sale_soft_dedupe_suppressions':
@@ -133,6 +138,9 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount).toBe(0)
     expect(json.falseExclusionSaleIdentity.missingValidYstmUrls).toBe(0)
     expect(json.coverageBootstrap.enabled).toBe(false)
+    expect(json.esnetIngest.crawlableConfigCount).toBe(0)
+    expect(json.esnetIngest.enabled).toBe(false)
+    expect(json.esnetBootstrap.enabled).toBe(false)
     expect(json.falseExclusionSaleIdentity.healthy).toBe(true)
   })
 })

@@ -3,7 +3,6 @@ import { normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSourc
 import {
   EXTERNAL_FETCH_REASON,
   fetchSafeExternalPageHtml,
-  hashHostForLog,
   type ExternalFetchLogContext,
 } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 import {
@@ -23,11 +22,7 @@ import {
   PLACEHOLDER_UNRESOLVED_REASON,
   shouldExcludePlaceholderFromCrawl,
 } from '@/lib/ingestion/discovery/discoveryPlaceholderPolicy'
-import {
-  extractCityPageCandidatesFromStateIndexHtml,
-  type DiscoveredCityPageCandidate,
-  type SourceDiscoveryFetchHtml,
-} from '@/lib/ingestion/discovery/sourceDiscovery'
+import type { DiscoveredCityPageCandidate, SourceDiscoveryFetchHtml } from '@/lib/ingestion/discovery/sourceDiscovery'
 import {
   isMalformedIngestionCityName,
   promoteSourceDiscoveryResults,
@@ -38,15 +33,11 @@ import {
   type RevalidationSelectionMode,
 } from '@/lib/ingestion/discovery/revalidationConfigSelection'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
+import type { DiscoveryValidationResult } from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 import {
-  getVerifiedStateIndexEntries,
-  type SourceStateIndexEntry,
-} from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
-import {
-  isSharedMetroHubSlug,
-  validateDiscoveredCityPage,
-  type DiscoveryValidationResult,
-} from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
+  resolveRevalidationPlatformAdapter,
+  type RevalidationSourcePlatform,
+} from '@/lib/ingestion/discovery/revalidationPlatformAdapters'
 import {
   emitDiscoveryRevalidationCompleted,
   hashDiscoveryUrl,
@@ -54,8 +45,6 @@ import {
 } from '@/lib/ingestion/discovery/sourceDiscoveryTelemetry'
 import { logger } from '@/lib/log'
 
-const EXTERNAL_PAGE_SOURCE = 'external_page_source'
-const ADAPTER_ID = 'external_source_revalidation'
 const DEFAULT_MAX_CONFIGS_PER_RUN = 100
 const DEFAULT_FETCH_CONCURRENCY = 3
 
@@ -71,6 +60,8 @@ export type revalidateSourceDiscoveryConfigsArgs = {
   placeholderFailureExcludeThreshold?: number
   /** Phase 2: prioritize empty `source_pages` configs, or repair only those rows. */
   selectionMode?: RevalidationSelectionMode
+  /** Defaults to `external_page_source`; use `estatesales_net` for ES.net metro configs. */
+  sourcePlatform?: RevalidationSourcePlatform
 }
 
 export type RevalidationRecordAction =
@@ -105,16 +96,18 @@ function parseMax(value: number | undefined, fallback: number, cap: number): num
 function buildFetchContext(
   index: number,
   stateCode: string,
+  adapterId: string,
+  hostHash: string,
   telemetryContext?: Record<string, unknown>
 ): ExternalFetchLogContext {
   return {
     component: 'ingestion/discovery/revalidateSourceDiscoveryConfigs',
     operation: 'fetch_page',
-    adapter: ADAPTER_ID,
+    adapter: adapterId,
     city: 'revalidation',
     state: stateCode,
     pageIndex: index,
-    hostHash: hashHostForLog('yardsaletreasuremap.com'),
+    hostHash,
     reason: EXTERNAL_FETCH_REASON.OK,
     ...telemetryContext,
   }
@@ -143,21 +136,7 @@ function hasDiscoveryAttempt(row: IngestionCityConfigDiscoveryRow): boolean {
   return row.source_last_discovered_at != null && row.source_last_discovered_at !== ''
 }
 
-/** Shared hub URLs may differ from config municipality slug by design. */
-export function detectHubDrift(configCity: string, canonicalUrl: string): boolean {
-  let parts: string[]
-  try {
-    parts = new URL(canonicalUrl).pathname.split('/').filter(Boolean)
-  } catch {
-    return false
-  }
-  const citySegment = parts[2] ?? ''
-  if (!citySegment || isSharedMetroHubSlug(citySegment)) return false
-  const urlCity = normalizeIngestionCity(citySegment.replace(/\.html?$/i, ''))
-  const cfgCity = normalizeIngestionCity(configCity)
-  if (!urlCity || !cfgCity) return false
-  return urlCity !== cfgCity
-}
+export { detectHubDrift } from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 
 export type ValidateConfigSourcePageResult = {
   validation: DiscoveryValidationResult
@@ -172,8 +151,10 @@ export async function validateConfigSourcePage(
   row: IngestionCityConfigDiscoveryRow,
   fetchHtml: SourceDiscoveryFetchHtml,
   fetchIndex: number,
-  telemetryContext?: Record<string, unknown>
+  telemetryContext?: Record<string, unknown>,
+  sourcePlatform?: RevalidationSourcePlatform
 ): Promise<ValidateConfigSourcePageResult | { error: string }> {
+  const platform = resolveRevalidationPlatformAdapter(sourcePlatform)
   const loc = normalizedConfigCityState(row)
   if (!loc) {
     return {
@@ -190,13 +171,16 @@ export async function validateConfigSourcePage(
 
   let html: string
   try {
-    html = await fetchHtml(canonicalUrl, buildFetchContext(fetchIndex, loc.state, telemetryContext))
+    html = await fetchHtml(
+      canonicalUrl,
+      buildFetchContext(fetchIndex, loc.state, platform.adapterId, platform.fetchHostHash, telemetryContext)
+    )
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { error: message }
   }
 
-  const validation = validateDiscoveredCityPage({
+  const validation = platform.validateDiscoveredPage({
     html,
     pageUrl: canonicalUrl,
     city: loc.city,
@@ -206,7 +190,7 @@ export async function validateConfigSourcePage(
   return {
     validation,
     canonicalUrl,
-    hubDrift: detectHubDrift(loc.city, canonicalUrl),
+    hubDrift: platform.detectHubDrift(loc.city, canonicalUrl),
   }
 }
 
@@ -240,13 +224,14 @@ function pickRediscoveryCandidate(
 
 async function rediscoverValidatedCandidate(
   row: IngestionCityConfigDiscoveryRow,
-  indexEntry: SourceStateIndexEntry,
+  indexEntry: { stateCode: string; indexUrl: string },
   indexHtml: string,
   fetchHtml: SourceDiscoveryFetchHtml,
   fetchIndex: number,
+  platform: ReturnType<typeof resolveRevalidationPlatformAdapter>,
   telemetryContext?: Record<string, unknown>
 ): Promise<DiscoveredCityPageCandidate & { validation: DiscoveryValidationResult } | null> {
-  const candidates = extractCityPageCandidatesFromStateIndexHtml(indexHtml, indexEntry)
+  const candidates = platform.extractCandidatesFromStateIndexHtml(indexHtml, indexEntry)
   const match = pickRediscoveryCandidate(row, candidates)
   if (!match) return null
 
@@ -255,12 +240,15 @@ async function rediscoverValidatedCandidate(
 
   let html: string
   try {
-    html = await fetchHtml(match.canonicalUrl, buildFetchContext(fetchIndex, loc.state, telemetryContext))
+    html = await fetchHtml(
+      match.canonicalUrl,
+      buildFetchContext(fetchIndex, loc.state, platform.adapterId, platform.fetchHostHash, telemetryContext)
+    )
   } catch {
     return null
   }
 
-  const validation = validateDiscoveredCityPage({
+  const validation = platform.validateDiscoveredPage({
     html,
     pageUrl: match.canonicalUrl,
     city: loc.city,
@@ -328,6 +316,7 @@ export async function revalidateSourceDiscoveryConfigs(
   }
   const records: RevalidationRecord[] = []
   const now = new Date().toISOString()
+  const platform = resolveRevalidationPlatformAdapter(args.sourcePlatform)
 
   const stateFilter = args.states?.map((s) => normalizeIngestionState(s)).filter(Boolean) as string[] | undefined
 
@@ -336,7 +325,7 @@ export async function revalidateSourceDiscoveryConfigs(
       'id, city, state, timezone, enabled, source_platform, source_pages, source_discovery_status, source_last_discovered_at, source_last_validated_at, source_last_failed_at, source_discovery_failure_reason, source_discovery_failure_count, source_crawl_excluded_at'
     )
     .eq('enabled', true)
-    .eq('source_platform', EXTERNAL_PAGE_SOURCE)
+    .eq('source_platform', platform.sourcePlatform)
     .is('source_crawl_excluded_at', null)
 
   if (stateFilter && stateFilter.length > 0) {
@@ -355,7 +344,7 @@ export async function revalidateSourceDiscoveryConfigs(
     mode: args.selectionMode,
   })
   const indexEntryByState = new Map(
-    getVerifiedStateIndexEntries(stateFilter).map((e) => [e.stateCode, e])
+    platform.getStateIndexEntries(stateFilter).map((e) => [e.stateCode, e])
   )
   const indexHtmlCache = new Map<string, string>()
 
@@ -364,7 +353,10 @@ export async function revalidateSourceDiscoveryConfigs(
     if (!entry) return null
     if (indexHtmlCache.has(stateCode)) return indexHtmlCache.get(stateCode) ?? null
     try {
-      const html = await fetchHtml(entry.indexUrl, buildFetchContext(0, stateCode, args.telemetryContext))
+      const html = await fetchHtml(
+        entry.indexUrl,
+        buildFetchContext(0, stateCode, platform.adapterId, platform.fetchHostHash, args.telemetryContext)
+      )
       indexHtmlCache.set(stateCode, html)
       return html
     } catch {
@@ -388,7 +380,13 @@ export async function revalidateSourceDiscoveryConfigs(
       telemetry.manualRowsSkipped += 1
       const url = primaryCanonicalUrl(row)
       if (url) {
-        const result = await validateConfigSourcePage(row, fetchHtml, rowIndex, args.telemetryContext)
+        const result = await validateConfigSourcePage(
+          row,
+          fetchHtml,
+          rowIndex,
+          args.telemetryContext,
+          args.sourcePlatform
+        )
         if (!('error' in result)) {
           telemetry.manualTelemetryOnly += 1
           telemetry.configsRevalidated += 1
@@ -418,6 +416,7 @@ export async function revalidateSourceDiscoveryConfigs(
               indexHtml,
               fetchHtml,
               rowIndex,
+              platform,
               args.telemetryContext
             )
             if (rediscovered) {
@@ -426,6 +425,7 @@ export async function revalidateSourceDiscoveryConfigs(
                 const promotion = await promoteSourceDiscoveryResults(admin, {
                   dryRun: false,
                   candidates: [rediscovered],
+                  sourcePlatform: platform.sourcePlatform,
                   telemetryContext: args.telemetryContext,
                 })
                 if (promotion.ok && promotion.telemetry.configsPromoted + promotion.telemetry.configsRepaired > 0) {
@@ -479,7 +479,13 @@ export async function revalidateSourceDiscoveryConfigs(
         return
       }
 
-      const validated = await validateConfigSourcePage(row, fetchHtml, rowIndex, args.telemetryContext)
+      const validated = await validateConfigSourcePage(
+        row,
+        fetchHtml,
+        rowIndex,
+        args.telemetryContext,
+        args.sourcePlatform
+      )
       if ('error' in validated) {
         await applyConfigUpdate(
           admin,
@@ -542,6 +548,7 @@ export async function revalidateSourceDiscoveryConfigs(
           indexHtml,
           fetchHtml,
           rowIndex,
+          platform,
           args.telemetryContext
         )
         if (rediscovered) {
@@ -549,6 +556,7 @@ export async function revalidateSourceDiscoveryConfigs(
           const promotion = await promoteSourceDiscoveryResults(admin, {
             dryRun,
             candidates: [rediscovered],
+            sourcePlatform: platform.sourcePlatform,
             telemetryContext: args.telemetryContext,
           })
           if (promotion.ok && (promotion.telemetry.configsPromoted > 0 || promotion.telemetry.configsRepaired > 0)) {

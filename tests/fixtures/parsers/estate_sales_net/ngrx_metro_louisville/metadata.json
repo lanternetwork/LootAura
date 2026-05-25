@@ -1,0 +1,11 @@
+{
+  "captured_at": "2026-05-24T12:00:00.000Z",
+  "source_host": "www.estatesales.net",
+  "pageUrl": "https://www.estatesales.net/KY/Louisville",
+  "config": {
+    "city": "Louisville",
+    "state": "KY",
+    "source_platform": "estatesales_net",
+    "source_pages": ["https://www.estatesales.net/KY/Louisville"]
+  }
+}

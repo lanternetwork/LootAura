@@ -13,6 +13,26 @@ vi.mock('@/lib/ingestion/discovery/runYstmGraphEnumerationDiscovery', () => ({
   runYstmGraphEnumerationDiscovery: (...args: unknown[]) => graphEnumerationMock(...args),
 }))
 
+vi.mock('@/lib/ingestion/estatesalesnet/esnetDiscoveryCadence', () => ({
+  shouldRunEsnetDiscoveryThisInvocation: () => false,
+}))
+
+vi.mock('@/lib/ingestion/estatesalesnet/discovery/runEsnetGraphEnumerationDiscovery', () => ({
+  runEsnetGraphEnumerationDiscovery: vi.fn().mockResolvedValue({
+    ok: true,
+    promotable: [],
+    telemetry: {
+      statesScanned: 0,
+      candidatePagesDiscovered: 0,
+      candidatePagesValid: 0,
+      candidatePagesInvalid: 0,
+      candidateRegistryUpserts: 0,
+      validationsAttempted: 0,
+      configsPromoted: 0,
+    },
+  }),
+}))
+
 vi.mock('@/lib/ingestion/discovery/ystmSourcePageCandidatesStore', () => ({
   listValidatedUnpromotedCandidates: (...args: unknown[]) => listBacklogMock(...args),
   markSourcePageCandidatesPromoted: (...args: unknown[]) => markPromotedMock(...args),

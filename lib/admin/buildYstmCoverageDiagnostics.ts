@@ -34,6 +34,20 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
         ? `on (enabled at: ${data.coverageBootstrap.enabledAt ?? '—'})`
         : `off${data.coverageBootstrap.disabledReason ? ` (${data.coverageBootstrap.disabledReason})` : ''}`
     ),
+    bullet(
+      'ES.net provider ingestion (DB)',
+      data.esnetIngest.enabled
+        ? `on (enabled at: ${data.esnetIngest.enabledAt ?? '—'})`
+        : `off${data.esnetIngest.disabledReason ? ` (${data.esnetIngest.disabledReason})` : ''}`
+    ),
+    bullet('ES.net crawlable configs', data.esnetIngest.crawlableConfigCount),
+    bullet('ES.net ingest cadence (min)', data.esnetIngest.ingestMinIntervalMinutes),
+    bullet(
+      'ES.net burst bootstrap (DB)',
+      data.esnetBootstrap.enabled
+        ? `on (enabled at: ${data.esnetBootstrap.enabledAt ?? '—'})`
+        : `off${data.esnetBootstrap.disabledReason ? ` (${data.esnetBootstrap.disabledReason})` : ''}`
+    ),
     '',
     '### Sale-instance identity (Phase 3)',
     bullet('external-source rows with sale_instance_key', data.saleInstanceIdentity.ystmRowsWithKey),

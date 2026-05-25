@@ -100,3 +100,19 @@ export function validateDiscoveredCityPage(
 
   return { ok: true, kind: 'valid_empty_city_page' }
 }
+
+/** Shared hub URLs may differ from config municipality slug by design. */
+export function detectHubDrift(configCity: string, canonicalUrl: string): boolean {
+  let parts: string[]
+  try {
+    parts = new URL(canonicalUrl).pathname.split('/').filter(Boolean)
+  } catch {
+    return false
+  }
+  const citySegment = parts[2] ?? ''
+  if (!citySegment || isSharedMetroHubSlug(citySegment)) return false
+  const urlCity = normalizeIngestionCity(citySegment.replace(/\.html?$/i, ''))
+  const cfgCity = normalizeIngestionCity(configCity)
+  if (!urlCity || !cfgCity) return false
+  return urlCity !== cfgCity
+}

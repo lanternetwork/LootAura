@@ -17,6 +17,8 @@ import { revalidateSourceDiscoveryConfigs } from '@/lib/ingestion/discovery/reva
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import type { ValidatedDiscoveryCandidate } from '@/lib/ingestion/discovery/sourceDiscovery'
 import { runYstmGraphEnumerationDiscovery } from '@/lib/ingestion/discovery/runYstmGraphEnumerationDiscovery'
+import { shouldRunEsnetDiscoveryThisInvocation } from '@/lib/ingestion/estatesalesnet/esnetDiscoveryCadence'
+import { runEsnetGraphEnumerationDiscovery } from '@/lib/ingestion/estatesalesnet/discovery/runEsnetGraphEnumerationDiscovery'
 import {
   listValidatedUnpromotedCandidates,
   markSourcePageCandidatesPromoted,
@@ -251,6 +253,31 @@ export async function runSourceDiscoveryCron(
       }
     }
 
+    if (
+      shouldRunEsnetDiscoveryThisInvocation() &&
+      batch.states.length > 0 &&
+      !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)
+    ) {
+      const esnetGraph = await runEsnetGraphEnumerationDiscovery(admin, {
+        stateCodes: batch.states,
+        budgets,
+        telemetryContext: { ...telemetryContext, phase: 'esnet_graph_enumeration' },
+      })
+      if (esnetGraph.ok) {
+        telemetry.statesScanned += esnetGraph.telemetry.statesScanned
+        telemetry.candidatePagesDiscovered += esnetGraph.telemetry.candidatePagesDiscovered
+        telemetry.candidatePagesValid += esnetGraph.telemetry.candidatePagesValid
+        telemetry.candidatePagesInvalid += esnetGraph.telemetry.candidatePagesInvalid
+        telemetry.candidateRegistryUpserts += esnetGraph.telemetry.candidateRegistryUpserts
+        telemetry.configsPromoted += esnetGraph.telemetry.configsPromoted
+        if (!telemetry.phasesCompleted.includes('esnet_graph_enumeration')) {
+          telemetry.phasesCompleted.push('esnet_graph_enumeration')
+        }
+      } else {
+        telemetry.degraded = true
+      }
+    }
+
     // Promote validated registry backlog even when graph enumeration failed or was skipped (footprint phase).
     if (!isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
       await promoteValidatedRegistryCandidates(admin, {
@@ -280,8 +307,29 @@ export async function runSourceDiscoveryCron(
       } else {
         telemetry.degraded = true
       }
-    } else {
-      telemetry.degraded = true
+    }
+
+    if (shouldRunEsnetDiscoveryThisInvocation() && !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)) {
+      const esnetRevalidation = await revalidateSourceDiscoveryConfigs(admin, {
+        dryRun: false,
+        states: batch.states.length > 0 ? batch.states : undefined,
+        maxConfigsPerRun: Math.min(40, budgets.maxRevalidationConfigsPerRun),
+        selectionMode: 'balanced',
+        sourcePlatform: 'estatesales_net',
+        placeholderFailureExcludeThreshold: budgets.placeholderFailureExcludeThreshold,
+        telemetryContext: { ...telemetryContext, phase: 'esnet_revalidate' },
+      })
+      if (esnetRevalidation.ok) {
+        telemetry.configsRevalidated += esnetRevalidation.telemetry.configsRevalidated
+        telemetry.configsRepaired += esnetRevalidation.telemetry.configsRepaired
+        telemetry.configsFailed += esnetRevalidation.telemetry.configsFailed
+        telemetry.placeholdersUnresolved += esnetRevalidation.telemetry.placeholdersUnresolved
+        if (!telemetry.phasesCompleted.includes('esnet_revalidate')) {
+          telemetry.phasesCompleted.push('esnet_revalidate')
+        }
+      } else {
+        telemetry.degraded = true
+      }
     }
 
     const registryCounts = await loadRegistryAggregateCounts(admin)

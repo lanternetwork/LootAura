@@ -52,6 +52,8 @@ export function parseSeeSourceUnlockAtFromListingUrl(sourceUrl: string | null | 
 export type GatedListingDiagnostics = {
   slugWasPlaceholder?: boolean
   chosenAddressSource?: string
+  /** EstateSales.NET: ISO timestamp before full address is shown. */
+  utcShowAddressAfter?: string | null
 }
 
 /**
@@ -64,6 +66,15 @@ export function detectGatedListing(input: {
   addressRaw: string | null | undefined
   diagnostics?: GatedListingDiagnostics
 }): { gated: boolean; unlockAt: Date | null; slugWasPlaceholder: boolean } {
+  const utcAfter = input.diagnostics?.utcShowAddressAfter
+  if (!input.addressRaw?.trim() && typeof utcAfter === 'string' && utcAfter.trim()) {
+    const unlockAt = new Date(utcAfter.trim())
+    if (Number.isFinite(unlockAt.getTime())) {
+      const gated = unlockAt.getTime() > Date.now()
+      return { gated, unlockAt, slugWasPlaceholder: false }
+    }
+  }
+
   const url = input.sourceUrl?.trim() ?? ''
   const parts = url ? parseYstmListingPathParts(url) : null
   const slug = parts?.addressSlugSegment ?? null

@@ -52,9 +52,25 @@ function shrinkRawPayload(raw: Record<string, unknown>): Record<string, unknown>
       ? sortStrings(imageUrls as string[])
       : imageUrls
 
+  const esnet =
+    raw.sourcePlatform === 'estatesales_net'
+      ? {
+          schemaVersion: raw.schemaVersion ?? null,
+          sourcePlatform: raw.sourcePlatform,
+          esnetSaleId: raw.esnetSaleId ?? null,
+          orgName: raw.orgName ?? null,
+          saleTypeName: raw.saleTypeName ?? null,
+          postalCode: raw.postalCode ?? null,
+          utcShowAddressAfter: raw.utcShowAddressAfter ?? null,
+          pictureCount: raw.pictureCount ?? null,
+          listPageUrl: raw.listPageUrl ?? null,
+        }
+      : {}
+
   return sortKeyDeep({
     adapter: raw.adapter,
     externalId: raw.externalId ?? null,
+    ...esnet,
     pathCitySlug: raw.pathCitySlug ?? null,
     hubSegment: raw.hubSegment ?? null,
     addressSlug: raw.addressSlug ?? null,

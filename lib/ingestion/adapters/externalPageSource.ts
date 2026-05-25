@@ -85,6 +85,29 @@ import {
 } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
+import {
+  ESNET_SOURCE_PLATFORM,
+  isEsnetIngestEnabled,
+  parserVersionForEsnetPlatform,
+} from '@/lib/ingestion/estatesalesnet/constants'
+import { computeEsnetSaleInstanceIdentity } from '@/lib/ingestion/estatesalesnet/computeEsnetSaleInstanceIdentity'
+import { isEstatesalesNetIngestionConfig } from '@/lib/ingestion/estatesalesnet/esnetHosts'
+import { parseEsnetNgrxListHtml } from '@/lib/ingestion/estatesalesnet/parseEsnetNgrxListHtml'
+import {
+  readEsnetNativeCoordsFromListingRawPayload,
+  validateEsnetNativeCoords,
+} from '@/lib/ingestion/estatesalesnet/readEsnetNativeCoords'
+import type {
+  ExternalPageSourceIngestionConfig,
+  ExternalPageSourceListing,
+  ParseExternalPageSourceResult,
+} from '@/lib/ingestion/adapters/externalPageSourceTypes'
+
+export type {
+  ExternalPageSourceIngestionConfig,
+  ExternalPageSourceListing,
+  ParseExternalPageSourceResult,
+} from '@/lib/ingestion/adapters/externalPageSourceTypes'
 
 const ADAPTER_ID = 'external_page_source'
 const PARSER_VERSION_ROW = 'external_page_source_mvp_v3'
@@ -107,33 +130,6 @@ function mapIngestedSaleSourceUrlRow(row: IngestedSaleSourceUrlLookupRow) {
     failure_reasons: row.failure_reasons,
     superseded_by_ingested_sale_id: row.superseded_by_ingested_sale_id ?? null,
   }
-}
-
-export interface ExternalPageSourceIngestionConfig {
-  city: string
-  state: string
-  source_platform: string
-  /** JSON array from DB; normalized by `normalizeSourcePages`. */
-  source_pages: unknown
-}
-
-export interface ExternalPageSourceListing {
-  title: string
-  description: string | null
-  addressRaw: string | null
-  city: string
-  state: string
-  startDate?: string
-  endDate?: string
-  sourceUrl: string
-  imageSourceUrl: string | null
-  /** Listing-level fields only; persist merges page metadata before insert. */
-  rawPayload: Record<string, unknown>
-}
-
-export interface ParseExternalPageSourceResult {
-  listings: ExternalPageSourceListing[]
-  invalid: number
 }
 
 export interface ExternalPageSourcePersistSummary {
@@ -324,6 +320,8 @@ function epochSecondsToIsoDate(value: number): string | null {
 function nativeCoordsForSoftDedupeProbe(
   listing: ExternalPageSourceListing
 ): { lat: number | null; lng: number | null } {
+  const esnet = readEsnetNativeCoordsFromListingRawPayload(listing.rawPayload)
+  if (esnet) return { lat: esnet.lat, lng: esnet.lng }
   const native = readYstmNativeCoordsFromListingRawPayload(listing.rawPayload)
   return { lat: native?.lat ?? null, lng: native?.lng ?? null }
 }
@@ -832,6 +830,10 @@ export function parseExternalPageSourceHtml(
   config: ExternalPageSourceIngestionConfig,
   pageUrl: string
 ): ParseExternalPageSourceResult {
+  if (isEstatesalesNetIngestionConfig(config.source_platform, pageUrl)) {
+    return parseEsnetNgrxListHtml(html, config, pageUrl)
+  }
+
   const normalizedHtml = html.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const stateSegment = resolveUsListStatePathSegment(config.state)
   if (!stateSegment) {
@@ -1146,8 +1148,21 @@ export async function persistExternalPageSource(
     return summary
   }
 
-  const admin = getAdminDb()
   const platform = config.source_platform || ADAPTER_ID
+  const parserVersion = parserVersionForEsnetPlatform(platform)
+
+  if (platform === ESNET_SOURCE_PLATFORM && !isEsnetIngestEnabled()) {
+    logger.info('ES.net ingest disabled; skipping config', {
+      component: 'ingestion/adapters/externalPageSource',
+      operation: 'persist_config_skipped',
+      city: config.city,
+      state: config.state,
+      adapter: ADAPTER_ID,
+    })
+    return summary
+  }
+
+  const admin = getAdminDb()
 
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
     const pageUrl = pages[pageIndex]
@@ -1196,7 +1211,7 @@ export async function persistExternalPageSource(
         buildTelemetryRecord(ObservabilityEvents.ingestion.externalFetchFailed, {
           ...telemBase,
           adapter: ADAPTER_ID,
-          parserVersion: PARSER_VERSION_ROW,
+          parserVersion,
           pageIndex,
           pageHostHash,
           errorCode: 'fetch_page',
@@ -1226,7 +1241,7 @@ export async function persistExternalPageSource(
         buildTelemetryRecord(ObservabilityEvents.ingestion.externalParseFailed, {
           ...telemBase,
           adapter: ADAPTER_ID,
-          parserVersion: PARSER_VERSION_ROW,
+          parserVersion: parserVersion,
           pageIndex,
           pageHostHash,
           errorCode: 'parse_page',
@@ -1243,7 +1258,7 @@ export async function persistExternalPageSource(
         buildTelemetryRecord(ObservabilityEvents.ingestion.externalZeroListings, {
           ...telemBase,
           adapter: ADAPTER_ID,
-          parserVersion: PARSER_VERSION_ROW,
+          parserVersion: parserVersion,
           pageIndex,
           pageHostHash,
           invalidListingCount: parseResult.invalid,
@@ -1267,6 +1282,11 @@ export async function persistExternalPageSource(
       const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as GatedListingDiagnostics & {
         chosenAddressSource?: string
       }
+      const esnetUtcShowAddressAfter =
+        platform === ESNET_SOURCE_PLATFORM &&
+        typeof listing.rawPayload.utcShowAddressAfter === 'string'
+          ? listing.rawPayload.utcShowAddressAfter
+          : null
       const addressLifecycle = resolveIngestAddressLifecycle({
         sourceUrl: listing.sourceUrl,
         addressRaw: listing.addressRaw,
@@ -1275,6 +1295,7 @@ export async function persistExternalPageSource(
         diagnostics: {
           slugWasPlaceholder: ingestDiag.slugWasPlaceholder,
           chosenAddressSource: ingestDiag.chosenAddressSource,
+          utcShowAddressAfter: esnetUtcShowAddressAfter,
         },
       })
 
@@ -1285,6 +1306,27 @@ export async function persistExternalPageSource(
       let insertLat: number | null = null
       let insertLng: number | null = null
       const spatialInsertFields: Record<string, unknown> = {}
+
+      if (platform === ESNET_SOURCE_PLATFORM) {
+        const esnetNative = readEsnetNativeCoordsFromListingRawPayload(listing.rawPayload)
+        if (
+          esnetNative &&
+          validateEsnetNativeCoords({
+            nativeCoords: esnetNative,
+            city: listing.city,
+            state: listing.state,
+            sourceUrl: listing.sourceUrl,
+          }) &&
+          listing.startDate
+        ) {
+          insertLat = esnetNative.lat
+          insertLng = esnetNative.lng
+          insertStatus = 'ready'
+          spatialInsertFields.geocode_confidence = 'high'
+          spatialInsertFields.coordinate_precision = 'native_list'
+          spatialInsertFields.geocode_method = 'esnet_list_native'
+        }
+      }
 
       if (
         insertStatus === 'needs_geocode' &&
@@ -1329,23 +1371,39 @@ export async function persistExternalPageSource(
         },
         listing
       )
-      const saleInstanceIdentity = computeYstmSaleInstanceIdentity({
-        sourcePlatform: platform,
-        sourceUrl: listing.sourceUrl,
-        state: listing.state,
-        city: listing.city,
-        normalizedAddress: normalizedLine,
-        dateStart: listing.startDate ?? null,
-        dateEnd: listing.endDate ?? null,
-        timeStart: scheduleFields.time_start,
-        timeEnd: scheduleFields.time_end,
-        title: listing.title,
-        description: listing.description,
-        imageSourceUrl: listing.imageSourceUrl,
-        lat: insertLat,
-        lng: insertLng,
-        rawPayload: legacyRowPayload,
-      })
+      const saleInstanceIdentity =
+        platform === ESNET_SOURCE_PLATFORM
+          ? computeEsnetSaleInstanceIdentity({
+              sourcePlatform: platform,
+              sourceUrl: listing.sourceUrl,
+              state: listing.state,
+              city: listing.city,
+              normalizedAddress: normalizedLine,
+              dateStart: listing.startDate ?? null,
+              dateEnd: listing.endDate ?? null,
+              title: listing.title,
+              description: listing.description,
+              lat: insertLat,
+              lng: insertLng,
+              rawPayload: legacyRowPayload,
+            })
+          : computeYstmSaleInstanceIdentity({
+              sourcePlatform: platform,
+              sourceUrl: listing.sourceUrl,
+              state: listing.state,
+              city: listing.city,
+              normalizedAddress: normalizedLine,
+              dateStart: listing.startDate ?? null,
+              dateEnd: listing.endDate ?? null,
+              timeStart: scheduleFields.time_start,
+              timeEnd: scheduleFields.time_end,
+              title: listing.title,
+              description: listing.description,
+              imageSourceUrl: listing.imageSourceUrl,
+              lat: insertLat,
+              lng: insertLng,
+              rawPayload: legacyRowPayload,
+            })
 
       const insertRow = {
         source_platform: platform,
@@ -1371,7 +1429,7 @@ export async function persistExternalPageSource(
         raw_payload: legacyRowPayload,
         status: insertStatus,
         failure_reasons: [],
-        parser_version: PARSER_VERSION_ROW,
+        parser_version: parserVersion,
         parse_confidence: insertStatus === 'needs_geocode' ? 'high' : 'low',
         is_duplicate: false,
         duplicate_of: null,
@@ -1482,7 +1540,7 @@ export async function persistExternalPageSource(
           buildTelemetryRecord(ObservabilityEvents.parser.extractionFailure, {
             ...telemBase,
             adapter: ADAPTER_ID,
-            parserVersion: PARSER_VERSION_ROW,
+            parserVersion: parserVersion,
             pageIndex,
             pageHostHash,
             errorCode: 'dedupe_lookup',
@@ -1548,7 +1606,7 @@ export async function persistExternalPageSource(
           buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceShadowCompared, {
             ...telemBase,
             adapter: ADAPTER_ID,
-            parserVersion: PARSER_VERSION_ROW,
+            parserVersion: parserVersion,
             pageIndex,
             pageHostHash,
             phase: 'list_recrawl',
@@ -1592,7 +1650,7 @@ export async function persistExternalPageSource(
             buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceClassified, {
               ...telemBase,
               adapter: ADAPTER_ID,
-              parserVersion: PARSER_VERSION_ROW,
+              parserVersion: parserVersion,
               pageIndex,
               pageHostHash,
               phase: 'list_recrawl_classifier_enforce',
@@ -1665,7 +1723,7 @@ export async function persistExternalPageSource(
             buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceClassified, {
               ...telemBase,
               adapter: ADAPTER_ID,
-              parserVersion: PARSER_VERSION_ROW,
+              parserVersion: parserVersion,
               pageIndex,
               pageHostHash,
               phase: 'list_recrawl',
@@ -1707,7 +1765,7 @@ export async function persistExternalPageSource(
             buildTelemetryRecord(ObservabilityEvents.ingestion.saleInstanceClassified, {
               ...telemBase,
               adapter: ADAPTER_ID,
-              parserVersion: PARSER_VERSION_ROW,
+              parserVersion: parserVersion,
               pageIndex,
               pageHostHash,
               phase: 'list_recrawl_detail_first_gate',
@@ -1888,7 +1946,7 @@ export async function persistExternalPageSource(
       buildTelemetryRecord(ObservabilityEvents.parser.duplicateSuppressed, {
         ...telemBase,
         adapter: ADAPTER_ID,
-        parserVersion: PARSER_VERSION_ROW,
+        parserVersion: parserVersion,
         duplicateUrlSkipped,
         duplicateConstraintSkipped,
         duplicateScoredSkipped: summary.duplicateScoredSkipped,
@@ -1902,7 +1960,7 @@ export async function persistExternalPageSource(
       buildTelemetryRecord(ObservabilityEvents.parser.normalizationWarning, {
         ...telemBase,
         adapter: ADAPTER_ID,
-        parserVersion: PARSER_VERSION_ROW,
+        parserVersion: parserVersion,
         normalizationWarnings,
       })
     )
@@ -1912,7 +1970,7 @@ export async function persistExternalPageSource(
     buildTelemetryRecord(ObservabilityEvents.parser.parseTimed, {
       ...telemBase,
       adapter: ADAPTER_ID,
-      parserVersion: PARSER_VERSION_ROW,
+      parserVersion: parserVersion,
       parseDurationMsTotal,
       pagesProcessed: summary.pagesProcessed,
     })
@@ -1922,7 +1980,7 @@ export async function persistExternalPageSource(
     buildTelemetryRecord(ObservabilityEvents.parser.persistComplete, {
       ...telemBase,
       adapter: ADAPTER_ID,
-      parserVersion: PARSER_VERSION_ROW,
+      parserVersion: parserVersion,
       pagesProcessed: summary.pagesProcessed,
       listingsExtracted: summary.fetched,
       inserted: summary.inserted,
@@ -1955,7 +2013,7 @@ export async function persistExternalPageSource(
     buildTelemetryRecord(ObservabilityEvents.ingestion.externalPersistSummary, {
       ...telemBase,
       adapter: ADAPTER_ID,
-      parserVersion: PARSER_VERSION_ROW,
+      parserVersion: parserVersion,
       sourcePlatform: platform,
       pagesProcessed: summary.pagesProcessed,
       listingsExtracted: summary.fetched,

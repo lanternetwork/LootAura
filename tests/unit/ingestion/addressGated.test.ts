@@ -32,6 +32,17 @@ describe('addressGated', () => {
     expect(gated.gated).toBe(false)
   })
 
+  it('detects gated from ES.net utcShowAddressAfter when address is null', () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString()
+    const gated = detectGatedListing({
+      sourceUrl: 'https://www.estatesales.net/KY/Louisville/40204/4926588',
+      addressRaw: null,
+      diagnostics: { utcShowAddressAfter: future },
+    })
+    expect(gated.gated).toBe(true)
+    expect(gated.unlockAt?.toISOString()).toBe(future)
+  })
+
   it('does not gate See-source URL when metadata supplied usable address', () => {
     const url =
       'https://yardsaletreasuremap.com/US/Illinois/Elmwood-Park/See-source-for-address-after-2026-05-08-22%3A00%3A00/38733355/userlisting.html?s=tl'

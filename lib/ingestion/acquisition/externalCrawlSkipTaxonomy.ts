@@ -26,6 +26,10 @@ export const EXTERNAL_CRAWL_SKIP_SUB_REASONS = [
   'invalid_detail_payload',
   'repair_pending',
   'publish_failed',
+  'duplicate_cross_provider',
+  'duplicate_cross_provider_soft',
+  'duplicate_cross_metro',
+  'provider_observation_suppressed',
 ] as const
 
 export type ExternalCrawlSkipSubReason = (typeof EXTERNAL_CRAWL_SKIP_SUB_REASONS)[number]
@@ -45,6 +49,10 @@ export const SUSPICIOUS_CRAWL_SKIP_SUB_REASONS: readonly ExternalCrawlSkipSubRea
   'expired_false_positive',
   'gated_false_positive',
   'unknown',
+  'duplicate_cross_provider',
+  'duplicate_cross_provider_soft',
+  'duplicate_cross_metro',
+  'provider_observation_suppressed',
 ] as const
 
 export const OPERATIONAL_CRAWL_SKIP_SUB_REASONS: readonly ExternalCrawlSkipSubReason[] = [

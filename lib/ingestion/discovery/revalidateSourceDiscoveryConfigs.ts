@@ -34,7 +34,7 @@ import {
 } from '@/lib/ingestion/discovery/revalidationConfigSelection'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import {
-  isSharedMetroHubSlug,
+  detectHubDrift,
   type DiscoveryValidationResult,
 } from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 import {
@@ -139,21 +139,7 @@ function hasDiscoveryAttempt(row: IngestionCityConfigDiscoveryRow): boolean {
   return row.source_last_discovered_at != null && row.source_last_discovered_at !== ''
 }
 
-/** Shared hub URLs may differ from config municipality slug by design. */
-export function detectHubDrift(configCity: string, canonicalUrl: string): boolean {
-  let parts: string[]
-  try {
-    parts = new URL(canonicalUrl).pathname.split('/').filter(Boolean)
-  } catch {
-    return false
-  }
-  const citySegment = parts[2] ?? ''
-  if (!citySegment || isSharedMetroHubSlug(citySegment)) return false
-  const urlCity = normalizeIngestionCity(citySegment.replace(/\.html?$/i, ''))
-  const cfgCity = normalizeIngestionCity(configCity)
-  if (!urlCity || !cfgCity) return false
-  return urlCity !== cfgCity
-}
+export { detectHubDrift } from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 
 export type ValidateConfigSourcePageResult = {
   validation: DiscoveryValidationResult

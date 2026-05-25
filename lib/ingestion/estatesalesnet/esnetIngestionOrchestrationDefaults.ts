@@ -1,6 +1,6 @@
 /**
  * ES.net ingest orchestration defaults (code-only; no Vercel env vars).
- * Materially slower than YSTM `INGESTION_ORCHESTRATION_*` / daily `*/2` lane.
+ * Materially slower than YSTM INGESTION_ORCHESTRATION env defaults and the two-minute daily ingest lane.
  */
 
 export const ESNET_INGEST_ORCHESTRATION_DEFAULTS = {

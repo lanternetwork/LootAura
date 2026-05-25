@@ -1,6 +1,6 @@
-import type { DiscoveredCityPageCandidate } from '@/lib/ingestion/discovery/sourceDiscovery'
 import {
   extractCityPageCandidatesFromStateIndexHtml,
+  type DiscoveredCityPageCandidate,
   type SourceStateIndexEntry,
 } from '@/lib/ingestion/discovery/sourceDiscovery'
 import {

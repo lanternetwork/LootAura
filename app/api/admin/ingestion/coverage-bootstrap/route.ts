@@ -5,13 +5,13 @@ import {
   fetchEsnetIngestState,
   setEsnetBootstrapEnabled,
   setEsnetIngestEnabled,
+  type EsnetProviderRuntimeState,
 } from '@/lib/ingestion/estatesalesnet/esnetOrchestrationState'
 import {
   fetchCoverageBootstrapState,
   setCoverageBootstrapEnabled,
   type CoverageBootstrapDisabledReason,
 } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
-import type { EsnetProviderRuntimeState } from '@/lib/ingestion/estatesalesnet/esnetOrchestrationState'
 import { getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 

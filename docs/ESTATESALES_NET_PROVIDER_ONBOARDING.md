@@ -43,7 +43,7 @@ Admin API: `POST /api/admin/ingestion/coverage-bootstrap` with `{ "enabled": boo
 
 ## Provider cadence (code defaults)
 
-ES.net does **not** use YSTM `*/2` ingest cadence or `INGESTION_ORCHESTRATION_*` env budgets.
+ES.net does **not** use the YSTM two-minute ingest cadence or `INGESTION_ORCHESTRATION_*` env budgets.
 
 | Lane | Normal | Bootstrap burst |
 |------|--------|-----------------|

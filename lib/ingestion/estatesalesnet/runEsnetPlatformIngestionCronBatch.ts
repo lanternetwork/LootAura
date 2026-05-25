@@ -1,11 +1,14 @@
-import { persistExternalPageSource, normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSource'
-import type { ExternalPageSourcePersistSummary } from '@/lib/ingestion/adapters/externalPageSource'
+import {
+  normalizeSourcePages,
+  persistExternalPageSource,
+  type ExternalPageSourcePersistSummary,
+} from '@/lib/ingestion/adapters/externalPageSource'
 import { fetchEsnetCoverageBootstrapEnabled } from '@/lib/ingestion/estatesalesnet/coverageBootstrapEstatesalesNet'
 import { ESNET_SOURCE_PLATFORM, isEsnetIngestEnabled } from '@/lib/ingestion/estatesalesnet/constants'
 import {
   buildYieldAwareCrawlPlan,
   type CrawlConfigRow,
-} from '@/lib/ingestion/acquisition/configCrawlStats'
+} from '@/lib/ingestion/acquisition/yieldAwareCrawlSchedule'
 import {
   emptyExternalCrawlSkipSubReasonCounts,
   mergeCrawlSkipSubReasonCounts,

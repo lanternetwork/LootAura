@@ -914,7 +914,7 @@ async function runIngestionOrchestration(
         enabledRows: (enabledCities ?? []) as ExternalConfigRow[],
         budgetStartedAtMs,
         telemetryContext,
-        beforePageFetch: async ({ pageUrl, pageIndex, city, state }) => {
+        beforePageFetch: async ({ pageUrl }) => {
           let domain = 'unknown-host'
           try {
             domain = new URL(pageUrl).hostname.toLowerCase()

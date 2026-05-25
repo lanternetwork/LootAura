@@ -2,7 +2,10 @@ import {
   extractCityPageCandidatesFromStateIndexHtml,
   type DiscoveredCityPageCandidate,
 } from '@/lib/ingestion/discovery/sourceDiscovery'
-import type { SourceStateIndexEntry } from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
+import {
+  getVerifiedStateIndexEntries,
+  type SourceStateIndexEntry,
+} from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 import {
   detectHubDrift,
   validateDiscoveredCityPage,
@@ -14,7 +17,6 @@ import {
   type EsnetStateIndexEntry,
 } from '@/lib/ingestion/estatesalesnet/discovery/esnetStateIndexCatalog'
 import { validateDiscoveredEsnetCityPage } from '@/lib/ingestion/estatesalesnet/discovery/validateDiscoveredEsnetCityPage'
-import { getVerifiedStateIndexEntries } from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 import { hashHostForLog } from '@/lib/ingestion/adapters/externalPageSafeFetch'
 
 export type RevalidationSourcePlatform = 'external_page_source' | 'estatesales_net'

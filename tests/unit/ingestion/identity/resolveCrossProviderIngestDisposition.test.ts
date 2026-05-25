@@ -44,7 +44,7 @@ describe('resolveCrossProviderIngestDisposition', () => {
     })
     expect(result.confidence).toBe('high')
     expect(result.disposition).toBe('would_link_observation')
-    expect(result.matchMethod).toBe('canonical_key_exact')
+    expect(result.matchMethod).toBe('canonical_plus_geo')
     expect(result.isFalseNegative).toBe(false)
   })
 

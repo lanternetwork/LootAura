@@ -7,6 +7,7 @@ import type {
 import { MAX_IMPORTED_LISTING_IMAGES } from '@/lib/ingestion/importedListingImagePolicy'
 import { buildEsnetCanonicalDetailUrl } from '@/lib/ingestion/estatesalesnet/esnetHosts'
 import { ESNET_SOURCE_PLATFORM } from '@/lib/ingestion/estatesalesnet/constants'
+import { extractEsnetNgrxStateFromDocument } from '@/lib/ingestion/estatesalesnet/esnetNgrxState'
 import { logger } from '@/lib/log'
 
 type EsnetSaleRow = {
@@ -49,31 +50,6 @@ function dateRangeFromRow(dates: EsnetSaleRow['dates']): { start?: string; end?:
   return { start: isoDays[0], end: isoDays[isoDays.length - 1] }
 }
 
-function extractNgrxState(document: Document): Record<string, unknown> | null {
-  const el =
-    document.querySelector('#estatesales-net-state') ??
-    document.querySelector('script#estatesales-net-state[type="application/json"]')
-  if (!el?.textContent?.trim()) {
-    for (const script of document.querySelectorAll('script[type="application/json"]')) {
-      const text = script.textContent?.trim()
-      if (text?.includes('NGRX_STATE') && text.includes('saleRows')) {
-        try {
-          const parsed = JSON.parse(text) as Record<string, unknown>
-          return parsed
-        } catch {
-          continue
-        }
-      }
-    }
-    return null
-  }
-  try {
-    return JSON.parse(el.textContent.trim()) as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
 function saleRowsFromNgrx(root: Record<string, unknown>): Record<string, EsnetSaleRow> | null {
   const ngrx = root.NGRX_STATE as Record<string, unknown> | undefined
   const sales = ngrx?.sales as Record<string, unknown> | undefined
@@ -112,7 +88,7 @@ export function parseEsnetNgrxListHtml(
   const dom = new JSDOM(normalizedHtml, { url: pageUrl })
   const { document } = dom.window
 
-  const root = extractNgrxState(document)
+  const root = extractEsnetNgrxStateFromDocument(document)
   if (!root) {
     logger.warn('ES.net list parse: NGRX_STATE missing', {
       component: 'ingestion/estatesalesnet/parseEsnetNgrxListHtml',

@@ -11,6 +11,9 @@ describe('estatesalesnet constants', () => {
 
   it('uses list parser version for esnet platform', () => {
     expect(parserVersionForEsnetPlatform('estatesales_net')).toBe('estatesales_net_list_v1')
+    expect(parserVersionForEsnetPlatform('estatesales_net', { detailEnriched: true })).toBe(
+      'estatesales_net_detail_v1'
+    )
     expect(parserVersionForEsnetPlatform('external_page_source')).toBe('external_page_source_mvp_v3')
   })
 })

@@ -4,10 +4,10 @@ Implementation specification for adding EstateSales.NET (`estatesales_net`) as p
 
 ## Status
 
-- **Phase 0:** Feasibility (API capture doc, parser proof, overlap analysis)
-- **Phase 1:** List-level ingestion (this PR — foundation code + manual metro configs)
-- **Phase 2:** Detail enrichment via HTTP JSON (`docs/ESNET_API_CAPTURE.md` gate)
-- **Phase 3:** Nationwide discovery and operational scaling after burn-in
+- **Phase 0:** Feasibility — **3/3** (API capture verdict, list NGRX proof, overlap analysis in spec)
+- **Phase 1:** List-level ingestion — **6/6** (parser, identity, persist wiring, bootstrap key, flag gate, tests/fixtures)
+- **Phase 2:** Detail enrichment via SSR NGRX — **8/8** (capture doc, shared NGRX extract, detail parser, merge, enrichment fetch, persist queue, tests, code map below)
+- **Phase 3:** Nationwide discovery and operational scaling after burn-in — **0/5** (not started)
 
 ## Principles
 
@@ -51,11 +51,15 @@ No new Vercel/GitHub env vars are required in this PR; operators set the flag wh
 |--------|------|
 | `lib/ingestion/estatesalesnet/constants.ts` | Platform id, parser versions, ingest gate |
 | `lib/ingestion/estatesalesnet/parseEsnetNgrxListHtml.ts` | NGRX list parser |
+| `lib/ingestion/estatesalesnet/parseEsnetNgrxDetailHtml.ts` | NGRX detail parser (Phase 2) |
+| `lib/ingestion/estatesalesnet/attemptEsnetDetailEnrichment.ts` | Fetch detail HTML + merge |
 | `lib/ingestion/estatesalesnet/computeEsnetSaleInstanceIdentity.ts` | Sale-instance fields |
 | `lib/ingestion/estatesalesnet/esnetHosts.ts` | Host / URL helpers |
 | `lib/ingestion/estatesalesnet/coverageBootstrapEstatesalesNet.ts` | Bootstrap state key |
 | `lib/ingestion/adapters/externalPageSource.ts` | Routes parse + identity for `estatesales_net` |
 
-## Phase 2 prerequisite
+## Phase 2 (complete)
 
-Complete `docs/ESNET_API_CAPTURE.md` from live DevTools capture before implementing `esnetApiClient.ts`.
+Detail enrichment uses **SSR NGRX** on canonical sale URLs (see `docs/ESNET_API_CAPTURE.md`). Optional env `ESNET_DETAIL_ENRICH_CONCURRENCY` (default 4) bounds parallel detail fetches per list page. Rows enriched in persist set `parser_version` to `estatesales_net_detail_v1` and `raw_payload.detailPageParsed=true`.
+
+REST `esnetApiClient.ts` remains deferred until `/api/saleDetails` is confirmed from a live browser capture.

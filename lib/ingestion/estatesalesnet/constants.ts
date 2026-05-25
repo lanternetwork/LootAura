@@ -15,8 +15,10 @@ export function isEsnetIngestEnabled(env: NodeJS.ProcessEnv = process.env): bool
   return raw === '1' || /^true$/i.test(raw.trim())
 }
 
-export function parserVersionForEsnetPlatform(sourcePlatform: string): string {
-  return sourcePlatform === ESNET_SOURCE_PLATFORM
-    ? ESNET_PARSER_VERSION_LIST
-    : 'external_page_source_mvp_v3'
+export function parserVersionForEsnetPlatform(
+  sourcePlatform: string,
+  options?: { detailEnriched?: boolean }
+): string {
+  if (sourcePlatform !== ESNET_SOURCE_PLATFORM) return 'external_page_source_mvp_v3'
+  return options?.detailEnriched ? ESNET_PARSER_VERSION_DETAIL : ESNET_PARSER_VERSION_LIST
 }

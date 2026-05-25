@@ -97,6 +97,14 @@ import {
   readEsnetNativeCoordsFromListingRawPayload,
   validateEsnetNativeCoords,
 } from '@/lib/ingestion/estatesalesnet/readEsnetNativeCoords'
+import { isEstatesalesNetSourceUrl } from '@/lib/ingestion/estatesalesnet/esnetHosts'
+import {
+  attemptEsnetDetailEnrichment,
+  emptyEsnetDetailEnrichmentMetrics,
+  mergeEsnetDetailEnrichmentMetrics,
+  type EsnetDetailEnrichmentMetrics,
+} from '@/lib/ingestion/estatesalesnet/attemptEsnetDetailEnrichment'
+import { parseEsnetDetailEnrichmentConcurrencyFromEnv } from '@/lib/ingestion/estatesalesnet/esnetDetailEnrichmentConfig'
 import type {
   ExternalPageSourceIngestionConfig,
   ExternalPageSourceListing,
@@ -168,6 +176,11 @@ export interface ExternalPageSourcePersistSummary {
   /** Phase 6: existing YSTM detail URLs refreshed on list re-crawl (not duplicate-skipped). */
   ystmListRecrawlRefreshAttempted: number
   ystmListRecrawlRefreshSucceeded: number
+  /** EstateSales.NET SSR detail enrichment (Phase 2). */
+  esnetDetailEnrichmentAttempted: number
+  esnetDetailEnrichmentSucceeded: number
+  esnetDetailEnrichmentFetchFailed: number
+  esnetDetailEnrichmentParseFailed: number
   /** Phase 2: skip sub-reason counts for this config persist pass. */
   crawlSkipSubReasons: ExternalCrawlSkipSubReasonCounts
 }
@@ -1114,12 +1127,18 @@ export async function persistExternalPageSource(
     ystmDetailFirstInsertFailedByDbCode: {},
     ystmListRecrawlRefreshAttempted: 0,
     ystmListRecrawlRefreshSucceeded: 0,
+    esnetDetailEnrichmentAttempted: 0,
+    esnetDetailEnrichmentSucceeded: 0,
+    esnetDetailEnrichmentFetchFailed: 0,
+    esnetDetailEnrichmentParseFailed: 0,
     crawlSkipSubReasons: emptyExternalCrawlSkipSubReasonCounts(),
   }
 
   const detailFirstConcurrency = parseYstmDetailFirstConcurrencyFromEnv()
+  const esnetDetailConcurrency = parseEsnetDetailEnrichmentConcurrencyFromEnv()
   const listRecrawlRefreshMaxPerPage = parseYstmListRecrawlRefreshMaxPerPage()
   const detailFirstMetrics: YstmDetailFirstRunMetrics = emptyYstmDetailFirstRunMetrics()
+  const esnetDetailMetrics: EsnetDetailEnrichmentMetrics = emptyEsnetDetailEnrichmentMetrics()
 
   const bumpDuplicateKind = (counts: ExternalDuplicateSkipCounts, kind: keyof ExternalDuplicateSkipCounts) => {
     counts[kind] += 1
@@ -1272,6 +1291,7 @@ export async function persistExternalPageSource(
       existingIngestedSaleId?: string
     }
     const detailFirstCandidates: DetailFirstCandidate[] = []
+    const esnetDetailCandidates: DetailFirstCandidate[] = []
     let listRecrawlRefreshesQueued = 0
 
     const insertListingLegacy = async (
@@ -1429,7 +1449,11 @@ export async function persistExternalPageSource(
         raw_payload: legacyRowPayload,
         status: insertStatus,
         failure_reasons: [],
-        parser_version: parserVersion,
+        parser_version: parserVersionForEsnetPlatform(platform, {
+          detailEnriched:
+            platform === ESNET_SOURCE_PLATFORM &&
+            (listing.rawPayload as { detailPageParsed?: boolean }).detailPageParsed === true,
+        }),
         parse_confidence: insertStatus === 'needs_geocode' ? 'high' : 'low',
         is_duplicate: false,
         duplicate_of: null,
@@ -1833,12 +1857,51 @@ export async function persistExternalPageSource(
         }
       }
 
+      if (
+        platform === ESNET_SOURCE_PLATFORM &&
+        isEstatesalesNetSourceUrl(listing.sourceUrl)
+      ) {
+        esnetDetailCandidates.push({ listing, rowPayload })
+        continue
+      }
+
       if (isYstmDetailListingUrl(listing.sourceUrl)) {
         detailFirstCandidates.push({ listing, rowPayload })
         continue
       }
 
       await insertListingLegacy(listing, rowPayload)
+    }
+
+    if (esnetDetailCandidates.length > 0) {
+      await mapWithBoundedConcurrency(esnetDetailCandidates, esnetDetailConcurrency, async (candidate) => {
+        const { result, metrics: attemptMetrics } = await attemptEsnetDetailEnrichment({
+          config,
+          listSeed: candidate.listing,
+          pageIndex,
+          beforeDetailFetch: options?.beforePageFetch
+            ? async ({ detailUrl, pageIndex: detailPageIndex, city, state }) => {
+                await options.beforePageFetch!({
+                  pageUrl: detailUrl,
+                  pageIndex: detailPageIndex,
+                  city,
+                  state,
+                })
+              }
+            : undefined,
+        })
+        mergeEsnetDetailEnrichmentMetrics(esnetDetailMetrics, attemptMetrics)
+
+        const listingToInsert =
+          result.outcome === 'enriched' ? result.listing : candidate.listing
+        const rowPayload = buildRowRawPayload(listingToInsert, pageIndex, pageHostHash)
+        const detailHtml =
+          'detailPageHtml' in result && result.detailPageHtml ? result.detailPageHtml : undefined
+
+        await insertListingLegacy(listingToInsert, rowPayload, detailHtml)
+        summary.inserted += 1
+        summary.freshInserted += 1
+      })
     }
 
     if (detailFirstCandidates.length > 0) {
@@ -2008,6 +2071,11 @@ export async function persistExternalPageSource(
   summary.ystmDetailFirstInsertFailedByDbCode = {
     ...detailFirstFields.ystmDetailFirstInsertFailedByDbCode,
   }
+
+  summary.esnetDetailEnrichmentAttempted = esnetDetailMetrics.attempted
+  summary.esnetDetailEnrichmentSucceeded = esnetDetailMetrics.enriched
+  summary.esnetDetailEnrichmentFetchFailed = esnetDetailMetrics.fetchFailed
+  summary.esnetDetailEnrichmentParseFailed = esnetDetailMetrics.parseFailed
 
   emitObservabilityRecord(
     buildTelemetryRecord(ObservabilityEvents.ingestion.externalPersistSummary, {

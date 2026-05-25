@@ -1,6 +1,8 @@
 import type { ExternalPageSourceListing } from '@/lib/ingestion/adapters/externalPageSourceTypes'
-import type { EsnetDetailParsed } from '@/lib/ingestion/estatesalesnet/parseEsnetNgrxDetailHtml'
-import { esnetDetailRawPayloadFields } from '@/lib/ingestion/estatesalesnet/parseEsnetNgrxDetailHtml'
+import {
+  esnetDetailRawPayloadFields,
+  type EsnetDetailParsed,
+} from '@/lib/ingestion/estatesalesnet/parseEsnetNgrxDetailHtml'
 
 /**
  * Merge SSR detail NGRX fields over list seed. List wins for address when detail has none (gated).

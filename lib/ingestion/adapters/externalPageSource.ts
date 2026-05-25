@@ -91,13 +91,15 @@ import {
   parserVersionForEsnetPlatform,
 } from '@/lib/ingestion/estatesalesnet/constants'
 import { computeEsnetSaleInstanceIdentity } from '@/lib/ingestion/estatesalesnet/computeEsnetSaleInstanceIdentity'
-import { isEstatesalesNetIngestionConfig } from '@/lib/ingestion/estatesalesnet/esnetHosts'
+import {
+  isEstatesalesNetIngestionConfig,
+  isEstatesalesNetSourceUrl,
+} from '@/lib/ingestion/estatesalesnet/esnetHosts'
 import { parseEsnetNgrxListHtml } from '@/lib/ingestion/estatesalesnet/parseEsnetNgrxListHtml'
 import {
   readEsnetNativeCoordsFromListingRawPayload,
   validateEsnetNativeCoords,
 } from '@/lib/ingestion/estatesalesnet/readEsnetNativeCoords'
-import { isEstatesalesNetSourceUrl } from '@/lib/ingestion/estatesalesnet/esnetHosts'
 import {
   attemptEsnetDetailEnrichment,
   emptyEsnetDetailEnrichmentMetrics,

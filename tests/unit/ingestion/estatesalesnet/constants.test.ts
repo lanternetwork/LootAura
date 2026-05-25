@@ -3,8 +3,10 @@ import { isEsnetIngestEnabled, parserVersionForEsnetPlatform } from '@/lib/inges
 
 describe('estatesalesnet constants', () => {
   it('defaults ingest flag to disabled', () => {
-    expect(isEsnetIngestEnabled({})).toBe(false)
-    expect(isEsnetIngestEnabled({ ESNET_INGEST_ENABLED: 'true' })).toBe(true)
+    expect(isEsnetIngestEnabled({} as unknown as NodeJS.ProcessEnv)).toBe(false)
+    expect(
+      isEsnetIngestEnabled({ ESNET_INGEST_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)
+    ).toBe(true)
   })
 
   it('uses list parser version for esnet platform', () => {

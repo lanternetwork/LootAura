@@ -2,6 +2,36 @@
   "invalid": 0,
   "listings": [
     {
+      "addressRaw": null,
+      "city": "Louisville",
+      "dedupeIdentifiers": {
+        "externalId": "4926588",
+        "sourceUrl": "https://www.estatesales.net/KY/Louisville/40204/4926588"
+      },
+      "description": null,
+      "endDate": "2026-06-01",
+      "extractionConfidence": null,
+      "imageSourceUrl": "https://picturescdn.estatesales.net/4926588/1.jpg",
+      "imageUrls": ["https://picturescdn.estatesales.net/4926588/1.jpg"],
+      "rawPayload": {
+        "esnetSaleId": 4926588,
+        "externalId": "4926588",
+        "imageUrls": ["https://picturescdn.estatesales.net/4926588/1.jpg"],
+        "listPageUrl": "https://www.estatesales.net/KY/Louisville",
+        "orgName": "Another Organizer",
+        "pictureCount": 1,
+        "postalCode": "40204",
+        "saleTypeName": "Moving Sale",
+        "schemaVersion": 1,
+        "sourcePlatform": "estatesales_net",
+        "utcShowAddressAfter": "2026-05-28T13:00:00.000Z"
+      },
+      "sourceUrl": "https://www.estatesales.net/KY/Louisville/40204/4926588",
+      "startDate": "2026-06-01",
+      "state": "KY",
+      "title": "Private Listing Preview"
+    },
+    {
       "addressRaw": "1200 Bardstown Rd",
       "city": "Louisville",
       "dedupeIdentifiers": {
@@ -16,6 +46,7 @@
       "rawPayload": {
         "esnetSaleId": 4913946,
         "externalId": "4913946",
+        "imageUrls": ["https://picturescdn.estatesales.net/4913946/1.jpg"],
         "listPageUrl": "https://www.estatesales.net/KY/Louisville",
         "orgName": "Sample Estate Co",
         "pictureCount": 3,
@@ -29,35 +60,6 @@
       "startDate": "2026-05-30",
       "state": "KY",
       "title": "Historic Highlands Tag Sale"
-    },
-    {
-      "addressRaw": null,
-      "city": "Louisville",
-      "dedupeIdentifiers": {
-        "externalId": "4926588",
-        "sourceUrl": "https://www.estatesales.net/KY/Louisville/40204/4926588"
-      },
-      "description": null,
-      "endDate": "2026-06-02",
-      "extractionConfidence": null,
-      "imageSourceUrl": "https://picturescdn.estatesales.net/4926588/1.jpg",
-      "imageUrls": ["https://picturescdn.estatesales.net/4926588/1.jpg"],
-      "rawPayload": {
-        "esnetSaleId": 4926588,
-        "externalId": "4926588",
-        "listPageUrl": "https://www.estatesales.net/KY/Louisville",
-        "orgName": "Another Organizer",
-        "pictureCount": 1,
-        "postalCode": "40204",
-        "saleTypeName": "Moving Sale",
-        "schemaVersion": 1,
-        "sourcePlatform": "estatesales_net",
-        "utcShowAddressAfter": "2026-05-28T13:00:00.000Z"
-      },
-      "sourceUrl": "https://www.estatesales.net/KY/Louisville/40204/4926588",
-      "startDate": "2026-06-01",
-      "state": "KY",
-      "title": "Private Listing Preview"
     }
   ],
   "parserAdapter": "external_page_source",

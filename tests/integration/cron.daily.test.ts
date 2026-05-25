@@ -1617,7 +1617,14 @@ describe('GET /api/cron/daily', () => {
       expect(data.tasks.moderationDigest).toBeUndefined()
       expect(mockProcessFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
       expect(mockSendModerationDailyDigestEmail).not.toHaveBeenCalled()
-      expect(tablesTouched).toEqual(['ingestion_orchestration_state', 'ingestion_orchestration_state', 'ingestion_orchestration_state', 'ingestion_city_configs', 'ingestion_orchestration_state'])
+      expect(tablesTouched).toEqual([
+        'ingestion_orchestration_state',
+        'ingestion_orchestration_state',
+        'ingestion_orchestration_state',
+        'ingestion_city_configs',
+        'ingestion_orchestration_state',
+        'ingestion_orchestration_state',
+      ])
       expect(mockPersistExternalPageSource).not.toHaveBeenCalled()
     })
   })

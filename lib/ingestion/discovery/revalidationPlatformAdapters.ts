@@ -1,8 +1,8 @@
 import {
   extractCityPageCandidatesFromStateIndexHtml,
   type DiscoveredCityPageCandidate,
-  type SourceStateIndexEntry,
 } from '@/lib/ingestion/discovery/sourceDiscovery'
+import type { SourceStateIndexEntry } from '@/lib/ingestion/discovery/sourceStateIndexCatalog'
 import {
   detectHubDrift,
   validateDiscoveredCityPage,

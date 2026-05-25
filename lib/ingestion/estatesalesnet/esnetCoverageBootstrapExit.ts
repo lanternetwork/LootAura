@@ -13,7 +13,8 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 export type EsnetCoverageBootstrapExitSnapshot = {
   crawlableConfigCount: number
   fetchFailureRate24h: number | null
-  enabledAt: string | null
+  /** Optional on input; `maybeAutoDisableEsnetCoverageBootstrap` fills from DB state. */
+  enabledAt?: string | null
   nowMs?: number
 }
 

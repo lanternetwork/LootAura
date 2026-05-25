@@ -33,10 +33,7 @@ import {
   type RevalidationSelectionMode,
 } from '@/lib/ingestion/discovery/revalidationConfigSelection'
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
-import {
-  detectHubDrift,
-  type DiscoveryValidationResult,
-} from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
+import type { DiscoveryValidationResult } from '@/lib/ingestion/discovery/sourceDiscoveryValidator'
 import {
   resolveRevalidationPlatformAdapter,
   type RevalidationSourcePlatform,

@@ -16,30 +16,17 @@ vi.mock('@/lib/observability/emit', () => ({
   emitObservabilityRecord: vi.fn(),
 }))
 
-function chainAfterLte(rows: unknown[]) {
-  return {
-    is: () => ({
-      order: () => ({
-        limit: vi.fn().mockResolvedValue({ data: rows, error: null }),
-      }),
-    }),
-  }
-}
-
 function chainForSoftDup(rows: unknown[]) {
   return {
     select: () => ({
       eq: () => ({
         not: () => ({
           gte: () => ({
-            lte: () => chainAfterLte(rows),
-          }),
-        }),
-      }),
-      or: () => ({
-        not: () => ({
-          gte: () => ({
-            lte: () => chainAfterLte(rows),
+            lte: () => ({
+              order: () => ({
+                limit: vi.fn().mockResolvedValue({ data: rows, error: null }),
+              }),
+            }),
           }),
         }),
       }),

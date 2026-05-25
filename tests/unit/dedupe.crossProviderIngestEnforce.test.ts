@@ -61,8 +61,10 @@ describe('evaluateDuplicateSkipForExternalListListing (Phase C enforce)', () => 
             not: () => ({
               gte: () => ({
                 lte: () => ({
-                  order: () => ({
-                    limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  is: () => ({
+                    order: () => ({
+                      limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+                    }),
                   }),
                 }),
               }),

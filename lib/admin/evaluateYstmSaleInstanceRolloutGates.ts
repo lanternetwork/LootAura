@@ -66,6 +66,12 @@ export function evaluateYstmSaleInstanceRolloutGates(
     replay.replayedCount === 0 ||
     dash.ambiguousRequiresReview / Math.max(replay.replayedCount, 1) <= 0.05
 
+  const canonical = data.canonicalSaleInstance
+  const crossShadow = data.crossProviderShadow
+  const canonicalCoverageReady =
+    canonical.canonicalCoveragePct != null && canonical.canonicalCoveragePct >= 95
+  const shadowFalseNegativeClear = crossShadow.falseNegativeCount7d === 0
+
   const gates: YstmSaleInstanceRolloutGate[] = [
     {
       id: 'false_exclusion_traced',
@@ -141,12 +147,33 @@ export function evaluateYstmSaleInstanceRolloutGates(
         ? 'no operational alerts'
         : `${dash.alerts.length.toLocaleString()} alert(s) — see Phase 13 panel`,
     },
+    {
+      id: 'canonical_key_coverage',
+      label: 'Canonical sale key coverage (Phase A exit)',
+      stage: 'A',
+      status: gateStatus(
+        canonicalCoverageReady,
+        canonical.externalActiveEligible > 0 && !canonicalCoverageReady
+      ),
+      detail:
+        canonical.canonicalCoveragePct != null
+          ? `${canonical.canonicalCoveragePct.toFixed(1)}% active external rows (target ≥95%)`
+          : 'no active external rows',
+    },
+    {
+      id: 'cross_provider_shadow_false_negative',
+      label: 'Cross-provider shadow false negatives (7d)',
+      stage: 'B',
+      status: shadowFalseNegativeClear ? 'pass' : 'fail',
+      detail: `${crossShadow.falseNegativeCount7d.toLocaleString()} false negative(s) in 7d · ${crossShadow.shadowRecords24h.toLocaleString()} shadow row(s) in 24h`,
+    },
   ]
 
   const observabilityIds = new Set([
     'false_exclusion_traced',
     'shadow_replay_complete',
     'false_exclusion_dashboard',
+    'canonical_key_coverage',
   ])
   const enforcementIds = new Set([
     'shadow_no_divergence',

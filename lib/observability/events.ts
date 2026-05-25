@@ -45,6 +45,7 @@ export const ObservabilityEvents = {
     saleInstanceIdentityBackfillBatch: 'ingestion.sale_instance.identity_backfill_batch',
     canonicalSaleInstanceKeyPersisted: 'ingestion.canonical_sale_instance.persisted',
     canonicalSaleInstanceKeyBackfillBatch: 'ingestion.canonical_sale_instance.backfill_batch',
+    crossProviderShadowDisposition: 'ingestion.cross_provider.shadow_disposition',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

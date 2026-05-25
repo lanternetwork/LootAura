@@ -48,6 +48,10 @@ import {
   type CanonicalSaleInstanceMetrics,
 } from '@/lib/admin/canonicalSaleInstanceMetrics'
 import {
+  loadCrossProviderShadowMetrics,
+  type CrossProviderShadowMetrics,
+} from '@/lib/admin/crossProviderShadowMetrics'
+import {
   buildYstmFalseExclusionSaleIdentityDashboard,
   type YstmFalseExclusionSaleIdentityDashboard,
 } from '@/lib/admin/ystmFalseExclusionSaleIdentityDashboard'
@@ -113,6 +117,7 @@ export type YstmCoverageScoreboard = {
   saleInstanceShadowReplay: SaleInstanceShadowReplayReport
   saleInstanceIdentity: SaleInstanceIdentityMetrics
   canonicalSaleInstance: CanonicalSaleInstanceMetrics
+  crossProviderShadow: CrossProviderShadowMetrics
   sourceUrlAlias: SourceUrlAliasMetrics
   falseExclusionSaleIdentity: YstmFalseExclusionSaleIdentityDashboard
   coverageBootstrap: CoverageBootstrapState & {
@@ -164,6 +169,7 @@ export async function buildYstmCoverageScoreboard(
     saleInstanceShadowReplay,
     saleInstanceIdentity,
     canonicalSaleInstance,
+    crossProviderShadow,
     sourceUrlAlias,
     runsResult,
   ] = await Promise.all([
@@ -178,6 +184,7 @@ export async function buildYstmCoverageScoreboard(
     buildSaleInstanceShadowReplayReport(admin, missingRows, now),
     loadSaleInstanceIdentityMetrics(),
     loadCanonicalSaleInstanceMetrics(),
+    loadCrossProviderShadowMetrics(now.getTime()),
     loadSourceUrlAliasMetrics(),
     fromBase(admin, 'ystm_coverage_audit_runs')
       .select(
@@ -337,6 +344,7 @@ export async function buildYstmCoverageScoreboard(
     saleInstanceShadowReplay,
     saleInstanceIdentity,
     canonicalSaleInstance,
+    crossProviderShadow,
     sourceUrlAlias,
     falseExclusionSaleIdentity,
     coverageBootstrap: {

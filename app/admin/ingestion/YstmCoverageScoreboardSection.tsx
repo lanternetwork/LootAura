@@ -768,6 +768,36 @@ export default function YstmCoverageScoreboardSection() {
             </div>
           </div>
 
+          <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
+            <h3 className="text-sm font-semibold text-violet-950">
+              Cross-provider shadow convergence (Phase B)
+            </h3>
+            <p className="mt-1 text-xs text-violet-900">
+              Records would-link vs would-publish-distinct on external ingest when{' '}
+              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_SHADOW=true</code>. No ingest or
+              publish behavior change.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Shadow rows (24h)" value={data.crossProviderShadow.shadowRecords24h} />
+              <Metric
+                label="False negatives (7d)"
+                value={data.crossProviderShadow.falseNegativeCount7d}
+                highlight={data.crossProviderShadow.falseNegativeCount7d > 0}
+              />
+              <Metric label="Would link (24h)" value={data.crossProviderShadow.wouldLinkCount24h} />
+              <Metric
+                label="Would publish distinct (24h)"
+                value={data.crossProviderShadow.wouldPublishDistinctCount24h}
+              />
+            </div>
+            <p className="mt-3 text-xs text-violet-950">
+              Phase B exit: 0 false-negative shadow rows for 7 days. Last shadow:{' '}
+              {data.crossProviderShadow.lastRecordedAt
+                ? formatWhen(data.crossProviderShadow.lastRecordedAt)
+                : '—'}
+            </p>
+          </div>
+
           <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">
             <h3 className="text-sm font-semibold text-teal-950">Source URL alias history (Phase 4)</h3>
             <p className="mt-1 text-xs text-teal-900">

@@ -10,6 +10,7 @@ import {
 } from '@/lib/ingestion/duplicateScoring'
 import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
 import { findPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
+import { maybeRecordCrossProviderShadowOnExternalIngest } from '@/lib/ingestion/identity/maybeRecordCrossProviderShadowOnExternalIngest'
 import {
   recordIngestedSaleSoftDedupeSuppression,
   suppressionReasonFromEvaluation,
@@ -401,19 +402,33 @@ export async function evaluateDuplicateSkipForExternalListListing(
         matchedSaleInstanceKey: evaluation.winner.sale_instance_key ?? null,
       })
     )
-    return {
+    const result: ExternalListDuplicateSkipResult = {
       skip: true,
       duplicateOfId: evaluation.winner.id,
       evaluation,
       skipKind,
     }
+    await maybeRecordCrossProviderShadowOnExternalIngest(
+      platform,
+      probe,
+      result,
+      'external_list_insert_skip'
+    )
+    return result
   }
-  return {
+  const result: ExternalListDuplicateSkipResult = {
     skip: false,
     duplicateOfId: null,
     evaluation: rows.length > 0 ? evaluation : null,
     skipKind: null,
   }
+  await maybeRecordCrossProviderShadowOnExternalIngest(
+    platform,
+    probe,
+    result,
+    'external_list_insert_skip'
+  )
+  return result
 }
 
 export async function findIngestedSaleMatch(

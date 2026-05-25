@@ -96,6 +96,8 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
             ...thenableQuery({ data: [] }),
             upsert: vi.fn().mockResolvedValue({ error: null }),
           }
+        case 'cross_provider_sale_instance_shadow':
+          return thenableQuery({ data: [], count: 0 })
         default:
           return thenableQuery({ data: [] })
       }

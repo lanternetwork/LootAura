@@ -158,6 +158,15 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       crossProviderCanonicalGroups: 0,
       sampleCrossProviderCanonicalKeys: [],
     },
+    crossProviderShadow: {
+      shadowRecords24h: 0,
+      falseNegativeCount24h: 0,
+      falseNegativeCount7d: 0,
+      wouldLinkCount24h: 0,
+      wouldSuppressPublishCount24h: 0,
+      wouldPublishDistinctCount24h: 0,
+      lastRecordedAt: null,
+    },
     sourceUrlAlias: { totalAliasRows: 0 },
     saleInstanceShadowReplay: {
       generatedAt: '2026-05-22T00:00:00Z',

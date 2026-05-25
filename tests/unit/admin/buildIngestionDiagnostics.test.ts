@@ -451,6 +451,16 @@ describe('buildIngestionDiagnostics', () => {
         keyCollisionGroups: 2,
         sampleCollisionKeys: ['external_page_source:TX|austin|addr:2026-05-10|2026-05-12:123'],
       },
+      canonicalSaleInstance: {
+        externalRowsWithCanonicalKey: 100,
+        externalActiveRowsWithCanonicalKey: 90,
+        externalPublishedActiveWithCanonicalKey: 80,
+        externalActiveEligible: 95,
+        canonicalCoveragePct: 94.7,
+        canonicalCollisionGroups: 1,
+        crossProviderCanonicalGroups: 0,
+        sampleCrossProviderCanonicalKeys: [],
+      },
       sourceUrlAlias: { totalAliasRows: 42 },
       saleInstanceShadowReplay: {
         generatedAt: '2026-05-22T00:00:00Z',

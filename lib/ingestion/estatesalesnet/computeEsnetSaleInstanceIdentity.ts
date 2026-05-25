@@ -4,6 +4,7 @@ import {
   computeSourceLocationHash,
   normalizeLocationBucket,
 } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import { canonicalKeyFromSaleInstanceIdentity } from '@/lib/ingestion/identity/computeCanonicalSaleInstanceKey'
 import type { SaleInstanceIdentityFields } from '@/lib/ingestion/identity/saleInstanceIdentityTypes'
 import {
   computeContentHash,
@@ -98,10 +99,23 @@ export function computeEsnetSaleInstanceIdentity(
     })
   )
 
+  const canonical_sale_instance_key = canonicalKeyFromSaleInstanceIdentity({
+    state: input.state,
+    city: input.city,
+    normalizedAddress: input.normalizedAddress,
+    dateStart: input.dateStart,
+    dateEnd: input.dateEnd,
+    sourceScheduleHash: sourceScheduleHash,
+    sourceLocationHash: sourceLocationHash,
+    lat: input.lat,
+    lng: input.lng,
+  })
+
   return {
     source_listing_id: sourceListingId,
     sale_instance_key: saleInstanceKey,
     sale_instance_fingerprint: saleInstanceFingerprint,
+    canonical_sale_instance_key,
     source_payload_hash: sourcePayloadHash,
     source_content_hash: sourceContentHash,
     source_schedule_hash: sourceScheduleHash,

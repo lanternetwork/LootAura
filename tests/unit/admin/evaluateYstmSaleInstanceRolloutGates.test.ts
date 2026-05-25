@@ -126,6 +126,16 @@ function minimalCoverage(
       keyCollisionGroups: 0,
       sampleCollisionKeys: [],
     },
+    canonicalSaleInstance: {
+      externalRowsWithCanonicalKey: 180,
+      externalActiveRowsWithCanonicalKey: 175,
+      externalPublishedActiveWithCanonicalKey: 150,
+      externalActiveEligible: 195,
+      canonicalCoveragePct: 89.7,
+      canonicalCollisionGroups: 2,
+      crossProviderCanonicalGroups: 1,
+      sampleCrossProviderCanonicalKeys: [],
+    },
     sourceUrlAlias: { totalAliasRows: 50 },
     saleInstanceShadowReplay: {
       generatedAt: '2026-05-22T00:00:00Z',

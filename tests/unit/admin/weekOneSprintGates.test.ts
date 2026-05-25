@@ -148,6 +148,16 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       keyCollisionGroups: 0,
       sampleCollisionKeys: [],
     },
+    canonicalSaleInstance: {
+      externalRowsWithCanonicalKey: 0,
+      externalActiveRowsWithCanonicalKey: 0,
+      externalPublishedActiveWithCanonicalKey: 0,
+      externalActiveEligible: 0,
+      canonicalCoveragePct: null,
+      canonicalCollisionGroups: 0,
+      crossProviderCanonicalGroups: 0,
+      sampleCrossProviderCanonicalKeys: [],
+    },
     sourceUrlAlias: { totalAliasRows: 0 },
     saleInstanceShadowReplay: {
       generatedAt: '2026-05-22T00:00:00Z',

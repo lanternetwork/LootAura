@@ -5,6 +5,7 @@ import {
   computeScheduleHash,
   normalizeWhitespace,
 } from '@/lib/reconciliation/sourceHashing'
+import { canonicalKeyFromSaleInstanceIdentity } from '@/lib/ingestion/identity/computeCanonicalSaleInstanceKey'
 import type {
   ComputeYstmSaleInstanceIdentityInput,
   SaleInstanceIdentityFields,
@@ -127,10 +128,25 @@ export function computeYstmSaleInstanceIdentity(
     })
   )
 
+  const canonical_sale_instance_key = canonicalKeyFromSaleInstanceIdentity({
+    state: input.state,
+    city: input.city,
+    normalizedAddress: input.normalizedAddress,
+    dateStart: input.dateStart,
+    dateEnd: input.dateEnd,
+    timeStart: input.timeStart,
+    timeEnd: input.timeEnd,
+    lat: input.lat,
+    lng: input.lng,
+    sourceScheduleHash: sourceScheduleHash,
+    sourceLocationHash: sourceLocationHash,
+  })
+
   return {
     source_listing_id: sourceListingId,
     sale_instance_key: saleInstanceKey,
     sale_instance_fingerprint: saleInstanceFingerprint,
+    canonical_sale_instance_key,
     source_payload_hash: sourcePayloadHash,
     source_content_hash: sourceContentHash,
     source_schedule_hash: sourceScheduleHash,
@@ -149,6 +165,7 @@ export function saleInstanceIdentityDbColumns(
       source_listing_id: null,
       sale_instance_key: null,
       sale_instance_fingerprint: null,
+      canonical_sale_instance_key: null,
       source_payload_hash: null,
       source_content_hash: null,
       source_schedule_hash: null,
@@ -166,6 +183,7 @@ export function saleInstanceIdentityDbColumns(
     source_listing_id: identity.source_listing_id,
     sale_instance_key: identity.sale_instance_key,
     sale_instance_fingerprint: identity.sale_instance_fingerprint,
+    canonical_sale_instance_key: identity.canonical_sale_instance_key,
     source_payload_hash: identity.source_payload_hash,
     source_content_hash: identity.source_content_hash,
     source_schedule_hash: identity.source_schedule_hash,

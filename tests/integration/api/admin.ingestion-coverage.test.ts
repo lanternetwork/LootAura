@@ -133,6 +133,8 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.saleInstanceShadowReplay.divergenceOldSuppressNewPublishCount).toBe(0)
     expect(json.falseExclusionSaleIdentity.missingValidYstmUrls).toBe(0)
     expect(json.coverageBootstrap.enabled).toBe(false)
+    expect(json.esnetCoverageBootstrap.crawlableConfigCount).toBe(0)
+    expect(json.esnetCoverageBootstrap.ingestGateEnabled).toBe(false)
     expect(json.falseExclusionSaleIdentity.healthy).toBe(true)
   })
 })

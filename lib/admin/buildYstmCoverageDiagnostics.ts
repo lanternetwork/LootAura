@@ -34,6 +34,14 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
         ? `on (enabled at: ${data.coverageBootstrap.enabledAt ?? '—'})`
         : `off${data.coverageBootstrap.disabledReason ? ` (${data.coverageBootstrap.disabledReason})` : ''}`
     ),
+    bullet(
+      'ES.net ingest bootstrap',
+      data.esnetCoverageBootstrap.enabled
+        ? `on (enabled at: ${data.esnetCoverageBootstrap.enabledAt ?? '—'})`
+        : `off${data.esnetCoverageBootstrap.disabledReason ? ` (${data.esnetCoverageBootstrap.disabledReason})` : ''}`
+    ),
+    bullet('ES.net crawlable configs', data.esnetCoverageBootstrap.crawlableConfigCount),
+    bullet('ES.net ingest gate (ESNET_INGEST_ENABLED)', data.esnetCoverageBootstrap.ingestGateEnabled ? 'true' : 'false'),
     '',
     '### Sale-instance identity (Phase 3)',
     bullet('external-source rows with sale_instance_key', data.saleInstanceIdentity.ystmRowsWithKey),

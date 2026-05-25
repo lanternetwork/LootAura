@@ -187,6 +187,15 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       disabledReason: null,
       exitCriteriaPreview: { met: false, reasons: [] },
     },
+    esnetCoverageBootstrap: {
+      enabled: false,
+      enabledAt: null,
+      disabledAt: null,
+      disabledReason: null,
+      exitCriteriaPreview: { met: false, reasons: [] },
+      crawlableConfigCount: 0,
+      ingestGateEnabled: false,
+    },
     ...overrides,
   }
 }

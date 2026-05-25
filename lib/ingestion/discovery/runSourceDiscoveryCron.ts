@@ -307,8 +307,32 @@ export async function runSourceDiscoveryCron(
       } else {
         telemetry.degraded = true
       }
-    } else {
-      telemetry.degraded = true
+    }
+
+    if (
+      isEsnetIngestEnabled() &&
+      !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)
+    ) {
+      const esnetRevalidation = await revalidateSourceDiscoveryConfigs(admin, {
+        dryRun: false,
+        states: batch.states.length > 0 ? batch.states : undefined,
+        maxConfigsPerRun: Math.min(40, budgets.maxRevalidationConfigsPerRun),
+        selectionMode: 'balanced',
+        sourcePlatform: 'estatesales_net',
+        placeholderFailureExcludeThreshold: budgets.placeholderFailureExcludeThreshold,
+        telemetryContext: { ...telemetryContext, phase: 'esnet_revalidate' },
+      })
+      if (esnetRevalidation.ok) {
+        telemetry.configsRevalidated += esnetRevalidation.telemetry.configsRevalidated
+        telemetry.configsRepaired += esnetRevalidation.telemetry.configsRepaired
+        telemetry.configsFailed += esnetRevalidation.telemetry.configsFailed
+        telemetry.placeholdersUnresolved += esnetRevalidation.telemetry.placeholdersUnresolved
+        if (!telemetry.phasesCompleted.includes('esnet_revalidate')) {
+          telemetry.phasesCompleted.push('esnet_revalidate')
+        }
+      } else {
+        telemetry.degraded = true
+      }
     }
 
     const registryCounts = await loadRegistryAggregateCounts(admin)

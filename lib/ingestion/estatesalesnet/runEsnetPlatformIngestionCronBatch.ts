@@ -4,6 +4,10 @@ import {
   type ExternalPageSourcePersistSummary,
 } from '@/lib/ingestion/adapters/externalPageSource'
 import { fetchEsnetCoverageBootstrapEnabled } from '@/lib/ingestion/estatesalesnet/coverageBootstrapEstatesalesNet'
+import {
+  countEsnetCrawlableIngestionConfigs,
+  maybeAutoDisableEsnetCoverageBootstrap,
+} from '@/lib/ingestion/estatesalesnet/esnetCoverageBootstrapExit'
 import { ESNET_SOURCE_PLATFORM, isEsnetIngestEnabled } from '@/lib/ingestion/estatesalesnet/constants'
 import {
   buildYieldAwareCrawlPlan,
@@ -35,6 +39,7 @@ export type EsnetIngestionCronBatchResult = {
   skipped: boolean
   skipReason?: string
   summary: ExternalPageSourcePersistSummary | null
+  bootstrapAutoDisabled?: boolean
 }
 
 function emptyTotals(): ExternalPageSourcePersistSummary {
@@ -152,7 +157,17 @@ export async function runEsnetPlatformIngestionCronBatch(
     totals.esnetDetailEnrichmentParseFailed += s.esnetDetailEnrichmentParseFailed ?? 0
   }
 
-  return { skipped: false, summary: totals }
+  let bootstrapAutoDisabled = false
+  if (bootstrapEnabled) {
+    const crawlableConfigCount = await countEsnetCrawlableIngestionConfigs(adminDb)
+    const auto = await maybeAutoDisableEsnetCoverageBootstrap(adminDb, {
+      crawlableConfigCount,
+      fetchFailureRate24h: null,
+    })
+    bootstrapAutoDisabled = auto.disabled
+  }
+
+  return { skipped: false, summary: totals, bootstrapAutoDisabled }
 }
 
 export function mergeEsnetTotalsIntoIngestionStep(

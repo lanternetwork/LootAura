@@ -8,6 +8,7 @@ Implementation specification for adding EstateSales.NET (`estatesales_net`) as p
 - **Phase 1:** List-level ingestion — **6/6** (parser, identity, persist wiring, bootstrap key, flag gate, tests/fixtures)
 - **Phase 2:** Detail enrichment via SSR NGRX — **8/8** (capture doc, shared NGRX extract, detail parser, merge, enrichment fetch, persist queue, tests, code map below)
 - **Phase 3:** Nationwide discovery and operational scaling — **5/5**
+- **Phase 4:** Operations burn-in — **6/6**
 
 ## Principles
 
@@ -83,3 +84,22 @@ REST `esnetApiClient.ts` remains deferred until `/api/saleDetails` is confirmed 
 2. Set `ESNET_INGEST_ENABLED=true` when ready (no new GitHub/Vercel secrets).
 3. Optionally enable `coverage_bootstrap_estatesales_net` in `ingestion_orchestration_state` for higher crawl budgets.
 4. Let discovery cron populate `ingestion_city_configs` with `source_platform=estatesales_net` before expecting ingest volume.
+
+## Phase 4 (complete)
+
+| # | Deliverable | Module / notes |
+|---|-------------|----------------|
+| 1 | Admin toggle for `coverage_bootstrap_estatesales_net` | `POST /api/admin/ingestion/coverage-bootstrap` body `{ "enabled", "provider": "estatesales_net" }` |
+| 2 | Scoreboard panel + diagnostics export | `esnetCoverageBootstrap` on `GET /api/admin/ingestion/ystm-coverage` |
+| 3 | Auto-disable bootstrap when exit criteria met | `maybeAutoDisableEsnetCoverageBootstrap` after daily ES.net ingest + scoreboard load |
+| 4 | ES.net discovery revalidation lane | `revalidateSourceDiscoveryConfigs({ sourcePlatform: 'estatesales_net' })` in discovery cron |
+| 5 | Platform adapters for revalidation | `lib/ingestion/discovery/revalidationPlatformAdapters.ts` |
+| 6 | Operator notes | Revalidation runs when `ESNET_INGEST_ENABLED=true`; nationwide coverage audit remains YSTM-only until a dedicated ES.net audit phase |
+
+**Burn-in checklist**
+
+1. Merge PR and apply migrations `209` + `210`.
+2. Let discovery seed ES.net metro configs (graph enumeration + revalidation).
+3. Set `ESNET_INGEST_ENABLED=true` in production when ready.
+4. Enable ES.net bootstrap from the ingestion dashboard if higher crawl budgets are needed.
+5. Monitor `esnetCoverageBootstrap.crawlableConfigCount` and daily ingest telemetry (`esnetInserted`, detail enrichment counters).

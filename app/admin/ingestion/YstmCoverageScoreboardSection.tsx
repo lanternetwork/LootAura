@@ -78,6 +78,7 @@ export default function YstmCoverageScoreboardSection() {
   const [loading, setLoading] = useState(true)
   const [backfillUi, setBackfillUi] = useState<BackfillUiState>({ kind: 'idle' })
   const [bootstrapUi, setBootstrapUi] = useState<BootstrapUiState>({ kind: 'idle' })
+  const [esnetBootstrapUi, setEsnetBootstrapUi] = useState<BootstrapUiState>({ kind: 'idle' })
 
   const load = useCallback(async () => {
     try {
@@ -139,31 +140,34 @@ export default function YstmCoverageScoreboardSection() {
   }, [load])
 
   const toggleCoverageBootstrap = useCallback(
-    async (enabled: boolean) => {
+    async (enabled: boolean, provider: 'nationwide' | 'estatesales_net' = 'nationwide') => {
+      const setUi = provider === 'estatesales_net' ? setEsnetBootstrapUi : setBootstrapUi
       if (
         enabled &&
         !window.confirm(
-          'Enable nationwide coverage bootstrap? This increases audit/ingest/repair throughput and may dip coverage % while the audit footprint grows. Auto-disables when exit criteria are met.'
+          provider === 'estatesales_net'
+            ? 'Enable EstateSales.NET coverage bootstrap? Raises ES.net daily ingest budgets. Requires ESNET_INGEST_ENABLED=true. Auto-disables when provider exit criteria are met.'
+            : 'Enable nationwide coverage bootstrap? This increases audit/ingest/repair throughput and may dip coverage % while the audit footprint grows. Auto-disables when exit criteria are met.'
         )
       ) {
         return
       }
-      setBootstrapUi({ kind: 'running' })
+      setUi({ kind: 'running' })
       try {
         const res = await fetch('/api/admin/ingestion/coverage-bootstrap', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enabled }),
+          body: JSON.stringify({ enabled, provider }),
         })
         const json = (await res.json()) as { ok?: boolean; message?: string; code?: string }
         if (!res.ok || !json.ok) {
           throw new Error(json.message || json.code || `HTTP ${res.status}`)
         }
-        setBootstrapUi({ kind: 'idle' })
+        setUi({ kind: 'idle' })
         await load()
       } catch (e) {
-        setBootstrapUi({
+        setUi({
           kind: 'error',
           message: e instanceof Error ? e.message : String(e),
         })
@@ -280,6 +284,74 @@ export default function YstmCoverageScoreboardSection() {
             </div>
             {bootstrapUi.kind === 'error' && (
               <p className="mt-2 text-xs text-red-700">{bootstrapUi.message}</p>
+            )}
+          </div>
+
+          <div
+            className={`mb-4 rounded-md border p-4 ${
+              data.esnetCoverageBootstrap.enabled
+                ? 'border-sky-400 bg-sky-50'
+                : 'border-slate-200 bg-slate-50'
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-950">EstateSales.NET ingest bootstrap</h3>
+                <p className="mt-1 text-xs text-slate-700">
+                  Provider-scoped crawl budgets for <code className="text-xs">estatesales_net</code> configs
+                  (decoupled from nationwide bootstrap). List ingest still requires{' '}
+                  <code className="text-xs">ESNET_INGEST_ENABLED=true</code>.
+                </p>
+                <p className="mt-2 text-xs text-slate-600">
+                  Status:{' '}
+                  <span className="font-semibold">
+                    {data.esnetCoverageBootstrap.enabled ? 'ON' : 'OFF'}
+                  </span>
+                  {' · '}
+                  ingest gate:{' '}
+                  <span className="font-semibold">
+                    {data.esnetCoverageBootstrap.ingestGateEnabled ? 'enabled' : 'disabled'}
+                  </span>
+                  {' · '}
+                  crawlable configs: {data.esnetCoverageBootstrap.crawlableConfigCount.toLocaleString()}
+                  {data.esnetCoverageBootstrap.enabledAt && (
+                    <> · enabled {formatWhen(data.esnetCoverageBootstrap.enabledAt)}</>
+                  )}
+                </p>
+                {data.esnetCoverageBootstrap.enabled && (
+                  <p className="mt-1 text-xs text-slate-600">
+                    Exit preview:{' '}
+                    {data.esnetCoverageBootstrap.exitCriteriaPreview.met
+                      ? 'criteria met — will auto-disable on next ingest/scoreboard check'
+                      : data.esnetCoverageBootstrap.exitCriteriaPreview.reasons.slice(0, 3).join('; ') ||
+                        'pending'}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {data.esnetCoverageBootstrap.enabled ? (
+                  <button
+                    type="button"
+                    disabled={esnetBootstrapUi.kind === 'running'}
+                    onClick={() => void toggleCoverageBootstrap(false, 'estatesales_net')}
+                    className="rounded border border-slate-400 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    Disable ES.net bootstrap
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={esnetBootstrapUi.kind === 'running'}
+                    onClick={() => void toggleCoverageBootstrap(true, 'estatesales_net')}
+                    className="rounded border border-sky-600 bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    Enable ES.net bootstrap
+                  </button>
+                )}
+              </div>
+            </div>
+            {esnetBootstrapUi.kind === 'error' && (
+              <p className="mt-2 text-xs text-red-700">{esnetBootstrapUi.message}</p>
             )}
           </div>
 

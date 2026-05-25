@@ -490,6 +490,15 @@ describe('buildIngestionDiagnostics', () => {
         disabledReason: null,
         exitCriteriaPreview: { met: false, reasons: [] },
       },
+      esnetCoverageBootstrap: {
+        enabled: false,
+        enabledAt: null,
+        disabledAt: null,
+        disabledReason: null,
+        exitCriteriaPreview: { met: false, reasons: [] },
+        crawlableConfigCount: 0,
+        ingestGateEnabled: false,
+      },
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })

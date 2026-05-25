@@ -17,6 +17,8 @@ import { revalidateSourceDiscoveryConfigs } from '@/lib/ingestion/discovery/reva
 import { SOURCE_DISCOVERY_STATUS } from '@/lib/ingestion/discovery/sourceDiscoveryStatus'
 import type { ValidatedDiscoveryCandidate } from '@/lib/ingestion/discovery/sourceDiscovery'
 import { runYstmGraphEnumerationDiscovery } from '@/lib/ingestion/discovery/runYstmGraphEnumerationDiscovery'
+import { isEsnetIngestEnabled } from '@/lib/ingestion/estatesalesnet/constants'
+import { runEsnetGraphEnumerationDiscovery } from '@/lib/ingestion/estatesalesnet/discovery/runEsnetGraphEnumerationDiscovery'
 import {
   listValidatedUnpromotedCandidates,
   markSourcePageCandidatesPromoted,
@@ -248,6 +250,31 @@ export async function runSourceDiscoveryCron(
       } else {
         telemetry.degraded = true
         telemetry.graphEnumerationSkippedReason = 'graph_enumeration_failed'
+      }
+    }
+
+    if (
+      isEsnetIngestEnabled() &&
+      batch.states.length > 0 &&
+      !isRuntimeBudgetExceeded(startedAtMs, budgets.maxRuntimeMs)
+    ) {
+      const esnetGraph = await runEsnetGraphEnumerationDiscovery(admin, {
+        stateCodes: batch.states,
+        budgets,
+        telemetryContext: { ...telemetryContext, phase: 'esnet_graph_enumeration' },
+      })
+      if (esnetGraph.ok) {
+        telemetry.statesScanned += esnetGraph.telemetry.statesScanned
+        telemetry.candidatePagesDiscovered += esnetGraph.telemetry.candidatePagesDiscovered
+        telemetry.candidatePagesValid += esnetGraph.telemetry.candidatePagesValid
+        telemetry.candidatePagesInvalid += esnetGraph.telemetry.candidatePagesInvalid
+        telemetry.candidateRegistryUpserts += esnetGraph.telemetry.candidateRegistryUpserts
+        telemetry.configsPromoted += esnetGraph.telemetry.configsPromoted
+        if (!telemetry.phasesCompleted.includes('esnet_graph_enumeration')) {
+          telemetry.phasesCompleted.push('esnet_graph_enumeration')
+        }
+      } else {
+        telemetry.degraded = true
       }
     }
 

@@ -72,6 +72,10 @@ import {
 } from '@/lib/ingestion/adapters/externalPageSource'
 import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 import {
+  mergeEsnetTotalsIntoIngestionStep,
+  runEsnetPlatformIngestionCronBatch,
+} from '@/lib/ingestion/estatesalesnet/runEsnetPlatformIngestionCronBatch'
+import {
   fetchEnabledExternalIngestionCityConfigs,
   recordConfigCrawlStats,
 } from '@/lib/ingestion/acquisition/configCrawlStats'
@@ -906,6 +910,42 @@ async function runIngestionOrchestration(
         })
       }
 
+      const esnetBatch = await runEsnetPlatformIngestionCronBatch({
+        enabledRows: (enabledCities ?? []) as ExternalConfigRow[],
+        budgetStartedAtMs,
+        telemetryContext,
+        beforePageFetch: async ({ pageUrl, pageIndex, city, state }) => {
+          let domain = 'unknown-host'
+          try {
+            domain = new URL(pageUrl).hostname.toLowerCase()
+          } catch {
+            /* safe fetch validates URL */
+          }
+          const now = Date.now()
+          const last = lastRequestAtByDomain.get(domain)
+          const sameDomainDelayMs =
+            last === undefined ? 0 : Math.max(0, last + domainMinSpacingMs - now)
+          const jitterSpan = jitterRangeMs.maxMs - jitterRangeMs.minMs
+          const jitterDelayMs =
+            jitterRangeMs.minMs + Math.floor(nextRandom() * (jitterSpan + 1))
+          const appliedDelayMs = sameDomainDelayMs + jitterDelayMs
+          if (appliedDelayMs > 0) {
+            await sleepMs(appliedDelayMs)
+          }
+          lastRequestAtByDomain.set(domain, Date.now())
+          requestsByDomain.set(domain, (requestsByDomain.get(domain) ?? 0) + 1)
+        },
+      })
+      if (esnetBatch.summary) {
+        totals.fetched += esnetBatch.summary.fetched
+        totals.inserted += esnetBatch.summary.inserted
+        totals.skipped += esnetBatch.summary.skipped
+        totals.invalid += esnetBatch.summary.invalid
+        totals.errors += esnetBatch.summary.errors
+        totals.pagesProcessed += esnetBatch.summary.pagesProcessed
+        mergeCrawlSkipSubReasonCounts(totals.crawlSkipSubReasons, esnetBatch.summary.crawlSkipSubReasons)
+      }
+
       nextCursor =
         totalConfigs > 0
           ? (baseCursor + configsConsumed) % totalConfigs
@@ -953,6 +993,11 @@ async function runIngestionOrchestration(
           totals.freshInserted
         ),
         dedupeTelemetrySummary: ingestionDedupeTelemetrySummary,
+        esnetIngestSkipped: esnetBatch.skipped,
+        esnetIngestSkipReason: esnetBatch.skipReason ?? null,
+      }
+      if (esnetBatch.summary) {
+        mergeEsnetTotalsIntoIngestionStep(taskResult.steps.ingestion, esnetBatch.summary)
       }
 
       const completedAt = new Date().toISOString()

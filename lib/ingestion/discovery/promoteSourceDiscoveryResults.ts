@@ -16,6 +16,8 @@ import {
   type DiscoveryPromotionTelemetry,
 } from '@/lib/ingestion/discovery/sourceDiscoveryTelemetry'
 import { isYstmStateShellCityPageUrl } from '@/lib/ingestion/discovery/ystmCityListPageUrl'
+import { ESNET_SOURCE_PLATFORM } from '@/lib/ingestion/estatesalesnet/constants'
+import { isEstatesalesNetSourceUrl } from '@/lib/ingestion/estatesalesnet/esnetHosts'
 import { logger } from '@/lib/log'
 
 const EXTERNAL_PAGE_SOURCE = 'external_page_source'
@@ -54,6 +56,8 @@ export type promoteSourceDiscoveryResultsArgs = {
   candidates: ValidatedDiscoveryCandidate[]
   dryRun?: boolean
   telemetryContext?: Record<string, unknown>
+  /** Defaults to `external_page_source`; use `estatesales_net` for ES.net discovery. */
+  sourcePlatform?: string
 }
 
 export type promoteSourceDiscoveryResultsResult = {
@@ -150,6 +154,7 @@ export async function promoteSourceDiscoveryResults(
   }
   const records: PromotedConfigRecord[] = []
   const now = new Date().toISOString()
+  const sourcePlatform = args.sourcePlatform ?? EXTERNAL_PAGE_SOURCE
 
   const statesNeeded = new Set<string>()
   for (const candidate of args.candidates) {
@@ -161,7 +166,7 @@ export async function promoteSourceDiscoveryResults(
     .select(
       'id, city, state, timezone, enabled, source_platform, source_pages, source_discovery_status, source_last_discovered_at, source_last_validated_at, source_last_failed_at, source_discovery_failure_reason'
     )
-    .eq('source_platform', EXTERNAL_PAGE_SOURCE)
+    .eq('source_platform', sourcePlatform)
     .in('state', statesNeeded.size > 0 ? [...statesNeeded] : ['__none__'])
 
   if (loadError) {
@@ -220,36 +225,56 @@ export async function promoteSourceDiscoveryResults(
       continue
     }
 
-    const canonical = deriveYardsaleTreasureMapCityPageUrl(candidate.canonicalUrl)
-    if (!canonical || canonical !== candidate.canonicalUrl.replace(/\/$/, '')) {
-      telemetry.validationsFailed += 1
-      records.push({
-        city: loc.city,
-        state: loc.state,
-        action: 'skipped',
-        reason: 'non_canonical_url',
-        sharedHubPage: candidate.sharedHubPage,
-        canonicalUrl: candidate.canonicalUrl,
-        canonicalUrlHash: urlHash,
-      })
-      telemetry.skipped += 1
-      continue
+    const canonicalNormalized = candidate.canonicalUrl.trim().replace(/\/$/, '')
+    if (sourcePlatform === ESNET_SOURCE_PLATFORM) {
+      if (!isEstatesalesNetSourceUrl(canonicalNormalized)) {
+        telemetry.validationsFailed += 1
+        records.push({
+          city: loc.city,
+          state: loc.state,
+          action: 'skipped',
+          reason: 'non_canonical_url',
+          sharedHubPage: candidate.sharedHubPage,
+          canonicalUrl: candidate.canonicalUrl,
+          canonicalUrlHash: urlHash,
+        })
+        telemetry.skipped += 1
+        continue
+      }
+    } else {
+      const canonical = deriveYardsaleTreasureMapCityPageUrl(candidate.canonicalUrl)
+      if (!canonical || canonical !== canonicalNormalized) {
+        telemetry.validationsFailed += 1
+        records.push({
+          city: loc.city,
+          state: loc.state,
+          action: 'skipped',
+          reason: 'non_canonical_url',
+          sharedHubPage: candidate.sharedHubPage,
+          canonicalUrl: candidate.canonicalUrl,
+          canonicalUrlHash: urlHash,
+        })
+        telemetry.skipped += 1
+        continue
+      }
+
+      if (isYstmStateShellCityPageUrl(canonical)) {
+        telemetry.validationsFailed += 1
+        records.push({
+          city: loc.city,
+          state: loc.state,
+          action: 'skipped',
+          reason: 'state_shell_not_city_page',
+          sharedHubPage: candidate.sharedHubPage,
+          canonicalUrl: candidate.canonicalUrl,
+          canonicalUrlHash: urlHash,
+        })
+        telemetry.skipped += 1
+        continue
+      }
     }
 
-    if (isYstmStateShellCityPageUrl(canonical)) {
-      telemetry.validationsFailed += 1
-      records.push({
-        city: loc.city,
-        state: loc.state,
-        action: 'skipped',
-        reason: 'state_shell_not_city_page',
-        sharedHubPage: candidate.sharedHubPage,
-        canonicalUrl: candidate.canonicalUrl,
-        canonicalUrlHash: urlHash,
-      })
-      telemetry.skipped += 1
-      continue
-    }
+    const canonical = canonicalNormalized
 
     const existing = findExistingRow(byScope, byMalformedScope, loc.city, loc.state)
 
@@ -384,7 +409,7 @@ export async function promoteSourceDiscoveryResults(
             state: loc.state,
             timezone,
             enabled: true,
-            source_platform: EXTERNAL_PAGE_SOURCE,
+            source_platform: sourcePlatform,
             ...patch,
           })
           .select('id')
@@ -418,7 +443,7 @@ export async function promoteSourceDiscoveryResults(
           state: loc.state,
           timezone,
           enabled: true,
-          source_platform: EXTERNAL_PAGE_SOURCE,
+          source_platform: sourcePlatform,
           source_pages: patch.source_pages,
           source_discovery_status: SOURCE_DISCOVERY_STATUS.validated,
           source_last_discovered_at: now,

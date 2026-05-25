@@ -8,7 +8,11 @@ import {
   type SoftDuplicateCandidateRow,
   type SoftDuplicateEvaluation,
 } from '@/lib/ingestion/duplicateScoring'
+import { buildCrossProviderShadowIncoming } from '@/lib/ingestion/identity/buildCrossProviderShadowIncoming'
 import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
+import type { CrossProviderObservationInsert } from '@/lib/ingestion/identity/crossProviderDispositionTypes'
+import { evaluateCrossProviderObservationForIngest } from '@/lib/ingestion/identity/evaluateCrossProviderObservationForIngest'
+import { isCrossProviderIngestEnforcementEnabled } from '@/lib/ingestion/identity/crossProviderShadowEnforcement'
 import { findPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import { maybeRecordCrossProviderShadowOnExternalIngest } from '@/lib/ingestion/identity/maybeRecordCrossProviderShadowOnExternalIngest'
 import {
@@ -208,7 +212,7 @@ async function fetchSoftAddressCandidates(
   const { min, max } = softFetchDateBounds(dateStart)
   const { data, error } = await fromBase(admin, 'ingested_sales')
     .select(
-      'id, date_start, date_end, title, source_platform, external_id, lat, lng, image_source_url, source_url, canonical_source_url, sale_instance_key, source_listing_id, source_location_hash, status, failure_reasons'
+      'id, date_start, date_end, title, source_platform, external_id, lat, lng, image_source_url, source_url, canonical_source_url, sale_instance_key, source_listing_id, source_location_hash, canonical_sale_instance_key, status, failure_reasons'
     )
     .eq('normalized_address', normalizedAddress)
     .not('date_start', 'is', null)
@@ -246,7 +250,12 @@ function buildSoftDedupeSafetyIncoming(
   probe: ExternalListDuplicateProbe,
   normalizedAddress: string
 ): SoftDedupeSafetyIncoming {
-  const identity = computeYstmSaleInstanceIdentity({
+  const { canonicalSaleInstanceKey, saleInstanceKey } = buildCrossProviderShadowIncoming(
+    platform,
+    probe,
+    normalizedAddress
+  )
+  const ystmIdentity = computeYstmSaleInstanceIdentity({
     sourcePlatform: platform,
     sourceUrl: probe.sourceUrl,
     state: probe.state,
@@ -271,8 +280,10 @@ function buildSoftDedupeSafetyIncoming(
     normalizedAddress,
     lat: probe.lat ?? null,
     lng: probe.lng ?? null,
-    saleInstanceKey: identity?.sale_instance_key ?? null,
-    sourceLocationHash: identity?.source_location_hash ?? null,
+    sourcePlatform: platform,
+    saleInstanceKey: saleInstanceKey ?? ystmIdentity?.sale_instance_key ?? null,
+    sourceLocationHash: ystmIdentity?.source_location_hash ?? null,
+    canonicalSaleInstanceKey,
   }
 }
 
@@ -281,8 +292,23 @@ function buildSoftDedupeSafetyIncomingFromProcessed(
   processed: ProcessedIngestedSale,
   context?: DedupeTelemetryContext
 ): SoftDedupeSafetyIncoming {
-  const identity = computeYstmSaleInstanceIdentity({
-    sourcePlatform: context?.sourcePlatform ?? 'unknown',
+  const platform = context?.sourcePlatform ?? 'unknown'
+  const { canonicalSaleInstanceKey, saleInstanceKey } = buildCrossProviderShadowIncoming(
+    platform,
+    {
+      sourceUrl,
+      state: processed.state,
+      city: processed.city,
+      title: context?.normalizedTitle ?? '',
+      startDate: processed.dateStart,
+      endDate: processed.dateEnd,
+      lat: processed.lat,
+      lng: processed.lng,
+    },
+    processed.normalizedAddress ?? ''
+  )
+  const ystmIdentity = computeYstmSaleInstanceIdentity({
+    sourcePlatform: platform,
     sourceUrl,
     state: processed.state,
     city: processed.city,
@@ -306,8 +332,10 @@ function buildSoftDedupeSafetyIncomingFromProcessed(
     normalizedAddress: processed.normalizedAddress,
     lat: processed.lat,
     lng: processed.lng,
-    saleInstanceKey: identity?.sale_instance_key ?? null,
-    sourceLocationHash: identity?.source_location_hash ?? null,
+    sourcePlatform: platform,
+    saleInstanceKey: saleInstanceKey ?? ystmIdentity?.sale_instance_key ?? null,
+    sourceLocationHash: ystmIdentity?.source_location_hash ?? null,
+    canonicalSaleInstanceKey,
   }
 }
 
@@ -321,6 +349,38 @@ export type ExternalListDuplicateSkipResult = {
   evaluation: SoftDuplicateEvaluation | null
   /** Set when `skip` is true from soft scoring (URL-level skips classified in adapter). */
   skipKind: 'duplicate_cross_city_page' | null
+  /** Phase C: insert as cross-provider observation duplicate (never hard-skip). */
+  crossProviderObservation: CrossProviderObservationInsert | null
+}
+
+function platformsDifferForDedupe(a: string, b: string | null | undefined): boolean {
+  const pa = a.trim().toLowerCase()
+  const pb = b?.trim().toLowerCase() ?? ''
+  return Boolean(pb && pa !== pb)
+}
+
+async function finishExternalListDuplicateEvaluation(
+  admin: ReturnType<typeof getAdminDb>,
+  platform: string,
+  probe: ExternalListDuplicateProbe,
+  result: ExternalListDuplicateSkipResult,
+  shadowContext: string
+): Promise<ExternalListDuplicateSkipResult> {
+  if (result.crossProviderObservation) {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.ingestion.crossProviderObservationInsert, {
+        sourcePlatform: platform,
+        sourceUrl: probe.sourceUrl,
+        duplicateOfId: result.crossProviderObservation.duplicateOfId,
+        disposition: result.crossProviderObservation.disposition,
+        confidence: result.crossProviderObservation.confidence,
+        matchMethod: result.crossProviderObservation.matchMethod,
+        context: shadowContext,
+      })
+    )
+  }
+  await maybeRecordCrossProviderShadowOnExternalIngest(platform, probe, result, shadowContext)
+  return result
 }
 
 export async function evaluateDuplicateSkipForExternalListListing(
@@ -332,7 +392,35 @@ export async function evaluateDuplicateSkipForExternalListListing(
     ? probe.addressRaw.toLowerCase().replace(/\s+/g, ' ').trim()
     : null
   if (!normalizedAddress || !probe.startDate) {
-    return { skip: false, duplicateOfId: null, evaluation: null, skipKind: null }
+    return {
+      skip: false,
+      duplicateOfId: null,
+      evaluation: null,
+      skipKind: null,
+      crossProviderObservation: null,
+    }
+  }
+
+  const crossProviderObservation = await evaluateCrossProviderObservationForIngest(
+    platform,
+    probe,
+    normalizedAddress
+  )
+  if (crossProviderObservation) {
+    const observationResult: ExternalListDuplicateSkipResult = {
+      skip: false,
+      duplicateOfId: crossProviderObservation.duplicateOfId,
+      evaluation: null,
+      skipKind: null,
+      crossProviderObservation,
+    }
+    return finishExternalListDuplicateEvaluation(
+      admin,
+      platform,
+      probe,
+      observationResult,
+      'external_list_cross_provider_observation'
+    )
   }
 
   const incoming: DuplicateScoringIncoming = {
@@ -350,6 +438,26 @@ export async function evaluateDuplicateSkipForExternalListListing(
   const rows = await fetchSoftAddressCandidates(admin, normalizedAddress, probe.startDate)
   const evaluation = evaluateSoftDuplicateAgainstCandidates(incoming, rows)
   if (evaluation.suppress && evaluation.winner) {
+    if (
+      isCrossProviderIngestEnforcementEnabled() &&
+      platformsDifferForDedupe(platform, evaluation.winner.source_platform)
+    ) {
+      const crossPlatformResult: ExternalListDuplicateSkipResult = {
+        skip: false,
+        duplicateOfId: null,
+        evaluation,
+        skipKind: null,
+        crossProviderObservation: null,
+      }
+      return finishExternalListDuplicateEvaluation(
+        admin,
+        platform,
+        probe,
+        crossPlatformResult,
+        'external_list_insert_skip_cross_provider_no_hard_skip'
+      )
+    }
+
     const safetyIncoming = buildSoftDedupeSafetyIncoming(platform, probe, normalizedAddress)
     const safety = evaluateSoftDedupeSuppressionSafety(safetyIncoming, evaluation.winner)
     if (!safety.allowSuppress) {
@@ -366,12 +474,19 @@ export async function evaluateDuplicateSkipForExternalListListing(
           safetyBlockedReasons: safety.blockedReasons,
         })
       )
-      return {
-        skip: false,
-        duplicateOfId: null,
-        evaluation,
-        skipKind: null,
-      }
+      return finishExternalListDuplicateEvaluation(
+        admin,
+        platform,
+        probe,
+        {
+          skip: false,
+          duplicateOfId: null,
+          evaluation,
+          skipKind: null,
+          crossProviderObservation: null,
+        },
+        'external_list_insert_skip_safety_blocked'
+      )
     }
 
     const skipKind = 'duplicate_cross_city_page' as const
@@ -402,33 +517,33 @@ export async function evaluateDuplicateSkipForExternalListListing(
         matchedSaleInstanceKey: evaluation.winner.sale_instance_key ?? null,
       })
     )
-    const result: ExternalListDuplicateSkipResult = {
-      skip: true,
-      duplicateOfId: evaluation.winner.id,
-      evaluation,
-      skipKind,
-    }
-    await maybeRecordCrossProviderShadowOnExternalIngest(
+    return finishExternalListDuplicateEvaluation(
+      admin,
       platform,
       probe,
-      result,
+      {
+        skip: true,
+        duplicateOfId: evaluation.winner.id,
+        evaluation,
+        skipKind,
+        crossProviderObservation: null,
+      },
       'external_list_insert_skip'
     )
-    return result
   }
-  const result: ExternalListDuplicateSkipResult = {
-    skip: false,
-    duplicateOfId: null,
-    evaluation: rows.length > 0 ? evaluation : null,
-    skipKind: null,
-  }
-  await maybeRecordCrossProviderShadowOnExternalIngest(
+  return finishExternalListDuplicateEvaluation(
+    admin,
     platform,
     probe,
-    result,
+    {
+      skip: false,
+      duplicateOfId: null,
+      evaluation: rows.length > 0 ? evaluation : null,
+      skipKind: null,
+      crossProviderObservation: null,
+    },
     'external_list_insert_skip'
   )
-  return result
 }
 
 export async function findIngestedSaleMatch(

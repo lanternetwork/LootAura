@@ -22,8 +22,10 @@ export type SoftDedupeSafetyIncoming = {
   normalizedAddress: string | null
   lat: number | null
   lng: number | null
+  sourcePlatform?: string | null
   saleInstanceKey?: string | null
   sourceLocationHash?: string | null
+  canonicalSaleInstanceKey?: string | null
 }
 
 export type SoftDedupeSafetyCandidate = SoftDuplicateCandidateRow & {
@@ -32,6 +34,19 @@ export type SoftDedupeSafetyCandidate = SoftDuplicateCandidateRow & {
   status?: string | null
   failure_reasons?: unknown
   source_location_hash?: string | null
+  canonical_sale_instance_key?: string | null
+}
+
+function platformsDiffer(a: string | null | undefined, b: string | null | undefined): boolean {
+  const pa = a?.trim().toLowerCase() ?? ''
+  const pb = b?.trim().toLowerCase() ?? ''
+  return Boolean(pa && pb && pa !== pb)
+}
+
+function canonicalKeysMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const ka = a?.trim() ?? ''
+  const kb = b?.trim() ?? ''
+  return Boolean(ka && kb && ka === kb)
 }
 
 export type SoftDedupeSuppressionSafetyResult = {
@@ -188,7 +203,15 @@ export function evaluateSoftDedupeSuppressionSafety(
     blockedReasons.push('source_listing_id_materially_different')
   }
 
+  const crossProviderCanonicalConvergence =
+    platformsDiffer(incoming.sourcePlatform, winner.source_platform) &&
+    canonicalKeysMatch(
+      incoming.canonicalSaleInstanceKey,
+      winner.canonical_sale_instance_key
+    )
+
   if (
+    !crossProviderCanonicalConvergence &&
     incoming.saleInstanceKey?.trim() &&
     winner.sale_instance_key?.trim() &&
     incoming.saleInstanceKey.trim() !== winner.sale_instance_key.trim()

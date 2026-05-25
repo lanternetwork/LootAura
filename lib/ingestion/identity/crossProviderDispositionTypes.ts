@@ -41,6 +41,17 @@ export type CrossProviderIngestDispositionInput = {
   candidates: readonly CrossProviderConvergenceCandidate[]
 }
 
+/** Phase C: insert as provider observation linked to primary ingested row. */
+export type CrossProviderObservationInsert = {
+  isDuplicate: boolean
+  duplicateOfId: string
+  primaryIngestedSaleId: string
+  confidence: CrossProviderMatchConfidence
+  disposition: CrossProviderShadowDisposition
+  matchMethod: CrossProviderMatchMethod
+  matchReasons: string[]
+}
+
 export type CrossProviderIngestDispositionResult = {
   confidence: CrossProviderMatchConfidence
   disposition: CrossProviderShadowDisposition

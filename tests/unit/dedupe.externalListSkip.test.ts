@@ -75,6 +75,7 @@ describe('evaluateDuplicateSkipForExternalListListing', () => {
 
     expect(out.skip).toBe(true)
     expect(out.duplicateOfId).toBe('prior-1')
+    expect(out.crossProviderObservation).toBeNull()
   })
 
   it('does not skip when Phase 8 safety blocks weak suppress', async () => {
@@ -116,5 +117,106 @@ describe('evaluateDuplicateSkipForExternalListListing', () => {
 
     expect(out.skip).toBe(false)
     expect(out.duplicateOfId).toBeNull()
+    expect(out.crossProviderObservation).toBeNull()
+  })
+
+  it('inserts cross-provider observation instead of skipping when Phase C enforce is on', async () => {
+    const prior = process.env.INGESTION_CROSS_PROVIDER_INGEST_ENFORCE
+    process.env.INGESTION_CROSS_PROVIDER_INGEST_ENFORCE = 'true'
+    const canonical = 'c'.repeat(64)
+
+    mockFromBase.mockImplementation((_admin: unknown, table: string) => {
+      if (table === 'ingested_sale_soft_dedupe_suppressions') {
+        return { insert: vi.fn().mockResolvedValue({ error: null }) }
+      }
+      if (table === 'cross_provider_sale_instance_shadow') {
+        return { insert: vi.fn().mockResolvedValue({ error: null }) }
+      }
+      return {
+        select: () => ({
+          or: () => ({
+            not: () => ({
+              gte: () => ({
+                lte: () => ({
+                  is: () => ({
+                    order: () => ({
+                      limit: vi.fn().mockResolvedValue({
+                        data: [
+                          {
+                            id: 'ystm-prior',
+                            date_start: '2026-12-01',
+                            date_end: null,
+                            title: 'Holiday sale tools',
+                            source_platform: 'external_page_source',
+                            external_id: '77',
+                            lat: 41.8781,
+                            lng: -87.6298,
+                            image_source_url: null,
+                            canonical_sale_instance_key: canonical,
+                            sale_instance_key: 'external_page_source:ystm:77',
+                          },
+                        ],
+                        error: null,
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+          eq: () => ({
+            not: () => ({
+              gte: () => ({
+                lte: () => ({
+                  order: () => ({
+                    limit: vi.fn().mockResolvedValue({
+                      data: [
+                        {
+                          id: 'ystm-prior',
+                          date_start: '2026-12-01',
+                          date_end: null,
+                          title: 'Holiday sale tools',
+                          source_platform: 'external_page_source',
+                          external_id: '77',
+                          lat: 41.8781,
+                          lng: -87.6298,
+                          image_source_url: null,
+                          canonical_sale_instance_key: canonical,
+                          sale_instance_key: 'external_page_source:ystm:77',
+                        },
+                      ],
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }
+    })
+
+    vi.resetModules()
+    const { evaluateDuplicateSkipForExternalListListing } = await import('@/lib/ingestion/dedupe')
+    const out = await evaluateDuplicateSkipForExternalListListing({} as never, 'estatesales_net', {
+      title: 'Holiday sale tools',
+      city: 'Chicago',
+      state: 'IL',
+      addressRaw: '50 Oak St, Chicago, IL',
+      startDate: '2026-12-02',
+      endDate: null,
+      externalId: '99',
+      imageSourceUrl: null,
+      sourceUrl: 'https://www.estatesales.net/US/Illinois/Chicago/50-Oak-St/9999',
+      lat: 41.8781,
+      lng: -87.6298,
+    })
+
+    process.env.INGESTION_CROSS_PROVIDER_INGEST_ENFORCE = prior
+
+    expect(out.skip).toBe(false)
+    expect(out.crossProviderObservation?.duplicateOfId).toBe('ystm-prior')
+    expect(out.crossProviderObservation?.isDuplicate).toBe(true)
   })
 })

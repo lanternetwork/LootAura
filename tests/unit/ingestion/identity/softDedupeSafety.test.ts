@@ -91,4 +91,21 @@ describe('evaluateSoftDedupeSuppressionSafety', () => {
     expect(out.allowSuppress).toBe(false)
     expect(out.blockedReasons).toContain('sale_instance_key_mismatch')
   })
+
+  it('allows cross-provider suppress when canonical keys match despite sale_instance_key mismatch', () => {
+    const canonical = 'd'.repeat(64)
+    const out = evaluateSoftDedupeSuppressionSafety(
+      incoming({
+        sourcePlatform: 'estatesales_net',
+        saleInstanceKey: 'estatesales_net:4913946',
+        canonicalSaleInstanceKey: canonical,
+      }),
+      winner({
+        source_platform: 'external_page_source',
+        sale_instance_key: 'external_page_source:ystm:77',
+        canonical_sale_instance_key: canonical,
+      })
+    )
+    expect(out.blockedReasons).not.toContain('sale_instance_key_mismatch')
+  })
 })

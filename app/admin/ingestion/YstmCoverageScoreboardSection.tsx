@@ -796,6 +796,12 @@ export default function YstmCoverageScoreboardSection() {
                 ? formatWhen(data.crossProviderShadow.lastRecordedAt)
                 : '—'}
             </p>
+            <p className="mt-2 text-xs text-violet-900">
+              Phase C ingest enforcement (separate flag):{' '}
+              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_INGEST_ENFORCE=true</code>{' '}
+              retains cross-provider rows as <code className="text-[11px]">is_duplicate</code>{' '}
+              observations — publish gate is Phase D.
+            </p>
           </div>
 
           <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">

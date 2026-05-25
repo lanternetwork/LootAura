@@ -800,7 +800,14 @@ export default function YstmCoverageScoreboardSection() {
               Phase C ingest enforcement (separate flag):{' '}
               <code className="text-[11px]">INGESTION_CROSS_PROVIDER_INGEST_ENFORCE=true</code>{' '}
               retains cross-provider rows as <code className="text-[11px]">is_duplicate</code>{' '}
-              observations — publish gate is Phase D.
+              observations.
+            </p>
+            <p className="mt-2 text-xs text-violet-900">
+              Phase D publish link (separate flag):{' '}
+              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_PUBLISH_LINK=true</code>{' '}
+              reuses an existing cross-provider <code className="text-[11px]">published_sale_id</code>{' '}
+              before <code className="text-[11px]">createPublishedSale</code> and propagates to sibling
+              observations.
             </p>
           </div>
 

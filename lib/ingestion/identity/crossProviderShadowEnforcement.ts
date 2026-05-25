@@ -15,3 +15,14 @@ export function isCrossProviderIngestEnforcementEnabled(
 ): boolean {
   return env.INGESTION_CROSS_PROVIDER_INGEST_ENFORCE === 'true'
 }
+
+/**
+ * Phase D: link publish to an existing cross-provider sale instead of creating a second pin.
+ * Opt-in via `INGESTION_CROSS_PROVIDER_PUBLISH_LINK=true`.
+ */
+export function isCrossProviderPublishLinkEnforcementEnabled(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  return env.INGESTION_CROSS_PROVIDER_PUBLISH_ENFORCE === 'true'
+    || env.INGESTION_CROSS_PROVIDER_PUBLISH_LINK === 'true'
+}

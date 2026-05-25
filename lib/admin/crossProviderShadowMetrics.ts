@@ -27,42 +27,57 @@ export async function loadCrossProviderShadowMetrics(
   const since24h = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
   const since7d = new Date(nowMs - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const base24h = () =>
-    fromBase(admin, 'cross_provider_sale_instance_shadow').gte('recorded_at', since24h)
-
-  const { count: shadowRecords24h, error: totalErr } = await base24h().select('id', {
-    count: 'exact',
-    head: true,
-  })
+  const { count: shadowRecords24h, error: totalErr } = await fromBase(
+    admin,
+    'cross_provider_sale_instance_shadow'
+  )
+    .select('id', { count: 'exact', head: true })
+    .gte('recorded_at', since24h)
   if (totalErr) throw new Error(totalErr.message)
 
-  const { count: falseNegativeCount24h, error: fn24Err } = await base24h()
-    .eq('is_false_negative', true)
+  const { count: falseNegativeCount24h, error: fn24Err } = await fromBase(
+    admin,
+    'cross_provider_sale_instance_shadow'
+  )
     .select('id', { count: 'exact', head: true })
+    .gte('recorded_at', since24h)
+    .eq('is_false_negative', true)
   if (fn24Err) throw new Error(fn24Err.message)
 
   const { count: falseNegativeCount7d, error: fn7Err } = await fromBase(
     admin,
     'cross_provider_sale_instance_shadow'
   )
+    .select('id', { count: 'exact', head: true })
     .gte('recorded_at', since7d)
     .eq('is_false_negative', true)
-    .select('id', { count: 'exact', head: true })
   if (fn7Err) throw new Error(fn7Err.message)
 
-  const { count: wouldLinkCount24h, error: linkErr } = await base24h()
-    .eq('disposition', 'would_link_observation')
+  const { count: wouldLinkCount24h, error: linkErr } = await fromBase(
+    admin,
+    'cross_provider_sale_instance_shadow'
+  )
     .select('id', { count: 'exact', head: true })
+    .gte('recorded_at', since24h)
+    .eq('disposition', 'would_link_observation')
   if (linkErr) throw new Error(linkErr.message)
 
-  const { count: wouldSuppressPublishCount24h, error: supErr } = await base24h()
-    .eq('disposition', 'would_suppress_publish')
+  const { count: wouldSuppressPublishCount24h, error: supErr } = await fromBase(
+    admin,
+    'cross_provider_sale_instance_shadow'
+  )
     .select('id', { count: 'exact', head: true })
+    .gte('recorded_at', since24h)
+    .eq('disposition', 'would_suppress_publish')
   if (supErr) throw new Error(supErr.message)
 
-  const { count: wouldPublishDistinctCount24h, error: distErr } = await base24h()
-    .eq('disposition', 'would_publish_distinct')
+  const { count: wouldPublishDistinctCount24h, error: distErr } = await fromBase(
+    admin,
+    'cross_provider_sale_instance_shadow'
+  )
     .select('id', { count: 'exact', head: true })
+    .gte('recorded_at', since24h)
+    .eq('disposition', 'would_publish_distinct')
   if (distErr) throw new Error(distErr.message)
 
   const { data: lastRow, error: lastErr } = await fromBase(

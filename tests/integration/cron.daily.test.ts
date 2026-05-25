@@ -224,6 +224,49 @@ function ingestionCityConfigsExternalPageSourceRowsMock(rows: unknown[]) {
   }
 }
 
+function orchestrationRowForKey(
+  key: string,
+  initial: {
+    cursor?: number
+    lease_owner?: string | null
+    lease_expires_at?: string | null
+  }
+): Record<string, unknown> {
+  if (key === 'esnet_ingest_enabled') {
+    return {
+      key,
+      cursor: 0,
+      provider_ingest_enabled: false,
+      provider_ingest_enabled_at: null,
+      provider_ingest_disabled_at: null,
+      provider_ingest_disabled_reason: null,
+    }
+  }
+  if (key === 'esnet_bootstrap_enabled' || key === 'coverage_bootstrap_estatesales_net') {
+    return {
+      key,
+      cursor: 0,
+      coverage_bootstrap_enabled: false,
+      coverage_bootstrap_enabled_at: null,
+      coverage_bootstrap_disabled_at: null,
+      coverage_bootstrap_disabled_reason: null,
+    }
+  }
+  if (key === 'esnet_ingest_lane') {
+    return {
+      key,
+      cursor: 0,
+      last_completed_at: null,
+    }
+  }
+  return {
+    key: 'external_page_source',
+    cursor: initial.cursor ?? 0,
+    lease_owner: initial.lease_owner ?? null,
+    lease_expires_at: initial.lease_expires_at ?? null,
+  }
+}
+
 function createIngestionOrchestrationStateTableMock(initial: {
   cursor?: number
   lease_owner?: string | null
@@ -237,14 +280,27 @@ function createIngestionOrchestrationStateTableMock(initial: {
   }
   return {
     upsert: vi.fn().mockResolvedValue({ error: null }),
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
+    insert: vi.fn().mockResolvedValue({ error: null }),
+    select: vi.fn(() => {
+      let selectedKey = state.key
+      const buildEqChain = () => ({
+        eq: vi.fn((field: string, value: unknown) => {
+          if (field === 'key' && typeof value === 'string') {
+            selectedKey = value
+          }
+          return buildEqChain()
+        }),
         limit: vi.fn().mockResolvedValue({
-          data: [{ ...state }],
+          data: [orchestrationRowForKey(selectedKey, initial)],
           error: null,
         }),
-      })),
-    })),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: orchestrationRowForKey(selectedKey, initial),
+          error: null,
+        }),
+      })
+      return buildEqChain()
+    }),
     update: vi.fn((payload: Record<string, unknown>) => {
       const conditions: Record<string, unknown> = {}
       const addEq = (field: string, value: unknown) => {

@@ -87,6 +87,7 @@ describe('evaluateCrossProviderObservationForIngest', () => {
         sourceUrl: 'https://www.estatesales.net/KY/Louisville/40222/4913946',
         state: 'KY',
         city: 'Louisville',
+        addressRaw: '1200 bardstown rd',
         title: 'Smith estate sale',
         startDate: '2026-05-30',
         endDate: '2026-05-30',

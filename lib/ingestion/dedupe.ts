@@ -297,8 +297,8 @@ function buildSoftDedupeSafetyIncomingFromProcessed(
     platform,
     {
       sourceUrl,
-      state: processed.state,
-      city: processed.city,
+      state: processed.state ?? '',
+      city: processed.city ?? '',
       title: context?.normalizedTitle ?? '',
       startDate: processed.dateStart,
       endDate: processed.dateEnd,

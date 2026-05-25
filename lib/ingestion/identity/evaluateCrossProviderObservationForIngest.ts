@@ -1,11 +1,13 @@
 import type { ExternalListDuplicateProbe } from '@/lib/ingestion/dedupe'
 import { normalizeTitleForDedupe } from '@/lib/ingestion/duplicateScoring'
 import { buildCrossProviderShadowIncoming } from '@/lib/ingestion/identity/buildCrossProviderShadowIncoming'
-import type { CrossProviderObservationInsert } from '@/lib/ingestion/identity/crossProviderDispositionTypes'
+import type {
+  CrossProviderObservationInsert,
+  CrossProviderShadowDisposition,
+} from '@/lib/ingestion/identity/crossProviderDispositionTypes'
 import { isCrossProviderIngestEnforcementEnabled } from '@/lib/ingestion/identity/crossProviderShadowEnforcement'
 import { fetchCrossProviderConvergenceCandidates } from '@/lib/ingestion/identity/fetchCrossProviderConvergenceCandidates'
 import { resolveCrossProviderIngestDisposition } from '@/lib/ingestion/identity/resolveCrossProviderIngestDisposition'
-import type { CrossProviderShadowDisposition } from '@/lib/ingestion/identity/crossProviderDispositionTypes'
 import { getAdminDb } from '@/lib/supabase/clients'
 
 const OBSERVATION_DISPOSITIONS = new Set<CrossProviderShadowDisposition>([

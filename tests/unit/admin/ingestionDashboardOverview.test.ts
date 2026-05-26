@@ -194,6 +194,23 @@ describe('ingestionDashboardOverview', () => {
     expect(snap.topDropoffCount).toBe(800)
   })
 
+  it('uses providerGeocodeBypassRate for detail-first success priority', () => {
+    const metrics = minimalMetrics({
+      funnel: {
+        ...minimalMetrics().funnel,
+        '24h': {
+          ...minimalMetrics().funnel['24h'],
+          detailFirst: {
+            ...minimalMetrics().funnel['24h'].detailFirst,
+            providerGeocodeBypassRate: 0.5,
+          },
+        },
+      },
+    })
+    const priorities = buildOperationalPriorities(metrics, null)
+    expect(priorities.some((p) => p.issue.includes('Detail-first success rate'))).toBe(true)
+  })
+
   it('marks blocked when duplicate canonical clusters present', () => {
     const health = deriveIngestionHealthState(minimalMetrics(), {
       ok: true,

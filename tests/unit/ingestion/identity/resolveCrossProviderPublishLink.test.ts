@@ -30,8 +30,8 @@ describe('resolveCrossProviderPublishLink', () => {
   })
 
   it('returns null when flag is off', async () => {
-    delete process.env.INGESTION_CROSS_PROVIDER_PUBLISH_LINK
-    delete process.env.INGESTION_CROSS_PROVIDER_PUBLISH_ENFORCE
+    process.env.INGESTION_CROSS_PROVIDER_PUBLISH_LINK = 'false'
+    process.env.INGESTION_CROSS_PROVIDER_ENFORCEMENT = 'false'
     const { resolveCrossProviderPublishLink } = await import(
       '@/lib/ingestion/identity/resolveCrossProviderPublishLink'
     )

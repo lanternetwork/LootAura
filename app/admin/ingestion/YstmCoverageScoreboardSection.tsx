@@ -502,7 +502,8 @@ export default function YstmCoverageScoreboardSection() {
               </p>
               <p className="mt-2 text-xs font-medium text-slate-900">
                 Observability ready: {rolloutGates.observabilityReady ? 'yes' : 'no'} · Enforcement
-                ready: {rolloutGates.enforcementReady ? 'yes' : 'no'}
+                ready: {rolloutGates.enforcementReady ? 'yes' : 'no'} · Cross-provider ready:{' '}
+                {rolloutGates.crossProviderEnforcementReady ? 'yes' : 'no'}
               </p>
               <ul className="mt-3 space-y-2 text-sm">
                 {rolloutGates.gates.map((gate) => (
@@ -797,18 +798,55 @@ export default function YstmCoverageScoreboardSection() {
                 : '—'}
             </p>
             <p className="mt-2 text-xs text-violet-900">
-              Phase C ingest enforcement (separate flag):{' '}
-              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_INGEST_ENFORCE=true</code>{' '}
-              retains cross-provider rows as <code className="text-[11px]">is_duplicate</code>{' '}
-              observations.
+              Phases C–D enforcement default <strong>on</strong> (Phase E). Opt out per feature or use
+              master kill switch{' '}
+              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_ENFORCEMENT=false</code>.
             </p>
-            <p className="mt-2 text-xs text-violet-900">
-              Phase D publish link (separate flag):{' '}
-              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_PUBLISH_LINK=true</code>{' '}
-              reuses an existing cross-provider <code className="text-[11px]">published_sale_id</code>{' '}
-              before <code className="text-[11px]">createPublishedSale</code> and propagates to sibling
-              observations.
+          </div>
+
+          <div className="mb-6 rounded-md border border-fuchsia-200 bg-fuchsia-50 p-4">
+            <h3 className="text-sm font-semibold text-fuchsia-950">
+              Cross-provider convergence SLO (Phase E)
+            </h3>
+            <p className="mt-1 text-xs text-fuchsia-900">
+              Operational invariant: no two published sales may share the same{' '}
+              <code className="text-[11px]">canonical_sale_instance_key</code> across providers. Scoreboard
+              records one UTC snapshot per day for the 14-day hold.
             </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Duplicate canonical clusters"
+                value={data.crossProviderConvergence.duplicatePublishedCanonicalClusters}
+                highlight={data.crossProviderConvergence.duplicatePublishedCanonicalClusters > 0}
+              />
+              <Metric
+                label="SLO streak (zero-duplicate days)"
+                value={`${data.crossProviderConvergence.sloAttainment.consecutiveZeroDuplicateDays} / ${data.crossProviderConvergence.sloAttainment.requiredConsecutiveDays}`}
+                highlight={!data.crossProviderConvergence.sloAttainment.programComplete}
+              />
+              <Metric
+                label="Publish link rate (24h)"
+                value={
+                  data.crossProviderConvergence.publishLinkRate24h == null
+                    ? '—'
+                    : `${(data.crossProviderConvergence.publishLinkRate24h * 100).toFixed(1)}%`
+                }
+              />
+              <Metric
+                label="Ambiguous share (7d)"
+                value={
+                  data.crossProviderConvergence.ambiguousDispositionShare7d == null
+                    ? '—'
+                    : `${(data.crossProviderConvergence.ambiguousDispositionShare7d * 100).toFixed(1)}%`
+                }
+              />
+            </div>
+            {rolloutGates && (
+              <p className="mt-3 text-xs text-fuchsia-950">
+                Cross-provider enforcement ready:{' '}
+                {rolloutGates.crossProviderEnforcementReady ? 'yes' : 'no'}
+              </p>
+            )}
           </div>
 
           <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">

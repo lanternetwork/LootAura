@@ -167,6 +167,21 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       wouldPublishDistinctCount24h: 0,
       lastRecordedAt: null,
     },
+    crossProviderConvergence: {
+      duplicatePublishedCanonicalClusters: 0,
+      observationPublished24h: 0,
+      crossProviderShadowMatches24h: 0,
+      publishLinkRate24h: null,
+      ambiguousDispositionCount7d: 0,
+      ambiguousDispositionShare7d: null,
+      sloAttainment: {
+        requiredConsecutiveDays: 14,
+        consecutiveZeroDuplicateDays: 0,
+        latestDayQualifies: false,
+        programComplete: false,
+      },
+      sloTrend: [],
+    },
     sourceUrlAlias: { totalAliasRows: 0 },
     saleInstanceShadowReplay: {
       generatedAt: '2026-05-22T00:00:00Z',

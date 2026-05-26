@@ -460,6 +460,21 @@ describe('buildIngestionDiagnostics', () => {
         wouldPublishDistinctCount24h: 0,
         lastRecordedAt: null,
       },
+      crossProviderConvergence: {
+        duplicatePublishedCanonicalClusters: 0,
+        observationPublished24h: 0,
+        crossProviderShadowMatches24h: 0,
+        publishLinkRate24h: null,
+        ambiguousDispositionCount7d: 0,
+        ambiguousDispositionShare7d: null,
+        sloAttainment: {
+          requiredConsecutiveDays: 14,
+          consecutiveZeroDuplicateDays: 0,
+          latestDayQualifies: false,
+          programComplete: false,
+        },
+        sloTrend: [],
+      },
       canonicalSaleInstance: {
         externalRowsWithCanonicalKey: 100,
         externalActiveRowsWithCanonicalKey: 90,

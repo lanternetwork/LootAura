@@ -516,6 +516,27 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 - If `coveragePct` stays null with `valid_active_v = 0`, fix migrations/cron before tuning missing-ingest.
 - Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days (see Phase 7 below).
 
+### Cross-provider sale convergence (Phases A–E)
+
+**Goal:** One visible published sale per real-world event across YSTM (`external_page_source`) and EstateSales.NET (`estatesales_net`), with every provider observation retained for reconciliation.
+
+**Migrations:** `212_canonical_sale_instance_key_phase_a.sql`, `213_cross_provider_sale_instance_shadow_phase_b.sql`, `214_cross_provider_convergence_slo_phase_e.sql`.
+
+**Phase E (default-on):** Shadow, ingest observation retention, and publish-link enforcement are **enabled by default** after deploy. Opt out without redeploy:
+
+| Kill switch | Effect |
+|-------------|--------|
+| `INGESTION_CROSS_PROVIDER_ENFORCEMENT=false` | Disables shadow + ingest + publish enforcement |
+| `INGESTION_CROSS_PROVIDER_SHADOW=false` | Shadow dispositions only |
+| `INGESTION_CROSS_PROVIDER_INGEST_ENFORCE=false` | Ingest observation linkage only |
+| `INGESTION_CROSS_PROVIDER_PUBLISH_LINK=false` | Publish-link gate only |
+
+**Rollout order:** (1) Apply migrations 212–214. (2) Backfill canonical keys until scoreboard **Canonical sale key coverage ≥ 95%**. (3) Hold **0 shadow false negatives (7d)** while shadow runs. (4) Confirm **Cross-provider enforcement ready** on the scoreboard (includes **14 UTC days** at zero duplicate canonical publish clusters). (5) Leave enforcement default-on; use env opt-out only for rollback.
+
+**Operational SLO query (must stay empty):** No `canonical_sale_instance_key` may map to more than one distinct `published_sale_id` on published external ingested rows. The scoreboard field `crossProviderConvergence.duplicatePublishedCanonicalClusters` must remain **0**.
+
+**Telemetry:** `ingestion.cross_provider.shadow_disposition`, `ingestion.cross_provider.observation_insert`, `ingestion.cross_provider.publish_linked` (`lib/observability/events.ts`).
+
 **Phase 7 — SLO attainment and steady state (G4)**
 
 - **Program KPI:** `coveragePct ≥ 90` on the admin scoreboard (`sloAttainment` tracks consecutive UTC days at target).

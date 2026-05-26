@@ -98,6 +98,11 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
           }
         case 'cross_provider_sale_instance_shadow':
           return thenableQuery({ data: [], count: 0 })
+        case 'cross_provider_convergence_slo_daily':
+          return {
+            ...thenableQuery({ data: [] }),
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          }
         default:
           return thenableQuery({ data: [] })
       }

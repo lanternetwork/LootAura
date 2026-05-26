@@ -215,4 +215,24 @@ describe('ingestionDashboardOverview', () => {
     const priorities = buildOperationalPriorities(metrics, null)
     expect(priorities.some((p) => p.issue.includes('publish_failed'))).toBe(true)
   })
+
+  it('uses providerGeocodeBypassRate for detail-first priority when present', () => {
+    const metrics = minimalMetrics({
+      funnel: {
+        ...minimalMetrics().funnel,
+        '24h': {
+          ...minimalMetrics().funnel['24h'],
+          detailFirst: {
+            ...minimalMetrics().funnel['24h'].detailFirst,
+            attempted: 100,
+            succeeded: 99,
+            providerGeocodeBypassRate: 0.5,
+          },
+        },
+      },
+    })
+    const priorities = buildOperationalPriorities(metrics, null)
+    expect(priorities.some((p) => p.issue.includes('Detail-first success rate'))).toBe(true)
+    expect(priorities.some((p) => p.issue.includes('50.0%'))).toBe(true)
+  })
 })

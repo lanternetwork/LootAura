@@ -238,12 +238,12 @@ export function buildOperationalPriorities(
 
   const df = metrics.funnel['24h'].detailFirst
   if (df.attempted >= 20) {
-    const successRate = df.succeeded / df.attempted
+    const successRate = df.providerGeocodeBypassRate ?? df.succeeded / df.attempted
     if (successRate < DETAIL_FIRST_SUCCESS_RATE_TARGET) {
       priorities.push({
         severity: 'warning',
-        issue: `Parser success rate ${(successRate * 100).toFixed(1)}% below target`,
-        suggestedAction: 'Inspect Debug → Parser health fallback reasons.',
+        issue: `Detail-first success rate ${(successRate * 100).toFixed(1)}% below target`,
+        suggestedAction: 'Inspect Debug → Parser health and fallback reasons.',
       })
     }
   }

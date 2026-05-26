@@ -1,3 +1,4 @@
+import { countDuplicatePublishedCanonicalClusters } from '@/lib/admin/duplicateCanonicalPublishClusters'
 import { EXTERNAL_INGEST_PLATFORMS } from '@/lib/ingestion/identity/backfillCanonicalSaleInstanceKey'
 import {
   computeCrossProviderConvergenceSloAttainment,
@@ -41,54 +42,7 @@ function utcDayKey(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 10)
 }
 
-/**
- * Operational SLO: canonical keys with more than one distinct published_sale_id across external ingests.
- */
-export async function countDuplicatePublishedCanonicalClusters(
-  admin: ReturnType<typeof getAdminDb>
-): Promise<number> {
-  const platforms = [...EXTERNAL_INGEST_PLATFORMS]
-  const pageSize = 500
-  let from = 0
-  const saleIdsByCanonical = new Map<string, Set<string>>()
-
-  for (;;) {
-    const { data, error } = await fromBase(admin, 'ingested_sales')
-      .select('canonical_sale_instance_key, published_sale_id')
-      .in('source_platform', platforms)
-      .eq('status', 'published')
-      .not('canonical_sale_instance_key', 'is', null)
-      .not('published_sale_id', 'is', null)
-      .is('superseded_by_ingested_sale_id', null)
-      .range(from, from + pageSize - 1)
-    if (error) throw new Error(error.message)
-
-    const chunk = data ?? []
-    for (const row of chunk as Array<{
-      canonical_sale_instance_key?: string | null
-      published_sale_id?: string | null
-    }>) {
-      const key = row.canonical_sale_instance_key?.trim()
-      const saleId = row.published_sale_id?.trim()
-      if (!key || !saleId) continue
-      let set = saleIdsByCanonical.get(key)
-      if (!set) {
-        set = new Set()
-        saleIdsByCanonical.set(key, set)
-      }
-      set.add(saleId)
-    }
-
-    if (chunk.length < pageSize) break
-    from += pageSize
-  }
-
-  let clusters = 0
-  for (const saleIds of saleIdsByCanonical.values()) {
-    if (saleIds.size > 1) clusters += 1
-  }
-  return clusters
-}
+export { countDuplicatePublishedCanonicalClusters } from '@/lib/admin/duplicateCanonicalPublishClusters'
 
 async function loadSloTrend(
   admin: ReturnType<typeof getAdminDb>,

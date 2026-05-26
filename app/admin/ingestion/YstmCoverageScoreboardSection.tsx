@@ -73,7 +73,9 @@ function formatWhen(iso: string | null): string {
   }
 }
 
-function Metric(props: { label: string; value: number; highlight?: boolean }) {
+function Metric(props: { label: string; value: number | string; highlight?: boolean }) {
+  const display =
+    typeof props.value === 'number' ? props.value.toLocaleString() : props.value
   return (
     <div
       className={
@@ -83,7 +85,7 @@ function Metric(props: { label: string; value: number; highlight?: boolean }) {
       }
     >
       <p className="text-xs text-slate-600">{props.label}</p>
-      <p className="text-lg font-semibold tabular-nums">{props.value.toLocaleString()}</p>
+      <p className="text-lg font-semibold tabular-nums">{display}</p>
     </div>
   )
 }

@@ -1,0 +1,123 @@
+import { isCrossProviderPublishLinkEnforcementEnabled } from '@/lib/ingestion/identity/crossProviderShadowEnforcement'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import { logger } from '@/lib/log'
+
+export type CrossProviderPublishLink = {
+  publishedSaleId: string
+  primaryIngestedSaleId: string
+  matchedIngestedSaleId: string
+  matchMethod: 'canonical_published_sibling'
+}
+
+type PublishLinkCandidate = {
+  id: string
+  source_platform: string
+  published_sale_id: string | null
+  is_duplicate: boolean
+}
+
+export type CrossProviderPublishLinkInput = {
+  id: string
+  source_platform: string
+  canonical_sale_instance_key?: string | null
+}
+
+async function saleExistsForId(saleId: string): Promise<boolean> {
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, 'sales')
+    .select('id')
+    .eq('id', saleId)
+    .limit(1)
+  if (error) {
+    logger.warn('cross_provider_publish_link: sale lookup failed', {
+      component: 'ingestion/cross_provider_publish_link',
+      saleId,
+      message: error.message,
+    })
+    return false
+  }
+  return Array.isArray(data) && data.length > 0
+}
+
+function pickPublishedSibling(
+  candidates: readonly PublishLinkCandidate[]
+): { sibling: PublishLinkCandidate; primaryIngestedSaleId: string } | null {
+  const withSale = candidates.filter((c) => c.published_sale_id?.trim())
+  if (withSale.length === 0) return null
+
+  const sorted = withSale.slice().sort((a, b) => {
+    if (a.is_duplicate !== b.is_duplicate) {
+      return a.is_duplicate ? 1 : -1
+    }
+    return a.id.localeCompare(b.id)
+  })
+  const sibling = sorted[0]
+  const primaryRow = sorted.find((c) => !c.is_duplicate) ?? sibling
+  return { sibling, primaryIngestedSaleId: primaryRow.id }
+}
+
+/**
+ * Phase D belt-and-suspenders: reuse an already-published cross-provider sibling sale.
+ */
+export async function resolveCrossProviderPublishLink(
+  record: CrossProviderPublishLinkInput
+): Promise<CrossProviderPublishLink | null> {
+  if (!isCrossProviderPublishLinkEnforcementEnabled()) {
+    return null
+  }
+
+  const canonicalKey = record.canonical_sale_instance_key?.trim() ?? ''
+  if (!canonicalKey) {
+    return null
+  }
+
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, 'ingested_sales')
+    .select('id, source_platform, published_sale_id, is_duplicate')
+    .eq('canonical_sale_instance_key', canonicalKey)
+    .neq('id', record.id)
+    .neq('source_platform', record.source_platform)
+    .not('published_sale_id', 'is', null)
+    .is('superseded_by_ingested_sale_id', null)
+    .order('is_duplicate', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(20)
+
+  if (error) {
+    logger.warn('cross_provider_publish_link: sibling query failed', {
+      component: 'ingestion/cross_provider_publish_link',
+      rowId: record.id,
+      message: error.message,
+    })
+    return null
+  }
+
+  const rows = (data ?? []) as PublishLinkCandidate[]
+  const picked = pickPublishedSibling(rows)
+  if (!picked?.sibling.published_sale_id) {
+    return null
+  }
+
+  const saleId = picked.sibling.published_sale_id.trim()
+  if (!saleId) {
+    return null
+  }
+
+  const exists = await saleExistsForId(saleId)
+  if (!exists) {
+    logger.warn('cross_provider_publish_link: sibling published_sale_id missing sales row', {
+      component: 'ingestion/cross_provider_publish_link',
+      rowId: record.id,
+      matchedIngestedSaleId: picked.sibling.id,
+      saleId,
+    })
+    return null
+  }
+
+  return {
+    publishedSaleId: saleId,
+    primaryIngestedSaleId: picked.primaryIngestedSaleId,
+    matchedIngestedSaleId: picked.sibling.id,
+    matchMethod: 'canonical_published_sibling',
+  }
+}

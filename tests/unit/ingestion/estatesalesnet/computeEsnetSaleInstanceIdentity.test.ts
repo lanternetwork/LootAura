@@ -22,5 +22,6 @@ describe('computeEsnetSaleInstanceIdentity', () => {
     expect(fields?.source_listing_id).toBe('4913946')
     expect(fields?.sale_instance_key).toContain('estatesales_net:')
     expect(fields?.sale_instance_key).toContain('4913946')
+    expect(fields?.canonical_sale_instance_key).toHaveLength(64)
   })
 })

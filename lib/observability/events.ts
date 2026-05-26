@@ -43,6 +43,11 @@ export const ObservabilityEvents = {
     saleInstanceClassified: 'ingestion.sale_instance.classified',
     saleInstanceShadowCompared: 'ingestion.sale_instance.shadow_compared',
     saleInstanceIdentityBackfillBatch: 'ingestion.sale_instance.identity_backfill_batch',
+    canonicalSaleInstanceKeyPersisted: 'ingestion.canonical_sale_instance.persisted',
+    canonicalSaleInstanceKeyBackfillBatch: 'ingestion.canonical_sale_instance.backfill_batch',
+    crossProviderShadowDisposition: 'ingestion.cross_provider.shadow_disposition',
+    crossProviderObservationInsert: 'ingestion.cross_provider.observation_insert',
+    crossProviderPublishLinked: 'ingestion.cross_provider.publish_linked',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

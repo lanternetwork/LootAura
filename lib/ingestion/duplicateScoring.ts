@@ -73,6 +73,7 @@ export type SoftDuplicateCandidateRow = {
   sale_instance_key?: string | null
   source_listing_id?: string | null
   source_location_hash?: string | null
+  canonical_sale_instance_key?: string | null
   status?: string | null
   failure_reasons?: unknown
 }

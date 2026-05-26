@@ -1302,7 +1302,10 @@ export async function persistExternalPageSource(
     const insertListingLegacy = async (
       listing: ExternalPageSourceListing,
       rowPayload: Record<string, unknown>,
-      detailPageHtml?: string | null
+      detailPageHtml?: string | null,
+      ingestOptions?: {
+        crossProviderObservation?: import('@/lib/ingestion/identity/crossProviderDispositionTypes').CrossProviderObservationInsert | null
+      }
     ) => {
       const ingestDiag = (listing.rawPayload.ingestionDiagnostics ?? {}) as GatedListingDiagnostics & {
         chosenAddressSource?: string
@@ -1460,8 +1463,8 @@ export async function persistExternalPageSource(
             (listing.rawPayload as { detailPageParsed?: boolean }).detailPageParsed === true,
         }),
         parse_confidence: insertStatus === 'needs_geocode' ? 'high' : 'low',
-        is_duplicate: false,
-        duplicate_of: null,
+        is_duplicate: ingestOptions?.crossProviderObservation?.isDuplicate ?? false,
+        duplicate_of: ingestOptions?.crossProviderObservation?.duplicateOfId ?? null,
         ...addressLifecycleFieldsForDb(addressLifecycle),
         ...spatialInsertFields,
         ...saleInstanceIdentityDbColumns(saleInstanceIdentity),
@@ -1836,6 +1839,9 @@ export async function persistExternalPageSource(
         continue
       }
 
+      let crossProviderObservation:
+        | import('@/lib/ingestion/identity/crossProviderDispositionTypes').CrossProviderObservationInsert
+        | null = null
       if (!shouldDeferListSeedSoftDedupe(listing.sourceUrl)) {
         const listNativeCoords = nativeCoordsForSoftDedupeProbe(listing)
         const scoredDup = await evaluatePostDetailEnrichedDuplicateSkip(admin, platform, {
@@ -1860,6 +1866,7 @@ export async function persistExternalPageSource(
           )
           continue
         }
+        crossProviderObservation = scoredDup.crossProviderObservation
       }
 
       if (
@@ -1875,7 +1882,9 @@ export async function persistExternalPageSource(
         continue
       }
 
-      await insertListingLegacy(listing, rowPayload)
+      await insertListingLegacy(listing, rowPayload, undefined, {
+        crossProviderObservation,
+      })
     }
 
     if (esnetDetailCandidates.length > 0) {
@@ -1903,7 +1912,33 @@ export async function persistExternalPageSource(
         const detailHtml =
           'detailPageHtml' in result && result.detailPageHtml ? result.detailPageHtml : undefined
 
-        await insertListingLegacy(listingToInsert, rowPayload, detailHtml)
+        const esnetNativeCoords = nativeCoordsForSoftDedupeProbe(listingToInsert)
+        const esnetDup = await evaluatePostDetailEnrichedDuplicateSkip(admin, platform, {
+          title: listingToInsert.title,
+          city: listingToInsert.city,
+          state: listingToInsert.state,
+          addressRaw: listingToInsert.addressRaw,
+          startDate: listingToInsert.startDate ?? null,
+          endDate: listingToInsert.endDate ?? null,
+          externalId: (listingToInsert.rawPayload.externalId as string | null) ?? null,
+          imageSourceUrl: listingToInsert.imageSourceUrl,
+          sourceUrl: listingToInsert.sourceUrl,
+          lat: esnetNativeCoords.lat,
+          lng: esnetNativeCoords.lng,
+        })
+        if (esnetDup.skip) {
+          summary.duplicateScoredSkipped += 1
+          bumpDuplicateKind(duplicateKinds, esnetDup.skipKind ?? 'duplicate_cross_city_page')
+          recordCrawlSkip(
+            classifySoftDedupeListSkip(esnetDup.evaluation ?? { suppress: true }),
+            false
+          )
+          return
+        }
+
+        await insertListingLegacy(listingToInsert, rowPayload, detailHtml, {
+          crossProviderObservation: esnetDup.crossProviderObservation,
+        })
         summary.inserted += 1
         summary.freshInserted += 1
       })
@@ -1981,7 +2016,9 @@ export async function persistExternalPageSource(
           recordCrawlSkip(classifyDetailFirstFallbackSkip(result.reason), false)
         }
 
-        await insertListingLegacy(fallbackListing, candidate.rowPayload, fallbackDetailHtml)
+        await insertListingLegacy(fallbackListing, candidate.rowPayload, fallbackDetailHtml, {
+          crossProviderObservation: postDetailDup.crossProviderObservation,
+        })
       })
     }
   }

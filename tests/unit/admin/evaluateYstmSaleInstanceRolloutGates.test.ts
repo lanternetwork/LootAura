@@ -126,6 +126,40 @@ function minimalCoverage(
       keyCollisionGroups: 0,
       sampleCollisionKeys: [],
     },
+    canonicalSaleInstance: {
+      externalRowsWithCanonicalKey: 180,
+      externalActiveRowsWithCanonicalKey: 175,
+      externalPublishedActiveWithCanonicalKey: 150,
+      externalActiveEligible: 195,
+      canonicalCoveragePct: 96,
+      canonicalCollisionGroups: 2,
+      crossProviderCanonicalGroups: 1,
+      sampleCrossProviderCanonicalKeys: [],
+    },
+    crossProviderShadow: {
+      shadowRecords24h: 12,
+      falseNegativeCount24h: 0,
+      falseNegativeCount7d: 0,
+      wouldLinkCount24h: 4,
+      wouldSuppressPublishCount24h: 2,
+      wouldPublishDistinctCount24h: 6,
+      lastRecordedAt: '2026-05-22T00:00:00Z',
+    },
+    crossProviderConvergence: {
+      duplicatePublishedCanonicalClusters: 0,
+      observationPublished24h: 4,
+      crossProviderShadowMatches24h: 4,
+      publishLinkRate24h: 1,
+      ambiguousDispositionCount7d: 0,
+      ambiguousDispositionShare7d: 0,
+      sloAttainment: {
+        requiredConsecutiveDays: 14,
+        consecutiveZeroDuplicateDays: 14,
+        latestDayQualifies: true,
+        programComplete: true,
+      },
+      sloTrend: [],
+    },
     sourceUrlAlias: { totalAliasRows: 50 },
     saleInstanceShadowReplay: {
       generatedAt: '2026-05-22T00:00:00Z',
@@ -189,6 +223,7 @@ describe('evaluateYstmSaleInstanceRolloutGates', () => {
     const snap = evaluateYstmSaleInstanceRolloutGates(minimalCoverage())
     expect(snap.observabilityReady).toBe(true)
     expect(snap.enforcementReady).toBe(true)
+    expect(snap.crossProviderEnforcementReady).toBe(true)
     expect(snap.gates.find((g) => g.id === 'shadow_no_divergence')?.status).toBe('pass')
   })
 
@@ -203,6 +238,27 @@ describe('evaluateYstmSaleInstanceRolloutGates', () => {
     )
     expect(snap.enforcementReady).toBe(false)
     expect(snap.gates.find((g) => g.id === 'shadow_no_divergence')?.status).toBe('fail')
+  })
+
+  it('fails cross-provider enforcement when duplicate canonical publishes exist', () => {
+    const snap = evaluateYstmSaleInstanceRolloutGates(
+      minimalCoverage({
+        crossProviderConvergence: {
+          ...minimalCoverage().crossProviderConvergence,
+          duplicatePublishedCanonicalClusters: 2,
+          sloAttainment: {
+            requiredConsecutiveDays: 14,
+            consecutiveZeroDuplicateDays: 0,
+            latestDayQualifies: false,
+            programComplete: false,
+          },
+        },
+      })
+    )
+    expect(snap.crossProviderEnforcementReady).toBe(false)
+    expect(snap.gates.find((g) => g.id === 'cross_provider_duplicate_canonical_publish')?.status).toBe(
+      'fail'
+    )
   })
 
   it('fails duplicate-visible SLO when cluster rate exceeds threshold', () => {

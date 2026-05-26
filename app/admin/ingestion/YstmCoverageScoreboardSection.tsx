@@ -38,6 +38,22 @@ type BackfillUiState =
   | { kind: 'done'; summary: BackfillSummary; at: string }
   | { kind: 'error'; message: string; at: string }
 
+type CanonicalBackfillSummary = {
+  processed: number
+  rowsBackfilled: number
+  skipped: number
+  missingCanonicalInputs: number
+  canonicalCollisionGroups: number
+  dryRun: boolean
+  lastProcessedId: string | null
+}
+
+type CanonicalBackfillUiState =
+  | { kind: 'idle' }
+  | { kind: 'running' }
+  | { kind: 'done'; summary: CanonicalBackfillSummary; at: string }
+  | { kind: 'error'; message: string; at: string }
+
 type BootstrapUiState =
   | { kind: 'idle' }
   | { kind: 'running' }
@@ -57,7 +73,9 @@ function formatWhen(iso: string | null): string {
   }
 }
 
-function Metric(props: { label: string; value: number; highlight?: boolean }) {
+function Metric(props: { label: string; value: number | string; highlight?: boolean }) {
+  const display =
+    typeof props.value === 'number' ? props.value.toLocaleString() : props.value
   return (
     <div
       className={
@@ -67,7 +85,7 @@ function Metric(props: { label: string; value: number; highlight?: boolean }) {
       }
     >
       <p className="text-xs text-slate-600">{props.label}</p>
-      <p className="text-lg font-semibold tabular-nums">{props.value.toLocaleString()}</p>
+      <p className="text-lg font-semibold tabular-nums">{display}</p>
     </div>
   )
 }
@@ -77,6 +95,9 @@ export default function YstmCoverageScoreboardSection() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [backfillUi, setBackfillUi] = useState<BackfillUiState>({ kind: 'idle' })
+  const [canonicalBackfillUi, setCanonicalBackfillUi] = useState<CanonicalBackfillUiState>({
+    kind: 'idle',
+  })
   const [bootstrapUi, setBootstrapUi] = useState<BootstrapUiState>({ kind: 'idle' })
   const [esnetBootstrapUi, setEsnetBootstrapUi] = useState<BootstrapUiState>({ kind: 'idle' })
   const [esnetIngestUi, setEsnetIngestUi] = useState<BootstrapUiState>({ kind: 'idle' })
@@ -133,6 +154,44 @@ export default function YstmCoverageScoreboardSection() {
       await load()
     } catch (e) {
       setBackfillUi({
+        kind: 'error',
+        message: e instanceof Error ? e.message : String(e),
+        at: new Date().toISOString(),
+      })
+    }
+  }, [load])
+
+  const runCanonicalBackfill = useCallback(async () => {
+    setCanonicalBackfillUi({ kind: 'running' })
+    try {
+      const res = await fetch('/api/admin/ingested-sales/backfill-canonical-sale-instance-key', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchSize: BACKFILL_BATCH_SIZE,
+          dryRun: false,
+          maxRows: BACKFILL_MAX_ROWS,
+        }),
+      })
+      const json = (await res.json()) as {
+        ok?: boolean
+        summary?: CanonicalBackfillSummary
+        message?: string
+        code?: string
+      }
+      if (!res.ok || !json.ok || !json.summary) {
+        const detail =
+          json.message ||
+          (typeof json.code === 'string' ? json.code : null) ||
+          res.statusText ||
+          `HTTP ${res.status}`
+        throw new Error(detail)
+      }
+      setCanonicalBackfillUi({ kind: 'done', summary: json.summary, at: new Date().toISOString() })
+      await load()
+    } catch (e) {
+      setCanonicalBackfillUi({
         kind: 'error',
         message: e instanceof Error ? e.message : String(e),
         at: new Date().toISOString(),
@@ -445,7 +504,8 @@ export default function YstmCoverageScoreboardSection() {
               </p>
               <p className="mt-2 text-xs font-medium text-slate-900">
                 Observability ready: {rolloutGates.observabilityReady ? 'yes' : 'no'} · Enforcement
-                ready: {rolloutGates.enforcementReady ? 'yes' : 'no'}
+                ready: {rolloutGates.enforcementReady ? 'yes' : 'no'} · Cross-provider ready:{' '}
+                {rolloutGates.crossProviderEnforcementReady ? 'yes' : 'no'}
               </p>
               <ul className="mt-3 space-y-2 text-sm">
                 {rolloutGates.gates.map((gate) => (
@@ -631,6 +691,164 @@ export default function YstmCoverageScoreboardSection() {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="mb-6 rounded-md border border-indigo-200 bg-indigo-50 p-4">
+            <h3 className="text-sm font-semibold text-indigo-950">
+              Cross-provider canonical sale key (Phase A)
+            </h3>
+            <p className="mt-1 text-xs text-indigo-900">
+              Persists <code className="text-[11px]">canonical_sale_instance_key</code> on YSTM and
+              ES.net ingested rows for convergence telemetry. No ingest or publish behavior change yet.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Active coverage %"
+                value={
+                  data.canonicalSaleInstance.canonicalCoveragePct != null
+                    ? Math.round(data.canonicalSaleInstance.canonicalCoveragePct)
+                    : 0
+                }
+                highlight={
+                  data.canonicalSaleInstance.canonicalCoveragePct != null &&
+                  data.canonicalSaleInstance.canonicalCoveragePct < 95
+                }
+              />
+              <Metric
+                label="Active with canonical key"
+                value={data.canonicalSaleInstance.externalActiveRowsWithCanonicalKey}
+              />
+              <Metric
+                label="Cross-provider groups"
+                value={data.canonicalSaleInstance.crossProviderCanonicalGroups}
+                highlight={data.canonicalSaleInstance.crossProviderCanonicalGroups > 0}
+              />
+              <Metric
+                label="Canonical collision groups"
+                value={data.canonicalSaleInstance.canonicalCollisionGroups}
+              />
+            </div>
+            <div className="mt-4 rounded-md border border-indigo-300 bg-white p-3">
+              <p className="text-xs text-indigo-950">
+                Phase A exit: ≥95% of active external rows have a canonical key (
+                {data.canonicalSaleInstance.canonicalCoveragePct != null
+                  ? `${data.canonicalSaleInstance.canonicalCoveragePct.toFixed(1)}% now`
+                  : '—'}
+                ). Cross-provider groups are expected overlap signal (not duplicate publishes yet).
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void runCanonicalBackfill()}
+                  disabled={canonicalBackfillUi.kind === 'running'}
+                  className="rounded-md border border-indigo-600 bg-indigo-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {canonicalBackfillUi.kind === 'running'
+                    ? 'Running canonical backfill…'
+                    : 'Run canonical key backfill'}
+                </button>
+              </div>
+              {canonicalBackfillUi.kind === 'done' && (
+                <div className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-950">
+                  <p className="font-medium">
+                    Canonical backfill completed ({formatWhen(canonicalBackfillUi.at)})
+                  </p>
+                  <p className="mt-1">
+                    Processed {canonicalBackfillUi.summary.processed.toLocaleString()} · backfilled{' '}
+                    {canonicalBackfillUi.summary.rowsBackfilled.toLocaleString()} · skipped{' '}
+                    {canonicalBackfillUi.summary.skipped.toLocaleString()}
+                  </p>
+                </div>
+              )}
+              {canonicalBackfillUi.kind === 'error' && (
+                <div className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900">
+                  <p className="font-medium">
+                    Canonical backfill failed ({formatWhen(canonicalBackfillUi.at)})
+                  </p>
+                  <p className="mt-1">{canonicalBackfillUi.message}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
+            <h3 className="text-sm font-semibold text-violet-950">
+              Cross-provider shadow convergence (Phase B)
+            </h3>
+            <p className="mt-1 text-xs text-violet-900">
+              Records would-link vs would-publish-distinct on external ingest when{' '}
+              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_SHADOW=true</code>. No ingest or
+              publish behavior change.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Shadow rows (24h)" value={data.crossProviderShadow.shadowRecords24h} />
+              <Metric
+                label="False negatives (7d)"
+                value={data.crossProviderShadow.falseNegativeCount7d}
+                highlight={data.crossProviderShadow.falseNegativeCount7d > 0}
+              />
+              <Metric label="Would link (24h)" value={data.crossProviderShadow.wouldLinkCount24h} />
+              <Metric
+                label="Would publish distinct (24h)"
+                value={data.crossProviderShadow.wouldPublishDistinctCount24h}
+              />
+            </div>
+            <p className="mt-3 text-xs text-violet-950">
+              Phase B exit: 0 false-negative shadow rows for 7 days. Last shadow:{' '}
+              {data.crossProviderShadow.lastRecordedAt
+                ? formatWhen(data.crossProviderShadow.lastRecordedAt)
+                : '—'}
+            </p>
+            <p className="mt-2 text-xs text-violet-900">
+              Phases C–D enforcement default <strong>on</strong> (Phase E). Opt out per feature or use
+              master kill switch{' '}
+              <code className="text-[11px]">INGESTION_CROSS_PROVIDER_ENFORCEMENT=false</code>.
+            </p>
+          </div>
+
+          <div className="mb-6 rounded-md border border-fuchsia-200 bg-fuchsia-50 p-4">
+            <h3 className="text-sm font-semibold text-fuchsia-950">
+              Cross-provider convergence SLO (Phase E)
+            </h3>
+            <p className="mt-1 text-xs text-fuchsia-900">
+              Operational invariant: no two published sales may share the same{' '}
+              <code className="text-[11px]">canonical_sale_instance_key</code> across providers. Scoreboard
+              records one UTC snapshot per day for the 14-day hold.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Duplicate canonical clusters"
+                value={data.crossProviderConvergence.duplicatePublishedCanonicalClusters}
+                highlight={data.crossProviderConvergence.duplicatePublishedCanonicalClusters > 0}
+              />
+              <Metric
+                label="SLO streak (zero-duplicate days)"
+                value={`${data.crossProviderConvergence.sloAttainment.consecutiveZeroDuplicateDays} / ${data.crossProviderConvergence.sloAttainment.requiredConsecutiveDays}`}
+                highlight={!data.crossProviderConvergence.sloAttainment.programComplete}
+              />
+              <Metric
+                label="Publish link rate (24h)"
+                value={
+                  data.crossProviderConvergence.publishLinkRate24h == null
+                    ? '—'
+                    : `${(data.crossProviderConvergence.publishLinkRate24h * 100).toFixed(1)}%`
+                }
+              />
+              <Metric
+                label="Ambiguous share (7d)"
+                value={
+                  data.crossProviderConvergence.ambiguousDispositionShare7d == null
+                    ? '—'
+                    : `${(data.crossProviderConvergence.ambiguousDispositionShare7d * 100).toFixed(1)}%`
+                }
+              />
+            </div>
+            {rolloutGates && (
+              <p className="mt-3 text-xs text-fuchsia-950">
+                Cross-provider enforcement ready:{' '}
+                {rolloutGates.crossProviderEnforcementReady ? 'yes' : 'no'}
+              </p>
+            )}
           </div>
 
           <div className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4">

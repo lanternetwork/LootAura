@@ -129,9 +129,35 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     ...gates.gates.map((g) => `- [${g.status.toUpperCase()}] ${g.label}: ${g.detail}`),
     bullet('all gates pass', gates.allPass ? 'yes' : 'no'),
     '',
+    '### Cross-provider shadow (Phase B)',
+    bullet('shadow rows (24h)', data.crossProviderShadow.shadowRecords24h),
+    bullet('false negatives (7d)', data.crossProviderShadow.falseNegativeCount7d),
+    bullet('would link (24h)', data.crossProviderShadow.wouldLinkCount24h),
+    bullet('would publish distinct (24h)', data.crossProviderShadow.wouldPublishDistinctCount24h),
+    '',
+    '### Cross-provider convergence SLO (Phase E)',
+    bullet(
+      'duplicate canonical publish clusters',
+      data.crossProviderConvergence.duplicatePublishedCanonicalClusters
+    ),
+    bullet(
+      'SLO streak (zero-duplicate UTC days)',
+      `${data.crossProviderConvergence.sloAttainment.consecutiveZeroDuplicateDays} / ${data.crossProviderConvergence.sloAttainment.requiredConsecutiveDays}`
+    ),
+    bullet(
+      'publish link rate (24h)',
+      data.crossProviderConvergence.publishLinkRate24h == null
+        ? 'n/a'
+        : `${(data.crossProviderConvergence.publishLinkRate24h * 100).toFixed(1)}%`
+    ),
+    '',
     '### Sale-instance rollout gates (Phase 14)',
     bullet('observability ready (Stage A)', rolloutGates.observabilityReady ? 'yes' : 'no'),
     bullet('enforcement ready (Stage D)', rolloutGates.enforcementReady ? 'yes' : 'no'),
+    bullet(
+      'cross-provider enforcement ready (Phase E)',
+      rolloutGates.crossProviderEnforcementReady ? 'yes' : 'no'
+    ),
     ...rolloutGates.gates.map(
       (g) => `- [${g.status.toUpperCase()}] [${g.stage}] ${g.label}: ${g.detail}`
     ),

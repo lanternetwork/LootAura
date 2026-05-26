@@ -29,6 +29,11 @@ import {
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 import { classifyQueuePressure } from '@/lib/observability/metrics'
+import {
+  resolveCrossProviderPublishLink,
+  type CrossProviderPublishLink,
+} from '@/lib/ingestion/identity/resolveCrossProviderPublishLink'
+import { propagateCrossProviderPublishToObservations } from '@/lib/ingestion/identity/propagateCrossProviderPublishToObservations'
 
 export type PublishReadyByIdResult =
   | { ok: true; publishedSaleId: string }
@@ -59,6 +64,10 @@ interface ClaimedPublishRow {
   failure_reasons: unknown
   /** Fetched after claim for stale-reclaim guardrails (not returned by claim RPC). */
   failure_details?: unknown
+  /** Fetched after claim for Phase D cross-provider publish link (not returned by claim RPC). */
+  canonical_sale_instance_key?: string | null
+  is_duplicate?: boolean
+  duplicate_of?: string | null
 }
 
 /** Batch publish worker: one count set per `publishReadyIngestedSales()` invocation. */
@@ -979,7 +988,9 @@ async function attachFailureDetailsToClaimedPublishRows(rows: ClaimedPublishRow[
   const admin = getAdminDb()
   const ids = rows.map((r) => r.id)
   const { data, error } = await fromBase(admin, 'ingested_sales')
-    .select('id, failure_details')
+    .select(
+      'id, failure_details, canonical_sale_instance_key, is_duplicate, duplicate_of'
+    )
     .in('id', ids)
   if (error || !Array.isArray(data)) {
     logger.warn('Publish worker failure_details attach failed; stale reclaim guard may miss rows', {
@@ -990,16 +1001,42 @@ async function attachFailureDetailsToClaimedPublishRows(rows: ClaimedPublishRow[
     })
     return rows
   }
-  const byId = new Map<string, unknown>()
-  for (const row of data as Array<{ id?: string; failure_details?: unknown }>) {
+  const byId = new Map<
+    string,
+    {
+      failure_details: unknown
+      canonical_sale_instance_key: string | null
+      is_duplicate: boolean
+      duplicate_of: string | null
+    }
+  >()
+  for (const row of data as Array<{
+    id?: string
+    failure_details?: unknown
+    canonical_sale_instance_key?: string | null
+    is_duplicate?: boolean
+    duplicate_of?: string | null
+  }>) {
     if (row?.id) {
-      byId.set(row.id, row.failure_details ?? null)
+      byId.set(row.id, {
+        failure_details: row.failure_details ?? null,
+        canonical_sale_instance_key: row.canonical_sale_instance_key ?? null,
+        is_duplicate: row.is_duplicate ?? false,
+        duplicate_of: row.duplicate_of ?? null,
+      })
     }
   }
-  return rows.map((row) => ({
-    ...row,
-    failure_details: byId.has(row.id) ? byId.get(row.id) : row.failure_details,
-  }))
+  return rows.map((row) => {
+    const extra = byId.get(row.id)
+    if (!extra) return row
+    return {
+      ...row,
+      failure_details: extra.failure_details,
+      canonical_sale_instance_key: extra.canonical_sale_instance_key,
+      is_duplicate: extra.is_duplicate,
+      duplicate_of: extra.duplicate_of,
+    }
+  })
 }
 
 function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngestedSale {
@@ -1056,6 +1093,84 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
 
   await maybeSyncExistingSaleFromLatestIngest(saleId, record, sanitizedImages, patchCtx)
   return saleId
+}
+
+type PublishSaleResolution = {
+  saleId: string
+  crossProviderLink: CrossProviderPublishLink | null
+  reusedExistingLinkedSale: boolean
+}
+
+async function resolveSaleIdForPublishClaim(record: ClaimedPublishRow): Promise<PublishSaleResolution> {
+  const linkedSaleId = await linkedSaleIdForRow(record)
+  if (linkedSaleId) {
+    return { saleId: linkedSaleId, crossProviderLink: null, reusedExistingLinkedSale: true }
+  }
+
+  const crossProviderLink = await resolveCrossProviderPublishLink({
+    id: record.id,
+    source_platform: record.source_platform,
+    canonical_sale_instance_key: record.canonical_sale_instance_key,
+  })
+  if (crossProviderLink) {
+    return {
+      saleId: crossProviderLink.publishedSaleId,
+      crossProviderLink,
+      reusedExistingLinkedSale: false,
+    }
+  }
+
+  const saleId = await tryCreatePublishedSaleOrReuseExisting(record)
+  return { saleId, crossProviderLink: null, reusedExistingLinkedSale: false }
+}
+
+function buildPublishedIngestedRowUpdatePayload(
+  saleId: string,
+  crossProviderLink: CrossProviderPublishLink | null
+): Record<string, unknown> {
+  const base = {
+    status: 'published' as const,
+    published_sale_id: saleId,
+    published_at: new Date().toISOString(),
+  }
+  if (crossProviderLink) {
+    return {
+      ...base,
+      is_duplicate: true,
+      duplicate_of: crossProviderLink.primaryIngestedSaleId,
+    }
+  }
+  return base
+}
+
+async function completeCrossProviderPublishSideEffects(
+  record: ClaimedPublishRow,
+  saleId: string,
+  crossProviderLink: CrossProviderPublishLink | null
+): Promise<void> {
+  if (crossProviderLink) {
+    emitObservabilityRecord(
+      buildTelemetryRecord(ObservabilityEvents.ingestion.crossProviderPublishLinked, {
+        rowId: record.id,
+        sourcePlatform: record.source_platform,
+        publishedSaleId: saleId,
+        primaryIngestedSaleId: crossProviderLink.primaryIngestedSaleId,
+        matchedIngestedSaleId: crossProviderLink.matchedIngestedSaleId,
+        matchMethod: crossProviderLink.matchMethod,
+      })
+    )
+  }
+
+  const canonicalKey = record.canonical_sale_instance_key?.trim()
+  if (!canonicalKey) return
+
+  const primaryIngestedSaleId = crossProviderLink?.primaryIngestedSaleId ?? record.id
+  await propagateCrossProviderPublishToObservations({
+    canonicalSaleInstanceKey: canonicalKey,
+    publishedSaleId: saleId,
+    primaryIngestedSaleId,
+    excludeIngestedSaleId: record.id,
+  })
 }
 
 /**
@@ -1216,7 +1331,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     .not('lat', 'is', null)
     .not('lng', 'is', null)
     .select(
-      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, image_source_url, raw_payload, published_sale_id, failure_reasons, coordinate_precision'
+      'id, source_platform, source_url, title, description, normalized_address, city, state, zip_code, lat, lng, date_start, date_end, time_start, time_end, image_cloudinary_url, image_source_url, raw_payload, published_sale_id, failure_reasons, coordinate_precision, canonical_sale_instance_key, is_duplicate, duplicate_of'
     )
     .maybeSingle()
 
@@ -1260,14 +1375,16 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
 
   try {
     const sanitizedImages = await sanitizePublishImagesForRecord(claimed)
-    const linkedSaleId = await linkedSaleIdForRow(claimed)
-    if (linkedSaleId) {
+    const resolution = await resolveSaleIdForPublishClaim(claimed)
+    const { saleId, crossProviderLink, reusedExistingLinkedSale } = resolution
+    createdSaleId = saleId
+    if (reusedExistingLinkedSale) {
       publishFailureOperation = 'linked_address_validation_single'
       validateClaimedRowResolvedAddress(claimed)
+    } else if (crossProviderLink) {
+      publishFailureOperation = 'cross_provider_publish_link_single'
     }
-    const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(claimed))
-    createdSaleId = saleId
-    if (linkedSaleId) {
+    if (reusedExistingLinkedSale || crossProviderLink) {
       await maybeSyncExistingSaleFromLatestIngest(saleId, claimed, sanitizedImages, {
         rowId: claimed.id,
         city: claimed.city,
@@ -1275,11 +1392,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
       })
     }
 
-    const updatePayload = {
-      status: 'published' as const,
-      published_sale_id: saleId,
-      published_at: new Date().toISOString(),
-    }
+    const updatePayload = buildPublishedIngestedRowUpdatePayload(saleId, crossProviderLink)
     const firstUpdate = await fromBase(admin, 'ingested_sales').update(updatePayload).eq('id', claimed.id)
     if (firstUpdate.error) {
       const secondUpdate = await fromBase(admin, 'ingested_sales').update(updatePayload).eq('id', claimed.id)
@@ -1307,11 +1420,14 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
       }
     }
 
+    await completeCrossProviderPublishSideEffects(claimed, saleId, crossProviderLink)
+
     logger.info('publishReadyIngestedSaleById completed', {
       component: 'ingestion/publishWorker',
       operation: 'single_complete',
       rowId: claimed.id,
       saleId,
+      crossProviderPublishLink: Boolean(crossProviderLink),
     })
 
     return { ok: true, publishedSaleId: saleId }
@@ -1429,14 +1545,16 @@ export async function publishReadyIngestedSales(options?: {
     let publishFailureOperation: string = 'create_sale_batch'
     try {
       const sanitizedImages = await sanitizePublishImagesForRecord(row)
-      const linkedSaleId = await linkedSaleIdForRow(row)
-      if (linkedSaleId) {
+      const resolution = await resolveSaleIdForPublishClaim(row)
+      const { saleId, crossProviderLink, reusedExistingLinkedSale } = resolution
+      createdSaleId = saleId
+      if (reusedExistingLinkedSale) {
         publishFailureOperation = 'linked_address_validation_batch'
         validateClaimedRowResolvedAddress(row)
+      } else if (crossProviderLink) {
+        publishFailureOperation = 'cross_provider_publish_link_batch'
       }
-      const saleId = linkedSaleId ?? (await tryCreatePublishedSaleOrReuseExisting(row))
-      createdSaleId = saleId
-      if (linkedSaleId) {
+      if (reusedExistingLinkedSale || crossProviderLink) {
         await maybeSyncExistingSaleFromLatestIngest(saleId, row, sanitizedImages, {
           rowId: row.id,
           city: row.city,
@@ -1444,11 +1562,7 @@ export async function publishReadyIngestedSales(options?: {
         })
       }
 
-      const updatePayload = {
-        status: 'published',
-        published_sale_id: saleId,
-        published_at: new Date().toISOString(),
-      }
+      const updatePayload = buildPublishedIngestedRowUpdatePayload(saleId, crossProviderLink)
       const firstUpdate = await fromBase(admin, 'ingested_sales')
         .update(updatePayload)
         .eq('id', row.id)
@@ -1481,12 +1595,15 @@ export async function publishReadyIngestedSales(options?: {
         }
       }
 
+      await completeCrossProviderPublishSideEffects(row, saleId, crossProviderLink)
+
       summary.succeeded += 1
       logger.info('Publish worker row processed', {
         component: 'ingestion/publishWorker',
         operation: 'row_result',
         rowId: row.id,
         result: 'success',
+        crossProviderPublishLink: Boolean(crossProviderLink),
       })
     } catch (error) {
       summary.failed += 1

@@ -36,8 +36,14 @@ function chainForSoftDup(rows: unknown[]) {
 }
 
 describe('evaluateDuplicateSkipForExternalListListing', () => {
+  const priorEnv = { ...process.env }
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.INGESTION_CROSS_PROVIDER_ENFORCEMENT = 'false'
+  })
+
+  afterEach(() => {
+    process.env = { ...priorEnv }
   })
 
   it('skips insert when scored duplicate against existing row', async () => {
@@ -75,6 +81,7 @@ describe('evaluateDuplicateSkipForExternalListListing', () => {
 
     expect(out.skip).toBe(true)
     expect(out.duplicateOfId).toBe('prior-1')
+    expect(out.crossProviderObservation).toBeNull()
   })
 
   it('does not skip when Phase 8 safety blocks weak suppress', async () => {
@@ -116,5 +123,6 @@ describe('evaluateDuplicateSkipForExternalListListing', () => {
 
     expect(out.skip).toBe(false)
     expect(out.duplicateOfId).toBeNull()
+    expect(out.crossProviderObservation).toBeNull()
   })
 })

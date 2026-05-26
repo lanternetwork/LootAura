@@ -68,6 +68,8 @@ describe('computeYstmSaleInstanceIdentity', () => {
     expect(a?.sale_instance_key).toBe(b?.sale_instance_key)
     expect(a?.sale_instance_key).toContain('961002738')
     expect(a?.sale_instance_fingerprint).toHaveLength(64)
+    expect(a?.canonical_sale_instance_key).toHaveLength(64)
+    expect(a?.canonical_sale_instance_key).toBe(b?.canonical_sale_instance_key)
   })
 
   it('changes key when date window changes beyond same listing', () => {

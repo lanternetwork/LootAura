@@ -1,4 +1,9 @@
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
+import {
+  CROSS_PROVIDER_AMBIGUOUS_SHARE_MAX,
+  CROSS_PROVIDER_PUBLISH_LINK_RATE_MIN,
+} from '@/lib/admin/crossProviderConvergenceThresholds'
+import { CROSS_PROVIDER_CONVERGENCE_SLO_STEADY_STATE_DAYS } from '@/lib/admin/crossProviderConvergenceSloAttainment'
 
 /** Spec Phase 13 / PR #488: duplicate-visible clusters vs published active YSTM sales. */
 export const DUPLICATE_VISIBLE_CLUSTER_RATE_MAX = 0.005
@@ -11,7 +16,7 @@ export type YstmSaleInstanceRolloutGateStatus = 'pass' | 'fail' | 'pending'
 export type YstmSaleInstanceRolloutGate = {
   id: string
   label: string
-  stage: 'A' | 'B' | 'C' | 'D'
+  stage: 'A' | 'B' | 'C' | 'D' | 'E'
   status: YstmSaleInstanceRolloutGateStatus
   detail: string
 }
@@ -23,6 +28,8 @@ export type YstmSaleInstanceRolloutGatesSnapshot = {
   enforcementReady: boolean
   /** Stage A observability gates all pass. */
   observabilityReady: boolean
+  /** Phase E cross-provider convergence gates (SLO + link telemetry). */
+  crossProviderEnforcementReady: boolean
 }
 
 function gateStatus(pass: boolean, pending: boolean): YstmSaleInstanceRolloutGateStatus {
@@ -65,6 +72,22 @@ export function evaluateYstmSaleInstanceRolloutGates(
   const ambiguousBounded =
     replay.replayedCount === 0 ||
     dash.ambiguousRequiresReview / Math.max(replay.replayedCount, 1) <= 0.05
+
+  const canonical = data.canonicalSaleInstance
+  const crossShadow = data.crossProviderShadow
+  const convergence = data.crossProviderConvergence
+  const canonicalCoverageReady =
+    canonical.canonicalCoveragePct != null && canonical.canonicalCoveragePct >= 95
+  const shadowFalseNegativeClear = crossShadow.falseNegativeCount7d === 0
+  const duplicateCanonicalPublishClear =
+    convergence.duplicatePublishedCanonicalClusters === 0
+  const crossProviderSlo14dReady = convergence.sloAttainment.programComplete
+  const publishLinkRateOk =
+    convergence.publishLinkRate24h == null ||
+    convergence.publishLinkRate24h >= CROSS_PROVIDER_PUBLISH_LINK_RATE_MIN
+  const ambiguousShareOk =
+    convergence.ambiguousDispositionShare7d == null ||
+    convergence.ambiguousDispositionShare7d <= CROSS_PROVIDER_AMBIGUOUS_SHARE_MAX
 
   const gates: YstmSaleInstanceRolloutGate[] = [
     {
@@ -141,12 +164,85 @@ export function evaluateYstmSaleInstanceRolloutGates(
         ? 'no operational alerts'
         : `${dash.alerts.length.toLocaleString()} alert(s) — see Phase 13 panel`,
     },
+    {
+      id: 'canonical_key_coverage',
+      label: 'Canonical sale key coverage (Phase A exit)',
+      stage: 'A',
+      status: gateStatus(
+        canonicalCoverageReady,
+        canonical.externalActiveEligible > 0 && !canonicalCoverageReady
+      ),
+      detail:
+        canonical.canonicalCoveragePct != null
+          ? `${canonical.canonicalCoveragePct.toFixed(1)}% active external rows (target ≥95%)`
+          : 'no active external rows',
+    },
+    {
+      id: 'cross_provider_shadow_false_negative',
+      label: 'Cross-provider shadow false negatives (7d)',
+      stage: 'B',
+      status: shadowFalseNegativeClear ? 'pass' : 'fail',
+      detail: `${crossShadow.falseNegativeCount7d.toLocaleString()} false negative(s) in 7d · ${crossShadow.shadowRecords24h.toLocaleString()} shadow row(s) in 24h`,
+    },
+    {
+      id: 'cross_provider_duplicate_canonical_publish',
+      label: 'No duplicate published canonical keys (operational SLO)',
+      stage: 'E',
+      status: duplicateCanonicalPublishClear ? 'pass' : 'fail',
+      detail: `${convergence.duplicatePublishedCanonicalClusters.toLocaleString()} canonical cluster(s) with >1 published_sale_id`,
+    },
+    {
+      id: 'cross_provider_slo_14d',
+      label: 'Cross-provider duplicate-publish SLO (14 UTC days at zero)',
+      stage: 'E',
+      status: gateStatus(
+        crossProviderSlo14dReady,
+        !crossProviderSlo14dReady && duplicateCanonicalPublishClear
+      ),
+      detail: `${convergence.sloAttainment.consecutiveZeroDuplicateDays.toLocaleString()} / ${CROSS_PROVIDER_CONVERGENCE_SLO_STEADY_STATE_DAYS} consecutive zero-duplicate day(s)`,
+    },
+    {
+      id: 'cross_provider_publish_link_rate',
+      label: 'Cross-provider publish link rate (24h)',
+      stage: 'E',
+      status: gateStatus(
+        publishLinkRateOk,
+        convergence.crossProviderShadowMatches24h > 0 && !publishLinkRateOk
+      ),
+      detail:
+        convergence.publishLinkRate24h == null
+          ? `no cross-provider shadow matches in 24h (${convergence.observationPublished24h.toLocaleString()} observation publish(es))`
+          : `${(convergence.publishLinkRate24h * 100).toFixed(1)}% observation publishes / shadow matches (target ≥${(CROSS_PROVIDER_PUBLISH_LINK_RATE_MIN * 100).toFixed(0)}%)`,
+    },
+    {
+      id: 'cross_provider_ambiguous_share',
+      label: 'Cross-provider ambiguous disposition share (7d)',
+      stage: 'E',
+      status: ambiguousShareOk ? 'pass' : 'fail',
+      detail:
+        convergence.ambiguousDispositionShare7d == null
+          ? 'no shadow rows in 7d'
+          : `${(convergence.ambiguousDispositionShare7d * 100).toFixed(1)}% ambiguous (${convergence.ambiguousDispositionCount7d.toLocaleString()} / shadow 7d; max ${(CROSS_PROVIDER_AMBIGUOUS_SHARE_MAX * 100).toFixed(0)}%)`,
+    },
   ]
+
+  const crossProviderEnforcementIds = new Set([
+    'canonical_key_coverage',
+    'cross_provider_shadow_false_negative',
+    'cross_provider_duplicate_canonical_publish',
+    'cross_provider_slo_14d',
+    'cross_provider_publish_link_rate',
+    'cross_provider_ambiguous_share',
+  ])
+  const crossProviderEnforcementReady = gates
+    .filter((g) => crossProviderEnforcementIds.has(g.id))
+    .every((g) => g.status === 'pass')
 
   const observabilityIds = new Set([
     'false_exclusion_traced',
     'shadow_replay_complete',
     'false_exclusion_dashboard',
+    'canonical_key_coverage',
   ])
   const enforcementIds = new Set([
     'shadow_no_divergence',
@@ -169,5 +265,6 @@ export function evaluateYstmSaleInstanceRolloutGates(
     gates,
     observabilityReady,
     enforcementReady,
+    crossProviderEnforcementReady,
   }
 }

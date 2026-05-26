@@ -4,6 +4,7 @@ export type SaleInstanceIdentityFields = {
   source_listing_id: string | null
   sale_instance_key: string | null
   sale_instance_fingerprint: string | null
+  canonical_sale_instance_key: string | null
   source_payload_hash: string | null
   source_content_hash: string | null
   source_schedule_hash: string | null

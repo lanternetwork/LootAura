@@ -11,6 +11,7 @@ import {
   ingestionHealthSummary,
   type IngestionHealthState,
 } from '@/lib/admin/ingestionDashboardOverview'
+import IngestionStabilizationExitSection from '@/app/admin/ingestion/IngestionStabilizationExitSection'
 
 const HEALTH_STYLE: Record<IngestionHealthState, string> = {
   healthy: 'border-emerald-400 bg-emerald-50 text-emerald-950',
@@ -31,6 +32,9 @@ type Props = {
   onCopyDiagnostics: () => void
   copyState: 'idle' | 'copied' | 'error'
   copyDisabled: boolean
+  copyRefreshing?: boolean
+  onOpenDebug?: () => void
+  onOpenControls?: () => void
 }
 
 export default function IngestionOverviewPanel({
@@ -40,6 +44,9 @@ export default function IngestionOverviewPanel({
   onCopyDiagnostics,
   copyState,
   copyDisabled,
+  copyRefreshing = false,
+  onOpenDebug,
+  onOpenControls,
 }: Props) {
   const hero = ingestionHealthSummary(metrics, coverage)
   const funnel = buildFunnelSnapshot(metrics)
@@ -66,11 +73,13 @@ export default function IngestionOverviewPanel({
             disabled={copyDisabled}
             className="rounded-md border border-indigo-400 bg-white px-4 py-2 text-sm font-medium text-indigo-900 shadow-sm hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {copyState === 'copied'
-              ? 'Copied'
-              : copyState === 'error'
-                ? 'Copy failed'
-                : 'Copy diagnostics'}
+            {copyRefreshing
+              ? 'Refreshing coverage…'
+              : copyState === 'copied'
+                ? 'Copied'
+                : copyState === 'error'
+                  ? 'Copy failed'
+                  : 'Copy diagnostics'}
           </button>
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -94,6 +103,13 @@ export default function IngestionOverviewPanel({
           </div>
         </dl>
       </section>
+
+      <IngestionStabilizationExitSection
+        metrics={metrics}
+        coverage={coverage}
+        onOpenDebug={onOpenDebug}
+        onOpenControls={onOpenControls}
+      />
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Active runtime state</h2>

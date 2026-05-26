@@ -805,11 +805,21 @@ export default function YstmCoverageScoreboardSection({
                   : '—'}
                 ). Cross-provider groups are expected overlap signal (not duplicate publishes yet).
               </p>
+              {data.crossProviderConvergence.duplicatePublishedCanonicalClusters > 0 && (
+                <p className="mt-2 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-900">
+                  Workstream B blocked: remediate{' '}
+                  {data.crossProviderConvergence.duplicatePublishedCanonicalClusters} duplicate
+                  canonical publish cluster(s) (Debug) before running canonical backfill.
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => void runCanonicalBackfill()}
-                  disabled={canonicalBackfillUi.kind === 'running'}
+                  disabled={
+                    canonicalBackfillUi.kind === 'running' ||
+                    data.crossProviderConvergence.duplicatePublishedCanonicalClusters > 0
+                  }
                   className="rounded-md border border-indigo-600 bg-indigo-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {canonicalBackfillUi.kind === 'running'

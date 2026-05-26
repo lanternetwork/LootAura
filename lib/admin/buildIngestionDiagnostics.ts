@@ -1,4 +1,5 @@
 import { buildYstmCoverageDiagnostics } from '@/lib/admin/buildYstmCoverageDiagnostics'
+import { buildYstmStabilizationDiagnostics } from '@/lib/admin/buildYstmStabilizationDiagnostics'
 import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
@@ -341,6 +342,7 @@ export function buildIngestionDiagnostics(
 
   if (options.ystmCoverage?.ok) {
     lines.push('', buildYstmCoverageDiagnostics(options.ystmCoverage))
+    lines.push('', buildYstmStabilizationDiagnostics(data, options.ystmCoverage))
   }
 
   return lines.join('\n')

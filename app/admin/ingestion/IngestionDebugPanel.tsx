@@ -15,6 +15,7 @@ import {
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import CrawlSkipTaxonomySection from '@/app/admin/ingestion/CrawlSkipTaxonomySection'
+import IngestionConvergencePanel from '@/app/admin/ingestion/IngestionConvergencePanel'
 import IngestionFunnelSection from '@/app/admin/ingestion/IngestionFunnelSection'
 import YstmCoverageScoreboardSection from '@/app/admin/ingestion/YstmCoverageScoreboardSection'
 
@@ -121,6 +122,8 @@ export default function IngestionDebugPanel({
         coverageError={coverageError}
         onCoverageRefresh={onCoverageRefresh}
       />
+
+      <IngestionConvergencePanel />
 
       {data.volume && (
         <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">

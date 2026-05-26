@@ -2,9 +2,12 @@
 
 import { useCallback, useState } from 'react'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
+import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import IngestionWorkstreamsPanel from '@/app/admin/ingestion/IngestionWorkstreamsPanel'
 import YstmCoverageScoreboardSection from '@/app/admin/ingestion/YstmCoverageScoreboardSection'
 
 type Props = {
+  metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse | null
   coverageLoading: boolean
   coverageError: string | null
@@ -13,9 +16,11 @@ type Props = {
   onResetMetricsBaseline: () => void | Promise<void>
   baselineState: 'idle' | 'loading' | 'done' | 'error'
   baselineError: string | null
+  onOpenDebug?: () => void
 }
 
 export default function IngestionControlsPanel({
+  metrics,
   coverage,
   coverageLoading,
   coverageError,
@@ -24,6 +29,7 @@ export default function IngestionControlsPanel({
   onResetMetricsBaseline,
   baselineState,
   baselineError,
+  onOpenDebug,
 }: Props) {
   const [localBaselineError, setLocalBaselineError] = useState<string | null>(null)
 
@@ -66,6 +72,12 @@ export default function IngestionControlsPanel({
           </p>
         )}
       </section>
+
+      <IngestionWorkstreamsPanel
+        metrics={metrics}
+        coverage={coverage}
+        onOpenDebug={onOpenDebug}
+      />
 
       <YstmCoverageScoreboardSection
         variant="controls"

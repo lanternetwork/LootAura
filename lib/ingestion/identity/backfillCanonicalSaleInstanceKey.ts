@@ -2,7 +2,6 @@ import { computeCanonicalSaleInstanceKey } from '@/lib/ingestion/identity/comput
 import { computeEsnetSaleInstanceIdentity } from '@/lib/ingestion/estatesalesnet/computeEsnetSaleInstanceIdentity'
 import { ESNET_SOURCE_PLATFORM } from '@/lib/ingestion/estatesalesnet/constants'
 import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
-import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { isEstatesalesNetSourceUrl } from '@/lib/ingestion/estatesalesnet/esnetHosts'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
@@ -72,10 +71,34 @@ function isSupportedExternalRow(row: IngestedCanonicalBackfillRow): boolean {
   if (platform === ESNET_SOURCE_PLATFORM) {
     return isEstatesalesNetSourceUrl(row.source_url)
   }
-  return isYstmDetailListingUrl(row.source_url)
+  /**
+   * Backfill eligibility should align with Phase A goals (populate canonical keys on active external rows)
+   * and must not exclude non-YSTM external marketplace rows that still have stable address + schedule.
+   *
+   * We keep stricter URL checks for ES.net, but allow all `external_page_source` rows through and let
+   * `resolveCanonicalKey` determine whether inputs are sufficient.
+   */
+  return Boolean(row.source_url?.trim())
 }
 
 function resolveCanonicalKey(row: IngestedCanonicalBackfillRow): string | null {
+  // Platform-agnostic fallback: address + date window is sufficient to compute the canonical key.
+  // This avoids skipping valid external marketplace rows whose URL is not a YSTM detail listing page.
+  const directCanonical = computeCanonicalSaleInstanceKey({
+    state: row.state,
+    city: row.city,
+    normalizedAddress: row.normalized_address,
+    dateStart: row.date_start,
+    dateEnd: row.date_end,
+    timeStart: row.time_start,
+    timeEnd: row.time_end,
+    lat: toNumberOrNull(row.lat),
+    lng: toNumberOrNull(row.lng),
+    sourceScheduleHash: row.source_schedule_hash,
+    sourceLocationHash: row.source_location_hash,
+  })
+  if (directCanonical) return directCanonical
+
   if (row.source_schedule_hash?.trim() && row.source_location_hash?.trim()) {
     return computeCanonicalSaleInstanceKey({
       state: row.state,

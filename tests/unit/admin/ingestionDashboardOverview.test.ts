@@ -30,9 +30,8 @@ function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}): Inge
   }
 
   const proof = evaluateDetailFirstProofProtocol({
-    detailFirstMetricsBaselineAt: '2026-01-01T00:00:00.000Z',
+    metricsBaselineAt: '2026-01-01T00:00:00.000Z',
     detailFirst,
-    funnel24hFreshInserted: 50,
   })
 
   return {
@@ -118,7 +117,12 @@ function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}): Inge
         ],
         freshInserted: 50,
         skippedExpired: 100,
-        topDropoff: { stageId: 'duplicate_skipped', label: 'Duplicate skipped', count: 800 },
+        topDropoff: {
+          fromStageId: 'discovered',
+          toStageId: 'duplicate_skipped',
+          count: 800,
+          rate: 0.8,
+        },
         detailFirst,
         detailFirstCapture: {
           crawlerDiscovered: 1000,

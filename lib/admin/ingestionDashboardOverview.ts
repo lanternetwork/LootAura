@@ -74,7 +74,9 @@ export function buildFunnelSnapshot(metrics: IngestionMetricsResponse): FunnelSn
     inserted: stageCount(stages, 'inserted'),
     published: stageCount(stages, 'published'),
     publishFailed: stageCount(stages, 'publish_failed'),
-    topDropoffLabel: topDropoff?.label ?? '—',
+    topDropoffLabel: topDropoff
+      ? `${topDropoff.fromStageId} → ${topDropoff.toStageId}`
+      : '—',
     topDropoffCount: topDropoff?.count ?? 0,
     insertYield24h: metrics.volume.fetch.insertYield24h,
   }
@@ -164,7 +166,7 @@ export function deriveIngestionHealthState(
     }
   }
 
-  if (!metrics.funnel.detailFirst.operationalHealth.healthy) return 'degraded'
+  if (!metrics.funnel['24h'].detailFirst.operationalHealth.healthy) return 'degraded'
   if (coverage && !coverage.operationalHealth.healthy) return 'degraded'
   if (queues.addressEnrichment >= 150 || queues.catalogRepair >= 100) return 'degraded'
   if (metrics.volume.bottleneck === 'db_provider_pressure') return 'degraded'
@@ -234,7 +236,7 @@ export function buildOperationalPriorities(
     }
   }
 
-  const df = metrics.funnel.detailFirst
+  const df = metrics.funnel['24h'].detailFirst
   if (df.attempted >= 20) {
     const successRate = df.succeeded / df.attempted
     if (successRate < DETAIL_FIRST_SUCCESS_RATE_TARGET) {

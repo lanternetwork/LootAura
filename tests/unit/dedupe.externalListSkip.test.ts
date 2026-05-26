@@ -36,8 +36,14 @@ function chainForSoftDup(rows: unknown[]) {
 }
 
 describe('evaluateDuplicateSkipForExternalListListing', () => {
+  const priorEnv = { ...process.env }
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.INGESTION_CROSS_PROVIDER_ENFORCEMENT = 'false'
+  })
+
+  afterEach(() => {
+    process.env = { ...priorEnv }
   })
 
   it('skips insert when scored duplicate against existing row', async () => {

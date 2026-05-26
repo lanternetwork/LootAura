@@ -17,10 +17,18 @@ export type YstmDetailFirstFallbackReason =
   | 'insert_failed'
   | 'canonical_collision'
   | 'publish_failed'
+  | 'publish_hard_failed'
+  | 'publish_deferred_address_pending'
+  | 'publish_skipped_not_eligible'
 
 /** Counted on metrics but not a legacy fallback (excluded from fallback reconciliation). */
 export const YSTM_DETAIL_FIRST_NON_FALLBACK_REJECTED_REASONS: ReadonlySet<YstmDetailFirstFallbackReason> =
-  new Set(['publish_failed'])
+  new Set([
+    'publish_failed',
+    'publish_hard_failed',
+    'publish_deferred_address_pending',
+    'publish_skipped_not_eligible',
+  ])
 
 export const YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER: YstmDetailFirstFallbackReason[] = [
   'fallback_unclassified',
@@ -37,6 +45,9 @@ export const YSTM_DETAIL_FIRST_FALLBACK_REASON_ORDER: YstmDetailFirstFallbackRea
   'canonical_collision',
   'missing_title',
   'publish_failed',
+  'publish_hard_failed',
+  'publish_deferred_address_pending',
+  'publish_skipped_not_eligible',
 ]
 
 export type DetailFirstFallbackReasonCounts = Partial<

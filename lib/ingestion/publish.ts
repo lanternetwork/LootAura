@@ -5,9 +5,14 @@ import type { PublishInput } from '@/lib/ingestion/types'
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
+import {
+  capAddressForPublishSchema,
+  roundTimeToNearest30Minutes,
+} from '@/lib/ingestion/publishPreflight'
 import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
 
 export { normalizeAddressForPublish }
+export { capAddressForPublishSchema, roundTimeToNearest30Minutes } from '@/lib/ingestion/publishPreflight'
 
 export interface PublishableIngestedSale {
   id: string
@@ -35,7 +40,13 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
   const title = (ingestedSale.title || '').trim() || `${ingestedSale.city || 'Unknown'} Yard Sale`
   const city = (ingestedSale.city || '').trim()
   const state = (ingestedSale.state || '').trim()
-  const address = normalizeAddressForPublish(ingestedSale.normalized_address, city, state)
+  const normalizedAddress = capAddressForPublishSchema(
+    normalizeAddressForPublish(ingestedSale.normalized_address, city, state)
+  )
+  const address = normalizedAddress
+  const timeStart =
+    (roundTimeToNearest30Minutes(ingestedSale.time_start) ?? ingestedSale.time_start) || '09:00:00'
+  const timeEnd = roundTimeToNearest30Minutes(ingestedSale.time_end)
   const normalizedImages = Array.isArray(ingestedSale.image_urls)
     ? ingestedSale.image_urls
         .filter((value): value is string => typeof value === 'string')
@@ -58,8 +69,8 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
     lng: ingestedSale.lng,
     dateStart: ingestedSale.date_start,
     dateEnd: ingestedSale.date_end,
-    timeStart: ingestedSale.time_start || '09:00:00',
-    timeEnd: ingestedSale.time_end,
+    timeStart,
+    timeEnd,
     coverImageUrl,
     images,
     importSource: ingestedSale.source_platform,

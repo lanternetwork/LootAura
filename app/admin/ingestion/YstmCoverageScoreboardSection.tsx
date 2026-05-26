@@ -339,6 +339,7 @@ export default function YstmCoverageScoreboardSection({
       {data && (
         <>
           {showProviderControls && (
+            <>
           <div
             className={`mb-4 rounded-md border p-4 ${
               data.coverageBootstrap.enabled
@@ -509,6 +510,7 @@ export default function YstmCoverageScoreboardSection({
               <p className="mt-2 text-xs text-red-700">{esnetBootstrapUi.message}</p>
             )}
           </div>
+            </>
           )}
 
           {showTelemetry && sprintGates && (
@@ -841,6 +843,7 @@ export default function YstmCoverageScoreboardSection({
           )}
 
           {showTelemetry && (
+            <>
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">
               Cross-provider shadow convergence (Phase B)
@@ -1385,6 +1388,7 @@ export default function YstmCoverageScoreboardSection({
               )}
             </div>
           </div>
+            </>
           )}
         </>
       )}

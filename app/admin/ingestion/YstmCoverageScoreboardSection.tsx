@@ -17,6 +17,16 @@ import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSa
 
 const POLL_MS = 30_000
 
+export type YstmCoverageScoreboardVariant = 'full' | 'controls' | 'debug' | 'overview-compact'
+
+type YstmCoverageScoreboardProps = {
+  variant?: YstmCoverageScoreboardVariant
+  coverage?: YstmCoverageMetricsResponse | null
+  coverageLoading?: boolean
+  coverageError?: string | null
+  onCoverageRefresh?: () => void | Promise<void>
+}
+
 /** Per click — keeps server work under maxDuration; user can run again until gate passes. */
 const BACKFILL_BATCH_SIZE = 50
 const BACKFILL_MAX_ROWS = 250
@@ -90,10 +100,20 @@ function Metric(props: { label: string; value: number | string; highlight?: bool
   )
 }
 
-export default function YstmCoverageScoreboardSection() {
-  const [data, setData] = useState<YstmCoverageMetricsResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+export default function YstmCoverageScoreboardSection({
+  variant = 'full',
+  coverage: externalCoverage,
+  coverageLoading: externalLoading,
+  coverageError: externalError,
+  onCoverageRefresh,
+}: YstmCoverageScoreboardProps = {}) {
+  const useExternalCoverage = externalCoverage !== undefined
+  const [internalData, setInternalData] = useState<YstmCoverageMetricsResponse | null>(null)
+  const [internalError, setInternalError] = useState<string | null>(null)
+  const [internalLoading, setInternalLoading] = useState(!useExternalCoverage)
+  const data = useExternalCoverage ? externalCoverage : internalData
+  const error = useExternalCoverage ? (externalError ?? null) : internalError
+  const loading = useExternalCoverage ? (externalLoading ?? false) : internalLoading
   const [backfillUi, setBackfillUi] = useState<BackfillUiState>({ kind: 'idle' })
   const [canonicalBackfillUi, setCanonicalBackfillUi] = useState<CanonicalBackfillUiState>({
     kind: 'idle',
@@ -114,14 +134,22 @@ export default function YstmCoverageScoreboardSection() {
           `HTTP ${res.status}`
         throw new Error(detail)
       }
-      setData(json)
-      setError(null)
+      setInternalData(json)
+      setInternalError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setInternalError(e instanceof Error ? e.message : String(e))
     } finally {
-      setLoading(false)
+      setInternalLoading(false)
     }
   }, [])
+
+  const refreshCoverage = useCallback(async () => {
+    if (useExternalCoverage) {
+      await onCoverageRefresh?.()
+      return
+    }
+    await load()
+  }, [load, onCoverageRefresh, useExternalCoverage])
 
   const runIdentityBackfill = useCallback(async () => {
     setBackfillUi({ kind: 'running' })
@@ -151,7 +179,7 @@ export default function YstmCoverageScoreboardSection() {
         throw new Error(detail)
       }
       setBackfillUi({ kind: 'done', summary: json.summary, at: new Date().toISOString() })
-      await load()
+      await refreshCoverage()
     } catch (e) {
       setBackfillUi({
         kind: 'error',
@@ -159,7 +187,7 @@ export default function YstmCoverageScoreboardSection() {
         at: new Date().toISOString(),
       })
     }
-  }, [load])
+  }, [refreshCoverage])
 
   const runCanonicalBackfill = useCallback(async () => {
     setCanonicalBackfillUi({ kind: 'running' })
@@ -189,7 +217,7 @@ export default function YstmCoverageScoreboardSection() {
         throw new Error(detail)
       }
       setCanonicalBackfillUi({ kind: 'done', summary: json.summary, at: new Date().toISOString() })
-      await load()
+      await refreshCoverage()
     } catch (e) {
       setCanonicalBackfillUi({
         kind: 'error',
@@ -197,7 +225,7 @@ export default function YstmCoverageScoreboardSection() {
         at: new Date().toISOString(),
       })
     }
-  }, [load])
+  }, [refreshCoverage])
 
   const toggleProviderRuntime = useCallback(
     async (
@@ -235,7 +263,7 @@ export default function YstmCoverageScoreboardSection() {
           throw new Error(json.message || json.code || `HTTP ${res.status}`)
         }
         setUi({ kind: 'idle' })
-        await load()
+        await refreshCoverage()
       } catch (e) {
         setUi({
           kind: 'error',
@@ -243,14 +271,15 @@ export default function YstmCoverageScoreboardSection() {
         })
       }
     },
-    [load]
+    [refreshCoverage]
   )
 
   useEffect(() => {
+    if (useExternalCoverage) return
     void load()
     const id = window.setInterval(() => void load(), POLL_MS)
     return () => window.clearInterval(id)
-  }, [load])
+  }, [load, useExternalCoverage])
 
   const trendData =
     data?.trend.map((p) => ({
@@ -269,17 +298,37 @@ export default function YstmCoverageScoreboardSection() {
       ? (data.saleInstanceIdentity.ystmActiveRowsWithKey / data.publishedActiveLootAuraYstmUrls) * 100
       : null
 
+  if (variant === 'overview-compact') {
+    return null
+  }
+
+  const showProviderControls = variant === 'full' || variant === 'controls'
+  const showTelemetry = variant === 'full' || variant === 'debug'
+  const sectionTitle =
+    variant === 'controls'
+      ? 'Coverage controls'
+      : 'External marketplace nationwide coverage'
+
   return (
     <section className="mb-8 rounded-lg border border-emerald-300 bg-white p-6 shadow-sm">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-emerald-950">External marketplace nationwide coverage</h2>
-          <p className="mt-1 max-w-3xl text-sm text-gray-600">
-            Product goal: published active LootAura external-source sales visible on the map ÷ valid active external
-            listings from bounded audits. Not crawl discovered/skipped counts.
-          </p>
+          <h2 className="text-xl font-semibold text-emerald-950">{sectionTitle}</h2>
+          {showTelemetry && (
+            <p className="mt-1 max-w-3xl text-sm text-gray-600">
+              Product goal: published active LootAura external-source sales visible on the map ÷ valid active external
+              listings from bounded audits. Not crawl discovered/skipped counts.
+            </p>
+          )}
+          {variant === 'controls' && (
+            <p className="mt-1 max-w-3xl text-sm text-gray-600">
+              Runtime toggles and one-off backfills. Telemetry lives in Overview and Debug.
+            </p>
+          )}
         </div>
-        <p className="text-xs text-gray-500">Last audit: {formatWhen(data?.lastAuditAt ?? null)}</p>
+        {showTelemetry && (
+          <p className="text-xs text-gray-500">Last audit: {formatWhen(data?.lastAuditAt ?? null)}</p>
+        )}
       </div>
 
       {loading && !data && <p className="text-sm text-gray-500">Loading coverage scoreboard…</p>}
@@ -289,6 +338,8 @@ export default function YstmCoverageScoreboardSection() {
 
       {data && (
         <>
+          {showProviderControls && (
+            <>
           <div
             className={`mb-4 rounded-md border p-4 ${
               data.coverageBootstrap.enabled
@@ -459,8 +510,10 @@ export default function YstmCoverageScoreboardSection() {
               <p className="mt-2 text-xs text-red-700">{esnetBootstrapUi.message}</p>
             )}
           </div>
+            </>
+          )}
 
-          {sprintGates && (
+          {showTelemetry && sprintGates && (
             <div className="mb-4 rounded-md border border-violet-200 bg-violet-50 p-4">
               <h3 className="text-sm font-semibold text-violet-950">Week-1 sprint gates</h3>
               <p className="mt-1 text-xs text-violet-900">
@@ -493,7 +546,7 @@ export default function YstmCoverageScoreboardSection() {
             </div>
           )}
 
-          {rolloutGates && (
+          {showTelemetry && rolloutGates && (
             <div className="mb-4 rounded-md border border-slate-300 bg-slate-50 p-4">
               <h3 className="text-sm font-semibold text-slate-950">
                 Sale-instance rollout gates (Phase 14)
@@ -533,7 +586,7 @@ export default function YstmCoverageScoreboardSection() {
             </div>
           )}
 
-          {!data.operationalHealth.healthy && data.operationalHealth.alerts.length > 0 && (
+          {showTelemetry && !data.operationalHealth.healthy && data.operationalHealth.alerts.length > 0 && (
             <div className="mb-4 space-y-2">
               {data.operationalHealth.alerts.map((alert) => (
                 <p
@@ -550,6 +603,7 @@ export default function YstmCoverageScoreboardSection() {
             </div>
           )}
 
+          {showTelemetry && (
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Coverage</p>
@@ -581,7 +635,9 @@ export default function YstmCoverageScoreboardSection() {
               </p>
             </div>
           </div>
+          )}
 
+          {showTelemetry && (
           <div
             className={`mb-6 rounded-md border p-4 ${
               data.sloAttainment.programComplete
@@ -617,8 +673,9 @@ export default function YstmCoverageScoreboardSection() {
               </p>
             </div>
           </div>
+          )}
 
-          {data.lastRun && (
+          {showTelemetry && data.lastRun && (
             <p className="mb-4 text-xs text-gray-600">
               Last audit: {data.lastRun.listPagesFetched} list pages · {data.lastRun.listingUrlsDiscovered}{' '}
               URLs discovered · {data.lastRun.detailPagesValidated} detail checks · config cursor{' '}
@@ -626,29 +683,35 @@ export default function YstmCoverageScoreboardSection() {
             </p>
           )}
 
+          {(showTelemetry || showProviderControls) && (
           <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4">
             <h3 className="text-sm font-semibold text-sky-950">Sale-instance identity (Phase 3)</h3>
             <p className="mt-1 text-xs text-sky-900">
               New external-source inserts populate sale_instance_key and hashes (observability only — dedupe still
               uses source_url until later phases).
             </p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Metric label="Rows with key" value={data.saleInstanceIdentity.ystmRowsWithKey} />
-              <Metric
-                label="Active rows with key"
-                value={data.saleInstanceIdentity.ystmActiveRowsWithKey}
-              />
-              <Metric
-                label="Key collision groups"
-                value={data.saleInstanceIdentity.keyCollisionGroups}
-                highlight={data.saleInstanceIdentity.keyCollisionGroups > 0}
-              />
-            </div>
-            {data.saleInstanceIdentity.sampleCollisionKeys.length > 0 && (
-              <p className="mt-2 text-xs font-mono text-sky-900">
-                Sample collisions: {data.saleInstanceIdentity.sampleCollisionKeys.join(' · ')}
-              </p>
+            {showTelemetry && (
+              <>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <Metric label="Rows with key" value={data.saleInstanceIdentity.ystmRowsWithKey} />
+                  <Metric
+                    label="Active rows with key"
+                    value={data.saleInstanceIdentity.ystmActiveRowsWithKey}
+                  />
+                  <Metric
+                    label="Key collision groups"
+                    value={data.saleInstanceIdentity.keyCollisionGroups}
+                    highlight={data.saleInstanceIdentity.keyCollisionGroups > 0}
+                  />
+                </div>
+                {data.saleInstanceIdentity.sampleCollisionKeys.length > 0 && (
+                  <p className="mt-2 text-xs font-mono text-sky-900">
+                    Sample collisions: {data.saleInstanceIdentity.sampleCollisionKeys.join(' · ')}
+                  </p>
+                )}
+              </>
             )}
+            {showProviderControls && (
             <div className="mt-4 rounded-md border border-sky-300 bg-white p-3">
               <p className="text-xs text-sky-950">
                 Phase 12 backfill fills <code className="text-[11px]">sale_instance_key</code> on existing
@@ -691,8 +754,11 @@ export default function YstmCoverageScoreboardSection() {
                 </div>
               )}
             </div>
+            )}
           </div>
+          )}
 
+          {(showTelemetry || showProviderControls) && (
           <div className="mb-6 rounded-md border border-indigo-200 bg-indigo-50 p-4">
             <h3 className="text-sm font-semibold text-indigo-950">
               Cross-provider canonical sale key (Phase A)
@@ -701,6 +767,7 @@ export default function YstmCoverageScoreboardSection() {
               Persists <code className="text-[11px]">canonical_sale_instance_key</code> on YSTM and
               ES.net ingested rows for convergence telemetry. No ingest or publish behavior change yet.
             </p>
+            {showTelemetry && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Metric
                 label="Active coverage %"
@@ -728,6 +795,8 @@ export default function YstmCoverageScoreboardSection() {
                 value={data.canonicalSaleInstance.canonicalCollisionGroups}
               />
             </div>
+            )}
+            {showProviderControls && (
             <div className="mt-4 rounded-md border border-indigo-300 bg-white p-3">
               <p className="text-xs text-indigo-950">
                 Phase A exit: ≥95% of active external rows have a canonical key (
@@ -769,8 +838,12 @@ export default function YstmCoverageScoreboardSection() {
                 </div>
               )}
             </div>
+            )}
           </div>
+          )}
 
+          {showTelemetry && (
+            <>
           <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-950">
               Cross-provider shadow convergence (Phase B)
@@ -1315,6 +1388,8 @@ export default function YstmCoverageScoreboardSection() {
               )}
             </div>
           </div>
+            </>
+          )}
         </>
       )}
     </section>

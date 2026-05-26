@@ -45,7 +45,7 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
   )
   const address = normalizedAddress
   const timeStart =
-    roundTimeToNearest30Minutes(ingestedSale.time_start) ?? ingestedSale.time_start || '09:00:00'
+    (roundTimeToNearest30Minutes(ingestedSale.time_start) ?? ingestedSale.time_start) || '09:00:00'
   const timeEnd = roundTimeToNearest30Minutes(ingestedSale.time_end)
   const normalizedImages = Array.isArray(ingestedSale.image_urls)
     ? ingestedSale.image_urls

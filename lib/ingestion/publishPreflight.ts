@@ -49,7 +49,7 @@ export function isResolvedAddressPublishable(
 ): boolean {
   const cityT = (city ?? '').trim()
   const stateT = (state ?? '').trim()
-  const address = normalizeAddressForPublish(normalizedAddress, cityT, stateT)
+  const address = normalizeAddressForPublish(normalizedAddress ?? null, cityT, stateT)
   try {
     validateResolvedAddressForPublish(address, cityT, stateT)
     return true

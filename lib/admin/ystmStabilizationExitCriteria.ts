@@ -5,7 +5,9 @@ import {
   CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING,
   CRAWL_SKIP_TAXONOMY_MIN_SAMPLES,
 } from '@/lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth'
-import { YSTM_COVERAGE_TARGET_PCT } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
+
+/** Client-safe mirror of `YSTM_COVERAGE_TARGET_PCT` in ystmCoverageValidity.ts (avoid server import chain). */
+const YSTM_COVERAGE_TARGET_PCT = 90
 
 export const STABILIZATION_MISSING_VALID_NEAR_ZERO = 15
 export const STABILIZATION_CATALOG_REPAIR_MAX = 100

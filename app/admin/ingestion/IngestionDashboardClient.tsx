@@ -261,6 +261,7 @@ export default function IngestionDashboardClient() {
 
         {data && mode === 'controls' && (
           <IngestionControlsPanel
+            metrics={data}
             coverage={coverage}
             coverageLoading={coverageLoading}
             coverageError={coverageError}
@@ -269,6 +270,7 @@ export default function IngestionDashboardClient() {
             onResetMetricsBaseline={resetMetricsBaseline}
             baselineState={baselineState}
             baselineError={baselineError}
+            onOpenDebug={() => setMode('debug')}
           />
         )}
       </div>

@@ -40,6 +40,7 @@ export const ObservabilityEvents = {
     ystmDetailFirstFallback: 'ingestion.ystm_detail_first.fallback',
     ystmDetailFirstFetchFailed: 'ingestion.ystm_detail_first.fetch_failed',
     ystmDetailFirstRejectedReason: 'ingestion.ystm_detail_first.rejected_reason',
+    ystmDetailFirstPublishDeferred: 'ingestion.ystm_detail_first.publish_deferred',
     saleInstanceClassified: 'ingestion.sale_instance.classified',
     saleInstanceShadowCompared: 'ingestion.sale_instance.shadow_compared',
     saleInstanceIdentityBackfillBatch: 'ingestion.sale_instance.identity_backfill_batch',

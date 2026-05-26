@@ -28,10 +28,7 @@ import {
   validateDetailEnrichedListing,
 } from '@/lib/ingestion/acquisition/validateDetailEnrichedListing'
 import { detectGatedListing } from '@/lib/ingestion/address/addressGated'
-import {
-  addressLifecycleFieldsForDb,
-  resolveIngestAddressLifecycle,
-} from '@/lib/ingestion/address/resolveIngestAddressLifecycle'
+import { resolveIngestAddressLifecycle } from '@/lib/ingestion/address/resolveIngestAddressLifecycle'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
 import { classifyDetailFirstSpatialFailure } from '@/lib/ingestion/acquisition/classifyDetailFirstSpatialFailure'
@@ -60,6 +57,8 @@ import {
   supersedePublishedSaleForUrlReuse,
 } from '@/lib/ingestion/identity/ystmUrlReuseSupersession'
 import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
+import { detailFirstIngestLifecycleDbFields, resolveDetailFirstIngestLifecycle } from '@/lib/ingestion/detailFirstIngestLifecycle'
+import { shouldDeferPublishForPendingAddress } from '@/lib/ingestion/publishPreflight'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents, type ObservabilityEventName } from '@/lib/observability/events'
@@ -188,6 +187,14 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
     rawPayload: input.rowPayload,
   })
 
+  const ingestLifecycle = resolveDetailFirstIngestLifecycle({
+    addressLifecycle: input.addressLifecycle,
+    normalizedLine: input.normalizedLine,
+    city: input.city,
+    state: input.state,
+    nativeFirst: input.nativeFirst,
+  })
+
   return {
     source_platform: input.platform,
     source_url: input.listing.sourceUrl,
@@ -210,7 +217,6 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
     image_source_url: input.listing.imageSourceUrl,
     raw_text: null,
     raw_payload: input.rowPayload,
-    status: 'ready',
     failure_reasons: [],
     parser_version: PARSER_VERSION_ROW,
     parse_confidence: 'high',
@@ -219,24 +225,24 @@ function buildDetailFirstIngestedSaleInsertRow(input: {
     geocode_confidence: input.spatial.geocode_confidence,
     coordinate_precision: input.spatial.coordinate_precision,
     geocode_method: input.spatial.geocode_method,
-    ...addressLifecycleFieldsForDb(
-      input.nativeFirst
-        ? {
-            addressStatus: 'address_enrichment_pending',
-            canonicalSourceUrl: input.addressLifecycle.canonicalSourceUrl,
-            addressUnlockAt: null,
-            nextEnrichmentAttemptAt: null,
-            ingestStatus: 'ready',
-          }
-        : {
-            addressStatus: 'address_available',
-            canonicalSourceUrl: input.addressLifecycle.canonicalSourceUrl,
-            addressUnlockAt: input.addressLifecycle.addressUnlockAt,
-            nextEnrichmentAttemptAt: null,
-            ingestStatus: 'ready',
-          }
-    ),
+    ...detailFirstIngestLifecycleDbFields(ingestLifecycle),
     ...saleInstanceIdentityDbColumns(saleInstanceIdentity),
+  }
+}
+
+function recordDetailFirstPublishOutcome(
+  metrics: YstmDetailFirstRunMetrics,
+  reason: Extract<
+    YstmDetailFirstFallbackReason,
+    | 'publish_hard_failed'
+    | 'publish_deferred_address_pending'
+    | 'publish_skipped_not_eligible'
+    | 'publish_failed'
+  >
+): void {
+  metrics.rejectedByReason[reason] = (metrics.rejectedByReason[reason] ?? 0) + 1
+  if (reason === 'publish_hard_failed') {
+    metrics.rejectedByReason.publish_failed = (metrics.rejectedByReason.publish_failed ?? 0) + 1
   }
 }
 
@@ -832,20 +838,43 @@ export async function attemptYstmDetailFirstReady(
     payloadHash: (ingestRow.source_payload_hash as string | null) ?? null,
   })
 
-  const publishResult = await publishReadyIngestedSaleById(ingestedSaleId)
-  const published = publishResult.ok === true && 'publishedSaleId' in publishResult
-  if (published) {
-    metrics.published = 1
-    metrics.msToPublishedSamples.push(Date.now() - startedMs)
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstPublished, telem, {
+  const publishPreflightRow = {
+    normalized_address: normalizedLine,
+    city,
+    state,
+    source_url: listing.sourceUrl,
+    address_status: (ingestRow.address_status as string | null) ?? null,
+  }
+
+  let published = false
+  if (shouldDeferPublishForPendingAddress(publishPreflightRow)) {
+    recordDetailFirstPublishOutcome(metrics, 'publish_deferred_address_pending')
+    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstPublishDeferred, telem, {
+      deferredReason: 'address_pending',
       resolutionSource: spatial.resolutionSource,
-      msToPublished: Date.now() - startedMs,
     })
   } else {
-    metrics.rejectedByReason.publish_failed = (metrics.rejectedByReason.publish_failed ?? 0) + 1
-    emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
-      rejectedReason: 'publish_failed',
-    })
+    const publishResult = await publishReadyIngestedSaleById(ingestedSaleId)
+    published = publishResult.ok === true && 'publishedSaleId' in publishResult
+    if (published) {
+      metrics.published = 1
+      metrics.msToPublishedSamples.push(Date.now() - startedMs)
+      emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstPublished, telem, {
+        resolutionSource: spatial.resolutionSource,
+        msToPublished: Date.now() - startedMs,
+      })
+    } else if (publishResult.ok && 'skipped' in publishResult && publishResult.skipped) {
+      recordDetailFirstPublishOutcome(metrics, 'publish_skipped_not_eligible')
+      emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
+        rejectedReason: 'publish_skipped_not_eligible',
+        publishSkipReason: publishResult.reason,
+      })
+    } else {
+      recordDetailFirstPublishOutcome(metrics, 'publish_hard_failed')
+      emitDetailFirstEvent(ObservabilityEvents.ingestion.ystmDetailFirstRejectedReason, telem, {
+        rejectedReason: 'publish_hard_failed',
+      })
+    }
   }
 
   finalizeDetailFirstAttemptMetrics(metrics)

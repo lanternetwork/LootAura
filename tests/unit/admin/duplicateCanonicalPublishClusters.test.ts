@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatDuplicateCanonicalClustersClipboard,
   groupDuplicateCanonicalPublishClusters,
-} from '@/lib/admin/duplicateCanonicalPublishClusters'
+} from '@/lib/admin/duplicateCanonicalPublishClusterTypes'
 
 describe('groupDuplicateCanonicalPublishClusters', () => {
   it('returns clusters only when one canonical key maps to multiple published sales', () => {

@@ -4,10 +4,11 @@ import {
   type CrossProviderConvergenceSloAttainment,
   type CrossProviderConvergenceSloTrendPoint,
 } from '@/lib/admin/crossProviderConvergenceSloAttainment'
+export {
+  CROSS_PROVIDER_AMBIGUOUS_SHARE_MAX,
+  CROSS_PROVIDER_PUBLISH_LINK_RATE_MIN,
+} from '@/lib/admin/crossProviderConvergenceThresholds'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
-
-export const CROSS_PROVIDER_PUBLISH_LINK_RATE_MIN = 0.9
-export const CROSS_PROVIDER_AMBIGUOUS_SHARE_MAX = 0.05
 
 export type CrossProviderConvergenceMetrics = {
   duplicatePublishedCanonicalClusters: number

@@ -2,7 +2,7 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import {
   CROSS_PROVIDER_AMBIGUOUS_SHARE_MAX,
   CROSS_PROVIDER_PUBLISH_LINK_RATE_MIN,
-} from '@/lib/admin/crossProviderConvergenceMetrics'
+} from '@/lib/admin/crossProviderConvergenceThresholds'
 import { CROSS_PROVIDER_CONVERGENCE_SLO_STEADY_STATE_DAYS } from '@/lib/admin/crossProviderConvergenceSloAttainment'
 
 /** Spec Phase 13 / PR #488: duplicate-visible clusters vs published active YSTM sales. */

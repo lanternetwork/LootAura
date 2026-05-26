@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { formatDuplicateCanonicalClustersClipboard } from '@/lib/admin/duplicateCanonicalPublishClusterTypes'
-import type { DuplicateCanonicalPublishCluster } from '@/lib/admin/duplicateCanonicalPublishClusterTypes'
+import {
+  formatDuplicateCanonicalClustersClipboard,
+  type DuplicateCanonicalPublishCluster,
+} from '@/lib/admin/duplicateCanonicalPublishClusterTypes'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
 
 type ClustersResponse = {

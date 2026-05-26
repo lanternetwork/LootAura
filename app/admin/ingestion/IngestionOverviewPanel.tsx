@@ -33,6 +33,8 @@ type Props = {
   copyState: 'idle' | 'copied' | 'error'
   copyDisabled: boolean
   copyRefreshing?: boolean
+  onOpenDebug?: () => void
+  onOpenControls?: () => void
 }
 
 export default function IngestionOverviewPanel({
@@ -43,6 +45,8 @@ export default function IngestionOverviewPanel({
   copyState,
   copyDisabled,
   copyRefreshing = false,
+  onOpenDebug,
+  onOpenControls,
 }: Props) {
   const hero = ingestionHealthSummary(metrics, coverage)
   const funnel = buildFunnelSnapshot(metrics)
@@ -100,7 +104,12 @@ export default function IngestionOverviewPanel({
         </dl>
       </section>
 
-      <IngestionStabilizationExitSection metrics={metrics} coverage={coverage} />
+      <IngestionStabilizationExitSection
+        metrics={metrics}
+        coverage={coverage}
+        onOpenDebug={onOpenDebug}
+        onOpenControls={onOpenControls}
+      />
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Active runtime state</h2>

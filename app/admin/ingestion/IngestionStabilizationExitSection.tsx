@@ -13,6 +13,8 @@ const STATUS_STYLE = {
 type Props = {
   metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse | null
+  onOpenDebug?: () => void
+  onOpenControls?: () => void
 }
 
 function CriteriaList({
@@ -46,12 +48,47 @@ function CriteriaList({
   )
 }
 
-export default function IngestionStabilizationExitSection({ metrics, coverage }: Props) {
+export default function IngestionStabilizationExitSection({
+  metrics,
+  coverage,
+  onOpenDebug,
+  onOpenControls,
+}: Props) {
   const exit = evaluateYstmStabilizationExit(metrics, coverage)
+  const duplicateClusters =
+    coverage?.crossProviderConvergence.duplicatePublishedCanonicalClusters ?? 0
+  const showClusterActions = duplicateClusters > 0 && onOpenDebug != null
+  const showWorkstreamsAction = !exit.tier1Ready && onOpenControls != null
 
   return (
     <section className="rounded-lg border border-violet-300 bg-violet-50/50 p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-violet-950">YSTM stabilization exit (before ES.net resume)</h2>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h2 className="text-lg font-semibold text-violet-950">
+          YSTM stabilization exit (before ES.net resume)
+        </h2>
+        {(showClusterActions || showWorkstreamsAction) && (
+          <div className="flex flex-wrap gap-2">
+            {showClusterActions && (
+              <button
+                type="button"
+                onClick={onOpenDebug}
+                className="rounded-md border border-fuchsia-600 bg-white px-3 py-1.5 text-sm font-medium text-fuchsia-950 hover:bg-fuchsia-50"
+              >
+                Debug: {duplicateClusters} cluster(s)
+              </button>
+            )}
+            {showWorkstreamsAction && (
+              <button
+                type="button"
+                onClick={onOpenControls}
+                className="rounded-md border border-violet-600 bg-white px-3 py-1.5 text-sm font-medium text-violet-950 hover:bg-violet-50"
+              >
+                Controls: workstreams
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       <p className="mt-1 text-sm text-violet-900">
         Tier 1 gates ES.net <strong>planning</strong>. Tier 2 gates aggressive ES.net scaling. Daily metrics
         can be tracked before Tier 2 is required for planning.

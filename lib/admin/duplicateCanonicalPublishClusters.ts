@@ -124,3 +124,27 @@ export async function countDuplicatePublishedCanonicalClusters(
   const clusters = await listDuplicatePublishedCanonicalClusters(admin, 10_000)
   return clusters.length
 }
+
+/** Markdown for clipboard when remediating Workstream A clusters. */
+export function formatDuplicateCanonicalClustersClipboard(
+  clusters: DuplicateCanonicalPublishCluster[],
+  generatedAt: string
+): string {
+  const lines = [
+    '# Duplicate canonical publish clusters',
+    `- generatedAt: ${generatedAt}`,
+    `- clusterCount: ${clusters.length}`,
+    '',
+  ]
+  for (const cluster of clusters) {
+    lines.push(`## ${cluster.canonicalSaleInstanceKey}`)
+    lines.push(`- publishedSaleCount: ${cluster.publishedSaleCount}`)
+    for (const row of cluster.rows) {
+      lines.push(
+        `- ingested ${row.ingestedSaleId} → published ${row.publishedSaleId} (${row.sourcePlatform}) ${row.sourceUrl}`
+      )
+    }
+    lines.push('')
+  }
+  return lines.join('\n').trimEnd()
+}

@@ -245,6 +245,8 @@ export default function IngestionDashboardClient() {
             copyState={copyState}
             copyDisabled={loading || copyRefreshing}
             copyRefreshing={copyRefreshing}
+            onOpenDebug={() => setMode('debug')}
+            onOpenControls={() => setMode('controls')}
           />
         )}
 

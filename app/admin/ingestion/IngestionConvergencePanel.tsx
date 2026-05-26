@@ -1,7 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { DuplicateCanonicalPublishCluster } from '@/lib/admin/duplicateCanonicalPublishClusters'
+import {
+  formatDuplicateCanonicalClustersClipboard,
+  type DuplicateCanonicalPublishCluster,
+} from '@/lib/admin/duplicateCanonicalPublishClusters'
+import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
 
 type ClustersResponse = {
   ok: boolean
@@ -16,6 +20,7 @@ export default function IngestionConvergencePanel() {
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,6 +46,20 @@ export default function IngestionConvergencePanel() {
     void load()
   }, [load])
 
+  const copyClusters = useCallback(async () => {
+    if (!generatedAt || clusters.length === 0) return
+    try {
+      await copyTextToClipboard(
+        formatDuplicateCanonicalClustersClipboard(clusters, generatedAt)
+      )
+      setCopyState('copied')
+      window.setTimeout(() => setCopyState('idle'), 2000)
+    } catch {
+      setCopyState('error')
+      window.setTimeout(() => setCopyState('idle'), 4000)
+    }
+  }, [clusters, generatedAt])
+
   return (
     <section className="rounded-lg border border-fuchsia-300 bg-fuchsia-50/60 p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -58,14 +77,28 @@ export default function IngestionConvergencePanel() {
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="rounded-md border border-fuchsia-600 bg-white px-3 py-1.5 text-sm font-medium text-fuchsia-900 hover:bg-fuchsia-100 disabled:opacity-50"
-        >
-          {loading ? 'Loading…' : 'Refresh clusters'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void copyClusters()}
+            disabled={loading || clusters.length === 0}
+            className="rounded-md border border-fuchsia-600 bg-white px-3 py-1.5 text-sm font-medium text-fuchsia-900 hover:bg-fuchsia-100 disabled:opacity-50"
+          >
+            {copyState === 'copied'
+              ? 'Copied'
+              : copyState === 'error'
+                ? 'Copy failed'
+                : 'Copy cluster list'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="rounded-md border border-fuchsia-600 bg-white px-3 py-1.5 text-sm font-medium text-fuchsia-900 hover:bg-fuchsia-100 disabled:opacity-50"
+          >
+            {loading ? 'Loading…' : 'Refresh clusters'}
+          </button>
+        </div>
       </div>
 
       {error && (

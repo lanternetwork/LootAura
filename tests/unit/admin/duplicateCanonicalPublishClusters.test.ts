@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { groupDuplicateCanonicalPublishClusters } from '@/lib/admin/duplicateCanonicalPublishClusters'
+import {
+  formatDuplicateCanonicalClustersClipboard,
+  groupDuplicateCanonicalPublishClusters,
+} from '@/lib/admin/duplicateCanonicalPublishClusters'
 
 describe('groupDuplicateCanonicalPublishClusters', () => {
   it('returns clusters only when one canonical key maps to multiple published sales', () => {
@@ -61,5 +64,33 @@ describe('groupDuplicateCanonicalPublishClusters', () => {
       },
     ])
     expect(clusters).toHaveLength(0)
+  })
+
+  it('formats clusters for clipboard export', () => {
+    const clusters = groupDuplicateCanonicalPublishClusters([
+      {
+        ingestedSaleId: 'a1',
+        publishedSaleId: 'p1',
+        canonicalSaleInstanceKey: 'key-a',
+        sourcePlatform: 'yardsaletreasuremap',
+        sourceUrl: 'https://example.com/1',
+        city: null,
+        state: null,
+      },
+      {
+        ingestedSaleId: 'a2',
+        publishedSaleId: 'p2',
+        canonicalSaleInstanceKey: 'key-a',
+        sourcePlatform: 'yardsaletreasuremap',
+        sourceUrl: 'https://example.com/2',
+        city: null,
+        state: null,
+      },
+    ])
+    const text = formatDuplicateCanonicalClustersClipboard(clusters, '2026-05-26T00:00:00Z')
+    expect(text).toContain('key-a')
+    expect(text).toContain('clusterCount: 1')
+    expect(text).toContain('p1')
+    expect(text).toContain('p2')
   })
 })

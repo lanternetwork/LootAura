@@ -58,11 +58,16 @@ function minimalMetrics(): IngestionMetricsResponse {
       },
     },
     funnel: {
-      '24h': { detailFirst, stages: [], reach: {} as never, partition: {} as never },
+      '24h': {
+        detailFirst,
+        stages: {},
+        reach: {} as never,
+        partition: {} as never,
+      },
       '7d': {} as never,
     },
     oldestStuckRows: [],
-  } as IngestionMetricsResponse
+  } as unknown as IngestionMetricsResponse
 }
 
 describe('buildYstmStabilizationDiagnostics', () => {

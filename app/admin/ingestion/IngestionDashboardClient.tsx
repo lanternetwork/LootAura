@@ -34,6 +34,7 @@ export default function IngestionDashboardClient() {
   const [loading, setLoading] = useState(true)
   const [snapshots, setSnapshots] = useState<SnapshotPoint[]>([])
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [copyRefreshing, setCopyRefreshing] = useState(false)
   const [copyError, setCopyError] = useState<string | null>(null)
   const [baselineState, setBaselineState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [baselineError, setBaselineError] = useState<string | null>(null)
@@ -128,6 +129,25 @@ export default function IngestionDashboardClient() {
   const copyDiagnostics = useCallback(async () => {
     if (!data) return
     setCopyError(null)
+    setCopyRefreshing(true)
+    let freshCoverage = coverage
+    try {
+      const res = await fetch('/api/admin/ingestion/ystm-coverage', { credentials: 'include' })
+      const json = (await res.json()) as YstmCoverageMetricsResponse & {
+        ok?: boolean
+        message?: string
+      }
+      if (res.ok && json.ok) {
+        freshCoverage = json
+        setCoverage(json)
+        setCoverageError(null)
+      }
+    } catch {
+      /* use last known coverage if refresh fails */
+    } finally {
+      setCopyRefreshing(false)
+    }
+
     const environment =
       process.env.NEXT_PUBLIC_VERCEL_ENV ??
       process.env.NODE_ENV ??
@@ -135,7 +155,7 @@ export default function IngestionDashboardClient() {
     const text = buildIngestionDiagnostics(data, {
       environment,
       copiedAt: new Date().toISOString(),
-      ystmCoverage: coverage,
+      ystmCoverage: freshCoverage,
     })
     try {
       await copyTextToClipboard(text)
@@ -223,7 +243,8 @@ export default function IngestionDashboardClient() {
             coverageError={coverageError}
             onCopyDiagnostics={() => void copyDiagnostics()}
             copyState={copyState}
-            copyDisabled={loading}
+            copyDisabled={loading || copyRefreshing}
+            copyRefreshing={copyRefreshing}
           />
         )}
 

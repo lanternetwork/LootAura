@@ -7,7 +7,7 @@ import {
 } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 
-function minimalCoverage(
+export function minimalYstmCoverageScoreboard(
   overrides: Partial<YstmCoverageMetricsResponse> = {}
 ): YstmCoverageMetricsResponse {
   return {
@@ -220,7 +220,7 @@ function minimalCoverage(
 
 describe('evaluateYstmSaleInstanceRolloutGates', () => {
   it('passes observability and enforcement when scoreboard is green', () => {
-    const snap = evaluateYstmSaleInstanceRolloutGates(minimalCoverage())
+    const snap = evaluateYstmSaleInstanceRolloutGates(minimalYstmCoverageScoreboard())
     expect(snap.observabilityReady).toBe(true)
     expect(snap.enforcementReady).toBe(true)
     expect(snap.crossProviderEnforcementReady).toBe(true)
@@ -229,9 +229,9 @@ describe('evaluateYstmSaleInstanceRolloutGates', () => {
 
   it('fails enforcement when shadow divergence remains', () => {
     const snap = evaluateYstmSaleInstanceRolloutGates(
-      minimalCoverage({
+      minimalYstmCoverageScoreboard({
         saleInstanceShadowReplay: {
-          ...minimalCoverage().saleInstanceShadowReplay,
+          ...minimalYstmCoverageScoreboard().saleInstanceShadowReplay,
           divergenceOldSuppressNewPublishCount: 3,
         },
       })
@@ -242,9 +242,9 @@ describe('evaluateYstmSaleInstanceRolloutGates', () => {
 
   it('fails cross-provider enforcement when duplicate canonical publishes exist', () => {
     const snap = evaluateYstmSaleInstanceRolloutGates(
-      minimalCoverage({
+      minimalYstmCoverageScoreboard({
         crossProviderConvergence: {
-          ...minimalCoverage().crossProviderConvergence,
+          ...minimalYstmCoverageScoreboard().crossProviderConvergence,
           duplicatePublishedCanonicalClusters: 2,
           sloAttainment: {
             requiredConsecutiveDays: 14,
@@ -265,10 +265,10 @@ describe('evaluateYstmSaleInstanceRolloutGates', () => {
     const published = 1000
     const clusters = Math.ceil(published * DUPLICATE_VISIBLE_CLUSTER_RATE_MAX) + 1
     const snap = evaluateYstmSaleInstanceRolloutGates(
-      minimalCoverage({
+      minimalYstmCoverageScoreboard({
         publishedActiveLootAuraYstmUrls: published,
         falseExclusionSaleIdentity: {
-          ...minimalCoverage().falseExclusionSaleIdentity,
+          ...minimalYstmCoverageScoreboard().falseExclusionSaleIdentity,
           duplicateVisibleSaleClusters24h: clusters,
         },
       })
@@ -280,10 +280,10 @@ describe('evaluateYstmSaleInstanceRolloutGates', () => {
     const published = 200
     const withKey = Math.floor(published * ACTIVE_IDENTITY_KEY_COVERAGE_MIN) - 1
     const snap = evaluateYstmSaleInstanceRolloutGates(
-      minimalCoverage({
+      minimalYstmCoverageScoreboard({
         publishedActiveLootAuraYstmUrls: published,
         saleInstanceIdentity: {
-          ...minimalCoverage().saleInstanceIdentity,
+          ...minimalYstmCoverageScoreboard().saleInstanceIdentity,
           ystmActiveRowsWithKey: withKey,
         },
       })

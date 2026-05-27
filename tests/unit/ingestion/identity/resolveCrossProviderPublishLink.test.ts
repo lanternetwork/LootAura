@@ -51,22 +51,20 @@ describe('resolveCrossProviderPublishLink', () => {
           select: () => ({
             eq: () => ({
               neq: () => ({
-                neq: () => ({
-                  not: () => ({
-                    is: () => ({
+                not: () => ({
+                  is: () => ({
+                    order: () => ({
                       order: () => ({
-                        order: () => ({
-                          limit: async () => ({
-                            data: [
-                              {
-                                id: PRIMARY_INGESTED_ID,
-                                source_platform: 'external_page_source',
-                                published_sale_id: PUBLISHED_SALE_ID,
-                                is_duplicate: false,
-                              },
-                            ],
-                            error: null,
-                          }),
+                        limit: async () => ({
+                          data: [
+                            {
+                              id: PRIMARY_INGESTED_ID,
+                              source_platform: 'external_page_source',
+                              published_sale_id: PUBLISHED_SALE_ID,
+                              is_duplicate: false,
+                            },
+                          ],
+                          error: null,
                         }),
                       }),
                     }),
@@ -105,5 +103,132 @@ describe('resolveCrossProviderPublishLink', () => {
       matchMethod: 'canonical_published_sibling',
     })
     expect(mockFromBase).toHaveBeenCalled()
+  })
+
+  it('links to a published same-platform sibling by canonical key (YSTM↔YSTM)', async () => {
+    const KEEPER_ID = '33333333-3333-4333-8333-333333333333'
+    mockFromBase.mockImplementation((_admin: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        return {
+          select: () => ({
+            eq: () => ({
+              neq: () => ({
+                not: () => ({
+                  is: () => ({
+                    order: () => ({
+                      order: () => ({
+                        limit: async () => ({
+                          data: [
+                            {
+                              id: KEEPER_ID,
+                              source_platform: 'external_page_source',
+                              published_sale_id: PUBLISHED_SALE_ID,
+                              is_duplicate: false,
+                            },
+                          ],
+                          error: null,
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: () => ({
+            eq: () => ({
+              limit: async () => ({ data: [{ id: PUBLISHED_SALE_ID }], error: null }),
+            }),
+          }),
+        }
+      }
+      return {}
+    })
+
+    const { resolveCrossProviderPublishLink } = await import(
+      '@/lib/ingestion/identity/resolveCrossProviderPublishLink'
+    )
+    const result = await resolveCrossProviderPublishLink({
+      id: INCOMING_ID,
+      source_platform: 'external_page_source',
+      canonical_sale_instance_key: canonical,
+    })
+
+    expect(result).toEqual({
+      publishedSaleId: PUBLISHED_SALE_ID,
+      primaryIngestedSaleId: KEEPER_ID,
+      matchedIngestedSaleId: KEEPER_ID,
+      matchMethod: 'canonical_published_sibling_same_platform',
+    })
+  })
+
+  it('prefers same-platform sibling when both same and cross-platform exist', async () => {
+    const CROSS_PLATFORM_ID = '44444444-4444-4444-8444-444444444444'
+    const SAME_PLATFORM_ID = '55555555-5555-4555-8555-555555555555'
+    const SAME_SALE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    mockFromBase.mockImplementation((_admin: unknown, table: string) => {
+      if (table === 'ingested_sales') {
+        return {
+          select: () => ({
+            eq: () => ({
+              neq: () => ({
+                not: () => ({
+                  is: () => ({
+                    order: () => ({
+                      order: () => ({
+                        limit: async () => ({
+                          data: [
+                            {
+                              id: CROSS_PLATFORM_ID,
+                              source_platform: 'estatesales_net',
+                              published_sale_id: PUBLISHED_SALE_ID,
+                              is_duplicate: false,
+                            },
+                            {
+                              id: SAME_PLATFORM_ID,
+                              source_platform: 'external_page_source',
+                              published_sale_id: SAME_SALE,
+                              is_duplicate: false,
+                            },
+                          ],
+                          error: null,
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === 'sales') {
+        return {
+          select: () => ({
+            eq: () => ({
+              limit: async () => ({ data: [{ id: SAME_SALE }], error: null }),
+            }),
+          }),
+        }
+      }
+      return {}
+    })
+
+    const { resolveCrossProviderPublishLink } = await import(
+      '@/lib/ingestion/identity/resolveCrossProviderPublishLink'
+    )
+    const result = await resolveCrossProviderPublishLink({
+      id: INCOMING_ID,
+      source_platform: 'external_page_source',
+      canonical_sale_instance_key: canonical,
+    })
+
+    expect(result?.publishedSaleId).toBe(SAME_SALE)
+    expect(result?.matchMethod).toBe('canonical_published_sibling_same_platform')
+    expect(result?.matchedIngestedSaleId).toBe(SAME_PLATFORM_ID)
   })
 })

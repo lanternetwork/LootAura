@@ -96,7 +96,8 @@ export default function IngestionWorkstreamsPanel({ metrics, coverage, onOpenDeb
             ? `Insufficient classified skips (n=${crawl.total})`
             : '—'
           : `${(suspiciousShare * 100).toFixed(1)}% suspicious of ${crawl.total.toLocaleString()} classified skips`,
-      action: 'Sample top sub-reasons in Debug → crawl skip taxonomy; document benign patterns.',
+      action:
+        'Debug → crawl skip taxonomy: if bootstrap ON, date-change + refresh-queued is often expected. When bootstrap OFF, sample 50× url_match_dates_changed per YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md; no global dedupe changes.',
     },
     {
       id: 'D',

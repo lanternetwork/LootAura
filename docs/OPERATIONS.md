@@ -566,6 +566,14 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 **Success signal:** `canonicalSaleInstance.canonicalCoveragePct >= 95` while duplicate canonical publish clusters remain **0**.
 
+#### Crawl-skip suspicious-share triage (Workstream E / Phase 5)
+
+**Dashboard:** Ingestion → **Debug** → *Crawl skip taxonomy (24h)*; Overview priority when suspicious share ≥ 15% (n ≥ 20).
+
+**Runbook:** [`docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md`](./YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md) — bootstrap context, 50-row sampling procedure, A/B/C/D classification, Tier 2 “documented benign” template.
+
+**Do not:** weaken global dedupe or force-publish gated rows to lower suspicious share.
+
 **Phase 7 — SLO attainment and steady state (G4)**
 
 - **Program KPI:** `coveragePct ≥ 90` on the admin scoreboard (`sloAttainment` tracks consecutive UTC days at target).

@@ -330,7 +330,8 @@ export function buildOperationalPriorities(
       priorities.push({
         severity: 'warning',
         issue: `Suspicious crawl skips ${(suspiciousShare * 100).toFixed(1)}% of classified skips`,
-        suggestedAction: 'Open Debug → Refresh health; review date-change suppressions.',
+        suggestedAction:
+          'Debug → crawl skip taxonomy; sample url_match_dates_changed per docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md. Defer if bootstrap ON and mix is refresh-queued + date-change only.',
       })
     }
   }

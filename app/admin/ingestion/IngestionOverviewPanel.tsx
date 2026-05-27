@@ -59,13 +59,30 @@ export default function IngestionOverviewPanel({
       <section className={`rounded-lg border p-5 shadow-sm ${HEALTH_STYLE[hero.health]}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">System health</p>
-            <p className="mt-1 text-2xl font-bold capitalize">{hero.health}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">System health (Tier 1)</p>
+            <p className="mt-1 text-2xl font-bold">{hero.healthLabel}</p>
+            <p className="mt-1 text-sm font-medium">
+              {hero.interventionRequired
+                ? 'Intervention required — see priorities below or Debug.'
+                : hero.tier1Ready
+                  ? 'Tier 1 snapshot pass — continue 7-day hold in ops log.'
+                  : 'Tier 1 snapshot not met — monitor; no immediate blockers.'}
+            </p>
             <p className="mt-2 text-sm">
-              Current bottleneck: <span className="font-semibold">{hero.bottleneckLabel}</span>
+              Effective bottleneck: <span className="font-semibold">{hero.bottleneckLabel}</span>
+              {hero.rawBottleneck !== hero.bottleneck && (
+                <span className="opacity-80"> (metrics: {hero.rawBottleneck.replace(/_/g, ' ')})</span>
+              )}
             </p>
             <p className="mt-1 text-sm">{hero.coverageLine}</p>
             <p className="text-sm">{hero.convergenceLine}</p>
+            {hero.bootstrapAdvisories.length > 0 && (
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+                {hero.bootstrapAdvisories.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
           </div>
           <button
             type="button"

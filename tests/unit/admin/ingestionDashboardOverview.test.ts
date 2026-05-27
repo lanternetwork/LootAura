@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildCoverageBootstrapAdvisories,
   buildFunnelSnapshot,
   buildOperationalPriorities,
+  deriveEffectiveBottleneck,
   deriveIngestionHealthState,
+  isTier1InterventionRequired,
 } from '@/lib/admin/ingestionDashboardOverview'
 import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
@@ -215,8 +218,58 @@ describe('ingestionDashboardOverview', () => {
     const health = deriveIngestionHealthState(minimalMetrics(), {
       ok: true,
       crossProviderConvergence: { duplicatePublishedCanonicalClusters: 1 },
+      coverageBootstrap: { enabled: false },
+      esnetIngest: { enabled: false },
+      esnetBootstrap: { enabled: false },
     } as never)
     expect(health).toBe('blocked')
+    expect(isTier1InterventionRequired(minimalMetrics(), {
+      ok: true,
+      crossProviderConvergence: { duplicatePublishedCanonicalClusters: 1 },
+      coverageBootstrap: { enabled: false },
+      esnetIngest: { enabled: false },
+      esnetBootstrap: { enabled: false },
+    } as never)).toBe(true)
+  })
+
+  it('uses catalog repair as effective bottleneck when geocode queue is low', () => {
+    const metrics = minimalMetrics({
+      volume: {
+        ...minimalMetrics().volume,
+        bottleneck: 'geocode',
+        geocode: { ...minimalMetrics().volume.geocode, eligibleNeedsGeocodeCount: 2 },
+      },
+    })
+    const effective = deriveEffectiveBottleneck(metrics, {
+      ok: true,
+      catalogRepair: { repairQueueTotal: 274 },
+      pipelineBacklog: { catalogRepairQueue: 274 },
+    } as never)
+    expect(effective.id).toBe('catalog_repair')
+    expect(effective.label).toBe('Catalog repair')
+  })
+
+  it('emits bootstrap advisory when V grows and coverage falls', () => {
+    const advisories = buildCoverageBootstrapAdvisories({
+      ok: true,
+      coverageBootstrap: { enabled: true },
+      coveragePct: 79,
+      trend: [
+        {
+          completedAt: '2026-05-26T15:00:00Z',
+          coveragePct: 81,
+          validActiveYstmUrls: 1018,
+          publishedVisibleInAudit: 825,
+        },
+        {
+          completedAt: '2026-05-26T21:00:00Z',
+          coveragePct: 79,
+          validActiveYstmUrls: 1122,
+          publishedVisibleInAudit: 890,
+        },
+      ],
+    } as never)
+    expect(advisories.some((a) => a.includes('V) grew'))).toBe(true)
   })
 
   it('surfaces publish_failed in operational priorities', () => {

@@ -474,6 +474,8 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 **Goal:** At least **90%** of **valid-active** external marketplace listing URLs in the coverage audit footprint are **map-visible** on LootAura (`coveragePct ≥ 90`). This is **not** the detail-first parser SLO. Full program: `docs/EXTERNAL_SOURCE_COVERAGE_SPEC.md`.
 
+**Hands-off steady-state (pre–ESNet):** When stabilizing YSTM for autonomous operation, follow [`docs/YSTM_HANDS_OFF_STEADY_STATE_PROGRAM.md`](./YSTM_HANDS_OFF_STEADY_STATE_PROGRAM.md) for tier gates, workstreams, intervention thresholds, and ops cadence. Ingestion dashboard **Overview** health (`healthy` / `degraded` / `blocked`) is derived in `lib/admin/ingestionDashboardOverview.ts`.
+
 **Admin scoreboard:** `GET /api/admin/ingestion/ystm-coverage` (admin session). KPI fields: `validActiveYstmUrls`, `publishedVisibleInAuditFootprint`, `missingValidYstmUrls`, `coveragePct`.
 
 **Nationwide bootstrap (temporary catch-up):** Toggle from the ingestion dashboard (`POST /api/admin/ingestion/coverage-bootstrap` with `{ "enabled": true | false }`). State is stored in `ingestion_orchestration_state` key `coverage_bootstrap_nationwide` (migration `208_coverage_bootstrap_nationwide.sql`) — no new Vercel env vars. When enabled: higher code budgets, metro-priority audit, post-audit missing-ingest/repair chain, extra hourly missing-ingest and 3h catalog-repair crons in `vercel.json`. Auto-disables when exit criteria are met (≥90% coverage, missing ≤25, repair queue &lt;50, V≥3000, fetch/block ≤2%, enabled ≥24h) or fetch failure &gt;5%.
@@ -493,6 +495,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 — publish missing URLs |
 | `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
 | `0 12 * * *`, `0 14 * * *` | `/api/cron/ystm-catalog-repair` | 5 — repair stuck ingest |
+| `15 4 * * *` | `/api/cron/duplicate-canonical-slo` | Hands-off — daily duplicate canonical publish SLO (alert if clusters > 0) |
 
 **Default budgets (repo burn-in; override via env)**
 

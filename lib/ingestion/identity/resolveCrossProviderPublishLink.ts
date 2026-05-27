@@ -2,11 +2,15 @@ import { isCrossProviderPublishLinkEnforcementEnabled } from '@/lib/ingestion/id
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
+export type CanonicalPublishedSiblingMatchMethod =
+  | 'canonical_published_sibling'
+  | 'canonical_published_sibling_same_platform'
+
 export type CrossProviderPublishLink = {
   publishedSaleId: string
   primaryIngestedSaleId: string
   matchedIngestedSaleId: string
-  matchMethod: 'canonical_published_sibling'
+  matchMethod: CanonicalPublishedSiblingMatchMethod
 }
 
 type PublishLinkCandidate = {
@@ -40,12 +44,21 @@ async function saleExistsForId(saleId: string): Promise<boolean> {
 }
 
 function pickPublishedSibling(
-  candidates: readonly PublishLinkCandidate[]
-): { sibling: PublishLinkCandidate; primaryIngestedSaleId: string } | null {
+  candidates: readonly PublishLinkCandidate[],
+  incomingSourcePlatform: string
+): {
+  sibling: PublishLinkCandidate
+  primaryIngestedSaleId: string
+  matchMethod: CanonicalPublishedSiblingMatchMethod
+} | null {
   const withSale = candidates.filter((c) => c.published_sale_id?.trim())
   if (withSale.length === 0) return null
 
+  const incomingPlatform = incomingSourcePlatform.trim()
   const sorted = withSale.slice().sort((a, b) => {
+    const aSame = a.source_platform.trim() === incomingPlatform ? 0 : 1
+    const bSame = b.source_platform.trim() === incomingPlatform ? 0 : 1
+    if (aSame !== bSame) return aSame - bSame
     if (a.is_duplicate !== b.is_duplicate) {
       return a.is_duplicate ? 1 : -1
     }
@@ -53,11 +66,16 @@ function pickPublishedSibling(
   })
   const sibling = sorted[0]
   const primaryRow = sorted.find((c) => !c.is_duplicate) ?? sibling
-  return { sibling, primaryIngestedSaleId: primaryRow.id }
+  const matchMethod: CanonicalPublishedSiblingMatchMethod =
+    sibling.source_platform.trim() === incomingPlatform
+      ? 'canonical_published_sibling_same_platform'
+      : 'canonical_published_sibling'
+  return { sibling, primaryIngestedSaleId: primaryRow.id, matchMethod }
 }
 
 /**
- * Phase D belt-and-suspenders: reuse an already-published cross-provider sibling sale.
+ * Phase D/E: reuse an already-published canonical sibling sale (cross-provider or same-platform).
+ * Prevents duplicate visible pins when two rows share `canonical_sale_instance_key`.
  */
 export async function resolveCrossProviderPublishLink(
   record: CrossProviderPublishLinkInput
@@ -76,7 +94,6 @@ export async function resolveCrossProviderPublishLink(
     .select('id, source_platform, published_sale_id, is_duplicate')
     .eq('canonical_sale_instance_key', canonicalKey)
     .neq('id', record.id)
-    .neq('source_platform', record.source_platform)
     .not('published_sale_id', 'is', null)
     .is('superseded_by_ingested_sale_id', null)
     .order('is_duplicate', { ascending: true })
@@ -93,7 +110,7 @@ export async function resolveCrossProviderPublishLink(
   }
 
   const rows = (data ?? []) as PublishLinkCandidate[]
-  const picked = pickPublishedSibling(rows)
+  const picked = pickPublishedSibling(rows, record.source_platform)
   if (!picked?.sibling.published_sale_id) {
     return null
   }
@@ -118,6 +135,6 @@ export async function resolveCrossProviderPublishLink(
     publishedSaleId: saleId,
     primaryIngestedSaleId: picked.primaryIngestedSaleId,
     matchedIngestedSaleId: picked.sibling.id,
-    matchMethod: 'canonical_published_sibling',
+    matchMethod: picked.matchMethod,
   }
 }

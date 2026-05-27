@@ -98,6 +98,14 @@
     {
       "path": "/api/cron/ystm-catalog-repair",
       "schedule": "45 */3 * * *"
+    },
+    {
+      "path": "/api/cron/duplicate-canonical-slo",
+      "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/ystm-weekly-digest",
+      "schedule": "0 5 * * 1"
     }
   ]
 }

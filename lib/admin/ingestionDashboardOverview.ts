@@ -2,10 +2,24 @@ import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/i
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import {
+  evaluateYstmStabilizationExit,
+  STABILIZATION_CATALOG_REPAIR_MAX,
+  STABILIZATION_PUBLISH_FAILED_LOW_MAX,
+} from '@/lib/admin/ystmStabilizationExitCriteria'
+import {
   CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING,
   CRAWL_SKIP_TAXONOMY_MIN_SAMPLES,
 } from '@/lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth'
 import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
+
+/** Client-safe mirror of `YSTM_COVERAGE_TARGET_PCT` in ystmCoverageValidity.ts (avoid server import chain). */
+const YSTM_COVERAGE_TARGET_PCT = 90
+
+/** Tier 1 failures that require immediate intervention (Workstream H). */
+const TIER1_BLOCKED_CRITERION_IDS = new Set(['duplicate_clusters', 'detail_first_proof'])
+
+const GEOCODE_ELIGIBLE_LOW_THRESHOLD = 10
+const CATALOG_REPAIR_BOTTLENECK_MIN = 50
 
 export type IngestionDashboardMode = 'overview' | 'debug' | 'controls'
 
@@ -87,16 +101,18 @@ export function buildQueueHealthSummary(
   coverage: YstmCoverageMetricsResponse | null
 ): QueueHealthSummary {
   return {
-    catalogRepair: coverage?.catalogRepair.repairQueueTotal ?? coverage?.pipelineBacklog.catalogRepairQueue ?? 0,
+    catalogRepair:
+      coverage?.catalogRepair?.repairQueueTotal ?? coverage?.pipelineBacklog?.catalogRepairQueue ?? 0,
     addressEnrichment: metrics.volume.addressLifecycle.enrichmentBacklog,
     geocodeBacklog: metrics.backlog,
     geocodeEligible: metrics.geocodeEligibleBacklog,
     imageEnrichment: metrics.volume.imageEnrichment.backlog,
     missingIngest:
-      coverage?.pipelineBacklog.missingIngestionQueue ??
-      coverage?.missingIngestion.missingQueueTotal ??
+      coverage?.pipelineBacklog?.missingIngestionQueue ??
+      coverage?.missingIngestion?.missingQueueTotal ??
       0,
-    refreshStale: coverage?.pipelineBacklog.existingRefreshStale ?? coverage?.existingRefresh.staleOver12h ?? 0,
+    refreshStale:
+      coverage?.pipelineBacklog?.existingRefreshStale ?? coverage?.existingRefresh?.staleOver12h ?? 0,
     publishFailed: metrics.failureBreakdown.publish_failed,
     needsCheck: metrics.failureBreakdown.needs_check,
   }
@@ -143,35 +159,110 @@ export function buildRuntimeStateLines(
   ]
 }
 
+export function isTier1InterventionRequired(
+  metrics: IngestionMetricsResponse,
+  coverage: YstmCoverageMetricsResponse | null
+): boolean {
+  const exit = evaluateYstmStabilizationExit(metrics, coverage)
+  if (exit.tier1Criteria.some((c) => c.status === 'fail' && TIER1_BLOCKED_CRITERION_IDS.has(c.id))) {
+    return true
+  }
+  if (metrics.failureBreakdown.publish_failed > STABILIZATION_PUBLISH_FAILED_LOW_MAX) {
+    return true
+  }
+  const queues = buildQueueHealthSummary(metrics, coverage)
+  if (queues.catalogRepair >= 200) return true
+  return false
+}
+
+/**
+ * Overview health (green / degraded / blocked) derived from Tier 1 stabilization exit criteria.
+ */
 export function deriveIngestionHealthState(
   metrics: IngestionMetricsResponse,
   coverage: YstmCoverageMetricsResponse | null
 ): IngestionHealthState {
-  if (metrics.detailFirstProof.status === 'fail') return 'blocked'
-
-  if (coverage?.crossProviderConvergence.duplicatePublishedCanonicalClusters) {
+  if (isTier1InterventionRequired(metrics, coverage)) {
     return 'blocked'
   }
 
+  const exit = evaluateYstmStabilizationExit(metrics, coverage)
+  if (exit.tier1Ready) {
+    return 'healthy'
+  }
+
+  return 'degraded'
+}
+
+export function deriveEffectiveBottleneck(
+  metrics: IngestionMetricsResponse,
+  coverage: YstmCoverageMetricsResponse | null
+): { id: string; label: string; rawBottleneck: string } {
   const queues = buildQueueHealthSummary(metrics, coverage)
-  if (queues.publishFailed >= 100 || queues.catalogRepair >= 200) {
-    return 'blocked'
-  }
+  const rawBottleneck = metrics.volume.bottleneck
 
-  const crawl = metrics.volume.fetch.crawlSkipTaxonomy24h
-  if (crawl && crawl.total >= CRAWL_SKIP_TAXONOMY_MIN_SAMPLES) {
-    const suspiciousShare = crawl.suspicious / crawl.total
-    if (suspiciousShare >= CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING) {
-      return 'degraded'
+  if (queues.geocodeEligible <= GEOCODE_ELIGIBLE_LOW_THRESHOLD) {
+    if (
+      queues.catalogRepair >= CATALOG_REPAIR_BOTTLENECK_MIN &&
+      queues.catalogRepair >= queues.addressEnrichment
+    ) {
+      return { id: 'catalog_repair', label: 'Catalog repair', rawBottleneck }
+    }
+    if (queues.addressEnrichment >= STABILIZATION_CATALOG_REPAIR_MAX) {
+      return { id: 'address_enrichment', label: 'Address enrichment', rawBottleneck }
+    }
+    if (queues.catalogRepair >= STABILIZATION_CATALOG_REPAIR_MAX) {
+      return { id: 'catalog_repair', label: 'Catalog repair', rawBottleneck }
     }
   }
 
-  if (!metrics.funnel['24h'].detailFirst.operationalHealth.healthy) return 'degraded'
-  if (coverage && !coverage.operationalHealth.healthy) return 'degraded'
-  if (queues.addressEnrichment >= 150 || queues.catalogRepair >= 100) return 'degraded'
-  if (metrics.volume.bottleneck === 'db_provider_pressure') return 'degraded'
+  return { id: rawBottleneck, label: formatBottleneckLabel(rawBottleneck), rawBottleneck }
+}
 
-  return 'healthy'
+export function buildCoverageBootstrapAdvisories(
+  coverage: YstmCoverageMetricsResponse | null
+): string[] {
+  if (!coverage?.coverageBootstrap.enabled) {
+    return []
+  }
+
+  const advisories: string[] = []
+  const trend = coverage.trend ?? []
+
+  if (trend.length >= 2) {
+    const last = trend[trend.length - 1]
+    const prev = trend[trend.length - 2]
+    const vDelta = last.validActiveYstmUrls - prev.validActiveYstmUrls
+    if (
+      vDelta > 0 &&
+      last.coveragePct != null &&
+      prev.coveragePct != null &&
+      last.coveragePct < prev.coveragePct
+    ) {
+      advisories.push(
+        `Coverage fell ${(prev.coveragePct - last.coveragePct).toFixed(1)} pp while audit denominator (V) grew by ${vDelta.toLocaleString()} — expected while nationwide bootstrap expands the footprint faster than repair reconciles.`
+      )
+    }
+  }
+
+  if (coverage.coveragePct != null && coverage.coveragePct < YSTM_COVERAGE_TARGET_PCT) {
+    advisories.push(
+      `Nationwide bootstrap is ON and coverage is below ${YSTM_COVERAGE_TARGET_PCT}% — drain catalog repair before chasing coverage % while V is still expanding.`
+    )
+  }
+
+  return advisories
+}
+
+export function ingestionHealthDisplayLabel(health: IngestionHealthState): string {
+  switch (health) {
+    case 'healthy':
+      return 'Green'
+    case 'degraded':
+      return 'Degraded'
+    case 'blocked':
+      return 'Blocked'
+  }
 }
 
 export function buildOperationalPriorities(
@@ -208,11 +299,29 @@ export function buildOperationalPriorities(
     })
   }
 
+  for (const advisory of buildCoverageBootstrapAdvisories(coverage)) {
+    priorities.push({
+      severity: 'warning',
+      issue: advisory,
+      suggestedAction: 'Track V vs visible in daily ops log; turn bootstrap OFF when repair < 100.',
+    })
+  }
+
+  if (queues.refreshStale >= 150) {
+    priorities.push({
+      severity: 'warning',
+      issue: `Existing refresh stale backlog elevated (${queues.refreshStale.toLocaleString()} >12h)`,
+      suggestedAction:
+        'Ensure /api/cron/ystm-existing-refresh is running; tune CRON_YSTM_EXISTING_REFRESH_MAX_* only after repair stabilizes. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
+    })
+  }
+
   if (queues.catalogRepair >= 100) {
     priorities.push({
       severity: 'warning',
       issue: `Catalog repair queue elevated (${queues.catalogRepair.toLocaleString()})`,
-      suggestedAction: 'Let repair cron run; inspect publish vs needs_check in Debug.',
+      suggestedAction:
+        'Let repair cron drain; needs_check often represents gated address or non-publishable coordinate precision. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
     })
   }
 
@@ -224,6 +333,15 @@ export function buildOperationalPriorities(
     })
   }
 
+  if (queues.needsCheck >= 50) {
+    priorities.push({
+      severity: 'info',
+      issue: `${queues.needsCheck.toLocaleString()} needs_check row(s) (review/terminal queue)`,
+      suggestedAction:
+        'Treat needs_check as a bucket: address-gated listings and non-publishable precision park here; geocode cron can replay transient-provider dead-letter rows when 429 pressure is low. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
+    })
+  }
+
   const crawl = metrics.volume.fetch.crawlSkipTaxonomy24h
   if (crawl && crawl.total >= CRAWL_SKIP_TAXONOMY_MIN_SAMPLES) {
     const suspiciousShare = crawl.suspicious / crawl.total
@@ -231,7 +349,8 @@ export function buildOperationalPriorities(
       priorities.push({
         severity: 'warning',
         issue: `Suspicious crawl skips ${(suspiciousShare * 100).toFixed(1)}% of classified skips`,
-        suggestedAction: 'Open Debug → Refresh health; review date-change suppressions.',
+        suggestedAction:
+          'Debug → crawl skip taxonomy; sample url_match_dates_changed per docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md. Defer if bootstrap ON and mix is refresh-queued + date-change only.',
       })
     }
   }
@@ -286,15 +405,28 @@ export function ingestionHealthSummary(
   coverage: YstmCoverageMetricsResponse | null
 ): {
   health: IngestionHealthState
+  healthLabel: string
+  tier1Ready: boolean
+  interventionRequired: boolean
   bottleneck: string
   bottleneckLabel: string
+  rawBottleneck: string
   coverageLine: string
   convergenceLine: string
+  bootstrapAdvisories: string[]
 } {
+  const exit = evaluateYstmStabilizationExit(metrics, coverage)
+  const effective = deriveEffectiveBottleneck(metrics, coverage)
+  const health = deriveIngestionHealthState(metrics, coverage)
+
   return {
-    health: deriveIngestionHealthState(metrics, coverage),
-    bottleneck: metrics.volume.bottleneck,
-    bottleneckLabel: formatBottleneckLabel(metrics.volume.bottleneck),
+    health,
+    healthLabel: ingestionHealthDisplayLabel(health),
+    tier1Ready: exit.tier1Ready,
+    interventionRequired: isTier1InterventionRequired(metrics, coverage),
+    bottleneck: effective.id,
+    bottleneckLabel: effective.label,
+    rawBottleneck: effective.rawBottleneck,
     coverageLine: coverage
       ? `${coverage.coveragePct?.toFixed(1) ?? '—'}% coverage (V=${coverage.validActiveYstmUrls.toLocaleString()})`
       : 'Coverage data unavailable',
@@ -303,5 +435,6 @@ export function ingestionHealthSummary(
         ? 'Cross-provider convergence healthy'
         : `${coverage.crossProviderConvergence.duplicatePublishedCanonicalClusters} duplicate canonical cluster(s)`
       : 'Convergence data unavailable',
+    bootstrapAdvisories: buildCoverageBootstrapAdvisories(coverage),
   }
 }

@@ -49,6 +49,7 @@ export const ObservabilityEvents = {
     crossProviderShadowDisposition: 'ingestion.cross_provider.shadow_disposition',
     crossProviderObservationInsert: 'ingestion.cross_provider.observation_insert',
     crossProviderPublishLinked: 'ingestion.cross_provider.publish_linked',
+    duplicateCanonicalPublishSloCheck: 'ingestion.convergence.duplicate_canonical_publish_slo_check',
   },
   geocode: {
     batchStarted: 'geocode.worker.batch_started',

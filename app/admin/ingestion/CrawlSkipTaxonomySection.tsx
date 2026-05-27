@@ -36,10 +36,17 @@ export default function CrawlSkipTaxonomySection({
     >
       <h2 className="text-lg font-semibold text-gray-900">Crawl skip taxonomy (Phase 2)</h2>
       <p className="mt-1 max-w-3xl text-sm text-gray-600">
-        Classified skip sub-reasons from external crawl (observability only). Alerts use{' '}
-        <strong>suspicious share</strong> of classified skips (≥
-        {(CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING * 100).toFixed(0)}% when n≥{CRAWL_SKIP_TAXONOMY_MIN_SAMPLES}),
-        not total duplicate skip rate.
+        Classified skip sub-reasons from external crawl (observability only — suppression behavior is unchanged).
+        Alerts use <strong>suspicious share</strong> of classified skips (≥
+        {(CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING * 100).toFixed(0)}% when n≥{CRAWL_SKIP_TAXONOMY_MIN_SAMPLES}), not total
+        duplicate skip rate or publish failures.
+      </p>
+      <p className="mt-2 max-w-3xl text-sm text-slate-600">
+        During nationwide <strong>coverage bootstrap</strong>, elevated{' '}
+        <code className="text-[11px]">url_match_dates_changed</code> plus benign{' '}
+        <code className="text-[11px]">url_match_refresh_queued</code> is expected. Triage only when bootstrap is OFF or
+        repair is draining and suspicious share stays high — see{' '}
+        <code className="text-[11px]">docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md</code>.
       </p>
 
       {alerts.length > 0 && (
@@ -107,6 +114,19 @@ export default function CrawlSkipTaxonomySection({
           runs with Phase 2 deployed.
         </p>
       )}
+
+      {rollup.total >= CRAWL_SKIP_TAXONOMY_MIN_SAMPLES &&
+        rollup.suspiciousShare != null &&
+        rollup.suspiciousShare >= CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <p className="font-medium">Triage checklist (Workstream E)</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs">
+              <li>Confirm bootstrap state on Controls — defer if ON and top reasons are date-change + refresh-queued.</li>
+              <li>Sample ~50× <code className="text-[11px]">url_match_dates_changed</code> (benign refresh vs false suppression).</li>
+              <li>Document A/B/C/D counts in ops log; code fix only for confirmed false suppression (no global dedupe change).</li>
+            </ol>
+          </div>
+        )}
 
       <p className="mt-3 text-xs text-gray-500">
         Benign: {BENIGN_CRAWL_SKIP_SUB_REASONS.join(', ')} · Suspicious:{' '}

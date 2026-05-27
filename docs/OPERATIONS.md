@@ -474,6 +474,8 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 **Goal:** At least **90%** of **valid-active** external marketplace listing URLs in the coverage audit footprint are **map-visible** on LootAura (`coveragePct ≥ 90`). This is **not** the detail-first parser SLO. Full program: `docs/EXTERNAL_SOURCE_COVERAGE_SPEC.md`.
 
+**Hands-off steady-state (pre–ESNet):** When stabilizing YSTM for autonomous operation, follow [`docs/YSTM_HANDS_OFF_STEADY_STATE_PROGRAM.md`](./YSTM_HANDS_OFF_STEADY_STATE_PROGRAM.md) for tier gates, workstreams, intervention thresholds, and ops cadence. Ingestion dashboard **Overview** health (`healthy` / `degraded` / `blocked`) is derived in `lib/admin/ingestionDashboardOverview.ts`.
+
 **Admin scoreboard:** `GET /api/admin/ingestion/ystm-coverage` (admin session). KPI fields: `validActiveYstmUrls`, `publishedVisibleInAuditFootprint`, `missingValidYstmUrls`, `coveragePct`.
 
 **Nationwide bootstrap (temporary catch-up):** Toggle from the ingestion dashboard (`POST /api/admin/ingestion/coverage-bootstrap` with `{ "enabled": true | false }`). State is stored in `ingestion_orchestration_state` key `coverage_bootstrap_nationwide` (migration `208_coverage_bootstrap_nationwide.sql`) — no new Vercel env vars. When enabled: higher code budgets, metro-priority audit, post-audit missing-ingest/repair chain, extra hourly missing-ingest and 3h catalog-repair crons in `vercel.json`. Auto-disables when exit criteria are met (≥90% coverage, missing ≤25, repair queue &lt;50, V≥3000, fetch/block ≤2%, enabled ≥24h) or fetch failure &gt;5%.
@@ -493,6 +495,8 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | `0 8 * * *`, `0 20 * * *` | `/api/cron/ystm-missing-ingest` | 3 — publish missing URLs |
 | `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
 | `0 12 * * *`, `0 14 * * *` | `/api/cron/ystm-catalog-repair` | 5 — repair stuck ingest |
+| `15 4 * * *` | `/api/cron/duplicate-canonical-slo` | Hands-off — daily duplicate canonical publish SLO (alert if clusters > 0) |
+| `0 5 * * 1` | `/api/cron/ystm-weekly-digest` | Hands-off — weekly aggregate YSTM stabilization digest payload |
 
 **Default budgets (repo burn-in; override via env)**
 
@@ -512,7 +516,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 - After deploy, manually invoke once: `GET /api/cron/ystm-coverage-audit` with cron auth; confirm JSON `listingUrlsDiscovered > 0` and SQL `valid_active_v` increases.
 - Missing-ingest cron scans **never-attempted** URLs first (`missing_ingestion_attempted_at` nulls-first) before failed retries; watch `missingIngestionNeverAttempted` on the scoreboard.
-- Existing-refresh cron prioritizes **stale/never-synced** rows, then **published** ingested sales; watch `existingRefreshStale` and `neverSynced` on the scoreboard.
+- Existing-refresh cron prioritizes **stale/never-synced** rows, then **published** ingested sales; watch `existingRefreshStale` and `neverSynced` on the scoreboard (runbook: [`docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md)).
 - If `coveragePct` stays null with `valid_active_v = 0`, fix migrations/cron before tuning missing-ingest.
 - Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days (see Phase 7 below).
 
@@ -536,6 +540,52 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 **Operational SLO query (must stay empty):** No `canonical_sale_instance_key` may map to more than one distinct `published_sale_id` on published external ingested rows. The scoreboard field `crossProviderConvergence.duplicatePublishedCanonicalClusters` must remain **0**.
 
 **Telemetry:** `ingestion.cross_provider.shadow_disposition`, `ingestion.cross_provider.observation_insert`, `ingestion.cross_provider.publish_linked` (`lib/observability/events.ts`).
+
+#### Canonical key backfill operations (Phase A / Workstream B)
+
+**Primary execution path (what actually runs):**
+
+1. Admin UI button in `YstmCoverageScoreboardSection` posts to `POST /api/admin/ingested-sales/backfill-canonical-sale-instance-key`.
+2. Route validates payload with `RemediateCanonicalSaleInstanceKeySchema`.
+3. Route executes `remediateCanonicalSaleInstanceKeyBacklog()`.
+4. Remediator executes `runBackfillCanonicalSaleInstanceKey()` in bounded batches.
+5. Coverage scoreboard refreshes to reflect canonical coverage progress and collisions.
+
+**Guardrails and fallback behavior:**
+
+- UI blocks canonical backfill when `duplicatePublishedCanonicalClusters > 0`.
+- Backfill only scans external ingested rows with `canonical_sale_instance_key IS NULL`, `is_duplicate = false`, and non-null source URL.
+- Rows without sufficient canonical inputs are counted as skipped (`missingCanonicalInputs`) and left unchanged (no hardcoded fallback key).
+- API returns structured errors (`INVALID_BODY`, `BACKFILL_FAILED`) and logs failures under `api/admin/ingested-sales/backfill-canonical-sale-instance-key`.
+
+**Operator run sequence:**
+
+1. Confirm duplicate clusters are **0** on Overview/Debug.
+2. Run canonical backfill from Controls.
+3. After each batch, re-check duplicate clusters remain **0** and canonical coverage is trending up.
+4. Stop and investigate if clusters increase or collision groups spike unexpectedly.
+
+**Success signal:** `canonicalSaleInstance.canonicalCoveragePct >= 95` while duplicate canonical publish clusters remain **0**.
+
+#### Crawl-skip suspicious-share triage (Workstream E / Phase 5)
+
+**Dashboard:** Ingestion → **Debug** → *Crawl skip taxonomy (24h)*; Overview priority when suspicious share ≥ 15% (n ≥ 20).
+
+**Runbook:** [`docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md`](./YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md) — bootstrap context, 50-row sampling procedure, A/B/C/D classification, Tier 2 “documented benign” template.
+
+**Do not:** weaken global dedupe or force-publish gated rows to lower suspicious share.
+
+#### Refresh stale + needs_check operations (Workstreams F/G — Phases 6–7)
+
+**Runbook:** [`docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md) — refresh stale meaning, existing-refresh cron levers, and the `needs_check` bucket (address gating, precision gating, geocode dead-letter replay).
+
+#### Weekly YSTM stabilization digest (Workstream I / Phase 9)
+
+**Route:** `GET/POST /api/cron/ystm-weekly-digest` (cron auth only).
+
+**Purpose:** Emit an aggregate weekly snapshot for automation/ops capture (coverage %, missing, repair queue, refresh stale, duplicate clusters) and include markdown diagnostics generated from coverage scoreboard data.
+
+**Payload:** `job`, top-line fields (`coveragePct`, `catalogRepairQueue`, `existingRefreshStale`, `duplicatePublishedCanonicalClusters`), plus `digest` markdown string.
 
 **Phase 7 — SLO attainment and steady state (G4)**
 

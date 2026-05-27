@@ -11,7 +11,9 @@ import {
   CRAWL_SKIP_TAXONOMY_MIN_SAMPLES,
 } from '@/lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth'
 import { DETAIL_FIRST_SUCCESS_RATE_TARGET } from '@/lib/ingestion/acquisition/detailFirstOperationalHealth'
-import { YSTM_COVERAGE_TARGET_PCT } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
+
+/** Client-safe mirror of `YSTM_COVERAGE_TARGET_PCT` in ystmCoverageValidity.ts (avoid server import chain). */
+const YSTM_COVERAGE_TARGET_PCT = 90
 
 /** Tier 1 failures that require immediate intervention (Workstream H). */
 const TIER1_BLOCKED_CRITERION_IDS = new Set(['duplicate_clusters', 'detail_first_proof'])

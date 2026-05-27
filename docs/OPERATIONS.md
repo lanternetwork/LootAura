@@ -540,6 +540,32 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 **Telemetry:** `ingestion.cross_provider.shadow_disposition`, `ingestion.cross_provider.observation_insert`, `ingestion.cross_provider.publish_linked` (`lib/observability/events.ts`).
 
+#### Canonical key backfill operations (Phase A / Workstream B)
+
+**Primary execution path (what actually runs):**
+
+1. Admin UI button in `YstmCoverageScoreboardSection` posts to `POST /api/admin/ingested-sales/backfill-canonical-sale-instance-key`.
+2. Route validates payload with `RemediateCanonicalSaleInstanceKeySchema`.
+3. Route executes `remediateCanonicalSaleInstanceKeyBacklog()`.
+4. Remediator executes `runBackfillCanonicalSaleInstanceKey()` in bounded batches.
+5. Coverage scoreboard refreshes to reflect canonical coverage progress and collisions.
+
+**Guardrails and fallback behavior:**
+
+- UI blocks canonical backfill when `duplicatePublishedCanonicalClusters > 0`.
+- Backfill only scans external ingested rows with `canonical_sale_instance_key IS NULL`, `is_duplicate = false`, and non-null source URL.
+- Rows without sufficient canonical inputs are counted as skipped (`missingCanonicalInputs`) and left unchanged (no hardcoded fallback key).
+- API returns structured errors (`INVALID_BODY`, `BACKFILL_FAILED`) and logs failures under `api/admin/ingested-sales/backfill-canonical-sale-instance-key`.
+
+**Operator run sequence:**
+
+1. Confirm duplicate clusters are **0** on Overview/Debug.
+2. Run canonical backfill from Controls.
+3. After each batch, re-check duplicate clusters remain **0** and canonical coverage is trending up.
+4. Stop and investigate if clusters increase or collision groups spike unexpectedly.
+
+**Success signal:** `canonicalSaleInstance.canonicalCoveragePct >= 95` while duplicate canonical publish clusters remain **0**.
+
 **Phase 7 — SLO attainment and steady state (G4)**
 
 - **Program KPI:** `coveragePct ≥ 90` on the admin scoreboard (`sloAttainment` tracks consecutive UTC days at target).

@@ -307,11 +307,21 @@ export function buildOperationalPriorities(
     })
   }
 
+  if (queues.refreshStale >= 150) {
+    priorities.push({
+      severity: 'warning',
+      issue: `Existing refresh stale backlog elevated (${queues.refreshStale.toLocaleString()} >12h)`,
+      suggestedAction:
+        'Ensure /api/cron/ystm-existing-refresh is running; tune CRON_YSTM_EXISTING_REFRESH_MAX_* only after repair stabilizes. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
+    })
+  }
+
   if (queues.catalogRepair >= 100) {
     priorities.push({
       severity: 'warning',
       issue: `Catalog repair queue elevated (${queues.catalogRepair.toLocaleString()})`,
-      suggestedAction: 'Let repair cron run; inspect publish vs needs_check in Debug.',
+      suggestedAction:
+        'Let repair cron drain; needs_check often represents gated address or non-publishable coordinate precision. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
     })
   }
 
@@ -320,6 +330,15 @@ export function buildOperationalPriorities(
       severity: 'warning',
       issue: `Address enrichment backlog (${queues.addressEnrichment.toLocaleString()})`,
       suggestedAction: 'Confirm address enrichment worker; listings may be gated until unlock.',
+    })
+  }
+
+  if (queues.needsCheck >= 50) {
+    priorities.push({
+      severity: 'info',
+      issue: `${queues.needsCheck.toLocaleString()} needs_check row(s) (review/terminal queue)`,
+      suggestedAction:
+        'Treat needs_check as a bucket: address-gated listings and non-publishable precision park here; geocode cron can replay transient-provider dead-letter rows when 429 pressure is low. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
     })
   }
 

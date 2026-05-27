@@ -116,7 +116,7 @@ export default function IngestionWorkstreamsPanel({ metrics, coverage, onOpenDeb
       title: 'Existing refresh stale backlog',
       status: queues.refreshStale > 0 ? 'watch' : 'ready',
       metric: `${queues.refreshStale.toLocaleString()} stale >12h`,
-      action: 'Track daily trend in ops log; should be flat or down during stabilization.',
+      action: 'Track daily trend in ops log; tune refresh budgets only after repair stabilizes. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
     },
     {
       id: 'F',
@@ -130,7 +130,7 @@ export default function IngestionWorkstreamsPanel({ metrics, coverage, onOpenDeb
       title: 'Needs check queue',
       status: queues.needsCheck > 25 ? 'watch' : 'info',
       metric: `${queues.needsCheck.toLocaleString()} needs_check`,
-      action: 'Triage after repair queue and missing URLs are under control.',
+      action: 'Treat needs_check as a bucket (address gating, precision gating, dead-letter replay). Triage after repair/missing; see docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
     },
     {
       id: 'H',

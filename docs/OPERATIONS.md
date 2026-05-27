@@ -515,7 +515,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 
 - After deploy, manually invoke once: `GET /api/cron/ystm-coverage-audit` with cron auth; confirm JSON `listingUrlsDiscovered > 0` and SQL `valid_active_v` increases.
 - Missing-ingest cron scans **never-attempted** URLs first (`missing_ingestion_attempted_at` nulls-first) before failed retries; watch `missingIngestionNeverAttempted` on the scoreboard.
-- Existing-refresh cron prioritizes **stale/never-synced** rows, then **published** ingested sales; watch `existingRefreshStale` and `neverSynced` on the scoreboard.
+- Existing-refresh cron prioritizes **stale/never-synced** rows, then **published** ingested sales; watch `existingRefreshStale` and `neverSynced` on the scoreboard (runbook: [`docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md)).
 - If `coveragePct` stays null with `valid_active_v = 0`, fix migrations/cron before tuning missing-ingest.
 - Reduce defaults toward spec “steady state” after `coveragePct ≥ 90` for 14 days (see Phase 7 below).
 
@@ -573,6 +573,10 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 **Runbook:** [`docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md`](./YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md) — bootstrap context, 50-row sampling procedure, A/B/C/D classification, Tier 2 “documented benign” template.
 
 **Do not:** weaken global dedupe or force-publish gated rows to lower suspicious share.
+
+#### Refresh stale + needs_check operations (Workstreams F/G — Phases 6–7)
+
+**Runbook:** [`docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md) — refresh stale meaning, existing-refresh cron levers, and the `needs_check` bucket (address gating, precision gating, geocode dead-letter replay).
 
 **Phase 7 — SLO attainment and steady state (G4)**
 

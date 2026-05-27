@@ -17,6 +17,7 @@ Operators monitor alerts, not tune the system daily.
 - Long-form coverage spec (Phases 1–7 / G4): [`docs/EXTERNAL_SOURCE_COVERAGE_SPEC.md`](./EXTERNAL_SOURCE_COVERAGE_SPEC.md)
 - Cross-provider convergence (Phases A–E): [`docs/OPERATIONS.md`](./OPERATIONS.md) — *Cross-provider sale convergence*
 - Crawl-skip taxonomy and false-exclusion audit: [`docs/EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md`](./EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md)
+- Refresh backlog + needs_check policy runbook (Phases 6–7): [`docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md)
 
 **Code anchors**
 
@@ -147,11 +148,13 @@ Bootstrap can grow **V** faster than repair reconciles → coverage % may **fall
 
 - **After** repair stable. Track `existingRefreshStale`; correlate with refresh-queued skips.
 - **Do not** spike refresh throughput before repair <100.
+- **Runbook:** [`YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md)
 - **Exit:** flat/down 14 days; not driving missing growth.
 
 ### Phase 7 — Workstream G (P2): Needs-check policy
 
 - Merge with repair family. Bucket oldest `needs_check` rows; define retry/expire/repair per bucket.
+- **Runbook:** [`YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md)
 - **Exit:** `needs_check` bounded and explainable at steady-state.
 
 ### Phase 8 — Workstream H (P2): Dashboard finalization

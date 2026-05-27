@@ -9,6 +9,8 @@ import {
 } from '@/lib/admin/ingestionDashboardOverview'
 import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
+import { minimalYstmCoverageScoreboard } from '@/tests/unit/admin/evaluateYstmSaleInstanceRolloutGates.test'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 
 function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}): IngestionMetricsResponse {
@@ -215,60 +217,64 @@ describe('ingestionDashboardOverview', () => {
   })
 
   it('marks blocked when duplicate canonical clusters present', () => {
-    const health = deriveIngestionHealthState(minimalMetrics(), {
-      ok: true,
-      crossProviderConvergence: { duplicatePublishedCanonicalClusters: 1 },
-      coverageBootstrap: { enabled: false },
-      esnetIngest: { enabled: false },
-      esnetBootstrap: { enabled: false },
-    } as never)
-    expect(health).toBe('blocked')
-    expect(isTier1InterventionRequired(minimalMetrics(), {
-      ok: true,
-      crossProviderConvergence: { duplicatePublishedCanonicalClusters: 1 },
-      coverageBootstrap: { enabled: false },
-      esnetIngest: { enabled: false },
-      esnetBootstrap: { enabled: false },
-    } as never)).toBe(true)
+    const coverage = minimalYstmCoverageScoreboard({
+      crossProviderConvergence: {
+        ...minimalYstmCoverageScoreboard().crossProviderConvergence,
+        duplicatePublishedCanonicalClusters: 1,
+      },
+    })
+    const metrics = minimalMetrics()
+    expect(deriveIngestionHealthState(metrics, coverage)).toBe('blocked')
+    expect(isTier1InterventionRequired(metrics, coverage)).toBe(true)
   })
 
   it('uses catalog repair as effective bottleneck when geocode queue is low', () => {
     const metrics = minimalMetrics({
+      geocodeEligibleBacklog: 2,
       volume: {
         ...minimalMetrics().volume,
         bottleneck: 'geocode',
         geocode: { ...minimalMetrics().volume.geocode, eligibleNeedsGeocodeCount: 2 },
       },
     })
-    const effective = deriveEffectiveBottleneck(metrics, {
-      ok: true,
-      catalogRepair: { repairQueueTotal: 274 },
-      pipelineBacklog: { catalogRepairQueue: 274 },
-    } as never)
+    const effective = deriveEffectiveBottleneck(
+      metrics,
+      minimalYstmCoverageScoreboard({
+        catalogRepair: { ...minimalYstmCoverageScoreboard().catalogRepair, repairQueueTotal: 274 },
+        pipelineBacklog: {
+          ...minimalYstmCoverageScoreboard().pipelineBacklog,
+          catalogRepairQueue: 274,
+        },
+      })
+    )
     expect(effective.id).toBe('catalog_repair')
     expect(effective.label).toBe('Catalog repair')
   })
 
   it('emits bootstrap advisory when V grows and coverage falls', () => {
-    const advisories = buildCoverageBootstrapAdvisories({
-      ok: true,
-      coverageBootstrap: { enabled: true },
-      coveragePct: 79,
-      trend: [
-        {
-          completedAt: '2026-05-26T15:00:00Z',
-          coveragePct: 81,
-          validActiveYstmUrls: 1018,
-          publishedVisibleInAudit: 825,
+    const advisories = buildCoverageBootstrapAdvisories(
+      minimalYstmCoverageScoreboard({
+        coverageBootstrap: {
+          ...minimalYstmCoverageScoreboard().coverageBootstrap,
+          enabled: true,
         },
-        {
-          completedAt: '2026-05-26T21:00:00Z',
-          coveragePct: 79,
-          validActiveYstmUrls: 1122,
-          publishedVisibleInAudit: 890,
-        },
-      ],
-    } as never)
+        coveragePct: 79,
+        trend: [
+          {
+            completedAt: '2026-05-26T15:00:00Z',
+            coveragePct: 81,
+            validActiveYstmUrls: 1018,
+            publishedVisibleInAudit: 825,
+          },
+          {
+            completedAt: '2026-05-26T21:00:00Z',
+            coveragePct: 79,
+            validActiveYstmUrls: 1122,
+            publishedVisibleInAudit: 890,
+          },
+        ],
+      })
+    )
     expect(advisories.some((a) => a.includes('V) grew'))).toBe(true)
   })
 

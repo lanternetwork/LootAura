@@ -101,16 +101,18 @@ export function buildQueueHealthSummary(
   coverage: YstmCoverageMetricsResponse | null
 ): QueueHealthSummary {
   return {
-    catalogRepair: coverage?.catalogRepair.repairQueueTotal ?? coverage?.pipelineBacklog.catalogRepairQueue ?? 0,
+    catalogRepair:
+      coverage?.catalogRepair?.repairQueueTotal ?? coverage?.pipelineBacklog?.catalogRepairQueue ?? 0,
     addressEnrichment: metrics.volume.addressLifecycle.enrichmentBacklog,
     geocodeBacklog: metrics.backlog,
     geocodeEligible: metrics.geocodeEligibleBacklog,
     imageEnrichment: metrics.volume.imageEnrichment.backlog,
     missingIngest:
-      coverage?.pipelineBacklog.missingIngestionQueue ??
-      coverage?.missingIngestion.missingQueueTotal ??
+      coverage?.pipelineBacklog?.missingIngestionQueue ??
+      coverage?.missingIngestion?.missingQueueTotal ??
       0,
-    refreshStale: coverage?.pipelineBacklog.existingRefreshStale ?? coverage?.existingRefresh.staleOver12h ?? 0,
+    refreshStale:
+      coverage?.pipelineBacklog?.existingRefreshStale ?? coverage?.existingRefresh?.staleOver12h ?? 0,
     publishFailed: metrics.failureBreakdown.publish_failed,
     needsCheck: metrics.failureBreakdown.needs_check,
   }

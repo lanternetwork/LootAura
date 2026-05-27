@@ -496,6 +496,7 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 | `0 10 * * *`, `0 22 * * *` | `/api/cron/ystm-existing-refresh` | 4 — refresh known URLs |
 | `0 12 * * *`, `0 14 * * *` | `/api/cron/ystm-catalog-repair` | 5 — repair stuck ingest |
 | `15 4 * * *` | `/api/cron/duplicate-canonical-slo` | Hands-off — daily duplicate canonical publish SLO (alert if clusters > 0) |
+| `0 5 * * 1` | `/api/cron/ystm-weekly-digest` | Hands-off — weekly aggregate YSTM stabilization digest payload |
 
 **Default budgets (repo burn-in; override via env)**
 
@@ -577,6 +578,14 @@ Canonical event names: `lib/observability/events.ts` (`parser.source.degraded`, 
 #### Refresh stale + needs_check operations (Workstreams F/G — Phases 6–7)
 
 **Runbook:** [`docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md) — refresh stale meaning, existing-refresh cron levers, and the `needs_check` bucket (address gating, precision gating, geocode dead-letter replay).
+
+#### Weekly YSTM stabilization digest (Workstream I / Phase 9)
+
+**Route:** `GET/POST /api/cron/ystm-weekly-digest` (cron auth only).
+
+**Purpose:** Emit an aggregate weekly snapshot for automation/ops capture (coverage %, missing, repair queue, refresh stale, duplicate clusters) and include markdown diagnostics generated from coverage scoreboard data.
+
+**Payload:** `job`, top-line fields (`coveragePct`, `catalogRepairQueue`, `existingRefreshStale`, `duplicatePublishedCanonicalClusters`), plus `digest` markdown string.
 
 **Phase 7 — SLO attainment and steady state (G4)**
 

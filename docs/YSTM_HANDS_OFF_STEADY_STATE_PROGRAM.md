@@ -176,6 +176,7 @@ Stabilization exit table and cluster drill-down remain on the stabilization sect
 
 - **Required:** daily duplicate-cluster SLO cron; Phase 1B guard; existing crons + bootstrap auto-disable.
 - **Nice-to-have:** weekly digest, Slack, auto-remediation emails.
+- **Implemented in #505:** weekly digest endpoint `GET/POST /api/cron/ystm-weekly-digest` (aggregate payload + markdown diagnostics; cron-auth only).
 - **Exit:** No routine manual SQL for **30 consecutive days**.
 
 ---

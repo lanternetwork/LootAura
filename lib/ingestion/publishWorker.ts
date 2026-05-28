@@ -1090,7 +1090,8 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
   try {
     const created = await createPublishedSale(body)
     saleId = created.saleId
-    timeStartNormalizationReason = created.diagnostics.timeStartNormalizationReason
+    timeStartNormalizationReason =
+      created.diagnostics?.timeStartNormalizationReason ?? 'source_preserved'
   } catch (err) {
     if (!isIngestedSaleIdUniqueViolation(err)) throw err
     const existing = await fetchExistingSaleIdForIngested(record.id)

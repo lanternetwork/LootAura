@@ -21,9 +21,7 @@ describe('buildCrawlSmokeUrl', () => {
     expect(() => buildCrawlSmokeUrl('//evil.example/path')).toThrow(/Invalid crawl smoke path/)
   })
 
-  it('rejects paths that escape the configured origin', () => {
-    expect(() => buildCrawlSmokeUrl('https://evil.example/path')).toThrow(
-      /configured site origin/
-    )
+  it('rejects absolute URLs (only site-relative paths allowed)', () => {
+    expect(() => buildCrawlSmokeUrl('https://evil.example/path')).toThrow(/Invalid crawl smoke path/)
   })
 })

@@ -1,12 +1,14 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 import type { ListingSitemapRow } from '@/lib/seo/sitemap/listingEntries'
 
-/** Fetch all published sale ids for sitemap chunking (bounded by operational health at plan level). */
+/**
+ * Published sales for sitemap chunking.
+ * Uses service-role client (no request cookies) so sitemap generation works at build time.
+ */
 export async function fetchPublishedListingRowsForSitemap(): Promise<ListingSitemapRow[]> {
-  const supabase = await createSupabaseServerClient()
-  const { data, error } = await supabase
-    .from(T.sales)
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, T.sales)
     .select('id, updated_at')
     .eq('status', 'published')
     .order('updated_at', { ascending: false })

@@ -63,7 +63,6 @@ export default function SaleDetailSsrContent({ sale, items = [], nearbySales = [
         <ul className="mt-4 flex flex-wrap gap-3" aria-label="Sale photos">
           {gallery.map((url) => (
             <li key={url}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
                 alt={`${sale.title || 'Sale'} photo`}

@@ -1,5 +1,4 @@
-import type { SeoPilotMetro } from '@/lib/seo/types'
-import type { SeoInventorySummary } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoPilotMetro } from '@/lib/seo/types'
 export function buildCityPageH1(
   metro: SeoPilotMetro,
   inventory: SeoInventorySummary,

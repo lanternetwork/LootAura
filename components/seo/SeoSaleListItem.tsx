@@ -34,7 +34,6 @@ export default function SeoSaleListItem({ sale }: Props) {
         )}
         {cover?.url && (
           <Link href={href} className="mt-3 inline-block">
-            {/* eslint-disable-next-line @next/next/no-img-element -- crawlable URL for SEO */}
             <img
               src={cover.url}
               alt={cover.alt}

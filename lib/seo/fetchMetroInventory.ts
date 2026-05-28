@@ -1,8 +1,7 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
-import type { SeoPilotMetro } from '@/lib/seo/types'
-import type { SeoInventorySummary } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoPilotMetro } from '@/lib/seo/types'
 import type { Sale } from '@/lib/types'
 
 export type MetroInventoryResult = {

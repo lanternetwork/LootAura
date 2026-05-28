@@ -5,7 +5,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSaleWithItems, getNearestSalesForSale } from '@/lib/data/salesAccess'
 import { getUserRatingForSeller } from '@/lib/data/ratingsAccess'
 import SaleDetailClient from './SaleDetailClient'
-import { createSaleMetadata, createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
+import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
+import { createListingSeoMetadata } from '@/lib/seo/metadata'
 
 interface SaleDetailPageProps {
   params: Promise<{ id: string }>
@@ -149,5 +150,8 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
   const itemCats = result.items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  return createSaleMetadata(result.sale, { categories: displayCategories })
+  return createListingSeoMetadata(result.sale, {
+    categories: displayCategories,
+    robots: { index: false, follow: true },
+  })
 }

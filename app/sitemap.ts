@@ -1,61 +1,32 @@
-import { MetadataRoute } from 'next'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { T } from '@/lib/supabase/tables'
+import type { MetadataRoute } from 'next'
+import { buildStaticSitemapEntries } from '@/lib/seo/sitemap/staticEntries'
+import {
+  buildListingSitemapEntriesForChunk,
+  parseListingSitemapChunkId,
+} from '@/lib/seo/sitemap/listingEntries'
+import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPublishedListingRows'
+import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = await createSupabaseServerClient()
-  
-  // Get all published sales for dynamic URLs
-  const { data: sales } = await supabase
-    .from(T.sales)
-    .select('id, updated_at')
-    .eq('status', 'published')
-    .order('updated_at', { ascending: false })
-    .limit(1000) // Limit to prevent sitemap from being too large
+export async function generateSitemaps() {
+  const rows = await fetchPublishedListingRowsForSitemap()
+  const plan = resolveSeoSitemapPlan(rows.length)
+  return plan.segmentIds.map((segmentId) => ({ id: segmentId }))
+}
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+export default async function sitemap({
+  id,
+}: {
+  id: string
+}): Promise<MetadataRoute.Sitemap> {
+  if (id === 'static') {
+    return buildStaticSitemapEntries()
+  }
 
-  // Static pages
-  const staticPages: MetadataRoute.Sitemap = [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/explore`,
-      lastModified: new Date(),
-      changeFrequency: 'hourly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/explore?tab=map`,
-      lastModified: new Date(),
-      changeFrequency: 'hourly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/sales`,
-      lastModified: new Date(),
-      changeFrequency: 'hourly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/sell/new`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
-  ]
+  const chunkIndex = parseListingSitemapChunkId(id)
+  if (chunkIndex != null) {
+    const rows = await fetchPublishedListingRowsForSitemap()
+    return buildListingSitemapEntriesForChunk(rows, chunkIndex)
+  }
 
-  // Dynamic sale pages
-  const salePages: MetadataRoute.Sitemap = (sales || []).map((sale) => ({
-    url: `${baseUrl}/sales/${sale.id}`,
-    lastModified: new Date(sale.updated_at),
-    changeFrequency: 'weekly',
-    priority: 0.7,
-  }))
-
-  return [...staticPages, ...salePages]
+  return []
 }

@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSaleWithItems, getNearestSalesForSale } from '@/lib/data/salesAccess'
 import { getUserRatingForSeller } from '@/lib/data/ratingsAccess'
 import SaleDetailClient from './SaleDetailClient'
+import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
 
@@ -97,11 +98,14 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbStructuredData) }}
       />
+      <div className="sr-only" aria-label="Sale listing details">
+        <SaleDetailSsrContent sale={sale} items={items} nearbySales={nearbySales} />
+      </div>
       <Suspense fallback={<div className="p-4">Loading...</div>}>
-        <SaleDetailClient 
-          sale={sale} 
-          displayCategories={displayCategories} 
-          items={items} 
+        <SaleDetailClient
+          sale={sale}
+          displayCategories={displayCategories}
+          items={items}
           nearbySales={nearbySales}
           currentUserRating={currentUserRating}
           promotionsEnabled={promotionsEnabled}

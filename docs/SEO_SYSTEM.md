@@ -3,8 +3,9 @@
 Inventory-first, ingestion-gated local discovery SEO. See the final development specification in the repository PR description and phased plan:
 
 - **Phase 0** — Operational readiness + SEO index allowlist (`lib/seo/indexAllowlist.ts`)
-- **Phase 1** — Metadata, structured data, gated sitemaps, operational dashboards (this module)
-- **Phase 2+** — SSR city/listing surfaces, weekend pages, linking, validation, expansion
+- **Phase 1** — Metadata, structured data, gated sitemaps, operational dashboards
+- **Phase 2** — SSR listing crawl block + pilot city pages (`/yard-sales/[metroSlug]`)
+- **Phase 3+** — Weekend pages, linking, validation, expansion
 
 ## Phase 1 module layout
 
@@ -17,6 +18,10 @@ Inventory-first, ingestion-gated local discovery SEO. See the final development 
 | `lib/seo/metroQualification.ts` | Pilot metro scoring |
 | `lib/seo/sitemap/*` | Gated sitemap segments + chunking |
 | `app/admin/ingestion/SeoOperationalPanel.tsx` | Admin SEO readiness dashboard |
+| `app/yard-sales/[metroSlug]/page.tsx` | SSR city inventory pages (pilot metros) |
+| `components/seo/SaleDetailSsrContent.tsx` | SSR listing crawl block |
+| `components/seo/SeoSaleListItem.tsx` | Crawlable listing row for city pages |
+| `lib/seo/fetchMetroInventory.ts` | Metro inventory query |
 
 ## Public indexing kill switch
 

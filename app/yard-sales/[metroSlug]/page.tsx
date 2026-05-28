@@ -5,6 +5,7 @@ import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
 import { getPilotMetroBySlug, SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
 import { fetchMetroInventory } from '@/lib/seo/fetchMetroInventory'
 import { createCityPageMetadata } from '@/lib/seo/metadata'
+import { resolveMetroPageRobots } from '@/lib/seo/indexRollout'
 import {
   createCityPageStructuredDataBundle,
   saleToInventoryListItem,
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return createCityPageMetadata({
     metro,
     inventory: summary,
-    robots: { index: false, follow: true },
+    robots: resolveMetroPageRobots(metro.slug),
   })
 }
 

@@ -8,6 +8,7 @@ import SaleDetailClient from './SaleDetailClient'
 import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
+import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
 import {
   buildListingBreadcrumbItems,
   buildListingGeoLinks,
@@ -167,6 +168,6 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
 
   return createListingSeoMetadata(result.sale, {
     categories: displayCategories,
-    robots: { index: false, follow: true },
+    robots: resolveListingIndexRobots(),
   })
 }

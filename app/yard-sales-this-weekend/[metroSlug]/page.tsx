@@ -8,11 +8,14 @@ import {
   formatFreshnessSignalLabel,
 } from '@/lib/seo/fetchMetroWeekendInventory'
 import { createWeekendPageMetadata } from '@/lib/seo/metadata'
+import { resolveMetroPageRobots } from '@/lib/seo/indexRollout'
 import {
   createWeekendPageStructuredDataBundle,
   saleToInventoryListItem,
 } from '@/lib/seo/structuredData'
 import { getCityPagePath } from '@/lib/seo/canonical'
+import { buildMetroGeoLinks } from '@/lib/seo/geoLinking'
+import SeoGeoDiscoveryLinks from '@/components/seo/SeoGeoDiscoveryLinks'
 import {
   buildWeekendPageH1,
   buildWeekendPageSupportingCopy,
@@ -40,7 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     metro,
     inventory: summary,
     weekendLabel: weekend.label,
-    robots: { index: false, follow: true },
+    robots: resolveMetroPageRobots(metro.slug),
   })
 }
 
@@ -52,6 +55,7 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
   }
 
   const { sales, summary, weekend, freshnessBySaleId } = await fetchMetroWeekendInventory(metro)
+  const geoLinks = buildMetroGeoLinks(metro)
   const h1 = buildWeekendPageH1(metro, summary, weekend)
   const supportingCopy = buildWeekendPageSupportingCopy({ metro, inventory: summary, weekend })
   const structuredData = createWeekendPageStructuredDataBundle({
@@ -90,6 +94,8 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
         <p className="mt-2 text-sm font-medium text-emerald-800">
           {formatFreshnessLabel(summary.lastUpdatedAt)}
         </p>
+
+        <SeoGeoDiscoveryLinks links={geoLinks} showPrimary={false} />
 
         <section className="mt-8 rounded-lg border border-gray-200 bg-white px-4">
           <h2 className="sr-only">This weekend listings</h2>

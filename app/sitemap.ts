@@ -8,11 +8,11 @@ import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPubl
 import { buildCitySitemapEntries } from '@/lib/seo/sitemap/cityEntries'
 import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
-import { isSeoPublicIndexingEnabled } from '@/lib/seo/constants'
+import { isSeoIndexRolloutEnvReady } from '@/lib/seo/indexRollout'
 import { emptyInventoryByPilotSlug } from '@/lib/seo/buildSeoOperationalSnapshot'
 
 export async function generateSitemaps() {
-  if (!isSeoPublicIndexingEnabled()) {
+  if (!isSeoIndexRolloutEnvReady()) {
     return [{ id: 'static' }]
   }
   const rows = await fetchPublishedListingRowsForSitemap()

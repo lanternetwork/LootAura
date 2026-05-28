@@ -40,7 +40,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       coverage,
       sitemapCounts: computeSeoSitemapCounts({
         totalPublishedListings: publishedListingCount,
-        nationalIndexingAllowed: provisional.allowlist.indexingAllowed,
+        nationalIndexingAllowed: provisional.rollout.indexingAllowed,
         inventoryBySlug: emptyInventoryByPilotSlug(),
       }),
       inventoryByMetroSlug: emptyInventoryByPilotSlug(),
@@ -53,27 +53,37 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <div>
           <h2 className="text-lg font-semibold text-slate-900">SEO operational readiness</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Phase 1 foundation — index allowlist derives from ingestion gates (no parallel SEO gate system).
-            Public indexing requires <code className="text-xs">SEO_PUBLIC_INDEXING_ENABLED=true</code> plus
-            operational pass.
+            Index allowlist derives from ingestion gates. Phase 5 rollout additionally requires crawl +
+            Search Console attestation env vars before <code className="text-xs">noindex</code> is removed.
           </p>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
-            snapshot.allowlist.indexingAllowed
-              ? 'bg-emerald-100 text-emerald-900'
-              : 'bg-amber-100 text-amber-900'
-          }`}
-        >
-          {snapshot.allowlist.indexingAllowed ? 'indexing allowed' : 'indexing blocked (phase 0)'}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
+              snapshot.allowlist.indexingAllowed
+                ? 'bg-emerald-100 text-emerald-900'
+                : 'bg-amber-100 text-amber-900'
+            }`}
+          >
+            {snapshot.allowlist.indexingAllowed ? 'ops allowlist pass' : 'ops allowlist blocked'}
+          </span>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
+              snapshot.rollout.indexingAllowed
+                ? 'bg-emerald-100 text-emerald-900'
+                : 'bg-amber-100 text-amber-900'
+            }`}
+          >
+            {snapshot.rollout.indexingAllowed ? 'index rollout ready' : 'index rollout blocked'}
+          </span>
+        </div>
       </div>
 
-      {snapshot.allowlist.blockers.length > 0 && (
+      {snapshot.rollout.blockers.length > 0 && (
         <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          <p className="font-semibold">Blockers</p>
+          <p className="font-semibold">Rollout blockers</p>
           <ul className="mt-1 list-inside list-disc">
-            {snapshot.allowlist.blockers.map((b) => (
+            {snapshot.rollout.blockers.map((b) => (
               <li key={b}>{b}</li>
             ))}
           </ul>
@@ -119,8 +129,40 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <MetricCard label="Sitemap chunks" value={String(snapshot.sitemap.listingChunkCount)} />
       </div>
 
+      <div className="mt-4 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+        <p className="font-semibold text-slate-900">Phase 5 crawl smoke</p>
+        <p className="mt-1 text-slate-600">
+          Run{' '}
+          <code className="text-xs">GET /api/admin/seo/crawl-smoke?metroSlug=dallas-tx&amp;saleId=…</code>{' '}
+          against staging/production, then set{' '}
+          <code className="text-xs">SEO_CRAWL_VALIDATION_PASSED=true</code> and{' '}
+          <code className="text-xs">SEO_SEARCH_CONSOLE_VALIDATION_PASSED=true</code>. See{' '}
+          <code className="text-xs">docs/SEO_PHASE5_CRAWL_VALIDATION.md</code>.
+        </p>
+        {snapshot.rollout.qualifiedPilotMetros.length > 0 && (
+          <p className="mt-2 text-xs text-slate-600">
+            Qualified for index rollout: {snapshot.rollout.qualifiedPilotMetros.join(', ')}
+          </p>
+        )}
+      </div>
+
       <div className="mt-4">
-        <p className="text-sm font-semibold text-slate-900">Index allowlist gates</p>
+        <p className="text-sm font-semibold text-slate-900">Index rollout gates</p>
+        <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+          {snapshot.rollout.gates.map((gate) => (
+            <li
+              key={gate.id}
+              className={`rounded border px-3 py-2 text-xs ${GATE_STYLE[gate.status]}`}
+            >
+              <span className="font-semibold uppercase">{gate.status}</span> [{gate.source}]: {gate.label}{' '}
+              — {gate.detail}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-sm font-semibold text-slate-900">Operational allowlist gates</p>
         <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
           {snapshot.allowlist.gates.map((gate) => (
             <li

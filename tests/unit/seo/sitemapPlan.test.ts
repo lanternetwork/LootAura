@@ -28,8 +28,10 @@ describe('seo sitemap plan', () => {
     expect(plan.listingChunkCount).toBe(0)
   })
 
-  it('chunks listings when indexing enabled', () => {
+  it('chunks listings when index rollout env ready', () => {
     process.env.SEO_PUBLIC_INDEXING_ENABLED = 'true'
+    process.env.SEO_CRAWL_VALIDATION_PASSED = 'true'
+    process.env.SEO_SEARCH_CONSOLE_VALIDATION_PASSED = 'true'
     const plan = resolveSeoSitemapPlan(2500)
     expect(plan.indexingEnabled).toBe(true)
     expect(plan.listingChunkCount).toBe(countListingSitemapChunks(2500))

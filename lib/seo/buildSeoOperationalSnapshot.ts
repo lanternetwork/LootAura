@@ -1,6 +1,7 @@
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
+import { evaluateSeoIndexRolloutReadiness } from '@/lib/seo/indexRollout'
 import { qualifyAllPilotMetros } from '@/lib/seo/metroQualification'
 import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
 import type { SeoInventorySummary } from '@/lib/seo/types'
@@ -8,6 +9,7 @@ import type { SeoInventorySummary } from '@/lib/seo/types'
 export type SeoOperationalSnapshot = {
   generatedAt: string
   allowlist: ReturnType<typeof evaluateSeoIndexAllowlist>
+  rollout: ReturnType<typeof evaluateSeoIndexRolloutReadiness>
   pilotMetros: ReturnType<typeof qualifyAllPilotMetros>
   sitemap: {
     staticUrlCount: number
@@ -45,6 +47,11 @@ export function buildSeoOperationalSnapshot(options: {
 }): SeoOperationalSnapshot {
   const { metrics, coverage, sitemapCounts, inventoryByMetroSlug = {} } = options
   const allowlist = evaluateSeoIndexAllowlist(metrics, coverage)
+  const rollout = evaluateSeoIndexRolloutReadiness({
+    metrics,
+    coverage,
+    inventoryByMetroSlug,
+  })
   const pilotMetros = qualifyAllPilotMetros({
     nationalIndexingAllowed: allowlist.indexingAllowed,
     inventoryBySlug: inventoryByMetroSlug,
@@ -62,18 +69,17 @@ export function buildSeoOperationalSnapshot(options: {
       ? refreshStale / publishedActive
       : null
 
-  const qualifiedCount = pilotMetros.filter((m) => m.qualified).length
-
   return {
     generatedAt: new Date().toISOString(),
     allowlist,
+    rollout,
     pilotMetros,
     sitemap: {
       ...sitemapCounts,
-      indexingEnabled: allowlist.indexingAllowed,
+      indexingEnabled: rollout.indexingAllowed,
     },
     metrics: {
-      indexedMetros: allowlist.indexingAllowed ? qualifiedCount : 0,
+      indexedMetros: rollout.qualifiedPilotMetros.length,
       crawlableInventoryPct: null,
       staleInventoryPct: stalePct,
       canonicalCoveragePct: coverage?.canonicalSaleInstance?.canonicalCoveragePct ?? null,

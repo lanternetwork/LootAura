@@ -8,6 +8,11 @@ import SaleDetailClient from './SaleDetailClient'
 import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
+import {
+  buildListingBreadcrumbItems,
+  buildListingGeoLinks,
+  buildNearbyListingLinks,
+} from '@/lib/seo/geoLinking'
 
 interface SaleDetailPageProps {
   params: Promise<{ id: string }>
@@ -65,8 +70,13 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const itemCats = items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  // Fetch nearby sales (non-blocking - if it fails, we just don't show the card)
-  const nearbySales = await getNearestSalesForSale(supabase, id, 2).catch(() => [])
+  // Fetch nearby sales for client UI (limit unchanged) + broader set for SEO crawl links only
+  const [nearbySales, nearbySalesForSeo] = await Promise.all([
+    getNearestSalesForSale(supabase, id, 2).catch(() => []),
+    getNearestSalesForSale(supabase, id, 6).catch(() => []),
+  ])
+  const listingGeoLinks = buildListingGeoLinks(sale)
+  const nearbyListingLinks = buildNearbyListingLinks(nearbySalesForSeo)
 
   // Fetch current user's rating for this seller (if authenticated)
   let currentUserRating: number | null = null
@@ -79,11 +89,9 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
   // Create structured data for SEO
   const eventStructuredData = createSaleEventStructuredData(sale)
-  const breadcrumbStructuredData = createBreadcrumbStructuredData([
-    { name: 'Home', url: '/' },
-    { name: 'Sales', url: '/sales' },
-    { name: sale.title || 'Sale', url: `/sales/${sale.id}` },
-  ])
+  const breadcrumbStructuredData = createBreadcrumbStructuredData(
+    buildListingBreadcrumbItems(sale)
+  )
 
   const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'
   const paymentsEnabled = process.env.PAYMENTS_ENABLED === 'true'
@@ -99,7 +107,12 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbStructuredData) }}
       />
       <div className="sr-only" aria-label="Sale listing details">
-        <SaleDetailSsrContent sale={sale} items={items} nearbySales={nearbySales} />
+        <SaleDetailSsrContent
+          sale={sale}
+          items={items}
+          geoLinks={listingGeoLinks}
+          nearbyListingLinks={nearbyListingLinks}
+        />
       </div>
       <Suspense fallback={<div className="p-4">Loading...</div>}>
         <SaleDetailClient

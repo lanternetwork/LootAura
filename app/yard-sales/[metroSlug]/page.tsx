@@ -9,7 +9,8 @@ import {
   createCityPageStructuredDataBundle,
   saleToInventoryListItem,
 } from '@/lib/seo/structuredData'
-import { getCityPagePath, getWeekendPagePath } from '@/lib/seo/canonical'
+import { buildMetroGeoLinks, getNearbyPilotMetros } from '@/lib/seo/geoLinking'
+import SeoGeoDiscoveryLinks from '@/components/seo/SeoGeoDiscoveryLinks'
 import {
   buildCityPageH1,
   buildCityPageSupportingCopy,
@@ -48,14 +49,12 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
   }
 
   const { sales, summary } = await fetchMetroInventory(metro)
-  const nearbyMetros = SEO_PILOT_METROS.filter(
-    (m) => m.slug !== metro.slug && m.state === metro.state
-  ).slice(0, 4)
+  const geoLinks = buildMetroGeoLinks(metro)
   const h1 = buildCityPageH1(metro, summary)
   const supportingCopy = buildCityPageSupportingCopy({
     metro,
     inventory: summary,
-    nearbyMetros,
+    nearbyMetros: getNearbyPilotMetros(metro),
   })
   const structuredData = createCityPageStructuredDataBundle({
     metro,
@@ -84,13 +83,9 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
 
         <p className="mt-2 text-sm font-medium text-emerald-800">{formatFreshnessLabel(summary.lastUpdatedAt)}</p>
 
-        <p className="mt-4 flex flex-wrap gap-4">
-          <Link
-            href={getWeekendPagePath(metro.slug)}
-            className="text-sm font-medium text-purple-700 hover:text-purple-900"
-          >
-            Yard sales this weekend →
-          </Link>
+        <SeoGeoDiscoveryLinks links={geoLinks} />
+
+        <p className="mt-2">
           <Link
             href={`/sales?city=${encodeURIComponent(metro.city)}`}
             className="text-sm font-medium text-purple-700 hover:text-purple-900"
@@ -98,24 +93,6 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
             View on interactive map →
           </Link>
         </p>
-
-        {nearbyMetros.length > 0 && (
-          <nav className="mt-4" aria-label="Nearby metros">
-            <p className="text-sm font-medium text-gray-700">Nearby areas</p>
-            <ul className="mt-1 flex flex-wrap gap-2">
-              {nearbyMetros.map((m) => (
-                <li key={m.slug}>
-                  <Link
-                    href={getCityPagePath(m.slug)}
-                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-800 hover:border-purple-400"
-                  >
-                    {m.city}, {m.state}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
 
         <section className="mt-8 rounded-lg border border-gray-200 bg-white px-4">
           <h2 className="sr-only">Active listings</h2>

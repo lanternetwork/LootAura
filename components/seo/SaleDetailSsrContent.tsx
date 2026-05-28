@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { getListingCanonicalPath } from '@/lib/seo/canonical'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import { formatDateOnly } from '@/lib/display/date'
 import { displayAddress } from '@/lib/display/address'
+import type { ListingGeoLinks, SeoGeoLink } from '@/lib/seo/geoLinking'
+import SeoListingDiscoveryLinks from '@/components/seo/SeoListingDiscoveryLinks'
 import type { Sale, SaleItem } from '@/lib/types'
 
 type NearbySale = Sale & { distance_m?: number }
@@ -11,6 +12,8 @@ type Props = {
   sale: Sale
   items?: SaleItem[]
   nearbySales?: NearbySale[]
+  geoLinks: ListingGeoLinks
+  nearbyListingLinks: SeoGeoLink[]
 }
 
 function formatSaleDates(sale: Sale): string | null {
@@ -22,7 +25,12 @@ function formatSaleDates(sale: Sale): string | null {
 }
 
 /** Server-rendered sale detail — crawlable without client JS (Phase 2A). */
-export default function SaleDetailSsrContent({ sale, items = [], nearbySales = [] }: Props) {
+export default function SaleDetailSsrContent({
+  sale,
+  items = [],
+  geoLinks,
+  nearbyListingLinks,
+}: Props) {
   const address = displayAddress(sale.address, sale.city, sale.state)
   const dateLabel = formatSaleDates(sale)
   const cover = getSaleCoverUrl(sale)
@@ -43,6 +51,14 @@ export default function SaleDetailSsrContent({ sale, items = [], nearbySales = [
         <Link href="/sales" className="hover:text-gray-700">
           Sales
         </Link>
+        {geoLinks.city && (
+          <>
+            {' / '}
+            <Link href={geoLinks.city.href} className="hover:text-gray-700">
+              {geoLinks.metro?.city}
+            </Link>
+          </>
+        )}
         {' / '}
         <span className="text-gray-900">{sale.title || 'Sale'}</span>
       </nav>
@@ -90,30 +106,7 @@ export default function SaleDetailSsrContent({ sale, items = [], nearbySales = [
         </section>
       )}
 
-      {nearbySales.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900">Nearby sales</h2>
-          <ul className="mt-2 space-y-2">
-            {nearbySales.map((nearby) => (
-              <li key={nearby.id}>
-                <Link
-                  href={getListingCanonicalPath(nearby.id)}
-                  className="text-purple-700 hover:text-purple-900"
-                >
-                  {nearby.title || 'Yard Sale'}
-                  {nearby.city && nearby.state ? ` — ${nearby.city}, ${nearby.state}` : ''}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <p className="mt-6">
-        <Link href="/sales" className="font-medium text-purple-700 hover:text-purple-900">
-          Browse all sales on the map
-        </Link>
-      </p>
+      <SeoListingDiscoveryLinks geo={geoLinks} nearbyListings={nearbyListingLinks} />
     </article>
   )
 }

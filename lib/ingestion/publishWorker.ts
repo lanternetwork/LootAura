@@ -82,6 +82,13 @@ export interface PublishWorkerBatchSummary {
   skipped: number
   /** Rows closed as `expired` (past `date_end` vs UTC today). */
   expired: number
+  /** Why `time_start` was normalized during publish for rows created in this batch. */
+  timeStartNormalization: {
+    source_preserved: number
+    time_start_rounded: number
+    time_start_missing_defaulted: number
+    timezone_normalized: number
+  }
 }
 
 export interface LinkedSaleFinalizeSummary {
@@ -1065,7 +1072,10 @@ function claimedRowToPublishable(record: ClaimedPublishRow): PublishableIngested
 }
 
 /** Insert sale or, on unique conflict for `ingested_sale_id`, reuse the existing row. */
-async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<string> {
+async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow): Promise<{
+  saleId: string
+  timeStartNormalizationReason: 'source_preserved' | 'time_start_rounded' | 'time_start_missing_defaulted' | 'timezone_normalized'
+}> {
   const body = claimedRowToPublishable(record)
   const sanitizedImages = await sanitizePublishImagesForRecord(record)
   if (sanitizedImages.length > 0) {
@@ -1075,9 +1085,12 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
 
   const patchCtx = { rowId: record.id, city: record.city, state: record.state }
   let saleId: string
+  let timeStartNormalizationReason: 'source_preserved' | 'time_start_rounded' | 'time_start_missing_defaulted' | 'timezone_normalized' =
+    'source_preserved'
   try {
     const created = await createPublishedSale(body)
     saleId = created.saleId
+    timeStartNormalizationReason = created.diagnostics.timeStartNormalizationReason
   } catch (err) {
     if (!isIngestedSaleIdUniqueViolation(err)) throw err
     const existing = await fetchExistingSaleIdForIngested(record.id)
@@ -1092,19 +1105,25 @@ async function tryCreatePublishedSaleOrReuseExisting(record: ClaimedPublishRow):
   }
 
   await maybeSyncExistingSaleFromLatestIngest(saleId, record, sanitizedImages, patchCtx)
-  return saleId
+  return { saleId, timeStartNormalizationReason }
 }
 
 type PublishSaleResolution = {
   saleId: string
   crossProviderLink: CrossProviderPublishLink | null
   reusedExistingLinkedSale: boolean
+  timeStartNormalizationReason: 'source_preserved' | 'time_start_rounded' | 'time_start_missing_defaulted' | 'timezone_normalized'
 }
 
 async function resolveSaleIdForPublishClaim(record: ClaimedPublishRow): Promise<PublishSaleResolution> {
   const linkedSaleId = await linkedSaleIdForRow(record)
   if (linkedSaleId) {
-    return { saleId: linkedSaleId, crossProviderLink: null, reusedExistingLinkedSale: true }
+    return {
+      saleId: linkedSaleId,
+      crossProviderLink: null,
+      reusedExistingLinkedSale: true,
+      timeStartNormalizationReason: 'source_preserved',
+    }
   }
 
   const crossProviderLink = await resolveCrossProviderPublishLink({
@@ -1117,11 +1136,17 @@ async function resolveSaleIdForPublishClaim(record: ClaimedPublishRow): Promise<
       saleId: crossProviderLink.publishedSaleId,
       crossProviderLink,
       reusedExistingLinkedSale: false,
+      timeStartNormalizationReason: 'source_preserved',
     }
   }
 
-  const saleId = await tryCreatePublishedSaleOrReuseExisting(record)
-  return { saleId, crossProviderLink: null, reusedExistingLinkedSale: false }
+  const created = await tryCreatePublishedSaleOrReuseExisting(record)
+  return {
+    saleId: created.saleId,
+    crossProviderLink: null,
+    reusedExistingLinkedSale: false,
+    timeStartNormalizationReason: created.timeStartNormalizationReason,
+  }
 }
 
 function buildPublishedIngestedRowUpdatePayload(
@@ -1502,6 +1527,12 @@ export async function publishReadyIngestedSales(options?: {
     failed: 0,
     skipped: 0,
     expired: 0,
+    timeStartNormalization: {
+      source_preserved: 0,
+      time_start_rounded: 0,
+      time_start_missing_defaulted: 0,
+      timezone_normalized: 0,
+    },
   }
 
   for (const row of claimedRows) {
@@ -1546,7 +1577,7 @@ export async function publishReadyIngestedSales(options?: {
     try {
       const sanitizedImages = await sanitizePublishImagesForRecord(row)
       const resolution = await resolveSaleIdForPublishClaim(row)
-      const { saleId, crossProviderLink, reusedExistingLinkedSale } = resolution
+      const { saleId, crossProviderLink, reusedExistingLinkedSale, timeStartNormalizationReason } = resolution
       createdSaleId = saleId
       if (reusedExistingLinkedSale) {
         publishFailureOperation = 'linked_address_validation_batch'
@@ -1598,6 +1629,10 @@ export async function publishReadyIngestedSales(options?: {
       await completeCrossProviderPublishSideEffects(row, saleId, crossProviderLink)
 
       summary.succeeded += 1
+      const normalizationReason = timeStartNormalizationReason
+      if (normalizationReason && normalizationReason in summary.timeStartNormalization) {
+        summary.timeStartNormalization[normalizationReason] += 1
+      }
       logger.info('Publish worker row processed', {
         component: 'ingestion/publishWorker',
         operation: 'row_result',
@@ -1651,6 +1686,7 @@ export async function publishReadyIngestedSales(options?: {
     failed: summary.failed,
     skipped: summary.skipped,
     expired: summary.expired,
+    timeStartNormalization: summary.timeStartNormalization,
   })
 
   const durationMs = Date.now() - publishStartedAt
@@ -1667,6 +1703,7 @@ export async function publishReadyIngestedSales(options?: {
       durationMs,
       queuePressureClass: classifyQueuePressure(summary.attempted, Math.max(1, batchSize)),
       jobType: 'publish.db_claim_batch',
+      timeStartNormalization: summary.timeStartNormalization,
     })
   )
 

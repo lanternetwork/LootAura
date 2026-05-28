@@ -7,7 +7,9 @@ import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisp
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import {
   capAddressForPublishSchema,
+  normalizeTimeStartForPublish,
   roundTimeToNearest30Minutes,
+  type TimeStartNormalizationReason,
 } from '@/lib/ingestion/publishPreflight'
 import { resolvePersistableSaleEndsAt } from '@/lib/sales/resolvePersistableSaleEndsAt'
 
@@ -35,7 +37,14 @@ export interface PublishableIngestedSale {
   image_urls?: string[] | null
 }
 
-function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishInput {
+export interface PublishTimeNormalizationDiagnostics {
+  timeStartNormalizationReason: TimeStartNormalizationReason
+}
+
+function normalizePublishInput(ingestedSale: PublishableIngestedSale): {
+  input: PublishInput
+  diagnostics: PublishTimeNormalizationDiagnostics
+} {
   const ownerId = ingestedSale.owner_id?.trim() || FIXED_INGEST_OWNER_ID
   const title = (ingestedSale.title || '').trim() || `${ingestedSale.city || 'Unknown'} Yard Sale`
   const city = (ingestedSale.city || '').trim()
@@ -44,8 +53,7 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
     normalizeAddressForPublish(ingestedSale.normalized_address, city, state)
   )
   const address = normalizedAddress
-  const timeStart =
-    (roundTimeToNearest30Minutes(ingestedSale.time_start) ?? ingestedSale.time_start) || '09:00:00'
+  const normalizedTimeStart = normalizeTimeStartForPublish(ingestedSale.time_start)
   const timeEnd = roundTimeToNearest30Minutes(ingestedSale.time_end)
   const normalizedImages = Array.isArray(ingestedSale.image_urls)
     ? ingestedSale.image_urls
@@ -58,30 +66,37 @@ function normalizePublishInput(ingestedSale: PublishableIngestedSale): PublishIn
   const images = normalizedImages
 
   return {
-    ownerId,
-    title,
-    description: ingestedSale.description?.trim() || null,
-    address,
-    city,
-    state,
-    zipCode: ingestedSale.zip_code?.trim() || null,
-    lat: ingestedSale.lat,
-    lng: ingestedSale.lng,
-    dateStart: ingestedSale.date_start,
-    dateEnd: ingestedSale.date_end,
-    timeStart,
-    timeEnd,
-    coverImageUrl,
-    images,
-    importSource: ingestedSale.source_platform,
-    externalSourceUrl: ingestedSale.source_url,
-    ingestedSaleId: ingestedSale.id,
+    input: {
+      ownerId,
+      title,
+      description: ingestedSale.description?.trim() || null,
+      address,
+      city,
+      state,
+      zipCode: ingestedSale.zip_code?.trim() || null,
+      lat: ingestedSale.lat,
+      lng: ingestedSale.lng,
+      dateStart: ingestedSale.date_start,
+      dateEnd: ingestedSale.date_end,
+      timeStart: normalizedTimeStart.normalizedTimeStart,
+      timeEnd,
+      coverImageUrl,
+      images,
+      importSource: ingestedSale.source_platform,
+      externalSourceUrl: ingestedSale.source_url,
+      ingestedSaleId: ingestedSale.id,
+    },
+    diagnostics: {
+      timeStartNormalizationReason: normalizedTimeStart.reason,
+    },
   }
 }
 
-export async function createPublishedSale(ingestedSale: PublishableIngestedSale): Promise<{ saleId: string }> {
+export async function createPublishedSale(
+  ingestedSale: PublishableIngestedSale
+): Promise<{ saleId: string; diagnostics: PublishTimeNormalizationDiagnostics }> {
   const admin = getAdminDb()
-  const draftInput = normalizePublishInput(ingestedSale)
+  const { input: draftInput, diagnostics } = normalizePublishInput(ingestedSale)
   const validated = PublishInputSchema.parse(draftInput)
   validateResolvedAddressForPublish(validated.address, validated.city, validated.state)
   const displayAddress = formatAddressForPublishedSaleDisplay(validated.address as string)
@@ -141,6 +156,6 @@ export async function createPublishedSale(ingestedSale: PublishableIngestedSale)
     throw err
   }
 
-  return { saleId: data.id as string }
+  return { saleId: data.id as string, diagnostics }
 }
 

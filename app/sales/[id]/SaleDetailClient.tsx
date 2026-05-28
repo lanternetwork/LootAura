@@ -28,22 +28,7 @@ import { isNativeApp } from '@/lib/runtime/isNativeApp'
 import { queryClient } from '@/lib/queryClient'
 import { displayAddress } from '@/lib/display/address'
 import { formatDateOnly } from '@/lib/display/date'
-
-function isTrustedNextImageHost(urlString: string): boolean {
-  try {
-    const u = new URL(urlString)
-    if (u.protocol !== 'https:') return false
-    const host = u.hostname.toLowerCase()
-    if (host === 'res.cloudinary.com') return true
-    if (host === 'storage.googleapis.com') return true
-    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
-      return u.pathname.startsWith('/storage/v1/object/public/')
-    }
-    return false
-  } catch {
-    return false
-  }
-}
+import { isTrustedNextImageHost } from '@/lib/images/isTrustedNextImageHost'
 
 /** "Show more" only when line-clamp actually hides text; re-measures on layout, fonts, resize. */
 function ExpandableDescription({
@@ -276,8 +261,12 @@ export default function SaleDetailClient({
     return base
   }, [sale.images, sale.cover_image_url])
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [loadedGalleryUrls, setLoadedGalleryUrls] = useState<Set<string>>(new Set())
+  const [isGalleryImageLoading, setIsGalleryImageLoading] = useState(false)
   useEffect(() => {
     setSelectedImageIndex(0)
+    setLoadedGalleryUrls(new Set())
+    setIsGalleryImageLoading(false)
   }, [sale.id, galleryImages.length])
   const selectedImageUrl = galleryImages[selectedImageIndex] ?? cover?.url ?? null
   const selectedImageAlt = `${sale.title || 'Sale'} image ${selectedImageIndex + 1}`
@@ -285,11 +274,59 @@ export default function SaleDetailClient({
   const saleAddressDisplay = displayAddress(sale.address, sale.city, sale.state)
   const viewTrackedRef = useRef(false)
   const isOptimisticRef = useRef(false)
+  const hasEndDate = Boolean(sale.date_end)
+  const hasDistinctEndDate = hasEndDate && sale.date_end !== sale.date_start
+  const hasDistinctEndTime = Boolean(sale.time_end && sale.time_end !== sale.time_start)
+  const shouldRenderEndSection = hasDistinctEndDate || hasDistinctEndTime
   const [promotionStatus, setPromotionStatus] = useState<{
     isActive: boolean
     endsAt: string | null
   }>({ isActive: false, endsAt: null })
   const [isPromotionLoading, setIsPromotionLoading] = useState(true)
+
+  useEffect(() => {
+    if (!selectedImageUrl) {
+      setIsGalleryImageLoading(false)
+      return
+    }
+    setIsGalleryImageLoading(!loadedGalleryUrls.has(selectedImageUrl))
+  }, [selectedImageUrl, loadedGalleryUrls])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || galleryImages.length <= 1) return
+
+    const neighborIndexes = [
+      (selectedImageIndex - 1 + galleryImages.length) % galleryImages.length,
+      (selectedImageIndex + 1) % galleryImages.length,
+    ]
+    const preloadUrls = neighborIndexes
+      .map((idx) => galleryImages[idx])
+      .filter((url): url is string => Boolean(url && !loadedGalleryUrls.has(url)))
+
+    for (const url of preloadUrls) {
+      const img = new window.Image()
+      img.onload = () => {
+        setLoadedGalleryUrls((prev) => {
+          if (prev.has(url)) return prev
+          const next = new Set(prev)
+          next.add(url)
+          return next
+        })
+      }
+      img.src = url
+    }
+  }, [galleryImages, selectedImageIndex, loadedGalleryUrls])
+
+  const markGalleryImageLoaded = (url: string | null) => {
+    if (!url) return
+    setLoadedGalleryUrls((prev) => {
+      if (prev.has(url)) return prev
+      const next = new Set(prev)
+      next.add(url)
+      return next
+    })
+    setIsGalleryImageLoading(false)
+  }
 
   // Track click event for navigation/directions
   const handleNavigationClick = () => {
@@ -782,6 +819,11 @@ export default function SaleDetailClient({
 
         {/* Primary Photo */}
         <div className="relative w-full overflow-hidden rounded-2xl bg-gray-100 aspect-[4/3]">
+          {isGalleryImageLoading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 text-sm text-gray-700">
+              Loading image...
+            </div>
+          )}
           {selectedImageUrl ? (
             isTrustedNextImageHost(selectedImageUrl) ? (
               <Image
@@ -791,6 +833,7 @@ export default function SaleDetailClient({
                 fill
                 className="object-contain"
                 sizes="100vw"
+                onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
               />
             ) : (
               <img
@@ -800,6 +843,7 @@ export default function SaleDetailClient({
                 className="h-full w-full object-contain"
                 loading="lazy"
                 referrerPolicy="no-referrer"
+                onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
               />
             )
           ) : (
@@ -872,14 +916,16 @@ export default function SaleDetailClient({
                 </div>
               </div>
 
-              {sale.date_end && sale.date_end !== sale.date_start && (
+              {shouldRenderEndSection && (
                 <div className="flex gap-3">
                   <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <div className="font-medium text-gray-900 text-sm">Ends: {formatDate(sale.date_end)}</div>
-                    {sale.time_end && sale.time_end !== sale.time_start && (
+                    {hasDistinctEndDate && sale.date_end && (
+                      <div className="font-medium text-gray-900 text-sm">Ends: {formatDate(sale.date_end)}</div>
+                    )}
+                    {hasDistinctEndTime && sale.time_end && (
                       <div className="text-xs text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
                     )}
                   </div>
@@ -1008,6 +1054,11 @@ export default function SaleDetailClient({
           {/* Sale Header */}
           <div className="bg-white rounded-lg shadow-sm">
             <div className="relative w-full overflow-hidden rounded-t-lg bg-gray-100 aspect-[16/9] md:aspect-[4/3]">
+              {isGalleryImageLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 text-sm text-gray-700">
+                  Loading image...
+                </div>
+              )}
               {selectedImageUrl ? (
                 isTrustedNextImageHost(selectedImageUrl) ? (
                   <Image
@@ -1017,6 +1068,7 @@ export default function SaleDetailClient({
                     fill
                     className="object-contain"
                     sizes="(min-width:1024px) 66vw, 100vw"
+                    onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
                   />
                 ) : (
                   <img
@@ -1026,6 +1078,7 @@ export default function SaleDetailClient({
                     className="h-full w-full object-contain"
                     loading="lazy"
                     referrerPolicy="no-referrer"
+                    onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
                   />
                 )
               ) : (
@@ -1158,14 +1211,16 @@ export default function SaleDetailClient({
                     </div>
                   </div>
 
-                  {sale.date_end && sale.date_end !== sale.date_start && (
+                  {shouldRenderEndSection && (
                     <div className="flex gap-3">
                       <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <div>
-                        <div className="font-medium text-gray-900">Ends: {formatDate(sale.date_end)}</div>
-                        {sale.time_end && sale.time_end !== sale.time_start && (
+                        {hasDistinctEndDate && sale.date_end && (
+                          <div className="font-medium text-gray-900">Ends: {formatDate(sale.date_end)}</div>
+                        )}
+                        {hasDistinctEndTime && sale.time_end && (
                           <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
                         )}
                       </div>

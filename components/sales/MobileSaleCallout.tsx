@@ -12,22 +12,7 @@ import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import { displayAddress } from '@/lib/display/address'
 import { formatDateOnly } from '@/lib/display/date'
-
-function isTrustedNextImageHost(urlString: string): boolean {
-  try {
-    const u = new URL(urlString)
-    if (u.protocol !== 'https:') return false
-    const host = u.hostname.toLowerCase()
-    if (host === 'res.cloudinary.com') return true
-    if (host === 'storage.googleapis.com') return true
-    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
-      return u.pathname.startsWith('/storage/v1/object/public/')
-    }
-    return false
-  } catch {
-    return false
-  }
-}
+import { isTrustedNextImageHost } from '@/lib/images/isTrustedNextImageHost'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null
@@ -157,7 +142,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
     })
     
     // Normal Next.js navigation (works in both web and WebView)
-    router.push(detailUrl);
+    router.push(detailUrl)
   }
 
   const formatDate = (dateStr: string, timeStr?: string) => {
@@ -215,29 +200,39 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         <div className="flex flex-col p-0 overflow-hidden rounded-2xl pointer-events-none">
           {/* Image at top - full width, half size */}
           <div className="relative w-full h-16 bg-gray-100 rounded-t-2xl overflow-hidden pointer-events-none">
-            {cover ? (
-              isTrustedNextImageHost(cover.url) ? (
-                <Image
-                  src={cover.url}
-                  alt={cover.alt}
-                  fill
-                  sizes="(max-width: 400px) 100vw, 400px"
-                  className="object-cover"
-                />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleViewSale()
+              }}
+              className="absolute inset-0 pointer-events-auto"
+              aria-label={`Open ${sale.title || `Sale ${sale.id}`}`}
+            >
+              {cover ? (
+                isTrustedNextImageHost(cover.url) ? (
+                  <Image
+                    src={cover.url}
+                    alt={cover.alt}
+                    fill
+                    sizes="(max-width: 400px) 100vw, 400px"
+                    className="object-cover"
+                  />
+                ) : (
+                  <img
+                    src={cover.url}
+                    alt={cover.alt}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                )
               ) : (
-                <img
-                  src={cover.url}
-                  alt={cover.alt}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
-              )
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <SalePlaceholder className="w-full h-full opacity-60" />
-              </div>
-            )}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <SalePlaceholder className="w-full h-full opacity-60" />
+                </div>
+              )}
+            </button>
             {/* Close button overlay on image */}
             <button
               onClick={onDismiss}
@@ -253,9 +248,16 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           {/* Content section - only buttons/links should capture events */}
           <div className="flex flex-col p-2 pointer-events-none">
             {/* Title */}
-            <h3 className="text-base font-semibold line-clamp-2 mb-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleViewSale()
+              }}
+              className="text-base font-semibold line-clamp-2 mb-1 text-left pointer-events-auto hover:underline"
+            >
               {sale.title || `Sale ${sale.id}`}
-            </h3>
+            </button>
 
             {/* Address and date */}
             <div className="space-y-0.5 mb-2">
@@ -370,29 +372,39 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         <div className={`flex flex-col ${pinPosition ? 'p-0' : 'p-0'} overflow-hidden ${pinPosition ? 'rounded-2xl' : 'rounded-t-2xl'}`}>
           {/* Image at top - full width, half size */}
           <div className={`relative w-full h-16 bg-gray-100 ${pinPosition ? 'rounded-t-2xl' : 'rounded-t-2xl'} overflow-hidden`}>
-            {cover ? (
-              isTrustedNextImageHost(cover.url) ? (
-                <Image
-                  src={cover.url}
-                  alt={cover.alt}
-                  fill
-                  sizes="(max-width: 400px) 100vw, 400px"
-                  className="object-cover"
-                />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleViewSale()
+              }}
+              className="absolute inset-0"
+              aria-label={`Open ${sale.title || `Sale ${sale.id}`}`}
+            >
+              {cover ? (
+                isTrustedNextImageHost(cover.url) ? (
+                  <Image
+                    src={cover.url}
+                    alt={cover.alt}
+                    fill
+                    sizes="(max-width: 400px) 100vw, 400px"
+                    className="object-cover"
+                  />
+                ) : (
+                  <img
+                    src={cover.url}
+                    alt={cover.alt}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                )
               ) : (
-                <img
-                  src={cover.url}
-                  alt={cover.alt}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
-              )
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <SalePlaceholder className="w-full h-full opacity-60" />
-              </div>
-            )}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <SalePlaceholder className="w-full h-full opacity-60" />
+                </div>
+              )}
+            </button>
             {/* Close button overlay on image */}
             <button
               onClick={onDismiss}
@@ -408,9 +420,16 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           {/* Content section */}
           <div className={`flex flex-col ${pinPosition ? 'p-2' : 'p-3'}`}>
             {/* Title */}
-            <h3 className="text-base font-semibold line-clamp-2 mb-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleViewSale()
+              }}
+              className="text-base font-semibold line-clamp-2 mb-1 text-left hover:underline"
+            >
               {sale.title || `Sale ${sale.id}`}
-            </h3>
+            </button>
 
             {/* Address and date */}
             <div className="space-y-0.5 mb-2">

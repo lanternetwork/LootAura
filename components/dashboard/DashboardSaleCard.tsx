@@ -8,6 +8,7 @@ import { toast } from 'react-toastify'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
+import { isTrustedNextImageHost } from '@/lib/images/isTrustedNextImageHost'
 import { FaEdit, FaTrash } from 'react-icons/fa'
 import AddressLink from '@/components/common/AddressLink'
 import { getCsrfHeaders } from '@/lib/csrf-client'
@@ -134,14 +135,24 @@ export default function DashboardSaleCard({
       >
         <div className="relative bg-gray-100 h-40 sm:h-44 md:h-[160px] overflow-hidden">
           {cover ? (
-            <Image
-              src={cover.url}
-              alt={cover.alt}
-              fill
-              sizes="(min-width:1024px) 33vw, 100vw"
-              className="object-cover transform-gpu scale-[1.3]"
-              priority={false}
-            />
+            isTrustedNextImageHost(cover.url) ? (
+              <Image
+                src={cover.url}
+                alt={cover.alt}
+                fill
+                sizes="(min-width:1024px) 33vw, 100vw"
+                className="object-cover transform-gpu scale-[1.3]"
+                priority={false}
+              />
+            ) : (
+              <img
+                src={cover.url}
+                alt={cover.alt}
+                className="h-full w-full object-cover transform-gpu scale-[1.3]"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            )
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
               <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.69]" />
@@ -149,9 +160,9 @@ export default function DashboardSaleCard({
           )}
         </div>
 
-        <div className="p-3 md:p-4 flex flex-col gap-1">
+        <div className="p-3 md:p-4 flex flex-col gap-2 min-h-[210px]">
           <div className="flex justify-between items-start gap-2">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 min-h-[44px]">
               <div className="flex items-center gap-2 mb-1">
                 {sale.status && (
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -166,10 +177,10 @@ export default function DashboardSaleCard({
               <h3 className="text-base font-semibold line-clamp-1">{sale.title || `Sale ${sale.id}`}</h3>
             </div>
           </div>
-          {sale.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}
-          <div className="text-sm text-neutral-700">
+          {sale.description && <p className="text-xs text-neutral-600 line-clamp-1 min-h-[16px]">{sale.description}</p>}
+          <div className="text-sm text-neutral-700 min-h-[40px]">
             {sale.address && (
-              <div>
+              <div className="line-clamp-2">
                 <AddressLink
                   lat={sale.lat ?? undefined}
                   lng={sale.lng ?? undefined}
@@ -180,7 +191,7 @@ export default function DashboardSaleCard({
               </div>
             )}
             {!sale.address && sale.city && sale.state && (
-              <div>
+              <div className="line-clamp-2">
                 <AddressLink
                   lat={sale.lat ?? undefined}
                   lng={sale.lng ?? undefined}
@@ -229,7 +240,7 @@ export default function DashboardSaleCard({
           )}
           
           {/* Actions */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mt-2 pt-2 border-t border-gray-200">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mt-auto pt-2 border-t border-gray-200">
             <Link 
               href={`/sales/${sale.id}`}
               className="flex-1 text-center px-2 sm:px-3 py-1.5 text-sm text-[#3A2268] hover:bg-gray-50 rounded transition-colors min-w-0 flex-shrink-0"

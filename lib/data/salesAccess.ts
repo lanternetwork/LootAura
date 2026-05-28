@@ -786,9 +786,9 @@ export async function getNearestSalesForSale(
       return []
     }
 
-    // Use PostGIS RPC function to find nearest sales
-    // Search within a reasonable radius (50km) to ensure we find results
-    const maxDistanceMeters = 50 * 1000 // 50km
+    // Use PostGIS RPC function to find nearest sales.
+    // Keep radius effectively unbounded so far-but-nearest matches can still surface.
+    const maxDistanceMeters = 20_000_000 // ~half earth circumference
 
     // Try to use the PostGIS RPC function (in lootaura_v2 schema)
     // Use schema-qualified client to access lootaura_v2 functions
@@ -837,24 +837,57 @@ export async function getNearestSalesForSale(
         })
       }
 
-      // Fallback: query all published sales and calculate distance client-side
-      const { data: allSales, error: queryError } = await applyPhase4PublicPublishedSaleReadFilters(
-        supabase
-          .from('sales_v2')
-          .select('*')
-          .neq('id', saleId)
-          .not('lat', 'is', null)
-          .not('lng', 'is', null)
-      ).limit(100) // Reasonable limit for fallback
+      // Fallback: expand geographic bounds incrementally to avoid arbitrary global first-page bias.
+      const latitudeBands = [0.75, 1.5, 3.0, 6.0]
+      const targetCandidateCount = Math.max(limit * 25, 50)
+      const dedupedSales = new Map<string, any>()
+      let fallbackQueryError: { message?: string } | null = null
 
-      if (queryError || !allSales) {
+      for (const latitudeBand of latitudeBands) {
+        const latMin = currentSale.lat - latitudeBand
+        const latMax = currentSale.lat + latitudeBand
+        const longitudeBand = latitudeBand / Math.max(Math.cos((currentSale.lat * Math.PI) / 180), 0.1)
+        const lngMin = currentSale.lng - longitudeBand
+        const lngMax = currentSale.lng + longitudeBand
+
+        const { data: boundedSales, error: queryError } = await applyPhase4PublicPublishedSaleReadFilters(
+          supabase
+            .from('sales_v2')
+            .select('*')
+            .neq('id', saleId)
+            .not('lat', 'is', null)
+            .not('lng', 'is', null)
+            .gte('lat', latMin)
+            .lte('lat', latMax)
+            .gte('lng', lngMin)
+            .lte('lng', lngMax)
+        ).limit(250)
+
+        if (queryError) {
+          fallbackQueryError = queryError
+          continue
+        }
+
+        for (const candidate of boundedSales || []) {
+          if (candidate?.id && !dedupedSales.has(candidate.id)) {
+            dedupedSales.set(candidate.id, candidate)
+          }
+        }
+
+        if (dedupedSales.size >= targetCandidateCount) {
+          break
+        }
+      }
+
+      const allSales = Array.from(dedupedSales.values())
+      if (allSales.length === 0) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           const { logger } = await import('@/lib/log')
           logger.debug('[SALES_ACCESS] Fallback query failed', {
             component: 'salesAccess',
             operation: 'getNearestSalesForSale',
             saleId,
-            error: queryError?.message,
+            error: fallbackQueryError?.message ?? 'No candidates found in fallback geo-bounds',
           })
         }
         return []

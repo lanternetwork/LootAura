@@ -25,10 +25,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const metroSlug = searchParams.get('metroSlug') ?? undefined
   const sampleSaleId = searchParams.get('saleId') ?? undefined
-  const baseUrl = searchParams.get('baseUrl') ?? undefined
 
   try {
-    const report = await runSeoCrawlSmokeChecks({ metroSlug, sampleSaleId, baseUrl })
+    const report = await runSeoCrawlSmokeChecks({ metroSlug, sampleSaleId })
     return NextResponse.json({ ok: true, report })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Crawl smoke failed'

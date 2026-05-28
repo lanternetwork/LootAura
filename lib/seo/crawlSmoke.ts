@@ -1,5 +1,5 @@
 import { getSeoBaseUrl } from '@/lib/seo/constants'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { getPilotMetroBySlug } from '@/lib/seo/pilotMetros'
 import { getCityPagePath, getListingCanonicalPath, getWeekendPagePath } from '@/lib/seo/canonical'
 
 export type CrawlSmokeCheck = {
@@ -18,6 +18,26 @@ export type CrawlSmokeReport = {
 }
 
 const CRAWL_TIMEOUT_MS = 15_000
+/** Published sale ids are UUIDs; restrict path segments to block traversal / scheme injection. */
+const CRAWL_SMOKE_SALE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function getCrawlSmokeSiteOrigin(): string {
+  return new URL(getSeoBaseUrl()).origin
+}
+
+/** Same-origin URLs only — crawl smoke never follows admin-supplied hosts (SSRF-safe). */
+export function buildCrawlSmokeUrl(pathname: string): string {
+  if (!pathname.startsWith('/') || pathname.startsWith('//')) {
+    throw new Error('Invalid crawl smoke path')
+  }
+  const origin = getCrawlSmokeSiteOrigin()
+  const url = new URL(pathname, `${origin}/`)
+  if (url.origin !== origin) {
+    throw new Error('Crawl smoke URL must stay on configured site origin')
+  }
+  return url.href
+}
 
 async function fetchHtml(url: string): Promise<{ ok: boolean; html: string; status: number }> {
   const controller = new AbortController()
@@ -49,15 +69,18 @@ function check(
  * Phase 5B — HTTP smoke checks for SSR crawl markers on live/staging HTML.
  */
 export async function runSeoCrawlSmokeChecks(options?: {
-  baseUrl?: string
   metroSlug?: string
   sampleSaleId?: string
 }): Promise<CrawlSmokeReport> {
-  const baseUrl = (options?.baseUrl ?? getSeoBaseUrl()).replace(/\/$/, '')
-  const metro = SEO_PILOT_METROS.find((m) => m.slug === (options?.metroSlug ?? 'dallas-tx')) ?? SEO_PILOT_METROS[0]
+  const baseUrl = getSeoBaseUrl().replace(/\/$/, '')
+  const metroSlug = options?.metroSlug ?? 'dallas-tx'
+  const metro = getPilotMetroBySlug(metroSlug)
+  if (!metro) {
+    throw new Error(`Unknown pilot metro slug: ${metroSlug}`)
+  }
   const checks: CrawlSmokeCheck[] = []
 
-  const cityUrl = `${baseUrl}${getCityPagePath(metro.slug)}`
+  const cityUrl = buildCrawlSmokeUrl(getCityPagePath(metro.slug))
   const cityRes = await fetchHtml(cityUrl)
   const cityHasH1 = /<h1\b/i.test(cityRes.html)
   const cityHasListingLinks = /href=["']\/sales\/[^"']+["']/i.test(cityRes.html)
@@ -80,7 +103,7 @@ export async function runSeoCrawlSmokeChecks(options?: {
     )
   )
 
-  const weekendUrl = `${baseUrl}${getWeekendPagePath(metro.slug)}`
+  const weekendUrl = buildCrawlSmokeUrl(getWeekendPagePath(metro.slug))
   const weekendRes = await fetchHtml(weekendUrl)
   checks.push(
     check(
@@ -101,7 +124,10 @@ export async function runSeoCrawlSmokeChecks(options?: {
 
   const saleId = options?.sampleSaleId ?? process.env.SEO_CRAWL_SMOKE_SALE_ID?.trim()
   if (saleId) {
-    const listingUrl = `${baseUrl}${getListingCanonicalPath(saleId)}`
+    if (!CRAWL_SMOKE_SALE_ID_PATTERN.test(saleId)) {
+      throw new Error('Invalid crawl smoke sale id format')
+    }
+    const listingUrl = buildCrawlSmokeUrl(getListingCanonicalPath(saleId))
     const listingRes = await fetchHtml(listingUrl)
     const crawlable = listingRes.html.includes('data-seo-sale-detail="crawlable"')
     checks.push(
@@ -132,7 +158,7 @@ export async function runSeoCrawlSmokeChecks(options?: {
     )
   }
 
-  const sitemapUrl = `${baseUrl}/sitemap/static.xml`
+  const sitemapUrl = buildCrawlSmokeUrl('/sitemap/static.xml')
   const sitemapRes = await fetchHtml(sitemapUrl)
   const noQueryUrls = !sitemapRes.html.includes('?tab=') && !sitemapRes.html.includes('?')
   checks.push(

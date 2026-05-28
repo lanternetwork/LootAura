@@ -1,4 +1,4 @@
-import { getSeoActiveMetros, getSeoMetroCatalogForDashboard, isSeoExpansionCandidate, isSeoMetroActive, isSeoPilotMetro } from '@/lib/seo/metroCatalog'
+import { getSeoActiveMetros, getSeoMetroCatalogForDashboard, isSeoMetroActive, isSeoPilotMetro } from '@/lib/seo/metroCatalog'
 import { qualifyMetroForSeoRollout } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary, SeoMetroQualificationResult, SeoPilotMetro } from '@/lib/seo/types'
 

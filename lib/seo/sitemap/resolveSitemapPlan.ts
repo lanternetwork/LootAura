@@ -24,7 +24,7 @@ export function resolveSeoSitemapPlan(totalPublishedListings: number): SeoSitema
     for (let i = 0; i < listingChunkCount; i++) {
       segmentIds.push(listingSitemapChunkId(i))
     }
-    // City/weekend segments activate in Phase 2/3 when pages exist.
+    segmentIds.push('cities', 'weekends')
   }
 
   return {

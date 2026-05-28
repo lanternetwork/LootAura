@@ -36,5 +36,7 @@ describe('seo sitemap plan', () => {
     expect(plan.segmentIds[0]).toBe('static')
     expect(plan.segmentIds).toContain('listings-0')
     expect(plan.segmentIds).toContain('listings-2')
+    expect(plan.segmentIds).toContain('cities')
+    expect(plan.segmentIds).toContain('weekends')
   })
 })

@@ -5,8 +5,11 @@ import {
   parseListingSitemapChunkId,
 } from '@/lib/seo/sitemap/listingEntries'
 import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPublishedListingRows'
+import { buildCitySitemapEntries } from '@/lib/seo/sitemap/cityEntries'
+import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 import { isSeoPublicIndexingEnabled } from '@/lib/seo/constants'
+import { emptyInventoryByPilotSlug } from '@/lib/seo/buildSeoOperationalSnapshot'
 
 export async function generateSitemaps() {
   if (!isSeoPublicIndexingEnabled()) {
@@ -24,6 +27,20 @@ export default async function sitemap({
 }): Promise<MetadataRoute.Sitemap> {
   if (id === 'static') {
     return buildStaticSitemapEntries()
+  }
+
+  if (id === 'cities') {
+    return buildCitySitemapEntries({
+      nationalIndexingAllowed: true,
+      inventoryBySlug: emptyInventoryByPilotSlug(),
+    })
+  }
+
+  if (id === 'weekends') {
+    return buildWeekendSitemapEntries({
+      nationalIndexingAllowed: true,
+      inventoryBySlug: emptyInventoryByPilotSlug(),
+    })
   }
 
   const chunkIndex = parseListingSitemapChunkId(id)

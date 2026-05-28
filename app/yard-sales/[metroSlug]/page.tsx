@@ -9,7 +9,7 @@ import {
   createCityPageStructuredDataBundle,
   saleToInventoryListItem,
 } from '@/lib/seo/structuredData'
-import { getCityPagePath } from '@/lib/seo/canonical'
+import { getCityPagePath, getWeekendPagePath } from '@/lib/seo/canonical'
 import {
   buildCityPageH1,
   buildCityPageSupportingCopy,
@@ -84,7 +84,13 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
 
         <p className="mt-2 text-sm font-medium text-emerald-800">{formatFreshnessLabel(summary.lastUpdatedAt)}</p>
 
-        <p className="mt-4">
+        <p className="mt-4 flex flex-wrap gap-4">
+          <Link
+            href={getWeekendPagePath(metro.slug)}
+            className="text-sm font-medium text-purple-700 hover:text-purple-900"
+          >
+            Yard sales this weekend →
+          </Link>
           <Link
             href={`/sales?city=${encodeURIComponent(metro.city)}`}
             className="text-sm font-medium text-purple-700 hover:text-purple-900"

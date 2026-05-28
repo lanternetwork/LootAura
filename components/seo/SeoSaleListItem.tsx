@@ -7,10 +7,11 @@ import type { Sale } from '@/lib/types'
 
 type Props = {
   sale: Sale
+  badges?: string[]
 }
 
 /** Crawlable listing row — plain HTML links and images for SEO inventory blocks. */
-export default function SeoSaleListItem({ sale }: Props) {
+export default function SeoSaleListItem({ sale, badges = [] }: Props) {
   const href = getListingCanonicalPath(sale.id)
   const cover = getSaleCoverUrl(sale)
   const address = displayAddress(sale.address, sale.city, sale.state)
@@ -28,6 +29,18 @@ export default function SeoSaleListItem({ sale }: Props) {
           <Link href={href}>{sale.title || 'Yard Sale'}</Link>
         </h2>
         {dateLabel && <p className="mt-1 text-sm text-gray-600">{dateLabel}</p>}
+        {badges.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-2" aria-label="Freshness">
+            {badges.map((badge) => (
+              <li
+                key={badge}
+                className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800"
+              >
+                {badge}
+              </li>
+            ))}
+          </ul>
+        )}
         {address && <p className="mt-1 text-sm text-gray-700">{address}</p>}
         {sale.description && (
           <p className="mt-2 line-clamp-2 text-sm text-gray-600">{sale.description}</p>

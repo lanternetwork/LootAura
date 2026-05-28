@@ -1,5 +1,4 @@
-import { fetchMetroInventory } from '@/lib/seo/fetchMetroInventory'
-import type { MetroInventoryResult } from '@/lib/seo/fetchMetroInventory'
+import { fetchMetroInventory, type MetroInventoryResult } from '@/lib/seo/fetchMetroInventory'
 import type { SeoPilotMetro } from '@/lib/seo/types'
 import type { Sale } from '@/lib/types'
 import {

@@ -76,8 +76,6 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     }
   }
 
-  const _metadata = createSaleMetadata(sale)
-  
   // Create structured data for SEO
   const eventStructuredData = createSaleEventStructuredData(sale)
   const breadcrumbStructuredData = createBreadcrumbStructuredData([

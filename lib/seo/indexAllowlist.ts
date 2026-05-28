@@ -1,7 +1,9 @@
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
-import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
-import { DUPLICATE_VISIBLE_CLUSTER_RATE_MAX } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
+import {
+  DUPLICATE_VISIBLE_CLUSTER_RATE_MAX,
+  evaluateYstmSaleInstanceRolloutGates,
+} from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 import {
   evaluateYstmStabilizationExit,
   STABILIZATION_CANONICAL_COVERAGE_MIN_PCT,

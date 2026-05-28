@@ -9,6 +9,7 @@ Inventory-first, ingestion-gated local discovery SEO. See the final development 
 - **Phase 4** — Internal linking + discovery graph (`lib/seo/geoLinking.ts`)
 - **Phase 5** — Crawl validation + gated index rollout (`docs/SEO_PHASE5_CRAWL_VALIDATION.md`)
 - **Phase 6** — Controlled metro expansion (`docs/SEO_PHASE6_METRO_EXPANSION.md`)
+- **Phase 7** — Manual local discovery distribution (`docs/SEO_PHASE7_LOCAL_DISCOVERY_DISTRIBUTION.md`)
 
 ## Phase 1 module layout
 

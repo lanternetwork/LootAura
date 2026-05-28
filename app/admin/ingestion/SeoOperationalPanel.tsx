@@ -8,6 +8,7 @@ import {
 } from '@/lib/seo/buildSeoOperationalSnapshot'
 import { computeSeoSitemapCounts } from '@/lib/seo/sitemap/computeSitemapCounts'
 import type { SeoInventorySummary } from '@/lib/seo/types'
+import SeoDistributionPilotPanel from '@/app/admin/ingestion/SeoDistributionPilotPanel'
 import { useEffect, useMemo, useState } from 'react'
 
 const GATE_STYLE = {
@@ -232,6 +233,11 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
           ))}
         </ul>
       </div>
+
+      <SeoDistributionPilotPanel
+        nationalIndexingAllowed={snapshot.allowlist.indexingAllowed}
+        activeMetroSlugs={snapshot.metroExpansion.activeMetroSlugs}
+      />
 
       <div className="mt-4">
         <p className="text-sm font-semibold text-slate-900">Index rollout gates</p>

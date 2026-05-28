@@ -19,7 +19,7 @@ This is NOT: content marketing, mass page generation, AI-generated content SEO, 
 - **Phase 4** — Internal linking + discovery graph
 - **Phase 5** — Crawl + index validation (Search Console, raw HTML checks) — see `docs/SEO_PHASE5_CRAWL_VALIDATION.md`
 - **Phase 6** — Controlled metro expansion — see `docs/SEO_PHASE6_METRO_EXPANSION.md`
-- **Phase 7** — Local discovery distribution (manual pilot)
+- **Phase 7** — Local discovery distribution (manual pilot) — see `docs/SEO_PHASE7_LOCAL_DISCOVERY_DISTRIBUTION.md`
 
 ## Phase 0 — Critical rule
 

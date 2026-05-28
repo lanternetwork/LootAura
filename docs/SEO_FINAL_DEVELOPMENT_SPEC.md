@@ -18,7 +18,7 @@ This is NOT: content marketing, mass page generation, AI-generated content SEO, 
 - **Phase 3** — Weekend inventory surfaces (metro timezone boundaries)
 - **Phase 4** — Internal linking + discovery graph
 - **Phase 5** — Crawl + index validation (Search Console, raw HTML checks) — see `docs/SEO_PHASE5_CRAWL_VALIDATION.md`
-- **Phase 6** — Controlled metro expansion
+- **Phase 6** — Controlled metro expansion — see `docs/SEO_PHASE6_METRO_EXPANSION.md`
 - **Phase 7** — Local discovery distribution (manual pilot)
 
 ## Phase 0 — Critical rule
@@ -52,6 +52,7 @@ Track indexed metros, crawlable inventory %, stale %, canonical coverage, duplic
 - `SEO_SEARCH_CONSOLE_VALIDATION_PASSED=true` — Phase 5A attestation after Search Console checklist.
 - `SEO_INDEX_PILOT_METROS` — optional comma-separated metro slugs for gradual index rollout.
 - `SEO_CRAWL_SMOKE_SALE_ID` — optional published sale id for listing crawl smoke checks.
+- `SEO_EXPANSION_METRO_SLUGS` — comma-separated tier-2 metros to activate SSR city/weekend pages.
 
 ## Deferred
 

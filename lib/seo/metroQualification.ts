@@ -2,6 +2,7 @@ import type {
   SeoInventorySummary,
   SeoMetroQualificationInput,
   SeoMetroQualificationResult,
+  SeoPilotMetro,
 } from '@/lib/seo/types'
 import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
 
@@ -54,11 +55,12 @@ export function qualifyMetroForSeoRollout(input: SeoMetroQualificationInput): Se
   }
 }
 
-export function qualifyAllPilotMetros(options: {
+export function qualifyAllSeoMetros(options: {
+  metros: SeoPilotMetro[]
   nationalIndexingAllowed: boolean
   inventoryBySlug: Record<string, SeoInventorySummary>
 }): SeoMetroQualificationResult[] {
-  return SEO_PILOT_METROS.map((metro) =>
+  return options.metros.map((metro) =>
     qualifyMetroForSeoRollout({
       metro,
       nationalIndexingAllowed: options.nationalIndexingAllowed,
@@ -69,4 +71,11 @@ export function qualifyAllPilotMetros(options: {
       },
     })
   )
+}
+
+export function qualifyAllPilotMetros(options: {
+  nationalIndexingAllowed: boolean
+  inventoryBySlug: Record<string, SeoInventorySummary>
+}): SeoMetroQualificationResult[] {
+  return qualifyAllSeoMetros({ metros: SEO_PILOT_METROS, ...options })
 }

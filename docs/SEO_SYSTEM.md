@@ -7,7 +7,8 @@ Inventory-first, ingestion-gated local discovery SEO. See the final development 
 - **Phase 2** — SSR listing crawl block + pilot city pages (`/yard-sales/[metroSlug]`)
 - **Phase 3** — Weekend inventory pages (`/yard-sales-this-weekend/[metroSlug]`, metro TZ)
 - **Phase 4** — Internal linking + discovery graph (`lib/seo/geoLinking.ts`)
-- **Phase 5+** — Crawl validation, expansion
+- **Phase 5** — Crawl validation + gated index rollout (`docs/SEO_PHASE5_CRAWL_VALIDATION.md`)
+- **Phase 6** — Controlled metro expansion (`docs/SEO_PHASE6_METRO_EXPANSION.md`)
 
 ## Phase 1 module layout
 

@@ -2,7 +2,8 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist, type SeoIndexGate } from '@/lib/seo/indexAllowlist'
 import { isSeoPublicIndexingEnabled } from '@/lib/seo/constants'
-import { qualifyAllPilotMetros } from '@/lib/seo/metroQualification'
+import { getSeoActiveMetros } from '@/lib/seo/metroCatalog'
+import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary, SeoRobotsDirective } from '@/lib/seo/types'
 export function isSeoCrawlValidationPassed(): boolean {
   return process.env.SEO_CRAWL_VALIDATION_PASSED === 'true'
@@ -44,6 +45,8 @@ export type SeoIndexRolloutSnapshot = {
   indexingAllowed: boolean
   blockers: string[]
   gates: SeoIndexGate[]
+  qualifiedMetroSlugs: string[]
+  /** @deprecated use qualifiedMetroSlugs */
   qualifiedPilotMetros: string[]
 }
 
@@ -82,26 +85,30 @@ export function evaluateSeoIndexRolloutReadiness(options: {
   const nationalIndexingAllowed =
     allowlist.indexingAllowed && crawlPass && gscPass
 
-  const pilotMetros = qualifyAllPilotMetros({
+  const activeMetros = getSeoActiveMetros()
+  const qualifiedMetros = qualifyAllSeoMetros({
+    metros: activeMetros,
     nationalIndexingAllowed,
     inventoryBySlug: options.inventoryByMetroSlug ?? {},
   })
 
-  const pilotAllowlist = getSeoIndexPilotMetroSlugs()
-  const qualifiedPilotMetros = pilotMetros
-    .filter((m) => m.qualified && (!pilotAllowlist || pilotAllowlist.includes(m.slug)))
+  const metroIndexAllowlist = getSeoIndexPilotMetroSlugs()
+  const qualifiedMetroSlugs = qualifiedMetros
+    .filter((m) => m.qualified && (!metroIndexAllowlist || metroIndexAllowlist.includes(m.slug)))
     .map((m) => m.slug)
 
-  if (nationalIndexingAllowed && qualifiedPilotMetros.length === 0) {
-    blockers.push('No pilot metros qualified for index rollout')
+  if (nationalIndexingAllowed && qualifiedMetroSlugs.length === 0) {
+    blockers.push('No active metros qualified for index rollout')
   }
 
   return {
     generatedAt: new Date().toISOString(),
-    indexingAllowed: nationalIndexingAllowed && qualifiedPilotMetros.length > 0,
+    indexingAllowed: nationalIndexingAllowed && qualifiedMetroSlugs.length > 0,
     blockers: [...new Set(blockers)],
     gates,
-    qualifiedPilotMetros,
+    qualifiedMetroSlugs,
+    /** @deprecated use qualifiedMetroSlugs */
+    qualifiedPilotMetros: qualifiedMetroSlugs,
   }
 }
 
@@ -120,5 +127,8 @@ export function resolveListingIndexRobots(): SeoRobotsDirective {
 }
 
 export function resolveMetroPageRobots(metroSlug: string): SeoRobotsDirective {
+  if (!getSeoActiveMetros().some((m) => m.slug === metroSlug)) {
+    return { index: false, follow: true }
+  }
   return resolveSeoRobotsDirective({ metroSlug })
 }

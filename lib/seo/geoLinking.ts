@@ -3,7 +3,8 @@ import {
   getListingCanonicalPath,
   getWeekendPagePath,
 } from '@/lib/seo/canonical'
-import { buildMetroSlug, getPilotMetroBySlug, SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { buildMetroSlug } from '@/lib/seo/pilotMetros'
+import { getSeoActiveMetros, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 import type { SeoPilotMetro } from '@/lib/seo/types'
 import type { Sale } from '@/lib/types'
 
@@ -40,21 +41,30 @@ export function resolvePilotMetroForSale(sale: {
   city?: string | null
   state?: string | null
 }): SeoPilotMetro | null {
+  return resolveSeoMetroForSale(sale)
+}
+
+export function resolveSeoMetroForSale(sale: {
+  city?: string | null
+  state?: string | null
+}): SeoPilotMetro | null {
   if (!sale.city?.trim() || !sale.state?.trim()) return null
   const city = normalizeCity(sale.city)
   const state = normalizeState(sale.state)
   const slug = buildMetroSlug(sale.city, sale.state)
-  const bySlug = getPilotMetroBySlug(slug)
-  if (bySlug) return bySlug
+  const bySlug = getSeoMetroBySlug(slug)
+  if (bySlug && getSeoActiveMetros().some((m) => m.slug === bySlug.slug)) {
+    return bySlug
+  }
   return (
-    SEO_PILOT_METROS.find(
+    getSeoActiveMetros().find(
       (m) => normalizeCity(m.city) === city && normalizeState(m.state) === state
     ) ?? null
   )
 }
 
 export function getNearbyPilotMetros(metro: SeoPilotMetro, limit = 4): SeoPilotMetro[] {
-  return SEO_PILOT_METROS.filter((m) => m.slug !== metro.slug)
+  return getSeoActiveMetros().filter((m) => m.slug !== metro.slug)
     .sort((a, b) => {
       const aSameState = a.state === metro.state ? 0 : 1
       const bSameState = b.state === metro.state ? 0 : 1

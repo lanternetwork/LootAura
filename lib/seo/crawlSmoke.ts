@@ -1,5 +1,5 @@
 import { getSeoBaseUrl } from '@/lib/seo/constants'
-import { getPilotMetroBySlug } from '@/lib/seo/pilotMetros'
+import { getSeoActiveMetros, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 import { getCityPagePath, getListingCanonicalPath, getWeekendPagePath } from '@/lib/seo/canonical'
 
 export type CrawlSmokeCheck = {
@@ -74,9 +74,9 @@ export async function runSeoCrawlSmokeChecks(options?: {
 }): Promise<CrawlSmokeReport> {
   const baseUrl = getSeoBaseUrl().replace(/\/$/, '')
   const metroSlug = options?.metroSlug ?? 'dallas-tx'
-  const metro = getPilotMetroBySlug(metroSlug)
-  if (!metro) {
-    throw new Error(`Unknown pilot metro slug: ${metroSlug}`)
+  const metro = getSeoMetroBySlug(metroSlug)
+  if (!metro || !getSeoActiveMetros().some((m) => m.slug === metro.slug)) {
+    throw new Error(`Unknown or inactive metro slug: ${metroSlug}`)
   }
   const checks: CrawlSmokeCheck[] = []
 

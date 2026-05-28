@@ -2,7 +2,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
-import { getPilotMetroBySlug, SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import {
+  getSeoActiveMetros,
+  getSeoMetroBySlug,
+  isSeoMetroActive,
+} from '@/lib/seo/metroCatalog'
 import {
   fetchMetroWeekendInventory,
   formatFreshnessSignalLabel,
@@ -29,13 +33,13 @@ type PageProps = {
 }
 
 export function generateStaticParams() {
-  return SEO_PILOT_METROS.map((metro) => ({ metroSlug: metro.slug }))
+  return getSeoActiveMetros().map((metro) => ({ metroSlug: metro.slug }))
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { metroSlug } = await params
-  const metro = getPilotMetroBySlug(metroSlug)
-  if (!metro) {
+  const metro = getSeoMetroBySlug(metroSlug)
+  if (!metro || !isSeoMetroActive(metroSlug)) {
     return { title: 'Yard sales this weekend · Loot Aura' }
   }
   const { summary, weekend } = await fetchMetroWeekendInventory(metro)
@@ -49,8 +53,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function YardSalesThisWeekendMetroPage({ params }: PageProps) {
   const { metroSlug } = await params
-  const metro = getPilotMetroBySlug(metroSlug)
-  if (!metro) {
+  const metro = getSeoMetroBySlug(metroSlug)
+  if (!metro || !isSeoMetroActive(metroSlug)) {
     notFound()
   }
 

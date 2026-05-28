@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { getCityPageCanonicalUrl } from '@/lib/seo/canonical'
-import { qualifyAllPilotMetros } from '@/lib/seo/metroQualification'
+import { getSeoActiveMetros } from '@/lib/seo/metroCatalog'
+import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary } from '@/lib/seo/types'
 
 /**
@@ -13,7 +14,8 @@ export function buildCitySitemapEntries(options: {
 }): MetadataRoute.Sitemap {
   if (!options.nationalIndexingAllowed) return []
 
-  const qualified = qualifyAllPilotMetros({
+  const qualified = qualifyAllSeoMetros({
+    metros: getSeoActiveMetros(),
     nationalIndexingAllowed: true,
     inventoryBySlug: options.inventoryBySlug,
   }).filter((m) => m.qualified)

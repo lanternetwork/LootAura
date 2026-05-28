@@ -78,6 +78,6 @@ describe('seo index rollout', () => {
       },
     })
     expect(result.indexingAllowed).toBe(true)
-    expect(result.qualifiedPilotMetros.length).toBeGreaterThan(0)
+    expect(result.qualifiedMetroSlugs.length).toBeGreaterThan(0)
   })
 })

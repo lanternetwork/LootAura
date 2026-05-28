@@ -4,16 +4,23 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import {
   buildSeoOperationalSnapshot,
-  emptyInventoryByPilotSlug,
+  emptyInventoryByMetroSlug,
 } from '@/lib/seo/buildSeoOperationalSnapshot'
 import { computeSeoSitemapCounts } from '@/lib/seo/sitemap/computeSitemapCounts'
-import { useMemo } from 'react'
+import type { SeoInventorySummary } from '@/lib/seo/types'
+import { useEffect, useMemo, useState } from 'react'
 
 const GATE_STYLE = {
   pass: 'border-emerald-300 bg-emerald-50 text-emerald-950',
   fail: 'border-red-300 bg-red-50 text-red-950',
   pending: 'border-slate-300 bg-slate-50 text-slate-700',
   blocked: 'border-amber-300 bg-amber-50 text-amber-950',
+} as const
+
+const TIER_LABEL = {
+  pilot: 'Pilot',
+  expansion_active: 'Expansion (active)',
+  expansion_candidate: 'Expansion candidate',
 } as const
 
 type Props = {
@@ -23,17 +30,46 @@ type Props = {
 }
 
 export default function SeoOperationalPanel({ metrics, coverage, publishedListingCount = 0 }: Props) {
+  const [inventoryBySlug, setInventoryBySlug] = useState<Record<string, SeoInventorySummary>>(
+    () => emptyInventoryByMetroSlug()
+  )
+  const [inventoryStatus, setInventoryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    setInventoryStatus('loading')
+    fetch('/api/admin/seo/metro-inventory', { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Metro inventory request failed')
+        const body = (await res.json()) as {
+          ok: boolean
+          inventoryBySlug?: Record<string, SeoInventorySummary>
+        }
+        if (!body.ok || !body.inventoryBySlug) throw new Error('Invalid metro inventory response')
+        if (!cancelled) {
+          setInventoryBySlug(body.inventoryBySlug)
+          setInventoryStatus('ready')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setInventoryStatus('error')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const snapshot = useMemo(() => {
     const sitemapCounts = computeSeoSitemapCounts({
       totalPublishedListings: publishedListingCount,
       nationalIndexingAllowed: false,
-      inventoryBySlug: emptyInventoryByPilotSlug(),
+      inventoryBySlug,
     })
     const provisional = buildSeoOperationalSnapshot({
       metrics,
       coverage,
       sitemapCounts,
-      inventoryByMetroSlug: emptyInventoryByPilotSlug(),
+      inventoryByMetroSlug: inventoryBySlug,
     })
     return buildSeoOperationalSnapshot({
       metrics,
@@ -41,11 +77,11 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       sitemapCounts: computeSeoSitemapCounts({
         totalPublishedListings: publishedListingCount,
         nationalIndexingAllowed: provisional.rollout.indexingAllowed,
-        inventoryBySlug: emptyInventoryByPilotSlug(),
+        inventoryBySlug,
       }),
-      inventoryByMetroSlug: emptyInventoryByPilotSlug(),
+      inventoryByMetroSlug: inventoryBySlug,
     })
-  }, [metrics, coverage, publishedListingCount])
+  }, [metrics, coverage, publishedListingCount, inventoryBySlug])
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -53,8 +89,9 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <div>
           <h2 className="text-lg font-semibold text-slate-900">SEO operational readiness</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Index allowlist derives from ingestion gates. Phase 5 rollout additionally requires crawl +
-            Search Console attestation env vars before <code className="text-xs">noindex</code> is removed.
+            Index allowlist derives from ingestion gates. Phase 6 expansion metros activate via{' '}
+            <code className="text-xs">SEO_EXPANSION_METRO_SLUGS</code>. Phase 5 rollout env vars
+            control <code className="text-xs">noindex</code> removal.
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -79,6 +116,15 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         </div>
       </div>
 
+      <p className="mt-2 text-xs text-slate-500">
+        Live metro inventory:{' '}
+        {inventoryStatus === 'loading'
+          ? 'loading…'
+          : inventoryStatus === 'error'
+            ? 'unavailable (using zeros)'
+            : 'loaded'}
+      </p>
+
       {snapshot.rollout.blockers.length > 0 && (
         <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <p className="font-semibold">Rollout blockers</p>
@@ -98,6 +144,14 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
           value={
             snapshot.metrics.canonicalCoveragePct != null
               ? `${snapshot.metrics.canonicalCoveragePct.toFixed(1)}%`
+              : '—'
+          }
+        />
+        <MetricCard
+          label="Avg crawlable inventory"
+          value={
+            snapshot.metrics.crawlableInventoryPct != null
+              ? `${(snapshot.metrics.crawlableInventoryPct * 100).toFixed(0)}%`
               : '—'
           }
         />
@@ -126,7 +180,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
           }
         />
         <MetricCard label="Sitemap listing URLs" value={snapshot.sitemap.listingUrlCount.toLocaleString()} />
-        <MetricCard label="Sitemap chunks" value={String(snapshot.sitemap.listingChunkCount)} />
+        <MetricCard label="Active metros" value={String(snapshot.metroExpansion.activeMetroSlugs.length)} />
       </div>
 
       <div className="mt-4 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
@@ -134,16 +188,49 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <p className="mt-1 text-slate-600">
           Run{' '}
           <code className="text-xs">GET /api/admin/seo/crawl-smoke?metroSlug=dallas-tx&amp;saleId=…</code>{' '}
-          against staging/production, then set{' '}
-          <code className="text-xs">SEO_CRAWL_VALIDATION_PASSED=true</code> and{' '}
-          <code className="text-xs">SEO_SEARCH_CONSOLE_VALIDATION_PASSED=true</code>. See{' '}
+          then set Phase 5 attestation env vars. See{' '}
           <code className="text-xs">docs/SEO_PHASE5_CRAWL_VALIDATION.md</code>.
         </p>
-        {snapshot.rollout.qualifiedPilotMetros.length > 0 && (
+        {snapshot.rollout.qualifiedMetroSlugs.length > 0 && (
           <p className="mt-2 text-xs text-slate-600">
-            Qualified for index rollout: {snapshot.rollout.qualifiedPilotMetros.join(', ')}
+            Qualified for index rollout: {snapshot.rollout.qualifiedMetroSlugs.join(', ')}
           </p>
         )}
+      </div>
+
+      <div className="mt-4">
+        <p className="text-sm font-semibold text-slate-900">Metro expansion (Phase 6)</p>
+        <p className="mt-1 text-xs text-slate-600">
+          Activate candidates with <code className="text-xs">SEO_EXPANSION_METRO_SLUGS</code>. See{' '}
+          <code className="text-xs">docs/SEO_PHASE6_METRO_EXPANSION.md</code>.
+        </p>
+        <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+          {snapshot.metroExpansion.rows.map((row) => (
+            <li
+              key={row.slug}
+              className={`rounded border px-3 py-2 text-xs ${
+                row.qualified
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-950'
+                  : 'border-slate-300 bg-slate-50 text-slate-700'
+              }`}
+            >
+              <span className="font-semibold">{row.slug}</span> — {TIER_LABEL[row.tier]} — score{' '}
+              {row.score}
+              {row.pageActive ? ' · page active' : ' · page inactive'}
+              {row.qualified ? ' (qualified)' : ''}
+              <span className="block mt-1 text-slate-600">
+                {row.inventory.activeListingCount} listings ·{' '}
+                {(row.inventory.crawlableInventoryPct * 100).toFixed(0)}% crawlable
+                {row.inventory.lastUpdatedAt
+                  ? ` · updated ${new Date(row.inventory.lastUpdatedAt).toLocaleString()}`
+                  : ''}
+              </span>
+              {row.reasons.length > 0 && (
+                <span className="block mt-1 text-slate-600">{row.reasons.join('; ')}</span>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="mt-4">
@@ -171,28 +258,6 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
             >
               <span className="font-semibold uppercase">{gate.status}</span> [{gate.source}]: {gate.label}{' '}
               — {gate.detail}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-4">
-        <p className="text-sm font-semibold text-slate-900">Pilot metro qualification</p>
-        <ul className="mt-2 space-y-2">
-          {snapshot.pilotMetros.map((metro) => (
-            <li
-              key={metro.slug}
-              className={`rounded border px-3 py-2 text-xs ${
-                metro.qualified
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-950'
-                  : 'border-slate-300 bg-slate-50 text-slate-700'
-              }`}
-            >
-              <span className="font-semibold">{metro.slug}</span> — score {metro.score}
-              {metro.qualified ? ' (qualified)' : ''}
-              {metro.reasons.length > 0 && (
-                <span className="block mt-1 text-slate-600">{metro.reasons.join('; ')}</span>
-              )}
             </li>
           ))}
         </ul>

@@ -2,15 +2,17 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
 import { evaluateSeoIndexRolloutReadiness } from '@/lib/seo/indexRollout'
-import { qualifyAllPilotMetros } from '@/lib/seo/metroQualification'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { evaluateSeoMetroExpansion } from '@/lib/seo/metroExpansion'
+import { getSeoMetroCatalogForDashboard } from '@/lib/seo/metroCatalog'
+import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary } from '@/lib/seo/types'
 
 export type SeoOperationalSnapshot = {
   generatedAt: string
   allowlist: ReturnType<typeof evaluateSeoIndexAllowlist>
   rollout: ReturnType<typeof evaluateSeoIndexRolloutReadiness>
-  pilotMetros: ReturnType<typeof qualifyAllPilotMetros>
+  pilotMetros: ReturnType<typeof qualifyAllSeoMetros>
+  metroExpansion: ReturnType<typeof evaluateSeoMetroExpansion>
   sitemap: {
     staticUrlCount: number
     listingChunkCount: number
@@ -52,7 +54,12 @@ export function buildSeoOperationalSnapshot(options: {
     coverage,
     inventoryByMetroSlug,
   })
-  const pilotMetros = qualifyAllPilotMetros({
+  const pilotMetros = qualifyAllSeoMetros({
+    metros: getSeoMetroCatalogForDashboard(),
+    nationalIndexingAllowed: allowlist.indexingAllowed,
+    inventoryBySlug: inventoryByMetroSlug,
+  })
+  const metroExpansion = evaluateSeoMetroExpansion({
     nationalIndexingAllowed: allowlist.indexingAllowed,
     inventoryBySlug: inventoryByMetroSlug,
   })
@@ -74,13 +81,14 @@ export function buildSeoOperationalSnapshot(options: {
     allowlist,
     rollout,
     pilotMetros,
+    metroExpansion,
     sitemap: {
       ...sitemapCounts,
       indexingEnabled: rollout.indexingAllowed,
     },
     metrics: {
-      indexedMetros: rollout.qualifiedPilotMetros.length,
-      crawlableInventoryPct: null,
+      indexedMetros: rollout.qualifiedMetroSlugs.length,
+      crawlableInventoryPct: averageCrawlableInventoryPct(inventoryByMetroSlug),
       staleInventoryPct: stalePct,
       canonicalCoveragePct: coverage?.canonicalSaleInstance?.canonicalCoveragePct ?? null,
       duplicateCanonicalClusters:
@@ -96,10 +104,22 @@ export function buildSeoOperationalSnapshot(options: {
 }
 
 export function emptyInventoryByPilotSlug(): Record<string, SeoInventorySummary> {
+  return emptyInventoryByMetroSlug()
+}
+
+export function emptyInventoryByMetroSlug(): Record<string, SeoInventorySummary> {
   return Object.fromEntries(
-    SEO_PILOT_METROS.map((m) => [
+    getSeoMetroCatalogForDashboard().map((m) => [
       m.slug,
       { activeListingCount: 0, lastUpdatedAt: null, crawlableInventoryPct: 0 },
     ])
   )
+}
+
+function averageCrawlableInventoryPct(
+  inventoryBySlug: Record<string, SeoInventorySummary>
+): number | null {
+  const values = Object.values(inventoryBySlug).filter((v) => v.activeListingCount > 0)
+  if (values.length === 0) return null
+  return values.reduce((sum, v) => sum + v.crawlableInventoryPct, 0) / values.length
 }

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { SellerRatingStars } from '@/components/seller/SellerRatingStars'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { FIXED_INGEST_OWNER_ID } from '@/lib/ingestion/fixedIngestOwnerId'
 
 type SellerActivityCardProps = {
   ownerProfile?: { 
@@ -32,6 +33,7 @@ export function SellerActivityCard({ ownerProfile, ownerStats, currentUserRating
 
   const totalSales = ownerStats?.total_sales ?? 0
   const isSeller = currentUser?.id === ownerProfile?.id
+  const isIngestOwner = ownerProfile?.id === FIXED_INGEST_OWNER_ID
 
   // Build profile link - prefer username, fallback to id
   const profileSlug = ownerProfile?.username || ownerProfile?.id || ''
@@ -90,10 +92,12 @@ export function SellerActivityCard({ ownerProfile, ownerStats, currentUserRating
         <span className="text-[#5B4A83]">Member since</span>
         <span className="font-medium text-[#3A2268]">{memberSince}</span>
       </div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-[#5B4A83]">Sales posted</span>
-        <span className="font-medium text-[#3A2268]">{totalSales}</span>
-      </div>
+      {!isIngestOwner && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-[#5B4A83]">Sales posted</span>
+          <span className="font-medium text-[#3A2268]">{totalSales}</span>
+        </div>
+      )}
       {/* Rating Section */}
       {ownerProfile?.id && (
         <div className="space-y-2 pt-2 border-t border-gray-200">

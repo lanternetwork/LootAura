@@ -169,6 +169,7 @@ type NotesPayload = {
   geocode_cron?: GeocodeCronOrchestrationNote
   discovery_cron?: DiscoveryCronOrchestrationNote
   reconciliation_cron?: ReconciliationCronOrchestrationNote
+  publish_time_normalization?: PublishWorkerBatchSummary['timeStartNormalization']
   adaptive?: Record<string, unknown>
 }
 
@@ -239,6 +240,12 @@ const emptyPublish: PublishWorkerBatchSummary = {
   failed: 0,
   skipped: 0,
   expired: 0,
+  timeStartNormalization: {
+    source_preserved: 0,
+    time_start_rounded: 0,
+    time_start_missing_defaulted: 0,
+    timezone_normalized: 0,
+  },
 }
 
 export async function recordIngestionOrchestrationRun(params: {
@@ -254,10 +261,13 @@ export async function recordIngestionOrchestrationRun(params: {
   const geocode = params.geocodeSummary ?? emptyGeocode
   const publish = params.publishSummary ?? emptyPublish
   const notes: NotesPayload | null = (() => {
-    if (params.externalIngestion == null && params.adaptiveNote == null) return null
+    if (params.externalIngestion == null && params.adaptiveNote == null && publish.attempted === 0) return null
     const payload: NotesPayload = {}
     if (params.externalIngestion != null) {
       payload.external_ingestion = params.externalIngestion
+    }
+    if (publish.attempted > 0) {
+      payload.publish_time_normalization = publish.timeStartNormalization
     }
     if (params.adaptiveNote != null) {
       payload.adaptive = params.adaptiveNote

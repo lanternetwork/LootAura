@@ -1,10 +1,12 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import SalePlaceholder from './placeholders/SalePlaceholder'
 import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
+import { isTrustedNextImageHost } from '@/lib/images/isTrustedNextImageHost'
 import AddressLink from '@/components/common/AddressLink'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import { isDebugEnabled } from '@/lib/debug'
@@ -15,22 +17,6 @@ interface SaleCardProps {
   sale: Sale
   className?: string
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
-}
-
-function isTrustedNextImageHost(urlString: string): boolean {
-  try {
-    const u = new URL(urlString)
-    if (u.protocol !== 'https:') return false
-    const host = u.hostname.toLowerCase()
-    if (host === 'res.cloudinary.com') return true
-    if (host === 'storage.googleapis.com') return true
-    if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) {
-      return u.pathname.startsWith('/storage/v1/object/public/')
-    }
-    return false
-  } catch {
-    return false
-  }
 }
 
 export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
@@ -53,6 +39,12 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   const detailUrl = viewport 
     ? `/sales/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
     : `/sales/${sale.id}`
+  const handleDetailNavigationClick = () => {
+    trackAnalyticsEvent({
+      sale_id: sale.id,
+      event_type: 'click',
+    })
+  }
 
   return (
     <article 
@@ -64,35 +56,42 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
       data-kind="sale-row"
     >
       <div className="relative bg-gray-100 h-36 sm:h-[158px] md:h-[144px] overflow-hidden">
-        {cover ? (
-          isTrustedNextImageHost(cover.url) ? (
-            <Image
-              src={cover.url}
-              alt={cover.alt}
-              data-testid="sale-card-next-image"
-              fill
-              sizes="(min-width:1024px) 33vw, (min-width:768px) 50vw, 100vw"
-              className="object-cover transform-gpu scale-[1.3]"
-              priority={false}
-            />
+        <Link
+          href={detailUrl}
+          onClick={handleDetailNavigationClick}
+          className="absolute inset-0 z-[1]"
+          aria-label={`View details for ${sale?.title || `Sale ${sale?.id}`}`}
+        >
+          {cover ? (
+            isTrustedNextImageHost(cover.url) ? (
+              <Image
+                src={cover.url}
+                alt={cover.alt}
+                data-testid="sale-card-next-image"
+                fill
+                sizes="(min-width:1024px) 33vw, (min-width:768px) 50vw, 100vw"
+                className="object-cover transform-gpu scale-[1.3]"
+                priority={false}
+              />
+            ) : (
+              <img
+                src={cover.url}
+                alt={cover.alt}
+                data-testid="sale-card-external-img"
+                className="h-full w-full object-cover transform-gpu scale-[1.3]"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            )
           ) : (
-            <img
-              src={cover.url}
-              alt={cover.alt}
-              data-testid="sale-card-external-img"
-              className="h-full w-full object-cover transform-gpu scale-[1.3]"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          )
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
-            <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.69]" />
-          </div>
-        )}
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
+              <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.69]" />
+            </div>
+          )}
+        </Link>
         {/* Featured badge overlay */}
         {((sale as any).isFeatured === true || sale.is_featured === true) && (
-          <div className="absolute top-2 left-2 z-10">
+          <div className="absolute top-2 left-2 z-10 pointer-events-none">
             <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-green-600 text-white shadow-lg backdrop-blur-sm">
               Featured
             </span>
@@ -100,9 +99,9 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
         )}
       </div>
 
-      <div className="p-3 md:p-4 flex flex-col gap-1">
+      <div className="p-3 md:p-4 flex flex-col gap-2 min-h-[188px]">
         <div className="flex justify-between items-start gap-2">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 min-h-[44px]">
             <div className="flex items-center gap-2 mb-1">
               {((sale as any).is_demo === true || sale?.id?.startsWith?.('demo-')) && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-medium whitespace-nowrap">
@@ -110,16 +109,20 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
                 </span>
               )}
             </div>
-            <h3 className="text-base font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
+            <h3 className="text-base font-semibold line-clamp-1">
+              <Link href={detailUrl} onClick={handleDetailNavigationClick} className="hover:underline">
+                {sale?.title || `Sale ${sale?.id}`}
+              </Link>
+            </h3>
           </div>
           {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}
         </div>
-        {sale?.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}
-        <div className="text-sm text-neutral-700">
+        {sale?.description && <p className="text-xs text-neutral-600 line-clamp-1 min-h-[16px]">{sale.description}</p>}
+        <div className="text-sm text-neutral-700 min-h-[40px]">
           {(sale?.address || (sale?.city && sale?.state)) && (
             <div className="group">
               {sale?.address && (
-                <div className="group-hover:underline">
+                <div className="group-hover:underline line-clamp-2">
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
@@ -131,7 +134,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
                 </div>
               )}
               {!sale?.address && sale?.city && sale?.state && (
-                <div className="group-hover:underline">
+                <div className="group-hover:underline line-clamp-2">
                   <AddressLink
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
@@ -174,16 +177,11 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
         )}
         {sale?.id && (
           <button
-            className="link-accent hover:text-[var(--accent-hover)] font-medium text-sm text-left"
+            className="mt-auto link-accent hover:text-[var(--accent-hover)] font-medium text-sm text-left"
             data-href={detailUrl}
             onClick={() => {
-              trackAnalyticsEvent({
-                sale_id: sale.id,
-                event_type: 'click',
-              })
-              
-              // Normal Next.js navigation (works in both web and WebView)
-              window.location.href = detailUrl;
+              handleDetailNavigationClick()
+              window.location.href = detailUrl
             }}
           >
             View Details →

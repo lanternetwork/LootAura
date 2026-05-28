@@ -29,6 +29,46 @@ export function roundTimeToNearest30Minutes(value: string | null | undefined): s
   return `${String(roundedHours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}:00`
 }
 
+export type TimeStartNormalizationReason =
+  | 'source_preserved'
+  | 'time_start_rounded'
+  | 'time_start_missing_defaulted'
+  | 'timezone_normalized'
+
+export interface TimeStartNormalizationResult {
+  normalizedTimeStart: string
+  reason: TimeStartNormalizationReason
+}
+
+const TIME_START_DEFAULT = '09:00:00'
+const HHMMSS_REGEX = /^([01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/
+
+/**
+ * Normalize ingest start time for publishing while surfacing why normalization occurred.
+ * Keeps current behavior (default to 09:00 when missing, round to nearest 30 minutes).
+ */
+export function normalizeTimeStartForPublish(value: string | null | undefined): TimeStartNormalizationResult {
+  if (value == null || !String(value).trim()) {
+    return { normalizedTimeStart: TIME_START_DEFAULT, reason: 'time_start_missing_defaulted' }
+  }
+
+  const trimmed = String(value).trim()
+  const rounded = roundTimeToNearest30Minutes(trimmed)
+  if (rounded && rounded !== trimmed) {
+    return { normalizedTimeStart: rounded, reason: 'time_start_rounded' }
+  }
+
+  if (!HHMMSS_REGEX.test(trimmed) && /\d{1,2}:\d{2}/.test(trimmed)) {
+    const extracted = trimmed.match(/\d{1,2}:\d{2}(?::\d{2})?/)?.[0] ?? trimmed
+    const timezoneRounded = roundTimeToNearest30Minutes(extracted)
+    if (timezoneRounded) {
+      return { normalizedTimeStart: timezoneRounded, reason: 'timezone_normalized' }
+    }
+  }
+
+  return { normalizedTimeStart: rounded ?? trimmed, reason: 'source_preserved' }
+}
+
 /** Trim and cap publish address line without emptying a non-empty input. */
 export function capAddressForPublishSchema(
   address: string | null | undefined,

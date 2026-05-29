@@ -45,8 +45,7 @@ export async function GET(req: Request) {
   const result = await completeAuthCallbackFromRequest(
     supabase,
     url.searchParams,
-    url.origin,
-    req.headers.get('cookie') || ''
+    url.origin
   )
 
   if (result.kind === 'error') {

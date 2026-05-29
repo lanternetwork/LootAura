@@ -5,9 +5,9 @@ import { createServerSupabaseClient } from '@/lib/auth/server-session'
 import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
 import {
   decodeRedirectParam,
-  ensureUserProfile,
   sanitizeAuthRedirect,
 } from '@/lib/auth/authCallbackShared'
+import { ensureLootauraProfileExists } from '@/lib/profile/ensureLootauraProfile'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = new URL(request.url).origin
-    await ensureUserProfile(origin, request.headers.get('cookie') || '')
+    await ensureLootauraProfileExists()
 
     const redirectTo = sanitizeAuthRedirect(
       redirectParam ? decodeRedirectParam(redirectParam) : '/sales',

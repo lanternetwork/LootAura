@@ -1,5 +1,6 @@
 import type { CookieOptions } from '@supabase/ssr'
 import type { EmailOtpType, SupabaseClient } from '@supabase/supabase-js'
+import { ensureLootauraProfileExists } from '@/lib/profile/ensureLootauraProfile'
 
 /** OTP types accepted for verifyOtp on the auth callback (fail closed on unknown types). */
 export const ALLOWED_VERIFY_OTP_TYPES = [
@@ -85,22 +86,9 @@ export function buildAuthSuccessRedirectUrl(
   return redirectUrl
 }
 
-export async function ensureUserProfile(origin: string, cookieHeader: string): Promise<void> {
-  try {
-    const profileResponse = await fetch(new URL('/api/profile', origin), {
-      method: 'POST',
-      headers: { Cookie: cookieHeader },
-    })
-    if (!profileResponse.ok && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH_CALLBACK] Profile creation failed, but continuing', {
-        status: profileResponse.status,
-      })
-    }
-  } catch {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH_CALLBACK] Profile creation error, but continuing')
-    }
-  }
+/** @deprecated Use ensureLootauraProfileExists from @/lib/profile/ensureLootauraProfile */
+export async function ensureUserProfile(): Promise<void> {
+  await ensureLootauraProfileExists()
 }
 
 export type AuthCallbackSuccess = {
@@ -123,8 +111,7 @@ export type AuthCallbackResult = AuthCallbackSuccess | AuthCallbackFailure | Aut
 export async function completeAuthCallbackFromRequest(
   supabase: SupabaseClient,
   searchParams: URLSearchParams,
-  origin: string,
-  cookieHeader: string
+  origin: string
 ): Promise<AuthCallbackResult> {
   const redirectTo = resolveRedirectTo(searchParams)
   const finalRedirectTo = sanitizeAuthRedirect(redirectTo, origin)
@@ -148,7 +135,7 @@ export async function completeAuthCallbackFromRequest(
     if (!data.session) {
       return { kind: 'error', errorCode: 'no_session' }
     }
-    await ensureUserProfile(origin, cookieHeader)
+    await ensureLootauraProfileExists()
     return {
       kind: 'session',
       redirectUrl: buildAuthSuccessRedirectUrl(finalRedirectTo, origin),
@@ -169,7 +156,7 @@ export async function completeAuthCallbackFromRequest(
     if (!data.session) {
       return { kind: 'error', errorCode: 'no_session' }
     }
-    await ensureUserProfile(origin, cookieHeader)
+    await ensureLootauraProfileExists()
     return {
       kind: 'session',
       redirectUrl: buildAuthSuccessRedirectUrl(finalRedirectTo, origin),
@@ -184,7 +171,7 @@ export async function completeAuthCallbackFromRequest(
     if (sessionError || !data.session) {
       return { kind: 'error', errorCode: 'invalid_session' }
     }
-    await ensureUserProfile(origin, cookieHeader)
+    await ensureLootauraProfileExists()
     return {
       kind: 'session',
       redirectUrl: buildAuthSuccessRedirectUrl(finalRedirectTo, origin),

@@ -33,6 +33,10 @@ vi.mock('@supabase/ssr', () => ({
   }))
 }))
 
+vi.mock('@/lib/profile/ensureLootauraProfile', () => ({
+  ensureLootauraProfileExists: vi.fn().mockResolvedValue({ ok: true, created: true }),
+}))
+
 describe('OAuth Callback Route', () => {
   beforeEach(() => {
     vi.clearAllMocks()

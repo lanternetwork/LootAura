@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { setSessionCookies, isValidSession } from '@/lib/auth/server-session'
+import { cookies } from 'next/headers'
+import {
+  createServerSupabaseClient,
+  setSessionCookies,
+  isValidSession,
+} from '@/lib/auth/server-session'
+import { ensureLootauraProfileExists } from '@/lib/profile/ensureLootauraProfile'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 
@@ -92,29 +98,13 @@ async function signupHandler(request: NextRequest) {
     }
 
     if (data.session && isValidSession(data.session) && data.user) {
-      try {
-        const profileResponse = await fetch(new URL('/api/profile', request.url), {
-          method: 'POST',
-          headers: {
-            Cookie: request.headers.get('cookie') || '',
-          },
-        })
-
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json()
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[AUTH] Profile ensured during signup:', {
-              event: 'signup',
-              created: profileData.created,
-              userId: data.user.id,
-            })
-          }
-        }
-      } catch (profileError) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[AUTH] Profile creation error during signup, but continuing:', profileError)
-        }
-      }
+      const cookieStore = await cookies()
+      const sessionClient = createServerSupabaseClient(cookieStore)
+      await sessionClient.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
+      await ensureLootauraProfileExists()
 
       const response = NextResponse.json(
         {

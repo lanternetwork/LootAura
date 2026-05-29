@@ -24,13 +24,13 @@ vi.mock('next/headers', () => ({
   })),
 }))
 
+vi.mock('@/lib/profile/ensureLootauraProfile', () => ({
+  ensureLootauraProfileExists: vi.fn().mockResolvedValue({ ok: true, created: true }),
+}))
+
 describe('POST /api/auth/establish-session', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
-    )
   })
 
   it('establishes session from hash-fragment tokens', async () => {

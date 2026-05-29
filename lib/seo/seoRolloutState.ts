@@ -1,32 +1,19 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import {
+  SEO_ROLLOUT_DISABLED_STATE,
+  type SeoRolloutAttestationTarget,
+  type SeoRolloutRuntimeState,
+} from '@/lib/seo/seoRolloutTypes'
+
+export {
+  SEO_ROLLOUT_DISABLED_STATE,
+  isSeoIndexRolloutReady,
+  type SeoRolloutAttestationTarget,
+  type SeoRolloutRuntimeState,
+} from '@/lib/seo/seoRolloutTypes'
 
 export const SEO_ROLLOUT_STATE_KEY = 'seo_rollout'
-
-export type SeoRolloutAttestationTarget =
-  | 'public_indexing'
-  | 'crawl_validation'
-  | 'search_console'
-
-export type SeoRolloutRuntimeState = {
-  publicIndexingEnabled: boolean
-  publicIndexingEnabledAt: string | null
-  publicIndexingDisabledAt: string | null
-  crawlValidationPassed: boolean
-  crawlValidationPassedAt: string | null
-  searchConsoleValidationPassed: boolean
-  searchConsoleValidationPassedAt: string | null
-}
-
-export const SEO_ROLLOUT_DISABLED_STATE: SeoRolloutRuntimeState = {
-  publicIndexingEnabled: false,
-  publicIndexingEnabledAt: null,
-  publicIndexingDisabledAt: null,
-  crawlValidationPassed: false,
-  crawlValidationPassedAt: null,
-  searchConsoleValidationPassed: false,
-  searchConsoleValidationPassedAt: null,
-}
 
 type SeoRolloutStateRow = {
   seo_public_indexing_enabled: boolean | null
@@ -171,12 +158,4 @@ export async function setSeoRolloutAttestation(
   })
 
   return fetchSeoRolloutState(admin)
-}
-
-export function isSeoIndexRolloutReady(state: SeoRolloutRuntimeState): boolean {
-  return (
-    state.publicIndexingEnabled &&
-    state.crawlValidationPassed &&
-    state.searchConsoleValidationPassed
-  )
 }

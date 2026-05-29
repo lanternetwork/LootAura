@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
-import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutState'
+import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
 import { enabledSeoRolloutState } from './seoRolloutTestHelpers'

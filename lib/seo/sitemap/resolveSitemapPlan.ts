@@ -2,7 +2,7 @@ import {
   countListingSitemapChunks,
   listingSitemapChunkId,
 } from '@/lib/seo/sitemap/listingEntries'
-import { isSeoIndexRolloutReady, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutState'
+import { isSeoIndexRolloutReady, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
 
 export type SeoSitemapSegmentId = 'static' | string
 

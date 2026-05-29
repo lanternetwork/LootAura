@@ -5,7 +5,7 @@ import {
   resolveListingIndexRobots,
   resolveMetroPageRobots,
 } from '@/lib/seo/indexRollout'
-import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutState'
+import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
 import { enabledSeoRolloutState } from './seoRolloutTestHelpers'

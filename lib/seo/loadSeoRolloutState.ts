@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { getAdminDb } from '@/lib/supabase/clients'
 import { discoverSeoMetrosFromPublishedSales } from '@/lib/seo/metroCatalog'
 import { fetchSeoRolloutState, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutState'
-import { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutState'
+import { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutTypes'
 
 /** Request-scoped SEO rollout state (fail-closed when DB/schema unavailable). */
 export const getSeoRolloutStateForRequest = cache(async (): Promise<SeoRolloutRuntimeState> => {

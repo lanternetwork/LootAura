@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
-import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutState'
+import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
 
 describe('resolveSeoSitemapPlan', () => {

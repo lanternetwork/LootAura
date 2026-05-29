@@ -1,7 +1,7 @@
 import {
   SEO_ROLLOUT_DISABLED_STATE,
   type SeoRolloutRuntimeState,
-} from '@/lib/seo/seoRolloutState'
+} from '@/lib/seo/seoRolloutTypes'
 
 export function enabledSeoRolloutState(
   overrides: Partial<SeoRolloutRuntimeState> = {}

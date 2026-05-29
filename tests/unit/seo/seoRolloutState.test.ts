@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isSeoIndexRolloutReady, SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutState'
+import { isSeoIndexRolloutReady, SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
 
 describe('seoRolloutState', () => {

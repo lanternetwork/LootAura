@@ -3,7 +3,7 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
 import { evaluateSeoIndexRolloutReadiness } from '@/lib/seo/indexRollout'
 import { evaluateSeoMetroParticipation } from '@/lib/seo/metroParticipation'
-import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutState'
+import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 

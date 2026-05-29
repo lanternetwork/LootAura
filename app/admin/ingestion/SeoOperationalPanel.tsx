@@ -12,7 +12,7 @@ import {
   SEO_ROLLOUT_DISABLED_STATE,
   type SeoRolloutAttestationTarget,
   type SeoRolloutRuntimeState,
-} from '@/lib/seo/seoRolloutState'
+} from '@/lib/seo/seoRolloutTypes'
 import SeoDistributionPilotPanel from '@/app/admin/ingestion/SeoDistributionPilotPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 

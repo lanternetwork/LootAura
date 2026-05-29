@@ -4,9 +4,11 @@ import { createServerClient } from '@supabase/ssr'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { authDebug } from '@/lib/debug/authDebug'
+import { isRecoveryRedirectTarget, RECOVERY_RESET_PATH } from '@/lib/auth/authRecovery'
 import {
   completeAuthCallbackFromRequest,
   createAuthCallbackCookieHandlers,
+  decodeRedirectParam,
 } from '@/lib/auth/authCallbackShared'
 
 export const dynamic = 'force-dynamic'
@@ -52,6 +54,13 @@ async function callbackHandler(request: NextRequest) {
       authDebug.logAuthFlow('oauth-callback', 'error', 'error', {
         error: result.errorCode,
       })
+      const rawRedirect = url.searchParams.get('redirectTo') || url.searchParams.get('next')
+      const decodedRedirect = rawRedirect ? decodeRedirectParam(rawRedirect) : null
+      if (isRecoveryRedirectTarget(decodedRedirect)) {
+        const recoveryErrorUrl = new URL(RECOVERY_RESET_PATH, url.origin)
+        recoveryErrorUrl.searchParams.set('error', result.errorCode)
+        return NextResponse.redirect(recoveryErrorUrl)
+      }
       return NextResponse.redirect(
         new URL(`/auth/error?error=${encodeURIComponent(result.errorCode)}`, url.origin)
       )

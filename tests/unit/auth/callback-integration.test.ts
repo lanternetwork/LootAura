@@ -92,6 +92,41 @@ describe('OAuth Callback Route', () => {
       expect(response.url).toContain('/sales')
     })
 
+    it('should complete recovery via PKCE code and redirect to reset password', async () => {
+      mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+        data: { session: { user: { id: 'user123' } } },
+        error: null,
+      })
+
+      const request = new NextRequest(
+        'https://example.com/auth/callback?code=recovery-pkce&redirectTo=%2Fauth%2Freset-password'
+      )
+
+      const response = await GET(request)
+
+      expect(mockSupabaseClient.auth.exchangeCodeForSession).toHaveBeenCalledWith(
+        'recovery-pkce'
+      )
+      expect(response.url).toContain('/auth/reset-password')
+      expect(response.url).not.toContain('code=')
+    })
+
+    it('should redirect recovery callback errors to reset password page', async () => {
+      mockSupabaseClient.auth.exchangeCodeForSession.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Invalid code' },
+      })
+
+      const request = new NextRequest(
+        'https://example.com/auth/callback?code=bad&redirectTo=%2Fauth%2Freset-password'
+      )
+
+      const response = await GET(request)
+
+      expect(response.url).toContain('/auth/reset-password')
+      expect(response.url).toContain('error=Invalid')
+    })
+
     it('should reject invalid token_hash type', async () => {
       const request = new NextRequest(
         'https://example.com/auth/callback?token_hash=abc&type=not_allowed'

@@ -295,10 +295,12 @@ describe('OAuth Callback Route', () => {
       
       // Verify that safe logging is used (no redirectTo, no full URLs, no codes)
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[AUTH_CALLBACK] Processing OAuth callback:',
+        '[AUTH_CALLBACK] Processing auth callback:',
         expect.objectContaining({
           hasCode: true,
           hasError: false,
+          hasQueryTokens: false,
+          hasTokenHash: false,
           pathname: '/auth/callback',
           requestId: expect.any(String),
         })

@@ -200,6 +200,15 @@ export async function completeAuthCallbackFromRequest(
   return { kind: 'delegate_hash', finishUrl }
 }
 
+function normalizeSameSite(
+  value: CookieOptions['sameSite'] | undefined
+): 'lax' | 'strict' | 'none' {
+  if (value === 'strict' || value === 'none' || value === 'lax') {
+    return value
+  }
+  return 'lax'
+}
+
 export function createAuthCallbackCookieHandlers(
   cookieStore: {
     getAll: () => { name: string; value: string }[]
@@ -228,7 +237,7 @@ export function createAuthCallbackCookieHandlers(
             value,
             ...options,
             path: options?.path || '/',
-            sameSite: options?.sameSite || 'lax',
+            sameSite: normalizeSameSite(options?.sameSite),
             secure: options?.secure !== undefined ? options.secure : isHttps,
             httpOnly: options?.httpOnly !== undefined ? options.httpOnly : true,
           })

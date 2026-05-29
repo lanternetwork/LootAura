@@ -6,10 +6,9 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { parseAuthTokensFromHash } from '@/lib/auth/parseAuthFragment'
 import {
-  buildAuthCallbackDelegationUrl,
   buildAuthCallbackFinishDelegationUrl,
+  isLegacyPkceRecoveryLink,
   parseRecoveryAuthError,
-  shouldDelegateToAuthCallback,
 } from '@/lib/auth/authRecovery'
 
 type ResetPhase = 'pending' | 'delegating' | 'error' | 'ready'
@@ -112,7 +111,7 @@ function ResetPasswordForm() {
           </div>
           <div>
             <label htmlFor="confirm-password" className="block text-sm font-medium mb-1">
-              Confirm Password
+              Confirm New Password
             </label>
             <input
               id="confirm-password"
@@ -154,10 +153,11 @@ function ResetPasswordInner() {
       return
     }
 
-    if (shouldDelegateToAuthCallback(params)) {
-      setPhase('delegating')
-      const target = buildAuthCallbackDelegationUrl(window.location.origin, params)
-      window.location.replace(target)
+    if (isLegacyPkceRecoveryLink(params)) {
+      setErrorMessage(
+        'This reset link uses an older format. Please request a new password reset email.'
+      )
+      setPhase('error')
       return
     }
 

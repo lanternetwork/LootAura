@@ -1,49 +1,49 @@
 import { describe, it, expect } from 'vitest'
 import {
-  buildAuthCallbackDelegationUrl,
+  buildRecoveryConfirmUrlTemplate,
   buildRecoveryEmailRedirectTo,
+  isLegacyPkceRecoveryLink,
   isRecoveryRedirectTarget,
   parseRecoveryAuthError,
-  shouldDelegateToAuthCallback,
 } from '@/lib/auth/authRecovery'
 
 describe('authRecovery', () => {
   describe('buildRecoveryEmailRedirectTo', () => {
-    it('routes email through centralized callback with reset redirect', () => {
+    it('allowlists reset password path for resetPasswordForEmail', () => {
       expect(buildRecoveryEmailRedirectTo('https://lootaura.com')).toBe(
-        'https://lootaura.com/auth/callback?redirectTo=%2Fauth%2Freset-password'
+        'https://lootaura.com/auth/reset-password'
       )
     })
   })
 
-  describe('shouldDelegateToAuthCallback', () => {
-    it('delegates PKCE code', () => {
-      const params = new URLSearchParams('code=abc123')
-      expect(shouldDelegateToAuthCallback(params)).toBe(true)
-    })
-
-    it('delegates token_hash recovery', () => {
-      const params = new URLSearchParams('token_hash=hash&type=recovery')
-      expect(shouldDelegateToAuthCallback(params)).toBe(true)
-    })
-
-    it('does not delegate Supabase error query', () => {
-      const params = new URLSearchParams('error=access_denied&error_code=otp_expired')
-      expect(shouldDelegateToAuthCallback(params)).toBe(false)
+  describe('buildRecoveryConfirmUrlTemplate', () => {
+    it('documents OTP confirm link for Supabase email template', () => {
+      expect(buildRecoveryConfirmUrlTemplate('https://lootaura.com')).toBe(
+        'https://lootaura.com/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=%2Fauth%2Freset-password'
+      )
     })
   })
 
-  describe('buildAuthCallbackDelegationUrl', () => {
-    it('preserves code and sets recovery redirect', () => {
-      const params = new URLSearchParams('code=pkce-code')
-      const url = buildAuthCallbackDelegationUrl('https://lootaura.com', params)
-      expect(url).toBe(
-        'https://lootaura.com/auth/callback?code=pkce-code&redirectTo=%2Fauth%2Freset-password'
-      )
+  describe('isLegacyPkceRecoveryLink', () => {
+    it('detects PKCE code query on reset page', () => {
+      expect(isLegacyPkceRecoveryLink(new URLSearchParams('code=abc'))).toBe(true)
+      expect(isLegacyPkceRecoveryLink(new URLSearchParams())).toBe(false)
     })
   })
 
   describe('parseRecoveryAuthError', () => {
+    it('returns legacy message for ?code= links', () => {
+      const params = new URLSearchParams('code=pkce-code')
+      expect(parseRecoveryAuthError(params)).toContain('older format')
+    })
+
+    it('returns legacy message for PKCE verifier errors', () => {
+      const params = new URLSearchParams(
+        'error=PKCE+code+verifier+not+found+in+storage'
+      )
+      expect(parseRecoveryAuthError(params)).toContain('older format')
+    })
+
     it('returns expired message for otp_expired', () => {
       const params = new URLSearchParams('error=access_denied&error_code=otp_expired')
       expect(parseRecoveryAuthError(params)).toContain('expired')

@@ -1,6 +1,7 @@
 import type { CookieOptions } from '@supabase/ssr'
-import type { EmailOtpType, SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { ensureLootauraProfileExists } from '@/lib/profile/ensureLootauraProfile'
+import { completeAuthOtpConfirmFromRequest } from '@/lib/auth/authOtpConfirm'
 
 /** OTP types accepted for verifyOtp on the auth callback (fail closed on unknown types). */
 export const ALLOWED_VERIFY_OTP_TYPES = [
@@ -152,25 +153,13 @@ export async function completeAuthCallbackFromRequest(
     }
   }
 
-  if (tokenHash) {
-    if (!isAllowedVerifyOtpType(otpType)) {
-      return { kind: 'error', errorCode: 'invalid_callback' }
-    }
-    const { data, error: verifyError } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: otpType as EmailOtpType,
-    })
-    if (verifyError) {
-      return { kind: 'error', errorCode: 'verify_failed' }
-    }
-    if (!data.session) {
-      return { kind: 'error', errorCode: 'no_session' }
-    }
-    await ensureLootauraProfileExists()
-    return {
-      kind: 'session',
-      redirectUrl: buildAuthSuccessRedirectUrl(finalRedirectTo, origin),
-    }
+  if (tokenHash && otpType) {
+    return completeAuthOtpConfirmFromRequest(
+      supabase,
+      searchParams,
+      origin,
+      finalRedirectTo
+    )
   }
 
   if (accessToken && refreshToken) {

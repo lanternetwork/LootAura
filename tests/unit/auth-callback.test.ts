@@ -17,6 +17,7 @@ vi.mock('next/server', async () => {
 vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({
     get: vi.fn(() => null),
+    getAll: vi.fn(() => []),
     set: vi.fn(),
   }))
 }))
@@ -25,7 +26,9 @@ vi.mock('next/headers', () => ({
 vi.mock('@supabase/ssr', () => ({
   createServerClient: vi.fn(() => ({
     auth: {
-      exchangeCodeForSession: vi.fn()
+      exchangeCodeForSession: vi.fn(),
+      verifyOtp: vi.fn(),
+      setSession: vi.fn(),
     }
   }))
 }))
@@ -43,12 +46,12 @@ describe('OAuth Callback Route', () => {
     expect(response.url).toContain('/auth/error?error=access_denied')
   })
 
-  it('should redirect to error page when code parameter is missing', async () => {
+  it('should delegate to client finish when code parameter is missing', async () => {
     const request = new NextRequest('https://example.com/auth/callback')
     
     const response = await GET(request)
     
-    expect(response.url).toContain('/auth/error?error=missing_code')
+    expect(response.url).toContain('/auth/callback/finish')
   })
 
   it('should redirect to error page when code exchange fails', async () => {

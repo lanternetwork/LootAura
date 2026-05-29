@@ -16,6 +16,7 @@ vi.mock('next/server', async () => {
 // Mock cookies
 vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({
+    get: vi.fn(() => null),
     getAll: vi.fn(() => []),
     set: vi.fn(),
   })),
@@ -25,6 +26,8 @@ vi.mock('next/headers', () => ({
 const mockSupabaseClient = {
   auth: {
     exchangeCodeForSession: vi.fn(),
+    verifyOtp: vi.fn(),
+    setSession: vi.fn(),
   },
 }
 
@@ -54,12 +57,46 @@ describe('OAuth Callback Route', () => {
       expect(response.url).toContain('/auth/error?error=access_denied')
     })
 
-    it('should redirect to error page when code parameter is missing', async () => {
+    it('should delegate to client finish when code is missing (hash-fragment flow)', async () => {
       const request = new NextRequest('https://example.com/auth/callback')
       
       const response = await GET(request)
       
-      expect(response.url).toContain('/auth/error?error=missing_code')
+      expect(response.url).toContain('/auth/callback/finish')
+    })
+
+    it('should verify email signup via token_hash', async () => {
+      mockSupabaseClient.auth.verifyOtp.mockResolvedValueOnce({
+        data: { session: { user: { id: 'user123' } } },
+        error: null,
+      })
+
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ created: true }),
+      })
+
+      const request = new NextRequest(
+        'https://example.com/auth/callback?token_hash=abc&type=signup'
+      )
+
+      const response = await GET(request)
+
+      expect(mockSupabaseClient.auth.verifyOtp).toHaveBeenCalledWith({
+        token_hash: 'abc',
+        type: 'signup',
+      })
+      expect(response.url).toContain('/sales')
+    })
+
+    it('should reject invalid token_hash type', async () => {
+      const request = new NextRequest(
+        'https://example.com/auth/callback?token_hash=abc&type=not_allowed'
+      )
+
+      const response = await GET(request)
+
+      expect(response.url).toContain('/auth/error?error=invalid_callback')
     })
 
     it('should redirect to error page when code exchange fails', async () => {
@@ -258,10 +295,12 @@ describe('OAuth Callback Route', () => {
       
       // Verify that safe logging is used (no redirectTo, no full URLs, no codes)
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[AUTH_CALLBACK] Processing OAuth callback:',
+        '[AUTH_CALLBACK] Processing auth callback:',
         expect.objectContaining({
           hasCode: true,
           hasError: false,
+          hasQueryTokens: false,
+          hasTokenHash: false,
           pathname: '/auth/callback',
           requestId: expect.any(String),
         })

@@ -66,6 +66,18 @@ describe('OAuth Callback Middleware', () => {
     expect(NextResponse.redirect).not.toHaveBeenCalled()
   })
 
+  it('should bypass /auth/confirm route completely', async () => {
+    const request = new NextRequest(
+      'https://example.com/auth/confirm?token_hash=abc&type=recovery'
+    )
+    const { NextResponse } = await import('next/server')
+
+    await middleware(request)
+
+    expect(NextResponse.next).toHaveBeenCalled()
+    expect(NextResponse.redirect).not.toHaveBeenCalled()
+  })
+
   it('should not redirect if no code or error parameters', async () => {
     const request = new NextRequest('https://example.com/')
     const { NextResponse } = await import('next/server')

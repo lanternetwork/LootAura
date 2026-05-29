@@ -200,13 +200,13 @@ These templates should be pasted into the Supabase Dashboard → Authentication 
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
                   <td align="center" style="padding: 24px 0;">
-                    <a href="{{ .ConfirmationURL }}" style="display: inline-block; padding: 14px 28px; background-color: #3A2268; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;">Reset password</a>
+                    <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=%2Fauth%2Freset-password" style="display: inline-block; padding: 14px 28px; background-color: #3A2268; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;">Reset password</a>
                   </td>
                 </tr>
               </table>
               <p style="margin: 24px 0 0 0; font-size: 14px; line-height: 1.6; color: #666666;">If you didn't request a password reset, you can safely ignore this email.</p>
               <p style="margin: 16px 0 0 0; font-size: 14px; line-height: 1.6; color: #666666;">If the button doesn't work, copy and paste this link into your browser:</p>
-              <p style="margin: 8px 0 0 0; font-size: 14px; line-height: 1.6; color: #3A2268; word-break: break-all;">{{ .ConfirmationURL }}</p>
+              <p style="margin: 8px 0 0 0; font-size: 14px; line-height: 1.6; color: #3A2268; word-break: break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&amp;next=%2Fauth%2Freset-password</p>
             </td>
           </tr>
           <!-- Footer -->
@@ -222,6 +222,10 @@ These templates should be pasted into the Supabase Dashboard → Authentication 
 </body>
 </html>
 ```
+
+**Redirect allowlist (Supabase Dashboard → Authentication → URL Configuration):** add `https://lootaura.com/auth/confirm` and keep `https://lootaura.com/auth/reset-password` for `resetPasswordForEmail` `redirectTo`.
+
+See [auth-flows.md](./auth-flows.md) for recovery vs OAuth routing.
 
 ---
 
@@ -301,7 +305,7 @@ These templates should be pasted into the Supabase Dashboard → Authentication 
 ## Implementation Notes
 
 1. **Logo URL**: Update `https://lootaura.com/images/logo-white.png` to match your production domain if different
-2. **Template Variables**: All Supabase template variables (e.g., `{{ .ConfirmationURL }}`) are preserved
+2. **Template Variables**: Signup/magic link use `{{ .ConfirmationURL }}` (PKCE via `/auth/callback`). **Reset password** uses `{{ .TokenHash }}` and `/auth/confirm` (OTP, no PKCE verifier).
 3. **Email Client Compatibility**: Templates use table-based layouts and inline styles for maximum email client compatibility
 4. **Testing**: After updating templates in Supabase Dashboard, test by:
    - Signing up a new account (confirm signup)

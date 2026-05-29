@@ -123,8 +123,7 @@ describe('Password Reset Authentication', () => {
       expect(mockSupabaseClient.auth.resetPasswordForEmail).toHaveBeenCalledWith(
         'test@example.com',
         {
-          redirectTo:
-            'https://myapp.com/auth/callback?redirectTo=%2Fauth%2Freset-password',
+          redirectTo: 'https://myapp.com/auth/reset-password',
         }
       )
     })

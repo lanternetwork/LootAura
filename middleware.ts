@@ -67,8 +67,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
   
-  // 0.1. Bypass auth callback route completely to prevent redirect loops
-  if (pathname === '/auth/callback') {
+  // 0.1. Bypass auth callback/confirm routes to prevent redirect loops
+  if (pathname === '/auth/callback' || pathname === '/auth/confirm') {
     return NextResponse.next()
   }
   
@@ -397,7 +397,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // Match all app routes except static assets, health endpoints, and auth callback
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|robots.txt|sitemap.xml|sitemap/|ads.txt|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|robots.txt|sitemap.xml|sitemap/|ads.txt|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback|auth/confirm).*)',
     // Match API routes except health endpoints
     '/api/((?!health/).)*'
   ],

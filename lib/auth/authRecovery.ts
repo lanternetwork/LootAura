@@ -1,26 +1,22 @@
 /**
- * Password recovery routing — delegates auth completion to /auth/callback
- * instead of parsing PKCE/hash/token formats on the reset page.
+ * Password recovery routing — OTP confirm via /auth/confirm (no PKCE verifier).
  */
 
 export const RECOVERY_RESET_PATH = '/auth/reset-password'
 
-const AUTH_CALLBACK_PATH = '/auth/callback'
 const AUTH_CALLBACK_FINISH_PATH = '/auth/callback/finish'
 
-const PASSTHROUGH_CALLBACK_PARAMS = [
-  'code',
-  'token_hash',
-  'type',
-  'access_token',
-  'refresh_token',
-] as const
-
-/** Redirect target for resetPasswordForEmail — completes via centralized callback. */
+/** Allowlist target for resetPasswordForEmail (email template builds the confirm link). */
 export function buildRecoveryEmailRedirectTo(siteUrl: string): string {
   const base = siteUrl.replace(/\/$/, '')
-  const redirectTo = encodeURIComponent(RECOVERY_RESET_PATH)
-  return `${base}${AUTH_CALLBACK_PATH}?redirectTo=${redirectTo}`
+  return `${base}${RECOVERY_RESET_PATH}`
+}
+
+/** Documented shape for Supabase reset-password email template (Dashboard). */
+export function buildRecoveryConfirmUrlTemplate(siteUrl: string): string {
+  const base = siteUrl.replace(/\/$/, '')
+  const next = encodeURIComponent(RECOVERY_RESET_PATH)
+  return `${base}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=${next}`
 }
 
 export function isRecoveryRedirectTarget(redirectTo: string | null | undefined): boolean {
@@ -33,15 +29,32 @@ export function isRecoveryRedirectTarget(redirectTo: string | null | undefined):
   }
 }
 
-/** Supabase error query on landing URL — handle locally, do not forward to callback. */
+/** Legacy reset emails that used PKCE ?code= via ConfirmationURL. */
+export function isLegacyPkceRecoveryLink(searchParams: URLSearchParams): boolean {
+  return searchParams.has('code')
+}
+
 export function parseRecoveryAuthError(searchParams: URLSearchParams): string | null {
+  if (isLegacyPkceRecoveryLink(searchParams)) {
+    return 'This reset link uses an older format. Please request a new password reset email.'
+  }
+
   const error = searchParams.get('error')
   if (!error) return null
 
   const errorCode = searchParams.get('error_code') ?? ''
   const description = searchParams.get('error_description') ?? ''
+  const normalized = error.toLowerCase()
 
-  if (errorCode === 'otp_expired' || description.toLowerCase().includes('expired')) {
+  if (
+    normalized.includes('pkce') ||
+    normalized.includes('code verifier') ||
+    errorCode === 'otp_expired' ||
+    description.toLowerCase().includes('expired')
+  ) {
+    if (normalized.includes('pkce') || normalized.includes('code verifier')) {
+      return 'This reset link uses an older format. Please request a new password reset email.'
+    }
     return 'This password reset link has expired. Please request a new one.'
   }
 
@@ -49,32 +62,14 @@ export function parseRecoveryAuthError(searchParams: URLSearchParams): string | 
     return 'This password reset link is no longer valid. Please request a new one.'
   }
 
+  if (error === 'missing_otp_params' || error === 'verify_failed' || error === 'invalid_callback') {
+    return 'We could not verify your reset link. Please request a new one.'
+  }
+
   return 'We could not verify your reset link. Please request a new one.'
 }
 
-/** True when URL should be handled by /auth/callback (server can exchange session). */
-export function shouldDelegateToAuthCallback(searchParams: URLSearchParams): boolean {
-  if (searchParams.get('error')) return false
-  if (searchParams.get('code')) return true
-  if (searchParams.get('token_hash') && searchParams.get('type')) return true
-  if (searchParams.get('access_token') && searchParams.get('refresh_token')) return true
-  return false
-}
-
-export function buildAuthCallbackDelegationUrl(
-  origin: string,
-  searchParams: URLSearchParams
-): string {
-  const url = new URL(AUTH_CALLBACK_PATH, origin)
-  for (const key of PASSTHROUGH_CALLBACK_PARAMS) {
-    const value = searchParams.get(key)
-    if (value) url.searchParams.set(key, value)
-  }
-  url.searchParams.set('redirectTo', RECOVERY_RESET_PATH)
-  return url.toString()
-}
-
-/** Hash-fragment tokens must use client finish page (same establish-session path as signup). */
+/** Hash-fragment tokens use client finish page (establish-session path). */
 export function buildAuthCallbackFinishDelegationUrl(origin: string): string {
   const url = new URL(AUTH_CALLBACK_FINISH_PATH, origin)
   url.searchParams.set('redirectTo', RECOVERY_RESET_PATH)

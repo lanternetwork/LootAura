@@ -94,53 +94,55 @@ export default function SeoDistributionPilotPanel({ metros }: Props) {
             ))}
           </select>
         </label>
-        <button
-          type="button"
-          className="self-end rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-50"
-          disabled={!metroSlug || status === 'loading'}
-          onClick={() => void loadPack()}
-        >
-          {status === 'loading' ? 'Loading…' : 'Generate pack'}
-        </button>
+        <div className="flex items-end gap-2">
+          <button
+            type="button"
+            onClick={() => void loadPack()}
+            disabled={status === 'loading' || !metroSlug}
+            className="rounded border border-indigo-400 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-50 disabled:opacity-50"
+          >
+            {status === 'loading' ? 'Generating…' : 'Generate pack'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void copyPack()}
+            disabled={!pack?.eligible}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+          >
+            {copyState === 'copied' ? 'Copied' : 'Copy for paste'}
+          </button>
+        </div>
       </div>
 
       {status === 'error' && (
-        <p className="mt-2 text-xs text-red-700">Failed to load distribution pack.</p>
+        <p className="mt-2 text-xs text-red-700">Could not generate distribution pack.</p>
       )}
 
-      {pack && (
-        <div className="mt-3 rounded border border-slate-300 bg-white p-3 text-xs">
-          <p className="font-semibold text-slate-900">
-            {pack.eligible ? 'Eligible' : 'Blocked'} — score {pack.score}
-          </p>
-          {!pack.eligible && pack.blockers.length > 0 && (
-            <ul className="mt-1 list-inside list-disc text-slate-600">
-              {pack.blockers.map((b) => (
-                <li key={b}>{b}</li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-2 font-medium text-slate-800">{pack.title}</p>
-          <pre className="mt-2 whitespace-pre-wrap text-slate-700">{pack.body}</pre>
-          {pack.links.length > 0 && (
-            <ul className="mt-2 space-y-1 text-slate-600">
-              {pack.links.map((link) => (
-                <li key={link.href}>
-                  <a href={link.href} className="text-purple-700 hover:underline">
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-          <button
-            type="button"
-            className="mt-3 rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
-            disabled={!pack.eligible}
-            onClick={() => void copyPack()}
-          >
-            {copyState === 'copied' ? 'Copied' : 'Copy pack'}
-          </button>
+      {pack && !pack.eligible && (
+        <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-950">
+          <p className="font-semibold">Not eligible for distribution</p>
+          <ul className="mt-1 list-inside list-disc">
+            {pack.blockers.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {pack?.eligible && (
+        <div className="mt-3 space-y-2">
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-white p-2 text-xs text-slate-800">
+            {pack.title}
+            {'\n\n'}
+            {pack.body}
+          </pre>
+          <ul className="text-xs text-slate-600">
+            {pack.links.map((link) => (
+              <li key={link.url}>
+                <span className="font-medium">{link.label}:</span> {link.url}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

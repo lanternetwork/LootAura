@@ -6,6 +6,11 @@ import type { SeoDistributionSurfaceId } from '@/lib/seo/distribution/types'
 import { fetchMetroInventory } from '@/lib/seo/fetchMetroInventory'
 import { fetchMetroWeekendInventory } from '@/lib/seo/fetchMetroWeekendInventory'
 import { getSeoMetroBySlug, isSeoMetroActive } from '@/lib/seo/metroCatalog'
+import {
+  loadSeoIndexAllowlistForAdmin,
+  resolveSeoNationalIndexingAllowed,
+  SeoOperationalGateUnavailableError,
+} from '@/lib/seo/loadSeoIndexAllowlistForAdmin'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +20,7 @@ function jsonError(status: number, code: string, message: string) {
 
 /**
  * Phase 7 — human-reviewed local discovery copy packs (no automated posting).
- * GET /api/admin/seo/distribution-pack?metroSlug=dallas-tx&surface=reddit_weekend&nationalIndexingAllowed=true
+ * GET /api/admin/seo/distribution-pack?metroSlug=dallas-tx&surface=reddit_weekend
  */
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +35,14 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const metroSlug = searchParams.get('metroSlug')?.trim()
   const surface = searchParams.get('surface')?.trim() as SeoDistributionSurfaceId | undefined
-  const nationalIndexingAllowed = searchParams.get('nationalIndexingAllowed') === 'true'
+
+  if (searchParams.has('nationalIndexingAllowed')) {
+    return jsonError(
+      400,
+      'INVALID_REQUEST',
+      'nationalIndexingAllowed is not accepted — eligibility is derived server-side'
+    )
+  }
 
   if (!metroSlug) {
     return jsonError(400, 'INVALID_REQUEST', 'metroSlug is required')
@@ -42,6 +54,17 @@ export async function GET(request: NextRequest) {
   const metro = getSeoMetroBySlug(metroSlug)
   if (!metro || !isSeoMetroActive(metroSlug)) {
     return jsonError(404, 'METRO_NOT_FOUND', 'Unknown or inactive metro slug')
+  }
+
+  let nationalIndexingAllowed: boolean
+  try {
+    const allowlist = await loadSeoIndexAllowlistForAdmin(request)
+    nationalIndexingAllowed = resolveSeoNationalIndexingAllowed(allowlist)
+  } catch (error) {
+    if (error instanceof SeoOperationalGateUnavailableError) {
+      return jsonError(503, 'OPERATIONAL_GATES_UNAVAILABLE', error.message)
+    }
+    throw error
   }
 
   try {

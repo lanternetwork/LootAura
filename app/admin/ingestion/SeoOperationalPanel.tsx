@@ -234,10 +234,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         </ul>
       </div>
 
-      <SeoDistributionPilotPanel
-        nationalIndexingAllowed={snapshot.allowlist.indexingAllowed}
-        activeMetroSlugs={snapshot.metroExpansion.activeMetroSlugs}
-      />
+      <SeoDistributionPilotPanel activeMetroSlugs={snapshot.metroExpansion.activeMetroSlugs} />
 
       <div className="mt-4">
         <p className="text-sm font-semibold text-slate-900">Index rollout gates</p>

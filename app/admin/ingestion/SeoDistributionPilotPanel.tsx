@@ -6,14 +6,10 @@ import { getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 import { useCallback, useMemo, useState } from 'react'
 
 type Props = {
-  nationalIndexingAllowed: boolean
   activeMetroSlugs: string[]
 }
 
-export default function SeoDistributionPilotPanel({
-  nationalIndexingAllowed,
-  activeMetroSlugs,
-}: Props) {
+export default function SeoDistributionPilotPanel({ activeMetroSlugs }: Props) {
   const metros = useMemo(
     () =>
       activeMetroSlugs
@@ -34,7 +30,6 @@ export default function SeoDistributionPilotPanel({
       const params = new URLSearchParams({
         metroSlug,
         surface,
-        nationalIndexingAllowed: nationalIndexingAllowed ? 'true' : 'false',
       })
       const res = await fetch(`/api/admin/seo/distribution-pack?${params}`, {
         credentials: 'include',
@@ -48,7 +43,7 @@ export default function SeoDistributionPilotPanel({
     } catch {
       setStatus('error')
     }
-  }, [metroSlug, surface, nationalIndexingAllowed])
+  }, [metroSlug, surface])
 
   const copyPack = useCallback(async () => {
     if (!pack?.eligible) return

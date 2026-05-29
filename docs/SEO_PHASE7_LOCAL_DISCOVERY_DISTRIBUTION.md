@@ -18,7 +18,7 @@ A pack generates only when:
 
 1. Metro is **active** (pilot or `SEO_EXPANSION_METRO_SLUGS`)
 2. Metro passes the **same qualification matrix** as SEO (`lib/seo/metroQualification.ts`)
-3. National ops allowlist state is passed from the dashboard (`nationalIndexingAllowed` query param mirrors ingestion Tier 1/2 readiness)
+3. National ops allowlist is evaluated server-side via the same admin ingestion metrics + coverage handlers used by the SEO dashboard (`evaluateSeoIndexAllowlist`)
 4. Weekend surfaces require non-zero weekend inventory in the metro timezone window
 
 If blockers appear, fix ingestion/SEO gates before distributing.
@@ -34,7 +34,7 @@ If blockers appear, fix ingestion/SEO gates before distributing.
 ## API (admin only)
 
 ```http
-GET /api/admin/seo/distribution-pack?metroSlug=dallas-tx&surface=reddit_weekend&nationalIndexingAllowed=true
+GET /api/admin/seo/distribution-pack?metroSlug=dallas-tx&surface=reddit_weekend
 ```
 
 `surface` values: `reddit_city`, `reddit_weekend`, `facebook_city`, `facebook_weekend`, `digest_email`

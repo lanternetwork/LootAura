@@ -22,7 +22,6 @@ describe('seo distribution pack', () => {
   }
 
   it('builds UTM-tagged distribution URLs on site origin', () => {
-    process.env.NEXT_PUBLIC_SITE_URL = 'https://lootaura.app'
     const url = buildSeoDistributionUrl('/yard-sales/dallas-tx', 'reddit_city')
     expect(url).toContain('https://lootaura.app/yard-sales/dallas-tx')
     expect(url).toContain('utm_source=local_discovery')

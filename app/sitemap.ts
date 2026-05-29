@@ -10,15 +10,33 @@ import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
 import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
+
+export const dynamic = 'force-dynamic'
+
+async function loadNationwideMetroSnapshotForSitemap(): Promise<{
+  metros: SeoMetro[]
+  inventoryBySlug: Record<string, SeoInventorySummary>
+}> {
+  try {
+    return await fetchNationwideSeoMetroInventory()
+  } catch {
+    return { metros: [], inventoryBySlug: {} }
+  }
+}
 
 export async function generateSitemaps() {
-  const rolloutState = await getSeoRolloutStateForRequest()
-  if (!resolveSeoSitemapPlan(0, rolloutState).indexingEnabled) {
+  try {
+    const rolloutState = await getSeoRolloutStateForRequest()
+    if (!resolveSeoSitemapPlan(0, rolloutState).indexingEnabled) {
+      return [{ id: 'static' }]
+    }
+    const rows = await fetchPublishedListingRowsForSitemap()
+    const plan = resolveSeoSitemapPlan(rows.length, rolloutState)
+    return plan.segmentIds.map((segmentId) => ({ id: segmentId }))
+  } catch {
     return [{ id: 'static' }]
   }
-  const rows = await fetchPublishedListingRowsForSitemap()
-  const plan = resolveSeoSitemapPlan(rows.length, rolloutState)
-  return plan.segmentIds.map((segmentId) => ({ id: segmentId }))
 }
 
 export default async function sitemap({
@@ -30,17 +48,15 @@ export default async function sitemap({
     return buildStaticSitemapEntries()
   }
 
-  const { metros, inventoryBySlug } = await fetchNationwideSeoMetroInventory()
-
-  if (id === 'cities') {
-    return buildCitySitemapEntries({
-      metros,
-      nationalIndexingAllowed: true,
-      inventoryBySlug,
-    })
-  }
-
-  if (id === 'weekends') {
+  if (id === 'cities' || id === 'weekends') {
+    const { metros, inventoryBySlug } = await loadNationwideMetroSnapshotForSitemap()
+    if (id === 'cities') {
+      return buildCitySitemapEntries({
+        metros,
+        nationalIndexingAllowed: true,
+        inventoryBySlug,
+      })
+    }
     return buildWeekendSitemapEntries({
       metros,
       nationalIndexingAllowed: true,

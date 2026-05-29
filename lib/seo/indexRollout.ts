@@ -9,8 +9,6 @@ import {
   SEO_ROLLOUT_DISABLED_STATE,
 } from '@/lib/seo/seoRolloutTypes'
 
-export { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutTypes'
-
 export type SeoIndexRolloutSnapshot = {
   generatedAt: string
   indexingAllowed: boolean

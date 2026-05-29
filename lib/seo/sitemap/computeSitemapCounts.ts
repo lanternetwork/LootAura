@@ -5,8 +5,7 @@ import { countListingSitemapChunks } from '@/lib/seo/sitemap/listingEntries'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 import type { SeoSitemapCounts } from '@/lib/seo/buildSeoOperationalSnapshot'
 import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
-import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
-import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
+import type { SeoRolloutRuntimeState, SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 
 export function computeSeoSitemapCounts(options: {
   totalPublishedListings: number

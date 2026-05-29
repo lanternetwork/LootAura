@@ -50,7 +50,14 @@ export function CompleteAuthFromFragment({
 
       if (!tokens) {
         setStatus('error')
-        setErrorMessage('Sign-in link is incomplete or has expired. Please try again.')
+        const isRecovery =
+          searchParams.get('redirectTo') === '/auth/reset-password' ||
+          searchParams.get('next') === '/auth/reset-password'
+        setErrorMessage(
+          isRecovery
+            ? 'This password reset link is incomplete or has expired. Please request a new one.'
+            : 'Sign-in link is incomplete or has expired. Please try again.'
+        )
         return
       }
 

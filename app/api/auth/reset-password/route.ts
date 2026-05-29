@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
+import { buildRecoveryEmailRedirectTo } from '@/lib/auth/authRecovery'
 import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
 import { cookies } from 'next/headers'
 
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient(cookieStore)
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
-    const emailRedirectTo = siteUrl ? `${siteUrl}/auth/reset-password` : undefined
+    const emailRedirectTo = siteUrl ? buildRecoveryEmailRedirectTo(siteUrl) : undefined
 
     if (!emailRedirectTo && process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using Supabase default email redirect')

@@ -4,7 +4,7 @@ const originalEnv = process.env
 import { buildMetroDistributionPack } from '@/lib/seo/distribution/buildMetroDistributionPack'
 import { evaluateDistributionEligibility } from '@/lib/seo/distribution/evaluateDistributionEligibility'
 import { buildSeoDistributionUrl } from '@/lib/seo/distribution/buildDistributionUrls'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 describe('seo distribution pack', () => {
   beforeEach(() => {
@@ -14,7 +14,7 @@ describe('seo distribution pack', () => {
     process.env = originalEnv
   })
 
-  const metro = SEO_PILOT_METROS[0]
+  const metro = TEST_SEO_METRO_DALLAS
   const healthyInventory = {
     activeListingCount: 40,
     lastUpdatedAt: new Date().toISOString(),

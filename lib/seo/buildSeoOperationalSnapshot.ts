@@ -2,18 +2,17 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
 import { evaluateSeoIndexRolloutReadiness } from '@/lib/seo/indexRollout'
+import { evaluateSeoMetroParticipation } from '@/lib/seo/metroParticipation'
 import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutState'
-import { evaluateSeoMetroExpansion } from '@/lib/seo/metroExpansion'
-import { getSeoMetroCatalogForDashboard } from '@/lib/seo/metroCatalog'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
-import type { SeoInventorySummary } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 
 export type SeoOperationalSnapshot = {
   generatedAt: string
   allowlist: ReturnType<typeof evaluateSeoIndexAllowlist>
   rollout: ReturnType<typeof evaluateSeoIndexRolloutReadiness>
-  pilotMetros: ReturnType<typeof qualifyAllSeoMetros>
-  metroExpansion: ReturnType<typeof evaluateSeoMetroExpansion>
+  metroQualification: ReturnType<typeof qualifyAllSeoMetros>
+  metroParticipation: ReturnType<typeof evaluateSeoMetroParticipation>
   sitemap: {
     staticUrlCount: number
     listingChunkCount: number
@@ -46,23 +45,27 @@ export function buildSeoOperationalSnapshot(options: {
   metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse | null
   sitemapCounts: SeoSitemapCounts
+  metros: SeoMetro[]
   inventoryByMetroSlug?: Record<string, SeoInventorySummary>
   rolloutState: SeoRolloutRuntimeState
 }): SeoOperationalSnapshot {
-  const { metrics, coverage, sitemapCounts, inventoryByMetroSlug = {}, rolloutState } = options
+  const { metrics, coverage, sitemapCounts, metros, inventoryByMetroSlug = {}, rolloutState } =
+    options
   const allowlist = evaluateSeoIndexAllowlist(metrics, coverage, rolloutState)
   const rollout = evaluateSeoIndexRolloutReadiness({
     metrics,
     coverage,
+    metros,
     inventoryByMetroSlug,
     rolloutState,
   })
-  const pilotMetros = qualifyAllSeoMetros({
-    metros: getSeoMetroCatalogForDashboard(),
+  const metroQualification = qualifyAllSeoMetros({
+    metros,
     nationalIndexingAllowed: allowlist.indexingAllowed,
     inventoryBySlug: inventoryByMetroSlug,
   })
-  const metroExpansion = evaluateSeoMetroExpansion({
+  const metroParticipation = evaluateSeoMetroParticipation({
+    metros,
     nationalIndexingAllowed: allowlist.indexingAllowed,
     inventoryBySlug: inventoryByMetroSlug,
   })
@@ -83,8 +86,8 @@ export function buildSeoOperationalSnapshot(options: {
     generatedAt: new Date().toISOString(),
     allowlist,
     rollout,
-    pilotMetros,
-    metroExpansion,
+    metroQualification,
+    metroParticipation,
     sitemap: {
       ...sitemapCounts,
       indexingEnabled: rollout.indexingAllowed,
@@ -106,17 +109,13 @@ export function buildSeoOperationalSnapshot(options: {
   }
 }
 
-export function emptyInventoryByPilotSlug(): Record<string, SeoInventorySummary> {
-  return emptyInventoryByMetroSlug()
+export function emptyInventoryByMetroSlug(): Record<string, SeoInventorySummary> {
+  return {}
 }
 
-export function emptyInventoryByMetroSlug(): Record<string, SeoInventorySummary> {
-  return Object.fromEntries(
-    getSeoMetroCatalogForDashboard().map((m) => [
-      m.slug,
-      { activeListingCount: 0, lastUpdatedAt: null, crawlableInventoryPct: 0 },
-    ])
-  )
+/** @deprecated use emptyInventoryByMetroSlug */
+export function emptyInventoryByPilotSlug(): Record<string, SeoInventorySummary> {
+  return emptyInventoryByMetroSlug()
 }
 
 function averageCrawlableInventoryPct(

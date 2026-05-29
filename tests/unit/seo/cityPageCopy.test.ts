@@ -4,10 +4,10 @@ import {
   buildCityPageSupportingCopy,
   formatFreshnessLabel,
 } from '@/lib/seo/copy/cityPageCopy'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { TEST_SEO_METRO_DALLAS, TEST_SEO_METRO_PHOENIX } from './seoTestFixtures'
 
 describe('cityPageCopy', () => {
-  const metro = SEO_PILOT_METROS[0]
+  const metro = TEST_SEO_METRO_DALLAS
   const inventory = {
     activeListingCount: 42,
     lastUpdatedAt: '2026-05-28T12:00:00.000Z',
@@ -23,7 +23,7 @@ describe('cityPageCopy', () => {
     const copy = buildCityPageSupportingCopy({
       metro,
       inventory,
-      nearbyMetros: [SEO_PILOT_METROS[4]],
+      nearbyMetros: [TEST_SEO_METRO_PHOENIX],
     })
     expect(copy).toContain('42')
     expect(copy).toContain('Dallas')

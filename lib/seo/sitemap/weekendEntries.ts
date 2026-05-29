@@ -1,20 +1,20 @@
 import type { MetadataRoute } from 'next'
 import { getWeekendPageCanonicalUrl } from '@/lib/seo/canonical'
-import { getSeoActiveMetros } from '@/lib/seo/metroCatalog'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
-import type { SeoInventorySummary } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 
 /**
- * Weekend sitemap entries — gated identically to city surfaces.
+ * Weekend sitemap entries — nationwide metros that pass operational qualification.
  */
 export function buildWeekendSitemapEntries(options: {
+  metros: SeoMetro[]
   nationalIndexingAllowed: boolean
   inventoryBySlug: Record<string, SeoInventorySummary>
 }): MetadataRoute.Sitemap {
   if (!options.nationalIndexingAllowed) return []
 
   const qualified = qualifyAllSeoMetros({
-    metros: getSeoActiveMetros(),
+    metros: options.metros,
     nationalIndexingAllowed: true,
     inventoryBySlug: options.inventoryBySlug,
   }).filter((m) => m.qualified)

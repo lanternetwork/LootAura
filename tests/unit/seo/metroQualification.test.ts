@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { qualifyMetroForSeoRollout } from '@/lib/seo/metroQualification'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 describe('qualifyMetroForSeoRollout', () => {
-  const metro = SEO_PILOT_METROS[0]
+  const metro = TEST_SEO_METRO_DALLAS
 
   it('fails when national allowlist has not passed', () => {
     const result = qualifyMetroForSeoRollout({

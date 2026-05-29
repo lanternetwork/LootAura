@@ -1,16 +1,15 @@
 import type {
   SeoInventorySummary,
+  SeoMetro,
   SeoMetroQualificationInput,
   SeoMetroQualificationResult,
-  SeoPilotMetro,
 } from '@/lib/seo/types'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
 
 const CRAWLABLE_INVENTORY_MIN_PCT = 0.85
 
 /**
- * Metro qualification matrix — operational scoring before metro enters SEO rollout.
- * National allowlist must pass first; per-metro inventory thresholds apply.
+ * Metro qualification — operational scoring only (inventory + national gates).
+ * No pilot/expansion allowlists.
  */
 export function qualifyMetroForSeoRollout(input: SeoMetroQualificationInput): SeoMetroQualificationResult {
   const { metro, inventory, nationalIndexingAllowed } = input
@@ -18,7 +17,7 @@ export function qualifyMetroForSeoRollout(input: SeoMetroQualificationInput): Se
   let score = 0
 
   if (!nationalIndexingAllowed) {
-    reasons.push('National SEO index allowlist has not passed')
+    reasons.push('National SEO operational gates have not passed')
   } else {
     score += 40
   }
@@ -56,7 +55,7 @@ export function qualifyMetroForSeoRollout(input: SeoMetroQualificationInput): Se
 }
 
 export function qualifyAllSeoMetros(options: {
-  metros: SeoPilotMetro[]
+  metros: SeoMetro[]
   nationalIndexingAllowed: boolean
   inventoryBySlug: Record<string, SeoInventorySummary>
 }): SeoMetroQualificationResult[] {
@@ -71,11 +70,4 @@ export function qualifyAllSeoMetros(options: {
       },
     })
   )
-}
-
-export function qualifyAllPilotMetros(options: {
-  nationalIndexingAllowed: boolean
-  inventoryBySlug: Record<string, SeoInventorySummary>
-}): SeoMetroQualificationResult[] {
-  return qualifyAllSeoMetros({ metros: SEO_PILOT_METROS, ...options })
 }

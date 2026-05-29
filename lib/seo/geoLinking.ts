@@ -3,9 +3,8 @@ import {
   getListingCanonicalPath,
   getWeekendPagePath,
 } from '@/lib/seo/canonical'
-import { buildMetroSlug } from '@/lib/seo/pilotMetros'
-import { getSeoActiveMetros, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
-import type { SeoPilotMetro } from '@/lib/seo/types'
+import { getNearbyMetros, resolveSeoMetroForSale } from '@/lib/seo/metroCatalog'
+import type { SeoMetro } from '@/lib/seo/types'
 import type { Sale } from '@/lib/types'
 
 export type SeoGeoLink = {
@@ -14,7 +13,7 @@ export type SeoGeoLink = {
 }
 
 export type ListingGeoLinks = {
-  metro: SeoPilotMetro | null
+  metro: SeoMetro | null
   city: SeoGeoLink | null
   weekend: SeoGeoLink | null
   nearbyMetros: SeoGeoLink[]
@@ -26,56 +25,22 @@ export type MetroGeoLinks = {
   nearbyMetros: SeoGeoLink[]
 }
 
-function normalizeCity(city: string): string {
-  return city.trim().toLowerCase()
-}
-
-function normalizeState(state: string): string {
-  return state.trim().toUpperCase()
-}
-
-/**
- * Resolve a pilot metro for a sale when city/state match a configured slug.
- */
+/** @deprecated use resolveSeoMetroForSale */
 export function resolvePilotMetroForSale(sale: {
   city?: string | null
   state?: string | null
-}): SeoPilotMetro | null {
+}): SeoMetro | null {
   return resolveSeoMetroForSale(sale)
 }
 
-export function resolveSeoMetroForSale(sale: {
-  city?: string | null
-  state?: string | null
-}): SeoPilotMetro | null {
-  if (!sale.city?.trim() || !sale.state?.trim()) return null
-  const city = normalizeCity(sale.city)
-  const state = normalizeState(sale.state)
-  const slug = buildMetroSlug(sale.city, sale.state)
-  const bySlug = getSeoMetroBySlug(slug)
-  if (bySlug && getSeoActiveMetros().some((m) => m.slug === bySlug.slug)) {
-    return bySlug
-  }
-  return (
-    getSeoActiveMetros().find(
-      (m) => normalizeCity(m.city) === city && normalizeState(m.state) === state
-    ) ?? null
-  )
-}
+export { resolveSeoMetroForSale } from '@/lib/seo/metroCatalog'
 
-export function getNearbyPilotMetros(metro: SeoPilotMetro, limit = 4): SeoPilotMetro[] {
-  return getSeoActiveMetros().filter((m) => m.slug !== metro.slug)
-    .sort((a, b) => {
-      const aSameState = a.state === metro.state ? 0 : 1
-      const bSameState = b.state === metro.state ? 0 : 1
-      if (aSameState !== bSameState) return aSameState - bSameState
-      return a.city.localeCompare(b.city)
-    })
-    .slice(0, limit)
+export function getNearbyPilotMetros(metro: SeoMetro, allMetros: SeoMetro[], limit = 4): SeoMetro[] {
+  return getNearbyMetros(metro, allMetros, limit)
 }
 
 export function buildListingGeoLinks(sale: Sale): ListingGeoLinks {
-  const metro = resolvePilotMetroForSale(sale)
+  const metro = resolveSeoMetroForSale(sale)
   if (!metro) {
     return { metro: null, city: null, weekend: null, nearbyMetros: [] }
   }
@@ -89,14 +54,11 @@ export function buildListingGeoLinks(sale: Sale): ListingGeoLinks {
       href: getWeekendPagePath(metro.slug),
       label: `Yard sales this weekend in ${metro.city}`,
     },
-    nearbyMetros: getNearbyPilotMetros(metro).map((m) => ({
-      href: getCityPagePath(m.slug),
-      label: `${m.city}, ${m.state}`,
-    })),
+    nearbyMetros: [],
   }
 }
 
-export function buildMetroGeoLinks(metro: SeoPilotMetro): MetroGeoLinks {
+export function buildMetroGeoLinks(metro: SeoMetro, allMetros: SeoMetro[]): MetroGeoLinks {
   return {
     city: {
       href: getCityPagePath(metro.slug),
@@ -106,7 +68,7 @@ export function buildMetroGeoLinks(metro: SeoPilotMetro): MetroGeoLinks {
       href: getWeekendPagePath(metro.slug),
       label: `This weekend in ${metro.city}`,
     },
-    nearbyMetros: getNearbyPilotMetros(metro).map((m) => ({
+    nearbyMetros: getNearbyMetros(metro, allMetros).map((m) => ({
       href: getCityPagePath(m.slug),
       label: `${m.city}, ${m.state}`,
     })),

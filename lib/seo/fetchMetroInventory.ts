@@ -2,7 +2,7 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 import { buildInventorySummary } from '@/lib/seo/inventorySummary'
-import type { SeoInventorySummary, SeoPilotMetro } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 import type { Sale } from '@/lib/types'
 
 export type MetroInventoryResult = {
@@ -14,7 +14,7 @@ export type MetroInventoryResult = {
  * Published sales for a pilot metro (city + state), for SSR city pages and qualification.
  */
 export async function fetchMetroInventory(
-  metro: SeoPilotMetro,
+  metro: SeoMetro,
   options?: { limit?: number }
 ): Promise<MetroInventoryResult> {
   const limit = options?.limit ?? 100

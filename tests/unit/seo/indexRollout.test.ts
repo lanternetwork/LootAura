@@ -9,6 +9,13 @@ import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutState'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
 import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
+import { TEST_SEO_METRO_AUSTIN, TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
+
+const healthyInventory = {
+  activeListingCount: 50,
+  lastUpdatedAt: new Date().toISOString(),
+  crawlableInventoryPct: 0.95,
+}
 
 describe('seo index rollout', () => {
   it('rollout requires all three admin attestations', () => {
@@ -32,16 +39,25 @@ describe('seo index rollout', () => {
     })
   })
 
-  it('expansion candidates stay noindex until code-promoted to active metros', () => {
+  it('metro pages index only when operational qualification passes', () => {
     const rollout = enabledSeoRolloutState()
-    expect(resolveMetroPageRobots('austin-tx', rollout)).toEqual({ index: false, follow: true })
-    expect(resolveMetroPageRobots('dallas-tx', rollout)).toEqual({ index: true, follow: true })
+    expect(
+      resolveMetroPageRobots(TEST_SEO_METRO_AUSTIN, rollout, {
+        activeListingCount: 5,
+        lastUpdatedAt: new Date().toISOString(),
+        crawlableInventoryPct: 0.95,
+      }, true)
+    ).toEqual({ index: false, follow: true })
+    expect(
+      resolveMetroPageRobots(TEST_SEO_METRO_DALLAS, rollout, healthyInventory, true)
+    ).toEqual({ index: true, follow: true })
   })
 
   it('rollout readiness blocks without Phase 5 attestations', () => {
     const result = evaluateSeoIndexRolloutReadiness({
       metrics: minimalMetrics(),
       coverage: minimalYstmCoverageScoreboard(),
+      metros: [TEST_SEO_METRO_DALLAS],
       rolloutState: enabledSeoRolloutState({
         crawlValidationPassed: false,
         searchConsoleValidationPassed: false,
@@ -53,9 +69,17 @@ describe('seo index rollout', () => {
   })
 
   it('rollout readiness passes when allowlist and attestations are enabled', () => {
+    const metros = [
+      TEST_SEO_METRO_DALLAS,
+      { slug: 'phoenix-az', city: 'Phoenix', state: 'AZ', timezone: 'America/Phoenix', minActiveListings: 25 },
+      { slug: 'nashville-tn', city: 'Nashville', state: 'TN', timezone: 'America/Chicago', minActiveListings: 25 },
+      { slug: 'atlanta-ga', city: 'Atlanta', state: 'GA', timezone: 'America/New_York', minActiveListings: 25 },
+      { slug: 'houston-tx', city: 'Houston', state: 'TX', timezone: 'America/Chicago', minActiveListings: 25 },
+    ]
     const result = evaluateSeoIndexRolloutReadiness({
       metrics: minimalMetrics(),
       coverage: minimalYstmCoverageScoreboard(),
+      metros,
       rolloutState: enabledSeoRolloutState(),
       inventoryByMetroSlug: {
         'dallas-tx': {

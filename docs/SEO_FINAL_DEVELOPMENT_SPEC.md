@@ -18,7 +18,7 @@ This is NOT: content marketing, mass page generation, AI-generated content SEO, 
 - **Phase 3** — Weekend inventory surfaces (metro timezone boundaries)
 - **Phase 4** — Internal linking + discovery graph
 - **Phase 5** — Crawl + index validation (Search Console, raw HTML checks) — see `docs/SEO_PHASE5_CRAWL_VALIDATION.md`
-- **Phase 6** — Controlled metro expansion — see `docs/SEO_PHASE6_METRO_EXPANSION.md`
+- **Phase 6** — Nationwide metro participation (operational gates only) — see `docs/SEO_PHASE6_METRO_EXPANSION.md`
 - **Phase 7** — Local discovery distribution (manual pilot) — see `docs/SEO_PHASE7_LOCAL_DISCOVERY_DISTRIBUTION.md`
 
 ## Phase 0 — Critical rule
@@ -48,8 +48,8 @@ Track indexed metros, crawlable inventory %, stale %, canonical coverage, duplic
 ## Rollout configuration (no SEO env vars)
 
 - **Public indexing, crawl validation, Search Console** — admin attestations in `ingestion_orchestration_state` key `seo_rollout` (`POST /api/admin/seo/rollout-state`).
-- **Pilot metros** — `lib/seo/pilotMetros.ts`.
-- **Expansion activation** — promote metros into `SEO_ACTIVE_EXPANSION_METROS` in `lib/seo/expansionMetros.ts` (deploy).
+- **Metro discovery** — `discoverSeoMetrosFromPublishedSales()` in `lib/seo/metroCatalog.ts` (nationwide; no allowlists).
+- **Metro participation** — `evaluateSeoMetroParticipation()` / `qualifyMetroForSeoRollout()` (operational gates only).
 - **Crawl smoke listing** — `?saleId=` query param or latest published sale from DB.
 - **Canonical origin** — existing `NEXT_PUBLIC_SITE_URL` only (predates SEO).
 

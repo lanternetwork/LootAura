@@ -2,7 +2,7 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 import { getSeoBaseUrl } from '@/lib/seo/constants'
 import { getCityPagePath, getListingCanonicalPath, getWeekendPagePath } from '@/lib/seo/canonical'
-import { getSeoActiveMetros, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
+import { discoverSeoMetrosFromPublishedSales, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 
 export type CrawlSmokeCheck = {
   id: string
@@ -103,10 +103,14 @@ export async function runSeoCrawlSmokeChecks(options?: {
   sampleSaleId?: string
 }): Promise<CrawlSmokeReport> {
   const baseUrl = getSeoBaseUrl().replace(/\/$/, '')
-  const metroSlug = options?.metroSlug ?? 'dallas-tx'
-  const metro = getSeoMetroBySlug(metroSlug)
-  if (!metro || !getSeoActiveMetros().some((m) => m.slug === metro.slug)) {
-    throw new Error(`Unknown or inactive metro slug: ${metroSlug}`)
+  const metros = await discoverSeoMetrosFromPublishedSales()
+  const metroSlug = options?.metroSlug ?? metros[0]?.slug
+  if (!metroSlug) {
+    throw new Error('No metros with published inventory available for crawl smoke')
+  }
+  const metro = getSeoMetroBySlug(metros, metroSlug)
+  if (!metro) {
+    throw new Error(`Unknown metro slug (no published footprint): ${metroSlug}`)
   }
   const checks: CrawlSmokeCheck[] = []
 

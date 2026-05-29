@@ -7,7 +7,7 @@ import {
   emptyInventoryByMetroSlug,
 } from '@/lib/seo/buildSeoOperationalSnapshot'
 import { computeSeoSitemapCounts } from '@/lib/seo/sitemap/computeSitemapCounts'
-import type { SeoInventorySummary } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 import {
   SEO_ROLLOUT_DISABLED_STATE,
   type SeoRolloutAttestationTarget,
@@ -21,12 +21,6 @@ const GATE_STYLE = {
   fail: 'border-red-300 bg-red-50 text-red-950',
   pending: 'border-slate-300 bg-slate-50 text-slate-700',
   blocked: 'border-amber-300 bg-amber-50 text-amber-950',
-} as const
-
-const TIER_LABEL = {
-  pilot: 'Pilot',
-  expansion_active: 'Expansion (active)',
-  expansion_candidate: 'Expansion candidate',
 } as const
 
 type Props = {
@@ -60,6 +54,7 @@ function parseRolloutState(body: {
 }
 
 export default function SeoOperationalPanel({ metrics, coverage, publishedListingCount = 0 }: Props) {
+  const [metros, setMetros] = useState<SeoMetro[]>([])
   const [inventoryBySlug, setInventoryBySlug] = useState<Record<string, SeoInventorySummary>>(
     () => emptyInventoryByMetroSlug()
   )
@@ -91,10 +86,14 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         if (!res.ok) throw new Error('Metro inventory request failed')
         const body = (await res.json()) as {
           ok: boolean
+          metros?: SeoMetro[]
           inventoryBySlug?: Record<string, SeoInventorySummary>
         }
-        if (!body.ok || !body.inventoryBySlug) throw new Error('Invalid metro inventory response')
+        if (!body.ok || !body.metros || !body.inventoryBySlug) {
+          throw new Error('Invalid metro inventory response')
+        }
         if (!cancelled) {
+          setMetros(body.metros)
           setInventoryBySlug(body.inventoryBySlug)
           setInventoryStatus('ready')
         }
@@ -131,6 +130,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
     const sitemapCounts = computeSeoSitemapCounts({
       totalPublishedListings: publishedListingCount,
       nationalIndexingAllowed: false,
+      metros,
       inventoryBySlug,
       rolloutState,
     })
@@ -138,6 +138,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       metrics,
       coverage,
       sitemapCounts,
+      metros,
       inventoryByMetroSlug: inventoryBySlug,
       rolloutState,
     })
@@ -147,13 +148,15 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       sitemapCounts: computeSeoSitemapCounts({
         totalPublishedListings: publishedListingCount,
         nationalIndexingAllowed: provisional.rollout.indexingAllowed,
+        metros,
         inventoryBySlug,
         rolloutState,
       }),
+      metros,
       inventoryByMetroSlug: inventoryBySlug,
       rolloutState,
     })
-  }, [metrics, coverage, publishedListingCount, inventoryBySlug, rolloutState])
+  }, [metrics, coverage, publishedListingCount, metros, inventoryBySlug, rolloutState])
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -163,8 +166,8 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
           <p className="mt-1 text-sm text-slate-600">
             Index allowlist derives from ingestion gates. Rollout attestations are stored in{' '}
             <code className="text-xs">ingestion_orchestration_state</code> (key{' '}
-            <code className="text-xs">seo_rollout</code>). Expansion metros activate via code promotion in{' '}
-            <code className="text-xs">expansionMetros.ts</code>.
+            <code className="text-xs">seo_rollout</code>). Metros are discovered nationwide from published
+            inventory; participation is gated by operational thresholds only.
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -291,7 +294,11 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
           }
         />
         <MetricCard label="Sitemap listing URLs" value={snapshot.sitemap.listingUrlCount.toLocaleString()} />
-        <MetricCard label="Active metros" value={String(snapshot.metroExpansion.activeMetroSlugs.length)} />
+        <MetricCard
+          label="Participating metros"
+          value={String(snapshot.metroParticipation.participatingMetroSlugs.length)}
+        />
+        <MetricCard label="Discovered metros" value={String(metros.length)} />
       </div>
 
       <div className="mt-4 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
@@ -310,15 +317,13 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       </div>
 
       <div className="mt-4">
-        <p className="text-sm font-semibold text-slate-900">Metro expansion (Phase 6)</p>
+        <p className="text-sm font-semibold text-slate-900">Metro participation (nationwide)</p>
         <p className="mt-1 text-xs text-slate-600">
-          Promote metros by moving them from <code className="text-xs">SEO_EXPANSION_METRO_CANDIDATES</code> to{' '}
-          <code className="text-xs">SEO_ACTIVE_EXPANSION_METROS</code> in{' '}
-          <code className="text-xs">expansionMetros.ts</code>, then deploy. See{' '}
-          <code className="text-xs">docs/SEO_PHASE6_METRO_EXPANSION.md</code>.
+          Each metro with published inventory is scored against operational gates. No pilot or expansion
+          allowlists — qualification alone controls index rollout and distribution eligibility.
         </p>
         <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto">
-          {snapshot.metroExpansion.rows.map((row) => (
+          {snapshot.metroParticipation.rows.map((row) => (
             <li
               key={row.slug}
               className={`rounded border px-3 py-2 text-xs ${
@@ -327,10 +332,8 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
                   : 'border-slate-300 bg-slate-50 text-slate-700'
               }`}
             >
-              <span className="font-semibold">{row.slug}</span> — {TIER_LABEL[row.tier]} — score{' '}
-              {row.score}
-              {row.pageActive ? ' · page active' : ' · page inactive'}
-              {row.qualified ? ' (qualified)' : ''}
+              <span className="font-semibold">{row.slug}</span> — score {row.score}
+              {row.qualified ? ' (participating)' : ''}
               <span className="block mt-1 text-slate-600">
                 {row.inventory.activeListingCount} listings ·{' '}
                 {(row.inventory.crawlableInventoryPct * 100).toFixed(0)}% crawlable
@@ -346,7 +349,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         </ul>
       </div>
 
-      <SeoDistributionPilotPanel activeMetroSlugs={snapshot.metroExpansion.activeMetroSlugs} />
+      <SeoDistributionPilotPanel metros={metros} />
 
       <div className="mt-4">
         <p className="text-sm font-semibold text-slate-900">Index rollout gates</p>

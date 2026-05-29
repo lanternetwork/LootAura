@@ -1,6 +1,5 @@
-import { isSeoMetroActive } from '@/lib/seo/metroCatalog'
 import { qualifyMetroForSeoRollout } from '@/lib/seo/metroQualification'
-import type { SeoInventorySummary, SeoPilotMetro } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 
 export type SeoDistributionEligibility = {
   eligible: boolean
@@ -12,29 +11,19 @@ export type SeoDistributionEligibility = {
  * Phase 7 — same inventory/ops gates as SEO surfaces; human posts only when qualified.
  */
 export function evaluateDistributionEligibility(options: {
-  metro: SeoPilotMetro
+  metro: SeoMetro
   inventory: SeoInventorySummary
   nationalIndexingAllowed: boolean
 }): SeoDistributionEligibility {
-  const blockers: string[] = []
-
-  if (!isSeoMetroActive(options.metro.slug)) {
-    blockers.push('Metro page is not active (pilot or code-promoted expansion metro)')
-  }
-
   const qualification = qualifyMetroForSeoRollout({
     metro: options.metro,
     inventory: options.inventory,
     nationalIndexingAllowed: options.nationalIndexingAllowed,
   })
 
-  if (!qualification.qualified) {
-    blockers.push(...qualification.reasons)
-  }
-
   return {
-    eligible: blockers.length === 0,
-    blockers,
+    eligible: qualification.qualified,
+    blockers: qualification.qualified ? [] : qualification.reasons,
     score: qualification.score,
   }
 }

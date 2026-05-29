@@ -16,16 +16,17 @@ describe('geoLinking', () => {
     status: 'published',
   } as Sale
 
-  it('resolves pilot metro from sale city/state', () => {
+  it('resolves metro from sale city/state (nationwide, no allowlist)', () => {
     expect(resolvePilotMetroForSale(dallasSale)?.slug).toBe('dallas-tx')
-    expect(resolvePilotMetroForSale({ city: 'Unknown', state: 'ZZ' })).toBeNull()
+    expect(resolvePilotMetroForSale({ city: 'Unknown', state: 'ZZ' })?.slug).toBe('unknown-zz')
+    expect(resolvePilotMetroForSale({ city: '', state: 'TX' })).toBeNull()
   })
 
-  it('builds city and weekend links for pilot metros', () => {
+  it('builds city and weekend links when metro resolves', () => {
     const links = buildListingGeoLinks(dallasSale)
     expect(links.city?.href).toBe('/yard-sales/dallas-tx')
     expect(links.weekend?.href).toBe('/yard-sales-this-weekend/dallas-tx')
-    expect(links.nearbyMetros.length).toBeGreaterThan(0)
+    expect(links.nearbyMetros).toEqual([])
   })
 
   it('includes metro in breadcrumb trail when resolved', () => {

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { createCityPageMetadata, createWeekendPageMetadata } from '@/lib/seo/metadata'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 describe('seo metadata', () => {
-  const metro = SEO_PILOT_METROS[0]
+  const metro = TEST_SEO_METRO_DALLAS
   const inventory = {
     activeListingCount: 42,
     lastUpdatedAt: '2026-05-28T12:00:00.000Z',

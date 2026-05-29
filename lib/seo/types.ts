@@ -1,6 +1,6 @@
 export type SeoMetroSlug = string
 
-export type SeoPilotMetro = {
+export type SeoMetro = {
   slug: SeoMetroSlug
   city: string
   state: string
@@ -9,6 +9,9 @@ export type SeoPilotMetro = {
   /** Minimum active listings before metro qualifies for index rollout. */
   minActiveListings: number
 }
+
+/** @deprecated use SeoMetro */
+export type SeoPilotMetro = SeoMetro
 
 export type SeoInventorySummary = {
   activeListingCount: number
@@ -19,7 +22,7 @@ export type SeoInventorySummary = {
 }
 
 export type SeoMetroQualificationInput = {
-  metro: SeoPilotMetro
+  metro: SeoMetro
   inventory: SeoInventorySummary
   /** National indexing allowlist must pass before any metro indexes. */
   nationalIndexingAllowed: boolean

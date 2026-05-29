@@ -5,7 +5,7 @@ import { getDistributionSurface, isWeekendDistributionSurface } from '@/lib/seo/
 import type { SeoDistributionSurfaceId } from '@/lib/seo/distribution/types'
 import { fetchMetroInventory } from '@/lib/seo/fetchMetroInventory'
 import { fetchMetroWeekendInventory } from '@/lib/seo/fetchMetroWeekendInventory'
-import { getSeoMetroBySlug, isSeoMetroActive } from '@/lib/seo/metroCatalog'
+import { discoverSeoMetrosFromPublishedSales, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 import {
   loadSeoIndexAllowlistForAdmin,
   resolveSeoNationalIndexingAllowed,
@@ -51,9 +51,10 @@ export async function GET(request: NextRequest) {
     return jsonError(400, 'INVALID_REQUEST', 'surface must be a supported distribution channel')
   }
 
-  const metro = getSeoMetroBySlug(metroSlug)
-  if (!metro || !isSeoMetroActive(metroSlug)) {
-    return jsonError(404, 'METRO_NOT_FOUND', 'Unknown or inactive metro slug')
+  const metros = await discoverSeoMetrosFromPublishedSales()
+  const metro = getSeoMetroBySlug(metros, metroSlug)
+  if (!metro) {
+    return jsonError(404, 'METRO_NOT_FOUND', 'Unknown metro slug (no published inventory footprint)')
   }
 
   let nationalIndexingAllowed: boolean

@@ -1,9 +1,8 @@
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist, type SeoIndexGate } from '@/lib/seo/indexAllowlist'
-import { getSeoActiveMetros, isSeoMetroActive } from '@/lib/seo/metroCatalog'
-import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
-import type { SeoInventorySummary, SeoRobotsDirective } from '@/lib/seo/types'
+import { qualifyAllSeoMetros, qualifyMetroForSeoRollout } from '@/lib/seo/metroQualification'
+import type { SeoInventorySummary, SeoMetro, SeoRobotsDirective } from '@/lib/seo/types'
 import {
   isSeoIndexRolloutReady,
   type SeoRolloutRuntimeState,
@@ -26,6 +25,7 @@ export type SeoIndexRolloutSnapshot = {
 export function evaluateSeoIndexRolloutReadiness(options: {
   metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse | null
+  metros: SeoMetro[]
   inventoryByMetroSlug?: Record<string, SeoInventorySummary>
   rolloutState?: SeoRolloutRuntimeState
 }): SeoIndexRolloutSnapshot {
@@ -66,17 +66,17 @@ export function evaluateSeoIndexRolloutReadiness(options: {
   const nationalIndexingAllowed =
     allowlist.indexingAllowed && crawlPass && gscPass
 
-  const activeMetros = getSeoActiveMetros()
+  const inventoryBySlug = options.inventoryByMetroSlug ?? {}
   const qualifiedMetros = qualifyAllSeoMetros({
-    metros: activeMetros,
+    metros: options.metros,
     nationalIndexingAllowed,
-    inventoryBySlug: options.inventoryByMetroSlug ?? {},
+    inventoryBySlug,
   })
 
   const qualifiedMetroSlugs = qualifiedMetros.filter((m) => m.qualified).map((m) => m.slug)
 
   if (nationalIndexingAllowed && qualifiedMetroSlugs.length === 0) {
-    blockers.push('No active metros qualified for index rollout')
+    blockers.push('No metros qualified for index rollout (inventory thresholds)')
   }
 
   return {
@@ -90,29 +90,26 @@ export function evaluateSeoIndexRolloutReadiness(options: {
   }
 }
 
-export function resolveSeoRobotsDirective(
-  rolloutState: SeoRolloutRuntimeState,
-  options?: { metroSlug?: string }
-): SeoRobotsDirective {
+export function resolveListingIndexRobots(rolloutState: SeoRolloutRuntimeState): SeoRobotsDirective {
   if (!isSeoIndexRolloutReady(rolloutState)) {
-    return { index: false, follow: true }
-  }
-  if (options?.metroSlug && !isSeoMetroActive(options.metroSlug)) {
     return { index: false, follow: true }
   }
   return { index: true, follow: true }
 }
 
-export function resolveListingIndexRobots(rolloutState: SeoRolloutRuntimeState): SeoRobotsDirective {
-  return resolveSeoRobotsDirective(rolloutState)
-}
-
 export function resolveMetroPageRobots(
-  metroSlug: string,
-  rolloutState: SeoRolloutRuntimeState
+  metro: SeoMetro,
+  rolloutState: SeoRolloutRuntimeState,
+  inventory: SeoInventorySummary,
+  nationalIndexingAllowed: boolean
 ): SeoRobotsDirective {
-  if (!getSeoActiveMetros().some((m) => m.slug === metroSlug)) {
+  if (!isSeoIndexRolloutReady(rolloutState)) {
     return { index: false, follow: true }
   }
-  return resolveSeoRobotsDirective(rolloutState, { metroSlug })
+  const result = qualifyMetroForSeoRollout({
+    metro,
+    inventory,
+    nationalIndexingAllowed,
+  })
+  return { index: result.qualified, follow: true }
 }

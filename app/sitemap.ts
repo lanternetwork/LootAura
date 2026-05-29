@@ -9,7 +9,7 @@ import { buildCitySitemapEntries } from '@/lib/seo/sitemap/cityEntries'
 import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
-import { emptyInventoryByPilotSlug } from '@/lib/seo/buildSeoOperationalSnapshot'
+import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
 
 export async function generateSitemaps() {
   const rolloutState = await getSeoRolloutStateForRequest()
@@ -30,19 +30,21 @@ export default async function sitemap({
     return buildStaticSitemapEntries()
   }
 
-  const rolloutState = await getSeoRolloutStateForRequest()
+  const { metros, inventoryBySlug } = await fetchNationwideSeoMetroInventory()
 
   if (id === 'cities') {
     return buildCitySitemapEntries({
+      metros,
       nationalIndexingAllowed: true,
-      inventoryBySlug: emptyInventoryByPilotSlug(),
+      inventoryBySlug,
     })
   }
 
   if (id === 'weekends') {
     return buildWeekendSitemapEntries({
+      metros,
       nationalIndexingAllowed: true,
-      inventoryBySlug: emptyInventoryByPilotSlug(),
+      inventoryBySlug,
     })
   }
 

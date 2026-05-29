@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 const mockAssertAdmin = vi.hoisted(() => vi.fn())
 const mockLoadAllowlist = vi.hoisted(() => vi.fn())
 const mockFetchMetroInventory = vi.hoisted(() => vi.fn())
+const mockDiscoverMetros = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/auth/adminGate', () => ({
   assertAdminOrThrow: (...args: unknown[]) => mockAssertAdmin(...args),
@@ -21,6 +22,14 @@ vi.mock('@/lib/seo/fetchMetroInventory', () => ({
   fetchMetroInventory: (...args: unknown[]) => mockFetchMetroInventory(...args),
 }))
 
+vi.mock('@/lib/seo/metroCatalog', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seo/metroCatalog')>()
+  return {
+    ...actual,
+    discoverSeoMetrosFromPublishedSales: (...args: unknown[]) => mockDiscoverMetros(...args),
+  }
+})
+
 vi.mock('@/lib/seo/fetchMetroWeekendInventory', () => ({
   fetchMetroWeekendInventory: vi.fn(),
 }))
@@ -29,6 +38,15 @@ describe('GET /api/admin/seo/distribution-pack', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAssertAdmin.mockResolvedValue(undefined)
+    mockDiscoverMetros.mockResolvedValue([
+      {
+        slug: 'dallas-tx',
+        city: 'Dallas',
+        state: 'TX',
+        timezone: 'America/Chicago',
+        minActiveListings: 25,
+      },
+    ])
     mockLoadAllowlist.mockResolvedValue({
       indexingAllowed: false,
       phase0Pass: false,

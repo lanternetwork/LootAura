@@ -1,36 +1,33 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
-  getSeoActiveMetros,
-  getSeoMetroCatalogForDashboard,
-  isSeoMetroActive,
+  buildMetroSlug,
+  getNearbyMetros,
+  getSeoMetroBySlug,
+  resolveSeoMetroForSale,
 } from '@/lib/seo/metroCatalog'
-import { SEO_ACTIVE_EXPANSION_METROS } from '@/lib/seo/expansionMetros'
-import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
+import { TEST_SEO_METRO_DALLAS, TEST_SEO_METRO_AUSTIN, TEST_SEO_METRO_PHOENIX } from './seoTestFixtures'
 
-describe('seo metro catalog', () => {
-  afterEach(() => {
-    SEO_ACTIVE_EXPANSION_METROS.length = 0
+describe('metroCatalog', () => {
+  const metros = [TEST_SEO_METRO_DALLAS, TEST_SEO_METRO_AUSTIN, TEST_SEO_METRO_PHOENIX]
+
+  it('builds stable slugs from city and state', () => {
+    expect(buildMetroSlug('Dallas', 'TX')).toBe('dallas-tx')
+    expect(buildMetroSlug('St. Paul', 'MN')).toBe('st-paul-mn')
   })
 
-  it('active metros default to pilot list only', () => {
-    expect(getSeoActiveMetros().map((m) => m.slug)).toEqual(SEO_PILOT_METROS.map((m) => m.slug))
+  it('resolves metros by slug from catalog', () => {
+    expect(getSeoMetroBySlug(metros, 'dallas-tx')).toEqual(TEST_SEO_METRO_DALLAS)
+    expect(getSeoMetroBySlug(metros, 'unknown-zz')).toBeUndefined()
   })
 
-  it('dashboard catalog includes pilot and expansion candidates', () => {
-    const slugs = getSeoMetroCatalogForDashboard().map((m) => m.slug)
-    expect(slugs).toContain('dallas-tx')
-    expect(slugs).toContain('austin-tx')
+  it('resolves metro identity from sale city/state without allowlist', () => {
+    expect(resolveSeoMetroForSale({ city: 'Dallas', state: 'TX' })?.slug).toBe('dallas-tx')
+    expect(resolveSeoMetroForSale({ city: 'Dallas', state: 'TX' }, metros)?.slug).toBe('dallas-tx')
+    expect(resolveSeoMetroForSale({ city: '', state: 'TX' })).toBeNull()
   })
 
-  it('code-promoted expansion metros become active', () => {
-    SEO_ACTIVE_EXPANSION_METROS.push({
-      slug: 'austin-tx',
-      city: 'Austin',
-      state: 'TX',
-      timezone: 'America/Chicago',
-      minActiveListings: 25,
-    })
-    expect(isSeoMetroActive('austin-tx')).toBe(true)
-    expect(getSeoActiveMetros().map((m) => m.slug)).toContain('austin-tx')
+  it('prefers nearby metros in the same state', () => {
+    const nearby = getNearbyMetros(TEST_SEO_METRO_DALLAS, metros, 2)
+    expect(nearby.map((m) => m.slug)).toEqual(['austin-tx'])
   })
 })

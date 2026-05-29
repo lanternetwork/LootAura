@@ -16,7 +16,7 @@ Content derives from the same live inventory queries as SEO city/weekend pages.
 
 A pack generates only when:
 
-1. Metro is **active** (pilot or code-promoted expansion in `SEO_ACTIVE_EXPANSION_METROS`)
+1. Metro has a **published inventory footprint** (discovered via `discoverSeoMetrosFromPublishedSales`)
 2. Metro passes the **same qualification matrix** as SEO (`lib/seo/metroQualification.ts`)
 3. National ops allowlist is evaluated server-side via the same admin ingestion metrics + coverage handlers used by the SEO dashboard (`evaluateSeoIndexAllowlist`)
 4. Weekend surfaces require non-zero weekend inventory in the metro timezone window

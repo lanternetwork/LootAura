@@ -2,11 +2,15 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
-import { getSeoActiveMetros, getSeoMetroBySlug, isSeoMetroActive } from '@/lib/seo/metroCatalog'
+import { getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 import { fetchMetroInventory } from '@/lib/seo/fetchMetroInventory'
 import { createCityPageMetadata } from '@/lib/seo/metadata'
 import { resolveMetroPageRobots } from '@/lib/seo/indexRollout'
-import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
+import {
+  getSeoMetrosForRequest,
+  getSeoNationalIndexingAllowedForRequest,
+  getSeoRolloutStateForRequest,
+} from '@/lib/seo/loadSeoRolloutState'
 import {
   createCityPageStructuredDataBundle,
   saleToInventoryListItem,
@@ -20,46 +24,46 @@ import {
 } from '@/lib/seo/copy/cityPageCopy'
 
 export const dynamic = 'force-dynamic'
+export const dynamicParams = true
 
 type PageProps = {
   params: Promise<{ metroSlug: string }>
 }
 
-export function generateStaticParams() {
-  return getSeoActiveMetros().map((metro) => ({ metroSlug: metro.slug }))
-}
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { metroSlug } = await params
-  const metro = getSeoMetroBySlug(metroSlug)
-  if (!metro || !isSeoMetroActive(metroSlug)) {
+  const metros = await getSeoMetrosForRequest()
+  const metro = getSeoMetroBySlug(metros, metroSlug)
+  if (!metro) {
     return { title: 'Yard sales · Loot Aura' }
   }
-  const [rolloutState, { summary }] = await Promise.all([
+  const [rolloutState, nationalIndexingAllowed, { summary }] = await Promise.all([
     getSeoRolloutStateForRequest(),
+    getSeoNationalIndexingAllowedForRequest(),
     fetchMetroInventory(metro),
   ])
   return createCityPageMetadata({
     metro,
     inventory: summary,
-    robots: resolveMetroPageRobots(metro.slug, rolloutState),
+    robots: resolveMetroPageRobots(metro, rolloutState, summary, nationalIndexingAllowed),
   })
 }
 
 export default async function YardSalesMetroPage({ params }: PageProps) {
   const { metroSlug } = await params
-  const metro = getSeoMetroBySlug(metroSlug)
-  if (!metro || !isSeoMetroActive(metroSlug)) {
+  const metros = await getSeoMetrosForRequest()
+  const metro = getSeoMetroBySlug(metros, metroSlug)
+  if (!metro) {
     notFound()
   }
 
   const { sales, summary } = await fetchMetroInventory(metro)
-  const geoLinks = buildMetroGeoLinks(metro)
+  const geoLinks = buildMetroGeoLinks(metro, metros)
   const h1 = buildCityPageH1(metro, summary)
   const supportingCopy = buildCityPageSupportingCopy({
     metro,
     inventory: summary,
-    nearbyMetros: getNearbyPilotMetros(metro),
+    nearbyMetros: getNearbyPilotMetros(metro, metros),
   })
   const structuredData = createCityPageStructuredDataBundle({
     metro,

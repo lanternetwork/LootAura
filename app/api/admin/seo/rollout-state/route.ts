@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
-import {
-  fetchSeoRolloutState,
-  setSeoRolloutAttestation,
-  type SeoRolloutAttestationTarget,
-} from '@/lib/seo/seoRolloutState'
+import { fetchSeoRolloutState, setSeoRolloutAttestation } from '@/lib/seo/seoRolloutState'
+import type { SeoRolloutAttestationTarget } from '@/lib/seo/seoRolloutTypes'
 
 export const dynamic = 'force-dynamic'
 

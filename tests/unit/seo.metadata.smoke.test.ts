@@ -5,7 +5,15 @@
  * These are minimal checks to ensure SEO baseline is in place.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react')>()
+  return {
+    ...actual,
+    cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,
+  }
+})
 
 describe('SEO Metadata Smoke Tests', () => {
   it('should export metadata from landing page', async () => {

@@ -6,13 +6,6 @@ import {
   type SeoRolloutRuntimeState,
 } from '@/lib/seo/seoRolloutTypes'
 
-export {
-  SEO_ROLLOUT_DISABLED_STATE,
-  isSeoIndexRolloutReady,
-  type SeoRolloutAttestationTarget,
-  type SeoRolloutRuntimeState,
-} from '@/lib/seo/seoRolloutTypes'
-
 export const SEO_ROLLOUT_STATE_KEY = 'seo_rollout'
 
 type SeoRolloutStateRow = {

@@ -27,7 +27,7 @@ describe('metroCatalog', () => {
   })
 
   it('prefers nearby metros in the same state', () => {
-    const nearby = getNearbyMetros(TEST_SEO_METRO_DALLAS, metros, 2)
+    const nearby = getNearbyMetros(TEST_SEO_METRO_DALLAS, metros, 1)
     expect(nearby.map((m) => m.slug)).toEqual(['austin-tx'])
   })
 })

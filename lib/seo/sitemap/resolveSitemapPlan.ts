@@ -1,0 +1,39 @@
+import {
+  countListingSitemapChunks,
+  listingSitemapChunkId,
+} from '@/lib/seo/sitemap/listingEntries'
+import { isSeoIndexRolloutReady, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
+
+export type SeoSitemapSegmentId = 'static' | string
+
+export type SeoSitemapPlan = {
+  /** Whether listing/city/weekend segments may appear in sitemaps. */
+  indexingEnabled: boolean
+  segmentIds: SeoSitemapSegmentId[]
+  listingChunkCount: number
+  totalPublishedListings: number
+}
+
+export function resolveSeoSitemapPlan(
+  totalPublishedListings: number,
+  rolloutState: SeoRolloutRuntimeState
+): SeoSitemapPlan {
+  const indexingEnabled = isSeoIndexRolloutReady(rolloutState)
+  const segmentIds: SeoSitemapSegmentId[] = ['static']
+
+  let listingChunkCount = 0
+  if (indexingEnabled && totalPublishedListings > 0) {
+    listingChunkCount = countListingSitemapChunks(totalPublishedListings)
+    for (let i = 0; i < listingChunkCount; i++) {
+      segmentIds.push(listingSitemapChunkId(i))
+    }
+    segmentIds.push('cities', 'weekends')
+  }
+
+  return {
+    indexingEnabled,
+    segmentIds,
+    listingChunkCount,
+    totalPublishedListings,
+  }
+}

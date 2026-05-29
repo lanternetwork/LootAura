@@ -5,7 +5,16 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSaleWithItems, getNearestSalesForSale } from '@/lib/data/salesAccess'
 import { getUserRatingForSeller } from '@/lib/data/ratingsAccess'
 import SaleDetailClient from './SaleDetailClient'
-import { createSaleMetadata, createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
+import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
+import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
+import { createListingSeoMetadata } from '@/lib/seo/metadata'
+import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
+import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
+import {
+  buildListingBreadcrumbItems,
+  buildListingGeoLinks,
+  buildNearbyListingLinks,
+} from '@/lib/seo/geoLinking'
 
 interface SaleDetailPageProps {
   params: Promise<{ id: string }>
@@ -63,8 +72,13 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const itemCats = items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  // Fetch nearby sales (non-blocking - if it fails, we just don't show the card)
-  const nearbySales = await getNearestSalesForSale(supabase, id, 2).catch(() => [])
+  // Fetch nearby sales for client UI (limit unchanged) + broader set for SEO crawl links only
+  const [nearbySales, nearbySalesForSeo] = await Promise.all([
+    getNearestSalesForSale(supabase, id, 2).catch(() => []),
+    getNearestSalesForSale(supabase, id, 6).catch(() => []),
+  ])
+  const listingGeoLinks = buildListingGeoLinks(sale)
+  const nearbyListingLinks = buildNearbyListingLinks(nearbySalesForSeo)
 
   // Fetch current user's rating for this seller (if authenticated)
   let currentUserRating: number | null = null
@@ -75,15 +89,11 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     }
   }
 
-  const _metadata = createSaleMetadata(sale)
-  
   // Create structured data for SEO
   const eventStructuredData = createSaleEventStructuredData(sale)
-  const breadcrumbStructuredData = createBreadcrumbStructuredData([
-    { name: 'Home', url: '/' },
-    { name: 'Sales', url: '/sales' },
-    { name: sale.title || 'Sale', url: `/sales/${sale.id}` },
-  ])
+  const breadcrumbStructuredData = createBreadcrumbStructuredData(
+    buildListingBreadcrumbItems(sale)
+  )
 
   const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'
   const paymentsEnabled = process.env.PAYMENTS_ENABLED === 'true'
@@ -98,11 +108,19 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbStructuredData) }}
       />
+      <div className="sr-only" aria-label="Sale listing details">
+        <SaleDetailSsrContent
+          sale={sale}
+          items={items}
+          geoLinks={listingGeoLinks}
+          nearbyListingLinks={nearbyListingLinks}
+        />
+      </div>
       <Suspense fallback={<div className="p-4">Loading...</div>}>
-        <SaleDetailClient 
-          sale={sale} 
-          displayCategories={displayCategories} 
-          items={items} 
+        <SaleDetailClient
+          sale={sale}
+          displayCategories={displayCategories}
+          items={items}
           nearbySales={nearbySales}
           currentUserRating={currentUserRating}
           promotionsEnabled={promotionsEnabled}
@@ -149,5 +167,9 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
   const itemCats = result.items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  return createSaleMetadata(result.sale, { categories: displayCategories })
+  const rolloutState = await getSeoRolloutStateForRequest()
+  return createListingSeoMetadata(result.sale, {
+    categories: displayCategories,
+    robots: resolveListingIndexRobots(rolloutState),
+  })
 }

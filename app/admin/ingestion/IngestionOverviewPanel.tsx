@@ -12,6 +12,7 @@ import {
   type IngestionHealthState,
 } from '@/lib/admin/ingestionDashboardOverview'
 import IngestionStabilizationExitSection from '@/app/admin/ingestion/IngestionStabilizationExitSection'
+import SeoOperationalPanel from '@/app/admin/ingestion/SeoOperationalPanel'
 
 const HEALTH_STYLE: Record<IngestionHealthState, string> = {
   healthy: 'border-emerald-400 bg-emerald-50 text-emerald-950',
@@ -127,6 +128,8 @@ export default function IngestionOverviewPanel({
         onOpenDebug={onOpenDebug}
         onOpenControls={onOpenControls}
       />
+
+      <SeoOperationalPanel metrics={metrics} coverage={coverage} />
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Active runtime state</h2>

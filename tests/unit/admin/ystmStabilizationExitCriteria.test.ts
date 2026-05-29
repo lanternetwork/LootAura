@@ -5,7 +5,7 @@ import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/de
 import { evaluateYstmStabilizationExit } from '@/lib/admin/ystmStabilizationExitCriteria'
 import { minimalYstmCoverageScoreboard } from './evaluateYstmSaleInstanceRolloutGates.test'
 
-function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}): IngestionMetricsResponse {
+export function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}): IngestionMetricsResponse {
   const detailFirst = {
     attempted: 100,
     succeeded: 100,

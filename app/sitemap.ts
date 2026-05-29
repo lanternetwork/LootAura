@@ -1,61 +1,74 @@
-import { MetadataRoute } from 'next'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { T } from '@/lib/supabase/tables'
+import type { MetadataRoute } from 'next'
+import { buildStaticSitemapEntries } from '@/lib/seo/sitemap/staticEntries'
+import {
+  buildListingSitemapEntriesForChunk,
+  parseListingSitemapChunkId,
+} from '@/lib/seo/sitemap/listingEntries'
+import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPublishedListingRows'
+import { buildCitySitemapEntries } from '@/lib/seo/sitemap/cityEntries'
+import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
+import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
+import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
+import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = await createSupabaseServerClient()
-  
-  // Get all published sales for dynamic URLs
-  const { data: sales } = await supabase
-    .from(T.sales)
-    .select('id, updated_at')
-    .eq('status', 'published')
-    .order('updated_at', { ascending: false })
-    .limit(1000) // Limit to prevent sitemap from being too large
+export const dynamic = 'force-dynamic'
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+async function loadNationwideMetroSnapshotForSitemap(): Promise<{
+  metros: SeoMetro[]
+  inventoryBySlug: Record<string, SeoInventorySummary>
+}> {
+  try {
+    return await fetchNationwideSeoMetroInventory()
+  } catch {
+    return { metros: [], inventoryBySlug: {} }
+  }
+}
 
-  // Static pages
-  const staticPages: MetadataRoute.Sitemap = [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/explore`,
-      lastModified: new Date(),
-      changeFrequency: 'hourly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/explore?tab=map`,
-      lastModified: new Date(),
-      changeFrequency: 'hourly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/sales`,
-      lastModified: new Date(),
-      changeFrequency: 'hourly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/sell/new`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
-  ]
+export async function generateSitemaps() {
+  try {
+    const rolloutState = await getSeoRolloutStateForRequest()
+    if (!resolveSeoSitemapPlan(0, rolloutState).indexingEnabled) {
+      return [{ id: 'static' }]
+    }
+    const rows = await fetchPublishedListingRowsForSitemap()
+    const plan = resolveSeoSitemapPlan(rows.length, rolloutState)
+    return plan.segmentIds.map((segmentId) => ({ id: segmentId }))
+  } catch {
+    return [{ id: 'static' }]
+  }
+}
 
-  // Dynamic sale pages
-  const salePages: MetadataRoute.Sitemap = (sales || []).map((sale) => ({
-    url: `${baseUrl}/sales/${sale.id}`,
-    lastModified: new Date(sale.updated_at),
-    changeFrequency: 'weekly',
-    priority: 0.7,
-  }))
+export default async function sitemap({
+  id,
+}: {
+  id: string
+}): Promise<MetadataRoute.Sitemap> {
+  if (id === 'static') {
+    return buildStaticSitemapEntries()
+  }
 
-  return [...staticPages, ...salePages]
+  if (id === 'cities' || id === 'weekends') {
+    const { metros, inventoryBySlug } = await loadNationwideMetroSnapshotForSitemap()
+    if (id === 'cities') {
+      return buildCitySitemapEntries({
+        metros,
+        nationalIndexingAllowed: true,
+        inventoryBySlug,
+      })
+    }
+    return buildWeekendSitemapEntries({
+      metros,
+      nationalIndexingAllowed: true,
+      inventoryBySlug,
+    })
+  }
+
+  const chunkIndex = parseListingSitemapChunkId(id)
+  if (chunkIndex != null) {
+    const rows = await fetchPublishedListingRowsForSitemap()
+    return buildListingSitemapEntriesForChunk(rows, chunkIndex)
+  }
+
+  return []
 }

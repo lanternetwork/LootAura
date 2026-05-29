@@ -35,6 +35,7 @@ export async function middleware(req: NextRequest) {
       pathname === '/manifest.webmanifest' ||
       pathname === '/robots.txt' ||
       pathname === '/sitemap.xml' ||
+      pathname.startsWith('/sitemap/') ||
       pathname === '/ads.txt' ||
       pathname === '/sw.js' ||
       pathname.startsWith('/icon') ||
@@ -54,6 +55,7 @@ export async function middleware(req: NextRequest) {
     pathname === '/favicon.ico' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
+    pathname.startsWith('/sitemap/') ||
     pathname === '/ads.txt' ||
     pathname === '/sw.js' ||
     pathname.startsWith('/_next/') ||
@@ -213,6 +215,7 @@ export async function middleware(req: NextRequest) {
     pathname === '/apple-touch-icon.png' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
+    pathname.startsWith('/sitemap/') ||
     pathname === '/ads.txt' ||
     pathname === '/sw.js' ||
     pathname.startsWith('/icon') ||
@@ -394,7 +397,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // Match all app routes except static assets, health endpoints, and auth callback
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|robots.txt|sitemap.xml|ads.txt|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|robots.txt|sitemap.xml|sitemap/|ads.txt|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback).*)',
     // Match API routes except health endpoints
     '/api/((?!health/).)*'
   ],

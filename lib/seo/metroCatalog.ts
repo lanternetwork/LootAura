@@ -3,9 +3,6 @@ import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4Pub
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 import type { SeoMetro } from '@/lib/seo/types'
 
-/** @deprecated use SeoMetro */
-export type SeoPilotMetro = SeoMetro
-
 /** Minimum active listings before a metro qualifies for index rollout (nationwide default). */
 export const SEO_METRO_MIN_ACTIVE_LISTINGS = 25
 

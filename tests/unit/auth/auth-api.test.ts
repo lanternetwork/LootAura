@@ -25,6 +25,10 @@ vi.mock('next/headers', () => ({
   })),
 }))
 
+vi.mock('@/lib/profile/ensureLootauraProfile', () => ({
+  ensureLootauraProfileExists: vi.fn().mockResolvedValue({ ok: true, created: true }),
+}))
+
 describe('Auth API Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -174,8 +178,15 @@ describe('Auth API Routes', () => {
 
       const { createClient } = await import('@supabase/supabase-js')
       vi.mocked(createClient).mockReturnValue(mockSupabase as any)
-      const { isValidSession } = await import('@/lib/auth/server-session')
+      const { createServerSupabaseClient, isValidSession } = await import(
+        '@/lib/auth/server-session'
+      )
       vi.mocked(isValidSession).mockReturnValue(true)
+      vi.mocked(createServerSupabaseClient).mockReturnValue({
+        auth: {
+          setSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+        },
+      } as any)
 
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
@@ -220,8 +231,15 @@ describe('Auth API Routes', () => {
 
       const { createClient } = await import('@supabase/supabase-js')
       vi.mocked(createClient).mockReturnValue(mockSupabase as any)
-      const { isValidSession } = await import('@/lib/auth/server-session')
+      const { createServerSupabaseClient, isValidSession } = await import(
+        '@/lib/auth/server-session'
+      )
       vi.mocked(isValidSession).mockReturnValue(true)
+      vi.mocked(createServerSupabaseClient).mockReturnValue({
+        auth: {
+          setSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+        },
+      } as any)
 
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'

@@ -25,6 +25,16 @@ function buildAvatarUrl(user: User): string | null {
   return typeof url === 'string' && url.trim() ? url.trim() : null
 }
 
+function logEnsureDebug(event: string, details?: Record<string, string | undefined>) {
+  if (process.env.NEXT_PUBLIC_DEBUG !== 'true') return
+  const suffix = details
+    ? ` ${Object.entries(details)
+        .map(([k, v]) => `${k}=${v ?? ''}`)
+        .join(' ')}`
+    : ''
+  console.log(`[PROFILE_ENSURE] ${event}${suffix}`)
+}
+
 /**
  * Ensure the authenticated user has a row in lootaura_v2.profiles (RLS-safe).
  * Must run in a server context after session cookies are written to cookies().
@@ -43,14 +53,14 @@ export async function ensureLootauraProfileExists(options?: {
     } = await authClient.auth.getUser()
 
     if (authError || !user) {
-      console.error('[PROFILE_ENSURE] No authenticated user', {
+      logEnsureDebug('no_authenticated_user', {
         code: authError?.message ?? 'no_user',
       })
       return { ok: false, created: false, errorCode: 'unauthenticated' }
     }
 
     if (options?.userId && options.userId !== user.id) {
-      console.error('[PROFILE_ENSURE] userId mismatch', { expected: options.userId })
+      logEnsureDebug('user_id_mismatch', { expected: options.userId })
       return { ok: false, created: false, userId: user.id, errorCode: 'user_mismatch' }
     }
 
@@ -62,7 +72,7 @@ export async function ensureLootauraProfileExists(options?: {
       .maybeSingle()
 
     if (checkError) {
-      console.error('[PROFILE_ENSURE] Profile check failed', {
+      logEnsureDebug('profile_check_failed', {
         userId: user.id,
         code: checkError.code,
         message: checkError.message,
@@ -95,7 +105,7 @@ export async function ensureLootauraProfileExists(options?: {
       if (insertError.code === '23505') {
         return { ok: true, created: false, userId: user.id }
       }
-      console.error('[PROFILE_ENSURE] Profile insert failed', {
+      logEnsureDebug('profile_insert_failed', {
         userId: user.id,
         code: insertError.code,
         message: insertError.message,
@@ -124,14 +134,12 @@ export async function ensureLootauraProfileExists(options?: {
       }
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE_ENSURE] Profile created', { userId: user.id })
-    }
+    logEnsureDebug('profile_created', { userId: user.id })
 
     return { ok: true, created: true, userId: user.id }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown'
-    console.error('[PROFILE_ENSURE] Unexpected error', { message })
+    logEnsureDebug('unexpected_error', { message })
     return { ok: false, created: false, errorCode: message }
   }
 }

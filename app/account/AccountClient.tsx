@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { updateProfile, type ProfileUpdateInput } from './_actions'
 import { User } from '@supabase/supabase-js'
 import { Profile } from '@/lib/types'
+import AccountSecuritySection from '@/components/account/AccountSecuritySection'
 
 interface AccountClientProps {
   user: User | null
@@ -187,6 +188,12 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
               </div>
             </form>
           </div>
+
+          {user && (
+            <div className="bg-white rounded-lg shadow-sm p-8 mt-6">
+              <AccountSecuritySection user={user} />
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}

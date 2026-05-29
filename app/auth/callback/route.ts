@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { isRecoveryRedirectTarget, RECOVERY_RESET_PATH } from '@/lib/auth/authRecovery'
 import {
   completeAuthCallbackFromRequest,
   createAuthCallbackCookieHandlers,
+  decodeRedirectParam,
 } from '@/lib/auth/authCallbackShared'
 
 export async function GET(req: Request) {
@@ -49,6 +51,13 @@ export async function GET(req: Request) {
   )
 
   if (result.kind === 'error') {
+    const rawRedirect = url.searchParams.get('redirectTo') || url.searchParams.get('next')
+    const decodedRedirect = rawRedirect ? decodeRedirectParam(rawRedirect) : null
+    if (isRecoveryRedirectTarget(decodedRedirect)) {
+      const recoveryErrorUrl = new URL(RECOVERY_RESET_PATH, url.origin)
+      recoveryErrorUrl.searchParams.set('error', result.errorCode)
+      return NextResponse.redirect(recoveryErrorUrl)
+    }
     return NextResponse.redirect(
       new URL(`/auth/error?error=${encodeURIComponent(result.errorCode)}`, url.origin)
     )

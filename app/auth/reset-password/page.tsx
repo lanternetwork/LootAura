@@ -1,19 +1,20 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CompleteAuthFromFragment } from '@/components/auth/CompleteAuthFromFragment'
+import { useAuth } from '@/lib/hooks/useAuth'
 import { parseAuthTokensFromHash } from '@/lib/auth/parseAuthFragment'
+import {
+  buildAuthCallbackDelegationUrl,
+  buildAuthCallbackFinishDelegationUrl,
+  parseRecoveryAuthError,
+  shouldDelegateToAuthCallback,
+} from '@/lib/auth/authRecovery'
 
-function ResetPasswordForm({
-  accessToken,
-  refreshToken,
-}: {
-  accessToken: string
-  refreshToken: string
-}) {
-  const router = useRouter()
+type ResetPhase = 'pending' | 'delegating' | 'error' | 'ready'
+
+function ResetPasswordForm() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -48,11 +49,7 @@ function ResetPasswordForm({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          password,
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        }),
+        body: JSON.stringify({ password }),
       })
 
       const data = await response.json()
@@ -62,9 +59,6 @@ function ResetPasswordForm({
       }
 
       setSuccess(true)
-      setTimeout(() => {
-        router.push('/auth/signin')
-      }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     } finally {
@@ -103,9 +97,13 @@ function ResetPasswordForm({
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium mb-1">New Password</label>
+            <label htmlFor="new-password" className="block text-sm font-medium mb-1">
+              New Password
+            </label>
             <input
+              id="new-password"
               type="password"
+              autoComplete="new-password"
               className="w-full rounded border px-3 py-2"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -113,9 +111,13 @@ function ResetPasswordForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Confirm Password</label>
+            <label htmlFor="confirm-password" className="block text-sm font-medium mb-1">
+              Confirm Password
+            </label>
             <input
+              id="confirm-password"
               type="password"
+              autoComplete="new-password"
               className="w-full rounded border px-3 py-2"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -140,49 +142,70 @@ function ResetPasswordForm({
 
 function ResetPasswordInner() {
   const params = useSearchParams()
-  const [tokens, setTokens] = useState<{
-    access_token: string
-    refresh_token: string
-  } | null>(null)
-  const [needsHashCompletion, setNeedsHashCompletion] = useState(false)
+  const { data: user, isLoading: authLoading } = useAuth()
+  const [phase, setPhase] = useState<ResetPhase>('pending')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    const queryAccess = params.get('access_token')
-    const queryRefresh = params.get('refresh_token')
-    if (queryAccess && queryRefresh) {
-      setTokens({ access_token: queryAccess, refresh_token: queryRefresh })
+    const recoveryError = parseRecoveryAuthError(params)
+    if (recoveryError) {
+      setErrorMessage(recoveryError)
+      setPhase('error')
       return
     }
-    const fromHash = parseAuthTokensFromHash(window.location.hash)
-    if (fromHash) {
-      setNeedsHashCompletion(true)
+
+    if (shouldDelegateToAuthCallback(params)) {
+      setPhase('delegating')
+      const target = buildAuthCallbackDelegationUrl(window.location.origin, params)
+      window.location.replace(target)
+      return
     }
+
+    const hashTokens = parseAuthTokensFromHash(window.location.hash)
+    if (hashTokens) {
+      setPhase('delegating')
+      const finishPath = buildAuthCallbackFinishDelegationUrl(window.location.origin)
+      window.location.replace(finishPath + window.location.hash)
+      return
+    }
+
+    setPhase('pending')
   }, [params])
 
-  const onTokensReady = useCallback(
-    (ready: { access_token: string; refresh_token: string }) => {
-      setTokens(ready)
-      setNeedsHashCompletion(false)
-    },
-    []
-  )
+  useEffect(() => {
+    if (phase === 'error' || phase === 'delegating') return
+    if (authLoading) return
+    if (user) {
+      setPhase('ready')
+      return
+    }
+    if (phase === 'pending') {
+      setErrorMessage(
+        'Your reset link is invalid or has expired. Please request a new one.'
+      )
+      setPhase('error')
+    }
+  }, [phase, authLoading, user])
 
-  if (needsHashCompletion && !tokens) {
+  if (phase === 'pending' || phase === 'delegating' || authLoading) {
     return (
-      <CompleteAuthFromFragment
-        skipRedirect
-        onTokensReady={onTokensReady}
-        missingTokensHref="/auth/forgot-password"
-      />
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
+          <p className="text-gray-600">
+            {phase === 'delegating' ? 'Verifying your reset link…' : 'Loading…'}
+          </p>
+        </div>
+      </div>
     )
   }
 
-  if (!tokens) {
+  if (phase === 'error' || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-red-700 mb-4">
-            Your reset link is invalid or has expired. Please request a new one.
+            {errorMessage ||
+              'Your reset link is invalid or has expired. Please request a new one.'}
           </p>
           <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
             Request reset email
@@ -192,12 +215,7 @@ function ResetPasswordInner() {
     )
   }
 
-  return (
-    <ResetPasswordForm
-      accessToken={tokens.access_token}
-      refreshToken={tokens.refresh_token}
-    />
-  )
+  return <ResetPasswordForm />
 }
 
 export default function ResetPassword() {

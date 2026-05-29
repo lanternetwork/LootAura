@@ -37,6 +37,14 @@ export function resolveRedirectTo(searchParams: URLSearchParams): string {
   return decodeRedirectParam(raw)
 }
 
+/** Post-auth destinations under /auth/ that are allowed (recovery form, etc.). */
+export const ALLOWED_POST_AUTH_AUTH_PATHS = ['/auth/reset-password'] as const
+
+function isAllowedPostAuthAuthPath(path: string): boolean {
+  const pathOnly = path.split('?')[0] ?? path
+  return ALLOWED_POST_AUTH_AUTH_PATHS.some((allowed) => pathOnly === allowed)
+}
+
 /**
  * Sanitize post-auth redirect: relative paths only; never land on auth pages (loop prevention).
  */
@@ -52,7 +60,9 @@ export function sanitizeAuthRedirect(redirectTo: string, origin: string): string
     finalRedirectTo.startsWith('/login') ||
     finalRedirectTo.startsWith('/signin')
   ) {
-    finalRedirectTo = '/sales'
+    if (!isAllowedPostAuthAuthPath(finalRedirectTo)) {
+      finalRedirectTo = '/sales'
+    }
   }
 
   try {

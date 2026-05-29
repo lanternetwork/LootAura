@@ -23,6 +23,12 @@ describe('authCallbackShared', () => {
       expect(sanitizeAuthRedirect('/auth/signin', 'https://example.com')).toBe('/sales')
     })
 
+    it('allows password recovery reset page', () => {
+      expect(sanitizeAuthRedirect('/auth/reset-password', 'https://example.com')).toBe(
+        '/auth/reset-password'
+      )
+    })
+
     it('allows safe paths', () => {
       expect(sanitizeAuthRedirect('/favorites', 'https://example.com')).toBe('/favorites')
     })

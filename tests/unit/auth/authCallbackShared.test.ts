@@ -5,6 +5,10 @@ import {
   sanitizeAuthRedirect,
 } from '@/lib/auth/authCallbackShared'
 
+vi.mock('@/lib/profile/ensureLootauraProfile', () => ({
+  ensureLootauraProfileExists: vi.fn().mockResolvedValue({ ok: true, created: true }),
+}))
+
 describe('authCallbackShared', () => {
   describe('isAllowedVerifyOtpType', () => {
     it('allows signup and recovery', () => {
@@ -35,10 +39,6 @@ describe('authCallbackShared', () => {
 
     beforeEach(() => {
       vi.clearAllMocks()
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
-      )
     })
 
     it('exchanges PKCE code', async () => {
@@ -51,8 +51,7 @@ describe('authCallbackShared', () => {
       const result = await completeAuthCallbackFromRequest(
         mockSupabase as any,
         params,
-        'https://example.com',
-        ''
+        'https://example.com'
       )
 
       expect(result.kind).toBe('session')
@@ -75,8 +74,7 @@ describe('authCallbackShared', () => {
       const result = await completeAuthCallbackFromRequest(
         mockSupabase as any,
         params,
-        'https://example.com',
-        ''
+        'https://example.com'
       )
 
       expect(result.kind).toBe('session')
@@ -99,8 +97,7 @@ describe('authCallbackShared', () => {
       const result = await completeAuthCallbackFromRequest(
         mockSupabase as any,
         params,
-        'https://example.com',
-        ''
+        'https://example.com'
       )
 
       expect(result.kind).toBe('session')
@@ -115,8 +112,7 @@ describe('authCallbackShared', () => {
       const result = await completeAuthCallbackFromRequest(
         mockSupabase as any,
         params,
-        'https://example.com',
-        ''
+        'https://example.com'
       )
 
       expect(result.kind).toBe('delegate_hash')
@@ -133,8 +129,7 @@ describe('authCallbackShared', () => {
       const result = await completeAuthCallbackFromRequest(
         mockSupabase as any,
         params,
-        'https://example.com',
-        ''
+        'https://example.com'
       )
 
       expect(result).toEqual({ kind: 'error', errorCode: 'invalid_callback' })
@@ -145,8 +140,7 @@ describe('authCallbackShared', () => {
       const result = await completeAuthCallbackFromRequest(
         mockSupabase as any,
         params,
-        'https://example.com',
-        ''
+        'https://example.com'
       )
 
       expect(result).toEqual({ kind: 'error', errorCode: 'access_denied' })

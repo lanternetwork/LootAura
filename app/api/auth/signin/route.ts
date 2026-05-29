@@ -4,6 +4,7 @@ import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
+import { ensureLootauraProfileExists } from '@/lib/profile/ensureLootauraProfile'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,31 +38,7 @@ async function signinHandler(request: NextRequest) {
       )
     }
 
-    // Ensure profile exists for the user (idempotent)
-    try {
-      const profileResponse = await fetch(new URL('/api/profile', request.url), {
-        method: 'POST',
-        headers: {
-          'Cookie': request.headers.get('cookie') || '',
-        },
-      })
-      
-      if (profileResponse.ok) {
-        const profileData = await profileResponse.json()
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[AUTH] Profile ensured during signin:', { 
-            event: 'signin', 
-            created: profileData.created,
-            userId: data.user.id 
-          })
-        }
-      }
-    } catch (profileError) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] Profile creation error during signin, but continuing:', profileError)
-      }
-      // Don't fail the auth flow if profile creation fails
-    }
+    await ensureLootauraProfileExists()
 
     // Create response and set session cookies
     const response = NextResponse.json(

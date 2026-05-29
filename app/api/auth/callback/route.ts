@@ -45,8 +45,7 @@ async function callbackHandler(request: NextRequest) {
     const result = await completeAuthCallbackFromRequest(
       supabase,
       url.searchParams,
-      url.origin,
-      request.headers.get('cookie') || ''
+      url.origin
     )
 
     if (result.kind === 'error') {

@@ -6,6 +6,8 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
 import type { SocialLinks } from '@/lib/profile/social'
+import { ensureLootauraProfileExists } from '@/lib/profile/ensureLootauraProfile'
+import { fetchProfileV2 } from '@/lib/profile/fetchProfileV2'
 
 export interface ProfileData {
   id: string
@@ -49,41 +51,47 @@ export interface UserPreferences {
  * @param userId - User ID to fetch profile for
  * @returns Profile data or null if not found
  */
+async function readUserProfile(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ProfileData | null> {
+  const fromView = await fetchProfileV2(supabase, userId)
+  if (fromView) {
+    return fromView
+  }
+
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_profile', {
+      p_user_id: userId,
+    })
+    if (rpcData && !rpcError) {
+      const parsed = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData
+      return parsed as ProfileData
+    }
+  } catch (e) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[PROFILE_ACCESS] RPC fallback failed:', e)
+    }
+  }
+
+  return null
+}
+
 export async function getUserProfile(
   supabase: SupabaseClient,
   userId: string
 ): Promise<ProfileData | null> {
   try {
-    // Try profiles_v2 view first
-    const { data, error } = await supabase
-      .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links, email_favorites_digest_enabled, email_seller_weekly_enabled')
-      .eq('id', userId)
-      .maybeSingle()
-
-    if (error) {
-      // Log error for debugging
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE_ACCESS] Error querying profiles_v2 view:', error)
-      }
-      // Continue to RPC fallback
-    } else if (data) {
-      return data as ProfileData
+    let profile = await readUserProfile(supabase, userId)
+    if (profile) {
+      return profile
     }
 
-    // Fallback to RPC if view doesn't return data or had an error
-    if (!data) {
-      try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('get_profile', { p_user_id: userId })
-        if (rpcData && !rpcError) {
-          const parsed = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData
-          return parsed as ProfileData
-        }
-      } catch (e) {
-        // RPC failed, continue to return null
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('[PROFILE_ACCESS] RPC fallback failed:', e)
-        }
+    const ensured = await ensureLootauraProfileExists({ userId })
+    if (ensured.ok) {
+      profile = await readUserProfile(supabase, userId)
+      if (profile) {
+        return profile
       }
     }
 

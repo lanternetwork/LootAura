@@ -1,11 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  ProfileSummaryCard,
+  type ProfileCardStatus,
+} from '@/components/dashboard/ProfileSummaryCard'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import AccountLockedBanner from '@/components/account/AccountLockedBanner'
 import { useProfile } from '@/lib/hooks/useAuth'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 import type { DraftListing } from '@/lib/data/salesAccess'
 import type { ProfileData, Metrics7d } from '@/lib/data/profileAccess'
 import { Sale } from '@/lib/types'
@@ -29,23 +34,71 @@ export default function DashboardClient({
   promotionsEnabled = false,
   paymentsEnabled = false,
 }: DashboardClientProps) {
+  const router = useRouter()
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [draftsError, setDraftsError] = useState<any>(null)
+  const [recoveryAttempted, setRecoveryAttempted] = useState(false)
+  const [recovering, setRecovering] = useState(false)
+
+  const {
+    data: clientProfile,
+    isLoading: profileLoading,
+    isError: profileError,
+    error: profileErrorDetail,
+    refetch: refetchProfile,
+  } = useProfile()
+
+  const profile = clientProfile ?? initialProfile ?? null
+
+  const runProfileRecovery = useCallback(async () => {
+    setRecovering(true)
+    try {
+      await fetch('/api/profile', {
+        method: 'POST',
+        credentials: 'include',
+        headers: getCsrfHeaders(),
+      })
+      await refetchProfile()
+      router.refresh()
+    } finally {
+      setRecovering(false)
+      setRecoveryAttempted(true)
+    }
+  }, [refetchProfile, router])
+
+  useEffect(() => {
+    if (profileLoading || profile || profileError || recoveryAttempted || recovering) {
+      return
+    }
+    void runProfileRecovery()
+  }, [
+    profileLoading,
+    profile,
+    profileError,
+    recoveryAttempted,
+    recovering,
+    runProfileRecovery,
+  ])
+
+  const profileCardStatus: ProfileCardStatus = useMemo(() => {
+    if (profile) return 'ready'
+    if (profileError) return 'error'
+    if (profileLoading || recovering) return 'loading'
+    if (!recoveryAttempted) return 'loading'
+    return 'missing'
+  }, [profile, profileError, profileLoading, recovering, recoveryAttempted])
 
   const handleDraftDelete = (draftKey: string) => {
     setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
   }
 
   const handleDraftPublish = (_draftKey: string, _saleId: string) => {
-    // Remove draft from list on successful publish
     setDrafts((prev) => prev.filter((d) => d.draft_key !== _draftKey))
-    // Emit revalidation event to trigger page refresh
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'create', id: _saleId } }))
     }
-    // Sales will be refreshed via server-side revalidation on next navigation
   }
 
   const handleRetryDrafts = async () => {
@@ -66,14 +119,17 @@ export default function DashboardClient({
       } else {
         setDraftsError({ message: result.error || 'Failed to load drafts' })
       }
-    } catch (error) {
+    } catch {
       setDraftsError({ message: 'Network error. Please try again.' })
     } finally {
       setDraftsLoading(false)
     }
   }
 
-  const { data: profile } = useProfile()
+  const handleProfileRetry = () => {
+    setRecoveryAttempted(false)
+    void runProfileRecovery()
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 overflow-x-hidden">
@@ -81,18 +137,22 @@ export default function DashboardClient({
         <h1 className="text-2xl font-semibold">Seller Dashboard</h1>
       </div>
 
-      {/* Account Locked Banner */}
-      {profile?.is_locked && (
-        <AccountLockedBanner lockReason={profile.lock_reason || undefined} />
+      {clientProfile?.is_locked && (
+        <AccountLockedBanner lockReason={clientProfile.lock_reason || undefined} />
       )}
 
       <div className="space-y-6">
-        {/* Row 1: Profile Summary (read-only with Edit Profile button) */}
-        <ProfileSummaryCard profile={initialProfile || null} />
+        <ProfileSummaryCard
+          profile={profileCardStatus === 'ready' ? profile : null}
+          status={profileCardStatus}
+          onRetry={handleProfileRetry}
+          errorMessage={
+            profileErrorDetail instanceof Error ? profileErrorDetail.message : null
+          }
+        />
 
-        {/* Row 3: Sales Panel (with Live, Archived, and Drafts tabs) */}
         <SalesPanel
-          initialArchivedCount={initialArchivedCount} 
+          initialArchivedCount={initialArchivedCount}
           sales={sales}
           drafts={drafts}
           isLoadingDrafts={draftsLoading}
@@ -107,7 +167,6 @@ export default function DashboardClient({
           onRetryDrafts={handleRetryDrafts}
         />
 
-        {/* Row 4: Analytics */}
         <AnalyticsPanel metrics7d={initialMetrics || null} />
       </div>
     </div>

@@ -36,8 +36,11 @@ vi.mock('@supabase/ssr', () => ({
   createServerClient: vi.fn(() => mockSupabaseClient),
 }))
 
-// Mock fetch for profile creation
-global.fetch = vi.fn()
+const mockEnsureLootauraProfile = vi.fn().mockResolvedValue({ ok: true, created: true })
+
+vi.mock('@/lib/profile/ensureLootauraProfile', () => ({
+  ensureLootauraProfileExists: (...args: unknown[]) => mockEnsureLootauraProfile(...args),
+}))
 
 describe('OAuth Callback Route', () => {
   beforeEach(() => {
@@ -218,27 +221,11 @@ describe('OAuth Callback Route', () => {
         error: null
       })
 
-      const mockFetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ created: true }),
-      })
-      global.fetch = mockFetch
-
       const request = new NextRequest('https://example.com/auth/callback?code=abc123')
       
       await GET(request)
       
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          href: 'https://example.com/api/profile'
-        }),
-        {
-          method: 'POST',
-          headers: {
-            'Cookie': '',
-          },
-        }
-      )
+      expect(mockEnsureLootauraProfile).toHaveBeenCalled()
     })
 
     it('should continue auth flow even if profile creation fails', async () => {
@@ -253,11 +240,7 @@ describe('OAuth Callback Route', () => {
         error: null
       })
 
-      // Mock failed profile creation
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-      })
+      mockEnsureLootauraProfile.mockResolvedValueOnce({ ok: false, created: false })
 
       const request = new NextRequest('https://example.com/auth/callback?code=abc123&redirectTo=/sales')
       

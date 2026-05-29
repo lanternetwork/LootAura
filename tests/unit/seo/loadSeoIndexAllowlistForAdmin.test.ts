@@ -23,10 +23,8 @@ describe('loadSeoIndexAllowlistForAdmin', () => {
   })
 
   it('derives allowlist from admin metrics and coverage handlers', async () => {
-    mockGetCoverage.mockResolvedValue(
-      NextResponse.json({ ok: true, ...minimalYstmCoverageScoreboard() })
-    )
-    mockGetMetrics.mockResolvedValue(NextResponse.json({ ok: true, ...minimalMetrics() }))
+    mockGetCoverage.mockResolvedValue(NextResponse.json(minimalYstmCoverageScoreboard()))
+    mockGetMetrics.mockResolvedValue(NextResponse.json(minimalMetrics()))
 
     const { loadSeoIndexAllowlistForAdmin, resolveSeoNationalIndexingAllowed } = await import(
       '@/lib/seo/loadSeoIndexAllowlistForAdmin'
@@ -41,7 +39,7 @@ describe('loadSeoIndexAllowlistForAdmin', () => {
 
   it('fails closed when operational HTTP responses are not ok', async () => {
     mockGetCoverage.mockResolvedValue(NextResponse.json({ ok: false }, { status: 503 }))
-    mockGetMetrics.mockResolvedValue(NextResponse.json({ ok: true, ...minimalMetrics() }))
+    mockGetMetrics.mockResolvedValue(NextResponse.json(minimalMetrics()))
 
     const { loadSeoIndexAllowlistForAdmin, SeoOperationalGateUnavailableError } = await import(
       '@/lib/seo/loadSeoIndexAllowlistForAdmin'
@@ -53,9 +51,7 @@ describe('loadSeoIndexAllowlistForAdmin', () => {
   })
 
   it('fails closed when metrics payload reports failure', async () => {
-    mockGetCoverage.mockResolvedValue(
-      NextResponse.json({ ok: true, ...minimalYstmCoverageScoreboard() })
-    )
+    mockGetCoverage.mockResolvedValue(NextResponse.json(minimalYstmCoverageScoreboard()))
     mockGetMetrics.mockResolvedValue(NextResponse.json({ ok: false, error: 'db down' }))
 
     const { loadSeoIndexAllowlistForAdmin, SeoOperationalGateUnavailableError } = await import(

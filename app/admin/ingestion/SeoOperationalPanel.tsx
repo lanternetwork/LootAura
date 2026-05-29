@@ -8,8 +8,13 @@ import {
 } from '@/lib/seo/buildSeoOperationalSnapshot'
 import { computeSeoSitemapCounts } from '@/lib/seo/sitemap/computeSitemapCounts'
 import type { SeoInventorySummary } from '@/lib/seo/types'
+import {
+  SEO_ROLLOUT_DISABLED_STATE,
+  type SeoRolloutAttestationTarget,
+  type SeoRolloutRuntimeState,
+} from '@/lib/seo/seoRolloutState'
 import SeoDistributionPilotPanel from '@/app/admin/ingestion/SeoDistributionPilotPanel'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const GATE_STYLE = {
   pass: 'border-emerald-300 bg-emerald-50 text-emerald-950',
@@ -30,15 +35,57 @@ type Props = {
   publishedListingCount?: number
 }
 
+function parseRolloutState(body: {
+  rolloutState?: {
+    publicIndexingEnabled?: boolean
+    publicIndexingEnabledAt?: string | null
+    publicIndexingDisabledAt?: string | null
+    crawlValidationPassed?: boolean
+    crawlValidationPassedAt?: string | null
+    searchConsoleValidationPassed?: boolean
+    searchConsoleValidationPassedAt?: string | null
+  }
+}): SeoRolloutRuntimeState {
+  const s = body.rolloutState
+  if (!s) return SEO_ROLLOUT_DISABLED_STATE
+  return {
+    publicIndexingEnabled: s.publicIndexingEnabled === true,
+    publicIndexingEnabledAt: s.publicIndexingEnabledAt ?? null,
+    publicIndexingDisabledAt: s.publicIndexingDisabledAt ?? null,
+    crawlValidationPassed: s.crawlValidationPassed === true,
+    crawlValidationPassedAt: s.crawlValidationPassedAt ?? null,
+    searchConsoleValidationPassed: s.searchConsoleValidationPassed === true,
+    searchConsoleValidationPassedAt: s.searchConsoleValidationPassedAt ?? null,
+  }
+}
+
 export default function SeoOperationalPanel({ metrics, coverage, publishedListingCount = 0 }: Props) {
   const [inventoryBySlug, setInventoryBySlug] = useState<Record<string, SeoInventorySummary>>(
     () => emptyInventoryByMetroSlug()
   )
   const [inventoryStatus, setInventoryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [rolloutState, setRolloutState] = useState<SeoRolloutRuntimeState>(SEO_ROLLOUT_DISABLED_STATE)
+  const [rolloutStatus, setRolloutStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [attestBusy, setAttestBusy] = useState<SeoRolloutAttestationTarget | null>(null)
+
+  const loadRolloutState = useCallback(async () => {
+    setRolloutStatus('loading')
+    try {
+      const res = await fetch('/api/admin/seo/rollout-state', { credentials: 'include' })
+      const body = (await res.json()) as { ok: boolean; rolloutState?: SeoRolloutRuntimeState }
+      if (!res.ok || !body.ok) throw new Error('Rollout state request failed')
+      setRolloutState(parseRolloutState(body))
+      setRolloutStatus('ready')
+    } catch {
+      setRolloutState(SEO_ROLLOUT_DISABLED_STATE)
+      setRolloutStatus('error')
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
     setInventoryStatus('loading')
+    void loadRolloutState()
     fetch('/api/admin/seo/metro-inventory', { credentials: 'include' })
       .then(async (res) => {
         if (!res.ok) throw new Error('Metro inventory request failed')
@@ -58,19 +105,41 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadRolloutState])
+
+  const setAttestation = useCallback(
+    async (target: SeoRolloutAttestationTarget, enabled: boolean) => {
+      setAttestBusy(target)
+      try {
+        const res = await fetch('/api/admin/seo/rollout-state', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target, enabled }),
+        })
+        const body = (await res.json()) as { ok: boolean; rolloutState?: SeoRolloutRuntimeState }
+        if (!res.ok || !body.ok) throw new Error('Attestation update failed')
+        setRolloutState(parseRolloutState(body))
+      } finally {
+        setAttestBusy(null)
+      }
+    },
+    []
+  )
 
   const snapshot = useMemo(() => {
     const sitemapCounts = computeSeoSitemapCounts({
       totalPublishedListings: publishedListingCount,
       nationalIndexingAllowed: false,
       inventoryBySlug,
+      rolloutState,
     })
     const provisional = buildSeoOperationalSnapshot({
       metrics,
       coverage,
       sitemapCounts,
       inventoryByMetroSlug: inventoryBySlug,
+      rolloutState,
     })
     return buildSeoOperationalSnapshot({
       metrics,
@@ -79,10 +148,12 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         totalPublishedListings: publishedListingCount,
         nationalIndexingAllowed: provisional.rollout.indexingAllowed,
         inventoryBySlug,
+        rolloutState,
       }),
       inventoryByMetroSlug: inventoryBySlug,
+      rolloutState,
     })
-  }, [metrics, coverage, publishedListingCount, inventoryBySlug])
+  }, [metrics, coverage, publishedListingCount, inventoryBySlug, rolloutState])
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -90,9 +161,10 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <div>
           <h2 className="text-lg font-semibold text-slate-900">SEO operational readiness</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Index allowlist derives from ingestion gates. Phase 6 expansion metros activate via{' '}
-            <code className="text-xs">SEO_EXPANSION_METRO_SLUGS</code>. Phase 5 rollout env vars
-            control <code className="text-xs">noindex</code> removal.
+            Index allowlist derives from ingestion gates. Rollout attestations are stored in{' '}
+            <code className="text-xs">ingestion_orchestration_state</code> (key{' '}
+            <code className="text-xs">seo_rollout</code>). Expansion metros activate via code promotion in{' '}
+            <code className="text-xs">expansionMetros.ts</code>.
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -124,7 +196,45 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
           : inventoryStatus === 'error'
             ? 'unavailable (using zeros)'
             : 'loaded'}
+        {' · '}
+        Rollout state:{' '}
+        {rolloutStatus === 'loading'
+          ? 'loading…'
+          : rolloutStatus === 'error'
+            ? 'unavailable (fail-closed)'
+            : 'loaded'}
       </p>
+
+      <div className="mt-4 rounded border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800">
+        <p className="font-semibold text-slate-900">Index rollout controls (admin)</p>
+        <p className="mt-1 text-xs text-slate-600">
+          Enable only after operational allowlist is green. Disabling public indexing immediately restores{' '}
+          <code className="text-xs">noindex</code> on the next request.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <RolloutToggle
+            label="Public indexing"
+            enabled={rolloutState.publicIndexingEnabled}
+            busy={attestBusy === 'public_indexing'}
+            onEnable={() => setAttestation('public_indexing', true)}
+            onDisable={() => setAttestation('public_indexing', false)}
+          />
+          <RolloutToggle
+            label="Crawl validation"
+            enabled={rolloutState.crawlValidationPassed}
+            busy={attestBusy === 'crawl_validation'}
+            onEnable={() => setAttestation('crawl_validation', true)}
+            onDisable={() => setAttestation('crawl_validation', false)}
+          />
+          <RolloutToggle
+            label="Search Console"
+            enabled={rolloutState.searchConsoleValidationPassed}
+            busy={attestBusy === 'search_console'}
+            onEnable={() => setAttestation('search_console', true)}
+            onDisable={() => setAttestation('search_console', false)}
+          />
+        </div>
+      </div>
 
       {snapshot.rollout.blockers.length > 0 && (
         <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
@@ -189,7 +299,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <p className="mt-1 text-slate-600">
           Run{' '}
           <code className="text-xs">GET /api/admin/seo/crawl-smoke?metroSlug=dallas-tx&amp;saleId=…</code>{' '}
-          then set Phase 5 attestation env vars. See{' '}
+          then attest crawl validation above. See{' '}
           <code className="text-xs">docs/SEO_PHASE5_CRAWL_VALIDATION.md</code>.
         </p>
         {snapshot.rollout.qualifiedMetroSlugs.length > 0 && (
@@ -202,7 +312,9 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       <div className="mt-4">
         <p className="text-sm font-semibold text-slate-900">Metro expansion (Phase 6)</p>
         <p className="mt-1 text-xs text-slate-600">
-          Activate candidates with <code className="text-xs">SEO_EXPANSION_METRO_SLUGS</code>. See{' '}
+          Promote metros by moving them from <code className="text-xs">SEO_EXPANSION_METRO_CANDIDATES</code> to{' '}
+          <code className="text-xs">SEO_ACTIVE_EXPANSION_METROS</code> in{' '}
+          <code className="text-xs">expansionMetros.ts</code>, then deploy. See{' '}
           <code className="text-xs">docs/SEO_PHASE6_METRO_EXPANSION.md</code>.
         </p>
         <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto">
@@ -266,6 +378,43 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         </ul>
       </div>
     </section>
+  )
+}
+
+function RolloutToggle({
+  label,
+  enabled,
+  busy,
+  onEnable,
+  onDisable,
+}: {
+  label: string
+  enabled: boolean
+  busy: boolean
+  onEnable: () => void
+  onDisable: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs">
+      <span className="font-medium text-slate-800">{label}</span>
+      <span className={enabled ? 'text-emerald-700' : 'text-slate-500'}>{enabled ? 'on' : 'off'}</span>
+      <button
+        type="button"
+        disabled={busy || enabled}
+        className="rounded bg-emerald-600 px-2 py-0.5 text-white disabled:opacity-40"
+        onClick={() => onEnable()}
+      >
+        Enable
+      </button>
+      <button
+        type="button"
+        disabled={busy || !enabled}
+        className="rounded bg-slate-600 px-2 py-0.5 text-white disabled:opacity-40"
+        onClick={() => onDisable()}
+      >
+        Disable
+      </button>
+    </div>
   )
 }
 

@@ -37,10 +37,8 @@ Inventory-first, ingestion-gated local discovery SEO. See the final development 
 
 Public indexing and listing sitemap inclusion require:
 
-```bash
-SEO_PUBLIC_INDEXING_ENABLED=true
-```
+1. Admin **public indexing** attestation (`ingestion_orchestration_state` key `seo_rollout`)
+2. Operational allowlist pass (Tier 1, Tier 2, Phase 14 enforcement, duplicate cluster bounds)
+3. Phase 5 crawl + Search Console attestations (same DB row)
 
-Plus operational allowlist pass (Tier 1, Tier 2, Phase 14 enforcement, duplicate cluster bounds).
-
-Until both pass, only the **static** sitemap segment is emitted.
+Until all pass, only the **static** sitemap segment is emitted. No SEO-specific Vercel env vars.

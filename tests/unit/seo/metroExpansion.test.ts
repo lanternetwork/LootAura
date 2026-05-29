@@ -1,18 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { evaluateSeoMetroExpansion } from '@/lib/seo/metroExpansion'
-
-const originalEnv = process.env
+import { SEO_ACTIVE_EXPANSION_METROS } from '@/lib/seo/expansionMetros'
 
 describe('evaluateSeoMetroExpansion', () => {
-  beforeEach(() => {
-    process.env = { ...originalEnv }
-    delete process.env.SEO_EXPANSION_METRO_SLUGS
-  })
   afterEach(() => {
-    process.env = originalEnv
+    SEO_ACTIVE_EXPANSION_METROS.length = 0
   })
 
-  it('marks expansion candidates inactive until env activation', () => {
+  it('marks expansion candidates inactive until code promotion', () => {
     const snapshot = evaluateSeoMetroExpansion({
       nationalIndexingAllowed: true,
       inventoryBySlug: {},
@@ -22,8 +17,14 @@ describe('evaluateSeoMetroExpansion', () => {
     expect(austin?.pageActive).toBe(false)
   })
 
-  it('marks env-activated expansion metros as active', () => {
-    process.env.SEO_EXPANSION_METRO_SLUGS = 'austin-tx'
+  it('marks code-promoted expansion metros as active', () => {
+    SEO_ACTIVE_EXPANSION_METROS.push({
+      slug: 'austin-tx',
+      city: 'Austin',
+      state: 'TX',
+      timezone: 'America/Chicago',
+      minActiveListings: 25,
+    })
     const snapshot = evaluateSeoMetroExpansion({
       nationalIndexingAllowed: true,
       inventoryBySlug: {

@@ -8,15 +8,16 @@ import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPubl
 import { buildCitySitemapEntries } from '@/lib/seo/sitemap/cityEntries'
 import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
-import { isSeoIndexRolloutEnvReady } from '@/lib/seo/indexRollout'
+import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
 import { emptyInventoryByPilotSlug } from '@/lib/seo/buildSeoOperationalSnapshot'
 
 export async function generateSitemaps() {
-  if (!isSeoIndexRolloutEnvReady()) {
+  const rolloutState = await getSeoRolloutStateForRequest()
+  if (!resolveSeoSitemapPlan(0, rolloutState).indexingEnabled) {
     return [{ id: 'static' }]
   }
   const rows = await fetchPublishedListingRowsForSitemap()
-  const plan = resolveSeoSitemapPlan(rows.length)
+  const plan = resolveSeoSitemapPlan(rows.length, rolloutState)
   return plan.segmentIds.map((segmentId) => ({ id: segmentId }))
 }
 
@@ -28,6 +29,8 @@ export default async function sitemap({
   if (id === 'static') {
     return buildStaticSitemapEntries()
   }
+
+  const rolloutState = await getSeoRolloutStateForRequest()
 
   if (id === 'cities') {
     return buildCitySitemapEntries({

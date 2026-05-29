@@ -2,6 +2,7 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
 import { evaluateSeoIndexRolloutReadiness } from '@/lib/seo/indexRollout'
+import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutState'
 import { evaluateSeoMetroExpansion } from '@/lib/seo/metroExpansion'
 import { getSeoMetroCatalogForDashboard } from '@/lib/seo/metroCatalog'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
@@ -46,13 +47,15 @@ export function buildSeoOperationalSnapshot(options: {
   coverage: YstmCoverageMetricsResponse | null
   sitemapCounts: SeoSitemapCounts
   inventoryByMetroSlug?: Record<string, SeoInventorySummary>
+  rolloutState: SeoRolloutRuntimeState
 }): SeoOperationalSnapshot {
-  const { metrics, coverage, sitemapCounts, inventoryByMetroSlug = {} } = options
-  const allowlist = evaluateSeoIndexAllowlist(metrics, coverage)
+  const { metrics, coverage, sitemapCounts, inventoryByMetroSlug = {}, rolloutState } = options
+  const allowlist = evaluateSeoIndexAllowlist(metrics, coverage, rolloutState)
   const rollout = evaluateSeoIndexRolloutReadiness({
     metrics,
     coverage,
     inventoryByMetroSlug,
+    rolloutState,
   })
   const pilotMetros = qualifyAllSeoMetros({
     metros: getSeoMetroCatalogForDashboard(),

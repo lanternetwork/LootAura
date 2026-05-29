@@ -1,21 +1,13 @@
-import { SEO_EXPANSION_METRO_CANDIDATES } from '@/lib/seo/expansionMetros'
+import { SEO_ACTIVE_EXPANSION_METROS, SEO_EXPANSION_METRO_CANDIDATES } from '@/lib/seo/expansionMetros'
 import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
 import type { SeoPilotMetro } from '@/lib/seo/types'
 
-export function getSeoExpansionMetroSlugsFromEnv(): string[] {
-  const raw = process.env.SEO_EXPANSION_METRO_SLUGS?.trim()
-  if (!raw) return []
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
-/** Pilot metros always ship SSR surfaces; expansion metros require explicit env activation. */
+/**
+ * Pilot metros always ship SSR surfaces; expansion metros require code promotion
+ * into `SEO_ACTIVE_EXPANSION_METROS` (move from candidates in expansionMetros.ts).
+ */
 export function getSeoActiveMetros(): SeoPilotMetro[] {
-  const activated = new Set(getSeoExpansionMetroSlugsFromEnv())
-  const expansionActive = SEO_EXPANSION_METRO_CANDIDATES.filter((m) => activated.has(m.slug))
-  return [...SEO_PILOT_METROS, ...expansionActive]
+  return [...SEO_PILOT_METROS, ...SEO_ACTIVE_EXPANSION_METROS]
 }
 
 export function getSeoMetroCatalogForDashboard(): SeoPilotMetro[] {

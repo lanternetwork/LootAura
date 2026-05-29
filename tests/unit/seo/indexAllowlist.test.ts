@@ -1,27 +1,27 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
+import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutState'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
-
-const originalEnv = process.env
+import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
 
 describe('evaluateSeoIndexAllowlist', () => {
-  beforeEach(() => {
-    process.env = { ...originalEnv, SEO_PUBLIC_INDEXING_ENABLED: 'false' }
-  })
-  afterEach(() => {
-    process.env = originalEnv
-  })
-
-  it('blocks indexing when SEO_PUBLIC_INDEXING_ENABLED is not true', () => {
-    const result = evaluateSeoIndexAllowlist(minimalMetrics(), minimalYstmCoverageScoreboard())
+  it('blocks indexing when admin public indexing is not enabled', () => {
+    const result = evaluateSeoIndexAllowlist(
+      minimalMetrics(),
+      minimalYstmCoverageScoreboard(),
+      SEO_ROLLOUT_DISABLED_STATE
+    )
     expect(result.indexingAllowed).toBe(false)
-    expect(result.blockers.some((b) => b.includes('SEO_PUBLIC_INDEXING_ENABLED'))).toBe(true)
+    expect(result.blockers.some((b) => b.includes('SEO public indexing'))).toBe(true)
   })
 
-  it('allows indexing when kill switch on and operational gates pass', () => {
-    process.env.SEO_PUBLIC_INDEXING_ENABLED = 'true'
-    const result = evaluateSeoIndexAllowlist(minimalMetrics(), minimalYstmCoverageScoreboard())
+  it('allows indexing when admin opt-in on and operational gates pass', () => {
+    const result = evaluateSeoIndexAllowlist(
+      minimalMetrics(),
+      minimalYstmCoverageScoreboard(),
+      enabledSeoRolloutState()
+    )
     expect(result.indexingAllowed).toBe(true)
     expect(result.blockers).toHaveLength(0)
     expect(result.tier1Ready).toBe(true)
@@ -29,7 +29,6 @@ describe('evaluateSeoIndexAllowlist', () => {
   })
 
   it('blocks when catalog repair queue exceeds threshold', () => {
-    process.env.SEO_PUBLIC_INDEXING_ENABLED = 'true'
     const result = evaluateSeoIndexAllowlist(
       minimalMetrics(),
       minimalYstmCoverageScoreboard({
@@ -41,7 +40,8 @@ describe('evaluateSeoIndexAllowlist', () => {
           ...minimalYstmCoverageScoreboard().pipelineBacklog,
           catalogRepairQueue: 500,
         },
-      })
+      }),
+      enabledSeoRolloutState()
     )
     expect(result.indexingAllowed).toBe(false)
     expect(result.tier1Ready).toBe(false)

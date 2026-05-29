@@ -14,12 +14,31 @@ vi.mock('@/app/api/admin/ingestion/ystm-coverage/route', () => ({
   GET: (...args: unknown[]) => mockGetCoverage(...args),
 }))
 
+const mockFetchRollout = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/seo/seoRolloutState', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seo/seoRolloutState')>()
+  return {
+    ...actual,
+    fetchSeoRolloutState: (...args: unknown[]) => mockFetchRollout(...args),
+  }
+})
+
 describe('loadSeoIndexAllowlistForAdmin', () => {
   const request = new NextRequest('http://localhost/api/admin/seo/distribution-pack')
 
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
+    mockFetchRollout.mockResolvedValue({
+      publicIndexingEnabled: false,
+      publicIndexingEnabledAt: null,
+      publicIndexingDisabledAt: null,
+      crawlValidationPassed: false,
+      crawlValidationPassedAt: null,
+      searchConsoleValidationPassed: false,
+      searchConsoleValidationPassedAt: null,
+    })
   })
 
   it('derives allowlist from admin metrics and coverage handlers', async () => {

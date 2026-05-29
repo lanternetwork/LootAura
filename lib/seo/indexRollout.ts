@@ -1,44 +1,16 @@
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist, type SeoIndexGate } from '@/lib/seo/indexAllowlist'
-import { isSeoPublicIndexingEnabled } from '@/lib/seo/constants'
-import { getSeoActiveMetros } from '@/lib/seo/metroCatalog'
+import { getSeoActiveMetros, isSeoMetroActive } from '@/lib/seo/metroCatalog'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary, SeoRobotsDirective } from '@/lib/seo/types'
-export function isSeoCrawlValidationPassed(): boolean {
-  return process.env.SEO_CRAWL_VALIDATION_PASSED === 'true'
-}
+import {
+  isSeoIndexRolloutReady,
+  type SeoRolloutRuntimeState,
+  SEO_ROLLOUT_DISABLED_STATE,
+} from '@/lib/seo/seoRolloutState'
 
-export function isSeoSearchConsoleValidationPassed(): boolean {
-  return process.env.SEO_SEARCH_CONSOLE_VALIDATION_PASSED === 'true'
-}
-
-/**
- * Runtime env attestation for indexable robots + sitemap (set after Phase 5 validation).
- * Operational allowlist must be green on the ingestion dashboard before enabling these env vars.
- */
-export function isSeoIndexRolloutEnvReady(): boolean {
-  return (
-    isSeoPublicIndexingEnabled() &&
-    isSeoCrawlValidationPassed() &&
-    isSeoSearchConsoleValidationPassed()
-  )
-}
-
-export function getSeoIndexPilotMetroSlugs(): string[] | null {
-  const raw = process.env.SEO_INDEX_PILOT_METROS?.trim()
-  if (!raw) return null
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
-export function isMetroAllowedForIndexRollout(metroSlug: string): boolean {
-  const allowlist = getSeoIndexPilotMetroSlugs()
-  if (!allowlist) return true
-  return allowlist.includes(metroSlug)
-}
+export { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutState'
 
 export type SeoIndexRolloutSnapshot = {
   generatedAt: string
@@ -48,39 +20,48 @@ export type SeoIndexRolloutSnapshot = {
   qualifiedMetroSlugs: string[]
   /** @deprecated use qualifiedMetroSlugs */
   qualifiedPilotMetros: string[]
+  rolloutState: SeoRolloutRuntimeState
 }
 
 export function evaluateSeoIndexRolloutReadiness(options: {
   metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse | null
   inventoryByMetroSlug?: Record<string, SeoInventorySummary>
+  rolloutState?: SeoRolloutRuntimeState
 }): SeoIndexRolloutSnapshot {
-  const allowlist = evaluateSeoIndexAllowlist(options.metrics, options.coverage)
+  const rolloutState = options.rolloutState ?? SEO_ROLLOUT_DISABLED_STATE
+  const allowlist = evaluateSeoIndexAllowlist(options.metrics, options.coverage, rolloutState)
   const gates: SeoIndexGate[] = [...allowlist.gates]
 
-  const crawlPass = isSeoCrawlValidationPassed()
+  const crawlPass = rolloutState.crawlValidationPassed
   gates.push({
     id: 'crawl_validation',
     label: 'Crawl / HTML validation (Phase 5B)',
     status: crawlPass ? 'pass' : 'blocked',
-    detail: crawlPass ? 'SEO_CRAWL_VALIDATION_PASSED=true' : 'Not attested — run crawl smoke',
+    detail: crawlPass
+      ? rolloutState.crawlValidationPassedAt
+        ? `Attested at ${rolloutState.crawlValidationPassedAt}`
+        : 'Admin attested'
+      : 'Not attested — run crawl smoke and attest in admin',
     source: 'seo_kill_switch',
   })
 
-  const gscPass = isSeoSearchConsoleValidationPassed()
+  const gscPass = rolloutState.searchConsoleValidationPassed
   gates.push({
     id: 'search_console_validation',
     label: 'Search Console validation (Phase 5A)',
     status: gscPass ? 'pass' : 'blocked',
     detail: gscPass
-      ? 'SEO_SEARCH_CONSOLE_VALIDATION_PASSED=true'
-      : 'Not attested — complete Search Console checklist',
+      ? rolloutState.searchConsoleValidationPassedAt
+        ? `Attested at ${rolloutState.searchConsoleValidationPassedAt}`
+        : 'Admin attested'
+      : 'Not attested — complete Search Console checklist in admin',
     source: 'seo_kill_switch',
   })
 
   const blockers = [...allowlist.blockers]
-  if (!crawlPass) blockers.push('Crawl validation not attested (SEO_CRAWL_VALIDATION_PASSED)')
-  if (!gscPass) blockers.push('Search Console validation not attested (SEO_SEARCH_CONSOLE_VALIDATION_PASSED)')
+  if (!crawlPass) blockers.push('Crawl validation not attested (admin)')
+  if (!gscPass) blockers.push('Search Console validation not attested (admin)')
 
   const nationalIndexingAllowed =
     allowlist.indexingAllowed && crawlPass && gscPass
@@ -92,10 +73,7 @@ export function evaluateSeoIndexRolloutReadiness(options: {
     inventoryBySlug: options.inventoryByMetroSlug ?? {},
   })
 
-  const metroIndexAllowlist = getSeoIndexPilotMetroSlugs()
-  const qualifiedMetroSlugs = qualifiedMetros
-    .filter((m) => m.qualified && (!metroIndexAllowlist || metroIndexAllowlist.includes(m.slug)))
-    .map((m) => m.slug)
+  const qualifiedMetroSlugs = qualifiedMetros.filter((m) => m.qualified).map((m) => m.slug)
 
   if (nationalIndexingAllowed && qualifiedMetroSlugs.length === 0) {
     blockers.push('No active metros qualified for index rollout')
@@ -107,28 +85,34 @@ export function evaluateSeoIndexRolloutReadiness(options: {
     blockers: [...new Set(blockers)],
     gates,
     qualifiedMetroSlugs,
-    /** @deprecated use qualifiedMetroSlugs */
     qualifiedPilotMetros: qualifiedMetroSlugs,
+    rolloutState,
   }
 }
 
-export function resolveSeoRobotsDirective(options?: { metroSlug?: string }): SeoRobotsDirective {
-  if (!isSeoIndexRolloutEnvReady()) {
+export function resolveSeoRobotsDirective(
+  rolloutState: SeoRolloutRuntimeState,
+  options?: { metroSlug?: string }
+): SeoRobotsDirective {
+  if (!isSeoIndexRolloutReady(rolloutState)) {
     return { index: false, follow: true }
   }
-  if (options?.metroSlug && !isMetroAllowedForIndexRollout(options.metroSlug)) {
+  if (options?.metroSlug && !isSeoMetroActive(options.metroSlug)) {
     return { index: false, follow: true }
   }
   return { index: true, follow: true }
 }
 
-export function resolveListingIndexRobots(): SeoRobotsDirective {
-  return resolveSeoRobotsDirective()
+export function resolveListingIndexRobots(rolloutState: SeoRolloutRuntimeState): SeoRobotsDirective {
+  return resolveSeoRobotsDirective(rolloutState)
 }
 
-export function resolveMetroPageRobots(metroSlug: string): SeoRobotsDirective {
+export function resolveMetroPageRobots(
+  metroSlug: string,
+  rolloutState: SeoRolloutRuntimeState
+): SeoRobotsDirective {
   if (!getSeoActiveMetros().some((m) => m.slug === metroSlug)) {
     return { index: false, follow: true }
   }
-  return resolveSeoRobotsDirective({ metroSlug })
+  return resolveSeoRobotsDirective(rolloutState, { metroSlug })
 }

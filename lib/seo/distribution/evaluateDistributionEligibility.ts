@@ -19,7 +19,7 @@ export function evaluateDistributionEligibility(options: {
   const blockers: string[] = []
 
   if (!isSeoMetroActive(options.metro.slug)) {
-    blockers.push('Metro page is not active (pilot or SEO_EXPANSION_METRO_SLUGS)')
+    blockers.push('Metro page is not active (pilot or code-promoted expansion metro)')
   }
 
   const qualification = qualifyMetroForSeoRollout({

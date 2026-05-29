@@ -45,14 +45,13 @@ Separate segments: static, listings (chunked), cities and weekends (gated, empty
 
 Track indexed metros, crawlable inventory %, stale %, canonical coverage, duplicate clusters, sitemap counts, freshness trends.
 
-## Environment
+## Rollout configuration (no SEO env vars)
 
-- `SEO_PUBLIC_INDEXING_ENABLED=true` — explicit opt-in required for listing sitemap segments and public indexing (in addition to operational allowlist pass).
-- `SEO_CRAWL_VALIDATION_PASSED=true` — Phase 5B attestation after crawl smoke passes.
-- `SEO_SEARCH_CONSOLE_VALIDATION_PASSED=true` — Phase 5A attestation after Search Console checklist.
-- `SEO_INDEX_PILOT_METROS` — optional comma-separated metro slugs for gradual index rollout.
-- `SEO_CRAWL_SMOKE_SALE_ID` — optional published sale id for listing crawl smoke checks.
-- `SEO_EXPANSION_METRO_SLUGS` — comma-separated tier-2 metros to activate SSR city/weekend pages.
+- **Public indexing, crawl validation, Search Console** — admin attestations in `ingestion_orchestration_state` key `seo_rollout` (`POST /api/admin/seo/rollout-state`).
+- **Pilot metros** — `lib/seo/pilotMetros.ts`.
+- **Expansion activation** — promote metros into `SEO_ACTIVE_EXPANSION_METROS` in `lib/seo/expansionMetros.ts` (deploy).
+- **Crawl smoke listing** — `?saleId=` query param or latest published sale from DB.
+- **Canonical origin** — existing `NEXT_PUBLIC_SITE_URL` only (predates SEO).
 
 ## Deferred
 

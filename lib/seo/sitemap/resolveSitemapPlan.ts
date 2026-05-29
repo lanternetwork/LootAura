@@ -2,7 +2,7 @@ import {
   countListingSitemapChunks,
   listingSitemapChunkId,
 } from '@/lib/seo/sitemap/listingEntries'
-import { isSeoIndexRolloutEnvReady } from '@/lib/seo/indexRollout'
+import { isSeoIndexRolloutReady, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutState'
 
 export type SeoSitemapSegmentId = 'static' | string
 
@@ -14,8 +14,11 @@ export type SeoSitemapPlan = {
   totalPublishedListings: number
 }
 
-export function resolveSeoSitemapPlan(totalPublishedListings: number): SeoSitemapPlan {
-  const indexingEnabled = isSeoIndexRolloutEnvReady()
+export function resolveSeoSitemapPlan(
+  totalPublishedListings: number,
+  rolloutState: SeoRolloutRuntimeState
+): SeoSitemapPlan {
+  const indexingEnabled = isSeoIndexRolloutReady(rolloutState)
   const segmentIds: SeoSitemapSegmentId[] = ['static']
 
   let listingChunkCount = 0

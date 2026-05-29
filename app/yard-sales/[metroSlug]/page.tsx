@@ -6,6 +6,7 @@ import { getSeoActiveMetros, getSeoMetroBySlug, isSeoMetroActive } from '@/lib/s
 import { fetchMetroInventory } from '@/lib/seo/fetchMetroInventory'
 import { createCityPageMetadata } from '@/lib/seo/metadata'
 import { resolveMetroPageRobots } from '@/lib/seo/indexRollout'
+import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
 import {
   createCityPageStructuredDataBundle,
   saleToInventoryListItem,
@@ -34,11 +35,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!metro || !isSeoMetroActive(metroSlug)) {
     return { title: 'Yard sales · Loot Aura' }
   }
-  const { summary } = await fetchMetroInventory(metro)
+  const [rolloutState, { summary }] = await Promise.all([
+    getSeoRolloutStateForRequest(),
+    fetchMetroInventory(metro),
+  ])
   return createCityPageMetadata({
     metro,
     inventory: summary,
-    robots: resolveMetroPageRobots(metro.slug),
+    robots: resolveMetroPageRobots(metro.slug, rolloutState),
   })
 }
 

@@ -13,6 +13,7 @@ import {
 } from '@/lib/seo/fetchMetroWeekendInventory'
 import { createWeekendPageMetadata } from '@/lib/seo/metadata'
 import { resolveMetroPageRobots } from '@/lib/seo/indexRollout'
+import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
 import {
   createWeekendPageStructuredDataBundle,
   saleToInventoryListItem,
@@ -42,12 +43,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!metro || !isSeoMetroActive(metroSlug)) {
     return { title: 'Yard sales this weekend · Loot Aura' }
   }
-  const { summary, weekend } = await fetchMetroWeekendInventory(metro)
+  const [rolloutState, { summary, weekend }] = await Promise.all([
+    getSeoRolloutStateForRequest(),
+    fetchMetroWeekendInventory(metro),
+  ])
   return createWeekendPageMetadata({
     metro,
     inventory: summary,
     weekendLabel: weekend.label,
-    robots: resolveMetroPageRobots(metro.slug),
+    robots: resolveMetroPageRobots(metro.slug, rolloutState),
   })
 }
 

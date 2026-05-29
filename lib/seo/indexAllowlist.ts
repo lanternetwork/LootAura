@@ -10,7 +10,10 @@ import {
   STABILIZATION_CATALOG_REPAIR_MAX,
   STABILIZATION_MISSING_VALID_NEAR_ZERO,
 } from '@/lib/admin/ystmStabilizationExitCriteria'
-import { isSeoPublicIndexingEnabled } from '@/lib/seo/constants'
+import {
+  SEO_ROLLOUT_DISABLED_STATE,
+  type SeoRolloutRuntimeState,
+} from '@/lib/seo/seoRolloutState'
 
 export type SeoIndexGateStatus = 'pass' | 'fail' | 'pending' | 'blocked'
 
@@ -53,24 +56,27 @@ function gateFromCriterion(
  */
 export function evaluateSeoIndexAllowlist(
   metrics: IngestionMetricsResponse,
-  coverage: YstmCoverageMetricsResponse | null
+  coverage: YstmCoverageMetricsResponse | null,
+  rolloutState: SeoRolloutRuntimeState = SEO_ROLLOUT_DISABLED_STATE
 ): SeoIndexAllowlistSnapshot {
   const generatedAt = new Date().toISOString()
   const gates: SeoIndexGate[] = []
   const blockers: string[] = []
 
-  const killSwitchOn = isSeoPublicIndexingEnabled()
+  const killSwitchOn = rolloutState.publicIndexingEnabled
   gates.push({
     id: 'seo_public_indexing_enabled',
-    label: 'SEO_PUBLIC_INDEXING_ENABLED',
+    label: 'SEO public indexing (admin)',
     status: killSwitchOn ? 'pass' : 'blocked',
     detail: killSwitchOn
-      ? 'Explicit opt-in enabled'
-      : 'Not set — Phase 0 blocks public indexing and sitemap inclusion',
+      ? rolloutState.publicIndexingEnabledAt
+        ? `Enabled at ${rolloutState.publicIndexingEnabledAt}`
+        : 'Admin opt-in enabled'
+      : 'Not enabled — Phase 0 blocks public indexing and sitemap inclusion',
     source: 'seo_kill_switch',
   })
   if (!killSwitchOn) {
-    blockers.push('SEO_PUBLIC_INDEXING_ENABLED is not true (Phase 0)')
+    blockers.push('SEO public indexing is not enabled by admin (Phase 0)')
   }
 
   const exit = evaluateYstmStabilizationExit(metrics, coverage)

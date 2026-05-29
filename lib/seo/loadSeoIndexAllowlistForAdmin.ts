@@ -4,6 +4,8 @@ import { GET as getYstmCoverage } from '@/app/api/admin/ingestion/ystm-coverage/
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist, type SeoIndexAllowlistSnapshot } from '@/lib/seo/indexAllowlist'
+import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
+import { getAdminDb } from '@/lib/supabase/clients'
 
 export class SeoOperationalGateUnavailableError extends Error {
   constructor(message = 'Cannot determine SEO operational gate state') {
@@ -19,9 +21,10 @@ export class SeoOperationalGateUnavailableError extends Error {
 export async function loadSeoIndexAllowlistForAdmin(
   request: NextRequest
 ): Promise<SeoIndexAllowlistSnapshot> {
-  const [coverageRes, metricsRes] = await Promise.all([
+  const [coverageRes, metricsRes, rolloutState] = await Promise.all([
     getYstmCoverage(request),
     getIngestionMetrics(request),
+    fetchSeoRolloutState(getAdminDb()),
   ])
 
   if (!coverageRes.ok || !metricsRes.ok) {
@@ -37,7 +40,7 @@ export async function loadSeoIndexAllowlistForAdmin(
     throw new SeoOperationalGateUnavailableError('Ingestion operational metrics reported failure')
   }
 
-  return evaluateSeoIndexAllowlist(metrics, coverage)
+  return evaluateSeoIndexAllowlist(metrics, coverage, rolloutState)
 }
 
 /** National operational allowlist pass — mirrors SeoOperationalPanel / metro expansion wiring. */

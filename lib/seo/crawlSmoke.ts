@@ -1,6 +1,8 @@
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import { T } from '@/lib/supabase/tables'
 import { getSeoBaseUrl } from '@/lib/seo/constants'
-import { getSeoActiveMetros, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 import { getCityPagePath, getListingCanonicalPath, getWeekendPagePath } from '@/lib/seo/canonical'
+import { getSeoActiveMetros, getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
 
 export type CrawlSmokeCheck = {
   id: string
@@ -65,6 +67,34 @@ function check(
   return { id, label, url, pass, detail }
 }
 
+/** Resolve listing id from query param or latest published sale (no env fallback). */
+export async function resolveCrawlSmokeSampleSaleId(
+  sampleSaleId?: string
+): Promise<string | undefined> {
+  const trimmed = sampleSaleId?.trim()
+  if (trimmed) {
+    if (!CRAWL_SMOKE_SALE_ID_PATTERN.test(trimmed)) {
+      throw new Error('Invalid crawl smoke sale id format')
+    }
+    return trimmed
+  }
+
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, T.sales)
+    .select('id')
+    .eq('status', 'published')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data?.id) {
+    return undefined
+  }
+
+  const id = String(data.id)
+  return CRAWL_SMOKE_SALE_ID_PATTERN.test(id) ? id : undefined
+}
+
 /**
  * Phase 5B — HTTP smoke checks for SSR crawl markers on live/staging HTML.
  */
@@ -122,11 +152,8 @@ export async function runSeoCrawlSmokeChecks(options?: {
     )
   )
 
-  const saleId = options?.sampleSaleId ?? process.env.SEO_CRAWL_SMOKE_SALE_ID?.trim()
+  const saleId = await resolveCrawlSmokeSampleSaleId(options?.sampleSaleId)
   if (saleId) {
-    if (!CRAWL_SMOKE_SALE_ID_PATTERN.test(saleId)) {
-      throw new Error('Invalid crawl smoke sale id format')
-    }
     const listingUrl = buildCrawlSmokeUrl(getListingCanonicalPath(saleId))
     const listingRes = await fetchHtml(listingUrl)
     const crawlable = listingRes.html.includes('data-seo-sale-detail="crawlable"')
@@ -151,9 +178,9 @@ export async function runSeoCrawlSmokeChecks(options?: {
       check(
         'listing_skipped',
         'Listing crawl check (optional)',
-        '(set SEO_CRAWL_SMOKE_SALE_ID)',
+        '(pass ?saleId= or publish a listing)',
         true,
-        'Skipped — provide sample published sale id'
+        'Skipped — provide sample published sale id via ?saleId='
       )
     )
   }

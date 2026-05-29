@@ -36,7 +36,7 @@ describe('GET /api/admin/seo/distribution-pack', () => {
       tier2Ready: true,
       enforcementReady: true,
       gates: [],
-      blockers: ['SEO_PUBLIC_INDEXING_ENABLED is not true (Phase 0)'],
+      blockers: ['SEO public indexing is not enabled by admin (Phase 0)'],
       generatedAt: new Date().toISOString(),
     })
     mockFetchMetroInventory.mockResolvedValue({

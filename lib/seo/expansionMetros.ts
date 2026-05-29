@@ -1,9 +1,11 @@
 import type { SeoPilotMetro } from '@/lib/seo/types'
 
 /**
- * Tier-2 expansion candidates — pages/index only when ops activates via SEO_EXPANSION_METRO_SLUGS
- * and metro passes the same qualification matrix as pilots (inventory scoreboard).
+ * Tier-2 expansion candidates — promote into `SEO_ACTIVE_EXPANSION_METROS` via code deploy
+ * when ops approves (same qualification matrix as pilots).
  */
+export const SEO_ACTIVE_EXPANSION_METROS: SeoPilotMetro[] = []
+
 export const SEO_EXPANSION_METRO_CANDIDATES: SeoPilotMetro[] = [
   {
     slug: 'austin-tx',

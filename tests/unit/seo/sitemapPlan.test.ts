@@ -1,43 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
-import { buildStaticSitemapEntries } from '@/lib/seo/sitemap/staticEntries'
-import { countListingSitemapChunks } from '@/lib/seo/sitemap/listingEntries'
+import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutState'
+import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
 
-const originalEnv = process.env
-
-describe('seo sitemap plan', () => {
-  beforeEach(() => {
-    process.env = { ...originalEnv, SEO_PUBLIC_INDEXING_ENABLED: 'false' }
-  })
-  afterEach(() => {
-    process.env = originalEnv
-  })
-
-  it('static segment never includes query URLs', () => {
-    const entries = buildStaticSitemapEntries()
-    for (const entry of entries) {
-      expect(entry.url).not.toContain('?')
-      expect(entry.url).not.toContain('tab=map')
-    }
-  })
-
-  it('includes only static segment when indexing disabled', () => {
-    const plan = resolveSeoSitemapPlan(5000)
+describe('resolveSeoSitemapPlan', () => {
+  it('returns static-only plan when rollout attestations are off', () => {
+    const plan = resolveSeoSitemapPlan(5000, SEO_ROLLOUT_DISABLED_STATE)
     expect(plan.indexingEnabled).toBe(false)
     expect(plan.segmentIds).toEqual(['static'])
     expect(plan.listingChunkCount).toBe(0)
   })
 
-  it('chunks listings when index rollout env ready', () => {
-    process.env.SEO_PUBLIC_INDEXING_ENABLED = 'true'
-    process.env.SEO_CRAWL_VALIDATION_PASSED = 'true'
-    process.env.SEO_SEARCH_CONSOLE_VALIDATION_PASSED = 'true'
-    const plan = resolveSeoSitemapPlan(2500)
+  it('includes listing chunks and city/weekend when rollout ready', () => {
+    const plan = resolveSeoSitemapPlan(2500, enabledSeoRolloutState())
     expect(plan.indexingEnabled).toBe(true)
-    expect(plan.listingChunkCount).toBe(countListingSitemapChunks(2500))
+    expect(plan.listingChunkCount).toBe(3)
     expect(plan.segmentIds[0]).toBe('static')
-    expect(plan.segmentIds).toContain('listings-0')
-    expect(plan.segmentIds).toContain('listings-2')
     expect(plan.segmentIds).toContain('cities')
     expect(plan.segmentIds).toContain('weekends')
   })

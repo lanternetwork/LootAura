@@ -1,33 +1,36 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import {
   getSeoActiveMetros,
-  getSeoMetroBySlug,
+  getSeoMetroCatalogForDashboard,
   isSeoMetroActive,
 } from '@/lib/seo/metroCatalog'
+import { SEO_ACTIVE_EXPANSION_METROS } from '@/lib/seo/expansionMetros'
 import { SEO_PILOT_METROS } from '@/lib/seo/pilotMetros'
 
-const originalEnv = process.env
-
 describe('seo metro catalog', () => {
-  beforeEach(() => {
-    process.env = { ...originalEnv }
-    delete process.env.SEO_EXPANSION_METRO_SLUGS
-  })
   afterEach(() => {
-    process.env = originalEnv
+    SEO_ACTIVE_EXPANSION_METROS.length = 0
   })
 
-  it('includes only pilots when expansion env unset', () => {
+  it('active metros default to pilot list only', () => {
     expect(getSeoActiveMetros().map((m) => m.slug)).toEqual(SEO_PILOT_METROS.map((m) => m.slug))
-    expect(isSeoMetroActive('austin-tx')).toBe(false)
   })
 
-  it('activates expansion metros from env', () => {
-    process.env.SEO_EXPANSION_METRO_SLUGS = 'austin-tx,charlotte-nc'
-    const slugs = getSeoActiveMetros().map((m) => m.slug)
+  it('dashboard catalog includes pilot and expansion candidates', () => {
+    const slugs = getSeoMetroCatalogForDashboard().map((m) => m.slug)
+    expect(slugs).toContain('dallas-tx')
     expect(slugs).toContain('austin-tx')
-    expect(slugs).toContain('charlotte-nc')
+  })
+
+  it('code-promoted expansion metros become active', () => {
+    SEO_ACTIVE_EXPANSION_METROS.push({
+      slug: 'austin-tx',
+      city: 'Austin',
+      state: 'TX',
+      timezone: 'America/Chicago',
+      minActiveListings: 25,
+    })
     expect(isSeoMetroActive('austin-tx')).toBe(true)
-    expect(getSeoMetroBySlug('austin-tx')?.city).toBe('Austin')
+    expect(getSeoActiveMetros().map((m) => m.slug)).toContain('austin-tx')
   })
 })

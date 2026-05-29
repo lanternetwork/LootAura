@@ -15,11 +15,3 @@ export const SEO_SITE_NAME = 'Loot Aura'
 export function getSeoBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
 }
-
-/**
- * Master kill switch for public indexing / sitemap inclusion (Phase 0).
- * Indexing requires explicit opt-in even when operational gates pass.
- */
-export function isSeoPublicIndexingEnabled(): boolean {
-  return process.env.SEO_PUBLIC_INDEXING_ENABLED === 'true'
-}

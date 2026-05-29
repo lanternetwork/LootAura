@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   evaluateSeoIndexRolloutReadiness,
-  isSeoIndexRolloutReady,
   resolveListingIndexRobots,
   resolveMetroPageRobots,
 } from '@/lib/seo/indexRollout'
-import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
+import { isSeoIndexRolloutReady, SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
 import { enabledSeoRolloutState } from './seoRolloutTestHelpers'

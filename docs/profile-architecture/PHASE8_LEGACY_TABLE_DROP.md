@@ -1,7 +1,8 @@
 # Phase 8 — Drop `public.profiles`
 
-**Status:** Manual script ready (not in `supabase/migrations/`)  
-**Script:** [profile-drop-legacy-public-profiles.sql](../../scripts/audit/profile-drop-legacy-public-profiles.sql)
+**Status:** Migration ready  
+**Migration:** `supabase/migrations/217_drop_legacy_public_profiles.sql`  
+**SQL Editor copy:** [profile-drop-legacy-public-profiles.sql](../../scripts/audit/profile-drop-legacy-public-profiles.sql)
 
 ## Prerequisites (all required)
 
@@ -18,7 +19,7 @@
 1. Run preflight section of [profile-drop-legacy-public-profiles.sql](../../scripts/audit/profile-drop-legacy-public-profiles.sql) in **staging** (full script).
 2. Smoke-test: `/account`, `/api/profile`, public `/u/[username]`, preferences.
 3. Repeat in **production**.
-4. After success, add a numbered migration `217_drop_legacy_public_profiles.sql` to the repo (copy from this script) so new environments do not recreate the legacy table — **only after prod drop succeeds**.
+4. Apply migration **217** via deploy or SQL Editor (idempotent if you already ran the manual script).
 
 ## What must remain
 

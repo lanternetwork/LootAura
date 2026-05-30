@@ -1,9 +1,8 @@
--- Phase 8 — Drop legacy public.profiles
+-- Phase 8: Drop legacy public.profiles after Phase 6 merge (migration 216).
 --
--- Canonical deploy path: supabase/migrations/217_drop_legacy_public_profiles.sql
--- Use this file for one-off runs in SQL Editor (same logic as migration 217).
---
--- PREREQUISITES: migration 216 applied; only_public = 0 (see post-verify SQL).
+-- PREREQUISITES: profile-phase6-post-migration-verify.sql → only_public = 0
+-- Idempotent: no-op if table already dropped (e.g. manual script ran first).
+-- Keeps lootaura_v2.profiles and public.profiles_v2.
 
 DO $$
 DECLARE
@@ -36,10 +35,6 @@ BEGIN
 
   DROP POLICY IF EXISTS "Users manage profile" ON public.profiles;
   DROP TABLE public.profiles CASCADE;
-END $$;
 
--- Confirm removal
-SELECT
-  to_regclass('public.profiles') IS NULL AS legacy_public_profiles_dropped,
-  to_regclass('lootaura_v2.profiles') IS NOT NULL AS v2_profiles_still_exists,
-  to_regclass('public.profiles_v2') IS NOT NULL AS profiles_v2_view_still_exists;
+  RAISE NOTICE 'Phase 8: dropped public.profiles';
+END $$;

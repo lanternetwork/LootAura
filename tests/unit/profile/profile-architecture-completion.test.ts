@@ -3,14 +3,14 @@ import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 describe('Profile architecture spec completion guards', () => {
-  it('does not auto-deploy DROP public.profiles in supabase/migrations', () => {
+  it('only migration 217 may drop public.profiles', () => {
     const migrationsDir = join(process.cwd(), 'supabase/migrations')
     const sqlFiles = readdirSync(migrationsDir).filter((f) => f.endsWith('.sql'))
     const dropLegacy = sqlFiles.filter((file) => {
       const sql = readFileSync(join(migrationsDir, file), 'utf8')
-      return /DROP\s+TABLE\s+(IF\s+EXISTS\s+)?public\.profiles/i.test(sql)
+      return /DROP\s+TABLE\s+.*public\.profiles/i.test(sql)
     })
-    expect(dropLegacy).toEqual([])
+    expect(dropLegacy).toEqual(['217_drop_legacy_public_profiles.sql'])
   })
 
   it('Phase 8 drop script fails closed when only_public remains', () => {

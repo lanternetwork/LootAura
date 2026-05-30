@@ -129,41 +129,24 @@ export async function GET(_req: NextRequest) {
       } else {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.error('[PROFILE] GET update_profile RPC failed:', createRpcError?.message, createRpcError?.code)
-          console.log('[PROFILE] GET trying direct query to base table as last resort')
         }
-        // Even if RPC fails, try to query base table directly as last resort
-        try {
-          // Try to query the base table directly using a simple select
-          // This bypasses RPC and view issues
-          const { data: directData, error: directError } = await sb
-            .from('profiles')
-            .select('id, avatar_url, created_at')
-            .eq('id', user.id)
-            .maybeSingle()
-          if (directData) {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[PROFILE] GET direct query found profile, synthesizing with nulls')
+        const ensured = await ensureLootauraProfileExists()
+        if (ensured.ok) {
+          data = await fetchProfileV2(sb, user.id)
+          if (!data) {
+            try {
+              const { data: rpcData, error: rpcError } = await sb.rpc('get_profile', {
+                p_user_id: user.id,
+              })
+              if (rpcData && !rpcError) {
+                data = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData
+              }
+            } catch {
+              // fail closed — no legacy table fallback
             }
-            data = {
-              ...directData,
-              display_name: null,
-              bio: null,
-              location_city: null,
-              location_region: null,
-              verified: false,
-            }
-          } else {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.error('[PROFILE] GET direct query also failed:', directError?.message)
-            }
-            // Profile doesn't exist and couldn't create it - return 404
-            return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
           }
-        } catch (directE: any) {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.error('[PROFILE] GET direct query exception:', directE?.message || directE)
-          }
-          // Profile doesn't exist and couldn't create it - return 404
+        }
+        if (!data) {
           return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
         }
       }

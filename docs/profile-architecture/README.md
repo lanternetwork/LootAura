@@ -20,8 +20,15 @@ Run production SQL and complete gate before Phase 5 legacy removal.
 | Phase 3: `/account` → `POST /api/profile/update` | Complete |
 | Phase 4: Remove `_actions`, `api/v2/profiles`, `useUpdateProfile` | Complete |
 
+## Phase 5 (this PR)
+
+| Artifact | Status |
+|----------|--------|
+| [PHASE5_LEGACY_READ_WRITE_REMOVAL.md](./PHASE5_LEGACY_READ_WRITE_REMOVAL.md) | Complete |
+
+No `app/**` code uses `.from('profiles')` (legacy `public.profiles`). Phase 1 production gate still recommended before legacy table retirement.
+
 ## Later phases
 
-- Phase 5: Legacy read/write removal (conditional on Phase 1 gate + Phase 6)
-- Phase 6: Data migration (conditional)
+- Phase 6: Data migration (conditional on Phase 1 divergence)
 - Phase 7: Retirement readiness audit

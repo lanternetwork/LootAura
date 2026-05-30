@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { PreferencesSchema } from '@/lib/validators/preferences'
 
 const DEFAULTS = { theme: 'system', email_opt_in: false, units: 'imperial', discovery_radius_km: 10 }
@@ -66,15 +67,16 @@ async function putPreferencesHandler(req: Request) {
     .maybeSingle()
 
   if (error) {
-    // If user_preferences table doesn't exist or has schema issues, fallback to profile.preferences
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.warn('[PREFERENCES] PUT user_preferences failed, falling back to profile.preferences:', error.message)
+      console.warn(
+        '[PREFERENCES] PUT user_preferences failed, falling back to lootaura_v2.profiles:',
+        error.message
+      )
     }
-    
-    // Fallback: Store preferences in profile.preferences JSONB column
-    const { data: profileData, error: profileError } = await sb
-      .from('profiles')
-      .update({ 
+
+    const rls = await getRlsDb()
+    const { data: profileData, error: profileError } = await fromBase(rls, 'profiles')
+      .update({
         preferences: {
           ...parsed.data,
           updated_at: new Date().toISOString(),
@@ -84,26 +86,25 @@ async function putPreferencesHandler(req: Request) {
       .eq('id', user.id)
       .select('preferences')
       .maybeSingle()
-    
+
     if (profileError) {
       const status = profileError.code === '42501' ? 403 : 500
       return NextResponse.json({ ok: false, error: profileError.message }, { status })
     }
-    
-    // Return preferences in the same format as user_preferences table
-    const prefs = profileData?.preferences || parsed.data
+
+    const prefs = (profileData?.preferences as Record<string, unknown>) || parsed.data
     const response = {
-      theme: prefs.theme || parsed.data.theme || DEFAULTS.theme,
-      email_opt_in: prefs.email_opt_in ?? parsed.data.email_opt_in ?? DEFAULTS.email_opt_in,
-      units: prefs.units || parsed.data.units || DEFAULTS.units,
-      discovery_radius_km: prefs.discovery_radius_km ?? parsed.data.discovery_radius_km ?? DEFAULTS.discovery_radius_km,
+      theme: (prefs.theme as string) || parsed.data.theme || DEFAULTS.theme,
+      email_opt_in:
+        (prefs.email_opt_in as boolean) ?? parsed.data.email_opt_in ?? DEFAULTS.email_opt_in,
+      units: (prefs.units as string) || parsed.data.units || DEFAULTS.units,
+      discovery_radius_km:
+        (prefs.discovery_radius_km as number) ??
+        parsed.data.discovery_radius_km ??
+        DEFAULTS.discovery_radius_km,
       updated_at: new Date().toISOString(),
     }
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PREFERENCES] PUT fallback to profile.preferences success')
-    }
-    
+
     return NextResponse.json({ ok: true, data: response })
   }
 

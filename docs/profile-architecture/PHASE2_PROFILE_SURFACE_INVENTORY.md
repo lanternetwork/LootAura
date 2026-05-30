@@ -85,11 +85,9 @@
 
 ---
 
-## Phase 5 backlog (from inventory)
+## Phase 5 — complete
 
-| Phase | Items |
-|-------|--------|
-| **5** | Remove legacy reads/writes in `profile/route.ts`, `u/[username]`, `preferences`, `health` (after Phase 1 gate + optional Phase 6) |
+Legacy `public.profiles` fallbacks removed from `profile/route.ts`, `u/[username]` metadata, `preferences` PUT fallback, and `health/supabase`. See [PHASE5_LEGACY_READ_WRITE_REMOVAL.md](./PHASE5_LEGACY_READ_WRITE_REMOVAL.md). Phase 1 production gate still applies before legacy table drop.
 
 ---
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 
 /**
@@ -45,5 +45,28 @@ describe('Account settings canonical profile path', () => {
     const source = readFileSync(join(process.cwd(), 'lib/hooks/useAuth.ts'), 'utf8')
     expect(source).not.toMatch(/export function useUpdateProfile/)
     expect(source).not.toContain(".from('profiles')")
+  })
+
+  it('app routes do not query legacy public.profiles table', () => {
+    const legacyFromProfiles = /\.from\(['"]profiles['"]\)/
+    const appRoot = join(process.cwd(), 'app')
+
+    function walk(dir: string): string[] {
+      const paths: string[] = []
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name)
+        if (statSync(full).isDirectory()) {
+          paths.push(...walk(full))
+        } else if (name.endsWith('.ts') || name.endsWith('.tsx')) {
+          paths.push(full)
+        }
+      }
+      return paths
+    }
+
+    const offenders = walk(appRoot).filter((file) =>
+      legacyFromProfiles.test(readFileSync(file, 'utf8'))
+    )
+    expect(offenders).toEqual([])
   })
 })

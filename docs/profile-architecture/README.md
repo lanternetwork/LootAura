@@ -36,7 +36,14 @@ No `app/**` code uses `.from('profiles')` (legacy `public.profiles`). Phase 1 pr
 
 **Verdict:** App is retirement-ready; **do not** `DROP public.profiles` until Phase 1 gate (and Phase 6 if needed).
 
-## Later phases
+## Phase 6 (artifact ready — apply after Phase 1 gate)
 
-- Phase 6: Data migration (conditional — run production divergence SQL first)
-- Future: `DROP TABLE public.profiles` migration (separate PR after gates)
+| Artifact | Status |
+|----------|--------|
+| [PHASE6_PUBLIC_TO_V2_MIGRATION.md](./PHASE6_PUBLIC_TO_V2_MIGRATION.md) | Runbook |
+| `supabase/migrations/216_migrate_public_profiles_to_v2.sql` | **Do not apply** until production divergence SQL reviewed |
+| [profile-phase6-post-migration-verify.sql](../../scripts/audit/profile-phase6-post-migration-verify.sql) | Post-apply verify |
+
+## Later
+
+- `DROP TABLE public.profiles` — separate PR after Phase 6 verify + Phase 7 sign-off

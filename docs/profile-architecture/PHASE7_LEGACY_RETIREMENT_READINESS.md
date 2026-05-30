@@ -89,7 +89,7 @@ Migrations `061`, `034`, `062`, `084`, `102+` mention `public.profiles` only for
 | 2 | Phase 5: no app fallback to `public.profiles` | **Done** |
 | 3 | Phase 1 production SQL: `users_only_public` = 0 | **Pending** |
 | 4 | Phase 1: no material field drift in `users_in_both` | **Pending** |
-| 5 | Phase 6: merge public-only rows into v2 (if gate 3/4 fail) | **Not started** |
+| 5 | Phase 6: merge public-only rows into v2 (if gate 3/4 fail) | **SQL ready** — see [PHASE6](./PHASE6_PUBLIC_TO_V2_MIGRATION.md); apply in prod after gate |
 | 6 | Post-migration: re-run divergence SQL — all users visible in v2 | **Pending** |
 | 7 | Observability: no spike in profile 404s / missing avatars after Phase 5 | **Monitor in prod** |
 

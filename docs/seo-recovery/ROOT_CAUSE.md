@@ -91,3 +91,11 @@ Repair: explicit `app/sitemap.xml/route.ts` handler that emits a sitemap index r
 - Add `/sitemap.xml` route handler for sitemap index.
 
 No rollout, robots, qualification, or ingestion changes.
+
+---
+
+## Addendum — Geo-link footprint alignment (Workstream C)
+
+After schema repair, preview audit showed **43/100** listing geo links still dead. Cause: metro discovery used phase4 + `date_end` filters while listing sitemap and geo links derive from all `status = published` sales with city/state.
+
+**Repair:** `discoverSeoMetrosFromPublishedSales()` now uses the same published city/state footprint as the listing sitemap (`applyPublishedSaleCityStateFootprint`). City/weekend **page inventory** still uses phase4 + date filters via `fetchMetroInventory()` — qualification rules unchanged.

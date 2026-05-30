@@ -1,7 +1,6 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
-import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
-import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
+import { applyPublishedSaleCityStateFootprint } from '@/lib/seo/publishedSaleCityStateQuery'
 import type { SeoMetro } from '@/lib/seo/types'
 
 /** Minimum active listings before a metro qualifies for index rollout (nationwide default). */
@@ -95,26 +94,10 @@ function saleRowToMetro(city: string, state: string): SeoMetro {
  */
 export async function discoverSeoMetrosFromPublishedSales(): Promise<SeoMetro[]> {
   const admin = getAdminDb()
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
-  const todayStr = today.toISOString().split('T')[0]
 
-  const runQuery = (includeModeration: boolean) =>
-    applyPhase4PublicPublishedSaleReadFilters(
-      fromBase(admin, T.sales).select('city, state'),
-      { includeModeration }
-    )
-      .not('city', 'is', null)
-      .not('state', 'is', null)
-      .or(`date_end.gte.${todayStr},and(date_end.is.null,date_start.gte.${todayStr})`)
-      .limit(15000)
-
-  let { data, error } = await runQuery(true)
-  if (error && isPostgrestMissingModerationStatusColumn(error)) {
-    const retry = await runQuery(false)
-    data = retry.data
-    error = retry.error
-  }
+  const { data, error } = await applyPublishedSaleCityStateFootprint(
+    fromBase(admin, T.sales).select('city, state')
+  ).limit(15000)
 
   if (error) {
     console.error('[SEO_METRO_DISCOVERY] failed:', error.message)

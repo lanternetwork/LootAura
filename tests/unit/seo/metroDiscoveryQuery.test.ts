@@ -7,33 +7,28 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: (db: { from: typeof mockFrom }, table: string) => db.from(table),
 }))
 
-vi.mock('@/lib/sales/phase4PublicPublishedSaleReadFilters', () => ({
-  applyPhase4PublicPublishedSaleReadFilters: (query: unknown) => query,
-}))
-
-vi.mock('@/lib/sales/isPostgrestMissingModerationStatusColumn', () => ({
-  isPostgrestMissingModerationStatusColumn: () => false,
-}))
-
 describe('discoverSeoMetrosFromPublishedSales query target', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFrom.mockReturnValue({
+    const chain = {
       select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
       not: vi.fn().mockReturnThis(),
-      or: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({
         data: [{ city: 'Louisville', state: 'KY' }],
         error: null,
       }),
-    })
+    }
+    mockFrom.mockReturnValue(chain)
   })
 
-  it('queries lootaura_v2.sales (not public.sales_v2 view)', async () => {
+  it('queries lootaura_v2.sales with published city/state footprint', async () => {
     const { discoverSeoMetrosFromPublishedSales } = await import('@/lib/seo/metroCatalog')
     const metros = await discoverSeoMetrosFromPublishedSales()
 
     expect(mockFrom).toHaveBeenCalledWith('sales')
+    const chain = mockFrom.mock.results[0]?.value
+    expect(chain.eq).toHaveBeenCalledWith('status', 'published')
     expect(metros.map((m) => m.slug)).toContain('louisville-ky')
   })
 })

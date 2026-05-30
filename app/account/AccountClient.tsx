@@ -2,29 +2,54 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateProfile, type ProfileUpdateInput } from './_actions'
+import { useQueryClient } from '@tanstack/react-query'
 import { User } from '@supabase/supabase-js'
 import { Profile } from '@/lib/types'
 import AccountSecuritySection from '@/components/account/AccountSecuritySection'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface AccountClientProps {
   user: User | null
   profile: Profile | null
 }
 
+type ProfileFormData = {
+  display_name: string
+  avatar_url: string
+  bio: string
+}
+
+function mapApiValidationToFieldErrors(
+  details: unknown
+): Record<string, string[]> | null {
+  if (!details || typeof details !== 'object') return null
+  const issues = (details as { issues?: Array<{ path: (string | number)[]; message: string }> })
+    .issues
+  if (!Array.isArray(issues)) return null
+  const fieldErrors: Record<string, string[]> = {}
+  for (const issue of issues) {
+    const key = issue.path?.[0]
+    if (typeof key === 'string') {
+      fieldErrors[key] = [issue.message]
+    }
+  }
+  return Object.keys(fieldErrors).length > 0 ? fieldErrors : null
+}
+
 export default function AccountClient({ user, profile }: AccountClientProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [isPending, startTransition] = useTransition()
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProfileFormData>({
     display_name: profile?.display_name || '',
     avatar_url: profile?.avatar_url || '',
-    bio: profile?.bio || ''
+    bio: profile?.bio || '',
   })
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  const handleInputChange = (field: keyof ProfileFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,18 +59,46 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
 
     startTransition(async () => {
       try {
-        const result = await updateProfile(formData as ProfileUpdateInput)
-
-        if (result.success) {
-          setMessage({ type: 'success', text: 'Profile updated successfully!' })
-        } else {
-          if (result.fieldErrors) {
-            setFieldErrors(result.fieldErrors)
-          } else {
-            setMessage({ type: 'error', text: result.error || 'Failed to update profile' })
-          }
+        const payload = {
+          display_name: formData.display_name.trim() || undefined,
+          avatar_url: formData.avatar_url.trim() || null,
+          bio: formData.bio.trim() || '',
         }
-      } catch (error) {
+
+        const response = await fetch('/api/profile/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getCsrfHeaders(),
+          },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+
+        const result = (await response.json()) as {
+          ok?: boolean
+          error?: string
+          details?: unknown
+        }
+
+        if (!response.ok || result.ok === false) {
+          const mapped = mapApiValidationToFieldErrors(result.details)
+          if (mapped) {
+            setFieldErrors(mapped)
+          } else {
+            setMessage({
+              type: 'error',
+              text: result.error || 'We could not save your profile changes. Please try again.',
+            })
+          }
+          return
+        }
+
+        if (user?.id) {
+          await queryClient.invalidateQueries({ queryKey: ['profile', user.id] })
+        }
+        setMessage({ type: 'success', text: 'Profile updated successfully!' })
+      } catch {
         setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
       }
     })
@@ -80,7 +133,7 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg shadow-sm p-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Profile Information</h2>
-            
+
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Avatar */}
               <div>
@@ -160,11 +213,13 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
 
               {/* Message */}
               {message && (
-                <div className={`p-4 rounded-lg ${
-                  message.type === 'success' 
-                    ? 'bg-green-50 text-green-700 border border-green-200' 
-                    : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
+                <div
+                  className={`p-4 rounded-lg ${
+                    message.type === 'success'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}
+                >
                   {message.text}
                 </div>
               )}
@@ -216,7 +271,7 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
                   {new Date(user?.created_at || '').toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
-                    day: 'numeric'
+                    day: 'numeric',
                   })}
                 </p>
               </div>
@@ -236,7 +291,7 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
                 </svg>
                 My Favorites
               </a>
-              
+
               <a
                 href="/sell/new"
                 className="block w-full text-left px-4 py-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors min-h-[44px] flex items-center"
@@ -246,7 +301,7 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
                 </svg>
                 List a Sale
               </a>
-              
+
               <a
                 href="/sales"
                 className="block w-full text-left px-4 py-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors min-h-[44px] flex items-center"

@@ -12,17 +12,23 @@ import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import { isDebugEnabled } from '@/lib/debug'
 import { displayAddress } from '@/lib/display/address'
 import { formatDateOnly } from '@/lib/display/date'
+import {
+  getMarketplaceDistanceFromUserLabel,
+  type UserMapCoordinates,
+} from '@/lib/map/formatMarketplaceDistanceFromUser'
 
 interface SaleCardProps {
   sale: Sale
   className?: string
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
+  userLocation?: UserMapCoordinates | null
 }
 
-export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
+export default function SaleCard({ sale, className, viewport, userLocation }: SaleCardProps) {
   if (!sale) return null
   const cover = getSaleCoverUrl(sale)
   const saleAddressDisplay = displayAddress(sale.address, sale.city, sale.state)
+  const distanceFromUser = getMarketplaceDistanceFromUserLabel(userLocation, sale)
   
   // Debug: log cover image resolution
   if (!cover && isDebugEnabled) {
@@ -148,6 +154,11 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
             </div>
           )}
         </div>
+        {distanceFromUser && (
+          <p className="text-xs text-neutral-500" data-testid="sale-card-distance-from-user">
+            {distanceFromUser}
+          </p>
+        )}
         {sale?.date_start && (
           <div className="text-xs text-neutral-600">
             {sale.date_end && sale.date_end !== sale.date_start ? (

@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Profile, Sale } from '@/lib/types'
-import { ProfileSchema } from '@/lib/zodSchemas'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
 const sb = createSupabaseBrowserClient()
@@ -59,39 +58,6 @@ export function useProfile() {
       return data as Profile | null
     },
     enabled: !!user,
-  })
-}
-
-export function useUpdateProfile() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (profileData: Partial<Profile>) => {
-      const { data: { user } } = await sb.auth.getUser()
-      if (!user) {
-        throw new Error('Not authenticated')
-      }
-
-      const parsed = ProfileSchema.partial().safeParse(profileData)
-      if (!parsed.success) {
-        throw new Error('Invalid profile data')
-      }
-
-      const { data, error } = await sb
-        .from('profiles')
-        .upsert({ id: user.id, ...parsed.data })
-        .select()
-        .single()
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      return data as Profile
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] })
-    },
   })
 }
 

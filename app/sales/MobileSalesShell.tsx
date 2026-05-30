@@ -53,9 +53,9 @@ interface MobileSalesShellProps {
   // Hybrid result for location-based pin selection
   hybridResult?: HybridPinsResult | null
   
-  // User location for recenter button visibility
-  userLocation: { lat: number; lng: number } | null
-  
+  // User location for map marker (render-only; from SalesClient lastUserLocation)
+  lastUserLocation: { lat: number; lng: number; source: 'gps' | 'ip'; timestamp: number } | null
+
   // Callback for user-initiated GPS (bypasses authority guard)
   // Receives location and optional map instance for imperative recentering
   onUserLocationRequest: (location: { lat: number; lng: number }, mapInstance?: any, source?: 'gps' | 'ip') => void
@@ -95,7 +95,7 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters,
   hybridResult,
-  userLocation: _userLocation, // Unused - we use actualUserLocation (GPS) instead of userLocation prop (map center)
+  lastUserLocation,
   onUserLocationRequest, // Callback for user-initiated GPS (bypasses authority guard)
   shouldShowLocationIcon // Visibility flag computed in SalesClient
 }: MobileSalesShellProps) {
@@ -492,6 +492,11 @@ export default function MobileSalesShell({
               attributionControl={false}
               interactive={mode === 'map'}
               skipCenteringOnClick={true}
+              lastUserLocation={
+                lastUserLocation
+                  ? { lat: lastUserLocation.lat, lng: lastUserLocation.lng }
+                  : null
+              }
             />
             
             {/* Floating Action Buttons */}
@@ -565,6 +570,11 @@ export default function MobileSalesShell({
                 onDismiss={() => onLocationClick(selectedPinId || '')}
                 viewport={mapViewport}
                 pinPosition={pinPosition}
+                userLocation={
+                  lastUserLocation
+                    ? { lat: lastUserLocation.lat, lng: lastUserLocation.lng }
+                    : null
+                }
               />
             )}
           </div>
@@ -652,6 +662,11 @@ export default function MobileSalesShell({
                   _mode="grid" 
                   viewport={mapViewport || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }}
                   isLoading={loading}
+                  userLocation={
+                    lastUserLocation
+                      ? { lat: lastUserLocation.lat, lng: lastUserLocation.lng }
+                      : null
+                  }
                 />
               </div>
             )}

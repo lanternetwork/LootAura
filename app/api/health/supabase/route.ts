@@ -43,10 +43,10 @@ export async function GET(request: NextRequest) {
       .select('count')
       .limit(1)
 
-    // Test service role client
+    // Test service role client against canonical v2 read surface (not legacy public.profiles)
     const serviceClient = createClient(supabaseUrl, serviceRoleKey)
     const { error: serviceError } = await serviceClient
-      .from('profiles')
+      .from('profiles_v2')
       .select('count')
       .limit(1)
 

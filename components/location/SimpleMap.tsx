@@ -8,6 +8,8 @@ import { PinsProps, HybridPinsProps } from "@/lib/pins/types"
 import PinsOverlay from "./PinsOverlay"
 import HybridPinsOverlay from "./HybridPinsOverlay"
 import AttributionOSM from "./AttributionOSM"
+import UserLocationMarker from '@/components/map/UserLocationMarker'
+import { isValidUserMapCoordinate } from '@/lib/map/isValidUserMapCoordinate'
 import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 
 interface SimpleMapProps {
@@ -42,6 +44,8 @@ interface SimpleMapProps {
   bottomSheetHeight?: number // Height of bottom sheet in pixels (for mobile) - used for map resizing and pin centering offset
   skipCenteringOnClick?: boolean // Skip centering behavior and immediately select on first click (for mobile)
   onMapClick?: () => void // Callback when map is clicked (not on pins/markers)
+  /** Render-only user position from SalesClient lastUserLocation (Phase 1). */
+  lastUserLocation?: { lat: number; lng: number } | null
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -67,7 +71,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   attributionControl = true,
   bottomSheetHeight = 0,
   skipCenteringOnClick = false,
-  onMapClick
+  onMapClick,
+  lastUserLocation = null,
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -737,6 +742,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
               />
             ))
         )}
+
+        {lastUserLocation &&
+          isValidUserMapCoordinate(lastUserLocation.lat, lastUserLocation.lng) && (
+            <UserLocationMarker lat={lastUserLocation.lat} lng={lastUserLocation.lng} />
+          )}
         
         {/* Selected sale popup */}
         {selectedSaleId && (

@@ -31,22 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
     ? await supabase.from('profiles_v2').select('display_name, bio, avatar_url, username').eq('id', slug).maybeSingle()
     : await supabase.from('profiles_v2').select('display_name, bio, avatar_url, username').eq('username', slug).maybeSingle()
   
-  let profile = prof.data as any
-  if (!profile) {
-    // Fallback to base table if view has not materialized yet
-    const byTable = isUUID
-      ? await supabase.from('profiles').select('id, created_at').eq('id', slug).maybeSingle()
-      : await supabase.from('profiles_v2').select('id, username, created_at').eq('username', slug).maybeSingle()
-    if (byTable.data) {
-      const username = isUUID ? null : (byTable.data as any).username ?? null
-      profile = {
-        username,
-        display_name: null,
-        bio: null,
-        avatar_url: null,
-      }
-    }
-  }
+  const profile = prof.data as any
   if (!profile) {
     return createPageMetadata({ title: 'User Not Found', path: `/u/${slug}` })
   }

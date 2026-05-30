@@ -18,7 +18,7 @@ describe('GET /api/admin/seo/metro-inventory', () => {
   it('returns metros and inventory when admin authorized', async () => {
     const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
     const { fetchNationwideSeoMetroInventory } = await import('@/lib/seo/fetchAllSeoMetroInventory')
-    vi.mocked(assertAdminOrThrow).mockResolvedValue(undefined)
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1', email: 'admin@test.com' } })
     vi.mocked(fetchNationwideSeoMetroInventory).mockResolvedValue({
       metros: [TEST_SEO_METRO_DALLAS],
       inventoryBySlug: {

@@ -40,6 +40,7 @@ describe('fetchMetroInventory query target', () => {
       select: vi.fn().mockReturnThis(),
       ilike: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       or: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({

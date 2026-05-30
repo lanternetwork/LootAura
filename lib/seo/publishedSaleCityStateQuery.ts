@@ -5,6 +5,5 @@
  * Inventory on city/weekend pages still uses phase4 + date filters separately.
  */
 export function applyPublishedSaleCityStateFootprint<T>(query: T): T {
-  let q = (query as any).eq('status', 'published').not('city', 'is', null).not('state', 'is', null)
-  return q as T
+  return (query as any).eq('status', 'published').not('city', 'is', null).not('state', 'is', null) as T
 }

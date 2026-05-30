@@ -9,6 +9,7 @@ describe('migration 216 public profiles to v2', () => {
   )
 
   it('merges into lootaura_v2.profiles without dropping legacy table', () => {
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS bio')
     expect(sql).toContain('INSERT INTO lootaura_v2.profiles')
     expect(sql).toContain('FROM public.profiles')
     expect(sql).toContain('UPDATE lootaura_v2.profiles')

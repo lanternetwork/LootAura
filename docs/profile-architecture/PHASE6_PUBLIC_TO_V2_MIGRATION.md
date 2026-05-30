@@ -15,6 +15,7 @@ Phase 5 app code is already live without `public.profiles` fallbacks. If `only_p
 
 ## What the migration does
 
+0. **Bootstrap** optional `public.profiles` columns (`bio`, `location_*`, `updated_at`) if migration 061 never ran in production.
 1. **Insert** rows present only in `public.profiles` into `lootaura_v2.profiles` (`ON CONFLICT DO NOTHING`).
 2. **Merge** rows in both tables:
    - If `public.updated_at` is strictly newer → take non-null public field values.

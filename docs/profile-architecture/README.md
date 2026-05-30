@@ -44,6 +44,13 @@ No `app/**` code uses `.from('profiles')` (legacy `public.profiles`). Phase 1 pr
 | `supabase/migrations/216_migrate_public_profiles_to_v2.sql` | **Do not apply** until production divergence SQL reviewed |
 | [profile-phase6-post-migration-verify.sql](../../scripts/audit/profile-phase6-post-migration-verify.sql) | Post-apply verify |
 
-## Later
+## Phase 8 (manual — after Phase 6 verify)
 
-- `DROP TABLE public.profiles` — separate PR after Phase 6 verify + Phase 7 sign-off
+| Artifact | Status |
+|----------|--------|
+| [PHASE8_LEGACY_TABLE_DROP.md](./PHASE8_LEGACY_TABLE_DROP.md) | Runbook |
+| [profile-drop-legacy-public-profiles.sql](../../scripts/audit/profile-drop-legacy-public-profiles.sql) | **Manual SQL only** (not in `supabase/migrations/` until prod drop succeeds) |
+
+## Spec complete
+
+See [SPEC_COMPLETION.md](./SPEC_COMPLETION.md) for operator checklist. No further application phases planned on this branch.

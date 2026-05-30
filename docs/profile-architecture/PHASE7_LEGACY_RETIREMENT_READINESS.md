@@ -53,7 +53,7 @@ Confirm whether `public.profiles` can be dropped safely. **This phase does not d
 
 | Symbol | Location | Notes |
 |--------|----------|-------|
-| `T.profiles` | `lib/supabase/tables.ts` | No remaining imports in `app/` or `lib/` |
+| `T.profiles` | `lib/supabase/tables.ts` | **Removed** (Phase 8) |
 
 ---
 

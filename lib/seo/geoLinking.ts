@@ -39,8 +39,8 @@ export function getNearbyPilotMetros(metro: SeoMetro, allMetros: SeoMetro[], lim
   return getNearbyMetros(metro, allMetros, limit)
 }
 
-export function buildListingGeoLinks(sale: Sale): ListingGeoLinks {
-  const metro = resolveSeoMetroForSale(sale)
+export function buildListingGeoLinks(sale: Sale, metros?: SeoMetro[]): ListingGeoLinks {
+  const metro = resolveSeoMetroForSale(sale, metros)
   if (!metro) {
     return { metro: null, city: null, weekend: null, nearbyMetros: [] }
   }
@@ -75,12 +75,15 @@ export function buildMetroGeoLinks(metro: SeoMetro, allMetros: SeoMetro[]): Metr
   }
 }
 
-export function buildListingBreadcrumbItems(sale: Sale): Array<{ name: string; url: string }> {
+export function buildListingBreadcrumbItems(
+  sale: Sale,
+  metros?: SeoMetro[]
+): Array<{ name: string; url: string }> {
   const items = [
     { name: 'Home', url: '/' },
     { name: 'Sales', url: '/sales' },
   ]
-  const geo = buildListingGeoLinks(sale)
+  const geo = buildListingGeoLinks(sale, metros)
   if (geo.city) {
     items.push({ name: geo.metro!.city, url: geo.city.href })
   }

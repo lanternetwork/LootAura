@@ -130,7 +130,7 @@ export function resolveSeoMetroForSale(
   if (!sale.city?.trim() || !sale.state?.trim()) return null
   const slug = buildMetroSlug(sale.city, sale.state)
   if (metros) {
-    return getSeoMetroBySlug(metros, slug) ?? saleRowToMetro(sale.city, sale.state)
+    return getSeoMetroBySlug(metros, slug) ?? null
   }
   return saleRowToMetro(sale.city, sale.state)
 }

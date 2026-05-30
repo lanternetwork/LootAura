@@ -99,3 +99,5 @@ No rollout, robots, qualification, or ingestion changes.
 After schema repair, preview audit showed **43/100** listing geo links still dead. Cause: metro discovery used phase4 + `date_end` filters while listing sitemap and geo links derive from all `status = published` sales with city/state.
 
 **Repair:** `discoverSeoMetrosFromPublishedSales()` now uses the same published city/state footprint as the listing sitemap (`applyPublishedSaleCityStateFootprint`). City/weekend **page inventory** still uses phase4 + date filters via `fetchMetroInventory()` — qualification rules unchanged.
+
+**Geo-link emission:** Listing pages pass the live metro catalog into `buildListingGeoLinks()`. `resolveSeoMetroForSale(sale, metros)` returns a metro only when the slug exists in the catalog, so emitted geo links always resolve.

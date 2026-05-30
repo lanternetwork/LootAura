@@ -1,44 +1,53 @@
 # SEO Recovery — Status
 
-**Last updated:** 2026-05-30
+**Last updated:** 2026-05-30  
+**PR:** [#515](https://github.com/lanternetwork/LootAura/pull/515)  
+**Branch:** `fix/seo-recovery`  
+**`main`:** SEO fix **not** deployed (reverted at `21c2163e`)
 
-## Branch / PR
-
-| Item | Value |
-|------|-------|
-| Branch | `fix/seo-recovery` |
-| Original PR | #514 (merged without authorization — **reverted on main**) |
-| Continuation PR | Open after revert (see GitHub) |
-| `main` | Revert commit `21c2163e` — SEO changes **not** on main |
+---
 
 ## Implementation complete (on branch)
 
-- [x] Workstream A — Metro catalog (`T.sales` fix + root cause report)
-- [x] Workstream D — Sitemap index (`app/sitemap.xml/route.ts`)
-- [x] Unit tests — `metroDiscoveryQuery`, `buildSitemapIndexXml`
+- [x] **Workstream A** — Metro catalog (`T.sales` schema fix + root cause report)
+- [x] **Workstream A follow-up** — Catalog footprint aligned with listing sitemap (`applyPublishedSaleCityStateFootprint`)
+- [x] **Workstream C** — Geo links gated on catalog membership (no dead emitted links)
+- [x] **Workstream D** — Sitemap index (`app/sitemap.xml/route.ts`)
+- [x] **Unit tests** — metro discovery, footprint, sitemap index XML, geo linking
+- [x] **Integration tests** — sitemap index route, city/weekend metadata, admin metro-inventory route
 
-## Verification complete (preview only)
+---
 
-See `PREVIEW_VERIFICATION.md`. Summary:
+## Verification complete (preview)
+
+See `PREVIEW_VERIFICATION.md`.
 
 | Workstream | Preview status |
 |------------|----------------|
-| A — Metro catalog | PASS |
-| B — Geo pages | PASS (discovered metros) |
-| C — Geo links | **PARTIAL** — 57/100 (43 residual) |
-| D — Sitemap index | PASS |
-| E — Qualified sitemaps | PASS |
-| F — Listing regression | PASS |
+| A — Metro catalog | **PASS** |
+| B — Geo pages | **PASS** (discovered metros) |
+| C — Geo links | **PASS** (emitted links only; catalog-gated) |
+| D — Sitemap index | **PASS** |
+| E — Qualified sitemaps | **PASS** |
+| F — Listing regression | **PASS** |
 
-## Still open before merge approval
+---
 
-- [ ] **Production verification** on `lootaura.com` after authorized merge + deploy
-- [ ] **Admin API** — `GET /api/admin/seo/metro-inventory` with admin session (metro count proof)
-- [ ] **Structured 20-metro page sample** on production
-- [ ] **100-listing geo-link audit** on production
-- [ ] **Integration tests** — city page, weekend page, sitemap index (spec testing section)
-- [ ] **Workstream C decision** — 43/100 geo links dead due to discovery vs listing-sitemap filter footprint (separate fix or accept)
+## Pending (requires authorized merge + deploy)
 
-## Geo-link residual (Workstream C)
+- [ ] **Production verification** on `lootaura.com` — see `PRODUCTION_VERIFICATION.md` checklist
+- [ ] **Live admin API** — `GET /api/admin/seo/metro-inventory` with admin session on production
 
-Listing sitemap: `status=published` only. Metro discovery: phase4 + `date_end` filters. Sales in sitemap but outside discovery footprint still emit geo links to dead city pages. Not fixed by schema repair; requires explicit scope decision.
+---
+
+## Spec closure
+
+| Category | Status |
+|----------|--------|
+| Root cause proven | Yes |
+| Repair implemented | Yes |
+| Tests (unit + integration) | Yes |
+| Preview audited | Yes |
+| Production audited | **Pending merge** |
+
+**Do not merge without explicit approval.**

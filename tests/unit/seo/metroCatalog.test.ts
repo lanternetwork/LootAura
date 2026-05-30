@@ -23,6 +23,7 @@ describe('metroCatalog', () => {
   it('resolves metro identity from sale city/state without allowlist', () => {
     expect(resolveSeoMetroForSale({ city: 'Dallas', state: 'TX' })?.slug).toBe('dallas-tx')
     expect(resolveSeoMetroForSale({ city: 'Dallas', state: 'TX' }, metros)?.slug).toBe('dallas-tx')
+    expect(resolveSeoMetroForSale({ city: 'Unknown', state: 'ZZ' }, metros)).toBeNull()
     expect(resolveSeoMetroForSale({ city: '', state: 'TX' })).toBeNull()
   })
 

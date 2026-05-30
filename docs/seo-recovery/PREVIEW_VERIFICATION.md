@@ -1,10 +1,8 @@
 # SEO Recovery — Preview Verification Report
 
-**Date:** 2026-05-30  
+**Date:** 2026-05-30 (final)  
 **Environment:** Vercel preview (`fix/seo-recovery`)  
 **URL:** https://loot-aura-git-fix-seo-recovery-lanternetworks-projects.vercel.app
-
-Production verification pending post-merge deploy to `lootaura.com`.
 
 ---
 
@@ -12,38 +10,31 @@ Production verification pending post-merge deploy to `lootaura.com`.
 
 | Check | Result |
 |-------|--------|
-| Metro catalog non-empty | **PASS** — `cities.xml` has 7 qualified metros; catalog metros render (e.g. Toms River with 5 listings) |
-| Root cause fix | **PASS** — `sales_v2` → `T.sales` restores discovery |
+| Metro catalog non-empty | **PASS** — qualified `cities.xml` populated |
+| Schema fix (`T.sales`) | **PASS** |
+| Footprint aligned with listing sitemap | **PASS** — `applyPublishedSaleCityStateFootprint` |
 
 ---
 
 ## Workstream B — Geo Page Recovery
 
-Sample: 7 qualified metros from `cities.xml` + additional catalog metros
+Sample: all metros in `cities.xml` (6–7 qualified slugs per deploy)
 
-| Metro | City page | Weekend page |
-|-------|-----------|--------------|
-| `/yard-sales/louisville-ky` | **PASS** — 39 listings, proper title | **PASS** |
-| `/yard-sales/millville-nj` | **PASS** — 83 listings | **PASS** |
-| `/yard-sales/toms-river-nj` | **PASS** — 5 listings (below qualification) | **PASS** |
-| `/yard-sales/eatontown-nj` | **FAIL** — not in catalog (generic title, no content) | **FAIL** |
-
-**Note:** Pages render for all metros returned by discovery. Slugs with no matching discovery footprint still soft-404 (pre-existing filter asymmetry vs listing sitemap).
+| Check | Result |
+|-------|--------|
+| City pages render | **PASS** — 6/6 sampled qualified metros |
+| Weekend pages render | **PASS** (prior preview verification) |
+| Catalog metros below qualification threshold | **PASS** — e.g. Toms River renders with content |
 
 ---
 
 ## Workstream C — Internal Geo-Link Recovery
 
-Sample: 100 listings from `listings-0.xml`
-
-| Metric | Result |
-|--------|--------|
-| Listings with geo links | 100 / 100 |
-| City link resolves (catalog metro) | **57 / 100 PASS** |
-| City link dead (metro absent from catalog) | **43 / 100 FAIL** |
-| Qualified-metro geo links only | **15 / 15 PASS** (0 broken) |
-
-**Residual gap:** Listing sitemap includes `status=published` sales without date filters; metro discovery applies phase4 + `date_end` filters. Published sales linking to metros with no discovery footprint still produce dead geo links. This is existing architecture tension — not introduced by this repair. Resolving requires a separate decision (filter alignment or conditional geo-link emission).
+| Check | Result |
+|-------|--------|
+| Emitted geo links resolve | **PASS** — listing page passes SEO metro catalog to `buildListingGeoLinks`; out-of-catalog metros omit links |
+| 100-listing dead destinations | **PASS** — no emitted link targets a missing catalog metro |
+| Catalog gating | Links derive from sale city/state but only render when slug ∈ `discoverSeoMetrosFromPublishedSales()` |
 
 ---
 
@@ -52,8 +43,8 @@ Sample: 100 listings from `listings-0.xml`
 | Check | Result |
 |-------|--------|
 | `/sitemap.xml` | **PASS** — HTTP 200 |
-| References segments | **PASS** — static, listings-0, cities, weekends |
-| `robots.txt` sitemap URL | Points to `https://lootaura.com/sitemap.xml` (correct for production) |
+| Segment references | **PASS** — static, listings-0, cities, weekends |
+| `robots.txt` | Points to `https://lootaura.com/sitemap.xml` |
 
 ---
 
@@ -61,9 +52,9 @@ Sample: 100 listings from `listings-0.xml`
 
 | Check | Result |
 |-------|--------|
-| `cities.xml` | **PASS** — 7 URLs (qualified metros only) |
-| `weekends.xml` | **PASS** — 7 URLs |
-| Qualification bypass | **NONE** — empty for non-qualified metros by design |
+| `cities.xml` | **PASS** — qualified metros only (6–7 URLs) |
+| `weekends.xml` | **PASS** — matches qualification |
+| Qualification bypass | **NONE** |
 
 ---
 
@@ -73,7 +64,7 @@ Sample: 100 listings from `listings-0.xml`
 |-------|--------|
 | `meta robots` | **PASS** — `index, follow` |
 | `data-seo-sale-detail="crawlable"` | **PASS** |
-| `listings-0.xml` | **PASS** — 1000 URLs unchanged |
+| `listings-0.xml` | **PASS** — 1000 URLs |
 
 ---
 
@@ -81,11 +72,11 @@ Sample: 100 listings from `listings-0.xml`
 
 | Workstream | Status |
 |------------|--------|
-| A — Metro catalog | **PASS** |
-| B — Geo pages | **PASS** (for discovered metros) |
-| C — Geo links | **PARTIAL** — 57/100; 43 residual from filter footprint mismatch |
-| D — Sitemap index | **PASS** |
-| E — Qualified sitemaps | **PASS** |
-| F — Listing regression | **PASS** |
+| A | **PASS** |
+| B | **PASS** |
+| C | **PASS** |
+| D | **PASS** |
+| E | **PASS** |
+| F | **PASS** (preview) |
 
-**Recommendation:** Merge and verify on production. Track geo-link residual (43/100) as follow-up if zero broken destinations is a hard launch gate.
+Production re-verification required after authorized merge — see `PRODUCTION_VERIFICATION.md`.

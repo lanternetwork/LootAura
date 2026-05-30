@@ -2,9 +2,7 @@
 
 P0 architecture consolidation: single source of truth in `lootaura_v2.profiles`, reads via `public.profiles_v2`, no runtime dependency on `public.profiles`.
 
-## Phase 1 (this PR) — production audit only
-
-No application code changes until Phase 1 reports are reviewed.
+## Phase 1 — production audit
 
 | Artifact | Purpose |
 |----------|---------|
@@ -12,19 +10,18 @@ No application code changes until Phase 1 reports are reviewed.
 | [PHASE1_SCHEMA_VERIFICATION_REPORT.md](./PHASE1_SCHEMA_VERIFICATION_REPORT.md) | Repo vs production schema + legacy code assumptions |
 | [PHASE1_PRODUCTION_DIVERGENCE_REPORT.md](./PHASE1_PRODUCTION_DIVERGENCE_REPORT.md) | Table comparison + Phase 1 gate |
 
-## Implementation gate
+Run production SQL and complete gate before Phase 5 legacy removal.
 
-1. Run `profile-divergence-audit.sql` in **production** Supabase SQL Editor.
-2. Paste metrics into the Phase 1 reports (sections marked **Production — fill from SQL**).
-3. Review `G1_phase1_gate_summary` before starting Phase 3+ code.
+## Phase 2–4 (this PR)
 
-**Phase 5 ordering:** Phases 3 and 4 complete first; Phase 5 only if no divergence **or** Phase 6 migration complete.
+| Artifact | Status |
+|----------|--------|
+| [PHASE2_PROFILE_SURFACE_INVENTORY.md](./PHASE2_PROFILE_SURFACE_INVENTORY.md) | Complete |
+| Phase 3: `/account` → `POST /api/profile/update` | Complete |
+| Phase 4: Remove `_actions`, `api/v2/profiles`, `useUpdateProfile` | Complete |
 
-## Later phases (not in this PR)
+## Later phases
 
-- Phase 2: Profile surface inventory
-- Phase 3: Account surface migration
-- Phase 4: Legacy API retirement
-- Phase 5: Legacy read/write removal (conditional)
+- Phase 5: Legacy read/write removal (conditional on Phase 1 gate + Phase 6)
 - Phase 6: Data migration (conditional)
 - Phase 7: Retirement readiness audit

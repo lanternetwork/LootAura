@@ -20,7 +20,7 @@ describe('Profile architecture spec completion guards', () => {
     )
     expect(sql).toContain('only_public')
     expect(sql).toContain('RAISE EXCEPTION')
-    expect(sql).toContain('DROP TABLE IF EXISTS public.profiles')
+    expect(sql).toMatch(/DROP TABLE public\.profiles/)
   })
 
   it('T table constant no longer exposes legacy profiles name', () => {

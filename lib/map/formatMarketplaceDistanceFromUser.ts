@@ -4,18 +4,21 @@ import { isValidUserMapCoordinate } from '@/lib/map/isValidUserMapCoordinate'
 
 export type UserMapCoordinates = { lat: number; lng: number }
 
+const METERS_PER_MILE = 1609.344
+const NEARBY_MAX_METERS = 0.1 * METERS_PER_MILE
+const LONG_DISTANCE_MIN_METERS = 100 * METERS_PER_MILE
+
 /** Format user→sale distance for marketplace cards and callouts. */
 export function formatMarketplaceDistanceFromUserMeters(meters: number): string {
-  const miles = metersToMiles(meters)
-
-  if (miles < 0.1) {
+  if (meters < NEARBY_MAX_METERS) {
     return 'Nearby'
   }
 
-  if (miles >= 100) {
-    return `${Math.round(miles)} mi away`
+  if (meters >= LONG_DISTANCE_MIN_METERS) {
+    return `${Math.round(metersToMiles(meters))} mi away`
   }
 
+  const miles = metersToMiles(meters)
   const rounded = Math.round(miles * 10) / 10
   return `${rounded.toFixed(1)} mi away`
 }
@@ -29,12 +32,15 @@ export function getMarketplaceDistanceFromUserLabel(
     return null
   }
 
-  const saleLat = sale.lat
-  const saleLng = sale.lng
-  if (!isValidUserMapCoordinate(saleLat, saleLng)) {
+  if (!isValidUserMapCoordinate(sale.lat, sale.lng)) {
     return null
   }
 
-  const meters = haversineMeters(userLocation.lat, userLocation.lng, saleLat, saleLng)
+  const meters = haversineMeters(
+    userLocation.lat,
+    userLocation.lng,
+    sale.lat as number,
+    sale.lng as number
+  )
   return formatMarketplaceDistanceFromUserMeters(meters)
 }

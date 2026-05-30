@@ -13,8 +13,10 @@ import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import { displayAddress } from '@/lib/display/address'
 import { formatDateOnly } from '@/lib/display/date'
 import { isTrustedNextImageHost } from '@/lib/images/isTrustedNextImageHost'
-import { getMarketplaceDistanceFromUserLabel } from '@/lib/map/formatMarketplaceDistanceFromUser'
-import type { UserMapCoordinates } from '@/lib/map/formatMarketplaceDistanceFromUser'
+import {
+  getMarketplaceDistanceFromUserLabel,
+  type UserMapCoordinates,
+} from '@/lib/map/formatMarketplaceDistanceFromUser'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null

@@ -12,8 +12,10 @@ import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import { isDebugEnabled } from '@/lib/debug'
 import { displayAddress } from '@/lib/display/address'
 import { formatDateOnly } from '@/lib/display/date'
-import { getMarketplaceDistanceFromUserLabel } from '@/lib/map/formatMarketplaceDistanceFromUser'
-import type { UserMapCoordinates } from '@/lib/map/formatMarketplaceDistanceFromUser'
+import {
+  getMarketplaceDistanceFromUserLabel,
+  type UserMapCoordinates,
+} from '@/lib/map/formatMarketplaceDistanceFromUser'
 
 interface SaleCardProps {
   sale: Sale

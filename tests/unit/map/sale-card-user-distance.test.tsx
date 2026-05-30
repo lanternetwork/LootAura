@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import SaleCard from '@/components/SaleCard'
-import { makeSale } from '../_helpers/factories'
+import { makeSale } from '../../_helpers/factories'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),

@@ -1,4 +1,5 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import { T } from '@/lib/supabase/tables'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 import type { SeoMetro } from '@/lib/seo/types'
@@ -100,7 +101,7 @@ export async function discoverSeoMetrosFromPublishedSales(): Promise<SeoMetro[]>
 
   const runQuery = (includeModeration: boolean) =>
     applyPhase4PublicPublishedSaleReadFilters(
-      fromBase(admin, 'sales_v2').select('city, state'),
+      fromBase(admin, T.sales).select('city, state'),
       { includeModeration }
     )
       .not('city', 'is', null)

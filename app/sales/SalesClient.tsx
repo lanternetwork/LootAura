@@ -2668,7 +2668,7 @@ export default function SalesClient({
           zipError={zipError}
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
           hybridResult={hybridResult}
-          userLocation={effectiveCenter || null}
+          lastUserLocation={lastUserLocation}
           onUserLocationRequest={handleUserLocationRequest}
           shouldShowLocationIcon={shouldShowLocationIcon}
         />
@@ -2734,6 +2734,7 @@ export default function SalesClient({
                       duration: 300, // Smooth transition
                       maxZoom: 15 // Prevent over-zooming
                     } : undefined}
+                    lastUserLocation={lastUserLocation}
                     hybridPins={{
                       sales: visibleSales,
                       selectedId: selectedPinId,

@@ -1,5 +1,4 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
-import { T } from '@/lib/supabase/tables'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 import { buildInventorySummary } from '@/lib/seo/inventorySummary'
@@ -26,7 +25,7 @@ export async function fetchMetroInventory(
 
   const runQuery = (includeModeration: boolean) =>
     applyPhase4PublicPublishedSaleReadFilters(
-      fromBase(admin, T.sales).select('*'),
+      fromBase(admin, 'sales_v2').select('*'),
       { includeModeration }
     )
       .ilike('city', metro.city)

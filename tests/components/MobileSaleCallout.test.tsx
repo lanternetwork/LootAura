@@ -63,4 +63,25 @@ describe('MobileSaleCallout', () => {
 
     expect(onDismiss).not.toHaveBeenCalled()
   })
+
+  it('shows distance from user when user location is available', () => {
+    const sale = makeSale({
+      id: 'callout-sale-2',
+      title: 'Nearby callout sale',
+      lat: 38.26,
+      lng: -85.76,
+    })
+
+    render(
+      <MobileSaleCallout
+        sale={sale}
+        onDismiss={() => {}}
+        viewport={{ center: { lat: 38, lng: -85 }, zoom: 10 }}
+        pinPosition={{ x: 100, y: 200 }}
+        userLocation={{ lat: 38.25, lng: -85.75 }}
+      />
+    )
+
+    expect(screen.getByTestId('callout-distance-from-user')).toBeInTheDocument()
+  })
 })

@@ -28,7 +28,15 @@ Run production SQL and complete gate before Phase 5 legacy removal.
 
 No `app/**` code uses `.from('profiles')` (legacy `public.profiles`). Phase 1 production gate still recommended before legacy table retirement.
 
+## Phase 7 (this PR)
+
+| Artifact | Status |
+|----------|--------|
+| [PHASE7_LEGACY_RETIREMENT_READINESS.md](./PHASE7_LEGACY_RETIREMENT_READINESS.md) | Complete |
+
+**Verdict:** App is retirement-ready; **do not** `DROP public.profiles` until Phase 1 gate (and Phase 6 if needed).
+
 ## Later phases
 
-- Phase 6: Data migration (conditional on Phase 1 divergence)
-- Phase 7: Retirement readiness audit
+- Phase 6: Data migration (conditional — run production divergence SQL first)
+- Future: `DROP TABLE public.profiles` migration (separate PR after gates)

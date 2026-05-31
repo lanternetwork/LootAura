@@ -38,7 +38,7 @@ describe('mobile filters Cancel behavior', () => {
     expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
     expect(screen.getByRole('button', { name: /cancel filter changes/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /reset filters/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^apply$/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /apply filters/i })).toBeTruthy()
   })
 
   it('MobileFilterSheet does not render Clear All', () => {
@@ -120,7 +120,7 @@ describe('mobile filters Cancel behavior', () => {
     rerender(<MobileFiltersModal {...props} isOpen={false} onClose={onClose} />)
     rerender(<MobileFiltersModal {...props} isOpen onClose={onClose} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^apply$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /apply filters/i }))
     expect(onApplyFilters).toHaveBeenCalledWith({
       dateRange: 'any',
       categories: ['Electronics'],
@@ -133,7 +133,7 @@ describe('mobile filters Cancel behavior', () => {
     render(<MobileFiltersModal {...baseModalProps} onApplyFilters={onApplyFilters} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: 'Furniture' }))
     fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'saturday' } })
-    fireEvent.click(screen.getByRole('button', { name: /^apply$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /apply filters/i }))
     expect(onApplyFilters).toHaveBeenCalledWith({
       dateRange: 'saturday',
       categories: ['Furniture'],

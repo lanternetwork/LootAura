@@ -266,12 +266,12 @@ export default function MobileFilterSheet({
           <button
             onClick={handleApply}
             disabled={isLoading}
-            aria-label={isLoading ? 'Applying filters...' : 'Apply selected filters'}
+            aria-label={isLoading ? 'Applying filters...' : 'Apply filters'}
             className={`flex-1 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
               isLoading ? 'opacity-50 cursor-not-allowed btn-accent' : 'btn-accent'
             }`}
           >
-            {isLoading ? 'Applying...' : 'Apply Filters'}
+            {isLoading ? 'Applying...' : 'Apply'}
           </button>
         </div>
       </div>

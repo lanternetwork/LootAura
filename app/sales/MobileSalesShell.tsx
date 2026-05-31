@@ -694,11 +694,9 @@ export default function MobileSalesShell({
         isOpen={isFiltersModalOpen}
         onClose={() => setIsFiltersModalOpen(false)}
         dateRange={filters.dateRange}
-        onDateRangeChange={(dateRange: DateRangeType) => onFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
-        onCategoriesChange={(categories) => onFiltersChange({ ...filters, categories })}
         distance={filters.distance}
-        onDistanceChange={(distance) => onFiltersChange({ ...filters, distance })}
+        onApplyFilters={(payload) => onFiltersChange({ ...filters, ...payload })}
         hasActiveFilters={hasActiveFilters}
         isLoading={loading}
         onClearFilters={onClearFilters}

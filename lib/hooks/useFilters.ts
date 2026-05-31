@@ -24,6 +24,9 @@ export interface FilterState {
   city?: string
 }
 
+/** Payload submitted by mobile filter Apply (modal/sheet). */
+export type MobileFiltersApplyPayload = Pick<FilterState, 'dateRange' | 'categories' | 'distance'>
+
 export interface UseFiltersReturn {
   filters: FilterState
   updateFilters: (newFilters: Partial<FilterState>, skipUrlUpdate?: boolean) => void

@@ -37,7 +37,7 @@ describe('mobile filters atomic Apply', () => {
     fireEvent.change(selects[0], { target: { value: 'saturday' } })
     fireEvent.change(selects[1], { target: { value: '25' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /apply selected filters/i }))
+    fireEvent.click(screen.getByRole('button', { name: /apply filters/i }))
 
     expect(onApplyFilters).toHaveBeenCalledTimes(1)
     expect(onApplyFilters).toHaveBeenCalledWith({
@@ -66,7 +66,7 @@ describe('mobile filters atomic Apply', () => {
     fireEvent.change(selects[0], { target: { value: 'saturday' } })
     fireEvent.change(selects[1], { target: { value: '25' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /apply selected filters/i }))
+    fireEvent.click(screen.getByRole('button', { name: /apply filters/i }))
 
     expect(onApplyFilters).toHaveBeenCalledTimes(1)
     expect(onApplyFilters).toHaveBeenCalledWith({
@@ -95,7 +95,7 @@ describe('mobile filters atomic Apply', () => {
     const dateSelect = screen.getAllByRole('combobox')[0]
     fireEvent.change(dateSelect, { target: { value: 'saturday' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /apply selected filters/i }))
+    fireEvent.click(screen.getByRole('button', { name: /apply filters/i }))
 
     expect(onApplyFilters).toHaveBeenCalledTimes(1)
     expect(onApplyFilters).toHaveBeenCalledWith({

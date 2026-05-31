@@ -2670,7 +2670,6 @@ export default function SalesClient({
           hasCompletedInitialLoad={hasCompletedInitialLoad}
           filters={filters}
           onFiltersChange={handleFiltersChange}
-          onClearFilters={clearFilters}
           onZipLocationFound={handleZipLocationFound}
           onZipError={handleZipError}
           zipError={zipError}
@@ -2861,7 +2860,6 @@ export default function SalesClient({
         onApplyFilters={(payload) => handleFiltersChange({ ...filters, ...payload })}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         isLoading={loading}
-        onClearFilters={clearFilters}
       />
     </>
   )

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { buildDatePresets } from '@/lib/shared/datePresets'
+import { MobileFiltersApplyPayload } from '@/lib/hooks/useFilters'
 
 // Category data
 const CATEGORY_DATA = [
@@ -21,11 +22,9 @@ type MobileFilterSheetProps = {
   isOpen: boolean
   onClose: () => void
   dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'
-  onDateRangeChange: (dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any') => void
   categories: string[]
-  onCategoriesChange: (categories: string[]) => void
   distance: number
-  onDistanceChange: (distance: number) => void
+  onApplyFilters: (payload: MobileFiltersApplyPayload) => void
   hasActiveFilters: boolean
   isLoading?: boolean
   onClearFilters?: () => void
@@ -35,11 +34,9 @@ export default function MobileFilterSheet({
   isOpen,
   onClose,
   dateRange,
-  onDateRangeChange,
   categories,
-  onCategoriesChange,
   distance,
-  onDistanceChange,
+  onApplyFilters,
   hasActiveFilters: _hasActiveFilters,
   isLoading = false,
   onClearFilters
@@ -127,12 +124,13 @@ export default function MobileFilterSheet({
   }, [tempCategories])
 
   const handleApply = useCallback(() => {
-    // Update filters - this will trigger map viewport change and fetch
-    onDateRangeChange(tempDateRange)
-    onCategoriesChange(tempCategories)
-    onDistanceChange(tempDistance)
+    onApplyFilters({
+      dateRange: tempDateRange,
+      categories: tempCategories,
+      distance: tempDistance,
+    })
     onClose()
-  }, [tempDateRange, tempCategories, tempDistance, onDateRangeChange, onCategoriesChange, onDistanceChange, onClose])
+  }, [tempDateRange, tempCategories, tempDistance, onApplyFilters, onClose])
 
   const handleReset = useCallback(() => {
     setTempDateRange('any')

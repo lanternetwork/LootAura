@@ -2856,11 +2856,9 @@ export default function SalesClient({
         isOpen={isMobileFilterSheetOpen}
         onClose={closeFilterSheet}
         dateRange={filters.dateRange}
-        onDateRangeChange={(dateRange: DateRangeType) => handleFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
-        onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
         distance={filters.distance}
-        onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
+        onApplyFilters={(payload) => handleFiltersChange({ ...filters, ...payload })}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         isLoading={loading}
         onClearFilters={clearFilters}

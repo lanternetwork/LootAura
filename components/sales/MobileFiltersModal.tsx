@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { buildDatePresets } from '@/lib/shared/datePresets'
-import { DateRangeType } from '@/lib/hooks/useFilters'
+import { DateRangeType, MobileFiltersApplyPayload } from '@/lib/hooks/useFilters'
 
 // Category data
 const CATEGORY_DATA = [
@@ -22,11 +22,9 @@ interface MobileFiltersModalProps {
   isOpen: boolean
   onClose: () => void
   dateRange: DateRangeType
-  onDateRangeChange: (dateRange: DateRangeType) => void
   categories: string[]
-  onCategoriesChange: (categories: string[]) => void
   distance: number
-  onDistanceChange: (distance: number) => void
+  onApplyFilters: (payload: MobileFiltersApplyPayload) => void
   hasActiveFilters: boolean
   isLoading?: boolean
   onClearFilters?: () => void
@@ -45,11 +43,9 @@ export default function MobileFiltersModal({
   isOpen,
   onClose,
   dateRange,
-  onDateRangeChange,
   categories,
-  onCategoriesChange,
   distance,
-  onDistanceChange,
+  onApplyFilters,
   hasActiveFilters: _hasActiveFilters,
   isLoading = false,
   onClearFilters,
@@ -93,11 +89,12 @@ export default function MobileFiltersModal({
   }, [tempCategories])
 
   const handleApply = useCallback(async () => {
-    // Update filters - this will trigger map viewport change and fetch
-    onDateRangeChange(tempDateRange)
-    onCategoriesChange(tempCategories)
-    onDistanceChange(tempDistance)
-    
+    onApplyFilters({
+      dateRange: tempDateRange,
+      categories: tempCategories,
+      distance: tempDistance,
+    })
+
     // Apply ZIP if it has been entered and is valid
     if (tempZip.trim()) {
       const zipRegex = /^\d{5}(-\d{4})?$/
@@ -139,7 +136,7 @@ export default function MobileFiltersModal({
     }
     
     onClose()
-  }, [tempDateRange, tempCategories, tempDistance, tempZip, onDateRangeChange, onCategoriesChange, onDistanceChange, onZipLocationFound, onZipError, onClose])
+  }, [tempDateRange, tempCategories, tempDistance, tempZip, onApplyFilters, onZipLocationFound, onZipError, onClose])
 
   const handleReset = useCallback(() => {
     setTempDateRange('any')

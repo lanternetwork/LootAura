@@ -27,7 +27,6 @@ interface MobileFiltersModalProps {
   onApplyFilters: (payload: MobileFiltersApplyPayload) => void
   hasActiveFilters: boolean
   isLoading?: boolean
-  onClearFilters?: () => void
   onZipLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => void
   onZipError: (error: string) => void
   zipError?: string | null
@@ -48,7 +47,6 @@ export default function MobileFiltersModal({
   onApplyFilters,
   hasActiveFilters: _hasActiveFilters,
   isLoading = false,
-  onClearFilters,
   onZipLocationFound,
   onZipError,
   zipError,
@@ -290,28 +288,21 @@ export default function MobileFiltersModal({
 
         {/* Footer Actions */}
         <div className="flex-shrink-0 px-4 py-4 border-t border-gray-200 flex gap-3" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-          {onClearFilters && (
-            <button
-              onClick={() => {
-                onClearFilters()
-                onClose()
-              }}
-              disabled={isLoading}
-              className="px-4 py-3 border border-gray-300 rounded-lg text-sm font-medium transition-colors min-h-[44px] hover:bg-gray-50"
-              aria-label="Clear all filters"
-            >
-              Clear All
-            </button>
-          )}
+          <button
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-4 py-3 border border-gray-300 rounded-lg text-sm font-medium transition-colors min-h-[44px] hover:bg-gray-50"
+            aria-label="Cancel filter changes"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleReset}
             disabled={isLoading}
             aria-label="Reset filters to default values"
-            className={`${onClearFilters ? 'flex-1' : 'flex-1'} px-4 py-3 border border-gray-300 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
-              isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-            }`}
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-sm font-medium transition-colors min-h-[44px] hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Reset
+            Reset Filters
           </button>
           <button
             onClick={handleApply}

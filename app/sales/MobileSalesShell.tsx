@@ -44,7 +44,6 @@ interface MobileSalesShellProps {
     distance: number
   }
   onFiltersChange: (newFilters: any) => void
-  onClearFilters: () => void
   onZipLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => void
   onZipError: (error: string) => void
   zipError: string | null
@@ -89,7 +88,6 @@ export default function MobileSalesShell({
   hasCompletedInitialLoad = false,
   filters,
   onFiltersChange,
-  onClearFilters,
   onZipLocationFound,
   onZipError,
   zipError,
@@ -699,7 +697,6 @@ export default function MobileSalesShell({
         onApplyFilters={(payload) => onFiltersChange({ ...filters, ...payload })}
         hasActiveFilters={hasActiveFilters}
         isLoading={loading}
-        onClearFilters={onClearFilters}
         onZipLocationFound={onZipLocationFound}
         onZipError={onZipError}
         zipError={zipError}

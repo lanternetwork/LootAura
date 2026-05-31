@@ -5,6 +5,8 @@ import {
   resolvePilotMetroForSale,
 } from '@/lib/seo/geoLinking'
 import type { Sale } from '@/lib/types'
+import type { SeoMetro } from '@/lib/seo/types'
+import { TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 describe('geoLinking', () => {
   const dallasSale = {
@@ -27,6 +29,16 @@ describe('geoLinking', () => {
     expect(links.city?.href).toBe('/yard-sales/dallas-tx')
     expect(links.weekend?.href).toBe('/yard-sales-this-weekend/dallas-tx')
     expect(links.nearbyMetros).toEqual([])
+  })
+
+  it('omits geo links when metro is absent from catalog', () => {
+    const links = buildListingGeoLinks(dallasSale, [TEST_SEO_METRO_DALLAS])
+    expect(links.city?.href).toBe('/yard-sales/dallas-tx')
+
+    const unknownSale = { ...dallasSale, city: 'Unknown', state: 'ZZ' } as Sale
+    const gated = buildListingGeoLinks(unknownSale, [TEST_SEO_METRO_DALLAS])
+    expect(gated.city).toBeNull()
+    expect(gated.weekend).toBeNull()
   })
 
   it('includes metro in breadcrumb trail when resolved', () => {

@@ -9,7 +9,7 @@ import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
-import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
+import { getSeoMetrosForRequest, getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
 import {
   buildListingBreadcrumbItems,
   buildListingGeoLinks,
@@ -73,11 +73,12 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
   // Fetch nearby sales for client UI (limit unchanged) + broader set for SEO crawl links only
-  const [nearbySales, nearbySalesForSeo] = await Promise.all([
+  const [nearbySales, nearbySalesForSeo, seoMetros] = await Promise.all([
     getNearestSalesForSale(supabase, id, 2).catch(() => []),
     getNearestSalesForSale(supabase, id, 6).catch(() => []),
+    getSeoMetrosForRequest(),
   ])
-  const listingGeoLinks = buildListingGeoLinks(sale)
+  const listingGeoLinks = buildListingGeoLinks(sale, seoMetros)
   const nearbyListingLinks = buildNearbyListingLinks(nearbySalesForSeo)
 
   // Fetch current user's rating for this seller (if authenticated)
@@ -92,7 +93,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   // Create structured data for SEO
   const eventStructuredData = createSaleEventStructuredData(sale)
   const breadcrumbStructuredData = createBreadcrumbStructuredData(
-    buildListingBreadcrumbItems(sale)
+    buildListingBreadcrumbItems(sale, seoMetros)
   )
 
   const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'

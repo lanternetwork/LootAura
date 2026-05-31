@@ -13,54 +13,53 @@ vi.mock('@/components/FavoriteButton', () => ({
   default: () => null,
 }))
 
-describe('Marketplace user location visualization (integration)', () => {
-  const userLocation = { lat: 38.25, lng: -85.75 }
+describe('Marketplace distance visualization (integration)', () => {
+  const viewport = { center: { lat: 38.25, lng: -85.75 }, zoom: 11 }
 
-  it('SalesList shows user-relative distance on cards when userLocation is set', () => {
+  it('SalesList shows viewport-aligned distance when sale.distance_m is set', () => {
     const sale = makeSale({
       id: 'integration-sale-1',
       title: 'Integration test sale',
       lat: 38.26,
       lng: -85.76,
+      distance_m: 1609,
     })
 
-    renderWithProviders(
-      <SalesList sales={[sale]} userLocation={userLocation} />
-    )
+    renderWithProviders(<SalesList sales={[sale]} viewport={viewport} />)
 
-    expect(screen.getByTestId('sale-card-distance-from-user')).toBeInTheDocument()
+    expect(screen.getByTestId('sale-card-distance-from-user')).toHaveTextContent('1.0 mi away')
   })
 
-  it('SalesList hides distance when userLocation is unavailable', () => {
+  it('SalesList hides distance when viewport and distance_m are unavailable', () => {
     const sale = makeSale({
       id: 'integration-sale-2',
       lat: 38.26,
       lng: -85.76,
     })
 
-    renderWithProviders(<SalesList sales={[sale]} userLocation={null} />)
+    renderWithProviders(<SalesList sales={[sale]} />)
 
     expect(screen.queryByTestId('sale-card-distance-from-user')).not.toBeInTheDocument()
   })
 
-  it('MobileSaleCallout shows user-relative distance when userLocation is set', () => {
+  it('MobileSaleCallout shows viewport-aligned distance from sale.distance_m', () => {
     const sale = makeSale({
       id: 'integration-callout-1',
       title: 'Callout integration sale',
       lat: 38.26,
       lng: -85.76,
+      distance_m: 804,
     })
 
     renderWithProviders(
       <MobileSaleCallout
         sale={sale}
         onDismiss={() => {}}
-        viewport={{ center: { lat: 38.25, lng: -85.75 }, zoom: 11 }}
+        viewport={viewport}
         pinPosition={{ x: 120, y: 240 }}
-        userLocation={userLocation}
       />
     )
 
-    expect(screen.getByTestId('callout-distance-from-user')).toBeInTheDocument()
+    expect(screen.getByTestId('callout-distance-from-user')).toHaveTextContent('0.5 mi away')
   })
 })

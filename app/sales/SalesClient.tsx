@@ -359,14 +359,6 @@ export default function SalesClient({
     return !isCentered
   }, [hasLocationPermission, lastUserLocation, mapView?.center, isCenteredOnLocation])
 
-  const userMapCoordinates = useMemo(
-    () =>
-      lastUserLocation
-        ? { lat: lastUserLocation.lat, lng: lastUserLocation.lng }
-        : null,
-    [lastUserLocation]
-  )
-
   // Sales data state - map is source of truth
   // fetchedSales: All sales for the buffered area (larger than viewport)
   // visibleSales: Subset of fetchedSales that intersect current viewport (computed via useMemo)
@@ -2789,7 +2781,6 @@ export default function SalesClient({
                   }}
                   viewport={mapView ? { center: mapView.center, zoom: mapView.zoom } : null}
                   pinPosition={desktopPinPosition}
-                  userLocation={userMapCoordinates}
                 />
               )}
               {process.env.NEXT_PUBLIC_DEBUG === 'true' && selectedPinId && (
@@ -2842,7 +2833,7 @@ export default function SalesClient({
                 )}
 
                 {!loading && visibleSalesDeduplicated.length > 0 && (
-                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} isLoading={loading} userLocation={userMapCoordinates} />
+                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} isLoading={loading} />
                 )}
               </div>
             </div>

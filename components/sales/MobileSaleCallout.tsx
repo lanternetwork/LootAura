@@ -14,16 +14,15 @@ import { displayAddress } from '@/lib/display/address'
 import { formatDateOnly } from '@/lib/display/date'
 import { isTrustedNextImageHost } from '@/lib/images/isTrustedNextImageHost'
 import {
-  getMarketplaceDistanceFromUserLabel,
-  type UserMapCoordinates,
+  getMarketplaceDistanceLabel,
+  type MarketplaceViewport,
 } from '@/lib/map/formatMarketplaceDistanceFromUser'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null
   onDismiss: () => void
-  viewport?: { center: { lat: number; lng: number }; zoom: number } | null
+  viewport?: MarketplaceViewport
   pinPosition?: { x: number; y: number } | null
-  userLocation?: UserMapCoordinates | null
 }
 
 /**
@@ -62,7 +61,7 @@ function detectPlatform(): Platform {
   return 'desktop'
 }
 
-export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPosition, userLocation }: MobileSaleCalloutProps) {
+export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPosition }: MobileSaleCalloutProps) {
   const router = useRouter()
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeDeltaY, setSwipeDeltaY] = useState(0)
@@ -133,7 +132,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
   if (!sale) return null
 
   const cover = getSaleCoverUrl(sale)
-  const distanceFromUser = getMarketplaceDistanceFromUserLabel(userLocation, sale)
+  const distanceLabel = getMarketplaceDistanceLabel(sale, viewport)
   
   // Build detail page URL with viewport params to restore view on back
   const detailUrl = viewport 
@@ -283,9 +282,9 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                   {formatDate(sale.date_start, sale.time_start)}
                 </p>
               )}
-              {distanceFromUser && (
+              {distanceLabel && (
                 <p className="text-xs text-gray-500" data-testid="callout-distance-from-user">
-                  {distanceFromUser}
+                  {distanceLabel}
                 </p>
               )}
             </div>
@@ -460,9 +459,9 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                   {formatDate(sale.date_start, sale.time_start)}
                 </p>
               )}
-              {distanceFromUser && (
+              {distanceLabel && (
                 <p className="text-xs text-gray-500" data-testid="callout-distance-from-user">
-                  {distanceFromUser}
+                  {distanceLabel}
                 </p>
               )}
             </div>

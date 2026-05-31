@@ -568,11 +568,6 @@ export default function MobileSalesShell({
                 onDismiss={() => onLocationClick(selectedPinId || '')}
                 viewport={mapViewport}
                 pinPosition={pinPosition}
-                userLocation={
-                  lastUserLocation
-                    ? { lat: lastUserLocation.lat, lng: lastUserLocation.lng }
-                    : null
-                }
               />
             )}
           </div>
@@ -660,11 +655,6 @@ export default function MobileSalesShell({
                   _mode="grid" 
                   viewport={mapViewport || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }}
                   isLoading={loading}
-                  userLocation={
-                    lastUserLocation
-                      ? { lat: lastUserLocation.lat, lng: lastUserLocation.lng }
-                      : null
-                  }
                 />
               </div>
             )}

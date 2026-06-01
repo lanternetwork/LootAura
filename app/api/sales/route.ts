@@ -22,6 +22,7 @@ import {
   parseBboxSalesDistanceKm,
   parseSalesRadiusKmFromParams,
 } from '@/lib/sales/parseSalesDistanceKm'
+import { computeSalesFetchWindow } from '@/lib/sales/computeSalesFetchWindow'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -637,7 +638,7 @@ async function salesHandler(request: NextRequest) {
       // and can exclude nearby rows in dense areas before distance filtering runs.
       // Inflate window size to reduce false exclusions under Supabase/PostgREST non-spatial ordering limits.
       // True fix: server-side spatial ordering (future PostGIS migration).
-      const fetchWindow = Math.min(1000, Math.max((offset + limit) * 5, 200))
+      const fetchWindow = computeSalesFetchWindow(offset, limit)
       let { data: salesData, error: salesError } = await query
         .order('date_start', { ascending: true, nullsFirst: false })
         .range(0, fetchWindow - 1)

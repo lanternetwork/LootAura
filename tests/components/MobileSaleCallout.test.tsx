@@ -64,24 +64,24 @@ describe('MobileSaleCallout', () => {
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
-  it('shows distance from user when user location is available', () => {
+  it('shows distance from sale.distance_m when viewport is set', () => {
     const sale = makeSale({
       id: 'callout-sale-2',
       title: 'Nearby callout sale',
       lat: 38.26,
       lng: -85.76,
+      distance_m: 804,
     })
 
     render(
       <MobileSaleCallout
         sale={sale}
         onDismiss={() => {}}
-        viewport={{ center: { lat: 38, lng: -85 }, zoom: 10 }}
+        viewport={{ center: { lat: 38.25, lng: -85.75 }, zoom: 10 }}
         pinPosition={{ x: 100, y: 200 }}
-        userLocation={{ lat: 38.25, lng: -85.75 }}
       />
     )
 
-    expect(screen.getByTestId('callout-distance-from-user')).toBeInTheDocument()
+    expect(screen.getByTestId('callout-distance-from-user')).toHaveTextContent('0.5 mi away')
   })
 })

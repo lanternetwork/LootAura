@@ -13,22 +13,21 @@ import { isDebugEnabled } from '@/lib/debug'
 import { displayAddress } from '@/lib/display/address'
 import { formatDateOnly } from '@/lib/display/date'
 import {
-  getMarketplaceDistanceFromUserLabel,
-  type UserMapCoordinates,
+  getMarketplaceDistanceLabel,
+  type MarketplaceViewport,
 } from '@/lib/map/formatMarketplaceDistanceFromUser'
 
 interface SaleCardProps {
   sale: Sale
   className?: string
-  viewport?: { center: { lat: number; lng: number }; zoom: number } | null
-  userLocation?: UserMapCoordinates | null
+  viewport?: MarketplaceViewport
 }
 
-export default function SaleCard({ sale, className, viewport, userLocation }: SaleCardProps) {
+export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   if (!sale) return null
   const cover = getSaleCoverUrl(sale)
   const saleAddressDisplay = displayAddress(sale.address, sale.city, sale.state)
-  const distanceFromUser = getMarketplaceDistanceFromUserLabel(userLocation, sale)
+  const distanceLabel = getMarketplaceDistanceLabel(sale, viewport)
   
   // Debug: log cover image resolution
   if (!cover && isDebugEnabled) {
@@ -154,9 +153,9 @@ export default function SaleCard({ sale, className, viewport, userLocation }: Sa
             </div>
           )}
         </div>
-        {distanceFromUser && (
+        {distanceLabel && (
           <p className="text-xs text-neutral-500" data-testid="sale-card-distance-from-user">
-            {distanceFromUser}
+            {distanceLabel}
           </p>
         )}
         {sale?.date_start && (

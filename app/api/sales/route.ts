@@ -17,6 +17,12 @@ import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
+import {
+  clampSalesDistanceKm,
+  parseBboxSalesDistanceKm,
+  parseSalesRadiusKmFromParams,
+} from '@/lib/sales/parseSalesDistanceKm'
+import { computeSalesFetchWindow } from '@/lib/sales/computeSalesFetchWindow'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 export const dynamic = 'force-dynamic'
@@ -145,9 +151,7 @@ async function salesHandler(request: NextRequest) {
       }
       
       // Set default radius for near=1 queries (25km)
-      distanceKm = searchParams.get('radiusKm') 
-        ? parseFloat(searchParams.get('radiusKm') || '25')
-        : 25
+      distanceKm = parseSalesRadiusKmFromParams(searchParams) ?? 25
       
       // Calculate bbox from lat/lng and distance
       const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
@@ -212,19 +216,15 @@ async function salesHandler(request: NextRequest) {
           latitude = (validatedBbox.north + validatedBbox.south) / 2
           longitude = (validatedBbox.east + validatedBbox.west) / 2
           
-          // When using viewport bounds, still respect distance filter if provided
-          // Parse distance from URL parameters (DEPRECATED - will be ignored)
-          const distanceParam = searchParams.get('dist') || searchParams.get('distance')
-          distanceKm = distanceParam ? parseFloat(distanceParam) : 1000 // Default to unlimited if not specified
-          
-          // Log deprecation warning if distance parameter is provided
-          if (distanceParam) {
+          // Honor canonical radiusKm (and deprecated dist/distance) for post-query distance filter.
+          // When absent, distanceKm stays undefined and falls through to legacy default block below.
+          distanceKm = parseBboxSalesDistanceKm(searchParams, (param) => {
             logger.warn('Deprecated distance parameter used', {
               component: 'sales',
               operation: 'deprecated_param',
-              param: 'distance'
+              param,
             })
-          }
+          })
           
           // Store the actual bbox for proper filtering
           actualBbox = validatedBbox
@@ -261,11 +261,11 @@ async function salesHandler(request: NextRequest) {
     // 2. Parse & validate other parameters
     if (distanceKm === undefined) {
       const legacyDistanceParam = searchParams.get('distanceKm')
-      distanceKm = Math.max(1, Math.min(
-        legacyDistanceParam ? parseFloat(legacyDistanceParam) : 40,
-        160
-      ))
-      
+      const legacyParsed = legacyDistanceParam ? parseFloat(legacyDistanceParam) : NaN
+      distanceKm = clampSalesDistanceKm(
+        !Number.isNaN(legacyParsed) && legacyParsed > 0 ? legacyParsed : 40
+      )
+
       // Log deprecation warning for legacy distance parameter
       if (legacyDistanceParam) {
         logger.warn('Deprecated distanceKm parameter used', {
@@ -638,7 +638,7 @@ async function salesHandler(request: NextRequest) {
       // and can exclude nearby rows in dense areas before distance filtering runs.
       // Inflate window size to reduce false exclusions under Supabase/PostgREST non-spatial ordering limits.
       // True fix: server-side spatial ordering (future PostGIS migration).
-      const fetchWindow = Math.min(1000, Math.max((offset + limit) * 5, 200))
+      const fetchWindow = computeSalesFetchWindow(offset, limit)
       let { data: salesData, error: salesError } = await query
         .order('date_start', { ascending: true, nullsFirst: false })
         .range(0, fetchWindow - 1)

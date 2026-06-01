@@ -4,13 +4,12 @@ import EmptyState from './EmptyState'
 import { Sale } from '@/lib/types'
 import { ListInlineAd } from '@/components/ads/AdSlots'
 import { AdsenseGuard } from '@/components/ads/AdsenseGuard'
-import type { UserMapCoordinates } from '@/lib/map/formatMarketplaceDistanceFromUser'
+import type { MarketplaceViewport } from '@/lib/map/formatMarketplaceDistanceFromUser'
 
 interface SalesListProps {
   sales: Sale[]
   _mode?: string
-  viewport?: { center: { lat: number; lng: number }; zoom: number } | null
-  userLocation?: UserMapCoordinates | null
+  viewport?: MarketplaceViewport
   /**
    * Whether the list is in a loading state
    * When true, no ads will be rendered (AdSense policy compliance)
@@ -24,7 +23,7 @@ interface SalesListProps {
  */
 const MIN_SALES_FOR_ADS = 4
 
-export default function SalesList({ sales, _mode, viewport, userLocation, isLoading = false }: SalesListProps) {
+export default function SalesList({ sales, _mode, viewport, isLoading = false }: SalesListProps) {
   const isEmpty = !sales?.length
 
   // AdSense Policy Compliance: Never show ads when loading or empty
@@ -60,7 +59,7 @@ export default function SalesList({ sales, _mode, viewport, userLocation, isLoad
       {sales.map((sale, index) => (
         <Fragment key={sale.id}>
           <div>
-            <SaleCard sale={sale} viewport={viewport} userLocation={userLocation} />
+            <SaleCard sale={sale} viewport={viewport} />
           </div>
           {/* Show inline ad after every 6th sale (indices 5, 11, 17, etc.) */}
           {/* Desktop only - mobile ads removed */}

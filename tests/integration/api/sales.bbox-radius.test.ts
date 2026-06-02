@@ -1,5 +1,5 @@
 /**
- * Integration tests: bbox marketplace fetches honor radiusKm (Workstream A).
+ * Integration tests: bbox browse vs near=1 distance semantics (PR #520).
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -34,7 +34,7 @@ const SALE_MID = {
   status: 'published',
 }
 
-/** ~22 km from center (~14 mi) */
+/** ~22 km from center (~14 mi) — inside bbox, outside 10 mi radius */
 const SALE_FAR = {
   id: 'far',
   lat: CENTER_LAT + 0.2,
@@ -147,13 +147,23 @@ function createBboxRequest(radiusKm: number) {
   return new NextRequest(url)
 }
 
-describe('GET /api/sales bbox radiusKm filtering', () => {
+function createNearRequest(radiusKm: number) {
+  const url = new URL('http://localhost:3000/api/sales')
+  url.searchParams.set('near', '1')
+  url.searchParams.set('lat', String(CENTER_LAT))
+  url.searchParams.set('lng', String(CENTER_LNG))
+  url.searchParams.set('radiusKm', String(radiusKm))
+  url.searchParams.set('limit', '200')
+  return new NextRequest(url)
+}
+
+describe('GET /api/sales bbox browse (viewport inventory gate)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setupSalesMock(ALL_SALES)
   })
 
-  it('excludes sales beyond radiusKm on bbox path (10 mi ≈ 16.09 km)', async () => {
+  it('includes sales inside fetch bbox even when beyond radiusKm (10 mi ≈ 16.09 km)', async () => {
     const response = await GET(createBboxRequest(16.0934))
     expect(response.status).toBe(200)
 
@@ -163,25 +173,57 @@ describe('GET /api/sales bbox radiusKm filtering', () => {
 
     expect(ids).toContain('near')
     expect(ids).toContain('mid')
-    expect(ids).not.toContain('far')
+    expect(ids).toContain('far')
   })
 
-  it('returns more sales for larger radiusKm when inventory exists (50 mi ≈ 80.47 km)', async () => {
+  it('does not change bbox result count when radiusKm param differs', async () => {
     const small = await GET(createBboxRequest(16.0934))
     const large = await GET(createBboxRequest(80.4672))
 
     const smallBody = await small.json()
     const largeBody = await large.json()
 
-    expect(smallBody.data.length).toBeLessThan(largeBody.data.length)
-    expect(largeBody.data.map((s: { id: string }) => s.id)).toContain('far')
+    expect(smallBody.data).toHaveLength(3)
+    expect(largeBody.data).toHaveLength(3)
   })
 
-  it('includes distanceKm in response metadata (not unlimited 1000)', async () => {
+  it('still returns distanceKm metadata and distance_m for sort/labels', async () => {
     const response = await GET(createBboxRequest(16.0934))
     const body = await response.json()
 
     expect(body.distanceKm).toBeCloseTo(16.0934, 2)
-    expect(body.distanceKm).toBeLessThan(1000)
+    const rows = body.data as { id: string; distance_m: number }[]
+    expect(rows.every((r) => typeof r.distance_m === 'number')).toBe(true)
+    expect(rows.map((r) => r.id)).toEqual(['near', 'mid', 'far'])
+  })
+})
+
+describe('GET /api/sales near=1 (radiusKm post-filter unchanged)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setupSalesMock(ALL_SALES)
+  })
+
+  it('excludes sales beyond radiusKm on near path (10 mi ≈ 16.09 km)', async () => {
+    const response = await GET(createNearRequest(16.0934))
+    expect(response.status).toBe(200)
+
+    const body = await response.json()
+    const ids = (body.data as { id: string }[]).map((s) => s.id)
+
+    expect(ids).toContain('near')
+    expect(ids).toContain('mid')
+    expect(ids).not.toContain('far')
+  })
+
+  it('returns more sales for larger radiusKm when inventory exists (50 mi ≈ 80.47 km)', async () => {
+    const small = await GET(createNearRequest(16.0934))
+    const large = await GET(createNearRequest(80.4672))
+
+    const smallBody = await small.json()
+    const largeBody = await large.json()
+
+    expect(smallBody.data.length).toBeLessThan(largeBody.data.length)
+    expect(largeBody.data.map((s: { id: string }) => s.id)).toContain('far')
   })
 })

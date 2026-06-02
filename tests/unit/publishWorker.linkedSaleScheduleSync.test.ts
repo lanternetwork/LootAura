@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const resolveEndsAtMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
@@ -119,6 +119,8 @@ function linkedSaleRow(overrides: Record<string, unknown> = {}) {
 
 describe('publishWorker linked sale schedule sync (reingest)', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'))
     vi.clearAllMocks()
     ctx.saleUpdatePayloads.length = 0
     ctx.ingestedUpdatePayloads.length = 0
@@ -131,6 +133,10 @@ describe('publishWorker linked sale schedule sync (reingest)', () => {
       ends_at: '2026-06-01T21:00:00.000Z',
       listing_timezone: 'America/Chicago',
     })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   function wireLinkedMocks(saleRow: Record<string, unknown>) {

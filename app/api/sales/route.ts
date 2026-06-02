@@ -216,7 +216,7 @@ async function salesHandler(request: NextRequest) {
           latitude = (validatedBbox.north + validatedBbox.south) / 2
           longitude = (validatedBbox.east + validatedBbox.west) / 2
           
-          // Honor canonical radiusKm (and deprecated dist/distance) for post-query distance filter.
+          // Parse radiusKm for response metadata; bbox browse does not post-filter by radius (PR #520).
           // When absent, distanceKm stays undefined and falls through to legacy default block below.
           distanceKm = parseBboxSalesDistanceKm(searchParams, (param) => {
             logger.warn('Deprecated distance parameter used', {
@@ -773,13 +773,11 @@ async function salesHandler(request: NextRequest) {
           }
         })
         .filter((sale) => {
-          // Always apply distance filtering if distanceKm is specified and less than 1000
-          if (distanceKm && distanceKm < 1000) {
+          // Near/ZIP: radiusKm is an inventory gate. Bbox browse: viewport/bbox only (PR #520).
+          if (near && distanceKm && distanceKm < 1000) {
             return sale && (sale.distance_km || 0) <= distanceKm
-          } else {
-            // No distance filtering (distanceKm >= 1000 or undefined)
-            return sale !== null
           }
+          return sale !== null
         })
                 .sort((a, b) => {
                   if (!a || !b) return 0
@@ -925,7 +923,12 @@ async function salesHandler(request: NextRequest) {
             const distanceM = R * c
             return { ...row, distance_m: Math.round(distanceM) }
           })
-          .filter((row: any) => row.distance_m <= (distanceKm * 1000))
+          .filter((row: any) => {
+            if (near && distanceKm && distanceKm < 1000) {
+              return row.distance_m <= distanceKm * 1000
+            }
+            return true
+          })
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
 
         // Set totalFilteredCount for pagination metadata (before slicing)

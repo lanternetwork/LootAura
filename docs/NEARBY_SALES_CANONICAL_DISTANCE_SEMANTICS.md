@@ -15,7 +15,7 @@ LootAura marketplace distance uses **two explicit reference models**, depending 
 | **Bbox / map pan-zoom** (default) | **Viewport center** — midpoint of the request bbox | “How far this sale is from where you are looking on the map” |
 | **Near / ZIP** (`near=1` + `lat`/`lng`) | **User anchor** — explicit lat/lng in the request | “How far this sale is from this place (ZIP or chosen point)” |
 
-**Canonical rule for the map-first path:** viewport center for **filtering**, **ranking**, and **labels**.
+**Canonical rule for the map-first path:** viewport (fetch bbox + client clip) controls **which sales are eligible**; viewport center is used for **ranking** and **labels** via `distance_m`. Bbox browse does **not** apply a `radiusKm` post-filter (PR #520).
 
 GPS may center the map or trigger near-mode search; it does **not** redefine bbox-path sort order or list labels after the user pans away.
 
@@ -37,12 +37,12 @@ Using user GPS for labels while sorting by viewport center produced contradictio
 
 ### Filtering (`radiusKm`)
 
-| Mode | Reference for haversine filter | Code |
-|------|------------------------------|------|
-| Bbox | Bbox center `(north+south)/2`, `(east+west)/2` | `app/api/sales/route.ts` (bbox parse → `latitude`/`longitude`) |
-| Near | Request `lat` / `lng` | Same route, `near=1` branch |
+| Mode | Inventory gate | `distance_m` / sort reference |
+|------|----------------|------------------------------|
+| **Bbox browse** | Expanded fetch bbox (+ client `visibleSales` clip) | Bbox center — **no** `radiusKm` post-filter |
+| **Near / ZIP** (`near=1`) | `lat`/`lng` + `radiusKm` haversine post-filter | Request anchor |
 
-Client sends `radiusKm` on both paths (`SalesClient.fetchMapSales`). Bbox path does **not** send device GPS for distance filtering.
+Client may still send `radiusKm` on bbox fetches (UI / metadata); the API ignores it as an exclusion gate during map browsing. Near path unchanged.
 
 ### Ranking
 
@@ -68,7 +68,7 @@ Do **not** use `getMarketplaceDistanceFromUserLabel` on marketplace list/card/ca
 | Concern | Mechanism |
 |---------|-----------|
 | Initial / “use my location” map position | Geolocation, cookies, `resolveInitialViewport` |
-| Which sales appear in bbox mode | Buffered bbox + optional `radiusKm` from **bbox center** |
+| Which sales appear in bbox mode | Buffered fetch bbox; `visibleSales` clips to viewport |
 | Distance copy on cards | Viewport-aligned (`distance_m` / viewport center) |
 
 ---
@@ -102,12 +102,13 @@ Key modules:
 
 | Phase | Workstream | Outcome |
 |-------|------------|---------|
-| 1 (#518) | A | Bbox path honors `radiusKm` (no effective 1000 km bypass) |
+| 1 (#518) | A | Bbox path honors `radiusKm` (superseded for browse by #520) |
 | 1 (#518) | B | Labels use API `distance_m` / viewport center, not GPS |
 | 1 (#518) | C | Fetch-window risk documented (no behavior change) |
 | 2 (#519) | A | Empty-buffer lock: do not set `bufferedBounds` on zero-row fetch |
 | 2 (#519) | B | Preserve Phase 1 distance filter behavior under lock fix |
-| 2 (#519) | C | **This document** — canonical semantics |
+| 2 (#519) | C | **This document** — canonical semantics (initial) |
+| 3 (#520) | A | Bbox browse: remove `radiusKm` post-filter; near unchanged |
 
 ---
 

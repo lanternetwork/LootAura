@@ -616,14 +616,20 @@ export default function SalesClient({
           markPerformance('sales_fetch_complete')
         }
         
-        // Update bufferedBounds to track what area we fetched
-        // For near=1 mode, calculate bounds from response or use null
+        // Update bufferedBounds to track what area we fetched.
+        //
+        // Lock-safety invariant:
+        // Never keep a non-null bufferedBounds when fetchedSales is empty.
+        // Otherwise handleViewportChange can suppress future fetches while the
+        // map is empty ("empty-buffer lock").
+        //
+        // For near=1 mode, calculate bounds from response or use null.
         if (nearOptions) {
           // For near=1, we don't track bufferedBounds (server calculates bbox)
           // The response may include bbox info, but we'll let the map viewport drive bounds
           setBufferedBounds(null)
         } else {
-          setBufferedBounds(bufferedBbox!)
+          setBufferedBounds(filtered.length > 0 ? bufferedBbox! : null)
         }
         
         setMapMarkers(prev => {

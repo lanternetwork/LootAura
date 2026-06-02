@@ -32,6 +32,8 @@ export type MarketplaceViewport = {
  * Marketplace list/card distance label aligned with GET /api/sales ranking.
  * Uses sale.distance_m (from viewport/bbox center) when present; otherwise
  * haversine from viewport center.
+ *
+ * @see docs/NEARBY_SALES_CANONICAL_DISTANCE_SEMANTICS.md
  */
 export function getMarketplaceDistanceLabel(
   sale: { lat?: number | null; lng?: number | null; distance_m?: number | null },

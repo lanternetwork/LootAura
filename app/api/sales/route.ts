@@ -212,7 +212,7 @@ async function salesHandler(request: NextRequest) {
             })
           }
           
-          // Calculate center and approximate distance from bbox
+          // Bbox-path distance reference = viewport center (see docs/NEARBY_SALES_CANONICAL_DISTANCE_SEMANTICS.md)
           latitude = (validatedBbox.north + validatedBbox.south) / 2
           longitude = (validatedBbox.east + validatedBbox.west) / 2
           

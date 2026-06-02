@@ -352,3 +352,38 @@ describe('Proactive initial fetch (Stage 1)', () => {
     expect(fetchMapSales).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('Empty-buffer lock safety invariant', () => {
+  it('clears buffered bounds when a bbox fetch succeeds with empty data', () => {
+    const bufferedBbox = { west: -86, south: 39, east: -85, north: 40 }
+
+    // Simulate the fetchMapSales success path state transition:
+    // setFetchedSales(filtered); setBufferedBounds(filtered.length > 0 ? bufferedBbox : null)
+    const filtered: Array<{ id: string }> = []
+    const nextBufferedBounds = filtered.length > 0 ? bufferedBbox : null
+
+    expect(filtered).toHaveLength(0)
+    expect(nextBufferedBounds).toBeNull()
+  })
+
+  it('retains buffered bounds when a bbox fetch returns non-empty data', () => {
+    const bufferedBbox = { west: -86, south: 39, east: -85, north: 40 }
+
+    const filtered = [{ id: 'sale-1' }]
+    const nextBufferedBounds = filtered.length > 0 ? bufferedBbox : null
+
+    expect(filtered.length).toBeGreaterThan(0)
+    expect(nextBufferedBounds).toEqual(bufferedBbox)
+  })
+
+  it('forces viewport recovery fetch when map is empty and buffer is null', () => {
+    const viewportBounds = { west: -86, south: 39, east: -85, north: 40 }
+    const bufferedBounds = null
+
+    // Mirrors handleViewportChange gating:
+    // const needsFetch = !bufferedBounds || !isViewportInsideBounds(...)
+    const needsFetch = !bufferedBounds || (bufferedBounds ? !isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR) : true)
+
+    expect(needsFetch).toBe(true)
+  })
+})

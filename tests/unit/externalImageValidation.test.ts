@@ -121,11 +121,55 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response(pngHeader.buffer.slice(0, pngHeader.byteLength), { status: 206 }))
+      vi.fn(async () => {
+        const body = new ArrayBuffer(pngHeader.byteLength)
+        new Uint8Array(body).set(pngHeader)
+        return new Response(body, { status: 206 })
+      })
     )
 
     const out = await sanitizeExternalImageUrls(['https://images.example.org/hero.png'], {
       rowId: '22222222-2222-4222-8222-222222222222',
+      city: 'A',
+      state: 'B',
+      max: MAX_IMPORTED_LISTING_IMAGES,
+    })
+    expect(out).toEqual([])
+  })
+
+  it('accepts decodable raster probe responses', async () => {
+    const { sanitizeExternalImageUrls } = await import('@/lib/ingestion/externalImageValidation')
+    const { minimalValidProbeFetchResponse } = await import('../helpers/minimalProbeImage')
+    vi.stubGlobal('fetch', vi.fn(async () => minimalValidProbeFetchResponse()))
+
+    const out = await sanitizeExternalImageUrls(['https://images.example.org/photo.png'], {
+      rowId: '33333333-3333-4333-8333-333333333333',
+      city: 'A',
+      state: 'B',
+      max: MAX_IMPORTED_LISTING_IMAGES,
+    })
+    expect(out).toEqual(['https://images.example.org/photo.png'])
+  })
+
+  it('rejects HTTP 403 and 404 probe responses', async () => {
+    const { sanitizeExternalImageUrls } = await import('@/lib/ingestion/externalImageValidation')
+    for (const status of [403, 404]) {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status })))
+      const out = await sanitizeExternalImageUrls([`https://images.example.org/broken-${status}.jpg`], {
+        rowId: '44444444-4444-4444-8444-444444444444',
+        city: 'A',
+        state: 'B',
+        max: MAX_IMPORTED_LISTING_IMAGES,
+      })
+      expect(out).toEqual([])
+    }
+  })
+
+  it('rejects empty probe bodies', async () => {
+    const { sanitizeExternalImageUrls } = await import('@/lib/ingestion/externalImageValidation')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
+    const out = await sanitizeExternalImageUrls(['https://images.example.org/empty.jpg'], {
+      rowId: '55555555-5555-4555-8555-555555555555',
       city: 'A',
       state: 'B',
       max: MAX_IMPORTED_LISTING_IMAGES,

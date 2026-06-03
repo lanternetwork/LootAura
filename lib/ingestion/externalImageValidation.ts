@@ -142,7 +142,9 @@ async function safeReadResponseBodyPrefix(res: Response, maxBytes: number): Prom
   return out
 }
 
-async function probeRasterSuggestsNonPhoto(urlString: string): Promise<'reject' | 'inconclusive'> {
+type RasterProbeOutcome = { ok: true } | { ok: false; reason: string }
+
+async function probePublishableRasterImageUrl(urlString: string): Promise<RasterProbeOutcome> {
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(), PROBE_TIMEOUT_MS)
   try {
@@ -153,7 +155,9 @@ async function probeRasterSuggestsNonPhoto(urlString: string): Promise<'reject' 
       redirect: 'follow',
     })
 
-    if (!res.ok && res.status !== 206) return 'inconclusive'
+    if (!res.ok && res.status !== 206) {
+      return { ok: false, reason: 'probe_fetch_http_error' }
+    }
 
     const cl = res.headers.get('content-length')
     if (res.status === 200 && cl) {
@@ -161,8 +165,10 @@ async function probeRasterSuggestsNonPhoto(urlString: string): Promise<'reject' 
       if (Number.isFinite(n) && n > PROBE_BYTE_LIMIT) {
         const buf = await safeReadResponseBodyPrefix(res, PROBE_BYTE_LIMIT)
         const dim = parseRasterImageDimensionsFromBytes(buf)
-        if (!dim) return 'inconclusive'
-        return dimensionsSuggestBrandOrTrackerAsset(dim) ? 'reject' : 'inconclusive'
+        if (!dim) return { ok: false, reason: 'probe_not_decodable_raster' }
+        return dimensionsSuggestBrandOrTrackerAsset(dim)
+          ? { ok: false, reason: 'banner_or_icon_dimensions' }
+          : { ok: true }
       }
     }
 
@@ -171,15 +177,28 @@ async function probeRasterSuggestsNonPhoto(urlString: string): Promise<'reject' 
         ? new Uint8Array(await res.arrayBuffer())
         : await safeReadResponseBodyPrefix(res, PROBE_BYTE_LIMIT)
 
-    if (buf.byteLength < 24) return 'inconclusive'
+    if (buf.byteLength < 24) return { ok: false, reason: 'probe_empty_or_short_body' }
     const dim = parseRasterImageDimensionsFromBytes(buf)
-    if (!dim) return 'inconclusive'
-    return dimensionsSuggestBrandOrTrackerAsset(dim) ? 'reject' : 'inconclusive'
+    if (!dim) return { ok: false, reason: 'probe_not_decodable_raster' }
+    return dimensionsSuggestBrandOrTrackerAsset(dim)
+      ? { ok: false, reason: 'banner_or_icon_dimensions' }
+      : { ok: true }
   } catch {
-    return 'inconclusive'
+    return { ok: false, reason: 'probe_fetch_failed' }
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** Full publish-time gate: SSRF-safe URL, non-branding path, decodable loadable raster. */
+export async function isPublishableExternalImageUrl(urlString: string): Promise<boolean> {
+  const trimmed = urlString.trim()
+  if (!trimmed) return false
+  const validation = await validateExternalImageUrlWithReason(trimmed)
+  if (!validation.ok) return false
+  if (urlSuggestsNonListingPhoto(trimmed)) return false
+  const probe = await probePublishableRasterImageUrl(trimmed)
+  return probe.ok
 }
 
 export async function sanitizeExternalImageUrls(
@@ -229,15 +248,15 @@ export async function sanitizeExternalImageUrls(
       continue
     }
 
-    const probe = await probeRasterSuggestsNonPhoto(trimmed)
-    if (probe === 'reject') {
+    const probe = await probePublishableRasterImageUrl(trimmed)
+    if (!probe.ok) {
       logger.warn('Publish image candidate rejected', {
         component: 'ingestion/externalImageValidation',
-        operation: 'raster_dimension_heuristic',
+        operation: 'raster_probe',
         rowId: context.rowId,
         city: context.city,
         state: context.state,
-        reason: 'banner_or_icon_dimensions',
+        reason: probe.reason,
       })
       continue
     }

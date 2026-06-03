@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { minimalValidProbeFetchResponse } from '../helpers/minimalProbeImage'
 
 const { dnsLookup, loggerInfo, loggerWarn, loggerError, adminDb } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
@@ -78,7 +79,7 @@ describe('publishWorker linked sale path address gate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
+    vi.stubGlobal('fetch', vi.fn(async () => minimalValidProbeFetchResponse()))
   })
 
   it('fails closed to publish_failed when linked row has placeholder address (no createPublishedSale)', async () => {

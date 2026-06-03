@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { minimalValidProbeFetchResponse } from '../helpers/minimalProbeImage'
 
 const canonical = 'b'.repeat(64)
 const INGESTED_ID = '55555555-5555-4555-8555-555555555555'
@@ -95,7 +96,7 @@ describe('publishWorker cross-provider publish link (Phase D)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
+    vi.stubGlobal('fetch', vi.fn(async () => minimalValidProbeFetchResponse()))
     resolveCrossProviderPublishLinkMock.mockResolvedValue({
       publishedSaleId: LINKED_SALE_ID,
       primaryIngestedSaleId: PRIMARY_INGESTED_ID,

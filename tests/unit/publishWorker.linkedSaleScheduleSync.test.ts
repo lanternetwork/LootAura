@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { minimalValidProbeFetchResponse } from '../helpers/minimalProbeImage'
 
 const resolveEndsAtMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
@@ -127,7 +128,7 @@ describe('publishWorker linked sale schedule sync (reingest)', () => {
     ctx.mirrorIngestPayloads.length = 0
     ctx.saleSelectCalls = 0
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
+    vi.stubGlobal('fetch', vi.fn(async () => minimalValidProbeFetchResponse()))
     resolveEndsAtMock.mockReset()
     resolveEndsAtMock.mockResolvedValue({
       ends_at: '2026-06-01T21:00:00.000Z',

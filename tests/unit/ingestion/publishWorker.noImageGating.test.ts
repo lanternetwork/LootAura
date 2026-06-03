@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { minimalValidProbeFetchResponse } from '../helpers/minimalProbeImage'
 
 const { dnsLookup, createPublishedSaleMock, mockFromBase } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
@@ -93,7 +94,7 @@ describe('publishReadyIngestedSaleById without images (D2.5 cron path)', () => {
     vi.clearAllMocks()
     dnsLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }])
     createPublishedSaleMock.mockResolvedValue({ saleId: 'sale-no-images' })
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 })))
+    vi.stubGlobal('fetch', vi.fn(async () => minimalValidProbeFetchResponse()))
     mockIngestedSalesClaimSequence(baseRow())
   })
 

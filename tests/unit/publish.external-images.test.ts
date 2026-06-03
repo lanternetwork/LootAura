@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InsufficientAddressForPublishError } from '@/lib/ingestion/publishValidation'
+import { minimalValidProbeFetchResponse } from '../helpers/minimalProbeImage'
 
 const { dnsLookup, resolvePersistableSaleEndsAtMock } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),
@@ -118,10 +119,7 @@ describe('createPublishedSale image handling', () => {
   })
 
   it('accepts image_cloudinary_url when sanitizer allows the URL', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(new ArrayBuffer(0), { status: 206 }))
-    )
+    vi.stubGlobal('fetch', vi.fn(async () => minimalValidProbeFetchResponse()))
     const { createPublishedSale } = await import('@/lib/ingestion/publish')
     const { mergeSanitizedCloudinaryIntoPublishable } = await import(
       '@/lib/ingestion/sanitizePublishCloudinaryFallback'

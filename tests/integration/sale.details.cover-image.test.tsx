@@ -77,9 +77,11 @@ vi.mock('next/image', () => ({
     'data-testid'?: string
     fill?: boolean
     priority?: boolean
+    onLoad?: () => void
+    onError?: () => void
     [key: string]: unknown
   }) => {
-    const { src, alt, className, sizes, 'data-testid': dataTestId } = props
+    const { src, alt, className, sizes, onLoad, onError, 'data-testid': dataTestId } = props
     return (
       <img
         src={src}
@@ -87,6 +89,8 @@ vi.mock('next/image', () => ({
         className={className}
         sizes={sizes}
         data-testid={dataTestId}
+        onLoad={onLoad}
+        onError={onError}
       />
     )
   },
@@ -204,5 +208,20 @@ describe('SaleDetailClient cover image rendering', () => {
     for (let i = 0; i < 10; i += 1) {
       expect(screen.getAllByLabelText(`Show sale image ${i + 1}`).length).toBeGreaterThan(0)
     }
+  })
+
+  it('shows placeholder when cover image fails to load', () => {
+    mockGetSaleCoverUrl.mockReturnValue({
+      url: 'https://images.example.net/broken-cover.jpg',
+      alt: 'Broken image',
+    })
+
+    render(<SaleDetailClient sale={mockSale as any} displayCategories={[]} items={[]} />)
+
+    const imgs = screen.getAllByTestId('sale-detail-cover-external-img')
+    fireEvent.error(imgs[0])
+
+    expect(screen.queryByText('Loading image...')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('sale-placeholder').length).toBeGreaterThan(0)
   })
 })

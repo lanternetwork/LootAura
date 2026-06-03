@@ -262,10 +262,12 @@ export default function SaleDetailClient({
   }, [sale.images, sale.cover_image_url])
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [loadedGalleryUrls, setLoadedGalleryUrls] = useState<Set<string>>(new Set())
+  const [failedGalleryUrls, setFailedGalleryUrls] = useState<Set<string>>(new Set())
   const [isGalleryImageLoading, setIsGalleryImageLoading] = useState(false)
   useEffect(() => {
     setSelectedImageIndex(0)
     setLoadedGalleryUrls(new Set())
+    setFailedGalleryUrls(new Set())
     setIsGalleryImageLoading(false)
   }, [sale.id, galleryImages.length])
   const selectedImageUrl = galleryImages[selectedImageIndex] ?? cover?.url ?? null
@@ -289,8 +291,12 @@ export default function SaleDetailClient({
       setIsGalleryImageLoading(false)
       return
     }
+    if (failedGalleryUrls.has(selectedImageUrl)) {
+      setIsGalleryImageLoading(false)
+      return
+    }
     setIsGalleryImageLoading(!loadedGalleryUrls.has(selectedImageUrl))
-  }, [selectedImageUrl, loadedGalleryUrls])
+  }, [selectedImageUrl, loadedGalleryUrls, failedGalleryUrls])
 
   useEffect(() => {
     if (typeof window === 'undefined' || galleryImages.length <= 1) return
@@ -327,6 +333,20 @@ export default function SaleDetailClient({
     })
     setIsGalleryImageLoading(false)
   }
+
+  const markGalleryImageFailed = (url: string | null) => {
+    if (!url) return
+    setFailedGalleryUrls((prev) => {
+      if (prev.has(url)) return prev
+      const next = new Set(prev)
+      next.add(url)
+      return next
+    })
+    setIsGalleryImageLoading(false)
+  }
+
+  const showSelectedGalleryImage =
+    Boolean(selectedImageUrl) && !failedGalleryUrls.has(selectedImageUrl ?? '')
 
   // Track click event for navigation/directions
   const handleNavigationClick = () => {
@@ -824,26 +844,28 @@ export default function SaleDetailClient({
               Loading image...
             </div>
           )}
-          {selectedImageUrl ? (
-            isTrustedNextImageHost(selectedImageUrl) ? (
+          {showSelectedGalleryImage ? (
+            isTrustedNextImageHost(selectedImageUrl!) ? (
               <Image
-                src={selectedImageUrl}
+                src={selectedImageUrl!}
                 alt={selectedImageAlt}
                 data-testid="sale-detail-cover-next-image"
                 fill
                 className="object-contain"
                 sizes="100vw"
                 onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                onError={() => markGalleryImageFailed(selectedImageUrl)}
               />
             ) : (
               <img
-                src={selectedImageUrl}
+                src={selectedImageUrl!}
                 alt={selectedImageAlt}
                 data-testid="sale-detail-cover-external-img"
                 className="h-full w-full object-contain"
                 loading="lazy"
                 referrerPolicy="no-referrer"
                 onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                onError={() => markGalleryImageFailed(selectedImageUrl)}
               />
             )
           ) : (
@@ -1059,26 +1081,28 @@ export default function SaleDetailClient({
                   Loading image...
                 </div>
               )}
-              {selectedImageUrl ? (
-                isTrustedNextImageHost(selectedImageUrl) ? (
+              {showSelectedGalleryImage ? (
+                isTrustedNextImageHost(selectedImageUrl!) ? (
                   <Image
-                    src={selectedImageUrl}
+                    src={selectedImageUrl!}
                     alt={selectedImageAlt}
                     data-testid="sale-detail-cover-next-image"
                     fill
                     className="object-contain"
                     sizes="(min-width:1024px) 66vw, 100vw"
                     onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                    onError={() => markGalleryImageFailed(selectedImageUrl)}
                   />
                 ) : (
                   <img
-                    src={selectedImageUrl}
+                    src={selectedImageUrl!}
                     alt={selectedImageAlt}
                     data-testid="sale-detail-cover-external-img"
                     className="h-full w-full object-contain"
                     loading="lazy"
                     referrerPolicy="no-referrer"
                     onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                    onError={() => markGalleryImageFailed(selectedImageUrl)}
                   />
                 )
               ) : (

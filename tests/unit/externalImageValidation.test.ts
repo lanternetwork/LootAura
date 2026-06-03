@@ -121,7 +121,11 @@ describe('sanitizeExternalImageUrls branding and dimension heuristics', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response(new Blob([pngHeader]), { status: 206 }))
+      vi.fn(async () => {
+        const body = new ArrayBuffer(pngHeader.byteLength)
+        new Uint8Array(body).set(pngHeader)
+        return new Response(body, { status: 206 })
+      })
     )
 
     const out = await sanitizeExternalImageUrls(['https://images.example.org/hero.png'], {

@@ -15,7 +15,32 @@ import { requestGeolocation, isGeolocationAvailable, logLocationFallback } from 
 
 const HEADER_HEIGHT = 56 // px - mobile header height (h-14 = 56px)
 
+/** history.state marker for user-opened mobile list overlay (browser back closes tray). */
+export const MOBILE_SALES_LIST_OVERLAY_KEY = 'lootauraMobileSalesListOverlay'
+
 type MobileMode = 'map' | 'list'
+
+/** Build /sales URL preserving query params; adds or omits view=list. */
+export function buildMobileSalesViewUrl(
+  searchParams: { forEach: (cb: (value: string, key: string) => void) => void } | null,
+  targetMode: MobileMode
+): string {
+  const params = new URLSearchParams()
+  if (searchParams) {
+    searchParams.forEach((value, key) => {
+      if (key !== 'view') {
+        params.set(key, value)
+      }
+    })
+  }
+  if (targetMode === 'list') {
+    params.set('view', 'list')
+  }
+  const pathname =
+    typeof window !== 'undefined' ? window.location.pathname : '/sales'
+  const qs = params.toString()
+  return qs ? `${pathname}?${qs}` : pathname
+}
 
 interface MobileSalesShellProps {
   // Map props
@@ -107,6 +132,11 @@ export default function MobileSalesShell({
   const [mode, setMode] = useState<MobileMode>(initialMode)
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
   const mapRef = useRef<any>(null)
+  const modeRef = useRef<MobileMode>(initialMode)
+  const listOverlayHistoryRef = useRef(false)
+  const skipUrlSyncRef = useRef(false)
+
+  modeRef.current = mode
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
@@ -137,14 +167,21 @@ export default function MobileSalesShell({
     return !isLikelyDesktopEnvironment
   }, [])
 
-  // Sync mode to URL params
+  // Sync mode to URL params (router.replace). Skipped when pushState/popstate already updated the URL.
   useEffect(() => {
-    const currentView = searchParams?.get('view')
-    const newView = mode === 'list' ? 'list' : null // Only set 'list', remove param for 'map'
-    
+    if (skipUrlSyncRef.current) {
+      skipUrlSyncRef.current = false
+      return
+    }
+
+    const currentView =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('view')
+        : searchParams?.get('view') ?? null
+    const newView = mode === 'list' ? 'list' : null
+
     if (currentView !== newView) {
       const params = new URLSearchParams()
-      // Copy all existing params except 'view'
       if (searchParams) {
         searchParams.forEach((value, key) => {
           if (key !== 'view') {
@@ -152,14 +189,52 @@ export default function MobileSalesShell({
           }
         })
       }
-      // Add 'view' param if needed
       if (newView) {
         params.set('view', newView)
       }
-      const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
+      const newUrl = params.toString()
+        ? `?${params.toString()}`
+        : window.location.pathname
       router.replace(newUrl, { scroll: false })
     }
   }, [mode, searchParams, router])
+
+  // Browser/Android back closes list overlay (map stays mounted; remain on /sales).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const onPopState = () => {
+      if (modeRef.current !== 'list') return
+      listOverlayHistoryRef.current = false
+      skipUrlSyncRef.current = true
+      setMode('map')
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  const openListMode = useCallback(() => {
+    if (modeRef.current === 'list') return
+    if (typeof window !== 'undefined') {
+      const url = buildMobileSalesViewUrl(searchParams, 'list')
+      window.history.pushState({ [MOBILE_SALES_LIST_OVERLAY_KEY]: true }, '', url)
+      listOverlayHistoryRef.current = true
+    }
+    skipUrlSyncRef.current = true
+    setMode('list')
+  }, [searchParams])
+
+  const closeListMode = useCallback(() => {
+    if (modeRef.current !== 'list') return
+    if (listOverlayHistoryRef.current && typeof window !== 'undefined') {
+      listOverlayHistoryRef.current = false
+      skipUrlSyncRef.current = true
+      window.history.back()
+      return
+    }
+    setMode('map')
+  }, [])
   
   // Find selected sale from selectedPinId
   // selectedPinId can be either a sale ID or a location ID
@@ -250,10 +325,14 @@ export default function MobileSalesShell({
     }
   }, [selectedPinCoords])
   
-  // Handle mode toggle
+  // Handle mode toggle (list open pushes overlay history; close pops it)
   const handleToggleMode = useCallback(() => {
-    setMode(prev => prev === 'map' ? 'list' : 'map')
-  }, [])
+    if (modeRef.current === 'map') {
+      openListMode()
+    } else {
+      closeListMode()
+    }
+  }, [openListMode, closeListMode])
 
   // Visibility is now controlled by shouldShowLocationIcon prop from SalesClient
   // This ensures a single source of truth for visibility logic

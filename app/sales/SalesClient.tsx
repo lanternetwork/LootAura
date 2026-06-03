@@ -13,7 +13,11 @@ import MobileSalesShell from './MobileSalesShell'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
-import { createHybridPins } from '@/lib/pins/hybridClustering'
+import {
+  buildLocationGroupsHybridResult,
+  SALES_CLIENT_LOCATION_GROUPING_OPTIONS,
+} from '@/lib/pins/hybridClustering'
+import type { HybridPinsResult } from '@/lib/pins/types'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
 import { MAP_IDLE_FIRST_EVENT } from '@/lib/map/mapIdleEvent'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
@@ -1113,9 +1117,9 @@ export default function SalesClient({
     return () => clearTimeout(t)
   }, [hasCompletedInitialLoad])
 
-  // Hybrid system: Create location groups and apply clustering
-  // DEFERRED: Run clustering after first paint to improve initial load time
-  const [hybridResult, setHybridResult] = useState<ReturnType<typeof createHybridPins>>({
+  // Location groups for callouts/selection only (map pins cluster in HybridPinsOverlay)
+  // DEFERRED: Run grouping after first paint to improve initial load time
+  const [hybridResult, setHybridResult] = useState<HybridPinsResult>({
     type: 'individual' as const,
     pins: [],
     locations: [],
@@ -1123,7 +1127,7 @@ export default function SalesClient({
   })
   const [clusteringDeferred, setClusteringDeferred] = useState(true)
   
-  // Defer clustering until after first paint
+  // Defer location grouping until after first paint
   useEffect(() => {
     if (clusteringDeferred) {
       // Use requestIdleCallback if available, otherwise setTimeout
@@ -1140,24 +1144,16 @@ export default function SalesClient({
         }
         
         if (isDebugEnabled) {
-          console.log('[HYBRID] Clustering (deferred)', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
+          console.log('[HYBRID] Location grouping (deferred)', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
         }
         
-        // Only run clustering on visible sales - touch-only clustering
-        // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
-        const result = createHybridPins(visibleSales, currentViewport, {
-          coordinatePrecision: 6, // high precision to avoid accidental grouping
-          clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
-          minClusterSize: 2, // allow clustering for 2+ points
-          maxZoom: 16,
-          enableLocationGrouping: true,
-          enableVisualClustering: true
-        })
+        const result = buildLocationGroupsHybridResult(
+          visibleSales,
+          SALES_CLIENT_LOCATION_GROUPING_OPTIONS
+        )
         
         if (isDebugEnabled) {
-          console.log('[HYBRID] Clustering completed (deferred):', {
-            type: result.type,
-            pinsCount: result.pins.length,
+          console.log('[HYBRID] Location grouping completed (deferred):', {
             locationsCount: result.locations.length,
             visibleSalesCount: visibleSales.length,
             totalFetchedCount: fetchedSales.length
@@ -1178,20 +1174,13 @@ export default function SalesClient({
     }
   }, [clusteringDeferred, currentViewport, visibleSales, fetchedSales.length, markPerformance])
   
-  // Update clustering when inputs change (after initial deferral)
+  // Update location groups when visible sales change (after initial deferral)
   useEffect(() => {
     if (!clusteringDeferred) {
-      // Re-cluster on viewport/sales changes (after initial deferral)
       if (currentViewport && visibleSales.length > 0) {
-        const result = createHybridPins(visibleSales, currentViewport, {
-          coordinatePrecision: 6,
-          clusterRadius: 6.5,
-          minClusterSize: 2,
-          maxZoom: 16,
-          enableLocationGrouping: true,
-          enableVisualClustering: true
-        })
-        setHybridResult(result)
+        setHybridResult(
+          buildLocationGroupsHybridResult(visibleSales, SALES_CLIENT_LOCATION_GROUPING_OPTIONS)
+        )
       } else {
         setHybridResult({
           type: 'individual' as const,

@@ -24,6 +24,32 @@ const DEFAULT_OPTIONS: HybridClusteringOptions = {
   enableVisualClustering: true
 }
 
+/** Options shared by SalesClient location grouping (stage 1 only; map pins use full createHybridPins). */
+export const SALES_CLIENT_LOCATION_GROUPING_OPTIONS: Pick<
+  HybridClusteringOptions,
+  'coordinatePrecision' | 'enableLocationGrouping'
+> = {
+  coordinatePrecision: 6,
+  enableLocationGrouping: true,
+}
+
+/**
+ * Build HybridPinsResult with locations only (no visual clustering).
+ * Used by SalesClient for callouts/selection; map pins use HybridPinsOverlay + createHybridPins.
+ */
+export function buildLocationGroupsHybridResult(
+  sales: Sale[],
+  options: Partial<HybridClusteringOptions> = SALES_CLIENT_LOCATION_GROUPING_OPTIONS
+): HybridPinsResult {
+  const locations = groupSalesByLocation(sales, options)
+  return {
+    type: 'individual',
+    pins: [],
+    locations,
+    clusters: [],
+  }
+}
+
 /**
  * Group sales by unique coordinates (Stage 1: Location-based grouping)
  */
@@ -196,11 +222,7 @@ export function applyVisualClustering(
   })
   
   // Add individual locations that aren't clustered at current zoom
-  const indexForMembership = buildClusterIndex(
-    locations.map(l => ({ id: l.id, lat: l.lat, lng: l.lng })),
-    { radius: opts.clusterRadius, maxZoom: opts.maxZoom, minPoints: opts.minClusterSize }
-  )
-  const clusteredIds = getClusterMemberIds(indexForMembership, realClusters.map(c => c.id))
+  const clusteredIds = getClusterMemberIds(clusterIndex, realClusters.map(c => c.id))
   let colocatedClusterCount = 0
   locations.forEach(location => {
     if (clusteredIds.has(location.id)) {

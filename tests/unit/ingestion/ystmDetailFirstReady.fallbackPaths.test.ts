@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { YstmDetailPageParsed } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
 import { sumDetailFirstFallbackReasonCounts } from '@/lib/ingestion/acquisition/ystmDetailFirstFallbackReasons'
 import type { YstmDetailFirstRunMetrics } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
@@ -227,6 +227,8 @@ function mockInsertUniqueViolationWithPromote(promotedId: string) {
 
 describe('attemptYstmDetailFirstReady fallback paths', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'))
     vi.resetModules()
     mockFetchExternalPageSource.mockReset()
     mockParseYstmDetailPageFromHtml.mockReset()
@@ -238,6 +240,10 @@ describe('attemptYstmDetailFirstReady fallback paths', () => {
     mockHappyInsert()
     mockClassifySpatialFailure.mockResolvedValue('spatial_lookup_failed')
     mockParseYstmDetailPageFromHtml.mockReturnValue(detailParsedFromListing(VALID_LISTING))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('records parse_no_listing when source is not a detail URL', async () => {

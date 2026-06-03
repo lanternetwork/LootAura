@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { minimalValidProbeFetchResponse } from '../helpers/minimalProbeImage'
+import { minimalValidProbeFetchResponse } from '../../helpers/minimalProbeImage'
 
 const { dnsLookup, createPublishedSaleMock, mockFromBase } = vi.hoisted(() => ({
   dnsLookup: vi.fn(),

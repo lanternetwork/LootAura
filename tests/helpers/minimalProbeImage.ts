@@ -15,5 +15,5 @@ export function buildMinimalValidPngBytes(width = 100, height = 100): Uint8Array
 
 export function minimalValidProbeFetchResponse(width = 100, height = 100): Response {
   const bytes = buildMinimalValidPngBytes(width, height)
-  return new Response(bytes, { status: 206 })
+  return new Response(new Blob([bytes]), { status: 206 })
 }

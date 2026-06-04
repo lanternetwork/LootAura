@@ -18,6 +18,25 @@ export function Header() {
   
   // Check if we're on a sale detail page
   const isSaleDetailPage = pathname?.startsWith('/sales/') && pathname !== '/sales'
+
+  const isBrowseSalesActive =
+    pathname === '/sales' || (pathname?.startsWith('/sales/') ?? false)
+
+  const browseSalesTextLinkClass = isBrowseSalesActive
+    ? 'text-sm sm:text-base font-semibold text-[#3A2268] whitespace-nowrap'
+    : 'text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap'
+
+  const browseSalesIconLinkClass = isBrowseSalesActive
+    ? 'flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border-2 border-[#3A2268] bg-[#3A2268]/10 transition-colors'
+    : 'flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors'
+
+  const browseSalesIconSvgClass = isBrowseSalesActive
+    ? 'h-5 w-5 text-[#3A2268]'
+    : 'h-5 w-5 text-gray-700'
+
+  const browseSalesAriaCurrent = isBrowseSalesActive
+    ? ({ 'aria-current': 'page' as const })
+    : {}
   
   // Build back URL with viewport params if they exist
   const backUrl = (() => {
@@ -141,7 +160,14 @@ export function Header() {
           <div className="flex gap-2 sm:gap-6 items-center shrink-0">
             {/* Main links cluster - Text links for large screens */}
             <div ref={mainRef} className={`${isCollapsed ? 'hidden' : 'hidden lg:flex'} items-center gap-3 sm:gap-6`} aria-label="Main navigation">
-              <Link href="/sales" onClick={(e) => handleNativeNavigation('/sales', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Browse Sales</Link>
+              <Link
+                href="/sales"
+                onClick={(e) => handleNativeNavigation('/sales', e)}
+                className={browseSalesTextLinkClass}
+                {...browseSalesAriaCurrent}
+              >
+                Browse Sales
+              </Link>
               <Link href="/favorites" onClick={(e) => handleNativeNavigation('/favorites', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
               <Link href="/sell/new" onClick={(e) => handleNativeNavigation('/sell/new', e)} className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
             </div>
@@ -150,10 +176,11 @@ export function Header() {
               <Link
                 href="/sales"
                 onClick={(e) => handleNativeNavigation('/sales', e)}
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                className={browseSalesIconLinkClass}
                 aria-label="Browse Sales"
+                {...browseSalesAriaCurrent}
               >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={browseSalesIconSvgClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -190,10 +217,11 @@ export function Header() {
               <Link
                 href="/sales"
                 onClick={(e) => handleNativeNavigation('/sales', e)}
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                className={browseSalesIconLinkClass}
                 aria-label="Browse Sales"
+                {...browseSalesAriaCurrent}
               >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={browseSalesIconSvgClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>

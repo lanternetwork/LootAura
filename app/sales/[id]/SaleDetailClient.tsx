@@ -352,8 +352,14 @@ export default function SaleDetailClient({
   const showSelectedGalleryImage =
     Boolean(selectedImageUrl) && !failedGalleryUrls.has(selectedImageUrl ?? '')
 
+  const fullscreenGalleryImages = useMemo(() => {
+    if (galleryImages.length > 0) return galleryImages
+    if (showSelectedGalleryImage && selectedImageUrl) return [selectedImageUrl]
+    return []
+  }, [galleryImages, showSelectedGalleryImage, selectedImageUrl])
+
   const openFullscreenGallery = () => {
-    if (showSelectedGalleryImage && galleryImages.length > 0) {
+    if (showSelectedGalleryImage && fullscreenGalleryImages.length > 0) {
       setIsFullscreenGalleryOpen(true)
     }
   }
@@ -1635,7 +1641,7 @@ export default function SaleDetailClient({
       <SaleDetailFullscreenGallery
         open={isFullscreenGalleryOpen}
         onClose={() => setIsFullscreenGalleryOpen(false)}
-        images={galleryImages}
+        images={fullscreenGalleryImages}
         selectedIndex={selectedImageIndex}
         onSelectedIndexChange={setSelectedImageIndex}
         imageAlt={selectedImageAlt}

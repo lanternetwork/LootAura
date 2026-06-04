@@ -11,8 +11,8 @@ const LISTING_URL =
 const activeExisting = {
   status: 'ready',
   failure_reasons: [] as unknown,
-  date_start: '2026-06-01',
-  date_end: '2026-06-02',
+  date_start: '2099-06-01',
+  date_end: '2099-06-02',
   normalized_address: '123 main st',
 }
 
@@ -22,11 +22,11 @@ function listSeedCtx(overrides: Partial<Parameters<typeof classifyYstmUrlReuseFr
     sourceUrl: LISTING_URL,
     state: 'TX',
     city: 'Austin',
-    listingStartDate: '2026-07-10',
-    listingEndDate: '2026-07-11',
+    listingStartDate: '2099-07-10',
+    listingEndDate: '2099-07-11',
     listingAddressRaw: '123 Main St',
     existingIngestedSaleId: 'ing-1',
-    existingSaleInstanceKey: 'external_page_source:TX|austin|123 main st:2026-06-01|2026-06-02:961002738',
+    existingSaleInstanceKey: 'external_page_source:TX|austin|123 main st:2099-06-01|2099-06-02:961002738',
     existing: activeExisting,
     ...overrides,
   }
@@ -42,8 +42,8 @@ describe('classifyYstmUrlReuseFromListSeed', () => {
     expect(
       classifyYstmUrlReuseFromListSeed(
         listSeedCtx({
-          listingStartDate: '2026-06-02',
-          listingEndDate: '2026-06-03',
+          listingStartDate: '2099-06-02',
+          listingEndDate: '2099-06-03',
           existingSaleInstanceKey: null,
         })
       )
@@ -54,8 +54,8 @@ describe('classifyYstmUrlReuseFromListSeed', () => {
     expect(
       classifyYstmUrlReuseFromListSeed(
         listSeedCtx({
-          listingStartDate: '2026-08-01',
-          listingEndDate: '2026-08-02',
+          listingStartDate: '2099-08-01',
+          listingEndDate: '2099-08-02',
           listingAddressRaw: null,
           existingSaleInstanceKey: null,
           existing: {

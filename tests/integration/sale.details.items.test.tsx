@@ -346,7 +346,7 @@ describe('Sale Details Items Display', () => {
     expect(imageWithSrc).toBeDefined()
   })
 
-  it('should show empty state when no items exist', () => {
+  it('should omit Items section when no items exist', () => {
     render(
       <SaleDetailClient 
         sale={mockSale} 
@@ -355,9 +355,8 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    // Both mobile and desktop layouts render empty state
-    const emptyStateElements = screen.getAllByText('No items listed yet.')
-    expect(emptyStateElements.length).toBeGreaterThan(0)
+    expect(screen.queryByText('No items listed yet.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Items for Sale')).not.toBeInTheDocument()
     expect(screen.queryByText('Vintage Coffee Table')).not.toBeInTheDocument()
   })
 

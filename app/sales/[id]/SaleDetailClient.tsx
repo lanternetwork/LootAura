@@ -990,14 +990,9 @@ export default function SaleDetailClient({
           </div>
         )}
 
-        {/* Items Grid */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">Items for Sale</h2>
-          {items.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No items listed yet.</p>
-            </div>
-          ) : (
+        {items.length > 0 && (
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+            <h2 className="text-lg font-semibold text-gray-900">Items for Sale</h2>
             <div className="grid grid-cols-2 gap-3">
               {items.map((item) => (
                 <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -1028,8 +1023,8 @@ export default function SaleDetailClient({
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Map Card - Mobile */}
         {typeof sale.lat === 'number' && typeof sale.lng === 'number' && (
@@ -1327,14 +1322,9 @@ export default function SaleDetailClient({
             </div>
           )}
 
-          {/* Items Grid */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Items for Sale</h2>
-            {items.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No items listed yet.</p>
-              </div>
-            ) : (
+          {items.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Items for Sale</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map((item) => {
                   return (
@@ -1377,8 +1367,8 @@ export default function SaleDetailClient({
                 )
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}

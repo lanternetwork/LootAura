@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import SaleDetailClient from '@/app/sales/[id]/SaleDetailClient'
 
 const { mockGetSaleCoverUrl } = vi.hoisted(() => ({
@@ -262,10 +262,10 @@ describe('SaleDetailClient cover image rendering', () => {
     fireEvent.click(screen.getAllByLabelText('Show sale image 2')[0])
     fireEvent.click(screen.getAllByLabelText('View sale image fullscreen')[0])
 
-    expect(screen.getByRole('dialog', { name: 'Sale image gallery' })).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Next sale image'))
-    fireEvent.click(screen.getByLabelText('Next sale image'))
-    fireEvent.click(screen.getByLabelText('Close image gallery'))
+    const dialog = screen.getByRole('dialog', { name: 'Sale image gallery' })
+    fireEvent.click(within(dialog).getByLabelText('Next sale image'))
+    fireEvent.click(within(dialog).getByLabelText('Next sale image'))
+    fireEvent.click(within(dialog).getByLabelText('Close image gallery'))
 
     expect(screen.queryByRole('dialog', { name: 'Sale image gallery' })).not.toBeInTheDocument()
     expect(screen.getAllByTestId('sale-detail-cover-next-image')[0]).toHaveAttribute(

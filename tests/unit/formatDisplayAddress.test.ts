@@ -14,6 +14,12 @@ describe('formatAddressForPublishedSaleDisplay', () => {
     ).toBe('620 Lincoln Ave, Winnetka, IL 60093')
   })
 
+  it('strips trailing USA before title-casing', () => {
+    expect(
+      formatAddressForPublishedSaleDisplay('1929 w montrose ave, chicago, IL 60613, usa')
+    ).toBe('1929 W Montrose Ave, Chicago, IL 60613')
+  })
+
   it('does not mutate normalizeAddressForPublish inputs (dedupe / ingest line unchanged)', () => {
     const raw = '123 MAIN ST'
     const city = 'Chicago'

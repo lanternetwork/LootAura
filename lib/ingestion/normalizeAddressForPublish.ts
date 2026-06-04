@@ -1,3 +1,4 @@
+import { stripTrailingUsCountryFromAddressLine } from '@/lib/display/stripTrailingUsCountry'
 import { uspsCodeToFullNameForAddress } from '@/lib/ingestion/adapters/usStateListPathSegment'
 
 function escapeRegExp(value: string): string {
@@ -32,7 +33,9 @@ export function normalizeAddressForPublish(
   city: string,
   state: string
 ): string | null {
-  const base = (normalizedAddress || '').replace(/\s+/g, ' ').trim()
+  const base = stripTrailingUsCountryFromAddressLine(
+    (normalizedAddress || '').replace(/\s+/g, ' ').trim()
+  )
   if (!base) return null
 
   const cityState = [city, state].map((v) => v.trim()).filter(Boolean).join(', ')

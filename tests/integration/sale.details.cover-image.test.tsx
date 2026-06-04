@@ -7,8 +7,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import SaleDetailClient from '@/app/sales/[id]/SaleDetailClient'
 
-const { mockGetSaleCoverUrl } = vi.hoisted(() => ({
+const { mockGetSaleCoverUrl, simpleMapRenderProps } = vi.hoisted(() => ({
   mockGetSaleCoverUrl: vi.fn(),
+  simpleMapRenderProps: [] as Array<{ interactive?: boolean }>,
 }))
 
 vi.mock('next/navigation', async () => {
@@ -41,7 +42,10 @@ vi.mock('@/lib/images/cover', () => ({
 }))
 
 vi.mock('@/components/location/SimpleMap', () => ({
-  default: () => <div data-testid="simple-map">Map</div>,
+  default: (props: { interactive?: boolean }) => {
+    simpleMapRenderProps.push(props)
+    return <div data-testid="simple-map">Map</div>
+  },
 }))
 
 vi.mock('@/components/sales/SellerActivityCard', () => ({
@@ -130,6 +134,15 @@ const mockSale = {
 describe('SaleDetailClient cover image rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    simpleMapRenderProps.length = 0
+  })
+
+  it('renders Location preview map as non-interactive on mobile and desktop', () => {
+    render(<SaleDetailClient sale={mockSale as any} displayCategories={[]} items={[]} />)
+
+    expect(screen.getAllByTestId('simple-map').length).toBeGreaterThan(0)
+    expect(simpleMapRenderProps.length).toBeGreaterThan(0)
+    expect(simpleMapRenderProps.every((props) => props.interactive === false)).toBe(true)
   })
 
   it('uses next/image path for trusted hosts', () => {

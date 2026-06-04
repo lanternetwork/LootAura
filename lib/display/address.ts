@@ -1,4 +1,5 @@
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
+import { stripTrailingUsCountryFromAddressLine } from '@/lib/display/stripTrailingUsCountry'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -22,7 +23,7 @@ function addressAlreadyContainsCityState(address: string, city: string, state: s
 }
 
 export function displayAddress(address?: string | null, city?: string | null, state?: string | null): string {
-  const base = normalizeWhitespace(address || '')
+  const base = stripTrailingUsCountryFromAddressLine(normalizeWhitespace(address || ''))
   const cityNorm = normalizeWhitespace(city || '')
   const stateNorm = normalizeWhitespace(state || '')
   const cityState = [cityNorm, stateNorm].filter(Boolean).join(', ')

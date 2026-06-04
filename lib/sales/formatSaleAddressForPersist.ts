@@ -1,3 +1,4 @@
+import { stripTrailingUsCountryFromAddressLine } from '@/lib/display/stripTrailingUsCountry'
 import { formatAddressForPublishedSaleDisplay } from '@/lib/ingestion/formatDisplayAddress'
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
@@ -16,13 +17,14 @@ export function formatSaleAddressForPersist(
   if (!raw) return null
   const c = typeof city === 'string' ? city.replace(/\s+/g, ' ').trim() : ''
   const s = typeof state === 'string' ? state.replace(/\s+/g, ' ').trim() : ''
-  if (!c || !s) return raw
-  const normalized = normalizeAddressForPublish(raw, c, s)
+  const strippedRaw = stripTrailingUsCountryFromAddressLine(raw)
+  if (!c || !s) return strippedRaw
+  const normalized = normalizeAddressForPublish(strippedRaw, c, s)
   if (!normalized) return null
   try {
     validateResolvedAddressForPublish(normalized, c, s)
     return formatAddressForPublishedSaleDisplay(normalized)
   } catch {
-    return raw
+    return strippedRaw
   }
 }

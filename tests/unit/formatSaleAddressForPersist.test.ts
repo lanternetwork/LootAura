@@ -22,4 +22,14 @@ describe('formatSaleAddressForPersist', () => {
   it('preserves directionals in the formatted output', () => {
     expect(formatSaleAddressForPersist('100 n main st', 'Chicago', 'IL')).toBe('100 N Main St, Chicago, IL')
   })
+
+  it('strips USA from user-pasted address on persist', () => {
+    expect(
+      formatSaleAddressForPersist('123 Main St, Louisville, KY, USA', 'Louisville', 'KY')
+    ).toBe('123 Main St, Louisville, KY')
+  })
+
+  it('strips USA on validation-failure fallback', () => {
+    expect(formatSaleAddressForPersist('Louisville, KY, USA', 'Louisville', 'KY')).toBe('Louisville, KY')
+  })
 })

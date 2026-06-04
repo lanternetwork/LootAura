@@ -1,3 +1,5 @@
+import { stripTrailingUsCountryFromAddressLine } from '@/lib/display/stripTrailingUsCountry'
+
 /**
  * Presentation-only formatting for addresses written to published `sales.address`.
  * Does not run on ingest `normalized_address` or on dedupe/geocode inputs.
@@ -98,7 +100,7 @@ function formatCityOrRegionSegment(segment: string): string {
  * Safe to call only after publish-time address validation.
  */
 export function formatAddressForPublishedSaleDisplay(address: string): string {
-  const norm = address.replace(/\s+/g, ' ').trim()
+  const norm = stripTrailingUsCountryFromAddressLine(address.replace(/\s+/g, ' ').trim())
   if (!norm) return norm
 
   const segments = norm.split(',').map((s) => s.trim()).filter(Boolean)

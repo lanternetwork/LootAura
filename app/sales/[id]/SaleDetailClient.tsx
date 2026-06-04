@@ -22,6 +22,9 @@ import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 import ReportSaleModal from '@/components/moderation/ReportSaleModal'
+import SaleDetailFullscreenGallery, {
+  stepGalleryIndex,
+} from '@/components/sales/SaleDetailFullscreenGallery'
 import { BadgeCheck } from 'lucide-react'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 import { isNativeApp } from '@/lib/runtime/isNativeApp'
@@ -249,6 +252,7 @@ export default function SaleDetailClient({
   const { data: favoriteSales = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const [isFullscreenGalleryOpen, setIsFullscreenGalleryOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)
   const galleryImages = useMemo(() => {
     const base = Array.isArray(sale.images)
@@ -347,6 +351,18 @@ export default function SaleDetailClient({
 
   const showSelectedGalleryImage =
     Boolean(selectedImageUrl) && !failedGalleryUrls.has(selectedImageUrl ?? '')
+
+  const fullscreenGalleryImages = useMemo(() => {
+    if (galleryImages.length > 0) return galleryImages
+    if (showSelectedGalleryImage && selectedImageUrl) return [selectedImageUrl]
+    return []
+  }, [galleryImages, showSelectedGalleryImage, selectedImageUrl])
+
+  const openFullscreenGallery = () => {
+    if (showSelectedGalleryImage && fullscreenGalleryImages.length > 0) {
+      setIsFullscreenGalleryOpen(true)
+    }
+  }
 
   // Track click event for navigation/directions
   const handleNavigationClick = () => {
@@ -845,29 +861,36 @@ export default function SaleDetailClient({
             </div>
           )}
           {showSelectedGalleryImage ? (
-            isTrustedNextImageHost(selectedImageUrl!) ? (
-              <Image
-                src={selectedImageUrl!}
-                alt={selectedImageAlt}
-                data-testid="sale-detail-cover-next-image"
-                fill
-                className="object-contain"
-                sizes="100vw"
-                onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
-                onError={() => markGalleryImageFailed(selectedImageUrl)}
-              />
-            ) : (
-              <img
-                src={selectedImageUrl!}
-                alt={selectedImageAlt}
-                data-testid="sale-detail-cover-external-img"
-                className="h-full w-full object-contain"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
-                onError={() => markGalleryImageFailed(selectedImageUrl)}
-              />
-            )
+            <button
+              type="button"
+              onClick={openFullscreenGallery}
+              className="absolute inset-0 z-0 w-full h-full cursor-pointer border-0 bg-transparent p-0"
+              aria-label="View sale image fullscreen"
+            >
+              {isTrustedNextImageHost(selectedImageUrl!) ? (
+                <Image
+                  src={selectedImageUrl!}
+                  alt={selectedImageAlt}
+                  data-testid="sale-detail-cover-next-image"
+                  fill
+                  className="object-contain pointer-events-none"
+                  sizes="100vw"
+                  onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                  onError={() => markGalleryImageFailed(selectedImageUrl)}
+                />
+              ) : (
+                <img
+                  src={selectedImageUrl!}
+                  alt={selectedImageAlt}
+                  data-testid="sale-detail-cover-external-img"
+                  className="h-full w-full object-contain pointer-events-none"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                  onError={() => markGalleryImageFailed(selectedImageUrl)}
+                />
+              )}
+            </button>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
               <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
@@ -878,16 +901,26 @@ export default function SaleDetailClient({
               <button
                 type="button"
                 aria-label="Previous sale image"
-                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
-                onClick={() => setSelectedImageIndex((idx) => (idx === 0 ? galleryImages.length - 1 : idx - 1))}
+                className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedImageIndex((idx) =>
+                    stepGalleryIndex(idx, galleryImages.length, 'prev')
+                  )
+                }}
               >
                 Prev
               </button>
               <button
                 type="button"
                 aria-label="Next sale image"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
-                onClick={() => setSelectedImageIndex((idx) => (idx + 1) % galleryImages.length)}
+                className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedImageIndex((idx) =>
+                    stepGalleryIndex(idx, galleryImages.length, 'next')
+                  )
+                }}
               >
                 Next
               </button>
@@ -1082,29 +1115,36 @@ export default function SaleDetailClient({
                 </div>
               )}
               {showSelectedGalleryImage ? (
-                isTrustedNextImageHost(selectedImageUrl!) ? (
-                  <Image
-                    src={selectedImageUrl!}
-                    alt={selectedImageAlt}
-                    data-testid="sale-detail-cover-next-image"
-                    fill
-                    className="object-contain"
-                    sizes="(min-width:1024px) 66vw, 100vw"
-                    onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
-                    onError={() => markGalleryImageFailed(selectedImageUrl)}
-                  />
-                ) : (
-                  <img
-                    src={selectedImageUrl!}
-                    alt={selectedImageAlt}
-                    data-testid="sale-detail-cover-external-img"
-                    className="h-full w-full object-contain"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
-                    onError={() => markGalleryImageFailed(selectedImageUrl)}
-                  />
-                )
+                <button
+                  type="button"
+                  onClick={openFullscreenGallery}
+                  className="absolute inset-0 z-0 w-full h-full cursor-pointer border-0 bg-transparent p-0"
+                  aria-label="View sale image fullscreen"
+                >
+                  {isTrustedNextImageHost(selectedImageUrl!) ? (
+                    <Image
+                      src={selectedImageUrl!}
+                      alt={selectedImageAlt}
+                      data-testid="sale-detail-cover-next-image"
+                      fill
+                      className="object-contain pointer-events-none"
+                      sizes="(min-width:1024px) 66vw, 100vw"
+                      onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                      onError={() => markGalleryImageFailed(selectedImageUrl)}
+                    />
+                  ) : (
+                    <img
+                      src={selectedImageUrl!}
+                      alt={selectedImageAlt}
+                      data-testid="sale-detail-cover-external-img"
+                      className="h-full w-full object-contain pointer-events-none"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onLoad={() => markGalleryImageLoaded(selectedImageUrl)}
+                      onError={() => markGalleryImageFailed(selectedImageUrl)}
+                    />
+                  )}
+                </button>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
                   <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
@@ -1115,16 +1155,26 @@ export default function SaleDetailClient({
                   <button
                     type="button"
                     aria-label="Previous sale image"
-                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
-                    onClick={() => setSelectedImageIndex((idx) => (idx === 0 ? galleryImages.length - 1 : idx - 1))}
+                    className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedImageIndex((idx) =>
+                        stepGalleryIndex(idx, galleryImages.length, 'prev')
+                      )
+                    }}
                   >
                     Prev
                   </button>
                   <button
                     type="button"
                     aria-label="Next sale image"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
-                    onClick={() => setSelectedImageIndex((idx) => (idx + 1) % galleryImages.length)}
+                    className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedImageIndex((idx) =>
+                        stepGalleryIndex(idx, galleryImages.length, 'next')
+                      )
+                    }}
                   >
                     Next
                   </button>
@@ -1587,6 +1637,18 @@ export default function SaleDetailClient({
         </div>
       </div>
       )}
+
+      <SaleDetailFullscreenGallery
+        open={isFullscreenGalleryOpen}
+        onClose={() => setIsFullscreenGalleryOpen(false)}
+        images={fullscreenGalleryImages}
+        selectedIndex={selectedImageIndex}
+        onSelectedIndexChange={setSelectedImageIndex}
+        imageAlt={selectedImageAlt}
+        failedUrls={failedGalleryUrls}
+        onImageLoad={markGalleryImageLoaded}
+        onImageError={markGalleryImageFailed}
+      />
 
       {/* Report Sale Modal */}
       {currentUser && currentUser.id !== sale.owner_id && (

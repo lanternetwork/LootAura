@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import SaleDetailClient from '@/app/sales/[id]/SaleDetailClient'
 
 const { mockGetSaleCoverUrl } = vi.hoisted(() => ({
@@ -223,5 +223,68 @@ describe('SaleDetailClient cover image rendering', () => {
 
     expect(screen.queryByText('Loading image...')).not.toBeInTheDocument()
     expect(screen.getAllByTestId('sale-placeholder').length).toBeGreaterThan(0)
+  })
+
+  it('opens fullscreen gallery when hero is clicked', () => {
+    mockGetSaleCoverUrl.mockReturnValue({
+      url: 'https://res.cloudinary.com/demo/image/upload/v1/cover.jpg',
+      alt: 'Trusted image',
+    })
+
+    render(<SaleDetailClient sale={mockSale as any} displayCategories={[]} items={[]} />)
+
+    fireEvent.click(screen.getAllByLabelText('View sale image fullscreen')[0])
+
+    expect(screen.getByRole('dialog', { name: 'Sale image gallery' })).toBeInTheDocument()
+    expect(screen.getByTestId('sale-detail-fullscreen-image')).toHaveAttribute(
+      'src',
+      'https://res.cloudinary.com/demo/image/upload/v1/cover.jpg'
+    )
+  })
+
+  it('syncs selected index between fullscreen and inline gallery', () => {
+    mockGetSaleCoverUrl.mockReturnValue({
+      url: 'https://res.cloudinary.com/demo/image/upload/v1/1.jpg',
+      alt: 'Trusted image',
+    })
+    const saleWithGallery = {
+      ...mockSale,
+      images: [
+        'https://res.cloudinary.com/demo/image/upload/v1/1.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/2.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/3.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/4.jpg',
+      ],
+    }
+
+    render(<SaleDetailClient sale={saleWithGallery as any} displayCategories={[]} items={[]} />)
+
+    fireEvent.click(screen.getAllByLabelText('Show sale image 2')[0])
+    fireEvent.click(screen.getAllByLabelText('View sale image fullscreen')[0])
+
+    const dialog = screen.getByRole('dialog', { name: 'Sale image gallery' })
+    fireEvent.click(within(dialog).getByLabelText('Next sale image'))
+    fireEvent.click(within(dialog).getByLabelText('Next sale image'))
+    fireEvent.click(within(dialog).getByLabelText('Close image gallery'))
+
+    expect(screen.queryByRole('dialog', { name: 'Sale image gallery' })).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('sale-detail-cover-next-image')[0]).toHaveAttribute(
+      'src',
+      'https://res.cloudinary.com/demo/image/upload/v1/4.jpg'
+    )
+  })
+
+  it('does not open fullscreen when cover image failed to load', () => {
+    mockGetSaleCoverUrl.mockReturnValue({
+      url: 'https://images.example.net/broken-cover.jpg',
+      alt: 'Broken image',
+    })
+
+    render(<SaleDetailClient sale={mockSale as any} displayCategories={[]} items={[]} />)
+
+    const imgs = screen.getAllByTestId('sale-detail-cover-external-img')
+    fireEvent.error(imgs[0])
+
+    expect(screen.queryByLabelText('View sale image fullscreen')).not.toBeInTheDocument()
   })
 })

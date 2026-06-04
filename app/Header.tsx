@@ -96,7 +96,8 @@ export function Header() {
   }
   
   return (
-    <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">
+    {/* Global chrome: 110 < z < 120 — above map overlays (100–110), below MobileFiltersModal (120) */}
+    <nav className="sticky top-0 z-[115] bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-14 sm:h-16">
       <div ref={containerRef} className="w-full px-3 sm:px-6 lg:px-8 h-full">
         <div className="flex justify-between items-center h-full gap-2">
           {/* Mobile: Show back button on sale detail pages only, otherwise show logo */}

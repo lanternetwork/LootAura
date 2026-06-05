@@ -5,27 +5,26 @@ import { countListingSitemapChunks } from '@/lib/seo/sitemap/listingEntries'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 import type { SeoSitemapCounts } from '@/lib/seo/buildSeoOperationalSnapshot'
 import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
-import { SEO_ROLLOUT_DISABLED_STATE, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
-
 export function computeSeoSitemapCounts(options: {
   totalPublishedListings: number
-  nationalIndexingAllowed: boolean
+  inventoryIndexingAllowed: boolean
   metros?: SeoMetro[]
   inventoryBySlug?: Record<string, SeoInventorySummary>
-  rolloutState?: SeoRolloutRuntimeState
 }): SeoSitemapCounts {
-  const rolloutState = options.rolloutState ?? SEO_ROLLOUT_DISABLED_STATE
-  const plan = resolveSeoSitemapPlan(options.totalPublishedListings, rolloutState)
+  const plan = resolveSeoSitemapPlan(
+    options.totalPublishedListings,
+    options.inventoryIndexingAllowed
+  )
   const metros = options.metros ?? []
   const inventoryBySlug = options.inventoryBySlug ?? {}
   const cityEntries = buildCitySitemapEntries({
     metros,
-    nationalIndexingAllowed: options.nationalIndexingAllowed,
+    nationalIndexingAllowed: options.inventoryIndexingAllowed,
     inventoryBySlug,
   })
   const weekendEntries = buildWeekendSitemapEntries({
     metros,
-    nationalIndexingAllowed: options.nationalIndexingAllowed,
+    nationalIndexingAllowed: options.inventoryIndexingAllowed,
     inventoryBySlug,
   })
 

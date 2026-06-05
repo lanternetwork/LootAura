@@ -27,28 +27,33 @@ describe('seo index rollout', () => {
     expect(isSeoIndexRolloutReady(enabledSeoRolloutState())).toBe(true)
   })
 
-  it('robots stay noindex until rollout attestations are enabled', () => {
-    expect(resolveListingIndexRobots(SEO_ROLLOUT_DISABLED_STATE)).toEqual({
+  it('listing robots follow inventory emission gate R (boolean), not attestations alone', () => {
+    expect(resolveListingIndexRobots(false)).toEqual({
       index: false,
       follow: true,
     })
-    expect(resolveListingIndexRobots(enabledSeoRolloutState())).toEqual({
+    expect(resolveListingIndexRobots(true)).toEqual({
       index: true,
       follow: true,
     })
   })
 
-  it('metro pages index only when operational qualification passes', () => {
-    const rollout = enabledSeoRolloutState()
+  it('metro pages stay noindex when national emission gate R is false', () => {
     expect(
-      resolveMetroPageRobots(TEST_SEO_METRO_AUSTIN, rollout, {
+      resolveMetroPageRobots(TEST_SEO_METRO_DALLAS, healthyInventory, false)
+    ).toEqual({ index: false, follow: true })
+  })
+
+  it('metro pages index only when R is true and per-metro qualification passes', () => {
+    expect(
+      resolveMetroPageRobots(TEST_SEO_METRO_AUSTIN, {
         activeListingCount: 5,
         lastUpdatedAt: new Date().toISOString(),
         crawlableInventoryPct: 0.95,
       }, true)
     ).toEqual({ index: false, follow: true })
     expect(
-      resolveMetroPageRobots(TEST_SEO_METRO_DALLAS, rollout, healthyInventory, true)
+      resolveMetroPageRobots(TEST_SEO_METRO_DALLAS, healthyInventory, true)
     ).toEqual({ index: true, follow: true })
   })
 

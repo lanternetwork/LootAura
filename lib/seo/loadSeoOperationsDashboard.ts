@@ -129,10 +129,9 @@ export async function loadSeoOperationsDashboard(
     coverage,
     sitemapCounts: computeSeoSitemapCounts({
       totalPublishedListings: publishedListingCount,
-      nationalIndexingAllowed: false,
+      inventoryIndexingAllowed: false,
       metros,
       inventoryBySlug,
-      rolloutState,
     }),
     metros,
     inventoryByMetroSlug: inventoryBySlug,
@@ -144,10 +143,9 @@ export async function loadSeoOperationsDashboard(
     coverage,
     sitemapCounts: computeSeoSitemapCounts({
       totalPublishedListings: publishedListingCount,
-      nationalIndexingAllowed: provisional.rollout.indexingAllowed,
+      inventoryIndexingAllowed: provisional.rollout.indexingAllowed,
       metros,
       inventoryBySlug,
-      rolloutState,
     }),
     metros,
     inventoryByMetroSlug: inventoryBySlug,

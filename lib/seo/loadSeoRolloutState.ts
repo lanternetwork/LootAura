@@ -1,7 +1,8 @@
 import { getAdminDb } from '@/lib/supabase/clients'
 import { discoverSeoMetrosFromPublishedSales } from '@/lib/seo/metroCatalog'
 import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
-import { isSeoIndexRolloutReady, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
+import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
+import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
 import { requestCache } from '@/lib/seo/requestCache'
 
 /** Request-scoped SEO rollout state (fail-closed when DB/schema unavailable). */
@@ -15,10 +16,10 @@ export const getSeoMetrosForRequest = requestCache(async () => {
 })
 
 /**
- * National gate for per-metro robots on public pages.
- * Ops should only enable rollout attestations when ingestion allowlist is green on the dashboard.
+ * Inventory SEO emission gate (R) for public pages.
+ * @deprecated Prefer getInventorySeoEmissionForRequest — this returns R only.
  */
 export const getSeoNationalIndexingAllowedForRequest = requestCache(async (): Promise<boolean> => {
-  const rolloutState = await getSeoRolloutStateForRequest()
-  return isSeoIndexRolloutReady(rolloutState)
+  const emission = await getInventorySeoEmissionForRequest()
+  return emission.indexingAllowed
 })

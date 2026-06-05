@@ -3,7 +3,7 @@ import type { SeoOperationalSnapshot } from '@/lib/seo/buildSeoOperationalSnapsh
 import { getSeoBaseUrl } from '@/lib/seo/constants'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
-import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
+import { SEO_ROLLOUT_DISABLED_STATE, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
 import type {
   SeoCanonicalSummary,
   SeoHealthBlocker,
@@ -69,11 +69,8 @@ export function buildCanonicalSummary(
   }
 }
 
-export function buildIndexabilitySummary(
-  snapshot: SeoOperationalSnapshot,
-  rolloutState: SeoRolloutRuntimeState
-): SeoIndexabilitySummary {
-  const listingRobots = resolveListingIndexRobots(rolloutState)
+export function buildIndexabilitySummary(snapshot: SeoOperationalSnapshot): SeoIndexabilitySummary {
+  const listingRobots = resolveListingIndexRobots(snapshot.rollout.indexingAllowed)
   const qualifiedMetroCount = snapshot.metroParticipation.participatingMetroSlugs.length
   const totalMetroCount = snapshot.metroParticipation.rows.length
   const blockedMetroCount = totalMetroCount - qualifiedMetroCount
@@ -108,11 +105,10 @@ export function buildListingFootprint(
 
 export function buildSitemapDiagnostics(
   snapshot: SeoOperationalSnapshot,
-  rolloutState: SeoRolloutRuntimeState,
   publishedCount: number
 ): SeoSitemapDiagnostics {
   const baseUrl = getSeoBaseUrl()
-  const plan = resolveSeoSitemapPlan(publishedCount, rolloutState)
+  const plan = resolveSeoSitemapPlan(publishedCount, snapshot.rollout.indexingAllowed)
 
   return {
     sitemapUrl: `${baseUrl}/sitemap.xml`,
@@ -133,6 +129,86 @@ export function emptyInternalLinkSample(): SeoInternalLinkSample {
     nearbySaleLinks: 0,
     nearbySampleSize: 0,
     label: 'Sample estimate (0 listings)',
+  }
+}
+
+/** Fail-closed dashboard when ingestion metrics cannot be loaded (Workstream F). */
+export function buildMetricsUnavailableSeoOperationsDashboard(options?: {
+  configuredSiteUrl?: string | null
+}): SeoOperationsDashboard {
+  const snapshot: SeoOperationalSnapshot = {
+    generatedAt: new Date().toISOString(),
+    allowlist: {
+      generatedAt: new Date().toISOString(),
+      indexingAllowed: false,
+      phase0Pass: false,
+      tier1Ready: false,
+      tier2Ready: false,
+      enforcementReady: false,
+      gates: [],
+      blockers: ['SEO operational inputs unavailable'],
+    },
+    rollout: {
+      generatedAt: new Date().toISOString(),
+      indexingAllowed: false,
+      blockers: ['SEO operational inputs unavailable'],
+      gates: [],
+      qualifiedMetroSlugs: [],
+      qualifiedPilotMetros: [],
+      rolloutState: SEO_ROLLOUT_DISABLED_STATE,
+    },
+    metroQualification: [],
+    metroParticipation: {
+      generatedAt: new Date().toISOString(),
+      participatingMetroSlugs: [],
+      rows: [],
+    },
+    sitemap: {
+      staticUrlCount: 3,
+      listingChunkCount: 0,
+      listingUrlCount: 0,
+      cityUrlCount: 0,
+      weekendUrlCount: 0,
+      indexingEnabled: false,
+    },
+    metrics: {
+      indexedMetros: 0,
+      crawlableInventoryPct: null,
+      staleInventoryPct: null,
+      canonicalCoveragePct: null,
+      duplicateCanonicalClusters: null,
+      duplicateVisibleClusters: null,
+      catalogRepairQueue: null,
+      missingValidUrls: null,
+    },
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    health: 'BLOCKED',
+    blockers: [{ source: 'ingestion', text: 'SEO operational inputs unavailable' }],
+    rolloutState: SEO_ROLLOUT_DISABLED_STATE,
+    canonical: buildCanonicalSummary(options?.configuredSiteUrl),
+    indexability: {
+      listings: 'NOINDEX',
+      qualifiedMetroCount: 0,
+      blockedMetroCount: 0,
+      totalMetroCount: 0,
+      defaultDirective: 'noindex,follow',
+    },
+    listingFootprint: { published: 0, indexable: 0, noindex: 0 },
+    sitemap: {
+      sitemapUrl: `${getSeoBaseUrl()}/sitemap.xml`,
+      indexingEnabled: false,
+      segments: ['static'],
+      staticUrlCount: 3,
+      listingUrlCount: 0,
+      cityUrlCount: 0,
+      weekendUrlCount: 0,
+    },
+    internalLinks: emptyInternalLinkSample(),
+    snapshot,
+    crawlSmoke: null,
   }
 }
 
@@ -159,12 +235,12 @@ export function buildSeoOperationsDashboard(options: {
     blockers: buildSeoHealthBlockers(snapshot),
     rolloutState,
     canonical: buildCanonicalSummary(configuredSiteUrl),
-    indexability: buildIndexabilitySummary(snapshot, rolloutState),
+    indexability: buildIndexabilitySummary(snapshot),
     listingFootprint: buildListingFootprint(
       publishedListingCount,
       snapshot.rollout.indexingAllowed
     ),
-    sitemap: buildSitemapDiagnostics(snapshot, rolloutState, publishedListingCount),
+    sitemap: buildSitemapDiagnostics(snapshot, publishedListingCount),
     internalLinks,
     snapshot,
     crawlSmoke,

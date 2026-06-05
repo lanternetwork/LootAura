@@ -14,6 +14,14 @@ vi.mock('@/lib/seo/loadSeoRolloutState', () => ({
   getSeoNationalIndexingAllowedForRequest: vi.fn().mockResolvedValue(false),
 }))
 
+vi.mock('@/lib/seo/resolveInventorySeoEmission', () => ({
+  getInventorySeoEmissionForRequest: vi.fn().mockResolvedValue({
+    indexingAllowed: false,
+    metricsAvailable: true,
+    rollout: { indexingAllowed: false, blockers: [] },
+  }),
+}))
+
 describe('SEO Metadata Smoke Tests', () => {
   it('should export metadata from landing page', async () => {
     const page = await import('@/app/page')

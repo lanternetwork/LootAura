@@ -117,16 +117,8 @@ async function countExternalDiscoveryStatus(
   return count ?? 0
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    await assertAdminOrThrow(request)
-  } catch (error) {
-    if (error instanceof NextResponse) {
-      return error
-    }
-    return jsonError(403, 'FORBIDDEN', 'Admin access required')
-  }
-
+/** Server-side metrics snapshot (no admin gate) — used by SEO inventory emission evaluation. */
+export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsResponse> {
   const admin = getAdminDb()
   const now = new Date()
   const nowMs = now.getTime()
@@ -857,12 +849,31 @@ export async function GET(request: NextRequest) {
       ),
     }
 
-    return NextResponse.json(body)
+    return body
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     logger.error('admin ingestion metrics failed', err instanceof Error ? err : new Error(message), {
       component: 'api/admin/ingestion/metrics',
     })
+    throw err instanceof Error ? err : new Error(message)
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    await assertAdminOrThrow(request)
+  } catch (error) {
+    if (error instanceof NextResponse) {
+      return error
+    }
+    return jsonError(403, 'FORBIDDEN', 'Admin access required')
+  }
+
+  try {
+    const body = await buildIngestionMetricsResponse()
+    return NextResponse.json(body)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
     return jsonError(500, 'METRICS_FAILED', message)
   }
 }

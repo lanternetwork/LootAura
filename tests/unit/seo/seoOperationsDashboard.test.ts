@@ -109,6 +109,27 @@ describe('seo operations dashboard', () => {
     expect(text).toContain('Indexable: 1248')
   })
 
+  it('never shows INDEX listings with zero indexable footprint when R is false', () => {
+    const snapshot = buildTestSnapshot(
+      enabledSeoRolloutState({
+        crawlValidationPassed: false,
+        searchConsoleValidationPassed: false,
+      })
+    )
+    const dashboard = buildSeoOperationsDashboard({
+      snapshot,
+      rolloutState: snapshot.rollout.rolloutState,
+      publishedListingCount: 1248,
+      configuredSiteUrl: 'https://lootaura.com',
+    })
+
+    expect(snapshot.rollout.indexingAllowed).toBe(false)
+    expect(dashboard.indexability.listings).toBe('NOINDEX')
+    expect(dashboard.listingFootprint.indexable).toBe(0)
+    expect(dashboard.listingFootprint.noindex).toBe(1248)
+    expect(dashboard.sitemap.indexingEnabled).toBe(false)
+  })
+
   it('formatSeoDiagnosticsText includes canonical warning when env missing', () => {
     delete process.env.NEXT_PUBLIC_SITE_URL
     const dashboard = buildSeoOperationsDashboard({

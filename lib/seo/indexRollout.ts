@@ -3,11 +3,7 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import { evaluateSeoIndexAllowlist, type SeoIndexGate } from '@/lib/seo/indexAllowlist'
 import { qualifyAllSeoMetros, qualifyMetroForSeoRollout } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary, SeoMetro, SeoRobotsDirective } from '@/lib/seo/types'
-import {
-  isSeoIndexRolloutReady,
-  type SeoRolloutRuntimeState,
-  SEO_ROLLOUT_DISABLED_STATE,
-} from '@/lib/seo/seoRolloutTypes'
+import { type SeoRolloutRuntimeState, SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 
 export type SeoIndexRolloutSnapshot = {
   generatedAt: string
@@ -88,26 +84,29 @@ export function evaluateSeoIndexRolloutReadiness(options: {
   }
 }
 
-export function resolveListingIndexRobots(rolloutState: SeoRolloutRuntimeState): SeoRobotsDirective {
-  if (!isSeoIndexRolloutReady(rolloutState)) {
+/** Listing robots — gated on R (inventory SEO emission), not attestations alone. */
+export function resolveListingIndexRobots(inventoryIndexingAllowed: boolean): SeoRobotsDirective {
+  if (!inventoryIndexingAllowed) {
     return { index: false, follow: true }
   }
   return { index: true, follow: true }
 }
 
+/**
+ * Metro/weekend robots — national gate is R; per-metro qualification unchanged when R is true.
+ */
 export function resolveMetroPageRobots(
   metro: SeoMetro,
-  rolloutState: SeoRolloutRuntimeState,
   inventory: SeoInventorySummary,
-  nationalIndexingAllowed: boolean
+  inventoryIndexingAllowed: boolean
 ): SeoRobotsDirective {
-  if (!isSeoIndexRolloutReady(rolloutState)) {
+  if (!inventoryIndexingAllowed) {
     return { index: false, follow: true }
   }
   const result = qualifyMetroForSeoRollout({
     metro,
     inventory,
-    nationalIndexingAllowed,
+    nationalIndexingAllowed: true,
   })
   return { index: result.qualified, follow: true }
 }

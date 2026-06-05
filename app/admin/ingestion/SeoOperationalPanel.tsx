@@ -130,10 +130,9 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
   const snapshot = useMemo(() => {
     const sitemapCounts = computeSeoSitemapCounts({
       totalPublishedListings: publishedListingCount,
-      nationalIndexingAllowed: false,
+      inventoryIndexingAllowed: false,
       metros,
       inventoryBySlug,
-      rolloutState,
     })
     const provisional = buildSeoOperationalSnapshot({
       metrics,
@@ -148,10 +147,9 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       coverage,
       sitemapCounts: computeSeoSitemapCounts({
         totalPublishedListings: publishedListingCount,
-        nationalIndexingAllowed: provisional.rollout.indexingAllowed,
+        inventoryIndexingAllowed: provisional.rollout.indexingAllowed,
         metros,
         inventoryBySlug,
-        rolloutState,
       }),
       metros,
       inventoryByMetroSlug: inventoryBySlug,

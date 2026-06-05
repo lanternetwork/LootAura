@@ -1,6 +1,5 @@
 import { evaluateYstmIngestionRepairProgram } from '@/lib/admin/evaluateYstmIngestionRepairProgram'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
-import type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 
 function bullet(label: string, value: string | number): string {

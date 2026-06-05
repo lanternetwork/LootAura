@@ -28,13 +28,7 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
-function getBrowseSalesIconLinks(): HTMLAnchorElement[] {
-  return screen
-    .getAllByRole('link', { name: 'Browse Sales' })
-    .filter((link) => link.getAttribute('aria-label') === 'Browse Sales') as HTMLAnchorElement[]
-}
-
-function getAllBrowseSalesLinks(): HTMLAnchorElement[] {
+function getBrowseSalesNavLinks(): HTMLAnchorElement[] {
   return screen.getAllByRole('link', { name: 'Browse Sales' }) as HTMLAnchorElement[]
 }
 
@@ -58,9 +52,7 @@ describe('Header Browse Sales active state', () => {
     mockUsePathname.mockReturnValue(pathname)
     render(<Header />)
 
-    expect(getAllBrowseSalesLinks().length).toBe(3)
-
-    const iconLinks = getBrowseSalesIconLinks()
+    const iconLinks = getBrowseSalesNavLinks()
     expect(iconLinks.length).toBe(2)
 
     for (const link of iconLinks) {
@@ -92,11 +84,8 @@ describe('Header Browse Sales active state', () => {
     mockUsePathname.mockReturnValue(pathname)
     render(<Header />)
 
-    for (const link of getAllBrowseSalesLinks()) {
+    for (const link of getBrowseSalesNavLinks()) {
       expect(link).not.toHaveAttribute('aria-current')
-    }
-
-    for (const link of getBrowseSalesIconLinks()) {
       expect(link.className).not.toContain('border-[#3A2268]')
     }
 

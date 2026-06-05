@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import {
@@ -167,7 +168,11 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
             Index allowlist derives from ingestion gates. Rollout attestations are stored in{' '}
             <code className="text-xs">ingestion_orchestration_state</code> (key{' '}
             <code className="text-xs">seo_rollout</code>). Metros are discovered nationwide from published
-            inventory; participation is gated by operational thresholds only.
+            inventory; participation is gated by operational thresholds only. Read-only diagnostics:{' '}
+            <Link href="/admin/seo" className="font-medium text-purple-700 hover:text-purple-900">
+              SEO Operations
+            </Link>
+            .
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">

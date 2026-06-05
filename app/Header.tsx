@@ -18,6 +18,8 @@ export function Header() {
   
   // Check if we're on a sale detail page
   const isSaleDetailPage = pathname?.startsWith('/sales/') && pathname !== '/sales'
+
+  const isOnMarketplaceMap = pathname === '/sales'
   
   // Build back URL with viewport params if they exist
   const backUrl = (() => {
@@ -187,17 +189,19 @@ export function Header() {
             </div>
             {/* Mobile-only navigation icons */}
             <div className="sm:hidden flex items-center gap-1 shrink-0">
-              <Link
-                href="/sales"
-                onClick={(e) => handleNativeNavigation('/sales', e)}
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                aria-label="Browse Sales"
-              >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </Link>
+              {!isOnMarketplaceMap && (
+                <Link
+                  href="/sales"
+                  onClick={(e) => handleNativeNavigation('/sales', e)}
+                  className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                  aria-label="Browse Sales"
+                >
+                  <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </Link>
+              )}
               <Link
                 href="/favorites"
                 onClick={(e) => handleNativeNavigation('/favorites', e)}

@@ -63,6 +63,7 @@ describe('buildIngestionDiagnostics', () => {
         ready: 0,
         publishing: 0,
       },
+      needsCheckBreakdown: null,
       timeseries: {} as IngestionMetricsResponse['timeseries'],
       orchestrationVisibility: {} as IngestionMetricsResponse['orchestrationVisibility'],
       volume: {
@@ -260,6 +261,7 @@ describe('buildIngestionDiagnostics', () => {
         ready: 0,
         publishing: 0,
       },
+      needsCheckBreakdown: null,
       funnel: {
         '24h': {
           stages: [],
@@ -550,5 +552,6 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('### Sale-instance rollout gates (Phase 14)')
     expect(md).toContain('### False-exclusion audit (Phase 1)')
     expect(md).toContain('### Week-1 sprint gates')
+    expect(md).toContain('## YSTM ingestion repair program')
   })
 })

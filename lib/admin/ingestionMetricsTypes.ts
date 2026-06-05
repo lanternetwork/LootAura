@@ -1,4 +1,7 @@
+import type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
+
+export type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import type {
   ConfigYieldLeaderboardEntry,
@@ -198,6 +201,8 @@ export interface IngestionMetricsResponse {
     ready: number
     publishing: number
   }
+  /** needs_check rows grouped by address_status and coordinate_precision (operator triage). */
+  needsCheckBreakdown: NeedsCheckBreakdown | null
   timeseries: {
     publishedByHour: Array<{ bucket: string; count: number }>
     ingestedPublishedByHour: Array<{ bucket: string; count: number }>

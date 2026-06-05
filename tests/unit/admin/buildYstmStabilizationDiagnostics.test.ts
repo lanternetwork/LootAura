@@ -46,6 +46,7 @@ function minimalMetrics(): IngestionMetricsResponse {
       ready: 0,
       publishing: 0,
     },
+    needsCheckBreakdown: null,
     timeseries: {} as IngestionMetricsResponse['timeseries'],
     orchestrationVisibility: {} as IngestionMetricsResponse['orchestrationVisibility'],
     volume: {

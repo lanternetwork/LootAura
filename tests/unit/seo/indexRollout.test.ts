@@ -27,12 +27,12 @@ describe('seo index rollout', () => {
     expect(isSeoIndexRolloutReady(enabledSeoRolloutState())).toBe(true)
   })
 
-  it('robots stay noindex until rollout attestations are enabled', () => {
-    expect(resolveListingIndexRobots(SEO_ROLLOUT_DISABLED_STATE)).toEqual({
+  it('listing robots follow inventory emission gate R (boolean), not attestations alone', () => {
+    expect(resolveListingIndexRobots(false)).toEqual({
       index: false,
       follow: true,
     })
-    expect(resolveListingIndexRobots(enabledSeoRolloutState())).toEqual({
+    expect(resolveListingIndexRobots(true)).toEqual({
       index: true,
       follow: true,
     })

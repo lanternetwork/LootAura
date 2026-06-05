@@ -61,12 +61,12 @@ export function buildSeoOperationalSnapshot(options: {
   })
   const metroQualification = qualifyAllSeoMetros({
     metros,
-    nationalIndexingAllowed: allowlist.indexingAllowed,
+    nationalIndexingAllowed: rollout.indexingAllowed,
     inventoryBySlug: inventoryByMetroSlug,
   })
   const metroParticipation = evaluateSeoMetroParticipation({
     metros,
-    nationalIndexingAllowed: allowlist.indexingAllowed,
+    nationalIndexingAllowed: rollout.indexingAllowed,
     inventoryBySlug: inventoryByMetroSlug,
   })
 

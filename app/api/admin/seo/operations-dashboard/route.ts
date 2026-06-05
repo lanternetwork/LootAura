@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
-import { formatSeoDiagnosticsText } from '@/lib/seo/buildSeoOperationsDashboard'
+import {
+  buildMetricsUnavailableSeoOperationsDashboard,
+  formatSeoDiagnosticsText,
+} from '@/lib/seo/buildSeoOperationsDashboard'
 import { SeoOperationalGateUnavailableError } from '@/lib/seo/loadSeoIndexAllowlistForAdmin'
 import { loadSeoOperationsDashboard } from '@/lib/seo/loadSeoOperationsDashboard'
 
@@ -38,7 +41,15 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof SeoOperationalGateUnavailableError) {
-      return jsonError(503, 'SEO_OPS_GATE_UNAVAILABLE', error.message)
+      const dashboard = buildMetricsUnavailableSeoOperationsDashboard({
+        configuredSiteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+      })
+      return NextResponse.json({
+        ok: true,
+        dashboard,
+        diagnosticsText: formatSeoDiagnosticsText(dashboard),
+        metricsUnavailable: true,
+      })
     }
     const message = error instanceof Error ? error.message : 'SEO operations dashboard failed'
     return jsonError(500, 'SEO_OPS_DASHBOARD_FAILED', message)

@@ -12,7 +12,14 @@ vi.mock('@/lib/seo/loadSeoRolloutState', () => ({
     crawlValidationPassedAt: null,
     searchConsoleValidationPassedAt: null,
   })),
-  getSeoNationalIndexingAllowedForRequest: vi.fn(async () => true),
+}))
+
+vi.mock('@/lib/seo/resolveInventorySeoEmission', () => ({
+  getInventorySeoEmissionForRequest: vi.fn(async () => ({
+    indexingAllowed: true,
+    metricsAvailable: true,
+    rollout: { indexingAllowed: true, blockers: [], qualifiedMetroSlugs: ['dallas-tx'] },
+  })),
 }))
 
 vi.mock('@/lib/seo/fetchMetroInventory', () => ({

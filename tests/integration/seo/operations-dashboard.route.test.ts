@@ -238,6 +238,31 @@ describe('GET /api/admin/seo/operations-dashboard', () => {
     })
   })
 
+  it('returns BLOCKED dashboard when operational metrics are unavailable', async () => {
+    const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
+    const { loadSeoOperationsDashboard } = await import('@/lib/seo/loadSeoOperationsDashboard')
+    const { SeoOperationalGateUnavailableError } = await import(
+      '@/lib/seo/loadSeoIndexAllowlistForAdmin'
+    )
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1', email: 'admin@test.com' } })
+    vi.mocked(loadSeoOperationsDashboard).mockRejectedValue(
+      new SeoOperationalGateUnavailableError('metrics down')
+    )
+
+    const { GET } = await import('@/app/api/admin/seo/operations-dashboard/route')
+    const response = await GET(
+      new NextRequest('http://localhost/api/admin/seo/operations-dashboard')
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.ok).toBe(true)
+    expect(body.metricsUnavailable).toBe(true)
+    expect(body.dashboard.health).toBe('BLOCKED')
+    expect(body.diagnosticsText).toContain('SEO HEALTH: BLOCKED')
+    expect(body.dashboard.indexability.listings).toBe('NOINDEX')
+  })
+
   it('returns 403 when admin gate rejects', async () => {
     const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
     const { NextResponse } = await import('next/server')

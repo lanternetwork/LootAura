@@ -38,7 +38,7 @@ export function buildYstmIngestionRepairDiagnostics(
     }
   }
 
-  if (breakdown) {
+  if (breakdown && breakdown.total > 0) {
     lines.push(
       '',
       '### needs_check breakdown',

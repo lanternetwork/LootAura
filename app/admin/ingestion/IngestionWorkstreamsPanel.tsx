@@ -34,8 +34,8 @@ export default function IngestionWorkstreamsPanel({ metrics, coverage, onOpenDeb
           </p>
           {coverage && (
             <p className="mt-2 text-xs text-slate-500">
-              Missing valid URLs: {coverage.missingValidYstmUrls.toLocaleString()} · Coverage:{' '}
-              {coverage.coveragePct.toFixed(1)}%
+              Missing valid URLs: {coverage.missingValidYstmUrls.toLocaleString()}
+              {coverage.coveragePct != null ? ` · Coverage: ${coverage.coveragePct.toFixed(1)}%` : ''}
             </p>
           )}
         </div>

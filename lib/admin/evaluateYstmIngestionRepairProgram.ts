@@ -13,6 +13,7 @@ import {
   CRAWL_SKIP_TAXONOMY_MIN_SAMPLES,
 } from '@/lib/ingestion/acquisition/crawlSkipTaxonomyOperationalHealth'
 import type { FalseExclusionTraceBucket } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 
 /** Client-safe mirror of `YSTM_COVERAGE_TARGET_PCT` in ystmCoverageValidity.ts. */
 const YSTM_COVERAGE_TARGET_PCT = 90
@@ -112,7 +113,7 @@ export function evaluateYstmIngestionRepairProgram(
   const visibleDupClusters = coverage?.falseExclusionSaleIdentity.duplicateVisibleSaleClusters24h ?? 0
   const visibleDupRate = publishedActive > 0 ? visibleDupClusters / publishedActive : 0
 
-  const crawl = metrics.volume.fetch.crawlSkipTaxonomy24h
+  const crawl = metrics.volume.fetch?.crawlSkipTaxonomy24h ?? emptyCrawlSkipTaxonomyRollup()
   const suspiciousShare =
     crawl && crawl.total >= CRAWL_SKIP_TAXONOMY_MIN_SAMPLES ? crawl.suspicious / crawl.total : null
 

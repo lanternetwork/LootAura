@@ -47,6 +47,7 @@ export function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}
       ready: 0,
       publishing: 0,
     },
+    needsCheckBreakdown: null,
     timeseries: {
       publishedByHour: [],
       ingestedPublishedByHour: [],
@@ -80,6 +81,10 @@ export function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}
       fetch: {
         configsOverdue: 0,
         crawlSkipTaxonomy24h: emptyCrawlSkipTaxonomyRollup(),
+      },
+      addressLifecycle: {
+        byStatus: {},
+        enrichmentBacklog: 0,
       },
     },
     funnel: {

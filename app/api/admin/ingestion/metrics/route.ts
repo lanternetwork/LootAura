@@ -29,6 +29,7 @@ import {
   type OrchestrationRunRow,
 } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
+import { countNeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import { countGeocodeDeadLetterReplayBuckets } from '@/lib/geocode/geocodeDeadLetterReplay'
 import {
   computeAcquisitionRunRates,
@@ -372,6 +373,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       .gte('published_at', iso24h)
 
     const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
+    const needsCheckBreakdownPromise = countNeedsCheckBreakdown()
     const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
 
     const imageFailureReasonCountPromises = IMAGE_ENRICHMENT_FAILURE_REASONS.map(
@@ -421,6 +423,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       readyFromNative24hResult,
       publishedFromNative24hResult,
       geocodeDeadLetterBuckets,
+      needsCheckBreakdown,
       acquisitionRegistry,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
@@ -457,6 +460,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       readyFromNative24hPromise,
       publishedFromNative24hPromise,
       geocodeDeadLetterBucketsPromise,
+      needsCheckBreakdownPromise,
       acquisitionRegistryPromise,
     ])
 
@@ -718,6 +722,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       geocodeTouches24h,
       efficiency,
       failureBreakdown,
+      needsCheckBreakdown,
       timeseries: {
         publishedByHour: mapToSortedSeries(publishedByHour),
         ingestedPublishedByHour: mapToSortedSeries(ingestedPublishedByHour),

@@ -3,8 +3,7 @@ import type { SeoOperationalSnapshot } from '@/lib/seo/buildSeoOperationalSnapsh
 import { getSeoBaseUrl } from '@/lib/seo/constants'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
-import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
-import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
+import { SEO_ROLLOUT_DISABLED_STATE, type SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
 import type {
   SeoCanonicalSummary,
   SeoHealthBlocker,

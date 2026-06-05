@@ -5,7 +5,10 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { buildSeoOperationalSnapshot } from '@/lib/seo/buildSeoOperationalSnapshot'
 import { buildSeoOperationsDashboard } from '@/lib/seo/buildSeoOperationsDashboard'
-import type { SeoInternalLinkSample } from '@/lib/seo/seoOperationsDashboardTypes'
+import type {
+  SeoInternalLinkSample,
+  SeoOperationsDashboard,
+} from '@/lib/seo/seoOperationsDashboardTypes'
 import { runSeoCrawlSmokeChecks, type CrawlSmokeReport } from '@/lib/seo/crawlSmoke'
 import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
 import {
@@ -18,9 +21,9 @@ import { computeSeoSitemapCounts } from '@/lib/seo/sitemap/computeSitemapCounts'
 import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
+import { adminSupabase } from '@/lib/supabase/admin'
 import type { Sale } from '@/lib/types'
 import type { SeoMetro } from '@/lib/seo/types'
-import type { SeoOperationsDashboard } from '@/lib/seo/seoOperationsDashboardTypes'
 
 const GEO_LINK_SAMPLE_SIZE = 100
 const NEARBY_LINK_SAMPLE_SIZE = 20
@@ -87,7 +90,7 @@ async function sampleInternalLinkCounts(metros: SeoMetro[]): Promise<SeoInternal
   const nearestResults = await Promise.all(
     nearbySample.map(async (row) => {
       try {
-        const nearby = await getNearestSalesForSale(admin, String(row.id), 6)
+        const nearby = await getNearestSalesForSale(adminSupabase, String(row.id), 6)
         return buildNearbyListingLinks(nearby).length
       } catch {
         return 0

@@ -14,6 +14,7 @@ import {
 import IngestionStabilizationExitSection from '@/app/admin/ingestion/IngestionStabilizationExitSection'
 import IngestionRepairProgramSection from '@/app/admin/ingestion/IngestionRepairProgramSection'
 import NeedsCheckRootCauseDiscoverySection from '@/app/admin/ingestion/NeedsCheckRootCauseDiscoverySection'
+import AddressEnrichmentDrainSection from '@/app/admin/ingestion/AddressEnrichmentDrainSection'
 import SeoOperationalPanel from '@/app/admin/ingestion/SeoOperationalPanel'
 
 const HEALTH_STYLE: Record<IngestionHealthState, string> = {
@@ -138,6 +139,8 @@ export default function IngestionOverviewPanel({
       />
 
       <NeedsCheckRootCauseDiscoverySection metrics={metrics} coverage={coverage} />
+
+      <AddressEnrichmentDrainSection metrics={metrics} />
 
       <SeoOperationalPanel metrics={metrics} coverage={coverage} />
 

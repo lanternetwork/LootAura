@@ -59,6 +59,7 @@ function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}): Inge
     },
     needsCheckBreakdown: null,
     needsCheckRootCauseAnalysis: null,
+    addressEnrichmentDrainCohort: null,
     timeseries: {
       publishedByHour: [],
       ingestedPublishedByHour: [],

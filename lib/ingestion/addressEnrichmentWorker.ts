@@ -12,9 +12,8 @@ import {
   parseSeeSourceUnlockAtFromListingUrl,
 } from '@/lib/ingestion/address/addressGated'
 import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
-import { isAddressGeocodeReady, normalizeAddressLineForIngest } from '@/lib/ingestion/address/addressUsability'
+import { isAddressGeocodeReady } from '@/lib/ingestion/address/addressUsability'
 import { applyDetailPageImageEnrichment } from '@/lib/ingestion/images/applyDetailPageImageEnrichment'
-import { enrichStreetLineWithPathMunicipalityWhenNoTail } from '@/lib/ingestion/ystmAddressSlug'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { promoteIngestedSaleCoordinates } from '@/lib/ingestion/spatial/promoteIngestedSaleCoordinates'
@@ -22,7 +21,14 @@ import { lookupSpatialCoordinates } from '@/lib/ingestion/spatial/resolveSpatial
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
 
-export const INGESTED_ADDRESS_ENRICHMENT_DETAILS_SCHEMA_VERSION = 1 as const
+import { mergeAddressEnrichmentDetails } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
+import {
+  isUnlockScheduledInFuture,
+  resolveEnrichmentAddressCandidate,
+} from '@/lib/ingestion/address/resolveEnrichmentAddressCandidate'
+import { reconcileExhaustedAddressEnrichmentPending } from '@/lib/ingestion/address/reconcileExhaustedAddressEnrichmentPending'
+
+export { INGESTED_ADDRESS_ENRICHMENT_DETAILS_SCHEMA_VERSION } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
 
 export type AddressEnrichmentWorkerSummary = {
   claimed: number
@@ -30,6 +36,7 @@ export type AddressEnrichmentWorkerSummary = {
   failedRetriable: number
   failedTerminal: number
   stillGated: number
+  exhaustedReconciled: number
   byFailureReason: Partial<Record<AddressEnrichmentFailureReason, number>>
 }
 
@@ -76,23 +83,7 @@ function classifyFetchFailure(error: unknown): AddressEnrichmentFailureReason {
   return 'fetch_failed'
 }
 
-function mergeAddressEnrichmentDetails(
-  existing: unknown,
-  patch: Record<string, unknown>
-): Record<string, unknown> {
-  const prior =
-    existing && typeof existing === 'object' && !Array.isArray(existing)
-      ? { ...(existing as Record<string, unknown>) }
-      : {}
-  prior.address_enrichment = {
-    schema_version: INGESTED_ADDRESS_ENRICHMENT_DETAILS_SCHEMA_VERSION,
-    recorded_at: new Date().toISOString(),
-    ...patch,
-  }
-  return prior
-}
-
-async function persistRowAddressOutcome(
+export type AddressEnrichmentWorkerSummary = {
   admin: ReturnType<typeof getAdminDb>,
   rowId: string,
   payload: Record<string, unknown>
@@ -216,16 +207,22 @@ async function processAddressEnrichmentRow(
     state: row.state,
   })
 
-  let addressRaw = normalizeAddressLineForIngest(enrichment?.addressRaw)
-  if (addressRaw) {
-    const enriched = enrichStreetLineWithPathMunicipalityWhenNoTail(addressRaw, row.source_url)
-    addressRaw = enriched.line
-  }
+  const resolvedAddress = resolveEnrichmentAddressCandidate({
+    detailPageAddressRaw: enrichment?.addressRaw,
+    sourceUrl: row.source_url,
+    nowMs: now.getTime(),
+  })
+  const addressRaw = resolvedAddress.addressRaw
 
   const gatedAfter = detectGatedListing({ sourceUrl: row.source_url, addressRaw })
+  const unlockInFuture = isUnlockScheduledInFuture({
+    sourceUrl: row.source_url,
+    addressUnlockAt: row.address_unlock_at,
+    nowMs: now.getTime(),
+  })
+
   if (!addressRaw || !isAddressGeocodeReady(addressRaw) || gatedAfter.gated) {
-    const stillGated = gatedAfter.gated || parseSeeSourceUnlockAtFromListingUrl(row.source_url) != null
-    if (stillGated && !isAddressGeocodeReady(addressRaw)) {
+    if (unlockInFuture && !isAddressGeocodeReady(addressRaw)) {
       const nextUnlock = gatedAfter.unlockAt ?? parseSeeSourceUnlockAtFromListingUrl(row.source_url)
       const nextAt = computeNextEnrichmentAttemptAt(nextUnlock, now.getTime(), canonical)
       await persistRowAddressOutcome(admin, rowId, {
@@ -253,6 +250,7 @@ async function processAddressEnrichmentRow(
       failure_details: mergeAddressEnrichmentDetails(row.failure_details, {
         lastReason: reason,
         attemptCount,
+        ...(resolvedAddress.source ? { resolvedAddressSource: resolvedAddress.source } : {}),
       }),
     })
     return { outcome: terminal ? 'terminal' : 'retriable', reason }
@@ -285,6 +283,7 @@ async function processAddressEnrichmentRow(
       ...(enrichment?.chosenAddressSource
         ? { chosenAddressSource: enrichment.chosenAddressSource }
         : {}),
+      ...(resolvedAddress.source ? { resolvedAddressSource: resolvedAddress.source } : {}),
     }),
   })
 
@@ -335,8 +334,14 @@ export async function enrichPendingAddresses(options?: {
     failedRetriable: 0,
     failedTerminal: 0,
     stillGated: 0,
+    exhaustedReconciled: 0,
     byFailureReason: {},
   }
+
+  const reconcileSummary = await reconcileExhaustedAddressEnrichmentPending({
+    batchSize: Math.max(batchSize * 4, 100),
+  })
+  summary.exhaustedReconciled = reconcileSummary.reconciled
 
   const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_address_enrichment', {
     p_batch_size: batchSize,

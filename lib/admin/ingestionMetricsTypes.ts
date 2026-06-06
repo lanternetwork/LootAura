@@ -1,9 +1,11 @@
 import type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
+import type { AddressEnrichmentDrainCohortAnalysis } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 
 export type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 export type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
+export type { AddressEnrichmentDrainCohortAnalysis } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'
 import type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import type {
   ConfigYieldLeaderboardEntry,
@@ -207,6 +209,8 @@ export interface IngestionMetricsResponse {
   needsCheckBreakdown: NeedsCheckBreakdown | null
   /** Workstream A2/B read-only scan — blocker classification inputs for discovery. */
   needsCheckRootCauseAnalysis: NeedsCheckRootCauseAnalysis | null
+  /** Workstreams A–B — address_enrichment_pending × provider_native drain cohort. */
+  addressEnrichmentDrainCohort: AddressEnrichmentDrainCohortAnalysis | null
   timeseries: {
     publishedByHour: Array<{ bucket: string; count: number }>
     ingestedPublishedByHour: Array<{ bucket: string; count: number }>

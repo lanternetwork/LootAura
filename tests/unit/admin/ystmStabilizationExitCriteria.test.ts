@@ -49,6 +49,7 @@ export function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}
     },
     needsCheckBreakdown: null,
     needsCheckRootCauseAnalysis: null,
+    addressEnrichmentDrainCohort: null,
     timeseries: {
       publishedByHour: [],
       ingestedPublishedByHour: [],

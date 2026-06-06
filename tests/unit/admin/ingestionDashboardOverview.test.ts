@@ -58,6 +58,7 @@ function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}): Inge
       publishing: 0,
     },
     needsCheckBreakdown: null,
+    needsCheckRootCauseAnalysis: null,
     timeseries: {
       publishedByHour: [],
       ingestedPublishedByHour: [],

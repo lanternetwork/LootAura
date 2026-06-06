@@ -1,3 +1,5 @@
+import { buildNeedsCheckRootCauseDiagnostics } from '@/lib/admin/buildNeedsCheckRootCauseDiagnostics'
+import { evaluateNeedsCheckRootCauseDiscovery } from '@/lib/admin/evaluateNeedsCheckRootCauseDiscovery'
 import { buildYstmIngestionRepairDiagnostics } from '@/lib/admin/buildYstmIngestionRepairDiagnostics'
 import { buildYstmCoverageDiagnostics } from '@/lib/admin/buildYstmCoverageDiagnostics'
 import { buildYstmStabilizationDiagnostics } from '@/lib/admin/buildYstmStabilizationDiagnostics'
@@ -345,6 +347,15 @@ export function buildIngestionDiagnostics(
     lines.push('', buildYstmCoverageDiagnostics(options.ystmCoverage))
     lines.push('', buildYstmStabilizationDiagnostics(data, options.ystmCoverage))
     lines.push('', buildYstmIngestionRepairDiagnostics(data, options.ystmCoverage))
+    if (data.needsCheckRootCauseAnalysis) {
+      const discovery = evaluateNeedsCheckRootCauseDiscovery(
+        data.needsCheckRootCauseAnalysis,
+        data,
+        options.ystmCoverage,
+        data.generatedAt
+      )
+      lines.push('', buildNeedsCheckRootCauseDiagnostics(discovery, data.needsCheckBreakdown))
+    }
   }
 
   return lines.join('\n')

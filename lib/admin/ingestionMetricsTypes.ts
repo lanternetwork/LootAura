@@ -1,7 +1,9 @@
 import type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
+import type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 
 export type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
+export type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
 import type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import type {
   ConfigYieldLeaderboardEntry,
@@ -203,6 +205,8 @@ export interface IngestionMetricsResponse {
   }
   /** needs_check rows grouped by address_status and coordinate_precision (operator triage). */
   needsCheckBreakdown: NeedsCheckBreakdown | null
+  /** Workstream A2/B read-only scan — blocker classification inputs for discovery. */
+  needsCheckRootCauseAnalysis: NeedsCheckRootCauseAnalysis | null
   timeseries: {
     publishedByHour: Array<{ bucket: string; count: number }>
     ingestedPublishedByHour: Array<{ bucket: string; count: number }>

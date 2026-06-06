@@ -83,7 +83,7 @@ function classifyFetchFailure(error: unknown): AddressEnrichmentFailureReason {
   return 'fetch_failed'
 }
 
-export type AddressEnrichmentWorkerSummary = {
+async function persistRowAddressOutcome(
   admin: ReturnType<typeof getAdminDb>,
   rowId: string,
   payload: Record<string, unknown>

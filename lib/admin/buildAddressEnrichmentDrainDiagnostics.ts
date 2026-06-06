@@ -1,5 +1,5 @@
-import type { AddressEnrichmentDrainCohortAnalysis } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'
 import {
+  type AddressEnrichmentDrainCohortAnalysis,
   ADDRESS_ENRICHMENT_FAILURE_SUBTYPES,
   ADDRESS_ENRICHMENT_PENDING_COHORT_CLASSIFICATIONS,
 } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'

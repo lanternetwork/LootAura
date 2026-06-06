@@ -139,7 +139,10 @@ export function evaluateNeedsCheckRootCauseDiscovery(
 
   const blockerCategories = sortedCategoryRows(analysis)
   const explaining = smallestExplainingSet(blockerCategories)
-  const dominantCategory = blockerCategories.find((row) => row.count > 0)?.category ?? null
+  const dominantCategory =
+    analysis.total > 0
+      ? (blockerCategories.find((row) => row.count > 0)?.category ?? null)
+      : null
   const dominantOwner = dominantCategory ? blockerCategoryToRepairOwner(dominantCategory) : null
 
   const ageBuckets: NeedsCheckAgeBucketRow[] = NEEDS_CHECK_AGE_BUCKETS.map((bucket) => ({

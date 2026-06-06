@@ -31,6 +31,7 @@ import {
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
 import { countNeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import { analyzeNeedsCheckRootCause } from '@/lib/admin/analyzeNeedsCheckRootCause'
+import { analyzeAddressEnrichmentDrainCohort } from '@/lib/admin/analyzeAddressEnrichmentDrainCohort'
 import { countGeocodeDeadLetterReplayBuckets } from '@/lib/geocode/geocodeDeadLetterReplay'
 import {
   computeAcquisitionRunRates,
@@ -376,6 +377,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
     const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
     const needsCheckBreakdownPromise = countNeedsCheckBreakdown()
     const needsCheckRootCauseAnalysisPromise = analyzeNeedsCheckRootCause(now)
+    const addressEnrichmentDrainCohortPromise = analyzeAddressEnrichmentDrainCohort(now)
     const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
 
     const imageFailureReasonCountPromises = IMAGE_ENRICHMENT_FAILURE_REASONS.map(
@@ -427,6 +429,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       geocodeDeadLetterBuckets,
       needsCheckBreakdown,
       needsCheckRootCauseAnalysis,
+      addressEnrichmentDrainCohort,
       acquisitionRegistry,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
@@ -465,6 +468,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       geocodeDeadLetterBucketsPromise,
       needsCheckBreakdownPromise,
       needsCheckRootCauseAnalysisPromise,
+      addressEnrichmentDrainCohortPromise,
       acquisitionRegistryPromise,
     ])
 
@@ -728,6 +732,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       failureBreakdown,
       needsCheckBreakdown,
       needsCheckRootCauseAnalysis,
+      addressEnrichmentDrainCohort,
       timeseries: {
         publishedByHour: mapToSortedSeries(publishedByHour),
         ingestedPublishedByHour: mapToSortedSeries(ingestedPublishedByHour),

@@ -30,6 +30,7 @@ import {
 } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
 import { countNeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
+import { analyzeNeedsCheckRootCause } from '@/lib/admin/analyzeNeedsCheckRootCause'
 import { countGeocodeDeadLetterReplayBuckets } from '@/lib/geocode/geocodeDeadLetterReplay'
 import {
   computeAcquisitionRunRates,
@@ -374,6 +375,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
 
     const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
     const needsCheckBreakdownPromise = countNeedsCheckBreakdown()
+    const needsCheckRootCauseAnalysisPromise = analyzeNeedsCheckRootCause(now)
     const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
 
     const imageFailureReasonCountPromises = IMAGE_ENRICHMENT_FAILURE_REASONS.map(
@@ -424,6 +426,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       publishedFromNative24hResult,
       geocodeDeadLetterBuckets,
       needsCheckBreakdown,
+      needsCheckRootCauseAnalysis,
       acquisitionRegistry,
     ] = await Promise.all([
       Promise.all(statusCountPromises),
@@ -461,6 +464,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       publishedFromNative24hPromise,
       geocodeDeadLetterBucketsPromise,
       needsCheckBreakdownPromise,
+      needsCheckRootCauseAnalysisPromise,
       acquisitionRegistryPromise,
     ])
 
@@ -723,6 +727,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       efficiency,
       failureBreakdown,
       needsCheckBreakdown,
+      needsCheckRootCauseAnalysis,
       timeseries: {
         publishedByHour: mapToSortedSeries(publishedByHour),
         ingestedPublishedByHour: mapToSortedSeries(ingestedPublishedByHour),

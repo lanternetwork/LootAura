@@ -64,6 +64,7 @@ describe('buildIngestionDiagnostics', () => {
         publishing: 0,
       },
       needsCheckBreakdown: null,
+      needsCheckRootCauseAnalysis: null,
       timeseries: {} as IngestionMetricsResponse['timeseries'],
       orchestrationVisibility: {} as IngestionMetricsResponse['orchestrationVisibility'],
       volume: {
@@ -262,6 +263,7 @@ describe('buildIngestionDiagnostics', () => {
         publishing: 0,
       },
       needsCheckBreakdown: null,
+      needsCheckRootCauseAnalysis: null,
       funnel: {
         '24h': {
           stages: [],

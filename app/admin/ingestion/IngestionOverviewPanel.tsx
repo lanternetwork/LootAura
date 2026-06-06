@@ -13,6 +13,7 @@ import {
 } from '@/lib/admin/ingestionDashboardOverview'
 import IngestionStabilizationExitSection from '@/app/admin/ingestion/IngestionStabilizationExitSection'
 import IngestionRepairProgramSection from '@/app/admin/ingestion/IngestionRepairProgramSection'
+import NeedsCheckRootCauseDiscoverySection from '@/app/admin/ingestion/NeedsCheckRootCauseDiscoverySection'
 import SeoOperationalPanel from '@/app/admin/ingestion/SeoOperationalPanel'
 
 const HEALTH_STYLE: Record<IngestionHealthState, string> = {
@@ -135,6 +136,8 @@ export default function IngestionOverviewPanel({
         coverage={coverage}
         onOpenControls={onOpenControls}
       />
+
+      <NeedsCheckRootCauseDiscoverySection metrics={metrics} coverage={coverage} />
 
       <SeoOperationalPanel metrics={metrics} coverage={coverage} />
 

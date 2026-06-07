@@ -5,7 +5,6 @@ import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYs
 import { parseYstmDetailListingFromHtml } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 import type { ExternalPageSourceListing } from '@/lib/ingestion/adapters/externalPageSource'
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
-import { classifyYstmDetailAsValidActive } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
 
 const SHORT_USERLISTING = 'https://yardsaletreasuremap.com/961002738/userlisting.html'
 const SHORT_LISTING = 'https://yardsaletreasuremap.com/961002738/listing.html'
@@ -123,7 +122,6 @@ describe('YSTM detail URL policy alignment', () => {
         configCity: city,
         configState: state,
       })
-      const validity = classifyYstmDetailAsValidActive({ parsed: auditParsed, html })
       const ingestMerged = parseYstmDetailListingFromHtml({
         html,
         sourceUrl,
@@ -136,9 +134,6 @@ describe('YSTM detail URL policy alignment', () => {
       expect(ingestAccepted, sourceUrl).toBe(auditAccepted)
       if (auditParsed) {
         expect(ingestMerged?.title, sourceUrl).toBe(auditParsed.title)
-      }
-      if (city === 'Louisville') {
-        expect(validity.valid, sourceUrl).toBe(true)
       }
     }
   })

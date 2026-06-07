@@ -56,7 +56,6 @@ import {
   planYstmUrlReuseSupersessionOnDetailRefresh,
   supersedePublishedSaleForUrlReuse,
 } from '@/lib/ingestion/identity/ystmUrlReuseSupersession'
-import { parseYstmListingPathParts } from '@/lib/ingestion/ystmListingCityAuthority'
 import { detailFirstIngestLifecycleDbFields, resolveDetailFirstIngestLifecycle } from '@/lib/ingestion/detailFirstIngestLifecycle'
 import { shouldDeferPublishForPendingAddress } from '@/lib/ingestion/publishPreflight'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
@@ -287,10 +286,6 @@ export function parseYstmDetailListingFromHtml(input: {
   config: ExternalPageSourceIngestionConfig
   listSeed: ExternalPageSourceListing
 }): ExternalPageSourceListing | null {
-  if (!parseYstmListingPathParts(input.sourceUrl)) {
-    return null
-  }
-
   const detailPage = parseYstmDetailPageFromHtml({
     html: input.html,
     sourceUrl: input.sourceUrl,

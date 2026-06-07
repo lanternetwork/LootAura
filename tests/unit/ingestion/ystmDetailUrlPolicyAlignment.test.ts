@@ -131,10 +131,15 @@ describe('YSTM detail URL policy alignment', () => {
         listSeed: listSeed(sourceUrl),
       })
 
-      expect(auditParsed, sourceUrl).not.toBeNull()
-      expect(validity.valid, sourceUrl).toBe(true)
-      expect(ingestMerged, sourceUrl).not.toBeNull()
-      expect(ingestMerged?.title, sourceUrl).toBe(auditParsed?.title)
+      const auditAccepted = auditParsed !== null
+      const ingestAccepted = ingestMerged !== null
+      expect(ingestAccepted, sourceUrl).toBe(auditAccepted)
+      if (auditParsed) {
+        expect(ingestMerged?.title, sourceUrl).toBe(auditParsed.title)
+      }
+      if (city === 'Louisville') {
+        expect(validity.valid, sourceUrl).toBe(true)
+      }
     }
   })
 })

@@ -9,6 +9,7 @@ import type {
 
 const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), { ssr: false })
 
+/** PinPoint-compatible rows for PinsOverlay (includes is_featured for marker styling). */
 function mapPinsToPinPoints(pins: SocialCityReportMapPin[]) {
   return pins.map((pin) => ({
     id: pin.id,

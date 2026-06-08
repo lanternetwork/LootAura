@@ -1,5 +1,7 @@
-import { buildViewportBoundsFromCenterZoom } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
-import type { ViewportBounds } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
+import {
+  buildViewportBoundsFromCenterZoom,
+  type ViewportBounds,
+} from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
 import { getKnownMetroMarketAnchor } from '@/lib/admin/social/metroMarketGeography'
 import {
   getSocialReportViewportPreset,

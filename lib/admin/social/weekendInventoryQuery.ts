@@ -3,8 +3,10 @@ import { T } from '@/lib/supabase/tables'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
 import { getThisWeekendWindowInMetro, saleOverlapsDateRange } from '@/lib/seo/weekendBoundaries'
-import type { ViewportBounds } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
-import { buildViewportBoundsFromCenterZoom } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
+import {
+  buildViewportBoundsFromCenterZoom,
+  type ViewportBounds,
+} from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
 import {
   SOCIAL_REPORT_VIEWPORT_PRESETS,
   type SocialReportViewportPreset,

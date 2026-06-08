@@ -8,7 +8,7 @@ describe('resolveSocialReportViewportForMetro', () => {
     expect(viewport.isRankingPreset).toBe(true)
     expect(viewport.centerLat).toBe(41.8781)
     expect(viewport.centerLng).toBe(-87.6298)
-    expect(viewport.zoom).toBe(8)
+    expect(viewport.zoom).toBe(7)
     expect(viewport.timezone).toBe('America/Chicago')
     expect(viewport.bounds.north).toBeGreaterThan(viewport.bounds.south)
   })
@@ -16,7 +16,7 @@ describe('resolveSocialReportViewportForMetro', () => {
   it('uses canonical preset for Dallas', () => {
     const viewport = resolveSocialReportViewportForMetro(TEST_SEO_METRO_DALLAS)
     expect(viewport.isRankingPreset).toBe(true)
-    expect(viewport.zoom).toBe(8)
+    expect(viewport.zoom).toBe(7)
   })
 
   it('marks unknown metros as non-ranking fallbacks', () => {

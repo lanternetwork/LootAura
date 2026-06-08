@@ -181,42 +181,32 @@ function formatFooterTimestamp(timestampLabel: string): string {
   return timestampLabel.replaceAll('\n', ' \u2022 ').toUpperCase()
 }
 
-function formatWeekendShortLabel(heroDateRange: string): string {
-  const match = heroDateRange.match(/^(\w+)\s+(\d+)(?:\u2013(\d+))?,\s*(\d{4})$/)
-  if (!match) return heroDateRange.toUpperCase()
-  const [, month, startDay, endDay, year] = match
-  const monthShort = month.slice(0, 3).toUpperCase()
-  if (endDay) {
-    return `${monthShort} ${startDay}\u2013${endDay}`
-  }
-  return `${monthShort} ${startDay}, ${year}`
-}
-
 /** Screenshot-ready social infographic canvas (no admin controls). */
 export default function SocialReportCanvas({ report }: SocialReportCanvasProps) {
   const cityTitle = `${report.city}, ${report.state}`
   const cityTitleUpper = `${report.city.toUpperCase()}, ${report.state}`
   const rankLabel = report.cityRank != null ? `#${report.cityRank}` : 'N/A'
-  const weekendShort = formatWeekendShortLabel(report.heroDateRange)
   const footerTimestamp = formatFooterTimestamp(report.timestampLabel)
   const heroDateUpper = formatHeroDateUpper(report.heroDateRange)
 
   return (
     <div
       data-testid="social-city-report"
-      className="shrink-0 overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/10"
+      className="box-border shrink-0 overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/10"
       style={{
         width: SOCIAL_REPORT_CANVAS_WIDTH,
+        minWidth: SOCIAL_REPORT_CANVAS_WIDTH,
+        maxWidth: SOCIAL_REPORT_CANVAS_WIDTH,
         height: SOCIAL_REPORT_CANVAS_HEIGHT,
       }}
     >
       <div className="flex h-full min-h-0 flex-col bg-white">
         {/* Header */}
         <header
-          className="relative shrink-0 bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-10 pb-5 pt-6"
+          className="relative flex shrink-0 items-center bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-10 py-6"
           style={{ height: `${SOCIAL_REPORT_LAYOUT_HEIGHT_SHARE.header * 100}%` }}
         >
-          <div className="flex h-full items-start justify-between gap-6">
+          <div className="flex w-full items-center justify-between gap-6">
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -330,13 +320,6 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
               accentColor="#7C3AED"
               iconBgClass="bg-violet-600 text-white"
               icon={<HouseIcon className="h-5 w-5" />}
-            />
-            <SecondaryMetricCard
-              value={weekendShort}
-              label="This Weekend"
-              accentColor="#2563EB"
-              iconBgClass="bg-blue-600 text-white"
-              icon={<CalendarIcon className="h-5 w-5" />}
             />
           </div>
         </section>

@@ -113,8 +113,8 @@ export default function SocialCityReportClient() {
 
   return (
     <div className="min-h-screen bg-slate-200 py-8">
-      <div className="mx-auto max-w-[1440px] px-6">
-        {/* Admin controls — outside screenshot canvas */}
+      {/* Admin controls — narrow column; must not constrain screenshot canvas width */}
+      <div className="mx-auto max-w-4xl px-6">
         <section aria-label="Admin controls" className="mb-8 space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -198,18 +198,24 @@ export default function SocialCityReportClient() {
             {reportError}
           </div>
         )}
+      </div>
 
-        {report && reportStatus === 'ready' && (
-          <>
-            <section aria-label="Screenshot canvas" className="mb-8">
+      {report && reportStatus === 'ready' && (
+        <>
+          <section aria-label="Screenshot canvas" className="mb-8 w-full">
+            <div className="mx-auto max-w-4xl px-6">
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                Screenshot this area
+                Screenshot the canvas below (1440×810)
               </p>
-              <div className="flex justify-center overflow-x-auto rounded-lg bg-slate-300/40 p-6">
+            </div>
+            <div className="w-full overflow-x-auto">
+              <div className="flex justify-center px-6 py-4">
                 <SocialReportCanvas report={report} />
               </div>
-            </section>
+            </div>
+          </section>
 
+          <div className="mx-auto max-w-4xl px-6">
             <section
               aria-label="Caption utility"
               className="rounded-lg border border-slate-300 bg-white p-4 shadow-sm"
@@ -236,9 +242,9 @@ export default function SocialCityReportClient() {
                 {report.caption}
               </pre>
             </section>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

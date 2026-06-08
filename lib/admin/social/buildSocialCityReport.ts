@@ -10,9 +10,10 @@ import {
   formatWeekendHeroDateRange,
 } from '@/lib/admin/social/formatSocialReportDisplay'
 import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
+import { buildMetroMarketAnchorsBySlug } from '@/lib/admin/social/metroMarketGeography'
 import {
   fetchWeekendInventoryCountsBySlug,
-  fetchWeekendMapPinsForMetro,
+  fetchWeekendMapInventoryForMetro,
 } from '@/lib/admin/social/weekendInventoryQuery'
 
 export function formatSocialMetroLabel(city: string, state: string): string {
@@ -51,9 +52,10 @@ export async function buildSocialCityReport(
     )
   }
 
-  const [countsBySlug, mapPins] = await Promise.all([
-    fetchWeekendInventoryCountsBySlug(metros, now),
-    fetchWeekendMapPinsForMetro(metro, now),
+  const anchorsBySlug = buildMetroMarketAnchorsBySlug(metros)
+  const [countsBySlug, mapInventory] = await Promise.all([
+    fetchWeekendInventoryCountsBySlug(metros, now, anchorsBySlug),
+    fetchWeekendMapInventoryForMetro(metro, metros, now, anchorsBySlug),
   ])
 
   const activeSales = countsBySlug[metro.slug] ?? 0
@@ -79,7 +81,9 @@ export async function buildSocialCityReport(
       cityRank,
       activeSales,
     }),
-    mapPins,
+    mapPins: mapInventory.pins,
+    mapPinsBeforeCap: mapInventory.pinsBeforeCap,
+    mapFitBounds: mapInventory.mapFitBounds,
   }
 }
 

@@ -6,6 +6,13 @@ export type SocialCityReportMapPin = {
   is_featured: boolean
 }
 
+export type SocialCityReportMapFitBounds = {
+  west: number
+  south: number
+  east: number
+  north: number
+}
+
 export type SocialCityReport = {
   city: string
   state: string
@@ -20,6 +27,10 @@ export type SocialCityReport = {
   timestampLabel: string
   caption: string
   mapPins: SocialCityReportMapPin[]
+  /** Mappable pins before 500 cap (weekend + market geography). */
+  mapPinsBeforeCap: number
+  /** fitBounds from all qualifying mappable pins before cap. */
+  mapFitBounds: SocialCityReportMapFitBounds | null
 }
 
 export type SocialMetroOption = {

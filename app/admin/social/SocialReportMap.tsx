@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import type { SocialCityReportMapPin } from '@/lib/admin/social/socialCityReportTypes'
+import type {
+  SocialCityReportMapFitBounds,
+  SocialCityReportMapPin,
+} from '@/lib/admin/social/socialCityReportTypes'
 import type { Sale } from '@/lib/types'
 
 const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), { ssr: false })
@@ -66,13 +69,21 @@ const DEFAULT_VIEWPORT: Viewport = {
 
 type SocialReportMapProps = {
   mapPins: SocialCityReportMapPin[]
+  mapFitBounds?: SocialCityReportMapFitBounds | null
   className?: string
 }
 
-export default function SocialReportMap({ mapPins, className }: SocialReportMapProps) {
+export default function SocialReportMap({
+  mapPins,
+  mapFitBounds,
+  className,
+}: SocialReportMapProps) {
   const [viewport, setViewport] = useState<Viewport | null>(null)
 
-  const fitBounds = useMemo(() => boundsFromPins(mapPins), [mapPins])
+  const fitBounds = useMemo(
+    () => mapFitBounds ?? boundsFromPins(mapPins),
+    [mapFitBounds, mapPins]
+  )
   const center = useMemo(
     () => (fitBounds ? centerFromBounds(fitBounds) : DEFAULT_CENTER),
     [fitBounds]

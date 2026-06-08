@@ -1,5 +1,13 @@
 import type { SeoMetro } from '@/lib/seo/types'
 
+export const TEST_SEO_METRO_CHICAGO: SeoMetro = {
+  slug: 'chicago-il',
+  city: 'Chicago',
+  state: 'IL',
+  timezone: 'America/Chicago',
+  minActiveListings: 25,
+}
+
 export const TEST_SEO_METRO_DALLAS: SeoMetro = {
   slug: 'dallas-tx',
   city: 'Dallas',

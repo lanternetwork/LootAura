@@ -83,6 +83,42 @@ export type YstmCoverageMissingIngestionAggregate = {
   missingIngestionNeverAttempted: number
 }
 
+export function shouldInvalidateObservationForExpiredAfterDetail(
+  outcome: YstmCoverageMissingIngestionOutcome,
+  failureReason?: string | null
+): boolean {
+  return outcome === 'failed' && failureReason === 'expired_after_detail'
+}
+
+export function buildMissingIngestionObservationUpdate(
+  patch: {
+    outcome: YstmCoverageMissingIngestionOutcome
+    failureReason?: string | null
+    lootauraVisible?: boolean
+  },
+  nowIso: string = new Date().toISOString()
+): Record<string, unknown> {
+  const update: Record<string, unknown> = {
+    missing_ingestion_attempted_at: nowIso,
+    missing_ingestion_outcome: patch.outcome,
+    missing_ingestion_failure_reason: patch.failureReason ?? null,
+    updated_at: nowIso,
+  }
+  if (patch.lootauraVisible === true) {
+    update.lootaura_visible = true
+  }
+  if (shouldInvalidateObservationForExpiredAfterDetail(patch.outcome, patch.failureReason)) {
+    update.ystm_valid_active = false
+    update.ystm_invalid_reason = 'expired'
+    update.false_exclusion_primary_bucket = null
+    update.false_exclusion_secondary_tags = []
+    update.false_exclusion_evidence = null
+    update.false_exclusion_summary = null
+    update.false_exclusion_traced_at = null
+  }
+  return update
+}
+
 export async function recordYstmCoverageMissingIngestionOutcome(
   admin: ReturnType<typeof getAdminDb>,
   canonicalUrl: string,
@@ -93,13 +129,7 @@ export async function recordYstmCoverageMissingIngestionOutcome(
   }
 ): Promise<void> {
   const { error } = await fromBase(admin, 'ystm_coverage_observations')
-    .update({
-      missing_ingestion_attempted_at: new Date().toISOString(),
-      missing_ingestion_outcome: patch.outcome,
-      missing_ingestion_failure_reason: patch.failureReason ?? null,
-      ...(patch.lootauraVisible === true ? { lootaura_visible: true } : {}),
-      updated_at: new Date().toISOString(),
-    })
+    .update(buildMissingIngestionObservationUpdate(patch))
     .eq('canonical_url', canonicalUrl)
   if (error) {
     throw new Error(error.message)

@@ -6,7 +6,6 @@ import {
   SOCIAL_REPORT_MAP_PANEL_HEIGHT,
   SOCIAL_REPORT_MAP_PANEL_WIDTH,
 } from '@/lib/admin/social/socialReportCanvasDimensions'
-import { SOCIAL_REPORT_VIEWPORT_PRESETS } from '@/lib/admin/social/socialReportViewportPresets'
 import type { SocialCityReport } from '@/lib/admin/social/socialCityReportTypes'
 import SocialReportMap from './SocialReportMap'
 
@@ -213,8 +212,6 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
   const cityTitle = `${report.city}, ${report.state}`
   const cityTitleUpper = `${report.city.toUpperCase()}, ${report.state}`
   const rankLabel = report.cityRank != null ? `#${report.cityRank}` : 'N/A'
-  const featuredSales = report.mapPins.filter((pin) => pin.is_featured).length
-  const rankedMetroCount = SOCIAL_REPORT_VIEWPORT_PRESETS.length.toLocaleString('en-US')
   const weekendShort = formatWeekendShortLabel(report.heroDateRange)
   const footerTimestamp = formatFooterTimestamp(report.timestampLabel)
   const heroDateUpper = formatHeroDateUpper(report.heroDateRange)
@@ -336,15 +333,15 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
               cityTitle={cityTitle}
             />
             <SecondaryMetricCard
-              value={featuredSales.toLocaleString('en-US')}
-              label="Featured Sales"
+              value={report.yardSales.toLocaleString('en-US')}
+              label="Yard Sales"
               accentColor="#DC2626"
               iconBgClass="bg-red-600 text-white"
               icon={<TagIcon className="h-5 w-5" />}
             />
             <SecondaryMetricCard
-              value={rankedMetroCount}
-              label="Ranked Metros"
+              value={report.estateSales.toLocaleString('en-US')}
+              label="Estate Sales"
               accentColor="#7C3AED"
               iconBgClass="bg-violet-600 text-white"
               icon={<HouseIcon className="h-5 w-5" />}

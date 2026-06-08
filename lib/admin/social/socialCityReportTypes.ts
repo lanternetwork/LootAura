@@ -17,6 +17,10 @@ export type SocialCityReport = {
   state: string
   citySlug: string
   activeSales: number
+  /** Viewport weekend sales whose title matches estate heuristics. */
+  estateSales: number
+  /** Viewport weekend sales not classified as estate by title. */
+  yardSales: number
   /** Rank among preset cities, or null when selected city has no ranking preset. */
   cityRank: number | null
   updatedAt: string

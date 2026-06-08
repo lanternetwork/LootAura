@@ -26,7 +26,9 @@ type MapPinRow = SaleDateRow & {
 }
 
 async function fetchPaginatedRows<T>(
-  buildQuery: (includeModeration: boolean) => ReturnType<typeof fromBase>,
+  buildQuery: (includeModeration: boolean) => {
+    range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }>
+  },
   includeModeration: boolean
 ): Promise<T[]> {
   const rows: T[] = []

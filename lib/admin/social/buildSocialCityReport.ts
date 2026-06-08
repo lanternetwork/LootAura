@@ -4,16 +4,17 @@ import {
 } from '@/lib/seo/metroCatalog'
 import { getThisWeekendWindowInMetro } from '@/lib/seo/weekendBoundaries'
 import { buildSocialCityReportCaption } from '@/lib/admin/social/buildSocialCityReportCaption'
-import { computeCityRankBySlug } from '@/lib/admin/social/computeCityRank'
+import { computeCityRankAmongPresets } from '@/lib/admin/social/computeCityRank'
 import {
   formatSocialReportTimestamp,
   formatWeekendHeroDateRange,
 } from '@/lib/admin/social/formatSocialReportDisplay'
+import { resolveSocialReportViewportForMetro } from '@/lib/admin/social/resolveSocialReportViewport'
+import { listSocialReportRankingPresetSlugs } from '@/lib/admin/social/socialReportViewportPresets'
 import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
-import { buildMetroMarketAnchorsBySlug } from '@/lib/admin/social/metroMarketGeography'
 import {
-  fetchWeekendInventoryCountsBySlug,
-  fetchWeekendMapInventoryForMetro,
+  fetchPresetViewportWeekendCountsBySlug,
+  fetchWeekendSalesInViewport,
 } from '@/lib/admin/social/weekendInventoryQuery'
 
 export function formatSocialMetroLabel(city: string, state: string): string {
@@ -52,38 +53,50 @@ export async function buildSocialCityReport(
     )
   }
 
-  const anchorsBySlug = buildMetroMarketAnchorsBySlug(metros)
-  const [countsBySlug, mapInventory] = await Promise.all([
-    fetchWeekendInventoryCountsBySlug(metros, now, anchorsBySlug),
-    fetchWeekendMapInventoryForMetro(metro, metros, now, anchorsBySlug),
+  const viewport = resolveSocialReportViewportForMetro(metro)
+  const [inventory, presetCounts] = await Promise.all([
+    fetchWeekendSalesInViewport(
+      { bounds: viewport.bounds, timezone: viewport.timezone },
+      now
+    ),
+    fetchPresetViewportWeekendCountsBySlug(now),
   ])
 
-  const activeSales = countsBySlug[metro.slug] ?? 0
-  const cityRank = computeCityRankBySlug(metros, countsBySlug, metro.slug)
-  const weekend = getThisWeekendWindowInMetro(metro.timezone, now)
+  const cityRank = viewport.isRankingPreset
+    ? computeCityRankAmongPresets(
+        listSocialReportRankingPresetSlugs(),
+        presetCounts,
+        metro.slug
+      )
+    : null
+
+  const weekend = getThisWeekendWindowInMetro(viewport.timezone, now)
   const updatedAt = now.toISOString()
 
   return {
     city: metro.city,
     state: metro.state,
     citySlug: metro.slug,
-    activeSales,
+    activeSales: inventory.activeSales,
     cityRank,
     updatedAt,
     weekendStart: weekend.start,
     weekendEnd: weekend.end,
     weekendLabel: weekend.label,
-    heroDateRange: formatWeekendHeroDateRange(weekend, metro.timezone),
-    timestampLabel: formatSocialReportTimestamp(now, metro.timezone),
+    heroDateRange: formatWeekendHeroDateRange(weekend, viewport.timezone),
+    timestampLabel: formatSocialReportTimestamp(now, viewport.timezone),
     caption: buildSocialCityReportCaption({
       city: metro.city,
       state: metro.state,
       cityRank,
-      activeSales,
+      activeSales: inventory.activeSales,
     }),
-    mapPins: mapInventory.pins,
-    mapPinsBeforeCap: mapInventory.pinsBeforeCap,
-    mapFitBounds: mapInventory.mapFitBounds,
+    mapPins: inventory.pins,
+    mapViewport: {
+      centerLat: viewport.centerLat,
+      centerLng: viewport.centerLng,
+      zoom: viewport.zoom,
+    },
   }
 }
 

@@ -6,11 +6,10 @@ export type SocialCityReportMapPin = {
   is_featured: boolean
 }
 
-export type SocialCityReportMapFitBounds = {
-  west: number
-  south: number
-  east: number
-  north: number
+export type SocialCityReportMapViewport = {
+  centerLat: number
+  centerLng: number
+  zoom: number
 }
 
 export type SocialCityReport = {
@@ -18,7 +17,8 @@ export type SocialCityReport = {
   state: string
   citySlug: string
   activeSales: number
-  cityRank: number
+  /** Rank among preset cities, or null when selected city has no ranking preset. */
+  cityRank: number | null
   updatedAt: string
   weekendStart: string
   weekendEnd: string
@@ -27,10 +27,7 @@ export type SocialCityReport = {
   timestampLabel: string
   caption: string
   mapPins: SocialCityReportMapPin[]
-  /** Mappable pins before 500 cap (weekend + market geography). */
-  mapPinsBeforeCap: number
-  /** Metro market bbox for map framing (same ~56 km radius as inventory scope). */
-  mapFitBounds: SocialCityReportMapFitBounds | null
+  mapViewport: SocialCityReportMapViewport
 }
 
 export type SocialMetroOption = {

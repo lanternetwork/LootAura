@@ -45,6 +45,19 @@ export default function AdminToolsPageClient() {
           </p>
         </div>
 
+        <div className="mb-8 rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-fuchsia-900">Social city reports</h2>
+          <p className="mt-1 text-sm text-fuchsia-800">
+            Screenshot-ready weekend inventory reports for social posts.
+          </p>
+          <Link
+            href="/admin/social"
+            className="mt-3 inline-block rounded-md bg-fuchsia-700 px-3 py-2 text-sm font-medium text-white hover:bg-fuchsia-800"
+          >
+            Open social reports →
+          </Link>
+        </div>
+
         <div className="mb-8 rounded-lg border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-indigo-900">Ingestion operations</h2>
           <p className="mt-1 text-sm text-indigo-800">

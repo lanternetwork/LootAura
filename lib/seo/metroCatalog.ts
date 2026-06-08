@@ -77,6 +77,18 @@ function timezoneForState(state: string): string {
   return STATE_TIMEZONE[state.trim().toUpperCase()] ?? DEFAULT_TIMEZONE
 }
 
+/** States whose primary metro timezone matches the given IANA zone. */
+export function getStatesForTimezone(timeZone: string): string[] {
+  return Object.entries(STATE_TIMEZONE)
+    .filter(([, tz]) => tz === timeZone)
+    .map(([state]) => state)
+}
+
+/** Distinct IANA timezones present in a metro list. */
+export function getUniqueMetroTimezones(metros: SeoMetro[]): string[] {
+  return [...new Set(metros.map((m) => m.timezone))].sort()
+}
+
 function saleRowToMetro(city: string, state: string): SeoMetro {
   const normalizedState = state.trim().toUpperCase()
   return {

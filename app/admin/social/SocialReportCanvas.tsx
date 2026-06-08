@@ -222,12 +222,10 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
   return (
     <div
       data-testid="social-city-report"
-      className="mx-auto w-full overflow-hidden rounded-sm shadow-2xl ring-1 ring-black/10"
+      className="shrink-0 overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/10"
       style={{
         width: SOCIAL_REPORT_CANVAS_WIDTH,
-        maxWidth: '100%',
         height: SOCIAL_REPORT_CANVAS_HEIGHT,
-        aspectRatio: `${SOCIAL_REPORT_CANVAS_WIDTH} / ${SOCIAL_REPORT_CANVAS_HEIGHT}`,
       }}
     >
       <div className="flex h-full min-h-0 flex-col bg-white">

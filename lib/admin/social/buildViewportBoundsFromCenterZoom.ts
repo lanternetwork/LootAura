@@ -29,19 +29,20 @@ function projectToWorldPixels(lat: number, lng: number, worldSize: number): { x:
   const x = ((lng + 180) / 360) * worldSize
   const latRad = (lat * Math.PI) / 180
   const y =
-    ((0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad)))) / (4 * Math.PI)) *
+    ((0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad))) / (4 * Math.PI)) *
     worldSize
   return { x, y }
 }
 
+/** Inverse of Mapbox GL `unproject` for a fixed world size. */
 function unprojectFromWorldPixels(
   x: number,
   y: number,
   worldSize: number
 ): { lat: number; lng: number } {
-  const lng = (x / worldSize) * 360 - 180
-  const n = Math.PI - (2 * Math.PI * y) / worldSize
-  const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))
+  const lng = (x / worldSize - 0.5) * 360
+  const lat =
+    (360 / Math.PI) * Math.atan(Math.exp(((0.5 - y / worldSize) * 2 * Math.PI))) - 90
   return { lat, lng }
 }
 

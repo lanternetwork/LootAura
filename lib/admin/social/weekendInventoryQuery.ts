@@ -7,6 +7,7 @@ import { getThisWeekendWindowInMetro, saleOverlapsDateRange } from '@/lib/seo/we
 import type { SeoMetro } from '@/lib/seo/types'
 import {
   buildBoundsFromCoords,
+  buildMetroMarketAnchorsBySlug,
   METRO_MARKET_RADIUS_METERS,
   resolveMetroSlugForSale,
   type MetroMarketAnchor,

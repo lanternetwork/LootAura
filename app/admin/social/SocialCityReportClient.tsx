@@ -205,7 +205,9 @@ export default function SocialCityReportClient() {
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
                 Screenshot this area
               </p>
-              <SocialReportCanvas report={report} />
+              <div className="flex justify-center overflow-x-auto rounded-lg bg-slate-300/40 p-6">
+                <SocialReportCanvas report={report} />
+              </div>
             </section>
 
             <section

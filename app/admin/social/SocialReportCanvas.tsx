@@ -6,7 +6,6 @@ import {
   SOCIAL_REPORT_MAP_PANEL_HEIGHT,
   SOCIAL_REPORT_MAP_PANEL_WIDTH,
 } from '@/lib/admin/social/socialReportCanvasDimensions'
-import { SOCIAL_REPORT_VIEWPORT_PRESETS } from '@/lib/admin/social/socialReportViewportPresets'
 import type { SocialCityReport } from '@/lib/admin/social/socialCityReportTypes'
 import SocialReportMap from './SocialReportMap'
 
@@ -104,21 +103,6 @@ function HouseIcon({ className }: { className?: string }) {
   )
 }
 
-function GarageIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M4 8.5 10 4l6 4.5V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path d="M7 16v-3.5h6V16" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M8.5 12.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 function MetricIconBadge({
   children,
   bgClass,
@@ -148,7 +132,7 @@ function PrimaryMetricCard({
         <TagIcon className="h-5 w-5" />
       </MetricIconBadge>
       <div className="min-w-0">
-        <p className="text-[clamp(2rem,3vw,2.75rem)] font-black leading-none text-white">{value}</p>
+        <p className="text-[2.5rem] font-black leading-none text-white">{value}</p>
         <p className="mt-1.5 text-xs font-bold uppercase tracking-[0.16em] text-[#F0B532]">
           Active Sales
         </p>
@@ -175,7 +159,7 @@ function SecondaryMetricCard({
     <div className="flex min-w-0 flex-1 items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-md">
       <MetricIconBadge bgClass={iconBgClass}>{icon}</MetricIconBadge>
       <div className="min-w-0">
-        <p className="text-[clamp(1.75rem,2.5vw,2.25rem)] font-black leading-none text-[#0c1628]">
+        <p className="text-[1.875rem] font-black leading-none text-[#0c1628]">
           {value}
         </p>
         <p
@@ -213,8 +197,6 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
   const cityTitle = `${report.city}, ${report.state}`
   const cityTitleUpper = `${report.city.toUpperCase()}, ${report.state}`
   const rankLabel = report.cityRank != null ? `#${report.cityRank}` : 'N/A'
-  const featuredSales = report.mapPins.filter((pin) => pin.is_featured).length
-  const rankedMetroCount = SOCIAL_REPORT_VIEWPORT_PRESETS.length.toLocaleString('en-US')
   const weekendShort = formatWeekendShortLabel(report.heroDateRange)
   const footerTimestamp = formatFooterTimestamp(report.timestampLabel)
   const heroDateUpper = formatHeroDateUpper(report.heroDateRange)
@@ -222,12 +204,10 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
   return (
     <div
       data-testid="social-city-report"
-      className="mx-auto w-full overflow-hidden rounded-sm shadow-2xl ring-1 ring-black/10"
+      className="shrink-0 overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/10"
       style={{
         width: SOCIAL_REPORT_CANVAS_WIDTH,
-        maxWidth: '100%',
         height: SOCIAL_REPORT_CANVAS_HEIGHT,
-        aspectRatio: `${SOCIAL_REPORT_CANVAS_WIDTH} / ${SOCIAL_REPORT_CANVAS_HEIGHT}`,
       }}
     >
       <div className="flex h-full min-h-0 flex-col bg-white">
@@ -264,10 +244,10 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
                 </div>
               </div>
 
-              <h2 className="mt-3 text-[clamp(2.25rem,3.8vw,3.5rem)] font-black leading-[0.95] tracking-tight text-white">
+              <h2 className="mt-3 text-[3.25rem] font-black leading-[0.95] tracking-tight text-white">
                 {cityTitleUpper}
               </h2>
-              <p className="mt-2 text-[clamp(1.15rem,1.9vw,1.6rem)] font-semibold uppercase text-[#F0B532]">
+              <p className="mt-2 text-[1.5rem] font-semibold uppercase text-[#F0B532]">
                 Weekend Sale Report
               </p>
               <div className="mt-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">
@@ -286,7 +266,7 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
             >
               <div className="flex items-center justify-center gap-2">
                 <TrophyIcon className="h-7 w-7 text-[#F0B532]" />
-                <p className="text-[clamp(2.25rem,3.5vw,3rem)] font-black leading-none text-[#F0B532]">
+                <p className="text-[2.75rem] font-black leading-none text-[#F0B532]">
                   {rankLabel}
                 </p>
               </div>
@@ -338,15 +318,15 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
               cityTitle={cityTitle}
             />
             <SecondaryMetricCard
-              value={featuredSales.toLocaleString('en-US')}
-              label="Featured Sales"
+              value={report.yardSales.toLocaleString('en-US')}
+              label="Yard Sales"
               accentColor="#DC2626"
               iconBgClass="bg-red-600 text-white"
               icon={<TagIcon className="h-5 w-5" />}
             />
             <SecondaryMetricCard
-              value={rankedMetroCount}
-              label="Ranked Metros"
+              value={report.estateSales.toLocaleString('en-US')}
+              label="Estate Sales"
               accentColor="#7C3AED"
               iconBgClass="bg-violet-600 text-white"
               icon={<HouseIcon className="h-5 w-5" />}
@@ -356,7 +336,7 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
               label="This Weekend"
               accentColor="#2563EB"
               iconBgClass="bg-blue-600 text-white"
-              icon={<GarageIcon className="h-5 w-5" />}
+              icon={<CalendarIcon className="h-5 w-5" />}
             />
           </div>
         </section>

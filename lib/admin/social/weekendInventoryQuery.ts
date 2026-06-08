@@ -11,6 +11,7 @@ import {
   SOCIAL_REPORT_VIEWPORT_PRESETS,
   type SocialReportViewportPreset,
 } from '@/lib/admin/social/socialReportViewportPresets'
+import { countEstateSalesFromTitles } from '@/lib/admin/social/isEstateSaleTitle'
 import type { SocialCityReportMapPin } from '@/lib/admin/social/socialCityReportTypes'
 
 const PAGE_SIZE = 1000
@@ -31,6 +32,8 @@ type MapPinRow = SaleGeoRow & {
 export type ViewportWeekendInventory = {
   pins: SocialCityReportMapPin[]
   activeSales: number
+  estateSales: number
+  yardSales: number
 }
 
 async function runWithModerationRetry<T>(
@@ -109,9 +112,14 @@ function rowsToViewportInventory(
 
   pins.sort((a, b) => a.id.localeCompare(b.id))
 
+  const estateSales = countEstateSalesFromTitles(pins.map((pin) => pin.title))
+  const activeSales = pins.length
+
   return {
     pins,
-    activeSales: pins.length,
+    activeSales,
+    estateSales,
+    yardSales: activeSales - estateSales,
   }
 }
 

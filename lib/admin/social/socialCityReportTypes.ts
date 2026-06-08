@@ -17,6 +17,8 @@ export type SocialCityReport = {
   state: string
   citySlug: string
   activeSales: number
+  estateSales: number
+  yardSales: number
   /** Rank among preset cities, or null when selected city has no ranking preset. */
   cityRank: number | null
   updatedAt: string

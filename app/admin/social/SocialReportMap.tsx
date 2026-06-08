@@ -6,26 +6,15 @@ import type {
   SocialCityReportMapPin,
   SocialCityReportMapViewport,
 } from '@/lib/admin/social/socialCityReportTypes'
-import type { Sale } from '@/lib/types'
 
 const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), { ssr: false })
 
-function pinsToSales(pins: SocialCityReportMapPin[]): Sale[] {
+function mapPinsToPinPoints(pins: SocialCityReportMapPin[]) {
   return pins.map((pin) => ({
     id: pin.id,
-    owner_id: '',
-    title: pin.title,
-    city: '',
-    state: '',
-    date_start: '',
-    time_start: '',
     lat: pin.lat,
     lng: pin.lng,
-    status: 'published',
-    privacy_mode: 'exact',
     is_featured: pin.is_featured,
-    created_at: '',
-    updated_at: '',
   }))
 }
 
@@ -45,7 +34,8 @@ export default function SocialReportMap({
     () => ({ lat: mapViewport.centerLat, lng: mapViewport.centerLng }),
     [mapViewport.centerLat, mapViewport.centerLng]
   )
-  const sales = useMemo(() => pinsToSales(mapPins), [mapPins])
+  const pinPoints = useMemo(() => mapPinsToPinPoints(mapPins), [mapPins])
+  const pinsProp = useMemo(() => ({ sales: pinPoints }), [pinPoints])
 
   const containerClass =
     className ?? 'h-64 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100'
@@ -59,7 +49,7 @@ export default function SocialReportMap({
         attributionControl={false}
         showOSMAttribution={true}
         attributionPosition="bottom-right"
-        sales={sales}
+        pins={pinsProp}
       />
     </div>
   )

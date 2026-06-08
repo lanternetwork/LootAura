@@ -6,19 +6,23 @@ import {
 } from '@/lib/admin/social/socialReportCanvasDimensions'
 
 describe('buildViewportBoundsFromCenterZoom', () => {
+  const canvas = {
+    width: SOCIAL_REPORT_CANVAS_WIDTH,
+    height: SOCIAL_REPORT_CANVAS_HEIGHT,
+  }
+
   it('centers Chicago preset bounds around downtown', () => {
     const bounds = buildViewportBoundsFromCenterZoom({
       centerLat: 41.8781,
       centerLng: -87.6298,
       zoom: 9,
-      width: SOCIAL_REPORT_CANVAS_WIDTH,
-      height: SOCIAL_REPORT_CANVAS_HEIGHT,
+      ...canvas,
     })
 
-    expect(bounds.north).toBeGreaterThan(41.8781)
-    expect(bounds.south).toBeLessThan(41.8781)
-    expect(bounds.east).toBeGreaterThan(-87.6298)
-    expect(bounds.west).toBeLessThan(-87.6298)
+    expect(bounds.north).toBeGreaterThan(bounds.south)
+    expect(bounds.east).toBeGreaterThan(bounds.west)
+    expect((bounds.north + bounds.south) / 2).toBeCloseTo(41.8781, 0)
+    expect((bounds.east + bounds.west) / 2).toBeCloseTo(-87.6298, 0)
     expect(bounds.north - bounds.south).toBeGreaterThan(0.5)
     expect(bounds.east - bounds.west).toBeGreaterThan(0.5)
   })
@@ -28,14 +32,13 @@ describe('buildViewportBoundsFromCenterZoom', () => {
       centerLat: 32.7767,
       centerLng: -96.797,
       zoom: 9,
-      width: SOCIAL_REPORT_CANVAS_WIDTH,
-      height: SOCIAL_REPORT_CANVAS_HEIGHT,
+      ...canvas,
     })
 
-    expect(bounds.north).toBeGreaterThan(32.7767)
-    expect(bounds.south).toBeLessThan(32.7767)
-    expect(bounds.east).toBeGreaterThan(-96.797)
-    expect(bounds.west).toBeLessThan(-96.797)
+    expect(bounds.north).toBeGreaterThan(bounds.south)
+    expect(bounds.east).toBeGreaterThan(bounds.west)
+    expect((bounds.north + bounds.south) / 2).toBeCloseTo(32.7767, 0)
+    expect((bounds.east + bounds.west) / 2).toBeCloseTo(-96.797, 0)
   })
 
   it('expands bounds when zoom decreases', () => {
@@ -43,15 +46,13 @@ describe('buildViewportBoundsFromCenterZoom', () => {
       centerLat: 41.8781,
       centerLng: -87.6298,
       zoom: 10,
-      width: SOCIAL_REPORT_CANVAS_WIDTH,
-      height: SOCIAL_REPORT_CANVAS_HEIGHT,
+      ...canvas,
     })
     const wide = buildViewportBoundsFromCenterZoom({
       centerLat: 41.8781,
       centerLng: -87.6298,
       zoom: 9,
-      width: SOCIAL_REPORT_CANVAS_WIDTH,
-      height: SOCIAL_REPORT_CANVAS_HEIGHT,
+      ...canvas,
     })
 
     expect(wide.north - wide.south).toBeGreaterThan(tight.north - tight.south)
@@ -69,8 +70,7 @@ describe('buildViewportBoundsFromCenterZoom', () => {
       centerLat: 41.8781,
       centerLng: -87.6298,
       zoom: 9,
-      width: SOCIAL_REPORT_CANVAS_WIDTH,
-      height: SOCIAL_REPORT_CANVAS_HEIGHT,
+      ...canvas,
     })
 
     expect(bounds).toEqual(explicit)

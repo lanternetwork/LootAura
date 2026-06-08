@@ -25,24 +25,25 @@ function worldSizeForZoom(zoom: number): number {
   return MAPBOX_TILE_SIZE * 2 ** zoom
 }
 
-function projectToWorldPixels(lat: number, lng: number, worldSize: number): { x: number; y: number } {
-  const x = ((lng + 180) / 360) * worldSize
-  const latRad = (lat * Math.PI) / 180
-  const y =
-    ((0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad)))) / (4 * Math.PI)) *
-    worldSize
-  return { x, y }
+function pixelXFromLng(lng: number, worldSize: number): number {
+  return ((lng + 180) / 360) * worldSize
 }
 
-function unprojectFromWorldPixels(
-  x: number,
-  y: number,
-  worldSize: number
-): { lat: number; lng: number } {
-  const lng = (x / worldSize) * 360 - 180
-  const latRad = Math.atan(Math.sinh(Math.PI - (2 * Math.PI * y) / worldSize))
-  const lat = (latRad * 180) / Math.PI
-  return { lat, lng }
+function pixelYFromLat(lat: number, worldSize: number): number {
+  const latRad = (lat * Math.PI) / 180
+  const yNormalized =
+    0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad))) / (4 * Math.PI)
+  return yNormalized * worldSize
+}
+
+function latFromPixelY(y: number, worldSize: number): number {
+  const yNormalized = y / worldSize
+  const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * yNormalized)))
+  return (latRad * 180) / Math.PI
+}
+
+function lngFromPixelX(x: number, worldSize: number): number {
+  return (x / worldSize) * 360 - 180
 }
 
 /**
@@ -54,23 +55,19 @@ export function buildViewportBoundsFromCenterZoom(
   const width = input.width ?? SOCIAL_REPORT_CANVAS_WIDTH
   const height = input.height ?? SOCIAL_REPORT_CANVAS_HEIGHT
   const worldSize = worldSizeForZoom(input.zoom)
-  const center = projectToWorldPixels(input.centerLat, input.centerLng, worldSize)
 
-  const northWest = unprojectFromWorldPixels(
-    center.x - width / 2,
-    center.y - height / 2,
-    worldSize
-  )
-  const southEast = unprojectFromWorldPixels(
-    center.x + width / 2,
-    center.y + height / 2,
-    worldSize
-  )
+  const centerX = pixelXFromLng(input.centerLng, worldSize)
+  const centerY = pixelYFromLat(input.centerLat, worldSize)
+
+  const west = lngFromPixelX(centerX - width / 2, worldSize)
+  const east = lngFromPixelX(centerX + width / 2, worldSize)
+  const north = latFromPixelY(centerY - height / 2, worldSize)
+  const south = latFromPixelY(centerY + height / 2, worldSize)
 
   return {
-    west: Math.min(northWest.lng, southEast.lng),
-    south: Math.min(northWest.lat, southEast.lat),
-    east: Math.max(northWest.lng, southEast.lng),
-    north: Math.max(northWest.lat, southEast.lat),
+    west: Math.min(west, east),
+    south: Math.min(north, south),
+    east: Math.max(west, east),
+    north: Math.max(north, south),
   }
 }

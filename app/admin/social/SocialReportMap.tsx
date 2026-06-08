@@ -59,11 +59,7 @@ export default function SocialReportMap({
         attributionControl={false}
         showOSMAttribution={true}
         attributionPosition="bottom-right"
-        pins={{
-          sales,
-          selectedId: null,
-          onPinClick: () => {},
-        }}
+        sales={sales}
       />
     </div>
   )

@@ -1,3 +1,8 @@
+import {
+  SOCIAL_REPORT_CANVAS_HEIGHT,
+  SOCIAL_REPORT_CANVAS_WIDTH,
+  SOCIAL_REPORT_LAYOUT_HEIGHT_SHARE,
+} from '@/lib/admin/social/socialReportCanvasDimensions'
 import type { SocialCityReport } from '@/lib/admin/social/socialCityReportTypes'
 import SocialReportMap from './SocialReportMap'
 
@@ -31,84 +36,100 @@ function MetricCard({
 /** Screenshot-ready social infographic canvas (no admin controls). */
 export default function SocialReportCanvas({ report }: SocialReportCanvasProps) {
   const cityTitle = `${report.city.toUpperCase()}, ${report.state}`
+  const rankLabel =
+    report.cityRank != null ? `#${report.cityRank}` : 'N/A'
 
   return (
     <div
       data-testid="social-city-report"
-      className="mx-auto w-full max-w-[1440px] overflow-hidden rounded-sm shadow-2xl ring-1 ring-black/20"
-      style={{ aspectRatio: '16 / 9' }}
+      className="mx-auto w-full overflow-hidden rounded-sm shadow-2xl ring-1 ring-black/20"
+      style={{
+        width: SOCIAL_REPORT_CANVAS_WIDTH,
+        maxWidth: '100%',
+        height: SOCIAL_REPORT_CANVAS_HEIGHT,
+        aspectRatio: `${SOCIAL_REPORT_CANVAS_WIDTH} / ${SOCIAL_REPORT_CANVAS_HEIGHT}`,
+      }}
     >
       <div className="flex h-full min-h-0 flex-col bg-[#0c1628]">
-        {/* Hero */}
-        <header className="relative shrink-0 bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-10 pb-6 pt-7">
-          <div className="flex items-start justify-between gap-8">
+        {/* Hero ~35% */}
+        <header
+          className="relative shrink-0 bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-10 pb-4 pt-6"
+          style={{ height: `${SOCIAL_REPORT_LAYOUT_HEIGHT_SHARE.hero * 100}%` }}
+        >
+          <div className="flex h-full items-start justify-between gap-6">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-3">
                 <img
                   src="/sitelogo-on-dark.svg"
                   alt="Loot Aura"
-                  className="h-11 w-auto shrink-0"
+                  className="h-10 w-auto shrink-0"
                 />
                 <span className="text-lg font-bold tracking-wide text-white">Loot Aura</span>
               </div>
 
-              <h2 className="mt-5 text-[clamp(2.5rem,4.5vw,4.25rem)] font-black leading-[0.95] tracking-tight text-white">
+              <h2 className="mt-3 text-[clamp(2rem,3.5vw,3.25rem)] font-black leading-[0.95] tracking-tight text-white">
                 {cityTitle}
               </h2>
-              <p className="mt-2 text-[clamp(1.25rem,2vw,1.75rem)] font-semibold text-[#F0B532]">
+              <p className="mt-1.5 text-[clamp(1.1rem,1.8vw,1.5rem)] font-semibold text-[#F0B532]">
                 Weekend Sale Report
               </p>
-              <p className="mt-1 text-lg font-medium text-white/80">{report.heroDateRange}</p>
+              <p className="mt-1 text-base font-medium text-white/80">{report.heroDateRange}</p>
             </div>
 
             <div
-              className="shrink-0 rounded-2xl border-2 border-[#F0B532] bg-[#0a1220]/80 px-8 py-6 text-center shadow-lg"
-              aria-label={`Rank ${report.cityRank} most active city this weekend`}
+              className="shrink-0 rounded-2xl border-2 border-[#F0B532] bg-[#0a1220]/80 px-6 py-4 text-center shadow-lg"
+              aria-label={
+                report.cityRank != null
+                  ? `Rank ${report.cityRank} among ranked metros this weekend`
+                  : 'City rank not available for this metro'
+              }
             >
-              <p className="text-[clamp(3rem,5vw,4.5rem)] font-black leading-none text-[#F0B532]">
-                #{report.cityRank}
+              <p className="text-[clamp(2.25rem,4vw,3.5rem)] font-black leading-none text-[#F0B532]">
+                {rankLabel}
               </p>
-              <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
+              <p className="mt-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white">
                 Most Active City
               </p>
-              <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-white/65">
-                This Weekend
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/65">
+                Ranked Metros
               </p>
             </div>
           </div>
         </header>
 
-        {/* Map */}
-        <section className="relative min-h-0 flex-1 border-y border-[#F0B532]/25">
+        {/* Map ~40% */}
+        <section
+          className="relative min-h-0 shrink-0 border-y border-[#F0B532]/25"
+          style={{ height: `${SOCIAL_REPORT_LAYOUT_HEIGHT_SHARE.map * 100}%` }}
+        >
           <SocialReportMap
             mapPins={report.mapPins}
-            mapFitBounds={report.mapFitBounds}
-            className="h-full min-h-[280px] rounded-none border-0"
+            mapViewport={report.mapViewport}
+            className="h-full w-full rounded-none border-0"
           />
           {report.mapPins.length === 0 && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#0c1628]/40">
               <p className="text-sm font-semibold uppercase tracking-widest text-white/50">
-                No map pins this weekend
+                No sales in viewport this weekend
               </p>
             </div>
           )}
         </section>
 
-        {/* Bottom metrics + footer */}
-        <footer className="shrink-0 bg-[#0a1220] px-10 py-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {/* Metrics + footer ~25% */}
+        <footer
+          className="flex shrink-0 flex-col justify-center bg-[#0a1220] px-10 py-4"
+          style={{ height: `${SOCIAL_REPORT_LAYOUT_HEIGHT_SHARE.footer * 100}%` }}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <MetricCard
               label="Active Sales"
               value={report.activeSales.toLocaleString('en-US')}
               accent
             />
-            <MetricCard label="City Rank" value={`#${report.cityRank}`} />
-            <MetricCard
-              label="On the Map"
-              value={report.mapPinsBeforeCap.toLocaleString('en-US')}
-            />
+            <MetricCard label="City Rank" value={rankLabel} />
           </div>
-          <p className="mt-4 text-center text-xs font-medium uppercase tracking-[0.2em] text-white/45">
+          <p className="mt-3 text-center text-xs font-medium uppercase tracking-[0.2em] text-white/45">
             Data powered by LootAura.com
           </p>
         </footer>

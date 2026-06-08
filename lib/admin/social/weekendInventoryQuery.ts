@@ -2,24 +2,18 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
-import { getStatesForTimezone, getUniqueMetroTimezones } from '@/lib/seo/metroCatalog'
 import { getThisWeekendWindowInMetro, saleOverlapsDateRange } from '@/lib/seo/weekendBoundaries'
-import type { SeoMetro } from '@/lib/seo/types'
+import type { ViewportBounds } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
+import { buildViewportBoundsFromCenterZoom } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
 import {
-  buildMarketBoundsAroundAnchor,
-  buildMetroMarketAnchorsBySlug,
-  resolveMetroSlugForSale,
-  type MetroMarketAnchor,
-  type MetroMarketBounds,
-} from '@/lib/admin/social/metroMarketGeography'
+  SOCIAL_REPORT_VIEWPORT_PRESETS,
+  type SocialReportViewportPreset,
+} from '@/lib/admin/social/socialReportViewportPresets'
 import type { SocialCityReportMapPin } from '@/lib/admin/social/socialCityReportTypes'
 
 const PAGE_SIZE = 1000
-export const SOCIAL_REPORT_MAP_PIN_LIMIT = 500
 
 type SaleGeoRow = {
-  city: string | null
-  state: string | null
   date_start: string | null
   date_end: string | null
   lat?: number | null
@@ -32,10 +26,9 @@ type MapPinRow = SaleGeoRow & {
   is_featured: boolean | null
 }
 
-export type MetroWeekendMapInventory = {
+export type ViewportWeekendInventory = {
   pins: SocialCityReportMapPin[]
-  pinsBeforeCap: number
-  mapFitBounds: MetroMarketBounds | null
+  activeSales: number
 }
 
 async function runWithModerationRetry<T>(
@@ -51,43 +44,8 @@ async function runWithModerationRetry<T>(
   }
 }
 
-async function fetchAllGeoSaleRows(options: {
-  states: string[]
-  now: Date
-}): Promise<SaleGeoRow[]> {
-  const admin = getAdminDb()
-  const rows: SaleGeoRow[] = []
-
-  const fetchChunk = async (includeModeration: boolean) => {
-    let offset = 0
-    for (;;) {
-      const { data, error } = await applyPhase4PublicPublishedSaleReadFilters(
-        fromBase(admin, T.sales)
-          .select('city, state, date_start, date_end, lat, lng')
-          .in('state', options.states)
-          .not('date_start', 'is', null),
-        { includeModeration, now: options.now }
-      ).range(offset, offset + PAGE_SIZE - 1)
-
-      if (error) {
-        throw error
-      }
-
-      const batch = (data ?? []) as SaleGeoRow[]
-      rows.push(...batch)
-      if (batch.length < PAGE_SIZE) {
-        break
-      }
-      offset += PAGE_SIZE
-    }
-  }
-
-  await runWithModerationRetry(fetchChunk)
-  return rows
-}
-
 async function fetchGeoRowsInBbox(options: {
-  bounds: MetroMarketBounds
+  bounds: ViewportBounds
   now: Date
 }): Promise<MapPinRow[]> {
   const admin = getAdminDb()
@@ -98,7 +56,7 @@ async function fetchGeoRowsInBbox(options: {
     for (;;) {
       const { data, error } = await applyPhase4PublicPublishedSaleReadFilters(
         fromBase(admin, T.sales)
-          .select('id, lat, lng, title, is_featured, city, state, date_start, date_end')
+          .select('id, lat, lng, title, is_featured, date_start, date_end')
           .gte('lat', options.bounds.south)
           .lte('lat', options.bounds.north)
           .gte('lng', options.bounds.west)
@@ -128,64 +86,17 @@ async function fetchGeoRowsInBbox(options: {
   return rows
 }
 
-/**
- * Nationwide weekend-overlap counts keyed by metro slug (market geography).
- */
-export async function fetchWeekendInventoryCountsBySlug(
-  metros: SeoMetro[],
-  now: Date = new Date(),
-  anchorsBySlug?: Record<string, MetroMarketAnchor | null>
-): Promise<Record<string, number>> {
-  const countsBySlug: Record<string, number> = {}
-  for (const metro of metros) {
-    countsBySlug[metro.slug] = 0
-  }
-
-  const anchors = anchorsBySlug ?? buildMetroMarketAnchorsBySlug(metros)
-  const timezones = getUniqueMetroTimezones(metros)
-
-  for (const timezone of timezones) {
-    const weekend = getThisWeekendWindowInMetro(timezone, now)
-    const states = getStatesForTimezone(timezone)
-    if (states.length === 0) continue
-
-    const rows = await fetchAllGeoSaleRows({ states, now })
-
-    for (const row of rows) {
-      if (!saleOverlapsDateRange(row, weekend.start, weekend.end)) continue
-      const slug = resolveMetroSlugForSale(row, metros, anchors)
-      if (!slug) continue
-      countsBySlug[slug] = (countsBySlug[slug] ?? 0) + 1
-    }
-  }
-
-  return countsBySlug
-}
-
-/** Map pins for metro market weekend inventory (same geography as counts). */
-export async function fetchWeekendMapInventoryForMetro(
-  metro: SeoMetro,
-  metros: SeoMetro[],
-  now: Date = new Date(),
-  anchorsBySlug?: Record<string, MetroMarketAnchor | null>
-): Promise<MetroWeekendMapInventory> {
-  const anchors = anchorsBySlug ?? buildMetroMarketAnchorsBySlug(metros)
-  const anchor = anchors[metro.slug]
-  const weekend = getThisWeekendWindowInMetro(metro.timezone, now)
-
-  if (!anchor) {
-    return { pins: [], pinsBeforeCap: 0, mapFitBounds: null }
-  }
-
-  const marketBounds = buildMarketBoundsAroundAnchor(anchor)
-  const rows = await fetchGeoRowsInBbox({ bounds: marketBounds, now })
-  const qualifyingPins: SocialCityReportMapPin[] = []
+function rowsToViewportInventory(
+  rows: MapPinRow[],
+  weekendStart: string,
+  weekendEnd: string
+): ViewportWeekendInventory {
+  const pins: SocialCityReportMapPin[] = []
 
   for (const row of rows) {
-    if (!saleOverlapsDateRange(row, weekend.start, weekend.end)) continue
+    if (!saleOverlapsDateRange(row, weekendStart, weekendEnd)) continue
     if (typeof row.lat !== 'number' || typeof row.lng !== 'number') continue
-    if (resolveMetroSlugForSale(row, metros, anchors) !== metro.slug) continue
-    qualifyingPins.push({
+    pins.push({
       id: row.id,
       lat: row.lat,
       lng: row.lng,
@@ -194,23 +105,48 @@ export async function fetchWeekendMapInventoryForMetro(
     })
   }
 
-  qualifyingPins.sort((a, b) => a.id.localeCompare(b.id))
-
-  const mapFitBounds = marketBounds
+  pins.sort((a, b) => a.id.localeCompare(b.id))
 
   return {
-    pins: qualifyingPins.slice(0, SOCIAL_REPORT_MAP_PIN_LIMIT),
-    pinsBeforeCap: qualifyingPins.length,
-    mapFitBounds,
+    pins,
+    activeSales: pins.length,
   }
 }
 
-/** @deprecated use fetchWeekendMapInventoryForMetro */
-export async function fetchWeekendMapPinsForMetro(
-  metro: SeoMetro,
+/** Weekend sales with coordinates inside viewport bounds (viewport is the inventory gate). */
+export async function fetchWeekendSalesInViewport(
+  viewport: { bounds: ViewportBounds; timezone: string },
   now: Date = new Date()
-): Promise<SocialCityReportMapPin[]> {
-  const metros = [metro]
-  const { pins } = await fetchWeekendMapInventoryForMetro(metro, metros, now)
-  return pins
+): Promise<ViewportWeekendInventory> {
+  const weekend = getThisWeekendWindowInMetro(viewport.timezone, now)
+  const rows = await fetchGeoRowsInBbox({ bounds: viewport.bounds, now })
+  return rowsToViewportInventory(rows, weekend.start, weekend.end)
+}
+
+function presetToViewportBounds(preset: SocialReportViewportPreset): ViewportBounds {
+  return buildViewportBoundsFromCenterZoom({
+    centerLat: preset.centerLat,
+    centerLng: preset.centerLng,
+    zoom: preset.zoom,
+  })
+}
+
+/** Viewport-bounded weekend counts for ranking preset cities only. */
+export async function fetchPresetViewportWeekendCountsBySlug(
+  now: Date = new Date()
+): Promise<Record<string, number>> {
+  const countsBySlug: Record<string, number> = {}
+
+  for (const preset of SOCIAL_REPORT_VIEWPORT_PRESETS) {
+    const { activeSales } = await fetchWeekendSalesInViewport(
+      {
+        bounds: presetToViewportBounds(preset),
+        timezone: preset.timezone,
+      },
+      now
+    )
+    countsBySlug[preset.citySlug] = activeSales
+  }
+
+  return countsBySlug
 }

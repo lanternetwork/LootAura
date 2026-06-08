@@ -43,8 +43,11 @@ describe('GET /api/admin/social/report', () => {
       timestampLabel: 'June 7, 2026\n8:00 AM CDT',
       caption: 'Dallas caption',
       mapPins: [],
-      mapPinsBeforeCap: 0,
-      mapFitBounds: null,
+      mapViewport: {
+        centerLat: 32.7767,
+        centerLng: -96.797,
+        zoom: 9,
+      },
     })
 
     const { GET } = await import('@/app/api/admin/social/report/route')

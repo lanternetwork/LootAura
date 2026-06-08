@@ -64,7 +64,12 @@ const DEFAULT_VIEWPORT: Viewport = {
   zoom: 4,
 }
 
-export default function SocialReportMap({ mapPins }: { mapPins: SocialCityReportMapPin[] }) {
+type SocialReportMapProps = {
+  mapPins: SocialCityReportMapPin[]
+  className?: string
+}
+
+export default function SocialReportMap({ mapPins, className }: SocialReportMapProps) {
   const [viewport, setViewport] = useState<Viewport | null>(null)
 
   const fitBounds = useMemo(() => boundsFromPins(mapPins), [mapPins])
@@ -75,13 +80,16 @@ export default function SocialReportMap({ mapPins }: { mapPins: SocialCityReport
   const sales = useMemo(() => pinsToSales(mapPins), [mapPins])
   const resolvedViewport = viewport ?? DEFAULT_VIEWPORT
 
+  const containerClass =
+    className ?? 'h-64 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100'
+
   return (
-    <div className="h-64 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+    <div className={containerClass}>
       <SimpleMap
         center={center}
         zoom={fitBounds ? undefined : 10}
         fitBounds={fitBounds}
-        fitBoundsOptions={{ padding: 32, duration: 0, maxZoom: 13 }}
+        fitBoundsOptions={{ padding: 40, duration: 0, maxZoom: 13 }}
         interactive={false}
         attributionControl={false}
         showOSMAttribution={true}

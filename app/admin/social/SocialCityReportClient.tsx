@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
 import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
-import SocialReportMap from './SocialReportMap'
+import SocialReportCanvas from './SocialReportCanvas'
 
 type MetrosResponse = {
   ok: boolean
@@ -114,66 +114,69 @@ export default function SocialCityReportClient() {
   return (
     <div className="min-h-screen bg-slate-200 py-8">
       <div className="mx-auto max-w-[1440px] px-6">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Social City Report</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Screenshot-ready weekend reports for social posts.{' '}
-              <Link href="/admin/seo" className="font-medium text-purple-700 hover:text-purple-900">
-                SEO ops
-              </Link>
-              {' · '}
-              <Link href="/admin/ingestion" className="font-medium text-purple-700 hover:text-purple-900">
-                Ingestion
-              </Link>
-            </p>
+        {/* Admin controls — outside screenshot canvas */}
+        <section aria-label="Admin controls" className="mb-8 space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Social City Report</h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Select a city, screenshot the canvas below, then post.{' '}
+                <Link href="/admin/seo" className="font-medium text-purple-700 hover:text-purple-900">
+                  SEO ops
+                </Link>
+                {' · '}
+                <Link href="/admin/ingestion" className="font-medium text-purple-700 hover:text-purple-900">
+                  Ingestion
+                </Link>
+              </p>
+            </div>
+            {selectedSlug && reportStatus === 'ready' && (
+              <button
+                type="button"
+                onClick={() => void loadReport(selectedSlug)}
+                className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              >
+                Refresh report
+              </button>
+            )}
           </div>
-          {selectedSlug && reportStatus === 'ready' && (
-            <button
-              type="button"
-              onClick={() => void loadReport(selectedSlug)}
-              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
-              Refresh report
-            </button>
-          )}
-        </div>
 
-        <div className="mb-6 rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
-          <label htmlFor="city-search" className="block text-sm font-semibold text-slate-800">
-            Select City
-          </label>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            <input
-              id="city-search"
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search cities…"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 sm:max-w-xs"
-              disabled={metrosStatus !== 'ready'}
-            />
-            <select
-              value={selectedSlug}
-              onChange={(event) => setSelectedSlug(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 sm:flex-1"
-              disabled={metrosStatus !== 'ready'}
-            >
-              <option value="">Choose a city…</option>
-              {filteredMetros.map((metro) => (
-                <option key={metro.slug} value={metro.slug}>
-                  {metro.label}
-                </option>
-              ))}
-            </select>
+          <div className="rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
+            <label htmlFor="city-search" className="block text-sm font-semibold text-slate-800">
+              Select City
+            </label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                id="city-search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search cities…"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:max-w-xs"
+                disabled={metrosStatus !== 'ready'}
+              />
+              <select
+                value={selectedSlug}
+                onChange={(event) => setSelectedSlug(event.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:flex-1"
+                disabled={metrosStatus !== 'ready'}
+              >
+                <option value="">Choose a city…</option>
+                {filteredMetros.map((metro) => (
+                  <option key={metro.slug} value={metro.slug}>
+                    {metro.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {metrosStatus === 'loading' && (
+              <p className="mt-2 text-sm text-slate-500">Loading metro catalog…</p>
+            )}
+            {metrosStatus === 'error' && (
+              <p className="mt-2 text-sm text-red-700">{metrosError}</p>
+            )}
           </div>
-          {metrosStatus === 'loading' && (
-            <p className="mt-2 text-sm text-slate-500">Loading metro catalog…</p>
-          )}
-          {metrosStatus === 'error' && (
-            <p className="mt-2 text-sm text-red-700">{metrosError}</p>
-          )}
-        </div>
+        </section>
 
         {!selectedSlug && (
           <div className="rounded-lg border border-dashed border-slate-400 bg-white/70 p-12 text-center">
@@ -197,74 +200,41 @@ export default function SocialCityReportClient() {
         )}
 
         {report && reportStatus === 'ready' && (
-          <div
-            data-testid="social-city-report"
-            className="overflow-hidden rounded-2xl border border-slate-300 bg-gradient-to-br from-white via-purple-50/40 to-indigo-50/60 shadow-lg"
-          >
-            <div className="grid min-h-[720px] grid-cols-12 gap-0">
-              <div className="col-span-12 border-b border-slate-200/80 bg-white/80 px-10 py-8 lg:col-span-5 lg:border-b-0 lg:border-r">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-purple-700">
-                  {report.city}, {report.state}
-                </p>
-                <h2 className="mt-2 text-4xl font-black leading-tight text-slate-900">
-                  Weekend Sale Report
-                </h2>
-                <p className="mt-3 text-xl font-medium text-slate-700">{report.heroDateRange}</p>
+          <>
+            <section aria-label="Screenshot canvas" className="mb-8">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Screenshot this area
+              </p>
+              <SocialReportCanvas report={report} />
+            </section>
 
-                <div className="mt-10 rounded-2xl bg-purple-700 px-6 py-8 text-white shadow-md">
-                  <p className="text-6xl font-black leading-none">#{report.cityRank}</p>
-                  <p className="mt-3 text-lg font-semibold">Most Active City</p>
-                  <p className="text-base text-purple-100">This Weekend</p>
-                </div>
-
-                <div className="mt-10">
-                  <p className="text-5xl font-black text-slate-900">
-                    {report.activeSales.toLocaleString('en-US')}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-slate-700">Active Sales</p>
-                </div>
-              </div>
-
-              <div className="col-span-12 flex flex-col px-10 py-8 lg:col-span-7">
+            <section
+              aria-label="Caption utility"
+              className="rounded-lg border border-slate-300 bg-white p-4 shadow-sm"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Map Preview
-                  </p>
-                  <SocialReportMap mapPins={report.mapPins} />
-                </div>
-
-                <div className="mt-6 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Caption
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyCaption()}
-                      className="rounded bg-slate-800 px-3 py-1 text-xs font-medium text-white hover:bg-slate-900"
-                    >
-                      Copy caption
-                    </button>
-                  </div>
-                  {copyMessage && (
-                    <p className="mt-1 text-xs text-emerald-700">{copyMessage}</p>
-                  )}
-                  <pre className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200 bg-white/90 p-4 font-sans text-base leading-relaxed text-slate-800">
-                    {report.caption}
-                  </pre>
-                </div>
-
-                <div className="mt-6 border-t border-slate-200 pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Updated
-                  </p>
-                  <p className="mt-1 whitespace-pre-line text-sm font-medium text-slate-700">
-                    {report.timestampLabel}
+                  <h2 className="text-sm font-semibold text-slate-800">Post caption</h2>
+                  <p className="text-xs text-slate-500">
+                    For copy/paste when posting — not part of the screenshot.
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyCaption()}
+                  className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+                >
+                  Copy caption
+                </button>
               </div>
-            </div>
-          </div>
+              {copyMessage && (
+                <p className="mt-2 text-xs text-emerald-700">{copyMessage}</p>
+              )}
+              <pre className="mt-3 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 font-sans text-sm leading-relaxed text-slate-700">
+                {report.caption}
+              </pre>
+            </section>
+          </>
         )}
       </div>
     </div>

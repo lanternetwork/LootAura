@@ -2,27 +2,40 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
-import { buildMetroSlug, getStatesForTimezone, getUniqueMetroTimezones } from '@/lib/seo/metroCatalog'
+import { getStatesForTimezone, getUniqueMetroTimezones } from '@/lib/seo/metroCatalog'
 import { getThisWeekendWindowInMetro, saleOverlapsDateRange } from '@/lib/seo/weekendBoundaries'
 import type { SeoMetro } from '@/lib/seo/types'
+import {
+  buildBoundsFromCoords,
+  METRO_MARKET_RADIUS_METERS,
+  resolveMetroSlugForSale,
+  type MetroMarketAnchor,
+  type MetroMarketBounds,
+} from '@/lib/admin/social/metroMarketGeography'
 import type { SocialCityReportMapPin } from '@/lib/admin/social/socialCityReportTypes'
 
 const PAGE_SIZE = 1000
 export const SOCIAL_REPORT_MAP_PIN_LIMIT = 500
 
-type SaleDateRow = {
+type SaleGeoRow = {
   city: string | null
   state: string | null
   date_start: string | null
   date_end: string | null
+  lat?: number | null
+  lng?: number | null
 }
 
-type MapPinRow = SaleDateRow & {
+type MapPinRow = SaleGeoRow & {
   id: string
-  lat: number | null
-  lng: number | null
   title: string | null
   is_featured: boolean | null
+}
+
+export type MetroWeekendMapInventory = {
+  pins: SocialCityReportMapPin[]
+  pinsBeforeCap: number
+  mapFitBounds: MetroMarketBounds | null
 }
 
 async function runWithModerationRetry<T>(
@@ -38,19 +51,31 @@ async function runWithModerationRetry<T>(
   }
 }
 
-async function fetchAllSaleDateRows(options: {
+function bboxAroundAnchor(anchor: MetroMarketAnchor): MetroMarketBounds {
+  const latDelta = METRO_MARKET_RADIUS_METERS / 111_000
+  const lngDelta =
+    METRO_MARKET_RADIUS_METERS / (111_000 * Math.cos((anchor.lat * Math.PI) / 180))
+  return {
+    south: anchor.lat - latDelta,
+    north: anchor.lat + latDelta,
+    west: anchor.lng - lngDelta,
+    east: anchor.lng + lngDelta,
+  }
+}
+
+async function fetchAllGeoSaleRows(options: {
   states: string[]
   now: Date
-}): Promise<SaleDateRow[]> {
+}): Promise<SaleGeoRow[]> {
   const admin = getAdminDb()
-  const rows: SaleDateRow[] = []
+  const rows: SaleGeoRow[] = []
 
   const fetchChunk = async (includeModeration: boolean) => {
     let offset = 0
     for (;;) {
       const { data, error } = await applyPhase4PublicPublishedSaleReadFilters(
         fromBase(admin, T.sales)
-          .select('city, state, date_start, date_end')
+          .select('city, state, date_start, date_end, lat, lng')
           .in('state', options.states)
           .not('date_start', 'is', null),
         { includeModeration, now: options.now }
@@ -60,7 +85,7 @@ async function fetchAllSaleDateRows(options: {
         throw error
       }
 
-      const batch = (data ?? []) as SaleDateRow[]
+      const batch = (data ?? []) as SaleGeoRow[]
       rows.push(...batch)
       if (batch.length < PAGE_SIZE) {
         break
@@ -73,7 +98,10 @@ async function fetchAllSaleDateRows(options: {
   return rows
 }
 
-async function fetchAllMapPinRows(metro: SeoMetro, now: Date): Promise<MapPinRow[]> {
+async function fetchGeoRowsInBbox(options: {
+  bounds: MetroMarketBounds
+  now: Date
+}): Promise<MapPinRow[]> {
   const admin = getAdminDb()
   const rows: MapPinRow[] = []
 
@@ -83,11 +111,17 @@ async function fetchAllMapPinRows(metro: SeoMetro, now: Date): Promise<MapPinRow
       const { data, error } = await applyPhase4PublicPublishedSaleReadFilters(
         fromBase(admin, T.sales)
           .select('id, lat, lng, title, is_featured, city, state, date_start, date_end')
-          .ilike('city', metro.city)
-          .eq('state', metro.state)
-          .not('date_start', 'is', null),
-        { includeModeration, now }
-      ).range(offset, offset + PAGE_SIZE - 1)
+          .gte('lat', options.bounds.south)
+          .lte('lat', options.bounds.north)
+          .gte('lng', options.bounds.west)
+          .lte('lng', options.bounds.east)
+          .not('date_start', 'is', null)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null),
+        { includeModeration, now: options.now }
+      )
+        .order('id', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1)
 
       if (error) {
         throw error
@@ -106,29 +140,20 @@ async function fetchAllMapPinRows(metro: SeoMetro, now: Date): Promise<MapPinRow
   return rows
 }
 
-function incrementSlugCount(
-  countsBySlug: Record<string, number>,
-  city: string | null | undefined,
-  state: string | null | undefined
-): void {
-  if (!city?.trim() || !state?.trim()) return
-  const slug = buildMetroSlug(city, state)
-  countsBySlug[slug] = (countsBySlug[slug] ?? 0) + 1
-}
-
 /**
- * Nationwide weekend-overlap counts keyed by metro slug.
- * One paginated query per distinct timezone (aggregate, not per-city inventory fetch).
+ * Nationwide weekend-overlap counts keyed by metro slug (market geography).
  */
 export async function fetchWeekendInventoryCountsBySlug(
   metros: SeoMetro[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  anchorsBySlug?: Record<string, MetroMarketAnchor | null>
 ): Promise<Record<string, number>> {
   const countsBySlug: Record<string, number> = {}
   for (const metro of metros) {
     countsBySlug[metro.slug] = 0
   }
 
+  const anchors = anchorsBySlug ?? buildMetroMarketAnchorsBySlug(metros)
   const timezones = getUniqueMetroTimezones(metros)
 
   for (const timezone of timezones) {
@@ -136,38 +161,69 @@ export async function fetchWeekendInventoryCountsBySlug(
     const states = getStatesForTimezone(timezone)
     if (states.length === 0) continue
 
-    const rows = await fetchAllSaleDateRows({ states, now })
+    const rows = await fetchAllGeoSaleRows({ states, now })
 
     for (const row of rows) {
       if (!saleOverlapsDateRange(row, weekend.start, weekend.end)) continue
-      incrementSlugCount(countsBySlug, row.city, row.state)
+      const slug = resolveMetroSlugForSale(row, metros, anchors)
+      if (!slug) continue
+      countsBySlug[slug] = (countsBySlug[slug] ?? 0) + 1
     }
   }
 
   return countsBySlug
 }
 
-/** Map pins for a single metro's weekend-overlap inventory (phase4 + overlap only). */
-export async function fetchWeekendMapPinsForMetro(
+/** Map pins for metro market weekend inventory (same geography as counts). */
+export async function fetchWeekendMapInventoryForMetro(
   metro: SeoMetro,
-  now: Date = new Date()
-): Promise<SocialCityReportMapPin[]> {
+  metros: SeoMetro[],
+  now: Date = new Date(),
+  anchorsBySlug?: Record<string, MetroMarketAnchor | null>
+): Promise<MetroWeekendMapInventory> {
+  const anchors = anchorsBySlug ?? buildMetroMarketAnchorsBySlug(metros)
+  const anchor = anchors[metro.slug]
   const weekend = getThisWeekendWindowInMetro(metro.timezone, now)
-  const rows = await fetchAllMapPinRows(metro, now)
 
-  const pins: SocialCityReportMapPin[] = []
+  if (!anchor) {
+    return { pins: [], pinsBeforeCap: 0, mapFitBounds: null }
+  }
+
+  const rows = await fetchGeoRowsInBbox({ bounds: bboxAroundAnchor(anchor), now })
+  const qualifyingPins: SocialCityReportMapPin[] = []
+
   for (const row of rows) {
     if (!saleOverlapsDateRange(row, weekend.start, weekend.end)) continue
     if (typeof row.lat !== 'number' || typeof row.lng !== 'number') continue
-    pins.push({
+    if (resolveMetroSlugForSale(row, metros, anchors) !== metro.slug) continue
+    qualifyingPins.push({
       id: row.id,
       lat: row.lat,
       lng: row.lng,
       title: row.title?.trim() || 'Sale',
       is_featured: row.is_featured === true,
     })
-    if (pins.length >= SOCIAL_REPORT_MAP_PIN_LIMIT) break
   }
 
+  qualifyingPins.sort((a, b) => a.id.localeCompare(b.id))
+
+  const mapFitBounds = buildBoundsFromCoords(
+    qualifyingPins.map((pin) => ({ lat: pin.lat, lng: pin.lng }))
+  )
+
+  return {
+    pins: qualifyingPins.slice(0, SOCIAL_REPORT_MAP_PIN_LIMIT),
+    pinsBeforeCap: qualifyingPins.length,
+    mapFitBounds,
+  }
+}
+
+/** @deprecated use fetchWeekendMapInventoryForMetro */
+export async function fetchWeekendMapPinsForMetro(
+  metro: SeoMetro,
+  now: Date = new Date()
+): Promise<SocialCityReportMapPin[]> {
+  const metros = [metro]
+  const { pins } = await fetchWeekendMapInventoryForMetro(metro, metros, now)
   return pins
 }

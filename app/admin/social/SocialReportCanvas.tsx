@@ -54,7 +54,7 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
                   alt="Loot Aura"
                   width={44}
                   height={44}
-                  className="h-11 w-11 shrink-0 brightness-0 invert"
+                  className="h-11 w-11 shrink-0"
                 />
                 <span className="text-lg font-bold tracking-wide text-white">Loot Aura</span>
               </div>
@@ -87,7 +87,11 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
 
         {/* Map */}
         <section className="relative min-h-0 flex-1 border-y border-[#F0B532]/25">
-          <SocialReportMap mapPins={report.mapPins} className="h-full min-h-[280px] rounded-none border-0" />
+          <SocialReportMap
+            mapPins={report.mapPins}
+            mapFitBounds={report.mapFitBounds}
+            className="h-full min-h-[280px] rounded-none border-0"
+          />
           {report.mapPins.length === 0 && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#0c1628]/40">
               <p className="text-sm font-semibold uppercase tracking-widest text-white/50">

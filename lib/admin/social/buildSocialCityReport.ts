@@ -78,6 +78,8 @@ export async function buildSocialCityReport(
     state: metro.state,
     citySlug: metro.slug,
     activeSales: inventory.activeSales,
+    estateSales: inventory.estateSales,
+    yardSales: inventory.yardSales,
     cityRank,
     updatedAt,
     weekendStart: weekend.start,

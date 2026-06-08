@@ -34,6 +34,8 @@ describe('GET /api/admin/social/report', () => {
       state: TEST_SEO_METRO_DALLAS.state,
       citySlug: TEST_SEO_METRO_DALLAS.slug,
       activeSales: 42,
+      estateSales: 8,
+      yardSales: 34,
       cityRank: 3,
       updatedAt: '2026-06-07T13:00:00.000Z',
       weekendStart: '2026-06-13',

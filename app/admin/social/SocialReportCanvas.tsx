@@ -194,7 +194,7 @@ function formatHeroDateUpper(heroDateRange: string): string {
 }
 
 function formatFooterTimestamp(timestampLabel: string): string {
-  return timestampLabel.replace('\n', ' \u2022 ').toUpperCase()
+  return timestampLabel.replaceAll('\n', ' \u2022 ').toUpperCase()
 }
 
 function formatWeekendShortLabel(heroDateRange: string): string {

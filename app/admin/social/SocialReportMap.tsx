@@ -100,7 +100,7 @@ export default function SocialReportMap({
         center={center}
         zoom={fitBounds ? undefined : 10}
         fitBounds={fitBounds}
-        fitBoundsOptions={{ padding: 40, duration: 0, maxZoom: 13 }}
+        fitBoundsOptions={{ padding: 100, duration: 0, maxZoom: 10 }}
         interactive={false}
         attributionControl={false}
         showOSMAttribution={true}

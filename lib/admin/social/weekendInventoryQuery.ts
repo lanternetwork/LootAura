@@ -6,9 +6,8 @@ import { getStatesForTimezone, getUniqueMetroTimezones } from '@/lib/seo/metroCa
 import { getThisWeekendWindowInMetro, saleOverlapsDateRange } from '@/lib/seo/weekendBoundaries'
 import type { SeoMetro } from '@/lib/seo/types'
 import {
-  buildBoundsFromCoords,
+  buildMarketBoundsAroundAnchor,
   buildMetroMarketAnchorsBySlug,
-  METRO_MARKET_RADIUS_METERS,
   resolveMetroSlugForSale,
   type MetroMarketAnchor,
   type MetroMarketBounds,
@@ -49,18 +48,6 @@ async function runWithModerationRetry<T>(
       return run(false)
     }
     throw error
-  }
-}
-
-function bboxAroundAnchor(anchor: MetroMarketAnchor): MetroMarketBounds {
-  const latDelta = METRO_MARKET_RADIUS_METERS / 111_000
-  const lngDelta =
-    METRO_MARKET_RADIUS_METERS / (111_000 * Math.cos((anchor.lat * Math.PI) / 180))
-  return {
-    south: anchor.lat - latDelta,
-    north: anchor.lat + latDelta,
-    west: anchor.lng - lngDelta,
-    east: anchor.lng + lngDelta,
   }
 }
 
@@ -190,7 +177,8 @@ export async function fetchWeekendMapInventoryForMetro(
     return { pins: [], pinsBeforeCap: 0, mapFitBounds: null }
   }
 
-  const rows = await fetchGeoRowsInBbox({ bounds: bboxAroundAnchor(anchor), now })
+  const marketBounds = buildMarketBoundsAroundAnchor(anchor)
+  const rows = await fetchGeoRowsInBbox({ bounds: marketBounds, now })
   const qualifyingPins: SocialCityReportMapPin[] = []
 
   for (const row of rows) {
@@ -208,9 +196,7 @@ export async function fetchWeekendMapInventoryForMetro(
 
   qualifyingPins.sort((a, b) => a.id.localeCompare(b.id))
 
-  const mapFitBounds = buildBoundsFromCoords(
-    qualifyingPins.map((pin) => ({ lat: pin.lat, lng: pin.lng }))
-  )
+  const mapFitBounds = marketBounds
 
   return {
     pins: qualifyingPins.slice(0, SOCIAL_REPORT_MAP_PIN_LIMIT),

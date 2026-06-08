@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   METRO_MARKET_RADIUS_METERS,
   buildBoundsFromCoords,
+  buildMarketBoundsAroundAnchor,
   resolveMetroSlugForSale,
 } from '@/lib/admin/social/metroMarketGeography'
 import {
@@ -58,5 +59,16 @@ describe('metroMarketGeography', () => {
 
   it('uses a market radius large enough for Chicago suburbs', () => {
     expect(METRO_MARKET_RADIUS_METERS).toBeGreaterThanOrEqual(50_000)
+  })
+
+  it('builds metro-scale market bounds around a metro anchor', () => {
+    const bounds = buildMarketBoundsAroundAnchor({ lat: 41.8781, lng: -87.6298 })
+    expect(bounds.north).toBeGreaterThan(41.8781)
+    expect(bounds.south).toBeLessThan(41.8781)
+    expect(bounds.east).toBeGreaterThan(-87.6298)
+    expect(bounds.west).toBeLessThan(-87.6298)
+    // ~56 km radius → roughly 1° latitude span (metro scale, not neighborhood).
+    expect(bounds.north - bounds.south).toBeGreaterThan(0.9)
+    expect(bounds.north - bounds.south).toBeLessThan(1.2)
   })
 })

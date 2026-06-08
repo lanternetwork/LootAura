@@ -25,34 +25,6 @@ type MapPinRow = SaleDateRow & {
   is_featured: boolean | null
 }
 
-async function fetchPaginatedRows<T>(
-  buildQuery: (includeModeration: boolean) => {
-    range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }>
-  },
-  includeModeration: boolean
-): Promise<T[]> {
-  const rows: T[] = []
-  let offset = 0
-
-  while (true) {
-    const query = buildQuery(includeModeration).range(offset, offset + PAGE_SIZE - 1)
-    const { data, error } = await query
-
-    if (error) {
-      throw error
-    }
-
-    const batch = (data ?? []) as T[]
-    rows.push(...batch)
-    if (batch.length < PAGE_SIZE) {
-      break
-    }
-    offset += PAGE_SIZE
-  }
-
-  return rows
-}
-
 async function runWithModerationRetry<T>(
   run: (includeModeration: boolean) => Promise<T>
 ): Promise<T> {
@@ -64,6 +36,74 @@ async function runWithModerationRetry<T>(
     }
     throw error
   }
+}
+
+async function fetchAllSaleDateRows(options: {
+  states: string[]
+  now: Date
+}): Promise<SaleDateRow[]> {
+  const admin = getAdminDb()
+  const rows: SaleDateRow[] = []
+
+  const fetchChunk = async (includeModeration: boolean) => {
+    let offset = 0
+    for (;;) {
+      const { data, error } = await applyPhase4PublicPublishedSaleReadFilters(
+        fromBase(admin, T.sales)
+          .select('city, state, date_start, date_end')
+          .in('state', options.states)
+          .not('date_start', 'is', null),
+        { includeModeration, now: options.now }
+      ).range(offset, offset + PAGE_SIZE - 1)
+
+      if (error) {
+        throw error
+      }
+
+      const batch = (data ?? []) as SaleDateRow[]
+      rows.push(...batch)
+      if (batch.length < PAGE_SIZE) {
+        break
+      }
+      offset += PAGE_SIZE
+    }
+  }
+
+  await runWithModerationRetry(fetchChunk)
+  return rows
+}
+
+async function fetchAllMapPinRows(metro: SeoMetro, now: Date): Promise<MapPinRow[]> {
+  const admin = getAdminDb()
+  const rows: MapPinRow[] = []
+
+  const fetchChunk = async (includeModeration: boolean) => {
+    let offset = 0
+    for (;;) {
+      const { data, error } = await applyPhase4PublicPublishedSaleReadFilters(
+        fromBase(admin, T.sales)
+          .select('id, lat, lng, title, is_featured, city, state, date_start, date_end')
+          .ilike('city', metro.city)
+          .eq('state', metro.state)
+          .not('date_start', 'is', null),
+        { includeModeration, now }
+      ).range(offset, offset + PAGE_SIZE - 1)
+
+      if (error) {
+        throw error
+      }
+
+      const batch = (data ?? []) as MapPinRow[]
+      rows.push(...batch)
+      if (batch.length < PAGE_SIZE) {
+        break
+      }
+      offset += PAGE_SIZE
+    }
+  }
+
+  await runWithModerationRetry(fetchChunk)
+  return rows
 }
 
 function incrementSlugCount(
@@ -89,7 +129,6 @@ export async function fetchWeekendInventoryCountsBySlug(
     countsBySlug[metro.slug] = 0
   }
 
-  const admin = getAdminDb()
   const timezones = getUniqueMetroTimezones(metros)
 
   for (const timezone of timezones) {
@@ -97,19 +136,7 @@ export async function fetchWeekendInventoryCountsBySlug(
     const states = getStatesForTimezone(timezone)
     if (states.length === 0) continue
 
-    const rows = await runWithModerationRetry((includeModeration) =>
-      fetchPaginatedRows<SaleDateRow>(
-        (includeMod) =>
-          applyPhase4PublicPublishedSaleReadFilters(
-            fromBase(admin, T.sales)
-              .select('city, state, date_start, date_end')
-              .in('state', states)
-              .not('date_start', 'is', null),
-            { includeModeration: includeMod, now }
-          ),
-        includeModeration
-      )
-    )
+    const rows = await fetchAllSaleDateRows({ states, now })
 
     for (const row of rows) {
       if (!saleOverlapsDateRange(row, weekend.start, weekend.end)) continue
@@ -125,23 +152,8 @@ export async function fetchWeekendMapPinsForMetro(
   metro: SeoMetro,
   now: Date = new Date()
 ): Promise<SocialCityReportMapPin[]> {
-  const admin = getAdminDb()
   const weekend = getThisWeekendWindowInMetro(metro.timezone, now)
-
-  const rows = await runWithModerationRetry((includeModeration) =>
-    fetchPaginatedRows<MapPinRow>(
-      (includeMod) =>
-        applyPhase4PublicPublishedSaleReadFilters(
-          fromBase(admin, T.sales)
-            .select('id, lat, lng, title, is_featured, city, state, date_start, date_end')
-            .ilike('city', metro.city)
-            .eq('state', metro.state)
-            .not('date_start', 'is', null),
-          { includeModeration: includeMod, now }
-        ),
-      includeModeration
-    )
-  )
+  const rows = await fetchAllMapPinRows(metro, now)
 
   const pins: SocialCityReportMapPin[] = []
   for (const row of rows) {

@@ -29,7 +29,8 @@ function projectToWorldPixels(lat: number, lng: number, worldSize: number): { x:
   const x = ((lng + 180) / 360) * worldSize
   const latRad = (lat * Math.PI) / 180
   const y =
-    (0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad))) / (4 * Math.PI) * worldSize
+    ((0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad)))) / (4 * Math.PI)) *
+    worldSize
   return { x, y }
 }
 

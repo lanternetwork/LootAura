@@ -29,8 +29,7 @@ function projectToWorldPixels(lat: number, lng: number, worldSize: number): { x:
   const x = ((lng + 180) / 360) * worldSize
   const latRad = (lat * Math.PI) / 180
   const y =
-    ((0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad))) / (4 * Math.PI)) *
-    worldSize
+    (0.5 - Math.log((1 + Math.sin(latRad)) / (1 - Math.sin(latRad))) / (4 * Math.PI) * worldSize
   return { x, y }
 }
 
@@ -69,9 +68,9 @@ export function buildViewportBoundsFromCenterZoom(
   )
 
   return {
-    west: northWest.lng,
-    north: northWest.lat,
-    east: southEast.lng,
-    south: southEast.lat,
+    west: Math.min(northWest.lng, southEast.lng),
+    south: Math.min(northWest.lat, southEast.lat),
+    east: Math.max(northWest.lng, southEast.lng),
+    north: Math.max(northWest.lat, southEast.lat),
   }
 }

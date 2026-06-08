@@ -1,7 +1,4 @@
-import {
-  SOCIAL_REPORT_CANVAS_HEIGHT,
-  SOCIAL_REPORT_CANVAS_WIDTH,
-} from '@/lib/admin/social/socialReportCanvasDimensions'
+import { getSocialReportMapViewportPixelSize } from '@/lib/admin/social/socialReportCanvasDimensions'
 
 /** Mapbox GL tile size (Web Mercator). */
 const MAPBOX_TILE_SIZE = 512
@@ -52,8 +49,9 @@ function lngFromPixelX(x: number, worldSize: number): number {
 export function buildViewportBoundsFromCenterZoom(
   input: ViewportCenterZoomInput
 ): ViewportBounds {
-  const width = input.width ?? SOCIAL_REPORT_CANVAS_WIDTH
-  const height = input.height ?? SOCIAL_REPORT_CANVAS_HEIGHT
+  const defaults = getSocialReportMapViewportPixelSize()
+  const width = input.width ?? defaults.width
+  const height = input.height ?? defaults.height
   const worldSize = worldSizeForZoom(input.zoom)
 
   const centerX = pixelXFromLng(input.centerLng, worldSize)

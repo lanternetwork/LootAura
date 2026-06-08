@@ -16,7 +16,7 @@ describe('resolveSocialReportViewportForMetro', () => {
   it('uses canonical preset for Dallas', () => {
     const viewport = resolveSocialReportViewportForMetro(TEST_SEO_METRO_DALLAS)
     expect(viewport.isRankingPreset).toBe(true)
-    expect(viewport.zoom).toBe(9)
+    expect(viewport.zoom).toBe(8)
   })
 
   it('marks unknown metros as non-ranking fallbacks', () => {

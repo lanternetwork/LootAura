@@ -18,11 +18,12 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
     zoom: 8,
     timezone: 'America/Chicago',
   },
+  /** zoom 8: wider DFW metro framing to match social report template */
   {
     citySlug: 'dallas-tx',
     centerLat: 32.7767,
     centerLng: -96.797,
-    zoom: 9,
+    zoom: 8,
     timezone: 'America/Chicago',
   },
   {

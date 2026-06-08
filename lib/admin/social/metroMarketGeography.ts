@@ -72,6 +72,19 @@ export function buildMetroMarketAnchorsBySlug(
   return anchors
 }
 
+/** ~56 km market bbox around a metro anchor (same radius as inventory assignment). */
+export function buildMarketBoundsAroundAnchor(anchor: MetroMarketAnchor): MetroMarketBounds {
+  const latDelta = METRO_MARKET_RADIUS_METERS / 111_000
+  const lngDelta =
+    METRO_MARKET_RADIUS_METERS / (111_000 * Math.cos((anchor.lat * Math.PI) / 180))
+  return {
+    south: anchor.lat - latDelta,
+    north: anchor.lat + latDelta,
+    west: anchor.lng - lngDelta,
+    east: anchor.lng + lngDelta,
+  }
+}
+
 export function buildBoundsFromCoords(
   coords: Array<{ lat: number; lng: number }>
 ): MetroMarketBounds | null {

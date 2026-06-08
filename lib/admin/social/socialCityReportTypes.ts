@@ -29,7 +29,7 @@ export type SocialCityReport = {
   mapPins: SocialCityReportMapPin[]
   /** Mappable pins before 500 cap (weekend + market geography). */
   mapPinsBeforeCap: number
-  /** fitBounds from all qualifying mappable pins before cap. */
+  /** Metro market bbox for map framing (same ~56 km radius as inventory scope). */
   mapFitBounds: SocialCityReportMapFitBounds | null
 }
 

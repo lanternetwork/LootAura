@@ -1,13 +1,8 @@
-import Image from 'next/image'
 import type { SocialCityReport } from '@/lib/admin/social/socialCityReportTypes'
 import SocialReportMap from './SocialReportMap'
 
 type SocialReportCanvasProps = {
   report: SocialCityReport
-}
-
-function formatTimestampSingleLine(timestampLabel: string): string {
-  return timestampLabel.replace(/\n/g, ' · ')
 }
 
 function MetricCard({
@@ -49,12 +44,10 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
           <div className="flex items-start justify-between gap-8">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-3">
-                <Image
-                  src="/sitelogo.svg"
+                <img
+                  src="/sitelogo-on-dark.svg"
                   alt="Loot Aura"
-                  width={44}
-                  height={44}
-                  className="h-11 w-11 shrink-0"
+                  className="h-11 w-auto shrink-0"
                 />
                 <span className="text-lg font-bold tracking-wide text-white">Loot Aura</span>
               </div>
@@ -103,17 +96,16 @@ export default function SocialReportCanvas({ report }: SocialReportCanvasProps) 
 
         {/* Bottom metrics + footer */}
         <footer className="shrink-0 bg-[#0a1220] px-10 py-5">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricCard
               label="Active Sales"
               value={report.activeSales.toLocaleString('en-US')}
               accent
             />
             <MetricCard label="City Rank" value={`#${report.cityRank}`} />
-            <MetricCard label="Weekend Dates" value={report.heroDateRange} />
             <MetricCard
-              label="Updated"
-              value={formatTimestampSingleLine(report.timestampLabel)}
+              label="On the Map"
+              value={report.mapPinsBeforeCap.toLocaleString('en-US')}
             />
           </div>
           <p className="mt-4 text-center text-xs font-medium uppercase tracking-[0.2em] text-white/45">

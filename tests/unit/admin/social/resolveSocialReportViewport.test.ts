@@ -8,7 +8,7 @@ describe('resolveSocialReportViewportForMetro', () => {
     expect(viewport.isRankingPreset).toBe(true)
     expect(viewport.centerLat).toBe(41.8781)
     expect(viewport.centerLng).toBe(-87.6298)
-    expect(viewport.zoom).toBe(9)
+    expect(viewport.zoom).toBe(8)
     expect(viewport.timezone).toBe('America/Chicago')
     expect(viewport.bounds.north).toBeGreaterThan(viewport.bounds.south)
   })

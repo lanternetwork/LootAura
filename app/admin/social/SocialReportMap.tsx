@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import type {
   SocialCityReportMapPin,
@@ -9,11 +9,6 @@ import type {
 import type { Sale } from '@/lib/types'
 
 const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), { ssr: false })
-
-type Viewport = {
-  bounds: [number, number, number, number]
-  zoom: number
-}
 
 function pinsToSales(pins: SocialCityReportMapPin[]): Sale[] {
   return pins.map((pin) => ({
@@ -34,30 +29,23 @@ function pinsToSales(pins: SocialCityReportMapPin[]): Sale[] {
   }))
 }
 
-const DEFAULT_VIEWPORT: Viewport = {
-  bounds: [-125, 24, -66, 50],
-  zoom: 4,
-}
-
 type SocialReportMapProps = {
   mapPins: SocialCityReportMapPin[]
   mapViewport: SocialCityReportMapViewport
   className?: string
 }
 
+/** Fixed viewport map — one pin per sale, no clustering (WYSIWYG with activeSales). */
 export default function SocialReportMap({
   mapPins,
   mapViewport,
   className,
 }: SocialReportMapProps) {
-  const [viewport, setViewport] = useState<Viewport | null>(null)
-
   const center = useMemo(
     () => ({ lat: mapViewport.centerLat, lng: mapViewport.centerLng }),
     [mapViewport.centerLat, mapViewport.centerLng]
   )
   const sales = useMemo(() => pinsToSales(mapPins), [mapPins])
-  const resolvedViewport = viewport ?? DEFAULT_VIEWPORT
 
   const containerClass =
     className ?? 'h-64 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100'
@@ -71,18 +59,10 @@ export default function SocialReportMap({
         attributionControl={false}
         showOSMAttribution={true}
         attributionPosition="bottom-right"
-        hybridPins={{
+        pins={{
           sales,
           selectedId: null,
-          onLocationClick: () => {},
-          onClusterClick: () => {},
-          viewport: resolvedViewport,
-        }}
-        onViewportChange={({ bounds, zoom }) => {
-          setViewport({
-            bounds: [bounds.west, bounds.south, bounds.east, bounds.north],
-            zoom,
-          })
+          onPinClick: () => {},
         }}
       />
     </div>

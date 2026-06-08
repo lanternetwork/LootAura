@@ -10,11 +10,12 @@ export const SOCIAL_REPORT_DEFAULT_ZOOM = 10
 
 /** Ranked / preset-driven screenshot viewports (code-maintained). */
 export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
+  /** zoom 8 (was 9): wider metro framing incl. north/west/south suburbs + lakefront */
   {
     citySlug: 'chicago-il',
     centerLat: 41.8781,
     centerLng: -87.6298,
-    zoom: 9,
+    zoom: 8,
     timezone: 'America/Chicago',
   },
   {

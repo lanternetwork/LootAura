@@ -2,6 +2,7 @@ import {
   buildViewportBoundsFromCenterZoom,
   type ViewportBounds,
 } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
+import { getSocialReportMapViewportPixelSize } from '@/lib/admin/social/socialReportCanvasDimensions'
 import { getKnownMetroMarketAnchor } from '@/lib/admin/social/metroMarketGeography'
 import {
   getSocialReportViewportPreset,
@@ -40,6 +41,7 @@ function buildResolvedViewport(options: {
       centerLat: options.centerLat,
       centerLng: options.centerLng,
       zoom: options.zoom,
+      ...getSocialReportMapViewportPixelSize(),
     }),
     isRankingPreset: options.isRankingPreset,
   }

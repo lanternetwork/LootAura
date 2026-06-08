@@ -205,14 +205,12 @@ export default function SocialCityReportClient() {
           <section aria-label="Screenshot canvas" className="mb-8 w-full">
             <div className="mx-auto max-w-4xl px-6">
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                Screenshot the white canvas below (1440×810) — grey padding is not part of the post
+                Screenshot the canvas below (1440×810)
               </p>
             </div>
             <div className="w-full overflow-x-auto">
-              <div className="flex justify-center px-6 py-8">
-                <div className="w-fit shrink-0 rounded-lg bg-slate-300/40 p-8">
-                  <SocialReportCanvas report={report} />
-                </div>
+              <div className="flex justify-center px-6 py-4">
+                <SocialReportCanvas report={report} />
               </div>
             </div>
           </section>

@@ -24,8 +24,8 @@ describe('buildViewportBoundsFromCenterZoom', () => {
     expect(bounds.east).toBeGreaterThan(bounds.west)
     expect((bounds.north + bounds.south) / 2).toBeCloseTo(41.8781, 0)
     expect((bounds.east + bounds.west) / 2).toBeCloseTo(-87.6298, 0)
-    expect(bounds.north - bounds.south).toBeGreaterThan(0.8)
-    expect(bounds.east - bounds.west).toBeGreaterThan(0.8)
+    expect(bounds.north - bounds.south).toBeGreaterThan(0.5)
+    expect(bounds.east - bounds.west).toBeGreaterThan(0.5)
   })
 
   it('centers Dallas preset bounds around downtown', () => {

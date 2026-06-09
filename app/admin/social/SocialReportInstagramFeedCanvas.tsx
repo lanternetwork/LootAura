@@ -34,7 +34,7 @@ export default function SocialReportInstagramFeedCanvas({
   return (
     <SocialReportCanvasFrame format={format}>
       <header
-        className="flex shrink-0 flex-col justify-end bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8 pb-4 pt-3"
+        className="flex shrink-0 flex-col justify-center bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8 py-3"
         style={{ height: `${definition.layoutHeightShares.header * 100}%` }}
       >
         <div className="flex items-center gap-3">
@@ -108,8 +108,7 @@ export default function SocialReportInstagramFeedCanvas({
                 }}
               />
             }
-            stacked
-            templateStacked
+            templateInline
           />
           <SecondaryMetricCard
             value={report.estateSales.toLocaleString('en-US')}
@@ -124,8 +123,7 @@ export default function SocialReportInstagramFeedCanvas({
                 }}
               />
             }
-            stacked
-            templateStacked
+            templateInline
           />
         </div>
       </section>

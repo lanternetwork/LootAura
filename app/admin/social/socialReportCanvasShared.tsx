@@ -623,8 +623,8 @@ export function SocialReportRankBadge({
 
   return (
     <div
-      className={`shrink-0 rounded-2xl border-2 border-[#F0B532] bg-[#0a1220]/80 text-center shadow-lg ${
-        isXl ? 'px-10 py-5' : isLarge ? 'px-8 py-5' : 'px-5 py-3'
+      className={`shrink-0 rounded-2xl border-[#F0B532] bg-[#0a1220]/80 text-center shadow-lg ${
+        isXl ? 'border-4 px-10 py-5' : isLarge ? 'border-2 px-8 py-5' : 'border-2 px-5 py-3'
       }`}
       aria-label={
         cityRank != null

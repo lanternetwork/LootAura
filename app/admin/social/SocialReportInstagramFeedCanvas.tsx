@@ -85,10 +85,10 @@ export default function SocialReportInstagramFeedCanvas({
       <SocialReportMapSection report={report} format={format} />
 
       <section
-        className="flex shrink-0 items-center bg-white px-8"
+        className="flex shrink-0 items-stretch bg-white px-8 py-2"
         style={{ height: `${definition.layoutHeightShares.metrics * 100}%` }}
       >
-        <div className="flex w-full items-stretch gap-3">
+        <div className="grid h-full w-full grid-cols-[2fr_1fr_1fr] items-stretch gap-3">
           <PrimaryMetricCard
             value={report.activeSales.toLocaleString('en-US')}
             cityTitle={cityTitle}

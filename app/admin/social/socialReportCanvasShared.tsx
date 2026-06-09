@@ -3,6 +3,7 @@ import {
   getSocialReportFormat,
   type SocialReportFormatSlug,
 } from '@/lib/admin/social/socialReportFormats'
+import { SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY } from '@/lib/admin/social/socialReportInstagramTypography'
 import type { SocialCityReport } from '@/lib/admin/social/socialCityReportTypes'
 import SocialReportMap from './SocialReportMap'
 
@@ -154,58 +155,80 @@ export function PrimaryMetricCard({
   fillBand = false,
   emphasize = false,
   wide = false,
+  templateHero = false,
 }: {
   value: string
   cityTitle: string
   compact?: boolean
   fillBand?: boolean
   emphasize?: boolean
-  /** Template layout: primary card spans ~2x secondary card width */
   wide?: boolean
+  /** Instagram template hero metric — fixed px scale */
+  templateHero?: boolean
 }) {
-  const isHeroMetric = wide && emphasize && fillBand
+  const isHeroMetric = templateHero || (wide && emphasize && fillBand)
+  const heroType = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
 
   return (
     <div
-      className={`flex min-w-0 items-center gap-3 rounded-2xl bg-[#0c1628] shadow-lg ${
+      className={`flex min-w-0 items-center gap-4 rounded-2xl bg-[#0c1628] shadow-lg ${
         wide ? 'flex-[2]' : 'flex-1'
       } ${
-        fillBand ? 'h-full px-5 py-5' : emphasize ? 'px-4 py-3.5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
+        fillBand ? 'h-full px-6 py-4' : emphasize ? 'px-4 py-3.5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
       }`}
     >
       <MetricIconBadge
         bgClass="bg-[#F0B532] text-[#0c1628]"
         size={isHeroMetric ? 'xl' : fillBand ? 'lg' : emphasize ? 'lg' : 'md'}
       >
-        <TagIcon className={isHeroMetric ? 'h-6 w-6' : 'h-5 w-5'} />
+        <TagIcon className={isHeroMetric ? 'h-7 w-7' : 'h-5 w-5'} />
       </MetricIconBadge>
       <div className="min-w-0">
-        <p
-          className={`font-black leading-none text-white ${
-            isHeroMetric
-              ? 'text-[3.5rem]'
-              : emphasize
-                ? 'text-[2.25rem]'
-                : fillBand
-                  ? 'text-[2rem]'
-                  : compact
-                    ? 'text-3xl'
-                    : 'text-[2rem]'
-          }`}
-        >
-          {value}
-        </p>
-        <p
-          className={`mt-1 font-bold uppercase tracking-[0.16em] text-[#F0B532] ${
-            isHeroMetric ? 'text-[11px]' : 'text-[10px]'
-          }`}
-        >
-          Active Sales
-        </p>
-        {(fillBand || !compact) && (
-          <p className={`mt-0.5 font-medium text-white/75 ${isHeroMetric ? 'text-sm' : 'text-xs'}`}>
-            Across {cityTitle}
-          </p>
+        {isHeroMetric ? (
+          <>
+            <p
+              className="font-black leading-none text-white"
+              style={{ fontSize: heroType.heroMetricValuePx }}
+            >
+              {value}
+            </p>
+            <p
+              className="mt-2 font-bold uppercase tracking-[0.14em] text-[#F0B532]"
+              style={{ fontSize: heroType.heroMetricLabelPx }}
+            >
+              Active Sales
+            </p>
+            {(fillBand || !compact) && (
+              <p
+                className="mt-1 font-medium text-white/75"
+                style={{ fontSize: heroType.heroMetricSubtitlePx }}
+              >
+                Across {cityTitle}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <p
+              className={`font-black leading-none text-white ${
+                emphasize
+                  ? 'text-[2.25rem]'
+                  : fillBand
+                    ? 'text-[2rem]'
+                    : compact
+                      ? 'text-3xl'
+                      : 'text-[2rem]'
+              }`}
+            >
+              {value}
+            </p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#F0B532]">
+              Active Sales
+            </p>
+            {(fillBand || !compact) && (
+              <p className="mt-0.5 text-xs font-medium text-white/75">Across {cityTitle}</p>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -220,6 +243,7 @@ export function SecondaryMetricCard({
   icon,
   compact = false,
   fillBand = false,
+  stacked = false,
 }: {
   value: string
   label: string
@@ -228,7 +252,33 @@ export function SecondaryMetricCard({
   icon: ReactNode
   compact?: boolean
   fillBand?: boolean
+  /** Instagram template — icon above value above label */
+  stacked?: boolean
 }) {
+  const heroType = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
+
+  if (stacked && fillBand) {
+    return (
+      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-4 shadow-md">
+        <MetricIconBadge bgClass={iconBgClass} size="lg">
+          {icon}
+        </MetricIconBadge>
+        <p
+          className="mt-3 font-black leading-none text-[#0c1628]"
+          style={{ fontSize: heroType.secondaryMetricValuePx }}
+        >
+          {value}
+        </p>
+        <p
+          className="mt-2 font-bold uppercase tracking-[0.14em]"
+          style={{ fontSize: heroType.secondaryMetricLabelPx, color: accentColor }}
+        >
+          {label}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div
       className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white shadow-md ${

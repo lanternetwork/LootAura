@@ -2,8 +2,10 @@ import {
   buildViewportBoundsFromCenterZoom,
   type ViewportBounds,
 } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
-import { getSocialReportMapViewportPixelSize } from '@/lib/admin/social/socialReportFormats'
-import type { SocialReportFormatSlug } from '@/lib/admin/social/socialReportFormats'
+import {
+  getSocialReportMapViewportPixelSize,
+  type SocialReportFormatSlug,
+} from '@/lib/admin/social/socialReportFormats'
 import { getKnownMetroMarketAnchor } from '@/lib/admin/social/metroMarketGeography'
 import {
   getSocialReportViewportPreset,

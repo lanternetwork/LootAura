@@ -151,25 +151,30 @@ export function PrimaryMetricCard({
   cityTitle,
   compact = false,
   fillBand = false,
+  emphasize = false,
 }: {
   value: string
   cityTitle: string
   compact?: boolean
   fillBand?: boolean
+  emphasize?: boolean
 }) {
   return (
     <div
       className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-[#0c1628] shadow-lg ${
-        fillBand ? 'h-full px-5 py-5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
+        fillBand ? 'h-full px-5 py-5' : emphasize ? 'px-4 py-3.5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
       }`}
     >
-      <MetricIconBadge bgClass="bg-[#F0B532] text-[#0c1628]" size={fillBand ? 'lg' : 'md'}>
+      <MetricIconBadge
+        bgClass="bg-[#F0B532] text-[#0c1628]"
+        size={fillBand ? 'lg' : emphasize ? 'lg' : 'md'}
+      >
         <TagIcon className="h-5 w-5" />
       </MetricIconBadge>
       <div className="min-w-0">
         <p
           className={`font-black leading-none text-white ${
-            fillBand ? 'text-[2rem]' : compact ? 'text-3xl' : 'text-[2rem]'
+            emphasize ? 'text-[2.25rem]' : fillBand ? 'text-[2rem]' : compact ? 'text-3xl' : 'text-[2rem]'
           }`}
         >
           {value}
@@ -230,6 +235,21 @@ export function SecondaryMetricCard({
   )
 }
 
+export function SocialReportSectionGap({ format }: { format: SocialReportFormatSlug }) {
+  const gapShare = getSocialReportFormat(format).sectionGapShare
+  if (!gapShare) {
+    return null
+  }
+
+  return (
+    <div
+      className="shrink-0 bg-white"
+      style={{ height: `${gapShare * 100}%` }}
+      aria-hidden="true"
+    />
+  )
+}
+
 export function SocialReportMapSection({
   report,
   format,
@@ -239,8 +259,8 @@ export function SocialReportMapSection({
   report: SocialCityReport
   format: SocialReportFormatSlug
   horizontalPaddingClass?: string
-  /** content = hug map panel; band = fixed % of canvas height (vertical-story) */
-  layout?: 'band' | 'content'
+  /** band = fill band; band-centered = fixed panel centered in band; content = hug panel */
+  layout?: 'band' | 'band-centered' | 'content'
 }) {
   const definition = getSocialReportFormat(format)
   const mapPanel = (
@@ -250,7 +270,9 @@ export function SocialReportMapSection({
       }`}
       style={{
         width: definition.mapPanelWidth,
-        ...(layout === 'content' ? { height: definition.mapPanelHeight } : {}),
+        ...(layout === 'band-centered' || layout === 'content'
+          ? { height: definition.mapPanelHeight }
+          : {}),
       }}
     >
       <SocialReportMap
@@ -278,6 +300,17 @@ export function SocialReportMapSection({
     )
   }
 
+  if (layout === 'band-centered') {
+    return (
+      <section
+        className={`flex shrink-0 items-center justify-center bg-white ${horizontalPaddingClass}`}
+        style={{ height: `${definition.layoutHeightShares.map * 100}%` }}
+      >
+        {mapPanel}
+      </section>
+    )
+  }
+
   return (
     <section
       className={`flex shrink-0 justify-center bg-white ${horizontalPaddingClass}`}
@@ -293,41 +326,50 @@ export function SocialReportFooter({
   format,
   horizontalPaddingClass = 'px-8',
   layout = 'band',
+  density = 'default',
 }: {
   report: SocialCityReport
   format: SocialReportFormatSlug
   horizontalPaddingClass?: string
   layout?: 'band' | 'content'
+  density?: 'default' | 'compact'
 }) {
   const definition = getSocialReportFormat(format)
   const footerTimestamp = formatFooterTimestamp(report.timestampLabel)
-  const className = `flex shrink-0 items-center justify-between border-t border-slate-200 bg-white py-4 ${horizontalPaddingClass}`
+  const isCompact = density === 'compact'
+  const className = `flex shrink-0 items-center justify-between border-t border-slate-200 bg-white ${
+    isCompact ? 'py-2' : 'py-4'
+  } ${horizontalPaddingClass}`
+
+  const clockIconClass = isCompact ? 'h-3.5 w-3.5 text-slate-500' : 'h-4 w-4 text-slate-500'
+  const labelClass = isCompact
+    ? 'text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-500'
+    : 'text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500'
+  const valueClass = isCompact
+    ? 'text-[10px] font-bold text-slate-900'
+    : 'text-xs font-bold text-slate-900'
+
+  const footerBody = (
+    <>
+      <div className="flex items-center gap-2">
+        <ClockIcon className={clockIconClass} />
+        <div>
+          <p className={labelClass}>Updated</p>
+          <p className={valueClass}>{footerTimestamp}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <GlobeIcon className={clockIconClass} />
+        <div className="text-right">
+          <p className={labelClass}>Data Powered By</p>
+          <p className={`${valueClass} uppercase tracking-[0.08em]`}>LootAura.com</p>
+        </div>
+      </div>
+    </>
+  )
 
   if (layout === 'content') {
-    return (
-      <footer className={className}>
-        <div className="flex items-center gap-2">
-          <ClockIcon className="h-4 w-4 text-slate-500" />
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Updated
-            </p>
-            <p className="text-xs font-bold text-slate-900">{footerTimestamp}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <GlobeIcon className="h-4 w-4 text-slate-500" />
-          <div className="text-right">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Data Powered By
-            </p>
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-900">
-              LootAura.com
-            </p>
-          </div>
-        </div>
-      </footer>
-    )
+    return <footer className={className}>{footerBody}</footer>
   }
 
   return (
@@ -335,26 +377,7 @@ export function SocialReportFooter({
       className={className}
       style={{ height: `${definition.layoutHeightShares.footer * 100}%` }}
     >
-      <div className="flex items-center gap-2">
-        <ClockIcon className="h-4 w-4 text-slate-500" />
-        <div>
-          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Updated
-          </p>
-          <p className="text-xs font-bold text-slate-900">{footerTimestamp}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <GlobeIcon className="h-4 w-4 text-slate-500" />
-        <div className="text-right">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Data Powered By
-          </p>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-900">
-            LootAura.com
-          </p>
-        </div>
-      </div>
+      {footerBody}
     </footer>
   )
 }

@@ -15,6 +15,8 @@ export type SocialReportFormatDefinition = {
   mapPanelWidth: number
   mapPanelHeight: number
   layoutHeightShares: SocialReportLayoutHeightShare
+  /** Per-gap white space between stacked sections (instagram uses three interstitial gaps). */
+  sectionGapShare?: number
 }
 
 export const SOCIAL_REPORT_FORMATS: Record<
@@ -27,14 +29,15 @@ export const SOCIAL_REPORT_FORMATS: Record<
     canvasWidth: 1080,
     canvasHeight: 1350,
     mapPanelWidth: 980,
-    /** 54% of canvas height — fills map band; drives viewport bounds */
-    mapPanelHeight: 729,
+    /** 36% of canvas — viewport SOT; centered in map band with breathing room */
+    mapPanelHeight: 486,
     layoutHeightShares: {
-      header: 0.19,
-      map: 0.54,
-      metrics: 0.17,
-      footer: 0.1,
+      header: 0.17,
+      map: 0.37,
+      metrics: 0.2,
+      footer: 0.055,
     },
+    sectionGapShare: 0.068,
   },
   'vertical-story': {
     slug: 'vertical-story',
@@ -87,4 +90,11 @@ export function getSocialReportMapViewportPixelSize(format: SocialReportFormatSl
 export function getSocialReportMapPanelHorizontalGutter(format: SocialReportFormatSlug): number {
   const definition = getSocialReportFormat(format)
   return (definition.canvasWidth - definition.mapPanelWidth) / 2
+}
+
+export function getSocialReportLayoutHeightTotal(format: SocialReportFormatSlug): number {
+  const definition = getSocialReportFormat(format)
+  const { header, map, metrics, footer } = definition.layoutHeightShares
+  const sectionGaps = definition.sectionGapShare ? definition.sectionGapShare * 3 : 0
+  return header + map + metrics + footer + sectionGaps
 }

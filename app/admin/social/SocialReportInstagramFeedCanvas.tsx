@@ -34,7 +34,7 @@ export default function SocialReportInstagramFeedCanvas({
   return (
     <SocialReportCanvasFrame format={format}>
       <header
-        className="flex shrink-0 flex-col justify-start bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8 pt-3 pb-1"
+        className="flex shrink-0 flex-col justify-center bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8 py-3"
         style={{ height: `${definition.layoutHeightShares.header * 100}%` }}
       >
         <div className="flex items-center gap-3">
@@ -53,7 +53,7 @@ export default function SocialReportInstagramFeedCanvas({
           Local Sales. Real Treasures.
         </p>
 
-        <div className="mt-1 flex items-start justify-between gap-4">
+        <div className="mt-2 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h2
               className="font-black leading-[0.9] tracking-tight text-white"
@@ -85,7 +85,7 @@ export default function SocialReportInstagramFeedCanvas({
       <SocialReportMapSection report={report} format={format} />
 
       <section
-        className="flex shrink-0 items-stretch bg-white px-8"
+        className="flex shrink-0 items-stretch bg-white px-8 py-3"
         style={{ height: `${definition.layoutHeightShares.metrics * 100}%` }}
       >
         <div className="flex h-full w-full gap-3">

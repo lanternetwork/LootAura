@@ -10,6 +10,7 @@ import {
   SocialReportFooter,
   SocialReportMapSection,
   SocialReportRankBadge,
+  SocialReportSectionGap,
   TagIcon,
 } from './socialReportCanvasShared'
 
@@ -40,60 +41,66 @@ export default function SocialReportInstagramFeedCanvas({
               <img
                 src="/sitelogo-on-dark.svg"
                 alt="Loot Aura"
-                className="h-8 w-auto shrink-0"
+                className="h-6 w-auto shrink-0"
               />
-              <span className="text-base font-bold tracking-wide text-white">Loot Aura</span>
+              <span className="text-sm font-bold tracking-wide text-white">Loot Aura</span>
             </div>
-            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.22em] text-[#F0B532]">
+            <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.2em] text-[#F0B532]">
               Local Sales. Real Treasures.
             </p>
-            <h2 className="mt-2 text-[2.25rem] font-black leading-[0.95] tracking-tight text-white">
+            <h2 className="mt-1.5 text-[2.5rem] font-black leading-[0.92] tracking-tight text-white">
               {cityTitleUpper}
             </h2>
-            <p className="mt-1 text-lg font-semibold uppercase text-[#F0B532]">
+            <p className="mt-0.5 text-sm font-semibold uppercase text-[#F0B532]/90">
               Weekend Sale Report
             </p>
-            <div className="mt-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-white/90">
-              <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-white/80" />
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/80">
+              <CalendarIcon className="h-3 w-3 shrink-0 text-white/70" />
               <span>{heroDateUpper}</span>
             </div>
           </div>
-          <SocialReportRankBadge rankLabel={rankLabel} cityRank={report.cityRank} />
+          <SocialReportRankBadge rankLabel={rankLabel} cityRank={report.cityRank} size="lg" />
         </div>
       </header>
 
-      <SocialReportMapSection report={report} format={format} />
+      <SocialReportSectionGap format={format} />
+
+      <SocialReportMapSection report={report} format={format} layout="band-centered" />
+
+      <SocialReportSectionGap format={format} />
 
       <section
-        className="flex shrink-0 items-stretch bg-white px-8"
+        className="flex shrink-0 items-center bg-white px-8"
         style={{ height: `${definition.layoutHeightShares.metrics * 100}%` }}
       >
-        <div className="flex h-full w-full gap-3">
+        <div className="flex w-full gap-3">
           <PrimaryMetricCard
             value={report.activeSales.toLocaleString('en-US')}
             cityTitle={cityTitle}
-            fillBand
+            emphasize
           />
           <SecondaryMetricCard
             value={report.yardSales.toLocaleString('en-US')}
             label="Yard Sales"
             accentColor="#DC2626"
             iconBgClass="bg-red-600 text-white"
-            icon={<TagIcon className="h-5 w-5" />}
-            fillBand
+            icon={<TagIcon className="h-4 w-4" />}
+            compact
           />
           <SecondaryMetricCard
             value={report.estateSales.toLocaleString('en-US')}
             label="Estate Sales"
             accentColor="#7C3AED"
             iconBgClass="bg-violet-600 text-white"
-            icon={<HouseIcon className="h-5 w-5" />}
-            fillBand
+            icon={<HouseIcon className="h-4 w-4" />}
+            compact
           />
         </div>
       </section>
 
-      <SocialReportFooter report={report} format={format} />
+      <SocialReportSectionGap format={format} />
+
+      <SocialReportFooter report={report} format={format} density="compact" />
     </SocialReportCanvasFrame>
   )
 }

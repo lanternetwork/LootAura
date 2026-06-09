@@ -15,8 +15,8 @@ describe('socialReportFormats', () => {
     expect(format.mapPanelWidth).toBe(format.canvasWidth)
     expect(format.mapEdgeToEdge).toBe(true)
     expect(format.layoutHeightShares.header).toBe(0.24)
-    expect(format.layoutHeightShares.map).toBe(0.48)
-    expect(format.layoutHeightShares.metrics).toBe(0.22)
+    expect(format.layoutHeightShares.map).toBe(0.54)
+    expect(format.layoutHeightShares.metrics).toBe(0.16)
     expect(format.layoutHeightShares.footer).toBe(0.06)
     expect(format.sectionGapShare).toBeUndefined()
     expect(format.mapPanelHeight).toBe(

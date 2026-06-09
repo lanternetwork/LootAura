@@ -47,13 +47,13 @@ export default function SocialReportInstagramFeedCanvas({
             <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.2em] text-[#F0B532]">
               Local Sales. Real Treasures.
             </p>
-            <h2 className="mt-1.5 text-[2.5rem] font-black leading-[0.92] tracking-tight text-white">
+            <h2 className="mt-1.5 text-[3rem] font-black leading-[0.9] tracking-tight text-white">
               {cityTitleUpper}
             </h2>
-            <p className="mt-0.5 text-sm font-semibold uppercase text-[#F0B532]/90">
+            <p className="mt-1 text-base font-semibold uppercase text-[#F0B532]">
               Weekend Sale Report
             </p>
-            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/80">
+            <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white/80">
               <CalendarIcon className="h-3 w-3 shrink-0 text-white/70" />
               <span>{heroDateUpper}</span>
             </div>

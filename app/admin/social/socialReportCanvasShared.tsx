@@ -136,9 +136,10 @@ function MetricIconBadge({
 }: {
   children: ReactNode
   bgClass: string
-  size?: 'md' | 'lg'
+  size?: 'md' | 'lg' | 'xl'
 }) {
-  const sizeClass = size === 'lg' ? 'h-12 w-12' : 'h-10 w-10'
+  const sizeClass =
+    size === 'xl' ? 'h-14 w-14' : size === 'lg' ? 'h-12 w-12' : 'h-10 w-10'
   return (
     <div className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-full ${bgClass}`}>
       {children}
@@ -152,38 +153,59 @@ export function PrimaryMetricCard({
   compact = false,
   fillBand = false,
   emphasize = false,
+  wide = false,
 }: {
   value: string
   cityTitle: string
   compact?: boolean
   fillBand?: boolean
   emphasize?: boolean
+  /** Template layout: primary card spans ~2x secondary card width */
+  wide?: boolean
 }) {
+  const isHeroMetric = wide && emphasize && fillBand
+
   return (
     <div
-      className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-[#0c1628] shadow-lg ${
+      className={`flex min-w-0 items-center gap-3 rounded-2xl bg-[#0c1628] shadow-lg ${
+        wide ? 'flex-[2]' : 'flex-1'
+      } ${
         fillBand ? 'h-full px-5 py-5' : emphasize ? 'px-4 py-3.5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
       }`}
     >
       <MetricIconBadge
         bgClass="bg-[#F0B532] text-[#0c1628]"
-        size={fillBand ? 'lg' : emphasize ? 'lg' : 'md'}
+        size={isHeroMetric ? 'xl' : fillBand ? 'lg' : emphasize ? 'lg' : 'md'}
       >
-        <TagIcon className="h-5 w-5" />
+        <TagIcon className={isHeroMetric ? 'h-6 w-6' : 'h-5 w-5'} />
       </MetricIconBadge>
       <div className="min-w-0">
         <p
           className={`font-black leading-none text-white ${
-            emphasize ? 'text-[2.25rem]' : fillBand ? 'text-[2rem]' : compact ? 'text-3xl' : 'text-[2rem]'
+            isHeroMetric
+              ? 'text-[3.5rem]'
+              : emphasize
+                ? 'text-[2.25rem]'
+                : fillBand
+                  ? 'text-[2rem]'
+                  : compact
+                    ? 'text-3xl'
+                    : 'text-[2rem]'
           }`}
         >
           {value}
         </p>
-        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#F0B532]">
+        <p
+          className={`mt-1 font-bold uppercase tracking-[0.16em] text-[#F0B532] ${
+            isHeroMetric ? 'text-[11px]' : 'text-[10px]'
+          }`}
+        >
           Active Sales
         </p>
         {(fillBand || !compact) && (
-          <p className="mt-0.5 text-xs font-medium text-white/75">Across {cityTitle}</p>
+          <p className={`mt-0.5 font-medium text-white/75 ${isHeroMetric ? 'text-sm' : 'text-xs'}`}>
+            Across {cityTitle}
+          </p>
         )}
       </div>
     </div>
@@ -219,7 +241,7 @@ export function SecondaryMetricCard({
       <div className="min-w-0">
         <p
           className={`font-black leading-none text-[#0c1628] ${
-            fillBand ? 'text-[1.75rem]' : compact ? 'text-2xl' : 'text-[1.625rem]'
+            fillBand ? 'text-[1.5rem]' : compact ? 'text-2xl' : 'text-[1.625rem]'
           }`}
         >
           {value}

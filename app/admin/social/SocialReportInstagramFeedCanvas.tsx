@@ -34,7 +34,7 @@ export default function SocialReportInstagramFeedCanvas({
   return (
     <SocialReportCanvasFrame format={format}>
       <header
-        className="flex shrink-0 flex-col justify-center bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8 py-3"
+        className="flex shrink-0 flex-col justify-end bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8 pb-4 pt-3"
         style={{ height: `${definition.layoutHeightShares.header * 100}%` }}
       >
         <div className="flex items-center gap-3">
@@ -53,32 +53,32 @@ export default function SocialReportInstagramFeedCanvas({
           Local Sales. Real Treasures.
         </p>
 
-        <div className="mt-3">
-          <div className="flex items-start justify-between gap-4">
+        <div className="mt-3 flex items-end justify-between gap-4">
+          <div className="min-w-0 flex-1">
             <h2
-              className="min-w-0 flex-1 font-black leading-[0.9] tracking-tight text-white"
+              className="font-black leading-[0.9] tracking-tight text-white"
               style={{ fontSize: typeScale.cityTitlePx }}
             >
               {cityTitleUpper}
             </h2>
-            <SocialReportRankBadge rankLabel={rankLabel} cityRank={report.cityRank} size="xl" />
+            <p
+              className="mt-1.5 font-bold uppercase text-[#F0B532]"
+              style={{ fontSize: typeScale.weekendReportPx }}
+            >
+              Weekend Sale Report
+            </p>
+            <div
+              className="mt-1.5 flex items-center gap-2 font-semibold uppercase tracking-[0.08em] text-white/85"
+              style={{ fontSize: typeScale.dateLinePx }}
+            >
+              <CalendarIcon
+                className="shrink-0 text-white/75"
+                style={{ width: typeScale.dateLinePx + 2, height: typeScale.dateLinePx + 2 }}
+              />
+              <span>{heroDateUpper}</span>
+            </div>
           </div>
-          <p
-            className="mt-1.5 font-bold uppercase text-[#F0B532]"
-            style={{ fontSize: typeScale.weekendReportPx }}
-          >
-            Weekend Sale Report
-          </p>
-          <div
-            className="mt-1.5 flex items-center gap-2 font-semibold uppercase tracking-[0.08em] text-white/85"
-            style={{ fontSize: typeScale.dateLinePx }}
-          >
-            <CalendarIcon
-              className="shrink-0 text-white/75"
-              style={{ width: typeScale.dateLinePx + 2, height: typeScale.dateLinePx + 2 }}
-            />
-            <span>{heroDateUpper}</span>
-          </div>
+          <SocialReportRankBadge rankLabel={rankLabel} cityRank={report.cityRank} size="xl" />
         </div>
       </header>
 

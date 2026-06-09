@@ -367,6 +367,7 @@ export function SecondaryMetricCard({
   fillBand = false,
   stacked = false,
   templateStacked = false,
+  templateInline = false,
 }: {
   value: string
   label: string
@@ -378,8 +379,34 @@ export function SecondaryMetricCard({
   /** Instagram template — icon above value above label */
   stacked?: boolean
   templateStacked?: boolean
+  /** Instagram template — icon beside value and label (matches hero card) */
+  templateInline?: boolean
 }) {
   const heroType = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
+
+  if (templateInline) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-md">
+        <MetricIconBadge bgClass={iconBgClass} pixelSize={heroType.secondaryMetricIconBadgePx}>
+          {icon}
+        </MetricIconBadge>
+        <div className="min-w-0">
+          <p
+            className="font-black leading-none text-[#0c1628]"
+            style={{ fontSize: heroType.secondaryMetricValuePx }}
+          >
+            {value}
+          </p>
+          <p
+            className="mt-1 font-bold uppercase tracking-[0.14em]"
+            style={{ fontSize: heroType.secondaryMetricLabelPx, color: accentColor }}
+          >
+            {label}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (templateStacked && stacked) {
     return (

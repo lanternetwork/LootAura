@@ -12,7 +12,8 @@ describe('socialReportFormats', () => {
     const format = getSocialReportFormat('instagram-feed')
     expect(format.canvasWidth).toBe(1080)
     expect(format.canvasHeight).toBe(1350)
-    expect(format.mapPanelWidth).toBeLessThan(format.canvasWidth)
+    expect(format.mapPanelWidth).toBe(format.canvasWidth)
+    expect(format.mapEdgeToEdge).toBe(true)
     expect(format.layoutHeightShares.header).toBeGreaterThanOrEqual(0.18)
     expect(format.layoutHeightShares.header).toBeLessThanOrEqual(0.22)
     expect(format.layoutHeightShares.map).toBeGreaterThanOrEqual(0.45)
@@ -40,9 +41,10 @@ describe('socialReportFormats', () => {
       keyof typeof SOCIAL_REPORT_FORMATS
     >) {
       const format = getSocialReportFormat(slug)
-      expect(getSocialReportMapPanelHorizontalGutter(slug)).toBe(
-        (format.canvasWidth - format.mapPanelWidth) / 2
-      )
+      const expectedGutter = format.mapEdgeToEdge
+        ? 0
+        : (format.canvasWidth - format.mapPanelWidth) / 2
+      expect(getSocialReportMapPanelHorizontalGutter(slug)).toBe(expectedGutter)
       const { width, height } = getSocialReportMapViewportPixelSize(slug)
       expect(width).toBe(format.mapPanelWidth)
       expect(height).toBe(format.mapPanelHeight)

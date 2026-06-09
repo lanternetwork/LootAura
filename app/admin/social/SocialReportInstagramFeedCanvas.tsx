@@ -7,6 +7,7 @@ import {
   HouseIcon,
   PrimaryMetricCard,
   SecondaryMetricCard,
+  SocialReportBrandPin,
   SocialReportCanvasFrame,
   SocialReportFooter,
   SocialReportMapSection,
@@ -33,24 +34,29 @@ export default function SocialReportInstagramFeedCanvas({
   return (
     <SocialReportCanvasFrame format={format}>
       <header
-        className="flex shrink-0 items-center bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8"
+        className="flex shrink-0 flex-col justify-center bg-gradient-to-r from-[#0c1628] via-[#12243d] to-[#16263e] px-8 py-3"
         style={{ height: `${definition.layoutHeightShares.header * 100}%` }}
       >
-        <div className="flex w-full items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <SocialReportBrandPin heightPx={typeScale.brandPinHeightPx} />
+          <span
+            className="font-bold tracking-wide text-white"
+            style={{ fontSize: typeScale.brandNamePx }}
+          >
+            Loot Aura
+          </span>
+        </div>
+        <p
+          className="mt-1 font-bold uppercase tracking-[0.2em] text-[#F0B532]"
+          style={{ fontSize: typeScale.brandTaglinePx }}
+        >
+          Local Sales. Real Treasures.
+        </p>
+
+        <div className="mt-2 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <img
-                src="/sitelogo-on-dark.svg"
-                alt="Loot Aura"
-                className="h-6 w-auto shrink-0"
-              />
-              <span className="text-sm font-bold tracking-wide text-white">Loot Aura</span>
-            </div>
-            <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.2em] text-[#F0B532]">
-              Local Sales. Real Treasures.
-            </p>
             <h2
-              className="mt-1.5 font-black leading-[0.9] tracking-tight text-white"
+              className="font-black leading-[0.9] tracking-tight text-white"
               style={{ fontSize: typeScale.cityTitlePx }}
             >
               {cityTitleUpper}
@@ -62,14 +68,17 @@ export default function SocialReportInstagramFeedCanvas({
               Weekend Sale Report
             </p>
             <div
-              className="mt-1 flex items-center gap-1.5 font-semibold uppercase tracking-[0.08em] text-white/80"
+              className="mt-1 flex items-center gap-2 font-semibold uppercase tracking-[0.08em] text-white/85"
               style={{ fontSize: typeScale.dateLinePx }}
             >
-              <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-white/70" />
+              <CalendarIcon
+                className="shrink-0 text-white/75"
+                style={{ width: typeScale.dateLinePx + 2, height: typeScale.dateLinePx + 2 }}
+              />
               <span>{heroDateUpper}</span>
             </div>
           </div>
-          <SocialReportRankBadge rankLabel={rankLabel} cityRank={report.cityRank} size="lg" />
+          <SocialReportRankBadge rankLabel={rankLabel} cityRank={report.cityRank} size="xl" />
         </div>
       </header>
 
@@ -92,18 +101,34 @@ export default function SocialReportInstagramFeedCanvas({
             label="Yard Sales"
             accentColor="#DC2626"
             iconBgClass="bg-red-600 text-white"
-            icon={<TagIcon className="h-5 w-5" />}
+            icon={
+              <TagIcon
+                style={{
+                  width: typeScale.secondaryMetricIconPx,
+                  height: typeScale.secondaryMetricIconPx,
+                }}
+              />
+            }
             fillBand
             stacked
+            templateStacked
           />
           <SecondaryMetricCard
             value={report.estateSales.toLocaleString('en-US')}
             label="Estate Sales"
             accentColor="#7C3AED"
             iconBgClass="bg-violet-600 text-white"
-            icon={<HouseIcon className="h-5 w-5" />}
+            icon={
+              <HouseIcon
+                style={{
+                  width: typeScale.secondaryMetricIconPx,
+                  height: typeScale.secondaryMetricIconPx,
+                }}
+              />
+            }
             fillBand
             stacked
+            templateStacked
           />
         </div>
       </section>

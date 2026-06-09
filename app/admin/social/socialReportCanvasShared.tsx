@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   getSocialReportFormat,
   type SocialReportFormatSlug,
@@ -40,9 +40,21 @@ export function SocialReportCanvasFrame({
   )
 }
 
-export function CalendarIcon({ className }: { className?: string }) {
+export function CalendarIcon({
+  className,
+  style,
+}: {
+  className?: string
+  style?: React.CSSProperties
+}) {
   return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
       <rect x="3" y="4.5" width="14" height="12.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M3 8h14" stroke="currentColor" strokeWidth="1.5" />
       <path d="M7 3v3M13 3v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -50,9 +62,21 @@ export function CalendarIcon({ className }: { className?: string }) {
   )
 }
 
-export function TrophyIcon({ className }: { className?: string }) {
+export function TrophyIcon({
+  className,
+  style,
+}: {
+  className?: string
+  style?: CSSProperties
+}) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M7 4h10v3a5 5 0 0 1-10 0V4Z"
         stroke="currentColor"
@@ -102,9 +126,21 @@ export function GlobeIcon({ className }: { className?: string }) {
   )
 }
 
-export function TagIcon({ className }: { className?: string }) {
+export function TagIcon({
+  className,
+  style,
+}: {
+  className?: string
+  style?: CSSProperties
+}) {
   return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M4 10.5V6.75A1.75 1.75 0 0 1 5.75 5H9.5l6.25 6.25a1.25 1.25 0 0 1 0 1.77l-2.23 2.23a1.25 1.25 0 0 1-1.77 0L4 10.5Z"
         stroke="currentColor"
@@ -116,9 +152,48 @@ export function TagIcon({ className }: { className?: string }) {
   )
 }
 
-export function HouseIcon({ className }: { className?: string }) {
+/** Stacked layers — total active sales across types. */
+export function LayersIcon({
+  className,
+  style,
+}: {
+  className?: string
+  style?: CSSProperties
+}) {
   return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M3.5 12.5 10 16l6.5-3.5M3.5 8.5 10 12l6.5-3.5M3.5 4.5 10 8l6.5-3.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function HouseIcon({
+  className,
+  style,
+}: {
+  className?: string
+  style?: CSSProperties
+}) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M4 9.25 10 4l6 5.25V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.25Z"
         stroke="currentColor"
@@ -130,19 +205,52 @@ export function HouseIcon({ className }: { className?: string }) {
   )
 }
 
+export function SocialReportBrandPin({ heightPx }: { heightPx: number }) {
+  return (
+    <svg
+      width={heightPx}
+      height={heightPx}
+      viewBox="0 0 48 48"
+      fill="none"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path
+        d="M24 4c-7.2 0-13 5.8-13 13 0 9.75 13 27 13 27s13-17.25 13-27c0-7.2-5.8-13-13-13Z"
+        fill="#F0B532"
+        stroke="#0c1628"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="24" cy="17" r="5.5" fill="#0c1628" />
+    </svg>
+  )
+}
+
 function MetricIconBadge({
   children,
   bgClass,
   size = 'md',
+  pixelSize,
 }: {
   children: ReactNode
   bgClass: string
   size?: 'md' | 'lg' | 'xl'
+  pixelSize?: number
 }) {
   const sizeClass =
-    size === 'xl' ? 'h-14 w-14' : size === 'lg' ? 'h-12 w-12' : 'h-10 w-10'
+    pixelSize == null
+      ? size === 'xl'
+        ? 'h-14 w-14'
+        : size === 'lg'
+          ? 'h-12 w-12'
+          : 'h-10 w-10'
+      : ''
   return (
-    <div className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-full ${bgClass}`}>
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-full ${bgClass} ${sizeClass}`}
+      style={pixelSize != null ? { width: pixelSize, height: pixelSize } : undefined}
+    >
       {children}
     </div>
   )
@@ -156,6 +264,7 @@ export function PrimaryMetricCard({
   emphasize = false,
   wide = false,
   templateHero = false,
+  icon,
 }: {
   value: string
   cityTitle: string
@@ -165,9 +274,21 @@ export function PrimaryMetricCard({
   wide?: boolean
   /** Instagram template hero metric — fixed px scale */
   templateHero?: boolean
+  icon?: ReactNode
 }) {
   const isHeroMetric = templateHero || (wide && emphasize && fillBand)
   const heroType = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
+  const metricIcon =
+    icon ?? (
+      <LayersIcon
+        style={
+          isHeroMetric
+            ? { width: heroType.heroMetricIconPx, height: heroType.heroMetricIconPx }
+            : undefined
+        }
+        className={isHeroMetric ? undefined : 'h-5 w-5'}
+      />
+    )
 
   return (
     <div
@@ -179,9 +300,10 @@ export function PrimaryMetricCard({
     >
       <MetricIconBadge
         bgClass="bg-[#F0B532] text-[#0c1628]"
-        size={isHeroMetric ? 'xl' : fillBand ? 'lg' : emphasize ? 'lg' : 'md'}
+        pixelSize={isHeroMetric ? heroType.heroMetricIconBadgePx : undefined}
+        size={isHeroMetric ? undefined : fillBand ? 'lg' : emphasize ? 'lg' : 'md'}
       >
-        <TagIcon className={isHeroMetric ? 'h-7 w-7' : 'h-5 w-5'} />
+        {metricIcon}
       </MetricIconBadge>
       <div className="min-w-0">
         {isHeroMetric ? (
@@ -244,6 +366,7 @@ export function SecondaryMetricCard({
   compact = false,
   fillBand = false,
   stacked = false,
+  templateStacked = false,
 }: {
   value: string
   label: string
@@ -254,8 +377,31 @@ export function SecondaryMetricCard({
   fillBand?: boolean
   /** Instagram template — icon above value above label */
   stacked?: boolean
+  templateStacked?: boolean
 }) {
   const heroType = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
+
+  if (templateStacked && stacked && fillBand) {
+    return (
+      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-4 shadow-md">
+        <MetricIconBadge bgClass={iconBgClass} pixelSize={heroType.secondaryMetricIconBadgePx}>
+          {icon}
+        </MetricIconBadge>
+        <p
+          className="mt-3 font-black leading-none text-[#0c1628]"
+          style={{ fontSize: heroType.secondaryMetricValuePx }}
+        >
+          {value}
+        </p>
+        <p
+          className="mt-2 font-bold uppercase tracking-[0.14em]"
+          style={{ fontSize: heroType.secondaryMetricLabelPx, color: accentColor }}
+        >
+          {label}
+        </p>
+      </div>
+    )
+  }
 
   if (stacked && fillBand) {
     return (
@@ -335,13 +481,17 @@ export function SocialReportMapSection({
   layout?: 'band' | 'band-centered' | 'content'
 }) {
   const definition = getSocialReportFormat(format)
+  const edgeToEdge = definition.mapEdgeToEdge === true
+  const sectionPaddingClass = edgeToEdge ? '' : horizontalPaddingClass
   const mapPanel = (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm ${
-        layout === 'band' ? 'h-full' : ''
+      className={`relative shrink-0 overflow-hidden bg-slate-100 ${
+        edgeToEdge
+          ? 'h-full w-full'
+          : `rounded-xl border border-slate-200 shadow-sm ${layout === 'band' ? 'h-full' : ''}`
       }`}
       style={{
-        width: definition.mapPanelWidth,
+        width: edgeToEdge ? '100%' : definition.mapPanelWidth,
         ...(layout === 'band-centered' || layout === 'content'
           ? { height: definition.mapPanelHeight }
           : {}),
@@ -350,7 +500,7 @@ export function SocialReportMapSection({
       <SocialReportMap
         mapPins={report.mapPins}
         mapViewport={report.mapViewport}
-        className="h-full w-full rounded-lg border-0"
+        className={`h-full w-full border-0 ${edgeToEdge ? '' : 'rounded-lg'}`}
       />
       {report.mapPins.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/60">
@@ -365,7 +515,7 @@ export function SocialReportMapSection({
   if (layout === 'content') {
     return (
       <section
-        className={`flex shrink-0 justify-center bg-white pt-3 pb-0 ${horizontalPaddingClass}`}
+        className={`flex shrink-0 bg-white pt-3 pb-0 ${edgeToEdge ? '' : 'justify-center'} ${sectionPaddingClass}`}
       >
         {mapPanel}
       </section>
@@ -375,7 +525,7 @@ export function SocialReportMapSection({
   if (layout === 'band-centered') {
     return (
       <section
-        className={`flex shrink-0 items-center justify-center bg-white ${horizontalPaddingClass}`}
+        className={`flex shrink-0 bg-white ${edgeToEdge ? '' : 'items-center justify-center'} ${sectionPaddingClass}`}
         style={{ height: `${definition.layoutHeightShares.map * 100}%` }}
       >
         {mapPanel}
@@ -385,7 +535,7 @@ export function SocialReportMapSection({
 
   return (
     <section
-      className={`flex shrink-0 justify-center bg-white ${horizontalPaddingClass}`}
+      className={`flex shrink-0 bg-white ${edgeToEdge ? 'w-full' : 'justify-center'} ${sectionPaddingClass}`}
       style={{ height: `${definition.layoutHeightShares.map * 100}%` }}
     >
       {mapPanel}
@@ -461,13 +611,16 @@ export function SocialReportRankBadge({
 }: {
   rankLabel: string
   cityRank: number | null
-  size?: 'md' | 'lg'
+  size?: 'md' | 'lg' | 'xl'
 }) {
-  const isLarge = size === 'lg'
+  const isXl = size === 'xl'
+  const isLarge = size === 'lg' || isXl
+  const typeScale = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
+
   return (
     <div
       className={`shrink-0 rounded-2xl border-2 border-[#F0B532] bg-[#0a1220]/80 text-center shadow-lg ${
-        isLarge ? 'px-8 py-5' : 'px-5 py-3'
+        isXl ? 'px-10 py-5' : isLarge ? 'px-8 py-5' : 'px-5 py-3'
       }`}
       aria-label={
         cityRank != null
@@ -476,15 +629,49 @@ export function SocialReportRankBadge({
       }
     >
       <div className="flex items-center justify-center gap-2">
-        <TrophyIcon className={isLarge ? 'h-8 w-8 text-[#F0B532]' : 'h-6 w-6 text-[#F0B532]'} />
-        <p className={`font-black leading-none text-[#F0B532] ${isLarge ? 'text-5xl' : 'text-[2.25rem]'}`}>
-          {rankLabel}
-        </p>
+        <TrophyIcon
+          className={isXl ? undefined : isLarge ? 'h-8 w-8 text-[#F0B532]' : 'h-6 w-6 text-[#F0B532]'}
+          style={
+            isXl
+              ? { width: typeScale.rankTrophyPx, height: typeScale.rankTrophyPx, color: '#F0B532' }
+              : undefined
+          }
+        />
+        {cityRank != null ? (
+          <p
+            className={`inline-flex items-baseline font-black leading-none text-[#F0B532] ${
+              isXl ? '' : isLarge ? 'text-5xl' : 'text-[2.25rem]'
+            }`}
+            style={isXl ? { fontSize: typeScale.rankNumberPx } : undefined}
+          >
+            <span>#</span>
+            <span style={{ marginLeft: isXl ? 10 : isLarge ? 8 : 6 }}>{cityRank}</span>
+          </p>
+        ) : (
+          <p
+            className={`font-black leading-none text-[#F0B532] ${
+              isXl ? '' : isLarge ? 'text-5xl' : 'text-[2.25rem]'
+            }`}
+            style={isXl ? { fontSize: typeScale.rankNumberPx } : undefined}
+          >
+            {rankLabel}
+          </p>
+        )}
       </div>
-      <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white">
+      <p
+        className={`mt-1.5 font-bold uppercase tracking-[0.14em] text-white ${
+          isXl ? '' : 'text-[9px]'
+        }`}
+        style={isXl ? { fontSize: typeScale.rankCaptionPx } : undefined}
+      >
         Most Active City
       </p>
-      <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/65">
+      <p
+        className={`mt-0.5 font-semibold uppercase tracking-[0.12em] text-white/65 ${
+          isXl ? '' : 'text-[9px]'
+        }`}
+        style={isXl ? { fontSize: typeScale.rankCaptionPx } : undefined}
+      >
         This Weekend
       </p>
     </div>

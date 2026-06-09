@@ -14,6 +14,8 @@ export type SocialReportFormatDefinition = {
   canvasHeight: number
   mapPanelWidth: number
   mapPanelHeight: number
+  /** Full-bleed map band (no side gutter, no rounded frame). */
+  mapEdgeToEdge?: boolean
   layoutHeightShares: SocialReportLayoutHeightShare
   /** Per-gap white space between stacked sections (instagram uses three interstitial gaps). */
   sectionGapShare?: number
@@ -28,9 +30,10 @@ export const SOCIAL_REPORT_FORMATS: Record<
     label: 'Instagram Feed (4:5)',
     canvasWidth: 1080,
     canvasHeight: 1350,
-    mapPanelWidth: 980,
+    mapPanelWidth: 1080,
     /** 48% of canvas — matches map band; viewport SOT */
     mapPanelHeight: 648,
+    mapEdgeToEdge: true,
     layoutHeightShares: {
       header: 0.24,
       map: 0.48,
@@ -88,6 +91,9 @@ export function getSocialReportMapViewportPixelSize(format: SocialReportFormatSl
 
 export function getSocialReportMapPanelHorizontalGutter(format: SocialReportFormatSlug): number {
   const definition = getSocialReportFormat(format)
+  if (definition.mapEdgeToEdge) {
+    return 0
+  }
   return (definition.canvasWidth - definition.mapPanelWidth) / 2
 }
 

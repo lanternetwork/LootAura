@@ -32,10 +32,10 @@ export const SOCIAL_REPORT_FORMATS: Record<
     /** 48% of canvas — matches map band; viewport SOT */
     mapPanelHeight: 648,
     layoutHeightShares: {
-      header: 0.2,
+      header: 0.24,
       map: 0.48,
-      metrics: 0.27,
-      footer: 0.05,
+      metrics: 0.22,
+      footer: 0.06,
     },
   },
   'vertical-story': {

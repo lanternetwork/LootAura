@@ -17,10 +17,10 @@ describe('socialReportFormats', () => {
     expect(format.layoutHeightShares.header).toBeLessThanOrEqual(0.22)
     expect(format.layoutHeightShares.map).toBeGreaterThanOrEqual(0.45)
     expect(format.layoutHeightShares.map).toBeLessThanOrEqual(0.5)
-    expect(format.layoutHeightShares.metrics).toBeGreaterThanOrEqual(0.22)
-    expect(format.layoutHeightShares.metrics).toBeLessThanOrEqual(0.28)
+    expect(format.layoutHeightShares.metrics).toBeGreaterThanOrEqual(0.2)
+    expect(format.layoutHeightShares.metrics).toBeLessThanOrEqual(0.24)
     expect(format.layoutHeightShares.footer).toBeGreaterThanOrEqual(0.05)
-    expect(format.layoutHeightShares.footer).toBeLessThanOrEqual(0.06)
+    expect(format.layoutHeightShares.footer).toBeLessThanOrEqual(0.07)
     expect(format.sectionGapShare).toBeUndefined()
     expect(format.mapPanelHeight).toBe(
       Math.round(format.layoutHeightShares.map * format.canvasHeight)

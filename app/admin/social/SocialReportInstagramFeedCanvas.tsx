@@ -1,4 +1,5 @@
 import { getSocialReportFormat } from '@/lib/admin/social/socialReportFormats'
+import { SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY } from '@/lib/admin/social/socialReportInstagramTypography'
 import type { SocialCityReport } from '@/lib/admin/social/socialCityReportTypes'
 import {
   CalendarIcon,
@@ -23,6 +24,7 @@ export default function SocialReportInstagramFeedCanvas({
 }: SocialReportInstagramFeedCanvasProps) {
   const format = 'instagram-feed' as const
   const definition = getSocialReportFormat(format)
+  const typeScale = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
   const cityTitle = `${report.city}, ${report.state}`
   const cityTitleUpper = `${report.city.toUpperCase()}, ${report.state}`
   const rankLabel = report.cityRank != null ? `#${report.cityRank}` : 'N/A'
@@ -47,14 +49,23 @@ export default function SocialReportInstagramFeedCanvas({
             <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.2em] text-[#F0B532]">
               Local Sales. Real Treasures.
             </p>
-            <h2 className="mt-1.5 text-[3rem] font-black leading-[0.9] tracking-tight text-white">
+            <h2
+              className="mt-1.5 font-black leading-[0.9] tracking-tight text-white"
+              style={{ fontSize: typeScale.cityTitlePx }}
+            >
               {cityTitleUpper}
             </h2>
-            <p className="mt-1 text-base font-semibold uppercase text-[#F0B532]">
+            <p
+              className="mt-1 font-bold uppercase text-[#F0B532]"
+              style={{ fontSize: typeScale.weekendReportPx }}
+            >
               Weekend Sale Report
             </p>
-            <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white/80">
-              <CalendarIcon className="h-3 w-3 shrink-0 text-white/70" />
+            <div
+              className="mt-1 flex items-center gap-1.5 font-semibold uppercase tracking-[0.08em] text-white/80"
+              style={{ fontSize: typeScale.dateLinePx }}
+            >
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-white/70" />
               <span>{heroDateUpper}</span>
             </div>
           </div>
@@ -73,8 +84,8 @@ export default function SocialReportInstagramFeedCanvas({
             value={report.activeSales.toLocaleString('en-US')}
             cityTitle={cityTitle}
             fillBand
-            emphasize
             wide
+            templateHero
           />
           <SecondaryMetricCard
             value={report.yardSales.toLocaleString('en-US')}
@@ -83,6 +94,7 @@ export default function SocialReportInstagramFeedCanvas({
             iconBgClass="bg-red-600 text-white"
             icon={<TagIcon className="h-5 w-5" />}
             fillBand
+            stacked
           />
           <SecondaryMetricCard
             value={report.estateSales.toLocaleString('en-US')}
@@ -91,6 +103,7 @@ export default function SocialReportInstagramFeedCanvas({
             iconBgClass="bg-violet-600 text-white"
             icon={<HouseIcon className="h-5 w-5" />}
             fillBand
+            stacked
           />
         </div>
       </section>

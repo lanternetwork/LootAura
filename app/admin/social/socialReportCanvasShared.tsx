@@ -604,14 +604,26 @@ export function SocialReportRankBadge({
               : undefined
           }
         />
-        <p
-          className={`font-black leading-none text-[#F0B532] ${
-            isXl ? '' : isLarge ? 'text-5xl' : 'text-[2.25rem]'
-          }`}
-          style={isXl ? { fontSize: typeScale.rankNumberPx } : undefined}
-        >
-          {rankLabel}
-        </p>
+        {cityRank != null ? (
+          <p
+            className={`inline-flex items-baseline font-black leading-none text-[#F0B532] ${
+              isXl ? '' : isLarge ? 'text-5xl' : 'text-[2.25rem]'
+            }`}
+            style={isXl ? { fontSize: typeScale.rankNumberPx } : undefined}
+          >
+            <span>#</span>
+            <span style={{ marginLeft: isXl ? 10 : isLarge ? 8 : 6 }}>{cityRank}</span>
+          </p>
+        ) : (
+          <p
+            className={`font-black leading-none text-[#F0B532] ${
+              isXl ? '' : isLarge ? 'text-5xl' : 'text-[2.25rem]'
+            }`}
+            style={isXl ? { fontSize: typeScale.rankNumberPx } : undefined}
+          >
+            {rankLabel}
+          </p>
+        )}
       </div>
       <p
         className={`mt-1.5 font-bold uppercase tracking-[0.14em] text-white ${

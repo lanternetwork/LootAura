@@ -21,7 +21,7 @@ describe('socialReportCanvasDimensions', () => {
     expect(SOCIAL_REPORT_CANVAS_HEIGHT).toBe(instagram.canvasHeight)
     expect(SOCIAL_REPORT_MAP_PANEL_WIDTH).toBe(instagram.mapPanelWidth)
     expect(SOCIAL_REPORT_MAP_PANEL_HORIZONTAL_GUTTER).toBe(
-      (instagram.canvasWidth - instagram.mapPanelWidth) / 2
+      getSocialReportMapPanelHorizontalGutter('instagram-feed')
     )
     const { width, height } = getSocialReportMapViewportPixelSize('instagram-feed')
     expect(width).toBe(SOCIAL_REPORT_MAP_PANEL_WIDTH)

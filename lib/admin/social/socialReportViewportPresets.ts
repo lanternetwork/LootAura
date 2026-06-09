@@ -10,20 +10,20 @@ export const SOCIAL_REPORT_DEFAULT_ZOOM = 10
 
 /** Ranked / preset-driven screenshot viewports (code-maintained). */
 export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
-  /** zoom 7: wider metro framing incl. north/west/south suburbs + lakefront */
+  /** zoom 8: tighter metro framing to match social report template */
   {
     citySlug: 'chicago-il',
     centerLat: 41.8781,
     centerLng: -87.6298,
-    zoom: 7,
+    zoom: 8,
     timezone: 'America/Chicago',
   },
-  /** zoom 7: wider DFW metro framing to match social report template */
+  /** zoom 8: tighter DFW metro framing to match social report template */
   {
     citySlug: 'dallas-tx',
     centerLat: 32.7767,
     centerLng: -96.797,
-    zoom: 7,
+    zoom: 8,
     timezone: 'America/Chicago',
   },
   {

@@ -448,13 +448,17 @@ export function SocialReportMapSection({
   layout?: 'band' | 'band-centered' | 'content'
 }) {
   const definition = getSocialReportFormat(format)
+  const edgeToEdge = definition.mapEdgeToEdge === true
+  const sectionPaddingClass = edgeToEdge ? '' : horizontalPaddingClass
   const mapPanel = (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm ${
-        layout === 'band' ? 'h-full' : ''
+      className={`relative shrink-0 overflow-hidden bg-slate-100 ${
+        edgeToEdge
+          ? 'h-full w-full'
+          : `rounded-xl border border-slate-200 shadow-sm ${layout === 'band' ? 'h-full' : ''}`
       }`}
       style={{
-        width: definition.mapPanelWidth,
+        width: edgeToEdge ? '100%' : definition.mapPanelWidth,
         ...(layout === 'band-centered' || layout === 'content'
           ? { height: definition.mapPanelHeight }
           : {}),
@@ -463,7 +467,7 @@ export function SocialReportMapSection({
       <SocialReportMap
         mapPins={report.mapPins}
         mapViewport={report.mapViewport}
-        className="h-full w-full rounded-lg border-0"
+        className={`h-full w-full border-0 ${edgeToEdge ? '' : 'rounded-lg'}`}
       />
       {report.mapPins.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/60">
@@ -478,7 +482,7 @@ export function SocialReportMapSection({
   if (layout === 'content') {
     return (
       <section
-        className={`flex shrink-0 justify-center bg-white pt-3 pb-0 ${horizontalPaddingClass}`}
+        className={`flex shrink-0 bg-white pt-3 pb-0 ${edgeToEdge ? '' : 'justify-center'} ${sectionPaddingClass}`}
       >
         {mapPanel}
       </section>
@@ -488,7 +492,7 @@ export function SocialReportMapSection({
   if (layout === 'band-centered') {
     return (
       <section
-        className={`flex shrink-0 items-center justify-center bg-white ${horizontalPaddingClass}`}
+        className={`flex shrink-0 bg-white ${edgeToEdge ? '' : 'items-center justify-center'} ${sectionPaddingClass}`}
         style={{ height: `${definition.layoutHeightShares.map * 100}%` }}
       >
         {mapPanel}
@@ -498,7 +502,7 @@ export function SocialReportMapSection({
 
   return (
     <section
-      className={`flex shrink-0 justify-center bg-white ${horizontalPaddingClass}`}
+      className={`flex shrink-0 bg-white ${edgeToEdge ? 'w-full' : 'justify-center'} ${sectionPaddingClass}`}
       style={{ height: `${definition.layoutHeightShares.map * 100}%` }}
     >
       {mapPanel}

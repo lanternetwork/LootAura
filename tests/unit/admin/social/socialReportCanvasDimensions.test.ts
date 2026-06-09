@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   getSocialReportFormat,
+  getSocialReportMapPanelHorizontalGutter,
   getSocialReportMapViewportPixelSize,
 } from '@/lib/admin/social/socialReportFormats'
 import {

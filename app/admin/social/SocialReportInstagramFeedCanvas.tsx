@@ -54,7 +54,7 @@ export default function SocialReportInstagramFeedCanvas({
         </p>
 
         <div className="mt-3">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start justify-between gap-4">
             <h2
               className="min-w-0 flex-1 font-black leading-[0.9] tracking-tight text-white"
               style={{ fontSize: typeScale.cityTitlePx }}

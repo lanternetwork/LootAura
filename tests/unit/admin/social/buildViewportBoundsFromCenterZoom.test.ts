@@ -1,16 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { buildViewportBoundsFromCenterZoom } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
-import {
-  getSocialReportMapViewportPixelSize,
-  SOCIAL_REPORT_MAP_PANEL_HEIGHT,
-  SOCIAL_REPORT_MAP_PANEL_WIDTH,
-} from '@/lib/admin/social/socialReportCanvasDimensions'
+import { getSocialReportMapViewportPixelSize } from '@/lib/admin/social/socialReportFormats'
 
 describe('buildViewportBoundsFromCenterZoom', () => {
-  const mapPanel = {
-    width: SOCIAL_REPORT_MAP_PANEL_WIDTH,
-    height: SOCIAL_REPORT_MAP_PANEL_HEIGHT,
-  }
+  const mapPanel = getSocialReportMapViewportPixelSize('instagram-feed')
 
   it('centers Chicago preset bounds around downtown', () => {
     const bounds = buildViewportBoundsFromCenterZoom({
@@ -60,7 +53,7 @@ describe('buildViewportBoundsFromCenterZoom', () => {
     expect(wide.east - wide.west).toBeGreaterThan(tight.east - tight.west)
   })
 
-  it('defaults to contained map panel dimensions', () => {
+  it('defaults to instagram-feed map panel dimensions', () => {
     const bounds = buildViewportBoundsFromCenterZoom({
       centerLat: 41.8781,
       centerLng: -87.6298,
@@ -71,7 +64,7 @@ describe('buildViewportBoundsFromCenterZoom', () => {
       centerLat: 41.8781,
       centerLng: -87.6298,
       zoom: 8,
-      ...getSocialReportMapViewportPixelSize(),
+      ...getSocialReportMapViewportPixelSize('instagram-feed'),
     })
 
     expect(bounds).toEqual(explicit)

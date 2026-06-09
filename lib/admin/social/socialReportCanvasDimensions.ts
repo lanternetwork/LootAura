@@ -1,33 +1,22 @@
-/** Canonical screenshot canvas for /admin/social (server bounds math + rendered canvas). */
-export const SOCIAL_REPORT_CANVAS_WIDTH = 1440
-export const SOCIAL_REPORT_CANVAS_HEIGHT = 810
-
-/** Vertical layout shares (header / map / metrics / footer) on white canvas. */
-export const SOCIAL_REPORT_LAYOUT_HEIGHT_SHARE = {
-  header: 0.27,
-  map: 0.47,
-  metrics: 0.18,
-  footer: 0.08,
-} as const
-
 /**
- * Centered map panel — must match the rendered map container in SocialReportCanvas.
- * Used for viewport-source-of-truth bounds (not full canvas width/height).
+ * @deprecated Use socialReportFormats.ts — 1440×810 retired; formats are format-specific.
+ * Re-exports instagram-feed dimensions for any legacy references during migration.
  */
-export const SOCIAL_REPORT_MAP_PANEL_WIDTH = 1280
-export const SOCIAL_REPORT_MAP_PANEL_HEIGHT = 360
+export {
+  getSocialReportFormat,
+  getSocialReportMapPanelHorizontalGutter,
+  getSocialReportMapViewportPixelSize,
+  type SocialReportFormatSlug,
+} from '@/lib/admin/social/socialReportFormats'
 
-/** Side gutter when map panel is centered in the map section. */
+import { getSocialReportFormat } from '@/lib/admin/social/socialReportFormats'
+
+const instagramFeed = getSocialReportFormat('instagram-feed')
+
+export const SOCIAL_REPORT_CANVAS_WIDTH = instagramFeed.canvasWidth
+export const SOCIAL_REPORT_CANVAS_HEIGHT = instagramFeed.canvasHeight
+export const SOCIAL_REPORT_LAYOUT_HEIGHT_SHARE = instagramFeed.layoutHeightShares
+export const SOCIAL_REPORT_MAP_PANEL_WIDTH = instagramFeed.mapPanelWidth
+export const SOCIAL_REPORT_MAP_PANEL_HEIGHT = instagramFeed.mapPanelHeight
 export const SOCIAL_REPORT_MAP_PANEL_HORIZONTAL_GUTTER =
-  (SOCIAL_REPORT_CANVAS_WIDTH - SOCIAL_REPORT_MAP_PANEL_WIDTH) / 2
-
-/** Pixel size Mapbox renders — inventory queries use these dimensions at preset center/zoom. */
-export function getSocialReportMapViewportPixelSize(): {
-  width: number
-  height: number
-} {
-  return {
-    width: SOCIAL_REPORT_MAP_PANEL_WIDTH,
-    height: SOCIAL_REPORT_MAP_PANEL_HEIGHT,
-  }
-}
+  (instagramFeed.canvasWidth - instagramFeed.mapPanelWidth) / 2

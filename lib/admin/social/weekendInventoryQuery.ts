@@ -8,6 +8,10 @@ import {
   type ViewportBounds,
 } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
 import {
+  getSocialReportMapViewportPixelSize,
+  type SocialReportFormatSlug,
+} from '@/lib/admin/social/socialReportFormats'
+import {
   SOCIAL_REPORT_VIEWPORT_PRESETS,
   type SocialReportViewportPreset,
 } from '@/lib/admin/social/socialReportViewportPresets'
@@ -133,16 +137,21 @@ export async function fetchWeekendSalesInViewport(
   return rowsToViewportInventory(rows, weekend.start, weekend.end)
 }
 
-function presetToViewportBounds(preset: SocialReportViewportPreset): ViewportBounds {
+function presetToViewportBounds(
+  preset: SocialReportViewportPreset,
+  format: SocialReportFormatSlug
+): ViewportBounds {
   return buildViewportBoundsFromCenterZoom({
     centerLat: preset.centerLat,
     centerLng: preset.centerLng,
     zoom: preset.zoom,
+    ...getSocialReportMapViewportPixelSize(format),
   })
 }
 
 /** Viewport-bounded weekend counts for ranking preset cities only. */
 export async function fetchPresetViewportWeekendCountsBySlug(
+  format: SocialReportFormatSlug,
   now: Date = new Date()
 ): Promise<Record<string, number>> {
   const countsBySlug: Record<string, number> = {}
@@ -150,7 +159,7 @@ export async function fetchPresetViewportWeekendCountsBySlug(
   for (const preset of SOCIAL_REPORT_VIEWPORT_PRESETS) {
     const { activeSales } = await fetchWeekendSalesInViewport(
       {
-        bounds: presetToViewportBounds(preset),
+        bounds: presetToViewportBounds(preset, format),
         timezone: preset.timezone,
       },
       now

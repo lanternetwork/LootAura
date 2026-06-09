@@ -3,6 +3,12 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
+import {
+  DEFAULT_SOCIAL_REPORT_FORMAT,
+  getSocialReportFormat,
+  listSocialReportFormatOptions,
+  type SocialReportFormatSlug,
+} from '@/lib/admin/social/socialReportFormats'
 import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
 import SocialReportCanvas from './SocialReportCanvas'
 
@@ -19,17 +25,24 @@ type ReportResponse = {
   message?: string
 }
 
+const FORMAT_OPTIONS = listSocialReportFormatOptions()
+
 export default function SocialCityReportClient() {
   const [metros, setMetros] = useState<SocialMetroOption[]>([])
   const [metrosStatus, setMetrosStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [metrosError, setMetrosError] = useState<string | null>(null)
 
   const [selectedSlug, setSelectedSlug] = useState('')
+  const [selectedFormat, setSelectedFormat] = useState<SocialReportFormatSlug>(
+    DEFAULT_SOCIAL_REPORT_FORMAT
+  )
   const [search, setSearch] = useState('')
   const [report, setReport] = useState<SocialCityReport | null>(null)
   const [reportStatus, setReportStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [reportError, setReportError] = useState<string | null>(null)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
+
+  const formatDefinition = getSocialReportFormat(selectedFormat)
 
   useEffect(() => {
     let cancelled = false
@@ -59,13 +72,13 @@ export default function SocialCityReportClient() {
     }
   }, [])
 
-  const loadReport = useCallback(async (citySlug: string) => {
+  const loadReport = useCallback(async (citySlug: string, format: SocialReportFormatSlug) => {
     if (!citySlug) return
     setReportStatus('loading')
     setReportError(null)
     try {
       const res = await fetch(
-        `/api/admin/social/report?citySlug=${encodeURIComponent(citySlug)}`,
+        `/api/admin/social/report?citySlug=${encodeURIComponent(citySlug)}&format=${encodeURIComponent(format)}`,
         { credentials: 'include' }
       )
       const body = (await res.json()) as ReportResponse
@@ -87,8 +100,8 @@ export default function SocialCityReportClient() {
       setReportStatus('idle')
       return
     }
-    void loadReport(selectedSlug)
-  }, [selectedSlug, loadReport])
+    void loadReport(selectedSlug, selectedFormat)
+  }, [selectedSlug, selectedFormat, loadReport])
 
   const filteredMetros = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -113,14 +126,13 @@ export default function SocialCityReportClient() {
 
   return (
     <div className="min-h-screen bg-slate-200 py-8">
-      {/* Admin controls — narrow column; must not constrain screenshot canvas width */}
       <div className="mx-auto max-w-4xl px-6">
         <section aria-label="Admin controls" className="mb-8 space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Social City Report</h1>
               <p className="mt-1 text-sm text-slate-600">
-                Select a city, screenshot the canvas below, then post.{' '}
+                Select a city and format, screenshot the canvas below, then post.{' '}
                 <Link href="/admin/seo" className="font-medium text-purple-700 hover:text-purple-900">
                   SEO ops
                 </Link>
@@ -133,7 +145,7 @@ export default function SocialCityReportClient() {
             {selectedSlug && reportStatus === 'ready' && (
               <button
                 type="button"
-                onClick={() => void loadReport(selectedSlug)}
+                onClick={() => void loadReport(selectedSlug, selectedFormat)}
                 className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
               >
                 Refresh report
@@ -169,6 +181,23 @@ export default function SocialCityReportClient() {
                 ))}
               </select>
             </div>
+            <label htmlFor="report-format" className="mt-4 block text-sm font-semibold text-slate-800">
+              Format
+            </label>
+            <select
+              id="report-format"
+              value={selectedFormat}
+              onChange={(event) =>
+                setSelectedFormat(event.target.value as SocialReportFormatSlug)
+              }
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:max-w-md"
+            >
+              {FORMAT_OPTIONS.map((option) => (
+                <option key={option.slug} value={option.slug}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             {metrosStatus === 'loading' && (
               <p className="mt-2 text-sm text-slate-500">Loading metro catalog…</p>
             )}
@@ -205,12 +234,13 @@ export default function SocialCityReportClient() {
           <section aria-label="Screenshot canvas" className="mb-8 w-full">
             <div className="mx-auto max-w-4xl px-6">
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                Screenshot the canvas below (1440×810)
+                Screenshot the canvas below ({formatDefinition.canvasWidth}×
+                {formatDefinition.canvasHeight})
               </p>
             </div>
             <div className="w-full overflow-x-auto">
               <div className="flex justify-center px-6 py-4">
-                <SocialReportCanvas report={report} />
+                <SocialReportCanvas report={report} format={selectedFormat} />
               </div>
             </div>
           </section>

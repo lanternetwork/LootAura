@@ -12,6 +12,17 @@ describe('socialReportFormats', () => {
     expect(format.canvasWidth).toBe(1080)
     expect(format.canvasHeight).toBe(1350)
     expect(format.mapPanelWidth).toBeLessThan(format.canvasWidth)
+    expect(format.layoutHeightShares.header).toBeGreaterThanOrEqual(0.18)
+    expect(format.layoutHeightShares.header).toBeLessThanOrEqual(0.2)
+    expect(format.layoutHeightShares.map).toBeGreaterThanOrEqual(0.5)
+    expect(format.layoutHeightShares.map).toBeLessThanOrEqual(0.55)
+    expect(format.layoutHeightShares.metrics).toBeGreaterThanOrEqual(0.15)
+    expect(format.layoutHeightShares.metrics).toBeLessThanOrEqual(0.18)
+    expect(format.layoutHeightShares.footer).toBeGreaterThanOrEqual(0.08)
+    expect(format.layoutHeightShares.footer).toBeLessThanOrEqual(0.1)
+    expect(format.mapPanelHeight).toBe(
+      Math.round(format.layoutHeightShares.map * format.canvasHeight)
+    )
   })
 
   it('defines vertical-story at 1080×1920', () => {

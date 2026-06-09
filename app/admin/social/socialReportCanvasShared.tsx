@@ -152,6 +152,33 @@ export function TagIcon({
   )
 }
 
+/** Stacked layers — total active sales across types. */
+export function LayersIcon({
+  className,
+  style,
+}: {
+  className?: string
+  style?: CSSProperties
+}) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M3.5 12.5 10 16l6.5-3.5M3.5 8.5 10 12l6.5-3.5M3.5 4.5 10 8l6.5-3.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function HouseIcon({
   className,
   style,
@@ -237,6 +264,7 @@ export function PrimaryMetricCard({
   emphasize = false,
   wide = false,
   templateHero = false,
+  icon,
 }: {
   value: string
   cityTitle: string
@@ -246,9 +274,21 @@ export function PrimaryMetricCard({
   wide?: boolean
   /** Instagram template hero metric — fixed px scale */
   templateHero?: boolean
+  icon?: ReactNode
 }) {
   const isHeroMetric = templateHero || (wide && emphasize && fillBand)
   const heroType = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
+  const metricIcon =
+    icon ?? (
+      <LayersIcon
+        style={
+          isHeroMetric
+            ? { width: heroType.heroMetricIconPx, height: heroType.heroMetricIconPx }
+            : undefined
+        }
+        className={isHeroMetric ? undefined : 'h-5 w-5'}
+      />
+    )
 
   return (
     <div
@@ -263,14 +303,7 @@ export function PrimaryMetricCard({
         pixelSize={isHeroMetric ? heroType.heroMetricIconBadgePx : undefined}
         size={isHeroMetric ? undefined : fillBand ? 'lg' : emphasize ? 'lg' : 'md'}
       >
-        <TagIcon
-          style={
-            isHeroMetric
-              ? { width: heroType.heroMetricIconPx, height: heroType.heroMetricIconPx }
-              : undefined
-          }
-          className={isHeroMetric ? undefined : 'h-5 w-5'}
-        />
+        {metricIcon}
       </MetricIconBadge>
       <div className="min-w-0">
         {isHeroMetric ? (

@@ -88,7 +88,7 @@ export default function SocialReportInstagramFeedCanvas({
         className="flex shrink-0 items-center bg-white px-8"
         style={{ height: `${definition.layoutHeightShares.metrics * 100}%` }}
       >
-        <div className="flex w-full items-center gap-3">
+        <div className="flex w-full items-stretch gap-3">
           <PrimaryMetricCard
             value={report.activeSales.toLocaleString('en-US')}
             cityTitle={cityTitle}

@@ -288,7 +288,7 @@ export function PrimaryMetricCard({
         isHeroMetric
           ? fillBand
             ? 'h-full px-6 py-4'
-            : 'px-5 py-2.5'
+            : 'h-full px-5 py-2.5'
           : fillBand
             ? 'h-full px-6 py-4'
             : emphasize
@@ -386,7 +386,7 @@ export function SecondaryMetricCard({
 
   if (templateInline) {
     return (
-      <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-md">
+      <div className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-md">
         <MetricIconBadge bgClass={iconBgClass} pixelSize={heroType.secondaryMetricIconBadgePx}>
           {icon}
         </MetricIconBadge>

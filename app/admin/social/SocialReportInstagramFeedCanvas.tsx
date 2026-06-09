@@ -10,7 +10,6 @@ import {
   SocialReportFooter,
   SocialReportMapSection,
   SocialReportRankBadge,
-  SocialReportSectionGap,
   TagIcon,
 } from './socialReportCanvasShared'
 
@@ -63,20 +62,17 @@ export default function SocialReportInstagramFeedCanvas({
         </div>
       </header>
 
-      <SocialReportSectionGap format={format} />
-
-      <SocialReportMapSection report={report} format={format} layout="band-centered" />
-
-      <SocialReportSectionGap format={format} />
+      <SocialReportMapSection report={report} format={format} />
 
       <section
-        className="flex shrink-0 items-center bg-white px-8"
+        className="flex shrink-0 items-stretch bg-white px-8 py-3"
         style={{ height: `${definition.layoutHeightShares.metrics * 100}%` }}
       >
-        <div className="flex w-full gap-3">
+        <div className="flex h-full w-full gap-3">
           <PrimaryMetricCard
             value={report.activeSales.toLocaleString('en-US')}
             cityTitle={cityTitle}
+            fillBand
             emphasize
           />
           <SecondaryMetricCard
@@ -84,21 +80,19 @@ export default function SocialReportInstagramFeedCanvas({
             label="Yard Sales"
             accentColor="#DC2626"
             iconBgClass="bg-red-600 text-white"
-            icon={<TagIcon className="h-4 w-4" />}
-            compact
+            icon={<TagIcon className="h-5 w-5" />}
+            fillBand
           />
           <SecondaryMetricCard
             value={report.estateSales.toLocaleString('en-US')}
             label="Estate Sales"
             accentColor="#7C3AED"
             iconBgClass="bg-violet-600 text-white"
-            icon={<HouseIcon className="h-4 w-4" />}
-            compact
+            icon={<HouseIcon className="h-5 w-5" />}
+            fillBand
           />
         </div>
       </section>
-
-      <SocialReportSectionGap format={format} />
 
       <SocialReportFooter report={report} format={format} density="compact" />
     </SocialReportCanvasFrame>

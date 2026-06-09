@@ -207,23 +207,13 @@ export function HouseIcon({
 
 export function SocialReportBrandPin({ heightPx }: { heightPx: number }) {
   return (
-    <svg
-      width={heightPx}
-      height={heightPx}
-      viewBox="0 0 48 48"
-      fill="none"
+    <img
+      src="/sitelogo.svg"
+      alt=""
       aria-hidden="true"
-      className="shrink-0"
-    >
-      <path
-        d="M24 4c-7.2 0-13 5.8-13 13 0 9.75 13 27 13 27s13-17.25 13-27c0-7.2-5.8-13-13-13Z"
-        fill="#F0B532"
-        stroke="#0c1628"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <circle cx="24" cy="17" r="5.5" fill="#0c1628" />
-    </svg>
+      className="w-auto shrink-0"
+      style={{ height: heightPx }}
+    />
   )
 }
 

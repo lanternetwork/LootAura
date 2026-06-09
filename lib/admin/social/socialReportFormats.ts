@@ -31,13 +31,13 @@ export const SOCIAL_REPORT_FORMATS: Record<
     canvasWidth: 1080,
     canvasHeight: 1350,
     mapPanelWidth: 1080,
-    /** 48% of canvas — matches map band; viewport SOT */
-    mapPanelHeight: 648,
+    /** 54% of canvas — matches map band; viewport SOT */
+    mapPanelHeight: 729,
     mapEdgeToEdge: true,
     layoutHeightShares: {
       header: 0.24,
-      map: 0.48,
-      metrics: 0.22,
+      map: 0.54,
+      metrics: 0.16,
       footer: 0.06,
     },
   },

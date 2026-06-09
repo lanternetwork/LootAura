@@ -74,6 +74,7 @@ export default function SocialReportInstagramFeedCanvas({
             cityTitle={cityTitle}
             fillBand
             emphasize
+            wide
           />
           <SecondaryMetricCard
             value={report.yardSales.toLocaleString('en-US')}

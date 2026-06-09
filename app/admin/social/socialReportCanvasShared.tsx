@@ -152,16 +152,21 @@ export function PrimaryMetricCard({
   compact = false,
   fillBand = false,
   emphasize = false,
+  wide = false,
 }: {
   value: string
   cityTitle: string
   compact?: boolean
   fillBand?: boolean
   emphasize?: boolean
+  /** Template layout: primary card spans ~2x secondary card width */
+  wide?: boolean
 }) {
   return (
     <div
-      className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-[#0c1628] shadow-lg ${
+      className={`flex min-w-0 items-center gap-3 rounded-2xl bg-[#0c1628] shadow-lg ${
+        wide ? 'flex-[2]' : 'flex-1'
+      } ${
         fillBand ? 'h-full px-5 py-5' : emphasize ? 'px-4 py-3.5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
       }`}
     >

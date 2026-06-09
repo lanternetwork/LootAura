@@ -150,28 +150,34 @@ export function PrimaryMetricCard({
   value,
   cityTitle,
   compact = false,
+  fillBand = false,
 }: {
   value: string
   cityTitle: string
   compact?: boolean
+  fillBand?: boolean
 }) {
   return (
     <div
       className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-[#0c1628] shadow-lg ${
-        compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
+        fillBand ? 'h-full px-5 py-5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
       }`}
     >
-      <MetricIconBadge bgClass="bg-[#F0B532] text-[#0c1628]" size={compact ? 'md' : 'md'}>
+      <MetricIconBadge bgClass="bg-[#F0B532] text-[#0c1628]" size={fillBand ? 'lg' : 'md'}>
         <TagIcon className="h-5 w-5" />
       </MetricIconBadge>
       <div className="min-w-0">
-        <p className={`font-black leading-none text-white ${compact ? 'text-3xl' : 'text-[2rem]'}`}>
+        <p
+          className={`font-black leading-none text-white ${
+            fillBand ? 'text-[2rem]' : compact ? 'text-3xl' : 'text-[2rem]'
+          }`}
+        >
           {value}
         </p>
         <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#F0B532]">
           Active Sales
         </p>
-        {!compact && (
+        {(fillBand || !compact) && (
           <p className="mt-0.5 text-xs font-medium text-white/75">Across {cityTitle}</p>
         )}
       </div>
@@ -186,6 +192,7 @@ export function SecondaryMetricCard({
   iconBgClass,
   icon,
   compact = false,
+  fillBand = false,
 }: {
   value: string
   label: string
@@ -193,16 +200,23 @@ export function SecondaryMetricCard({
   iconBgClass: string
   icon: ReactNode
   compact?: boolean
+  fillBand?: boolean
 }) {
   return (
     <div
       className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white shadow-md ${
-        compact ? 'px-4 py-4' : 'px-4 py-4'
+        fillBand ? 'h-full px-5 py-5' : compact ? 'px-4 py-4' : 'px-4 py-4'
       }`}
     >
-      <MetricIconBadge bgClass={iconBgClass}>{icon}</MetricIconBadge>
+      <MetricIconBadge bgClass={iconBgClass} size={fillBand ? 'lg' : 'md'}>
+        {icon}
+      </MetricIconBadge>
       <div className="min-w-0">
-        <p className={`font-black leading-none text-[#0c1628] ${compact ? 'text-2xl' : 'text-[1.625rem]'}`}>
+        <p
+          className={`font-black leading-none text-[#0c1628] ${
+            fillBand ? 'text-[1.75rem]' : compact ? 'text-2xl' : 'text-[1.625rem]'
+          }`}
+        >
           {value}
         </p>
         <p
@@ -231,10 +245,12 @@ export function SocialReportMapSection({
   const definition = getSocialReportFormat(format)
   const mapPanel = (
     <div
-      className="relative shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm"
+      className={`relative shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm ${
+        layout === 'band' ? 'h-full' : ''
+      }`}
       style={{
         width: definition.mapPanelWidth,
-        height: definition.mapPanelHeight,
+        ...(layout === 'content' ? { height: definition.mapPanelHeight } : {}),
       }}
     >
       <SocialReportMap
@@ -264,7 +280,7 @@ export function SocialReportMapSection({
 
   return (
     <section
-      className={`flex shrink-0 items-center justify-center bg-white ${horizontalPaddingClass}`}
+      className={`flex shrink-0 justify-center bg-white ${horizontalPaddingClass}`}
       style={{ height: `${definition.layoutHeightShares.map * 100}%` }}
     >
       {mapPanel}

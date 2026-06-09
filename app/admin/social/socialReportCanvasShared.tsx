@@ -220,37 +220,54 @@ export function SocialReportMapSection({
   report,
   format,
   horizontalPaddingClass = 'px-8',
+  layout = 'band',
 }: {
   report: SocialCityReport
   format: SocialReportFormatSlug
   horizontalPaddingClass?: string
+  /** content = hug map panel; band = fixed % of canvas height (vertical-story) */
+  layout?: 'band' | 'content'
 }) {
   const definition = getSocialReportFormat(format)
+  const mapPanel = (
+    <div
+      className="relative shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm"
+      style={{
+        width: definition.mapPanelWidth,
+        height: definition.mapPanelHeight,
+      }}
+    >
+      <SocialReportMap
+        mapPins={report.mapPins}
+        mapViewport={report.mapViewport}
+        className="h-full w-full rounded-lg border-0"
+      />
+      {report.mapPins.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/60">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+            No sales in viewport this weekend
+          </p>
+        </div>
+      )}
+    </div>
+  )
+
+  if (layout === 'content') {
+    return (
+      <section
+        className={`flex shrink-0 justify-center bg-white pt-3 pb-0 ${horizontalPaddingClass}`}
+      >
+        {mapPanel}
+      </section>
+    )
+  }
+
   return (
     <section
       className={`flex shrink-0 items-center justify-center bg-white ${horizontalPaddingClass}`}
       style={{ height: `${definition.layoutHeightShares.map * 100}%` }}
     >
-      <div
-        className="relative shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm"
-        style={{
-          width: definition.mapPanelWidth,
-          height: definition.mapPanelHeight,
-        }}
-      >
-        <SocialReportMap
-          mapPins={report.mapPins}
-          mapViewport={report.mapViewport}
-          className="h-full w-full rounded-lg border-0"
-        />
-        {report.mapPins.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/60">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              No sales in viewport this weekend
-            </p>
-          </div>
-        )}
-      </div>
+      {mapPanel}
     </section>
   )
 }
@@ -259,16 +276,47 @@ export function SocialReportFooter({
   report,
   format,
   horizontalPaddingClass = 'px-8',
+  layout = 'band',
 }: {
   report: SocialCityReport
   format: SocialReportFormatSlug
   horizontalPaddingClass?: string
+  layout?: 'band' | 'content'
 }) {
   const definition = getSocialReportFormat(format)
   const footerTimestamp = formatFooterTimestamp(report.timestampLabel)
+  const className = `flex shrink-0 items-center justify-between border-t border-slate-200 bg-white py-4 ${horizontalPaddingClass}`
+
+  if (layout === 'content') {
+    return (
+      <footer className={className}>
+        <div className="flex items-center gap-2">
+          <ClockIcon className="h-4 w-4 text-slate-500" />
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Updated
+            </p>
+            <p className="text-xs font-bold text-slate-900">{footerTimestamp}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <GlobeIcon className="h-4 w-4 text-slate-500" />
+          <div className="text-right">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Data Powered By
+            </p>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-900">
+              LootAura.com
+            </p>
+          </div>
+        </div>
+      </footer>
+    )
+  }
+
   return (
     <footer
-      className={`flex shrink-0 items-center justify-between border-t border-slate-200 bg-white ${horizontalPaddingClass}`}
+      className={className}
       style={{ height: `${definition.layoutHeightShares.footer * 100}%` }}
     >
       <div className="flex items-center gap-2">

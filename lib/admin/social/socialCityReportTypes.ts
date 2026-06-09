@@ -1,3 +1,5 @@
+import type { SocialReportFormatSlug } from '@/lib/admin/social/socialReportFormats'
+
 export type SocialCityReportMapPin = {
   id: string
   lat: number
@@ -13,6 +15,7 @@ export type SocialCityReportMapViewport = {
 }
 
 export type SocialCityReport = {
+  format: SocialReportFormatSlug
   city: string
   state: string
   citySlug: string

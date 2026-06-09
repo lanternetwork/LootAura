@@ -10,6 +10,7 @@ import {
   formatWeekendHeroDateRange,
 } from '@/lib/admin/social/formatSocialReportDisplay'
 import { resolveSocialReportViewportForMetro } from '@/lib/admin/social/resolveSocialReportViewport'
+import type { SocialReportFormatSlug } from '@/lib/admin/social/socialReportFormats'
 import { listSocialReportRankingPresetSlugs } from '@/lib/admin/social/socialReportViewportPresets'
 import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
 import {
@@ -36,6 +37,7 @@ export function buildSocialMetroOptions(
 
 export async function buildSocialCityReport(
   citySlug: string,
+  format: SocialReportFormatSlug,
   now: Date = new Date()
 ): Promise<SocialCityReport> {
   const normalizedSlug = citySlug.trim().toLowerCase()
@@ -53,13 +55,13 @@ export async function buildSocialCityReport(
     )
   }
 
-  const viewport = resolveSocialReportViewportForMetro(metro)
+  const viewport = resolveSocialReportViewportForMetro(metro, format)
   const [inventory, presetCounts] = await Promise.all([
     fetchWeekendSalesInViewport(
       { bounds: viewport.bounds, timezone: viewport.timezone },
       now
     ),
-    fetchPresetViewportWeekendCountsBySlug(now),
+    fetchPresetViewportWeekendCountsBySlug(format, now),
   ])
 
   const cityRank = viewport.isRankingPreset
@@ -74,6 +76,7 @@ export async function buildSocialCityReport(
   const updatedAt = now.toISOString()
 
   return {
+    format,
     city: metro.city,
     state: metro.state,
     citySlug: metro.slug,

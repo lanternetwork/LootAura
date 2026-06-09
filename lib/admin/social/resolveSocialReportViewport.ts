@@ -2,7 +2,8 @@ import {
   buildViewportBoundsFromCenterZoom,
   type ViewportBounds,
 } from '@/lib/admin/social/buildViewportBoundsFromCenterZoom'
-import { getSocialReportMapViewportPixelSize } from '@/lib/admin/social/socialReportCanvasDimensions'
+import { getSocialReportMapViewportPixelSize } from '@/lib/admin/social/socialReportFormats'
+import type { SocialReportFormatSlug } from '@/lib/admin/social/socialReportFormats'
 import { getKnownMetroMarketAnchor } from '@/lib/admin/social/metroMarketGeography'
 import {
   getSocialReportViewportPreset,
@@ -30,6 +31,7 @@ function buildResolvedViewport(options: {
   zoom: number
   timezone: string
   isRankingPreset: boolean
+  format: SocialReportFormatSlug
 }): ResolvedSocialReportViewport {
   return {
     citySlug: options.citySlug,
@@ -41,14 +43,17 @@ function buildResolvedViewport(options: {
       centerLat: options.centerLat,
       centerLng: options.centerLng,
       zoom: options.zoom,
-      ...getSocialReportMapViewportPixelSize(),
+      ...getSocialReportMapViewportPixelSize(options.format),
     }),
     isRankingPreset: options.isRankingPreset,
   }
 }
 
 /** Resolve screenshot viewport for a metro (preset or conservative fallback). */
-export function resolveSocialReportViewportForMetro(metro: SeoMetro): ResolvedSocialReportViewport {
+export function resolveSocialReportViewportForMetro(
+  metro: SeoMetro,
+  format: SocialReportFormatSlug
+): ResolvedSocialReportViewport {
   const preset = getSocialReportViewportPreset(metro.slug)
   if (preset) {
     return buildResolvedViewport({
@@ -58,6 +63,7 @@ export function resolveSocialReportViewportForMetro(metro: SeoMetro): ResolvedSo
       zoom: preset.zoom,
       timezone: preset.timezone,
       isRankingPreset: true,
+      format,
     })
   }
 
@@ -71,5 +77,6 @@ export function resolveSocialReportViewportForMetro(metro: SeoMetro): ResolvedSo
     zoom: SOCIAL_REPORT_DEFAULT_ZOOM,
     timezone: metro.timezone,
     isRankingPreset: false,
+    format,
   })
 }

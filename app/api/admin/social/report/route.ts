@@ -4,6 +4,7 @@ import {
   buildSocialCityReport,
   SocialCityReportError,
 } from '@/lib/admin/social/buildSocialCityReport'
+import { isSocialReportFormatSlug } from '@/lib/admin/social/socialReportFormats'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,8 +28,17 @@ export async function GET(request: NextRequest) {
     return jsonError(400, 'CITY_SLUG_REQUIRED', 'citySlug query parameter is required')
   }
 
+  const formatParam = request.nextUrl.searchParams.get('format')?.trim().toLowerCase() ?? ''
+  if (!formatParam || !isSocialReportFormatSlug(formatParam)) {
+    return jsonError(
+      400,
+      'FORMAT_REQUIRED',
+      'format query parameter is required (instagram-feed or vertical-story)'
+    )
+  }
+
   try {
-    const report = await buildSocialCityReport(citySlug)
+    const report = await buildSocialCityReport(citySlug, formatParam)
     return NextResponse.json({ ok: true, report })
   } catch (error) {
     if (error instanceof SocialCityReportError) {

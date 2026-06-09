@@ -30,6 +30,7 @@ describe('GET /api/admin/social/report', () => {
     const { buildSocialCityReport } = await import('@/lib/admin/social/buildSocialCityReport')
     vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1', email: 'admin@test.com' } })
     vi.mocked(buildSocialCityReport).mockResolvedValue({
+      format: 'instagram-feed',
       city: TEST_SEO_METRO_DALLAS.city,
       state: TEST_SEO_METRO_DALLAS.state,
       citySlug: TEST_SEO_METRO_DALLAS.slug,
@@ -48,20 +49,24 @@ describe('GET /api/admin/social/report', () => {
       mapViewport: {
         centerLat: 32.7767,
         centerLng: -96.797,
-        zoom: 9,
+        zoom: 7,
       },
     })
 
     const { GET } = await import('@/app/api/admin/social/report/route')
     const response = await GET(
-      new NextRequest('http://localhost/api/admin/social/report?citySlug=dallas-tx')
+      new NextRequest(
+        'http://localhost/api/admin/social/report?citySlug=dallas-tx&format=instagram-feed'
+      )
     )
     const body = await response.json()
 
     expect(response.status).toBe(200)
     expect(body.ok).toBe(true)
     expect(body.report.citySlug).toBe('dallas-tx')
+    expect(body.report.format).toBe('instagram-feed')
     expect(body.report.activeSales).toBe(42)
+    expect(buildSocialCityReport).toHaveBeenCalledWith('dallas-tx', 'instagram-feed')
   })
 
   it('returns 400 when citySlug missing', async () => {
@@ -69,11 +74,43 @@ describe('GET /api/admin/social/report', () => {
     vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1' } })
 
     const { GET } = await import('@/app/api/admin/social/report/route')
-    const response = await GET(new NextRequest('http://localhost/api/admin/social/report'))
+    const response = await GET(
+      new NextRequest('http://localhost/api/admin/social/report?format=instagram-feed')
+    )
     const body = await response.json()
 
     expect(response.status).toBe(400)
     expect(body.code).toBe('CITY_SLUG_REQUIRED')
+  })
+
+  it('returns 400 when format missing', async () => {
+    const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1' } })
+
+    const { GET } = await import('@/app/api/admin/social/report/route')
+    const response = await GET(
+      new NextRequest('http://localhost/api/admin/social/report?citySlug=dallas-tx')
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.code).toBe('FORMAT_REQUIRED')
+  })
+
+  it('returns 400 when format invalid', async () => {
+    const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1' } })
+
+    const { GET } = await import('@/app/api/admin/social/report/route')
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/admin/social/report?citySlug=dallas-tx&format=square'
+      )
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.code).toBe('FORMAT_REQUIRED')
   })
 
   it('returns 403 when admin gate rejects', async () => {
@@ -85,7 +122,9 @@ describe('GET /api/admin/social/report', () => {
 
     const { GET } = await import('@/app/api/admin/social/report/route')
     const response = await GET(
-      new NextRequest('http://localhost/api/admin/social/report?citySlug=dallas-tx')
+      new NextRequest(
+        'http://localhost/api/admin/social/report?citySlug=dallas-tx&format=instagram-feed'
+      )
     )
 
     expect(response.status).toBe(403)

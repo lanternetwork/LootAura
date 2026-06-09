@@ -1,4 +1,7 @@
-import { getSocialReportMapViewportPixelSize } from '@/lib/admin/social/socialReportCanvasDimensions'
+import {
+  DEFAULT_SOCIAL_REPORT_FORMAT,
+  getSocialReportMapViewportPixelSize,
+} from '@/lib/admin/social/socialReportFormats'
 
 /** Mapbox GL tile size (Web Mercator). */
 const MAPBOX_TILE_SIZE = 512
@@ -49,7 +52,7 @@ function lngFromPixelX(x: number, worldSize: number): number {
 export function buildViewportBoundsFromCenterZoom(
   input: ViewportCenterZoomInput
 ): ViewportBounds {
-  const defaults = getSocialReportMapViewportPixelSize()
+  const defaults = getSocialReportMapViewportPixelSize(DEFAULT_SOCIAL_REPORT_FORMAT)
   const width = input.width ?? defaults.width
   const height = input.height ?? defaults.height
   const worldSize = worldSizeForZoom(input.zoom)

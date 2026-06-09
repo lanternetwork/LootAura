@@ -48,8 +48,7 @@ export default function SocialReportMap({
         zoom={mapViewport.zoom}
         interactive={false}
         attributionControl={false}
-        showOSMAttribution={true}
-        attributionPosition="bottom-right"
+        showOSMAttribution={false}
         pins={pinsProp}
       />
     </div>

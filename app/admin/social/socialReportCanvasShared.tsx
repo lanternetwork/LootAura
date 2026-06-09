@@ -295,7 +295,17 @@ export function PrimaryMetricCard({
       className={`flex min-w-0 items-center gap-4 rounded-2xl bg-[#0c1628] shadow-lg ${
         wide ? 'flex-[2]' : 'flex-1'
       } ${
-        fillBand ? 'h-full px-6 py-4' : emphasize ? 'px-4 py-3.5' : compact ? 'px-4 py-4' : 'gap-4 px-5 py-4'
+        isHeroMetric
+          ? fillBand
+            ? 'h-full px-6 py-4'
+            : 'px-5 py-2.5'
+          : fillBand
+            ? 'h-full px-6 py-4'
+            : emphasize
+              ? 'px-4 py-3.5'
+              : compact
+                ? 'px-4 py-4'
+                : 'gap-4 px-5 py-4'
       }`}
     >
       <MetricIconBadge
@@ -315,14 +325,14 @@ export function PrimaryMetricCard({
               {value}
             </p>
             <p
-              className="mt-2 font-bold uppercase tracking-[0.14em] text-[#F0B532]"
+              className={`font-bold uppercase tracking-[0.14em] text-[#F0B532] ${fillBand ? 'mt-2' : 'mt-1'}`}
               style={{ fontSize: heroType.heroMetricLabelPx }}
             >
               Active Sales
             </p>
             {(fillBand || !compact) && (
               <p
-                className="mt-1 font-medium text-white/75"
+                className={`font-medium text-white/75 ${fillBand ? 'mt-1' : 'mt-0.5'}`}
                 style={{ fontSize: heroType.heroMetricSubtitlePx }}
               >
                 Across {cityTitle}
@@ -381,20 +391,24 @@ export function SecondaryMetricCard({
 }) {
   const heroType = SOCIAL_REPORT_INSTAGRAM_TYPOGRAPHY
 
-  if (templateStacked && stacked && fillBand) {
+  if (templateStacked && stacked) {
     return (
-      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-4 shadow-md">
+      <div
+        className={`flex min-w-0 flex-1 flex-col items-center rounded-2xl border border-slate-200 bg-white px-3 shadow-md ${
+          fillBand ? 'h-full justify-center py-4' : 'py-2'
+        }`}
+      >
         <MetricIconBadge bgClass={iconBgClass} pixelSize={heroType.secondaryMetricIconBadgePx}>
           {icon}
         </MetricIconBadge>
         <p
-          className="mt-3 font-black leading-none text-[#0c1628]"
+          className={`font-black leading-none text-[#0c1628] ${fillBand ? 'mt-3' : 'mt-2'}`}
           style={{ fontSize: heroType.secondaryMetricValuePx }}
         >
           {value}
         </p>
         <p
-          className="mt-2 font-bold uppercase tracking-[0.14em]"
+          className={`font-bold uppercase tracking-[0.14em] ${fillBand ? 'mt-2' : 'mt-1'}`}
           style={{ fontSize: heroType.secondaryMetricLabelPx, color: accentColor }}
         >
           {label}

@@ -14,7 +14,8 @@ describe('discoverSeoMetrosFromPublishedSales query target', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       not: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue({
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockResolvedValue({
         data: [{ city: 'Louisville', state: 'KY' }],
         error: null,
       }),

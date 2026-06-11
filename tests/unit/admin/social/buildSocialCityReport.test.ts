@@ -25,7 +25,7 @@ describe('buildSocialCityReport', () => {
 
     vi.mocked(discoverSeoMetrosFromPublishedSales).mockResolvedValue([])
     vi.mocked(fetchWeekendSalesInViewport).mockResolvedValue({
-      pins: [{ id: 'sale-1', lat: 41.88, lng: -87.63, is_featured: false }],
+      pins: [{ id: 'sale-1', lat: 41.88, lng: -87.63, title: 'Estate Sale', is_featured: false }],
       activeSales: 39,
       estateSales: 10,
       yardSales: 29,

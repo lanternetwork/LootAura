@@ -1,7 +1,8 @@
+import { discoverSeoMetrosFromPublishedSales } from '@/lib/seo/metroCatalog'
 import {
-  discoverSeoMetrosFromPublishedSales,
-  getSeoMetroBySlug,
-} from '@/lib/seo/metroCatalog'
+  mergeSocialMetroOptions,
+  resolveSocialReportMetro,
+} from '@/lib/admin/social/socialReportMetroRegistry'
 import { getThisWeekendWindowInMetro } from '@/lib/seo/weekendBoundaries'
 import { buildSocialCityReportCaption } from '@/lib/admin/social/buildSocialCityReportCaption'
 import { computeCityRankAmongPresets } from '@/lib/admin/social/computeCityRank'
@@ -23,16 +24,9 @@ export function formatSocialMetroLabel(city: string, state: string): string {
 }
 
 export function buildSocialMetroOptions(
-  metros: Awaited<ReturnType<typeof discoverSeoMetrosFromPublishedSales>>
+  discoveredMetros: Awaited<ReturnType<typeof discoverSeoMetrosFromPublishedSales>>
 ): SocialMetroOption[] {
-  return metros
-    .map((metro) => ({
-      slug: metro.slug,
-      city: metro.city,
-      state: metro.state,
-      label: formatSocialMetroLabel(metro.city, metro.state),
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+  return mergeSocialMetroOptions(discoveredMetros, formatSocialMetroLabel)
 }
 
 export async function buildSocialCityReport(
@@ -45,8 +39,8 @@ export async function buildSocialCityReport(
     throw new SocialCityReportError('CITY_SLUG_REQUIRED', 'citySlug is required', 400)
   }
 
-  const metros = await discoverSeoMetrosFromPublishedSales()
-  const metro = getSeoMetroBySlug(metros, normalizedSlug)
+  const discoveredMetros = await discoverSeoMetrosFromPublishedSales()
+  const metro = resolveSocialReportMetro(normalizedSlug, discoveredMetros)
   if (!metro) {
     throw new SocialCityReportError(
       'METRO_NOT_FOUND',

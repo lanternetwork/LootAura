@@ -100,31 +100,47 @@ function saleRowToMetro(city: string, state: string): SeoMetro {
   }
 }
 
+const METRO_DISCOVERY_PAGE_SIZE = 1000
+
 /**
  * Nationwide metro catalog — every city/state with current published sale footprint.
- * No pilot list, expansion list, or manual activation.
+ * Paginates through all published rows before deduping so inventory growth cannot drop metros.
  */
 export async function discoverSeoMetrosFromPublishedSales(): Promise<SeoMetro[]> {
   const admin = getAdminDb()
-
-  const { data, error } = await applyPublishedSaleCityStateFootprint(
-    fromBase(admin, T.sales).select('city, state')
-  ).limit(15000)
-
-  if (error) {
-    console.error('[SEO_METRO_DISCOVERY] failed:', error.message)
-    return []
-  }
-
   const bySlug = new Map<string, SeoMetro>()
-  for (const row of data ?? []) {
-    const city = (row as { city?: string }).city
-    const state = (row as { state?: string }).state
-    if (!city?.trim() || !state?.trim()) continue
-    const metro = saleRowToMetro(city, state)
-    if (!bySlug.has(metro.slug)) {
-      bySlug.set(metro.slug, metro)
+  let offset = 0
+
+  for (;;) {
+    const { data, error } = await applyPublishedSaleCityStateFootprint(
+      fromBase(admin, T.sales).select('city, state')
+    )
+      .order('id', { ascending: true })
+      .range(offset, offset + METRO_DISCOVERY_PAGE_SIZE - 1)
+
+    if (error) {
+      console.error('[SEO_METRO_DISCOVERY] failed:', error.message)
+      if (offset === 0) {
+        return []
+      }
+      break
     }
+
+    const chunk = data ?? []
+    for (const row of chunk) {
+      const city = (row as { city?: string }).city
+      const state = (row as { state?: string }).state
+      if (!city?.trim() || !state?.trim()) continue
+      const metro = saleRowToMetro(city, state)
+      if (!bySlug.has(metro.slug)) {
+        bySlug.set(metro.slug, metro)
+      }
+    }
+
+    if (chunk.length < METRO_DISCOVERY_PAGE_SIZE) {
+      break
+    }
+    offset += METRO_DISCOVERY_PAGE_SIZE
   }
 
   return Array.from(bySlug.values()).sort((a, b) => a.slug.localeCompare(b.slug))

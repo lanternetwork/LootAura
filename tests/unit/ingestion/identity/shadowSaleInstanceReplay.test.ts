@@ -1,11 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   compareShadowSaleInstanceDecisions,
   evaluateLegacyUrlGateDecision,
   wouldPublishFromSaleInstanceDecision,
 } from '@/lib/ingestion/identity/shadowSaleInstanceReplay'
 
+/** Listing fixtures use 2026-06-10; pin discovery time so windows stay active. */
+const SHADOW_REPLAY_NOW = new Date('2026-06-09T12:00:00.000Z')
+
 describe('shadowSaleInstanceReplay', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(SHADOW_REPLAY_NOW)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
   it('legacy URL gate suppresses when ingested row exists at URL', () => {
     const legacy = evaluateLegacyUrlGateDecision(
       {

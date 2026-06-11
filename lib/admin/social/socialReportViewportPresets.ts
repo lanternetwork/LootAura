@@ -1,5 +1,7 @@
 export type SocialReportViewportPreset = {
   citySlug: string
+  city: string
+  state: string
   centerLat: number
   centerLng: number
   zoom: number
@@ -13,6 +15,8 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
   /** zoom 8: tighter metro framing to match social report template */
   {
     citySlug: 'chicago-il',
+    city: 'Chicago',
+    state: 'IL',
     centerLat: 41.8781,
     centerLng: -87.6298,
     zoom: 8,
@@ -21,6 +25,8 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
   /** zoom 8: tighter DFW metro framing to match social report template */
   {
     citySlug: 'dallas-tx',
+    city: 'Dallas',
+    state: 'TX',
     centerLat: 32.7767,
     centerLng: -96.797,
     zoom: 8,
@@ -28,6 +34,8 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
   },
   {
     citySlug: 'houston-tx',
+    city: 'Houston',
+    state: 'TX',
     centerLat: 29.7604,
     centerLng: -95.3698,
     zoom: 9,
@@ -35,6 +43,8 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
   },
   {
     citySlug: 'phoenix-az',
+    city: 'Phoenix',
+    state: 'AZ',
     centerLat: 33.4484,
     centerLng: -112.074,
     zoom: 9,
@@ -42,6 +52,8 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
   },
   {
     citySlug: 'atlanta-ga',
+    city: 'Atlanta',
+    state: 'GA',
     centerLat: 33.749,
     centerLng: -84.388,
     zoom: 9,
@@ -49,6 +61,8 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
   },
   {
     citySlug: 'austin-tx',
+    city: 'Austin',
+    state: 'TX',
     centerLat: 30.2672,
     centerLng: -97.7431,
     zoom: 9,
@@ -56,6 +70,8 @@ export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
   },
   {
     citySlug: 'louisville-ky',
+    city: 'Louisville',
+    state: 'KY',
     centerLat: 38.2527,
     centerLng: -85.7585,
     zoom: 9,

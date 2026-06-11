@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/seo/metroCatalog', () => ({
-  discoverSeoMetrosFromPublishedSales: vi.fn(),
-}))
+const mockDiscoverMetros = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/seo/metroCatalog', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seo/metroCatalog')>()
+  return {
+    ...actual,
+    discoverSeoMetrosFromPublishedSales: (...args: unknown[]) => mockDiscoverMetros(...args),
+  }
+})
 
 vi.mock('@/lib/admin/social/weekendInventoryQuery', () => ({
   fetchWeekendSalesInViewport: vi.fn(),
@@ -13,17 +19,15 @@ describe('buildSocialCityReport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
+    mockDiscoverMetros.mockResolvedValue([])
   })
 
   it('builds a Chicago preset report when discovery is empty', async () => {
-    const { discoverSeoMetrosFromPublishedSales } = await import('@/lib/seo/metroCatalog')
     const {
       fetchWeekendSalesInViewport,
       fetchPresetViewportWeekendCountsBySlug,
     } = await import('@/lib/admin/social/weekendInventoryQuery')
     const { buildSocialCityReport } = await import('@/lib/admin/social/buildSocialCityReport')
-
-    vi.mocked(discoverSeoMetrosFromPublishedSales).mockResolvedValue([])
     vi.mocked(fetchWeekendSalesInViewport).mockResolvedValue({
       pins: [{ id: 'sale-1', lat: 41.88, lng: -87.63, title: 'Estate Sale', is_featured: false }],
       activeSales: 39,
@@ -51,12 +55,9 @@ describe('buildSocialCityReport', () => {
   })
 
   it('returns METRO_NOT_FOUND for unknown non-preset slugs', async () => {
-    const { discoverSeoMetrosFromPublishedSales } = await import('@/lib/seo/metroCatalog')
     const { buildSocialCityReport, SocialCityReportError } = await import(
       '@/lib/admin/social/buildSocialCityReport'
     )
-
-    vi.mocked(discoverSeoMetrosFromPublishedSales).mockResolvedValue([])
 
     await expect(buildSocialCityReport('unknown-il', 'instagram-feed')).rejects.toMatchObject({
       code: 'METRO_NOT_FOUND',

@@ -45,7 +45,7 @@ describe('discoverSeoMetrosFromPublishedSales pagination', () => {
   })
 
   it('paginates until a short final page', async () => {
-    const pageOne = [{ city: 'Aurora', state: 'IL' }]
+    const pageOne = Array.from({ length: 1000 }, () => ({ city: 'Aurora', state: 'IL' }))
     const pageTwo = [{ city: 'Dixon', state: 'IL' }]
     mockFrom.mockReturnValue(makeDiscoveryChain([pageOne, pageTwo]))
 

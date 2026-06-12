@@ -1,16 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
-import SocialReportMap from '@/app/admin/social/SocialReportMap'
 
-const simpleMapMock = vi.fn((_props: unknown) => <div data-testid="simple-map-mock" />)
-
-vi.mock('@/components/location/SimpleMap', () => ({
-  default: (props: unknown) => simpleMapMock(props),
-}))
+const { MockSimpleMap, simpleMapMock } = vi.hoisted(() => {
+  const simpleMapMock = vi.fn((_props: unknown) => <div data-testid="simple-map-mock" />)
+  function MockSimpleMap(props: unknown) {
+    return simpleMapMock(props)
+  }
+  return { MockSimpleMap, simpleMapMock }
+})
 
 vi.mock('next/dynamic', () => ({
-  default: () => require('../../../../components/location/SimpleMap').default,
+  default: () => MockSimpleMap,
 }))
+
+import SocialReportMap from '@/app/admin/social/SocialReportMap'
 
 const baseViewport = {
   centerLat: 30.27,

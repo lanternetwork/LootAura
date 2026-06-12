@@ -1,6 +1,6 @@
 import type { Ref } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 import SimpleMap from '@/components/location/SimpleMap'
 
 let lastMapProps: Record<string, unknown> = {}
@@ -15,7 +15,7 @@ vi.mock('react-map-gl', () => {
       lastMapProps = props
       React.useEffect(() => {
         props.onLoad?.()
-      }, [props.onLoad])
+      }, [])
       React.useImperativeHandle(ref, () => ({
         getMap: () => ({
           getZoom: () => 10,
@@ -66,11 +66,13 @@ describe('SimpleMap preserveDrawingBuffer', () => {
     expect(lastMapProps.preserveDrawingBuffer).toBe(true)
   })
 
-  it('invokes onMapIdle after first map idle', () => {
+  it('invokes onMapIdle after first map idle', async () => {
     const onMapIdle = vi.fn()
     render(
       <SimpleMap center={{ lat: 39, lng: -98 }} zoom={10} onMapIdle={onMapIdle} />
     )
-    expect(onMapIdle).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(onMapIdle).toHaveBeenCalledTimes(1)
+    })
   })
 })

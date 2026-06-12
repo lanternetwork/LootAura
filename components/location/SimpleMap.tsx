@@ -46,6 +46,10 @@ interface SimpleMapProps {
   onMapClick?: () => void // Callback when map is clicked (not on pins/markers)
   /** Render-only user position from SalesClient lastUserLocation (Phase 1). */
   lastUserLocation?: { lat: number; lng: number } | null
+  /** When true, Mapbox preserves the WebGL drawing buffer for canvas capture (admin social export only). */
+  preserveDrawingBuffer?: boolean
+  /** Called once when the map reaches its first idle state after load. */
+  onMapIdle?: () => void
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -73,6 +77,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   skipCenteringOnClick = false,
   onMapClick,
   lastUserLocation = null,
+  preserveDrawingBuffer = false,
+  onMapIdle,
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -168,24 +174,29 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       console.log('[MAP] onLoad - Map initialization completed')
     }
     const map = mapRef.current?.getMap()
-    if (map && typeof performance !== 'undefined' && performance.mark) {
-      if (!mapPerfMarksFiredRef.current.mounted) {
-        performance.mark('map_mounted')
-        mapPerfMarksFiredRef.current.mounted = true
-      }
-      if (!mapPerfMarksFiredRef.current.style) {
-        performance.mark('map_style_loaded')
-        mapPerfMarksFiredRef.current.style = true
+    if (map) {
+      if (typeof performance !== 'undefined' && performance.mark) {
+        if (!mapPerfMarksFiredRef.current.mounted) {
+          performance.mark('map_mounted')
+          mapPerfMarksFiredRef.current.mounted = true
+        }
+        if (!mapPerfMarksFiredRef.current.style) {
+          performance.mark('map_style_loaded')
+          mapPerfMarksFiredRef.current.style = true
+        }
       }
       map.once('idle', () => {
-        if (!mapPerfMarksFiredRef.current.idle) {
-          performance.mark('map_idle')
-          mapPerfMarksFiredRef.current.idle = true
-          // Lightweight signal for deferred work (Clarity, contention observers) so they don't run during map init
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent(MAP_IDLE_FIRST_EVENT))
+        if (typeof performance !== 'undefined' && performance.mark) {
+          if (!mapPerfMarksFiredRef.current.idle) {
+            performance.mark('map_idle')
+            mapPerfMarksFiredRef.current.idle = true
+            // Lightweight signal for deferred work (Clarity, contention observers) so they don't run during map init
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent(MAP_IDLE_FIRST_EVENT))
+            }
           }
         }
+        onMapIdle?.()
       })
     }
     setLoaded(true)
@@ -225,7 +236,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onViewportChange?.(viewport)
       }
     }
-  }, [onViewportChange])
+  }, [onMapIdle, onViewportChange])
 
   const onStyleData = useCallback(() => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -642,7 +653,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         }}
         mapStyle="mapbox://styles/lanternetwork/cmm40a1ky00fp01s13a2i58k5"
         style={{ position: "absolute", inset: 0 }}
-        preserveDrawingBuffer={false}
+        preserveDrawingBuffer={preserveDrawingBuffer}
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMove={handleMove}

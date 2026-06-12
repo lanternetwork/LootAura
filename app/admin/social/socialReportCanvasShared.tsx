@@ -504,12 +504,14 @@ export function SocialReportMapSection({
   format,
   horizontalPaddingClass = 'px-8',
   layout = 'band',
+  onMapIdle,
 }: {
   report: SocialCityReport
   format: SocialReportFormatSlug
   horizontalPaddingClass?: string
   /** band = fill band; band-centered = fixed panel centered in band; content = hug panel */
   layout?: 'band' | 'band-centered' | 'content'
+  onMapIdle?: () => void
 }) {
   const definition = getSocialReportFormat(format)
   const edgeToEdge = definition.mapEdgeToEdge === true
@@ -532,6 +534,7 @@ export function SocialReportMapSection({
         mapPins={report.mapPins}
         mapViewport={report.mapViewport}
         className={`h-full w-full border-0 ${edgeToEdge ? '' : 'rounded-lg'}`}
+        onMapIdle={onMapIdle}
       />
       {report.mapPins.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/60">

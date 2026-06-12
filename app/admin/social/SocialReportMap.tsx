@@ -23,6 +23,7 @@ type SocialReportMapProps = {
   mapPins: SocialCityReportMapPin[]
   mapViewport: SocialCityReportMapViewport
   className?: string
+  onMapIdle?: () => void
 }
 
 /** Fixed viewport map — one pin per sale, no clustering (WYSIWYG with activeSales). */
@@ -30,6 +31,7 @@ export default function SocialReportMap({
   mapPins,
   mapViewport,
   className,
+  onMapIdle,
 }: SocialReportMapProps) {
   const center = useMemo(
     () => ({ lat: mapViewport.centerLat, lng: mapViewport.centerLng }),
@@ -50,6 +52,8 @@ export default function SocialReportMap({
         attributionControl={false}
         showOSMAttribution={false}
         pins={pinsProp}
+        preserveDrawingBuffer={true}
+        onMapIdle={onMapIdle}
       />
     </div>
   )

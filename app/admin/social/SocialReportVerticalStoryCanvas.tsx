@@ -16,11 +16,13 @@ import {
 
 type SocialReportVerticalStoryCanvasProps = {
   report: SocialCityReport
+  onMapIdle?: () => void
 }
 
 /** Vertical story canvas — 1080×1920 (9:16). */
 export default function SocialReportVerticalStoryCanvas({
   report,
+  onMapIdle,
 }: SocialReportVerticalStoryCanvasProps) {
   const format = 'vertical-story' as const
   const definition = getSocialReportFormat(format)
@@ -72,7 +74,7 @@ export default function SocialReportVerticalStoryCanvas({
         </div>
       </header>
 
-      <SocialReportMapSection report={report} format={format} />
+      <SocialReportMapSection report={report} format={format} onMapIdle={onMapIdle} />
 
       <section
         className="flex shrink-0 flex-col justify-center gap-3 bg-white px-8"

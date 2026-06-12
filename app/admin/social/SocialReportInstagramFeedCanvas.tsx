@@ -17,11 +17,13 @@ import {
 
 type SocialReportInstagramFeedCanvasProps = {
   report: SocialCityReport
+  onMapIdle?: () => void
 }
 
 /** Instagram feed portrait canvas — 1080×1350 (4:5). */
 export default function SocialReportInstagramFeedCanvas({
   report,
+  onMapIdle,
 }: SocialReportInstagramFeedCanvasProps) {
   const format = 'instagram-feed' as const
   const definition = getSocialReportFormat(format)
@@ -82,7 +84,7 @@ export default function SocialReportInstagramFeedCanvas({
         </div>
       </header>
 
-      <SocialReportMapSection report={report} format={format} />
+      <SocialReportMapSection report={report} format={format} onMapIdle={onMapIdle} />
 
       <section
         className="flex shrink-0 items-stretch bg-white px-8 py-2"

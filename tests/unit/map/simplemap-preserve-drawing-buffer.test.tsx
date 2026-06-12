@@ -1,3 +1,4 @@
+import type { Ref } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
 import SimpleMap from '@/components/location/SimpleMap'
@@ -9,7 +10,7 @@ vi.mock('react-map-gl', () => {
   return {
     default: React.forwardRef(function MockMap(
       props: Record<string, unknown>,
-      ref: React.Ref<unknown>
+      ref: Ref<unknown>
     ) {
       lastMapProps = props
       React.useImperativeHandle(ref, () => ({

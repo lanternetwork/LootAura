@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
 import SocialReportMap from '@/app/admin/social/SocialReportMap'
 
-const simpleMapMock = vi.fn(() => <div data-testid="simple-map-mock" />)
+const simpleMapMock = vi.fn((_props: unknown) => <div data-testid="simple-map-mock" />)
 
 vi.mock('@/components/location/SimpleMap', () => ({
   default: (props: unknown) => simpleMapMock(props),
@@ -22,6 +22,7 @@ const basePin = {
   id: 'sale-1',
   lat: 30.27,
   lng: -97.74,
+  title: 'Weekend yard sale',
   is_featured: false,
 }
 

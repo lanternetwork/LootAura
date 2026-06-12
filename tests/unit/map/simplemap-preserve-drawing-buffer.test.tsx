@@ -9,10 +9,13 @@ vi.mock('react-map-gl', () => {
   const React = require('react') as typeof import('react')
   return {
     default: React.forwardRef(function MockMap(
-      props: Record<string, unknown>,
+      props: Record<string, unknown> & { onLoad?: () => void },
       ref: Ref<unknown>
     ) {
       lastMapProps = props
+      React.useEffect(() => {
+        props.onLoad?.()
+      }, [props.onLoad])
       React.useImperativeHandle(ref, () => ({
         getMap: () => ({
           getZoom: () => 10,

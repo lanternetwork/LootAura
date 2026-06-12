@@ -9,7 +9,7 @@ vi.mock('@/components/location/SimpleMap', () => ({
 }))
 
 vi.mock('next/dynamic', () => ({
-  default: () => require('@/components/location/SimpleMap').default,
+  default: () => require('../../../../components/location/SimpleMap').default,
 }))
 
 const baseViewport = {

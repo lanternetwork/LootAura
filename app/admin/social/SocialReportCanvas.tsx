@@ -6,12 +6,13 @@ import SocialReportVerticalStoryCanvas from './SocialReportVerticalStoryCanvas'
 type SocialReportCanvasProps = {
   report: SocialCityReport
   format: SocialReportFormatSlug
+  onMapIdle?: () => void
 }
 
 /** Routes to the format-specific screenshot canvas layout. */
-export default function SocialReportCanvas({ report, format }: SocialReportCanvasProps) {
+export default function SocialReportCanvas({ report, format, onMapIdle }: SocialReportCanvasProps) {
   if (format === 'vertical-story') {
-    return <SocialReportVerticalStoryCanvas report={report} />
+    return <SocialReportVerticalStoryCanvas report={report} onMapIdle={onMapIdle} />
   }
-  return <SocialReportInstagramFeedCanvas report={report} />
+  return <SocialReportInstagramFeedCanvas report={report} onMapIdle={onMapIdle} />
 }

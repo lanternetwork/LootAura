@@ -10,6 +10,10 @@ import {
   type SocialReportFormatSlug,
 } from '@/lib/admin/social/socialReportFormats'
 import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
+import {
+  exportSocialReportCanvasToPng,
+  SocialReportPngExportError,
+} from '@/lib/admin/social/exportSocialReportCanvasToPng'
 import SocialReportCanvas from './SocialReportCanvas'
 
 type MetrosResponse = {
@@ -41,8 +45,15 @@ export default function SocialCityReportClient() {
   const [reportStatus, setReportStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [reportError, setReportError] = useState<string | null>(null)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
+  const [mapIdle, setMapIdle] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const formatDefinition = getSocialReportFormat(selectedFormat)
+
+  const handleMapIdle = useCallback(() => {
+    setMapIdle(true)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -76,6 +87,8 @@ export default function SocialCityReportClient() {
     if (!citySlug) return
     setReportStatus('loading')
     setReportError(null)
+    setMapIdle(false)
+    setExportError(null)
     try {
       const res = await fetch(
         `/api/admin/social/report?citySlug=${encodeURIComponent(citySlug)}&format=${encodeURIComponent(format)}`,
@@ -113,6 +126,26 @@ export default function SocialCityReportClient() {
     )
   }, [metros, search])
 
+  const handleDownloadPng = useCallback(async () => {
+    if (!report) return
+    setExportError(null)
+    setIsExporting(true)
+    try {
+      await exportSocialReportCanvasToPng({
+        citySlug: report.citySlug,
+        formatSlug: selectedFormat,
+      })
+    } catch (error) {
+      if (error instanceof SocialReportPngExportError) {
+        setExportError(error.message)
+      } else {
+        setExportError('PNG export failed. Refresh the report and try again.')
+      }
+    } finally {
+      setIsExporting(false)
+    }
+  }, [report, selectedFormat])
+
   const handleCopyCaption = useCallback(async () => {
     if (!report?.caption) return
     setCopyMessage(null)
@@ -132,7 +165,7 @@ export default function SocialCityReportClient() {
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Social City Report</h1>
               <p className="mt-1 text-sm text-slate-600">
-                Select a city and format, screenshot the canvas below, then post.{' '}
+                Select a city and format, download a PNG or screenshot the canvas below, then post.{' '}
                 <Link href="/admin/seo" className="font-medium text-purple-700 hover:text-purple-900">
                   SEO ops
                 </Link>
@@ -143,13 +176,24 @@ export default function SocialCityReportClient() {
               </p>
             </div>
             {selectedSlug && reportStatus === 'ready' && (
-              <button
-                type="button"
-                onClick={() => void loadReport(selectedSlug, selectedFormat)}
-                className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
-              >
-                Refresh report
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadPng()}
+                  disabled={!mapIdle || isExporting}
+                  className="rounded bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isExporting ? 'Exporting…' : 'Download PNG'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadReport(selectedSlug, selectedFormat)}
+                  disabled={isExporting}
+                  className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Refresh report
+                </button>
+              </div>
             )}
           </div>
 
@@ -204,6 +248,11 @@ export default function SocialCityReportClient() {
             {metrosStatus === 'error' && (
               <p className="mt-2 text-sm text-red-700">{metrosError}</p>
             )}
+            {exportError && (
+              <p className="mt-2 text-sm text-red-700" role="alert">
+                {exportError}
+              </p>
+            )}
           </div>
         </section>
 
@@ -240,7 +289,12 @@ export default function SocialCityReportClient() {
             </div>
             <div className="w-full overflow-x-auto">
               <div className="flex justify-center px-6 py-4">
-                <SocialReportCanvas report={report} format={selectedFormat} />
+                <SocialReportCanvas
+                  key={`${report.citySlug}-${selectedFormat}`}
+                  report={report}
+                  format={selectedFormat}
+                  onMapIdle={handleMapIdle}
+                />
               </div>
             </div>
           </section>

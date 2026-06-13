@@ -2,6 +2,9 @@ import { fetchSafeExternalPageHtml } from '@/lib/ingestion/adapters/externalPage
 import { normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSource'
 import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYstmDetailPageFromHtml'
 import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
+import { fetchCoverageTieredSchedulerEnabled } from '@/lib/ingestion/ystmCoverage/coverageTieredSchedulerMode'
+import { buildTieredYstmCoverageAuditConfigOrder } from '@/lib/ingestion/ystmCoverage/buildTieredYstmCoverageAuditConfigOrder'
+import { resolveYstmStrategicMetroRegistry } from '@/lib/ingestion/ystmCoverage/resolveYstmStrategicMetroRegistry'
 import {
   parseYstmCoverageAuditBudgets,
   YSTM_COVERAGE_AUDIT_STATE_KEY,
@@ -15,9 +18,15 @@ import {
 import { extractYstmListingUrlsFromListHtml } from '@/lib/ingestion/ystmCoverage/extractYstmListingUrlsFromListHtml'
 import {
   aggregateYstmCoverageObservations,
+  loadYstmCoverageConfigStalenessHoursByKey,
   upsertYstmCoverageObservations,
   type YstmCoverageObservationUpsert,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+import {
+  insertYstmCoverageAuditConfigEvents,
+  type YstmCoverageAuditConfigEventInsert,
+  type YstmCoverageAuditConfigEventOutcome,
+} from '@/lib/ingestion/ystmCoverage/ystmCoverageAuditConfigEventsStore'
 import { loadYstmCoverageLootAuraMatchIndex } from '@/lib/ingestion/ystmCoverage/loadYstmCoverageLootAuraMatchIndex'
 import { matchYstmCoverageLootAuraFootprint } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
 import { computeYstmSaleInstanceIdentity } from '@/lib/ingestion/identity/computeYstmSaleInstanceIdentity'
@@ -42,9 +51,14 @@ export type YstmCoverageAuditCronTelemetry = {
   skipped: boolean
   skipReason: string | null
   bootstrapNationwide: boolean
+  tieredSchedulerEnabled: boolean
   auditSelectionMode: YstmCoverageAuditSelectionMode | null
   configCursorBefore: number
   configCursorAfter: number
+  longTailCursorBefore: number | null
+  longTailCursorAfter: number | null
+  tier1Scheduled: number
+  tier2Scheduled: number
   listPagesFetched: number
   listingUrlsDiscovered: number
   detailPagesValidated: number
@@ -162,9 +176,14 @@ function emptyAuditTelemetry(
 ): YstmCoverageAuditCronTelemetry {
   return {
     bootstrapNationwide: false,
+    tieredSchedulerEnabled: false,
     auditSelectionMode: null,
     configCursorBefore: 0,
     configCursorAfter: 0,
+    longTailCursorBefore: null,
+    longTailCursorAfter: null,
+    tier1Scheduled: 0,
+    tier2Scheduled: 0,
     listPagesFetched: 0,
     listingUrlsDiscovered: 0,
     detailPagesValidated: 0,
@@ -180,17 +199,51 @@ function emptyAuditTelemetry(
   }
 }
 
+function resolveConfigEventOutcome(input: {
+  pagesLength: number
+  fetchStarted: boolean
+  fetchCompleted: boolean
+  fetchFailed: boolean
+  urlsExtracted: number
+  budgetExhaustedBeforeFetch: boolean
+}): YstmCoverageAuditConfigEventOutcome {
+  if (input.pagesLength === 0) {
+    return 'skipped_no_pages'
+  }
+  if (input.budgetExhaustedBeforeFetch) {
+    return 'budget_exhausted'
+  }
+  if (input.fetchFailed && input.urlsExtracted === 0) {
+    return 'fetch_failed'
+  }
+  if (input.fetchStarted && !input.fetchCompleted && input.urlsExtracted === 0) {
+    return 'budget_exhausted'
+  }
+  if (input.urlsExtracted === 0) {
+    return 'zero_urls_extracted'
+  }
+  return 'ok_with_observations'
+}
+
 export async function runYstmCoverageAuditCron(
   admin: ReturnType<typeof getAdminDb>,
-  options?: { budgets?: YstmCoverageAuditBudgets; bootstrapEnabled?: boolean }
+  options?: {
+    budgets?: YstmCoverageAuditBudgets
+    bootstrapEnabled?: boolean
+    tieredSchedulerEnabled?: boolean
+  }
 ): Promise<YstmCoverageAuditCronResult> {
   const bootstrapEnabled =
     options?.bootstrapEnabled ?? (await fetchCoverageBootstrapEnabled(admin))
+  const tieredSchedulerEnabled =
+    options?.tieredSchedulerEnabled ?? (await fetchCoverageTieredSchedulerEnabled(admin))
   const budgets = options?.budgets ?? parseYstmCoverageAuditBudgets(process.env, bootstrapEnabled)
   const logContext = { component: 'ingestion/ystmCoverage/runYstmCoverageAuditCron' }
   const startedMs = Date.now()
 
-  const lease = await acquireIngestionOrchestrationLease(YSTM_COVERAGE_AUDIT_STATE_KEY, logContext)
+  const lease = await acquireIngestionOrchestrationLease(YSTM_COVERAGE_AUDIT_STATE_KEY, logContext, {
+    includeLongTailCursor: tieredSchedulerEnabled,
+  })
   if (!lease.acquired) {
     return {
       ok: true,
@@ -198,25 +251,33 @@ export async function runYstmCoverageAuditCron(
         skipped: true,
         skipReason: lease.reason ?? 'active_lease',
         bootstrapNationwide: bootstrapEnabled,
+        tieredSchedulerEnabled,
         configCursorBefore: lease.cursor,
         configCursorAfter: lease.cursor,
+        longTailCursorBefore: lease.longTailCursor ?? null,
+        longTailCursorAfter: lease.longTailCursor ?? null,
         overlapPrevented: true,
       }),
     }
   }
 
   const configCursorBefore = lease.cursor
+  const longTailCursorBefore = tieredSchedulerEnabled ? (lease.longTailCursor ?? lease.cursor) : null
   let listPagesFetched = 0
   let listingUrlsDiscovered = 0
   let detailPagesValidated = 0
   let configCursorAfter = configCursorBefore
+  let longTailCursorAfter = longTailCursorBefore ?? 0
+  let tier1Scheduled = 0
+  let tier2Scheduled = 0
   let runId: string | null = null
   let auditSelectionMode: YstmCoverageAuditSelectionMode | null = null
+  let catalogSize = 0
 
   try {
     const matchIndex = await loadYstmCoverageLootAuraMatchIndex(admin)
     const { data: configData, error: configError } = await fromBase(admin, 'ingestion_city_configs')
-      .select('city, state, source_platform, source_pages, source_crawl_excluded_at')
+      .select('id, city, state, source_platform, source_pages, source_crawl_excluded_at')
       .eq('enabled', true)
       .eq('source_platform', 'external_page_source')
     if (configError) {
@@ -225,20 +286,65 @@ export async function runYstmCoverageAuditCron(
 
     const partition = partitionCrawlableExternalCityConfigs((configData ?? []) as ExternalCityConfigRow[])
     const observationAggForOrder = await aggregateYstmCoverageObservations(admin)
-    const configOrder = buildYstmCoverageAuditConfigOrder({
-      crawlableConfigs: partition.crawlable,
-      observationAgg: observationAggForOrder,
-      bootstrapEnabled,
-      cursorBefore: configCursorBefore,
-    })
-    const orderedConfigs = configOrder.orderedConfigs
-    auditSelectionMode = configOrder.selectionMode
-    const catalogSize = configOrder.catalogSize
+    const configStalenessHoursByKey = tieredSchedulerEnabled
+      ? await loadYstmCoverageConfigStalenessHoursByKey(admin, startedMs)
+      : {}
+
+    let orderedSlots: Array<{
+      config: ExternalCityConfigRow
+      tier: 1 | 2
+      selectionIndex: number
+    }> = []
+
+    if (tieredSchedulerEnabled) {
+      const { resolved, unresolvedSlugs } = resolveYstmStrategicMetroRegistry({
+        crawlableConfigs: partition.crawlable,
+      })
+      if (unresolvedSlugs.length > 0) {
+        logger.warn('YSTM tiered scheduler unresolved strategic metros', {
+          ...logContext,
+          unresolvedSlugs,
+        })
+      }
+      const tieredOrder = buildTieredYstmCoverageAuditConfigOrder({
+        crawlableConfigs: partition.crawlable,
+        resolvedStrategic: resolved,
+        configStalenessHoursByKey,
+        longTailCursorBefore: longTailCursorBefore ?? 0,
+        maxConfigsPerRun: budgets.maxConfigsPerRun,
+        nowMs: startedMs,
+      })
+      orderedSlots = tieredOrder.slots
+      auditSelectionMode = tieredOrder.selectionMode
+      tier1Scheduled = tieredOrder.tier1Scheduled
+      tier2Scheduled = tieredOrder.tier2Scheduled
+      longTailCursorAfter = tieredOrder.longTailCursorAfter
+      catalogSize = partition.crawlable.length
+    } else {
+      const configOrder = buildYstmCoverageAuditConfigOrder({
+        crawlableConfigs: partition.crawlable,
+        observationAgg: observationAggForOrder,
+        bootstrapEnabled,
+        cursorBefore: configCursorBefore,
+      })
+      orderedSlots = configOrder.orderedConfigs.map((config, selectionIndex) => ({
+        config,
+        tier: 2 as const,
+        selectionIndex,
+      }))
+      auditSelectionMode = configOrder.selectionMode
+      catalogSize = configOrder.catalogSize
+    }
 
     runId = await insertAuditRun(admin, {
       status: 'running',
       config_cursor_before: configCursorBefore,
       config_cursor_after: configCursorBefore,
+      selection_mode: auditSelectionMode,
+      tier1_scheduled: tier1Scheduled,
+      tier2_scheduled: tier2Scheduled,
+      long_tail_cursor_before: longTailCursorBefore,
+      long_tail_cursor_after: longTailCursorBefore,
       lootaura_published_active_total: matchIndex.publishedActiveTotal,
     })
 
@@ -262,6 +368,8 @@ export async function runYstmCoverageAuditCron(
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_AUDIT_STATE_KEY, logContext, {
         owner: lease.owner,
         nextCursor: 0,
+        nextLongTailCursor: tieredSchedulerEnabled ? 0 : undefined,
+        updateLegacyCursor: !tieredSchedulerEnabled,
         markCompleted: true,
       })
       const postAuditReconcile = bootstrapEnabled
@@ -273,9 +381,14 @@ export async function runYstmCoverageAuditCron(
           skipped: false,
           skipReason: 'no_crawlable_configs',
           bootstrapNationwide: bootstrapEnabled,
+          tieredSchedulerEnabled,
           auditSelectionMode,
           configCursorBefore,
           configCursorAfter: 0,
+          longTailCursorBefore,
+          longTailCursorAfter: tieredSchedulerEnabled ? 0 : null,
+          tier1Scheduled,
+          tier2Scheduled,
           validActiveYstmUrls: agg.validActiveYstmUrls,
           publishedVisibleInAudit: agg.publishedVisibleInAudit,
           lootauraPublishedActiveTotal: matchIndex.publishedActiveTotal,
@@ -296,29 +409,67 @@ export async function runYstmCoverageAuditCron(
       configKey: string
     }> = []
     const listOnlyUpserts: YstmCoverageObservationUpsert[] = []
+    const configEvents: YstmCoverageAuditConfigEventInsert[] = []
 
     let configsProcessed = 0
     let orderIndex = 0
 
     while (
       configsProcessed < budgets.maxConfigsPerRun &&
-      orderIndex < orderedConfigs.length &&
+      orderIndex < orderedSlots.length &&
       listPagesFetched < budgets.maxListFetchesPerRun &&
       Date.now() - startedMs < budgets.maxRuntimeMs
     ) {
-      const config = orderedConfigs[orderIndex]!
+      const slot = orderedSlots[orderIndex]!
       orderIndex += 1
+      const config = slot.config
       const pages = normalizeSourcePages(config.source_pages)
+      let fetchStarted = false
+      let fetchCompleted = false
+      let fetchFailed = false
+      let listFetchError: string | null = null
+      let urlsExtractedForConfig = 0
+      let budgetExhaustedBeforeFetch = false
+      let listPageUrl: string | null = pages[0] ?? null
+
       if (pages.length === 0) {
+        configEvents.push({
+          auditRunId: runId,
+          configId: config.id ?? null,
+          tier: slot.tier,
+          selectionIndex: slot.selectionIndex,
+          city: config.city,
+          state: config.state,
+          listPageUrl: null,
+          selected: true,
+          fetchStarted: false,
+          fetchCompleted: false,
+          urlsExtracted: 0,
+          observationsWritten: 0,
+          outcome: 'skipped_no_pages',
+          listFetchError: null,
+        })
         configsProcessed += 1
         continue
       }
 
       for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
-        if (listPagesFetched >= budgets.maxListFetchesPerRun) break
-        if (Date.now() - startedMs >= budgets.maxRuntimeMs) break
+        if (listPagesFetched >= budgets.maxListFetchesPerRun) {
+          if (!fetchStarted) {
+            budgetExhaustedBeforeFetch = true
+          }
+          break
+        }
+        if (Date.now() - startedMs >= budgets.maxRuntimeMs) {
+          if (!fetchStarted) {
+            budgetExhaustedBeforeFetch = true
+          }
+          break
+        }
 
         const pageUrl = pages[pageIndex]!
+        listPageUrl = pageUrl
+        fetchStarted = true
         try {
           const html = await fetchSafeExternalPageHtml(pageUrl, {
             city: config.city,
@@ -327,11 +478,13 @@ export async function runYstmCoverageAuditCron(
             adapter: 'ystm_coverage_audit',
           })
           listPagesFetched += 1
+          fetchCompleted = true
           const extracted = extractYstmListingUrlsFromListHtml(html, pageUrl).slice(
             0,
             budgets.maxUrlsPerListPage
           )
           listingUrlsDiscovered += extracted.length
+          urlsExtractedForConfig += extracted.length
 
           for (const item of extracted) {
             const listMatch = buildListFootprintMatch(matchIndex, item.canonicalUrl)
@@ -360,26 +513,59 @@ export async function runYstmCoverageAuditCron(
             })
           }
         } catch (err) {
+          fetchFailed = true
+          listFetchError = err instanceof Error ? err.message : String(err)
           logger.warn('YSTM coverage audit list fetch failed', {
             ...logContext,
             city: config.city,
             state: config.state,
             pageIndex,
-            message: err instanceof Error ? err.message : String(err),
+            message: listFetchError,
           })
         }
       }
 
+      configEvents.push({
+        auditRunId: runId,
+        configId: config.id ?? null,
+        tier: slot.tier,
+        selectionIndex: slot.selectionIndex,
+        city: config.city,
+        state: config.state,
+        listPageUrl,
+        selected: true,
+        fetchStarted,
+        fetchCompleted,
+        urlsExtracted: urlsExtractedForConfig,
+        observationsWritten: urlsExtractedForConfig,
+        outcome: resolveConfigEventOutcome({
+          pagesLength: pages.length,
+          fetchStarted,
+          fetchCompleted,
+          fetchFailed,
+          urlsExtracted: urlsExtractedForConfig,
+          budgetExhaustedBeforeFetch,
+        }),
+        listFetchError,
+      })
+
       configsProcessed += 1
     }
 
-    configCursorAfter = catalogSize > 0 ? (configCursorBefore + configsProcessed) % catalogSize : 0
+    configCursorAfter =
+      !tieredSchedulerEnabled && catalogSize > 0
+        ? (configCursorBefore + configsProcessed) % catalogSize
+        : configCursorBefore
 
     const dedupedListUpserts = dedupeDetailQueueByCanonical(listOnlyUpserts)
     const dedupedDetailQueue = dedupeDetailQueueByCanonical(detailQueue)
 
     if (dedupedListUpserts.length > 0) {
       await upsertYstmCoverageObservations(admin, dedupedListUpserts)
+    }
+
+    if (configEvents.length > 0) {
+      await insertYstmCoverageAuditConfigEvents(admin, configEvents)
     }
 
     const detailCheckedAt = new Date().toISOString()
@@ -454,6 +640,11 @@ export async function runYstmCoverageAuditCron(
     await completeAuditRun(admin, runId, {
       status: 'completed',
       config_cursor_after: configCursorAfter,
+      selection_mode: auditSelectionMode,
+      tier1_scheduled: tier1Scheduled,
+      tier2_scheduled: tier2Scheduled,
+      long_tail_cursor_before: longTailCursorBefore,
+      long_tail_cursor_after: tieredSchedulerEnabled ? longTailCursorAfter : null,
       list_pages_fetched: listPagesFetched,
       listing_urls_discovered: listingUrlsDiscovered,
       detail_pages_validated: detailPagesValidated,
@@ -469,6 +660,8 @@ export async function runYstmCoverageAuditCron(
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_AUDIT_STATE_KEY, logContext, {
       owner: lease.owner,
       nextCursor: configCursorAfter,
+      nextLongTailCursor: tieredSchedulerEnabled ? longTailCursorAfter : undefined,
+      updateLegacyCursor: !tieredSchedulerEnabled,
       markCompleted: true,
     })
 
@@ -482,9 +675,14 @@ export async function runYstmCoverageAuditCron(
         skipped: false,
         skipReason: null,
         bootstrapNationwide: bootstrapEnabled,
+        tieredSchedulerEnabled,
         auditSelectionMode,
         configCursorBefore,
         configCursorAfter,
+        longTailCursorBefore,
+        longTailCursorAfter: tieredSchedulerEnabled ? longTailCursorAfter : null,
+        tier1Scheduled,
+        tier2Scheduled,
         listPagesFetched,
         listingUrlsDiscovered,
         detailPagesValidated,
@@ -517,6 +715,8 @@ export async function runYstmCoverageAuditCron(
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_AUDIT_STATE_KEY, logContext, {
       owner: lease.owner,
       nextCursor: configCursorAfter,
+      nextLongTailCursor: tieredSchedulerEnabled ? longTailCursorAfter : undefined,
+      updateLegacyCursor: !tieredSchedulerEnabled,
       markCompleted: false,
     })
     throw err

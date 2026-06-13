@@ -208,6 +208,51 @@ export async function aggregateYstmCoverageMissingIngestion(
   }
 }
 
+export async function loadYstmCoverageConfigStalenessHoursByKey(
+  admin: ReturnType<typeof getAdminDb>,
+  nowMs: number = Date.now()
+): Promise<Record<string, number | null>> {
+  const pageSize = 1000
+  let from = 0
+  const lastSeenByConfigKey = new Map<string, string>()
+
+  for (;;) {
+    const { data, error } = await fromBase(admin, 'ystm_coverage_observations')
+      .select('config_key, last_list_seen_at')
+      .not('config_key', 'is', null)
+      .order('config_key', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) {
+      throw new Error(error.message)
+    }
+    const chunk = (data ?? []) as Array<{
+      config_key: string | null
+      last_list_seen_at: string | null
+    }>
+    for (const row of chunk) {
+      const configKey = row.config_key?.trim()
+      if (!configKey || !row.last_list_seen_at) continue
+      const existing = lastSeenByConfigKey.get(configKey)
+      if (!existing || Date.parse(row.last_list_seen_at) > Date.parse(existing)) {
+        lastSeenByConfigKey.set(configKey, row.last_list_seen_at)
+      }
+    }
+    if (chunk.length < pageSize) break
+    from += pageSize
+  }
+
+  const result: Record<string, number | null> = {}
+  for (const [configKey, lastSeenAt] of lastSeenByConfigKey.entries()) {
+    const seenMs = Date.parse(lastSeenAt)
+    if (!Number.isFinite(seenMs)) {
+      result[configKey] = null
+      continue
+    }
+    result[configKey] = (nowMs - seenMs) / (60 * 60 * 1000)
+  }
+  return result
+}
+
 export async function aggregateYstmCoverageObservations(
   admin: ReturnType<typeof getAdminDb>
 ): Promise<YstmCoverageObservationAggregate> {

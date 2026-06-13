@@ -13,11 +13,13 @@ export type IngestionOrchestrationLease = {
   owner: string
   staleRecovered: boolean
   cursor: number
+  longTailCursor?: number
   reason?: 'active_lease' | 'acquire_failed' | 'lost_race'
 }
 
 type IngestionOrchestrationStateRow = {
   cursor: number | null
+  long_tail_cursor?: number | null
   lease_owner: string | null
   lease_expires_at: string | null
 }
@@ -43,7 +45,8 @@ export async function ensureIngestionOrchestrationStateRow(
 
 export async function acquireIngestionOrchestrationLease(
   stateKey: string,
-  logContext: Record<string, unknown>
+  logContext: Record<string, unknown>,
+  options?: { includeLongTailCursor?: boolean }
 ): Promise<IngestionOrchestrationLease> {
   const emitLeaseTelemetry = (result: IngestionOrchestrationLease): IngestionOrchestrationLease => {
     emitObservabilityRecord(
@@ -68,8 +71,10 @@ export async function acquireIngestionOrchestrationLease(
   const leaseSeconds = parseIngestionOrchestrationLeaseSeconds(process.env.INGESTION_ORCHESTRATION_LEASE_SECONDS)
   const leaseExpiresAtIso = new Date(nowMs + leaseSeconds * 1000).toISOString()
 
+  const selectColumns = 'cursor, long_tail_cursor, lease_owner, lease_expires_at' as const
+
   const { data: stateRows, error: selectError } = await fromBase(adminDb, 'ingestion_orchestration_state')
-    .select('cursor, lease_owner, lease_expires_at')
+    .select(selectColumns)
     .eq('key', stateKey)
     .limit(1)
   if (selectError || !Array.isArray(stateRows) || stateRows.length === 0) {
@@ -81,9 +86,13 @@ export async function acquireIngestionOrchestrationLease(
     return emitLeaseTelemetry({ acquired: false, owner, staleRecovered: false, cursor: 0, reason: 'acquire_failed' })
   }
 
-  const current = stateRows[0] as IngestionOrchestrationStateRow
+  const current = stateRows[0] as unknown as IngestionOrchestrationStateRow
   const ownerNow = current.lease_owner ?? null
   const expiresNow = current.lease_expires_at ?? null
+  const longTailCursor = current.long_tail_cursor ?? current.cursor ?? 0
+
+  const leaseResult = (partial: Omit<IngestionOrchestrationLease, 'longTailCursor'>): IngestionOrchestrationLease =>
+    options?.includeLongTailCursor ? { ...partial, longTailCursor } : partial
 
   if (isIngestionOrchestrationLeaseActiveAt(nowMs, ownerNow, expiresNow)) {
     logger.info('Ingestion orchestration lease already active; skipping overlapping run', {
@@ -92,13 +101,15 @@ export async function acquireIngestionOrchestrationLease(
       overlapPrevented: true,
       stateKey,
     })
-    return emitLeaseTelemetry({
-      acquired: false,
-      owner,
-      staleRecovered: false,
-      cursor: current.cursor ?? 0,
-      reason: 'active_lease',
-    })
+    return emitLeaseTelemetry(
+      leaseResult({
+        acquired: false,
+        owner,
+        staleRecovered: false,
+        cursor: current.cursor ?? 0,
+        reason: 'active_lease',
+      })
+    )
   }
 
   const staleRecovered = isStaleOrchestrationLeaseAt(nowMs, ownerNow, expiresNow)
@@ -131,13 +142,15 @@ export async function acquireIngestionOrchestrationLease(
       stateKey,
       message: updateError?.message,
     })
-    return emitLeaseTelemetry({
-      acquired: false,
-      owner,
-      staleRecovered: false,
-      cursor: current.cursor ?? 0,
-      reason: 'lost_race',
-    })
+    return emitLeaseTelemetry(
+      leaseResult({
+        acquired: false,
+        owner,
+        staleRecovered: false,
+        cursor: current.cursor ?? 0,
+        reason: 'lost_race',
+      })
+    )
   }
 
   logger.info('Ingestion orchestration lease acquired', {
@@ -146,12 +159,14 @@ export async function acquireIngestionOrchestrationLease(
     staleRecovered,
     stateKey,
   })
-  return emitLeaseTelemetry({
-    acquired: true,
-    owner,
-    staleRecovered,
-    cursor: (updatedRows[0]?.cursor as number | null) ?? (current.cursor ?? 0),
-  })
+  return emitLeaseTelemetry(
+    leaseResult({
+      acquired: true,
+      owner,
+      staleRecovered,
+      cursor: (updatedRows[0]?.cursor as number | null) ?? (current.cursor ?? 0),
+    })
+  )
 }
 
 export async function releaseIngestionOrchestrationLease(
@@ -160,15 +175,23 @@ export async function releaseIngestionOrchestrationLease(
   params: {
     owner: string
     nextCursor: number
+    nextLongTailCursor?: number
+    updateLegacyCursor?: boolean
     markCompleted: boolean
   }
 ): Promise<void> {
   const adminDb = getAdminDb()
+  const updateLegacyCursor = params.updateLegacyCursor !== false
   const payload: Record<string, unknown> = {
-    cursor: params.nextCursor,
     lease_owner: null,
     lease_expires_at: null,
     updated_at: new Date().toISOString(),
+  }
+  if (updateLegacyCursor) {
+    payload.cursor = params.nextCursor
+  }
+  if (params.nextLongTailCursor != null) {
+    payload.long_tail_cursor = params.nextLongTailCursor
   }
   if (params.markCompleted) {
     payload.last_completed_at = new Date().toISOString()

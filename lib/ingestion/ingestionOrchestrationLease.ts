@@ -71,9 +71,7 @@ export async function acquireIngestionOrchestrationLease(
   const leaseSeconds = parseIngestionOrchestrationLeaseSeconds(process.env.INGESTION_ORCHESTRATION_LEASE_SECONDS)
   const leaseExpiresAtIso = new Date(nowMs + leaseSeconds * 1000).toISOString()
 
-  const selectColumns = options?.includeLongTailCursor
-    ? 'cursor, long_tail_cursor, lease_owner, lease_expires_at'
-    : 'cursor, lease_owner, lease_expires_at'
+  const selectColumns = 'cursor, long_tail_cursor, lease_owner, lease_expires_at' as const
 
   const { data: stateRows, error: selectError } = await fromBase(adminDb, 'ingestion_orchestration_state')
     .select(selectColumns)
@@ -88,7 +86,7 @@ export async function acquireIngestionOrchestrationLease(
     return emitLeaseTelemetry({ acquired: false, owner, staleRecovered: false, cursor: 0, reason: 'acquire_failed' })
   }
 
-  const current = stateRows[0] as IngestionOrchestrationStateRow
+  const current = stateRows[0] as unknown as IngestionOrchestrationStateRow
   const ownerNow = current.lease_owner ?? null
   const expiresNow = current.lease_expires_at ?? null
   const longTailCursor = current.long_tail_cursor ?? current.cursor ?? 0

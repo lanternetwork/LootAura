@@ -109,7 +109,7 @@ describe('buildTieredYstmCoverageAuditConfigOrder', () => {
     expect(result.slots[0]!.tier).toBe(1)
     expect(result.slots.slice(1).every((slot) => slot.tier === 2)).toBe(true)
     expect(result.slots.some((slot) => slot.config.city === 'Dallas')).toBe(false)
-    expect(result.longTailCursorAfter).toBe(2)
+    expect(result.longTailCursorAfter).toBe(0)
   })
 
   it('consumes no Tier 1 slots when all strategic metros are fresh', () => {

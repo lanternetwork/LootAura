@@ -42,6 +42,10 @@ vi.mock('@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode', () => ({
   fetchCoverageBootstrapEnabled: vi.fn().mockResolvedValue(false),
 }))
 
+vi.mock('@/lib/ingestion/ystmCoverage/coverageTieredSchedulerMode', () => ({
+  fetchCoverageTieredSchedulerEnabled: vi.fn().mockResolvedValue(false),
+}))
+
 vi.mock('@/lib/ingestion/ystmCoverage/runPostAuditCoverageReconcile', () => ({
   runPostAuditCoverageReconcile: vi.fn().mockResolvedValue({
     ran: false,
@@ -154,6 +158,7 @@ describe('runYstmCoverageAuditCron', () => {
     )
 
     const result = await runYstmCoverageAuditCron({} as never, {
+      tieredSchedulerEnabled: false,
       budgets: {
         maxConfigsPerRun: 1,
         maxListFetchesPerRun: 10,
@@ -190,6 +195,7 @@ describe('runYstmCoverageAuditCron', () => {
     )
 
     const result = await runYstmCoverageAuditCron({} as never, {
+      tieredSchedulerEnabled: false,
       budgets: {
         maxConfigsPerRun: 1,
         maxListFetchesPerRun: 10,

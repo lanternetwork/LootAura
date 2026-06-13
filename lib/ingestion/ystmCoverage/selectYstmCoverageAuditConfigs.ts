@@ -1,7 +1,7 @@
 import type { YstmCoverageObservationAggregate } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import type { ExternalCityConfigRow } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 
-export type YstmCoverageAuditSelectionMode = 'metro_priority' | 'round_robin'
+export type YstmCoverageAuditSelectionMode = 'metro_priority' | 'round_robin' | 'tiered'
 
 function buildConfigKey(city: string, state: string): string {
   return `${state}|${city}`

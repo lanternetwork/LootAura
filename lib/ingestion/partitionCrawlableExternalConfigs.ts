@@ -1,6 +1,7 @@
 import { normalizeSourcePages } from '@/lib/ingestion/adapters/externalPageSource'
 
 export type ExternalCityConfigRow = {
+  id?: string
   city: string
   state: string
   source_platform: string

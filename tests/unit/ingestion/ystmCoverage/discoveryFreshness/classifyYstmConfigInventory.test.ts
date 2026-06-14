@@ -23,7 +23,7 @@ describe('classifyYstmConfigInventory', () => {
     ).toBe('LOW_ACTIVITY')
     expect(
       classifyYstmConfigInventory({
-        lastListingSeenAt: '2025-12-01T00:00:00.000Z',
+        lastListingSeenAt: '2026-02-01T00:00:00.000Z',
         nowMs,
       })
     ).toBe('DORMANT')

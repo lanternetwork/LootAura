@@ -14,6 +14,7 @@ import {
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
+import CoverageTieredSchedulerCard from '@/app/admin/ingestion/CoverageTieredSchedulerCard'
 
 const POLL_MS = 30_000
 
@@ -407,6 +408,8 @@ export default function YstmCoverageScoreboardSection({
               <p className="mt-2 text-xs text-red-700">{bootstrapUi.message}</p>
             )}
           </div>
+
+          <CoverageTieredSchedulerCard />
 
           <div
             className={`mb-4 rounded-md border p-4 ${

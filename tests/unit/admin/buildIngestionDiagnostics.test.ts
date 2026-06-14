@@ -4,6 +4,7 @@ import { emptyCrawlSkipTaxonomyRollup } from '@/lib/admin/crawlSkipTaxonomyMetri
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
+import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
 
 function stage(id: string, count: number) {
   return {
@@ -545,6 +546,7 @@ describe('buildIngestionDiagnostics', () => {
         disabledReason: null,
         exitCriteriaPreview: { met: false, reasons: [] },
       },
+      discoveryFreshness: minimalYstmDiscoveryFreshnessMetrics(),
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })

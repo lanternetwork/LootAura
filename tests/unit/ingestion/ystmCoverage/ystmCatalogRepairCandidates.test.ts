@@ -41,17 +41,23 @@ describe('ystmCatalogRepairCandidates', () => {
     ).toBe(false)
   })
 
-  it('prioritizes publish_failed before needs_check', () => {
+  it('prioritizes publish_failed before address-gated needs_check', () => {
     expect(
       compareCatalogRepairCandidatePriority(
-        { status: 'publish_failed', ingestedSaleId: 'b' },
-        { status: 'needs_check', ingestedSaleId: 'a' }
+        { status: 'publish_failed', addressStatus: null, ingestedSaleId: 'b' },
+        { status: 'needs_check', addressStatus: 'address_gated', ingestedSaleId: 'a' }
       )
     ).toBeLessThan(0)
     expect(
       compareCatalogRepairCandidatePriority(
-        { status: 'needs_geocode', ingestedSaleId: 'a' },
-        { status: 'ready', ingestedSaleId: 'b' }
+        { status: 'needs_check', addressStatus: 'address_gated', ingestedSaleId: 'a' },
+        { status: 'needs_check', addressStatus: null, ingestedSaleId: 'b' }
+      )
+    ).toBeLessThan(0)
+    expect(
+      compareCatalogRepairCandidatePriority(
+        { status: 'needs_geocode', addressStatus: null, ingestedSaleId: 'a' },
+        { status: 'ready', addressStatus: null, ingestedSaleId: 'b' }
       )
     ).toBeLessThan(0)
   })

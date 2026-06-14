@@ -81,6 +81,10 @@ import {
 } from '@/lib/ingestion/estatesalesnet/esnetOrchestrationState'
 import { parseEsnetIngestMinIntervalMinutes } from '@/lib/ingestion/estatesalesnet/esnetIngestionOrchestrationDefaults'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import {
+  loadYstmDiscoveryFreshnessMetrics,
+  type YstmDiscoveryFreshnessMetrics,
+} from '@/lib/ingestion/ystmCoverage/discoveryFreshness/loadYstmDiscoveryFreshnessMetrics'
 
 export type YstmCoverageTrendPoint = {
   completedAt: string
@@ -135,6 +139,7 @@ export type YstmCoverageScoreboard = {
   esnetBootstrap: EsnetProviderRuntimeState & {
     exitCriteriaPreview: { met: boolean; reasons: string[] }
   }
+  discoveryFreshness: YstmDiscoveryFreshnessMetrics
 }
 
 type AuditRunRow = {
@@ -178,6 +183,7 @@ export async function buildYstmCoverageScoreboard(
     crossProviderConvergence,
     sourceUrlAlias,
     runsResult,
+    discoveryFreshnessResult,
   ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
@@ -200,6 +206,7 @@ export async function buildYstmCoverageScoreboard(
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
       .limit(48),
+    loadYstmDiscoveryFreshnessMetrics(admin, now.getTime()),
   ])
 
   if (runsResult.error) {
@@ -368,6 +375,7 @@ export async function buildYstmCoverageScoreboard(
       ...esnetBootstrap,
       exitCriteriaPreview: esnetExitCriteriaPreview,
     },
+    discoveryFreshness: discoveryFreshnessResult,
   }
 }
 

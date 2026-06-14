@@ -28,6 +28,7 @@ import {
 } from '@/lib/reconciliation/syncPublishedSaleFromReconciledSource'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
+import { markYstmCoverageObservationFirstPublishedBySourceUrl } from '@/lib/ingestion/ystmCoverage/discoveryFreshness/ystmCoverageLifecycleTimestamps'
 import { classifyQueuePressure } from '@/lib/observability/metrics'
 import {
   resolveCrossProviderPublishLink,
@@ -1447,6 +1448,22 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     }
 
     await completeCrossProviderPublishSideEffects(claimed, saleId, crossProviderLink)
+
+    if (claimed.source_platform === 'external_page_source' && claimed.source_url) {
+      try {
+        await markYstmCoverageObservationFirstPublishedBySourceUrl(
+          admin,
+          claimed.source_url,
+          updatePayload.published_at as string
+        )
+      } catch (lifecycleError) {
+        logger.warn('Failed to mark coverage observation first published timestamp', {
+          component: 'ingestion/publishWorker',
+          rowId: claimed.id,
+          message: lifecycleError instanceof Error ? lifecycleError.message : String(lifecycleError),
+        })
+      }
+    }
 
     logger.info('publishReadyIngestedSaleById completed', {
       component: 'ingestion/publishWorker',

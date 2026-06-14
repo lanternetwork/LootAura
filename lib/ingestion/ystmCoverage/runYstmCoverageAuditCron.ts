@@ -4,6 +4,7 @@ import { parseYstmDetailPageFromHtml } from '@/lib/ingestion/acquisition/parseYs
 import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import { fetchCoverageTieredSchedulerEnabled } from '@/lib/ingestion/ystmCoverage/coverageTieredSchedulerMode'
 import { buildTieredYstmCoverageAuditConfigOrder } from '@/lib/ingestion/ystmCoverage/buildTieredYstmCoverageAuditConfigOrder'
+import { loadYstmConfigVelocityWeightByKey } from '@/lib/ingestion/ystmCoverage/discoveryFreshness/loadYstmDiscoveryFreshnessMetrics'
 import { resolveYstmStrategicMetroRegistry } from '@/lib/ingestion/ystmCoverage/resolveYstmStrategicMetroRegistry'
 import {
   parseYstmCoverageAuditBudgets,
@@ -306,10 +307,12 @@ export async function runYstmCoverageAuditCron(
           unresolvedSlugs,
         })
       }
+      const configVelocityWeightByKey = await loadYstmConfigVelocityWeightByKey(admin, startedMs)
       const tieredOrder = buildTieredYstmCoverageAuditConfigOrder({
         crawlableConfigs: partition.crawlable,
         resolvedStrategic: resolved,
         configStalenessHoursByKey,
+        configVelocityWeightByKey,
         longTailCursorBefore: longTailCursorBefore ?? 0,
         maxConfigsPerRun: budgets.maxConfigsPerRun,
         nowMs: startedMs,

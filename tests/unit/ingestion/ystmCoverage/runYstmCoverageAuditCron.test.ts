@@ -46,6 +46,10 @@ vi.mock('@/lib/ingestion/ystmCoverage/coverageTieredSchedulerMode', () => ({
   fetchCoverageTieredSchedulerEnabled: vi.fn().mockResolvedValue(false),
 }))
 
+vi.mock('@/lib/ingestion/ystmCoverage/discoveryFreshness/loadYstmDiscoveryFreshnessMetrics', () => ({
+  loadYstmConfigVelocityWeightByKey: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock('@/lib/ingestion/ystmCoverage/runPostAuditCoverageReconcile', () => ({
   runPostAuditCoverageReconcile: vi.fn().mockResolvedValue({
     ran: false,

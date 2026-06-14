@@ -1,6 +1,7 @@
-import type { YstmVelocityPool } from '@/lib/ingestion/ystmCoverage/discoveryFreshness/classifyYstmConfigInventory'
-import { velocityPoolWeight } from '@/lib/ingestion/ystmCoverage/discoveryFreshness/classifyYstmConfigInventory'
-
+import {
+  velocityPoolWeight,
+  type YstmVelocityPool,
+} from '@/lib/ingestion/ystmCoverage/discoveryFreshness/classifyYstmConfigInventory'
 /** Higher score = schedule sooner (staleness × velocity weight). */
 export function computeYstmSchedulingScore(params: {
   stalenessHours: number | null

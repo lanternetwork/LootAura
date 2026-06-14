@@ -1,5 +1,9 @@
-import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import {
+  markYstmCoverageObservationFirstIngested,
+  markYstmCoverageObservationFirstPublished,
+} from '@/lib/ingestion/ystmCoverage/discoveryFreshness/ystmCoverageLifecycleTimestamps'
 import type { YstmCoverageInvalidReason } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 import type { YstmCoverageFootprintMatchMethod } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
 
@@ -128,11 +132,19 @@ export async function recordYstmCoverageMissingIngestionOutcome(
     lootauraVisible?: boolean
   }
 ): Promise<void> {
+  const nowIso = new Date().toISOString()
   const { error } = await fromBase(admin, 'ystm_coverage_observations')
-    .update(buildMissingIngestionObservationUpdate(patch))
+    .update(buildMissingIngestionObservationUpdate(patch, nowIso))
     .eq('canonical_url', canonicalUrl)
   if (error) {
     throw new Error(error.message)
+  }
+
+  if (patch.outcome === 'ingested' || patch.outcome === 'published') {
+    await markYstmCoverageObservationFirstIngested(admin, canonicalUrl, nowIso)
+  }
+  if (patch.outcome === 'published') {
+    await markYstmCoverageObservationFirstPublished(admin, canonicalUrl, nowIso)
   }
 }
 

@@ -15,6 +15,7 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 import CoverageTieredSchedulerCard from '@/app/admin/ingestion/CoverageTieredSchedulerCard'
+import YstmDiscoveryFreshnessSection from '@/app/admin/ingestion/YstmDiscoveryFreshnessSection'
 
 const POLL_MS = 30_000
 
@@ -339,6 +340,10 @@ export default function YstmCoverageScoreboardSection({
 
       {data && (
         <>
+          {(showTelemetry || variant === 'controls') && data.discoveryFreshness && (
+            <YstmDiscoveryFreshnessSection data={data.discoveryFreshness} />
+          )}
+
           {showProviderControls && (
             <>
           <div

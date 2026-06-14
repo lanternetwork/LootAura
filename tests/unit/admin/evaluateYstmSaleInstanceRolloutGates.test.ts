@@ -6,6 +6,7 @@ import {
   evaluateYstmSaleInstanceRolloutGates,
 } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
+import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
 
 export function minimalYstmCoverageScoreboard(
   overrides: Partial<YstmCoverageMetricsResponse> = {}
@@ -214,6 +215,7 @@ export function minimalYstmCoverageScoreboard(
       disabledReason: null,
       exitCriteriaPreview: { met: false, reasons: [] },
     },
+    discoveryFreshness: minimalYstmDiscoveryFreshnessMetrics(),
     ...overrides,
   }
 }

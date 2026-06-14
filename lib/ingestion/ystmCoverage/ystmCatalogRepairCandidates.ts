@@ -11,6 +11,7 @@ export type YstmCatalogRepairCandidate = {
   city: string | null
   state: string | null
   status: string
+  addressStatus: string | null
   publishedSaleId: string | null
   catalogRepairOutcome: string | null
   catalogRepairAttemptedAt: string | null
@@ -29,6 +30,7 @@ type IngestedRow = {
   city: string | null
   state: string | null
   status: string
+  address_status: string | null
   published_sale_id: string | null
   catalog_repair_outcome: string | null
   catalog_repair_attempted_at: string | null
@@ -47,20 +49,30 @@ export function isEligibleForCatalogRepairRetry(
   return nowMs - attemptedMs >= failedRetryHours * 60 * 60 * 1000
 }
 
-/** Lower tier = higher priority (publish failures before large needs_check backlog). */
+/** Lower tier = higher priority (publish failures before address-gated unlock retries). */
 const CATALOG_REPAIR_STATUS_PRIORITY: Record<string, number> = {
   publish_failed: 0,
-  needs_geocode: 1,
-  ready: 2,
-  needs_check: 3,
+  address_gated_needs_check: 1,
+  needs_geocode: 2,
+  ready: 3,
+  needs_check: 4,
+}
+
+export function catalogRepairPriorityKey(
+  row: Pick<YstmCatalogRepairCandidate, 'status' | 'addressStatus'>
+): string {
+  if (row.status === 'needs_check' && row.addressStatus === 'address_gated') {
+    return 'address_gated_needs_check'
+  }
+  return row.status
 }
 
 export function compareCatalogRepairCandidatePriority(
-  a: Pick<YstmCatalogRepairCandidate, 'status' | 'ingestedSaleId'>,
-  b: Pick<YstmCatalogRepairCandidate, 'status' | 'ingestedSaleId'>
+  a: Pick<YstmCatalogRepairCandidate, 'status' | 'addressStatus' | 'ingestedSaleId'>,
+  b: Pick<YstmCatalogRepairCandidate, 'status' | 'addressStatus' | 'ingestedSaleId'>
 ): number {
-  const tierA = CATALOG_REPAIR_STATUS_PRIORITY[a.status] ?? 99
-  const tierB = CATALOG_REPAIR_STATUS_PRIORITY[b.status] ?? 99
+  const tierA = CATALOG_REPAIR_STATUS_PRIORITY[catalogRepairPriorityKey(a)] ?? 99
+  const tierB = CATALOG_REPAIR_STATUS_PRIORITY[catalogRepairPriorityKey(b)] ?? 99
   if (tierA !== tierB) return tierA - tierB
   return a.ingestedSaleId.localeCompare(b.ingestedSaleId)
 }
@@ -125,7 +137,7 @@ export async function fetchCatalogRepairCandidatePage(
   while (candidates.length < params.scanLimit && examined < params.scanLimit * 4) {
     const { data, error } = await fromBase(admin, 'ingested_sales')
       .select(
-        'id, source_url, city, state, status, published_sale_id, catalog_repair_outcome, catalog_repair_attempted_at'
+        'id, source_url, city, state, status, address_status, published_sale_id, catalog_repair_outcome, catalog_repair_attempted_at'
       )
       .eq('source_platform', 'external_page_source')
       .eq('is_duplicate', false)
@@ -148,6 +160,7 @@ export async function fetchCatalogRepairCandidatePage(
         city: row.city,
         state: row.state,
         status: row.status,
+        addressStatus: row.address_status,
         publishedSaleId: row.published_sale_id,
         catalogRepairOutcome: row.catalog_repair_outcome,
         catalogRepairAttemptedAt: row.catalog_repair_attempted_at,

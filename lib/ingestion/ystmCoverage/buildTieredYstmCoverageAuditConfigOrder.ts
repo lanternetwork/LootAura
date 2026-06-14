@@ -1,6 +1,14 @@
 import type { ExternalCityConfigRow } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 import { rotateConfigsFromCursor } from '@/lib/ingestion/ystmCoverage/selectYstmCoverageAuditConfigs'
 import type { ResolvedYstmStrategicMetro } from '@/lib/ingestion/ystmCoverage/resolveYstmStrategicMetroRegistry'
+import {
+  compareYstmSchedulingScore,
+  computeYstmSchedulingScore,
+} from '@/lib/ingestion/ystmCoverage/discoveryFreshness/computeYstmSchedulingScore'
+import {
+  velocityPoolWeight,
+  type YstmVelocityPool,
+} from '@/lib/ingestion/ystmCoverage/discoveryFreshness/classifyYstmConfigInventory'
 
 export type YstmCoverageAuditConfigSlot = {
   config: ExternalCityConfigRow
@@ -53,6 +61,7 @@ export function buildTieredYstmCoverageAuditConfigOrder(params: {
   crawlableConfigs: ExternalCityConfigRow[]
   resolvedStrategic: ResolvedYstmStrategicMetro[]
   configStalenessHoursByKey: YstmCoverageConfigStalenessMap
+  configVelocityWeightByKey?: Record<string, number>
   longTailCursorBefore: number
   maxConfigsPerRun: number
   nowMs?: number
@@ -68,6 +77,26 @@ export function buildTieredYstmCoverageAuditConfigOrder(params: {
   const strategicConfigs = params.resolvedStrategic.map((item) => item.config)
   const strategicIdentityKeys = new Set(strategicConfigs.map((config) => configIdentityKey(config)))
 
+  const velocityWeightForConfig = (config: ExternalCityConfigRow): number => {
+    const configKey = buildConfigKey(config.city ?? '', config.state ?? '')
+    return params.configVelocityWeightByKey?.[configKey] ?? velocityPoolWeight('COLD')
+  }
+
+  const schedulingScoreForConfig = (config: ExternalCityConfigRow): number => {
+    const configKey = buildConfigKey(config.city ?? '', config.state ?? '')
+    const weight = velocityWeightForConfig(config)
+    const pool: YstmVelocityPool =
+      weight >= velocityPoolWeight('HOT')
+        ? 'HOT'
+        : weight >= velocityPoolWeight('WARM')
+          ? 'WARM'
+          : 'COLD'
+    return computeYstmSchedulingScore({
+      stalenessHours: params.configStalenessHoursByKey[configKey] ?? null,
+      velocityPool: pool,
+    })
+  }
+
   const staleStrategic = sortConfigsDeterministic(
     strategicConfigs.filter((config) => {
       const entry = params.resolvedStrategic.find((item) => item.config === config)
@@ -81,14 +110,12 @@ export function buildTieredYstmCoverageAuditConfigOrder(params: {
   ).sort((a, b) => {
     const aKey = buildConfigKey(a.city ?? '', a.state ?? '')
     const bKey = buildConfigKey(b.city ?? '', b.state ?? '')
-    const aHours = params.configStalenessHoursByKey[aKey]
-    const bHours = params.configStalenessHoursByKey[bKey]
-    const aScore = aHours == null ? Number.POSITIVE_INFINITY : aHours
-    const bScore = bHours == null ? Number.POSITIVE_INFINITY : bHours
-    if (bScore !== aScore) {
-      return bScore - aScore
-    }
-    return aKey.toLowerCase().localeCompare(bKey.toLowerCase())
+    return compareYstmSchedulingScore(
+      schedulingScoreForConfig(a),
+      schedulingScoreForConfig(b),
+      aKey,
+      bKey
+    )
   })
 
   const tier1ReserveMax = computeTier1ReserveMax(staleStrategic.length, params.maxConfigsPerRun)
@@ -96,7 +123,16 @@ export function buildTieredYstmCoverageAuditConfigOrder(params: {
 
   const longTailPool = sortConfigsDeterministic(
     params.crawlableConfigs.filter((config) => !strategicIdentityKeys.has(configIdentityKey(config)))
-  )
+  ).sort((a, b) => {
+    const aKey = buildConfigKey(a.city ?? '', a.state ?? '')
+    const bKey = buildConfigKey(b.city ?? '', b.state ?? '')
+    return compareYstmSchedulingScore(
+      schedulingScoreForConfig(a),
+      schedulingScoreForConfig(b),
+      aKey,
+      bKey
+    )
+  })
   const longTailPoolSize = longTailPool.length
   const longTailOrdered = rotateConfigsFromCursor(longTailPool, params.longTailCursorBefore)
 

@@ -11,6 +11,7 @@ import {
   FALSE_EXCLUSION_TRACE_BUCKETS,
   type FalseExclusionTraceBucket,
 } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
 
 function emptyFalseExclusionBuckets(): Record<FalseExclusionTraceBucket, number> {
   return Object.fromEntries(
@@ -236,6 +237,7 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       disabledReason: null,
       exitCriteriaPreview: { met: false, reasons: [] },
     },
+    discoveryFreshness: minimalYstmDiscoveryFreshnessMetrics(),
     ...overrides,
   }
 }

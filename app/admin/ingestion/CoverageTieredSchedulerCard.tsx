@@ -111,7 +111,7 @@ export default function CoverageTieredSchedulerCard() {
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1 basis-full sm:basis-auto">
           <h3 className="text-sm font-semibold text-slate-950">Coverage tiered audit scheduler</h3>
           <p className="mt-1 text-xs text-slate-700">
             DB flag on <code className="text-xs">ystm_coverage_audit</code>. Tier 1: stale strategic metros
@@ -135,14 +135,15 @@ export default function CoverageTieredSchedulerCard() {
               <p className="mt-1 text-xs text-slate-600">
                 Legacy cursor (<code className="text-xs">cursor</code>):{' '}
                 <span className="font-semibold tabular-nums">{state.legacyCursor.toLocaleString()}</span>
-                {' · '}
-                Long-tail cursor:{' '}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Long-tail cursor (<code className="text-xs">long_tail_cursor</code>):{' '}
                 <span className="font-semibold tabular-nums">{state.longTailCursor.toLocaleString()}</span>
               </p>
             </>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {enabled ? (
             <button
               type="button"

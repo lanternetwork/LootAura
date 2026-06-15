@@ -404,8 +404,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     const target = e.originalEvent.target as HTMLElement
     const isClickOnMarker = target.closest('[data-cluster-marker="true"], [data-location-marker="true"], [data-pin-marker="true"], [data-testid="cluster"], [data-testid="location-marker"]')
+    const isClickOnSaleCallout = target.closest('[data-mobile-sale-callout="true"]')
     
-    if (!isClickOnMarker && onMapClick) {
+    if (!isClickOnMarker && !isClickOnSaleCallout && onMapClick) {
       onMapClick()
     }
   }, [onMapClick])

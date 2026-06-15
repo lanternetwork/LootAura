@@ -139,13 +139,15 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
     ? `/sales/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
     : `/sales/${sale.id}`
 
-  const handleViewSale = () => {
+  const handleViewSale = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+
     // Track click event
     trackAnalyticsEvent({
       sale_id: sale.id,
       event_type: 'click',
     })
-    
+
     // Normal Next.js navigation (works in both web and WebView)
     router.push(detailUrl)
   }
@@ -207,10 +209,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           <div className="relative w-full h-16 bg-gray-100 rounded-t-2xl overflow-hidden pointer-events-none">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleViewSale()
-              }}
+              onClick={handleViewSale}
               className="absolute inset-0 pointer-events-auto"
               aria-label={`Open ${sale.title || `Sale ${sale.id}`}`}
             >
@@ -255,10 +254,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             {/* Title */}
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleViewSale()
-              }}
+              onClick={handleViewSale}
               className="text-base font-semibold line-clamp-2 mb-1 text-left pointer-events-auto hover:underline"
             >
               {sale.title || `Sale ${sale.id}`}
@@ -315,6 +311,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               </span>
               {/* View Sale button - reduced width */}
               <button
+                type="button"
                 onClick={handleViewSale}
                 className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
               >
@@ -384,10 +381,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           <div className={`relative w-full h-16 bg-gray-100 ${pinPosition ? 'rounded-t-2xl' : 'rounded-t-2xl'} overflow-hidden`}>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleViewSale()
-              }}
+              onClick={handleViewSale}
               className="absolute inset-0"
               aria-label={`Open ${sale.title || `Sale ${sale.id}`}`}
             >
@@ -432,10 +426,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             {/* Title */}
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleViewSale()
-              }}
+              onClick={handleViewSale}
               className="text-base font-semibold line-clamp-2 mb-1 text-left hover:underline"
             >
               {sale.title || `Sale ${sale.id}`}
@@ -492,6 +483,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               </span>
               {/* View Sale button - reduced width */}
               <button
+                type="button"
                 onClick={handleViewSale}
                 className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
               >

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect, type MouseEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import SimpleMap from '@/components/location/SimpleMap'
@@ -451,12 +451,16 @@ export default function MobileSalesShell({
     })
   }, [canUsePreciseGeolocation, onUserLocationRequest])
   
-  // Close callout when map is clicked or moved
-  const handleMapClick = useCallback(() => {
-    if (selectedPinId) {
-      onLocationClick(selectedPinId)
-    }
-  }, [selectedPinId, onLocationClick])
+  // Close callout when the map-mode wrapper background is clicked (not bubbled callout UI).
+  const handleMapClick = useCallback(
+    (e: MouseEvent) => {
+      if (e.target !== e.currentTarget) return
+      if (selectedPinId) {
+        onLocationClick(selectedPinId)
+      }
+    },
+    [selectedPinId, onLocationClick]
+  )
   
   const handleViewportChangeWithDismiss = useCallback((args: { 
     center: { lat: number; lng: number }; 

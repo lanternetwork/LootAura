@@ -2716,7 +2716,7 @@ export default function SalesClient({
                   />
                 </div>
               )}
-              <div className="w-full h-full">
+              <div className="relative w-full h-full">
                 {mapView ? (
                   <SimpleMap
                     ref={desktopMapRef}
@@ -2761,23 +2761,22 @@ export default function SalesClient({
                     attributionControl={false}
                   />
                 ) : null}
+
+                {/* Desktop callout — inside map wrapper so pinPosition aligns with map hit-test layer */}
+                {selectedSale && desktopPinPosition && (
+                  <MobileSaleCallout
+                    sale={selectedSale}
+                    onDismiss={() => {
+                      if (isDebugEnabled) {
+                        console.log('[DESKTOP_CALLOUT] Dismissing callout')
+                      }
+                      setSelectedPinId(null)
+                    }}
+                    viewport={mapView ? { center: mapView.center, zoom: mapView.zoom } : null}
+                    pinPosition={desktopPinPosition}
+                  />
+                )}
               </div>
-              
-              
-              {/* Desktop callout card */}
-              {selectedSale && desktopPinPosition && (
-                <MobileSaleCallout
-                  sale={selectedSale}
-                  onDismiss={() => {
-                    if (isDebugEnabled) {
-                      console.log('[DESKTOP_CALLOUT] Dismissing callout')
-                    }
-                    setSelectedPinId(null)
-                  }}
-                  viewport={mapView ? { center: mapView.center, zoom: mapView.zoom } : null}
-                  pinPosition={desktopPinPosition}
-                />
-              )}
               {process.env.NEXT_PUBLIC_DEBUG === 'true' && selectedPinId && (
                 <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 z-50 rounded">
                   Debug: selectedPinId={selectedPinId}, selectedSale={selectedSale ? 'yes' : 'no'}, pinPosition={desktopPinPosition ? `x:${desktopPinPosition.x},y:${desktopPinPosition.y}` : 'null'}

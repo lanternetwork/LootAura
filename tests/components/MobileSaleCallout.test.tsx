@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
+import MobileSaleCallout, { MOBILE_SALE_CALLOUT_Z_INDEX } from '@/components/sales/MobileSaleCallout'
 import { makeSale } from '../_helpers/factories'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -135,11 +135,58 @@ describe('MobileSaleCallout', () => {
     expect(push).toHaveBeenCalledWith('/sales/callout-sale-1?lat=38&lng=-85&zoom=10')
     expect(parentClick).not.toHaveBeenCalled()
   })
+
+  it('callout root click does not bubble to a parent map dismiss handler', () => {
+    const parentClick = vi.fn()
+    const onDismiss = vi.fn()
+    const sale = makeSale({ id: 'callout-sale-1', title: 'Map callout sale' })
+
+    const { container } = render(
+      <div onClick={parentClick}>
+        <MobileSaleCallout
+          sale={sale}
+          onDismiss={onDismiss}
+          viewport={defaultViewport}
+          pinPosition={defaultPinPosition}
+        />
+      </div>
+    )
+
+    const calloutRoot = container.querySelector('[data-mobile-sale-callout="true"]')
+    expect(calloutRoot).not.toBeNull()
+    fireEvent.click(calloutRoot!)
+
+    expect(parentClick).not.toHaveBeenCalled()
+    expect(onDismiss).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('pin-position callout root captures pointer events and sits above FAB layer', () => {
+    const sale = makeSale({ id: 'callout-sale-1', title: 'Map callout sale' })
+
+    const { container } = render(
+      <MobileSaleCallout
+        sale={sale}
+        onDismiss={() => {}}
+        viewport={defaultViewport}
+        pinPosition={defaultPinPosition}
+      />
+    )
+
+    const calloutRoot = container.querySelector('[data-mobile-sale-callout="true"]') as HTMLElement
+    expect(calloutRoot).toHaveClass('pointer-events-auto')
+    expect(calloutRoot.style.zIndex).toBe(String(MOBILE_SALE_CALLOUT_Z_INDEX))
+    expect(MOBILE_SALE_CALLOUT_Z_INDEX).toBeGreaterThan(110)
+  })
 })
 
 describe('MobileSalesShell map dismiss contract', () => {
   const shellSource = readFileSync(
     path.resolve(process.cwd(), 'app/sales/MobileSalesShell.tsx'),
+    'utf8'
+  )
+  const calloutSource = readFileSync(
+    path.resolve(process.cwd(), 'components/sales/MobileSaleCallout.tsx'),
     'utf8'
   )
 
@@ -152,6 +199,12 @@ describe('MobileSalesShell map dismiss contract', () => {
     expect(shellSource).toMatch(/onMapClick=\{\(\) => \{/)
     expect(shellSource).toMatch(/onLocationClick\(selectedPinId\)/)
   })
+
+  it('mobile callout z-index stays above FAB overlay z-[110]', () => {
+    expect(shellSource).toMatch(/z-\[110\]/)
+    expect(calloutSource).toMatch(/MOBILE_SALE_CALLOUT_Z_INDEX = 120/)
+    expect(MOBILE_SALE_CALLOUT_Z_INDEX).toBeGreaterThan(110)
+  })
 })
 
 describe('SalesClient desktop map dismiss contract', () => {
@@ -159,9 +212,18 @@ describe('SalesClient desktop map dismiss contract', () => {
     path.resolve(process.cwd(), 'app/sales/SalesClient.tsx'),
     'utf8'
   )
+  const simpleMapSource = readFileSync(
+    path.resolve(process.cwd(), 'components/location/SimpleMap.tsx'),
+    'utf8'
+  )
 
   it('still guards desktop wrapper dismiss with target === currentTarget', () => {
     expect(salesClientSource).toMatch(/handleDesktopMapClick/)
     expect(salesClientSource).toMatch(/e\.target === e\.currentTarget/)
+  })
+
+  it('SimpleMap skips dismiss when click originates inside mobile sale callout', () => {
+    expect(simpleMapSource).toMatch(/data-mobile-sale-callout="true"/)
+    expect(simpleMapSource).toMatch(/isClickOnSaleCallout/)
   })
 })

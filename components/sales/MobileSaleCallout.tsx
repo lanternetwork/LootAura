@@ -36,6 +36,9 @@ interface MobileSaleCalloutProps {
  */
 type Platform = 'ios' | 'android' | 'desktop'
 
+/** Above mobile FAB overlay (z-110); keeps View Sale interactable near bottom-right FABs. */
+export const MOBILE_SALE_CALLOUT_Z_INDEX = 120
+
 /**
  * Detect platform from user agent
  * SSR-safe - returns 'desktop' during SSR, detects on client
@@ -177,7 +180,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         transform: `translate(-50%, ${swipeDeltaY > 0 ? swipeDeltaY - cardOffset : -cardOffset}px)`,
         maxWidth: 'calc(100vw - 2rem)',
         width: '220px',
-        zIndex: 50
+        zIndex: MOBILE_SALE_CALLOUT_Z_INDEX
       }
     : {
         transform: swipeDeltaY > 0 ? `translateY(${swipeDeltaY}px)` : 'translateY(0)',
@@ -189,8 +192,10 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
     return (
       <div 
         ref={cardRef}
-        className={`bg-white rounded-2xl shadow-lg border border-gray-200 will-change-transform transition-transform duration-200 relative pointer-events-none`}
+        data-mobile-sale-callout="true"
+        className="bg-white rounded-2xl shadow-lg border border-gray-200 will-change-transform transition-transform duration-200 relative pointer-events-auto"
         style={cardStyle}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Callout pointer/arrow pointing to pin */}
         <div 
@@ -327,14 +332,15 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
   // When at bottom (no pinPosition), use the original overlay approach
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-50 px-4"
+      className="fixed bottom-0 left-0 right-0 px-4"
+      data-mobile-sale-callout="true"
       style={{
         position: 'fixed' as const,
         bottom: 0,
         left: 0,
         right: 0,
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-        zIndex: 50
+        zIndex: MOBILE_SALE_CALLOUT_Z_INDEX
       }}
       onClick={(e) => {
         // Allow clicks on the card itself to work, but clicking outside dismisses

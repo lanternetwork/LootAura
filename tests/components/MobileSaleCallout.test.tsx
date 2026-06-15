@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import MobileSaleCallout, { MOBILE_SALE_CALLOUT_Z_INDEX } from '@/components/sales/MobileSaleCallout'
@@ -225,5 +226,89 @@ describe('SalesClient desktop map dismiss contract', () => {
   it('SimpleMap skips dismiss when click originates inside mobile sale callout', () => {
     expect(simpleMapSource).toMatch(/data-mobile-sale-callout="true"/)
     expect(simpleMapSource).toMatch(/isClickOnSaleCallout/)
+  })
+
+  it('renders desktop callout inside the same relative map wrapper as SimpleMap', () => {
+    const desktopMapSection = salesClientSource.slice(
+      salesClientSource.indexOf('{/* Map - Left on desktop */}'),
+      salesClientSource.indexOf('{/* Sales List - Right panel on desktop */}')
+    )
+
+    expect(desktopMapSection).toMatch(/className="relative w-full h-full"/)
+    expect(desktopMapSection).toMatch(/<SimpleMap[\s\S]*<MobileSaleCallout/)
+    expect(desktopMapSection).not.toMatch(/<\/SimpleMap>\s*\)\s*:\s*null\}\s*<\/div>\s*\{selectedSale && desktopPinPosition/)
+  })
+
+  it('keeps desktop SimpleMap onMapClick dismiss path for map canvas taps', () => {
+    const desktopMapSection = salesClientSource.slice(
+      salesClientSource.indexOf('{/* Map - Left on desktop */}'),
+      salesClientSource.indexOf('{/* Sales List - Right panel on desktop */}')
+    )
+
+    expect(desktopMapSection).toMatch(/onMapClick=\{\(\) => \{/)
+    expect(desktopMapSection).toMatch(/setSelectedPinId\(null\)/)
+  })
+})
+
+describe('Desktop map wrapper callout interactions', () => {
+  const defaultViewport = { center: { lat: 38, lng: -85 }, zoom: 10 }
+  const defaultPinPosition = { x: 100, y: 200 }
+
+  function renderDesktopMapWrapper(children: ReactNode, onMapDismiss = vi.fn()) {
+    return render(
+      <div
+        className="relative w-full h-full"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onMapDismiss()
+          }
+        }}
+      >
+        {children}
+      </div>
+    )
+  }
+
+  it('desktop View Sale navigates without triggering map wrapper dismiss', () => {
+    const onMapDismiss = vi.fn()
+    const sale = makeSale({ id: 'desktop-callout-sale', title: 'Desktop callout sale' })
+
+    renderDesktopMapWrapper(
+      <MobileSaleCallout
+        sale={sale}
+        onDismiss={() => {}}
+        viewport={defaultViewport}
+        pinPosition={defaultPinPosition}
+      />,
+      onMapDismiss
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'View Sale' }))
+
+    expect(push).toHaveBeenCalledWith('/sales/desktop-callout-sale?lat=38&lng=-85&zoom=10')
+    expect(onMapDismiss).not.toHaveBeenCalled()
+  })
+
+  it('desktop callout root click does not trigger map wrapper dismiss', () => {
+    const onMapDismiss = vi.fn()
+    const onDismiss = vi.fn()
+    const sale = makeSale({ id: 'desktop-callout-sale', title: 'Desktop callout sale' })
+
+    const { container } = renderDesktopMapWrapper(
+      <MobileSaleCallout
+        sale={sale}
+        onDismiss={onDismiss}
+        viewport={defaultViewport}
+        pinPosition={defaultPinPosition}
+      />,
+      onMapDismiss
+    )
+
+    const calloutRoot = container.querySelector('[data-mobile-sale-callout="true"]')
+    expect(calloutRoot).not.toBeNull()
+    fireEvent.click(calloutRoot!)
+
+    expect(onMapDismiss).not.toHaveBeenCalled()
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 })

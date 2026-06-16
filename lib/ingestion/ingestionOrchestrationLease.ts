@@ -64,21 +64,9 @@ export async function acquireIngestionOrchestrationLease(
     return result
   }
 
-  const owner = generateOperationId()
-
-  try {
-    await ensureIngestionOrchestrationStateRow(stateKey, logContext)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    logger.error(
-      'Failed to ensure ingestion orchestration state row during lease acquire',
-      error instanceof Error ? error : new Error(message),
-      { ...logContext, operation: 'lease_acquire', stateKey }
-    )
-    return emitLeaseTelemetry({ acquired: false, owner, staleRecovered: false, cursor: 0, reason: 'acquire_failed' })
-  }
-
+  await ensureIngestionOrchestrationStateRow(stateKey, logContext)
   const adminDb = getAdminDb()
+  const owner = generateOperationId()
   const nowMs = Date.now()
   const leaseSeconds = parseIngestionOrchestrationLeaseSeconds(process.env.INGESTION_ORCHESTRATION_LEASE_SECONDS)
   const leaseExpiresAtIso = new Date(nowMs + leaseSeconds * 1000).toISOString()

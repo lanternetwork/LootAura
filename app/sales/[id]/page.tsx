@@ -2,14 +2,15 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getSaleWithItems, getNearestSalesForSale } from '@/lib/data/salesAccess'
+import { getNearestSalesForSale, type NearestSalesCoords } from '@/lib/data/salesAccess'
+import { getSaleWithItemsForRequest } from '@/lib/data/saleDetailLoader'
 import { getUserRatingForSeller } from '@/lib/data/ratingsAccess'
 import SaleDetailClient from './SaleDetailClient'
 import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
-import { getSeoMetrosForRequest, getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
+import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
 import { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutTypes'
 import {
   buildListingBreadcrumbItems,
@@ -36,6 +37,18 @@ function isSaleLocallySeoEligible(sale: any): boolean {
   )
 }
 
+function getSaleNearestCoords(sale: { lat?: number | null; lng?: number | null }): NearestSalesCoords | undefined {
+  if (
+    typeof sale.lat === 'number' &&
+    typeof sale.lng === 'number' &&
+    !isNaN(sale.lat) &&
+    !isNaN(sale.lng)
+  ) {
+    return { lat: sale.lat, lng: sale.lng }
+  }
+  return undefined
+}
+
 export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const { id } = await params
   const supabase = await createSupabaseServerClient()
@@ -44,7 +57,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
   const isDebugAdmin = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
   const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase())) || isDebugAdmin
-  const result = await getSaleWithItems(supabase, id)
+  const result = await getSaleWithItemsForRequest(id)
 
   if (!result) {
     notFound()
@@ -88,13 +101,12 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const itemCats = items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  // Fetch nearby sales for client UI (limit unchanged) + broader set for SEO crawl links only
-  const [nearbySales, nearbySalesForSeo, seoMetros] = await Promise.all([
-    getNearestSalesForSale(supabase, id, 2).catch(() => []),
-    getNearestSalesForSale(supabase, id, 6).catch(() => []),
-    getSeoMetrosForRequest(),
-  ])
-  const listingGeoLinks = buildListingGeoLinks(sale, seoMetros)
+  const saleCoords = getSaleNearestCoords(sale)
+  const nearbySalesForSeo = saleCoords
+    ? await getNearestSalesForSale(supabase, id, 6, saleCoords).catch(() => [])
+    : []
+  const nearbySales = nearbySalesForSeo.slice(0, 2)
+  const listingGeoLinks = buildListingGeoLinks(sale)
   const nearbyListingLinks = buildNearbyListingLinks(nearbySalesForSeo)
 
   // Fetch current user's rating for this seller (if authenticated)
@@ -109,7 +121,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   // Create structured data for SEO
   const eventStructuredData = createSaleEventStructuredData(sale)
   const breadcrumbStructuredData = createBreadcrumbStructuredData(
-    buildListingBreadcrumbItems(sale, seoMetros)
+    buildListingBreadcrumbItems(sale)
   )
 
   const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'
@@ -155,7 +167,7 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
   const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
   const isDebugAdmin = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
   const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase())) || isDebugAdmin
-  const result = await getSaleWithItems(supabase, id)
+  const result = await getSaleWithItemsForRequest(id)
   
   if (!result || ((result.sale as any).moderation_status === 'hidden_by_admin' && !isAdmin)) {
     return {

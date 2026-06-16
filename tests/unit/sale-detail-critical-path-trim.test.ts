@@ -72,6 +72,18 @@ vi.mock('@/components/seo/SaleDetailSsrContent', () => ({
   default: () => null,
 }))
 
+vi.mock('@/components/sales/SellerActivityCard', () => ({
+  SellerActivityCard: () => null,
+}))
+
+vi.mock('@/app/sales/[id]/SaleDetailNearbySales', () => ({
+  default: () => null,
+}))
+
+vi.mock('@/app/sales/[id]/SaleDetailSellerActivity', () => ({
+  default: () => null,
+}))
+
 function buildSaleResult(overrides: Record<string, unknown> = {}) {
   return {
     sale: {
@@ -136,16 +148,25 @@ describe('sale detail critical path trim', () => {
     expect(mockGetSaleWithItems).toHaveBeenCalledWith(expect.anything(), 'sale-1')
   })
 
-  it('uses one nearest-sales fetch and passes known coordinates with limit 6', async () => {
+  it('does not fetch nearest sales during initial page render', async () => {
     const page = await import('@/app/sales/[id]/page')
     await page.default({ params: Promise.resolve({ id: 'sale-1' }) })
 
-    expect(mockGetNearestSalesForSale).toHaveBeenCalledTimes(1)
-    expect(mockGetNearestSalesForSale).toHaveBeenCalledWith(
-      expect.anything(),
-      'sale-1',
-      6,
-      { lat: 38.25, lng: -85.75 }
-    )
+    expect(mockGetNearestSalesForSale).not.toHaveBeenCalled()
+  })
+
+  it('does not fetch user rating during initial page render', async () => {
+    mockCreateSupabaseServerClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'viewer-1', email: 'viewer@example.com' } },
+        }),
+      },
+    })
+
+    const page = await import('@/app/sales/[id]/page')
+    await page.default({ params: Promise.resolve({ id: 'sale-1' }) })
+
+    expect(mockGetUserRatingForSeller).not.toHaveBeenCalled()
   })
 })

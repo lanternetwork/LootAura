@@ -247,5 +247,35 @@ describe('SellerRatingStars', () => {
     // This test verifies the key handler is attached
     expect(firstStar).toBeInTheDocument()
   })
+
+  it('updates local rating when currentUserRating arrives after mount', async () => {
+    const { rerender } = render(
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={4.5}
+          ratingsCount={10}
+          currentUserRating={null}
+          isSeller={false}
+        />
+      </TestWrapper>
+    )
+
+    expect(screen.queryByText(/your rating: 4 stars/i)).not.toBeInTheDocument()
+
+    rerender(
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={4.5}
+          ratingsCount={10}
+          currentUserRating={4}
+          isSeller={false}
+        />
+      </TestWrapper>
+    )
+
+    expect(screen.getByText(/your rating: 4 stars/i)).toBeInTheDocument()
+  })
 })
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { getCsrfHeaders } from '@/lib/csrf-client'
@@ -32,6 +32,12 @@ export function SellerRatingStars({
     avgRating: avgRating ?? null,
     ratingsCount: ratingsCount ?? 0,
   })
+
+  useEffect(() => {
+    if (currentUserRating !== undefined) {
+      setLocalRating(currentUserRating ?? null)
+    }
+  }, [currentUserRating])
 
   const isAuthenticated = !!user && !authLoading
   // Determine if current user is the seller (check both prop and compare IDs)

@@ -111,6 +111,20 @@ describe('runGeocodeCronPipeline', () => {
     expect(mockGeocodePendingSales).toHaveBeenCalled()
   })
 
+  it('continues geocode when queue batch throws', async () => {
+    mockProcessGeocodeQueueBatch.mockRejectedValue(new Error('Redis LPOP failed'))
+    const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
+    const result = await runGeocodeCronPipeline({
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
+      telemetryContext: { jobType: 'cron.geocode' },
+    })
+
+    expect(result.queue.processed).toBe(0)
+    expect(mockGeocodePendingSales).toHaveBeenCalled()
+  })
+
   it('continues geocode when backlog drain throws', async () => {
     mockGeocodePendingSales.mockRejectedValue(new Error('claim rpc failed'))
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')

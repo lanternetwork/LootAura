@@ -88,9 +88,27 @@ export async function runGeocodeCronPipeline(params: {
     }
   }
 
-  const batch = await processGeocodeQueueBatch(params.queueBatchSize, {
-    telemetryContext: params.telemetryContext,
-  })
+  let batch: Awaited<ReturnType<typeof processGeocodeQueueBatch>> = {
+    dequeued: 0,
+    completed: 0,
+    requeued: 0,
+  }
+  try {
+    batch = await processGeocodeQueueBatch(params.queueBatchSize, {
+      telemetryContext: params.telemetryContext,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error(
+      'Geocode queue batch failed; continuing geocode pipeline',
+      error instanceof Error ? error : new Error(message),
+      {
+        component: 'ingestion/geocodeCronPipeline',
+        operation: 'queue_batch',
+        ...params.telemetryContext,
+      }
+    )
+  }
 
   const backlogStartedAt = Date.now()
   let backlog: Awaited<ReturnType<typeof geocodePendingSales>>

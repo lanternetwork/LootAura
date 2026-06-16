@@ -21,8 +21,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized } from '@/lib/auth/cron'
 import { logger, generateOperationId } from '@/lib/log'
 import { recordGeocodeCronOrchestrationRun } from '@/lib/ingestion/orchestrationMetrics'
-import { adaptiveNoteToOrchestrationPayload } from '@/lib/ingestion/adaptiveThroughputProfile'
+import {
+  adaptiveNoteToOrchestrationPayload,
+  type AdaptiveThroughputNoteFields,
+} from '@/lib/ingestion/adaptiveThroughputProfile'
 import { resolveAdaptiveThroughputForCron } from '@/lib/ingestion/adaptiveThroughputSignals'
+import { buildStaticThroughputEnvelope } from '@/lib/ingestion/adaptiveThroughputConfig'
 import { createCorrelationBundle } from '@/lib/observability/correlation'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'
@@ -87,7 +91,39 @@ async function handleGeocodeCron(request: NextRequest) {
     throw error
   }
 
-  const { envelope: adaptiveEnvelope, note: adaptiveNote } = await resolveAdaptiveThroughputForCron()
+  let adaptiveEnvelope
+  let adaptiveNote: AdaptiveThroughputNoteFields
+  try {
+    const resolved = await resolveAdaptiveThroughputForCron()
+    adaptiveEnvelope = resolved.envelope
+    adaptiveNote = resolved.note
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.warn('Geocode cron adaptive throughput resolve failed; using static envelope', {
+      component: 'api/cron/geocode',
+      operation: 'adaptive_resolve_failed',
+      requestId,
+      environment,
+      deploymentEnv,
+      message,
+    })
+    adaptiveEnvelope = buildStaticThroughputEnvelope(false)
+    adaptiveNote = {
+      adaptiveEnabled: false,
+      adaptiveProfile: 'normal',
+      profileReason: 'adaptive_resolve_failed',
+      subsystemProfiles: { fetch: 'normal', geocode: 'normal', publish: 'normal' },
+      effectiveConfigBatchSize: adaptiveEnvelope.fetch.configBatchSize,
+      effectiveExecutionBudgetMs: adaptiveEnvelope.fetch.executionBudgetMs,
+      effectiveMinIntervalMinutes: adaptiveEnvelope.fetch.minIntervalMinutes,
+      effectiveDomainSpacingMs: adaptiveEnvelope.fetch.domainSpacingMs,
+      effectiveGeocodeBacklogBatchSize: adaptiveEnvelope.geocode.backlogBatchSize,
+      effectiveGeocodeQueueBatchSize: adaptiveEnvelope.geocode.queueBatchSize,
+      effectiveGeocodeConcurrencyCeiling: adaptiveEnvelope.geocode.concurrencyCeiling,
+      effectivePublishBatchSize: adaptiveEnvelope.publish.batchSize,
+      pressureSignals: ['adaptive_resolve_failed'],
+    }
+  }
   const adaptivePayload = adaptiveNoteToOrchestrationPayload(adaptiveNote)
   const limit = adaptiveEnvelope.geocode.queueBatchSize
   const backlogBatchSize = adaptiveEnvelope.geocode.backlogBatchSize

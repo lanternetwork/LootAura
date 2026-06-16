@@ -9,8 +9,8 @@ import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
-import { getSeoMetrosForRequest } from '@/lib/seo/loadSeoRolloutState'
-import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
+import { getSeoMetrosForRequest, getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
+import { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutTypes'
 import {
   buildListingBreadcrumbItems,
   buildListingGeoLinks,
@@ -169,9 +169,9 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
   const itemCats = result.items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  const emission = await getInventorySeoEmissionForRequest()
+  const rolloutState = await getSeoRolloutStateForRequest()
   return createListingSeoMetadata(result.sale, {
     categories: displayCategories,
-    robots: resolveListingIndexRobots(emission.indexingAllowed),
+    robots: resolveListingIndexRobots(isSeoIndexRolloutReady(rolloutState)),
   })
 }

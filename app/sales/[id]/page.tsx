@@ -21,6 +21,21 @@ interface SaleDetailPageProps {
   params: Promise<{ id: string }>
 }
 
+function isSaleLocallySeoEligible(sale: any): boolean {
+  // Fail closed unless this record is a publicly indexable listing shape.
+  return (
+    sale?.status === 'published' &&
+    sale?.moderation_status !== 'hidden_by_admin' &&
+    typeof sale?.title === 'string' &&
+    sale.title.trim().length > 0 &&
+    typeof sale?.city === 'string' &&
+    sale.city.trim().length > 0 &&
+    typeof sale?.state === 'string' &&
+    sale.state.trim().length > 0 &&
+    !sale?.archived_at
+  )
+}
+
 export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const { id } = await params
   const supabase = await createSupabaseServerClient()
@@ -169,9 +184,18 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
   const itemCats = result.items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  const rolloutState = await getSeoRolloutStateForRequest()
+  const saleLocallyEligible = isSaleLocallySeoEligible(result.sale)
+  let rolloutReady = false
+  try {
+    const rolloutState = await getSeoRolloutStateForRequest()
+    rolloutReady = isSeoIndexRolloutReady(rolloutState)
+  } catch {
+    // Fail closed: metadata generation should not over-index when rollout state cannot be loaded.
+    rolloutReady = false
+  }
+
   return createListingSeoMetadata(result.sale, {
     categories: displayCategories,
-    robots: resolveListingIndexRobots(isSeoIndexRolloutReady(rolloutState)),
+    robots: resolveListingIndexRobots(rolloutReady && saleLocallyEligible),
   })
 }

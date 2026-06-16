@@ -1,11 +1,16 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockBuildIngestionMetricsResponse = vi.hoisted(() => vi.fn())
 const mockBuildYstmCoverageScoreboard = vi.hoisted(() => vi.fn())
 const mockFetchNationwideSeoMetroInventory = vi.hoisted(() => vi.fn())
-const mockGetSaleWithItems = vi.hoisted(() => vi.fn())
+const mockGetInventorySeoEmissionForRequest = vi.hoisted(() => vi.fn())
+const mockGetSaleWithItemsForRequest = vi.hoisted(() => vi.fn())
 const mockCreateSupabaseServerClient = vi.hoisted(() => vi.fn())
 const mockGetSeoRolloutStateForRequest = vi.hoisted(() => vi.fn())
+
+const saleDetailPageSourcePath = path.join(process.cwd(), 'app/sales/[id]/page.tsx')
 
 vi.mock('@/app/api/admin/ingestion/metrics/route', () => ({
   buildIngestionMetricsResponse: (...args: unknown[]) => mockBuildIngestionMetricsResponse(...args),
@@ -19,13 +24,13 @@ vi.mock('@/lib/seo/fetchAllSeoMetroInventory', () => ({
   fetchNationwideSeoMetroInventory: (...args: unknown[]) => mockFetchNationwideSeoMetroInventory(...args),
 }))
 
-vi.mock('@/lib/data/salesAccess', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/data/salesAccess')>('@/lib/data/salesAccess')
-  return {
-    ...actual,
-    getSaleWithItems: (...args: unknown[]) => mockGetSaleWithItems(...args),
-  }
-})
+vi.mock('@/lib/seo/resolveInventorySeoEmission', () => ({
+  getInventorySeoEmissionForRequest: (...args: unknown[]) => mockGetInventorySeoEmissionForRequest(...args),
+}))
+
+vi.mock('@/lib/data/saleDetailLoader', () => ({
+  getSaleWithItemsForRequest: (...args: unknown[]) => mockGetSaleWithItemsForRequest(...args),
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) => mockCreateSupabaseServerClient(...args),
@@ -42,7 +47,7 @@ vi.mock('@/lib/seo/loadSeoRolloutState', async () => {
 
 describe('sale detail metadata decoupling', () => {
   function setupSale(overrides: Record<string, unknown> = {}) {
-    mockGetSaleWithItems.mockResolvedValue({
+    mockGetSaleWithItemsForRequest.mockResolvedValue({
       sale: {
         id: 'sale-1',
         owner_id: 'owner-1',
@@ -69,6 +74,11 @@ describe('sale detail metadata decoupling', () => {
     mockBuildIngestionMetricsResponse.mockResolvedValue({ ok: true })
     mockBuildYstmCoverageScoreboard.mockResolvedValue({})
     mockFetchNationwideSeoMetroInventory.mockResolvedValue({ metros: [], inventoryBySlug: {} })
+    mockGetInventorySeoEmissionForRequest.mockResolvedValue({
+      indexingAllowed: false,
+      metricsAvailable: true,
+      rollout: { indexingAllowed: false, blockers: [] },
+    })
     mockGetSeoRolloutStateForRequest.mockResolvedValue({
       publicIndexingEnabled: false,
       publicIndexingEnabledAt: null,
@@ -94,9 +104,20 @@ describe('sale detail metadata decoupling', () => {
 
     expect(metadata).toBeDefined()
     expect(mockGetSeoRolloutStateForRequest).toHaveBeenCalledTimes(1)
+    expect(mockGetInventorySeoEmissionForRequest).not.toHaveBeenCalled()
     expect(mockBuildIngestionMetricsResponse).not.toHaveBeenCalled()
     expect(mockBuildYstmCoverageScoreboard).not.toHaveBeenCalled()
     expect(mockFetchNationwideSeoMetroInventory).not.toHaveBeenCalled()
+  })
+
+  it('keeps inventory emission and admin telemetry out of sale detail page source', () => {
+    const source = readFileSync(saleDetailPageSourcePath, 'utf8')
+    expect(source).not.toContain('getInventorySeoEmissionForRequest')
+    expect(source).not.toContain('buildIngestionMetricsResponse')
+    expect(source).not.toContain('buildYstmCoverageScoreboard')
+    expect(source).not.toContain('fetchNationwideSeoMetroInventory')
+    expect(source).toContain('getSeoRolloutStateForRequest')
+    expect(source).toContain('isSeoIndexRolloutReady')
   })
 
   it('returns noindex when rollout state is unavailable', async () => {

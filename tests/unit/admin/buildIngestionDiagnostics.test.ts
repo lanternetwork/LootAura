@@ -656,7 +656,7 @@ describe('buildIngestionDiagnostics', () => {
           crawlSkipTaxonomyAlerts: [],
         },
       },
-    } as IngestionMetricsResponse
+    } as unknown as IngestionMetricsResponse
     const snapshot = buildSeoOperationalSnapshot({
       metrics: data,
       coverage: null,

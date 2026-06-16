@@ -4,6 +4,11 @@ import { evaluateNeedsCheckRootCauseDiscovery } from '@/lib/admin/evaluateNeedsC
 import { buildYstmIngestionRepairDiagnostics } from '@/lib/admin/buildYstmIngestionRepairDiagnostics'
 import { buildYstmCoverageDiagnostics } from '@/lib/admin/buildYstmCoverageDiagnostics'
 import { buildYstmStabilizationDiagnostics } from '@/lib/admin/buildYstmStabilizationDiagnostics'
+import { buildIngestionMetricsSupplementDiagnostics } from '@/lib/admin/buildIngestionMetricsSupplementDiagnostics'
+import { buildCoverageTieredSchedulerDiagnostics } from '@/lib/admin/buildCoverageTieredSchedulerDiagnostics'
+import { buildSeoOperationalDiagnostics } from '@/lib/admin/buildSeoOperationalDiagnostics'
+import type { IngestionDiagnosticsSupplements } from '@/lib/admin/ingestionDiagnosticsSupplements'
+import { formatDuplicateCanonicalClustersClipboard } from '@/lib/admin/duplicateCanonicalPublishClusterTypes'
 import type { IngestionFunnelStage, IngestionFunnelStageId } from '@/lib/admin/ingestionFunnelMetricsHelpers'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
@@ -23,6 +28,8 @@ export type BuildIngestionDiagnosticsOptions = {
   copiedAt?: string
   /** When set, appends external marketplace coverage scoreboard + week-1 sprint gates. */
   ystmCoverage?: YstmCoverageMetricsResponse | null
+  /** Dashboard panels fetched separately from metrics/coverage APIs. */
+  supplements?: IngestionDiagnosticsSupplements | null
 }
 
 function stageCount(stages: IngestionFunnelStage[], id: IngestionFunnelStageId): number {
@@ -360,6 +367,36 @@ export function buildIngestionDiagnostics(
       )
       lines.push('', buildNeedsCheckRootCauseDiagnostics(discovery, data.needsCheckBreakdown))
     }
+  }
+
+  if (options.supplements?.tieredScheduler) {
+    lines.push('', buildCoverageTieredSchedulerDiagnostics(options.supplements.tieredScheduler))
+  } else if (options.supplements?.tieredSchedulerError) {
+    lines.push(
+      '',
+      '## Coverage tiered audit scheduler',
+      bullet('load error', options.supplements.tieredSchedulerError)
+    )
+  }
+
+  lines.push('', buildIngestionMetricsSupplementDiagnostics(data))
+
+  if (options.supplements?.seoOperational) {
+    lines.push('', buildSeoOperationalDiagnostics(options.supplements.seoOperational))
+  }
+
+  if (options.supplements?.duplicateCanonicalClusters) {
+    const { generatedAt, clusters } = options.supplements.duplicateCanonicalClusters
+    lines.push(
+      '',
+      formatDuplicateCanonicalClustersClipboard(clusters, generatedAt)
+    )
+  } else if (options.supplements?.duplicateCanonicalClustersError) {
+    lines.push(
+      '',
+      '## Duplicate canonical publish clusters',
+      bullet('load error', options.supplements.duplicateCanonicalClustersError)
+    )
   }
 
   return lines.join('\n')

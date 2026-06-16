@@ -1,3 +1,5 @@
+import { buildYstmDiscoveryFreshnessDiagnostics } from '@/lib/admin/buildYstmDiscoveryFreshnessDiagnostics'
+import { buildYstmCoverageTelemetryDiagnostics } from '@/lib/admin/buildYstmCoverageTelemetryDiagnostics'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
@@ -15,6 +17,12 @@ function formatPct(value: number | null): string {
  * Markdown block for external marketplace coverage scoreboard (clipboard / support).
  */
 export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse): string {
+  const sections: string[] = []
+
+  if (data.discoveryFreshness) {
+    sections.push(buildYstmDiscoveryFreshnessDiagnostics(data.discoveryFreshness))
+  }
+
   const ge = data.graphEnumeration
   const last = ge.lastDiscoveryRun
   const gates = evaluateWeekOneSprintGates(data)
@@ -209,5 +217,7 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
     bullet('footprintMeetsMinimum', data.sloAttainment.footprintMeetsProgramMinimum ? 'yes' : 'no')
   )
 
-  return lines.join('\n')
+  sections.push(lines.join('\n'), buildYstmCoverageTelemetryDiagnostics(data))
+
+  return sections.join('\n\n')
 }

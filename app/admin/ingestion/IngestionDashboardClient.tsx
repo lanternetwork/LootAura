@@ -7,6 +7,7 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import type { IngestionDashboardMode } from '@/lib/admin/ingestionDashboardOverview'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
+import { gatherIngestionDiagnosticsSupplements } from '@/lib/admin/gatherIngestionDiagnosticsSupplements'
 import IngestionOverviewPanel from '@/app/admin/ingestion/IngestionOverviewPanel'
 import IngestionDebugPanel from '@/app/admin/ingestion/IngestionDebugPanel'
 import IngestionControlsPanel from '@/app/admin/ingestion/IngestionControlsPanel'
@@ -131,17 +132,21 @@ export default function IngestionDashboardClient() {
     setCopyError(null)
     setCopyRefreshing(true)
     let freshCoverage = coverage
+    let supplements = null
     try {
-      const res = await fetch('/api/admin/ingestion/ystm-coverage', { credentials: 'include' })
-      const json = (await res.json()) as YstmCoverageMetricsResponse & {
+      const coverageRes = await fetch('/api/admin/ingestion/ystm-coverage', {
+        credentials: 'include',
+      })
+      const json = (await coverageRes.json()) as YstmCoverageMetricsResponse & {
         ok?: boolean
         message?: string
       }
-      if (res.ok && json.ok) {
+      if (coverageRes.ok && json.ok) {
         freshCoverage = json
         setCoverage(json)
         setCoverageError(null)
       }
+      supplements = await gatherIngestionDiagnosticsSupplements(data, freshCoverage)
     } catch {
       /* use last known coverage if refresh fails */
     } finally {
@@ -156,6 +161,7 @@ export default function IngestionDashboardClient() {
       environment,
       copiedAt: new Date().toISOString(),
       ystmCoverage: freshCoverage,
+      supplements,
     })
     try {
       await copyTextToClipboard(text)

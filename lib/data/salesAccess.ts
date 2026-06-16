@@ -740,50 +740,71 @@ export async function getSaleWithItems(
  * @param limit - Maximum number of results (default: 2)
  * @returns Array of nearby sales with distance_m field, or empty array on error
  */
+export type NearestSalesCoords = {
+  lat: number
+  lng: number
+}
+
+function isValidNearestSalesCoords(coords: NearestSalesCoords | undefined): coords is NearestSalesCoords {
+  return (
+    coords != null &&
+    typeof coords.lat === 'number' &&
+    typeof coords.lng === 'number' &&
+    !isNaN(coords.lat) &&
+    !isNaN(coords.lng)
+  )
+}
+
 export async function getNearestSalesForSale(
   supabase: SupabaseClient,
   saleId: string,
-  limit: number = 2
+  limit: number = 2,
+  knownCoords?: NearestSalesCoords
 ): Promise<Array<Sale & { distance_m: number }>> {
   try {
-    // First, fetch the current sale's location
-    const { data: currentSale, error: saleError } = await supabase
-      .from('sales_v2')
-      .select('id, lat, lng')
-      .eq('id', saleId)
-      .single()
+    let saleLat: number
+    let saleLng: number
 
-    if (saleError || !currentSale) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        const { logger } = await import('@/lib/log')
-        logger.debug('[SALES_ACCESS] Could not fetch current sale for nearest sales', {
-          component: 'salesAccess',
-          operation: 'getNearestSalesForSale',
-          saleId,
-          error: saleError?.message,
-        })
-      }
-      return []
-    }
+    if (isValidNearestSalesCoords(knownCoords)) {
+      saleLat = knownCoords.lat
+      saleLng = knownCoords.lng
+    } else {
+      // Fetch the current sale's location when coords were not supplied by caller.
+      const { data: currentSale, error: saleError } = await supabase
+        .from('sales_v2')
+        .select('id, lat, lng')
+        .eq('id', saleId)
+        .single()
 
-    // Validate that the sale has coordinates
-    if (
-      typeof currentSale.lat !== 'number' ||
-      typeof currentSale.lng !== 'number' ||
-      isNaN(currentSale.lat) ||
-      isNaN(currentSale.lng)
-    ) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        const { logger } = await import('@/lib/log')
-        logger.debug('[SALES_ACCESS] Current sale has no valid coordinates', {
-          component: 'salesAccess',
-          operation: 'getNearestSalesForSale',
-          saleId,
-          lat: currentSale.lat,
-          lng: currentSale.lng,
-        })
+      if (saleError || !currentSale) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Could not fetch current sale for nearest sales', {
+            component: 'salesAccess',
+            operation: 'getNearestSalesForSale',
+            saleId,
+            error: saleError?.message,
+          })
+        }
+        return []
       }
-      return []
+
+      if (!isValidNearestSalesCoords({ lat: currentSale.lat, lng: currentSale.lng })) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Current sale has no valid coordinates', {
+            component: 'salesAccess',
+            operation: 'getNearestSalesForSale',
+            saleId,
+            lat: currentSale.lat,
+            lng: currentSale.lng,
+          })
+        }
+        return []
+      }
+
+      saleLat = currentSale.lat
+      saleLng = currentSale.lng
     }
 
     // Use PostGIS RPC function to find nearest sales.
@@ -799,8 +820,8 @@ export async function getNearestSalesForSale(
       const { getRlsDb } = await import('@/lib/supabase/clients')
       const rlsDb = await getRlsDb() // This returns a client scoped to lootaura_v2 schema
       const rpcResult = await rlsDb.rpc('get_sales_within_distance', {
-        user_lat: currentSale.lat,
-        user_lng: currentSale.lng,
+        user_lat: saleLat,
+        user_lng: saleLng,
         p_distance_meters: maxDistanceMeters,
         limit_count: limit + 1, // Fetch one extra to account for excluding current sale
       })
@@ -811,8 +832,8 @@ export async function getNearestSalesForSale(
       // (might work if search_path includes lootaura_v2)
       try {
         const rpcResult = await supabase.rpc('get_sales_within_distance', {
-          user_lat: currentSale.lat,
-          user_lng: currentSale.lng,
+          user_lat: saleLat,
+          user_lng: saleLng,
           p_distance_meters: maxDistanceMeters,
           limit_count: limit + 1,
         })
@@ -844,11 +865,11 @@ export async function getNearestSalesForSale(
       let fallbackQueryError: { message?: string } | null = null
 
       for (const latitudeBand of latitudeBands) {
-        const latMin = currentSale.lat - latitudeBand
-        const latMax = currentSale.lat + latitudeBand
-        const longitudeBand = latitudeBand / Math.max(Math.cos((currentSale.lat * Math.PI) / 180), 0.1)
-        const lngMin = currentSale.lng - longitudeBand
-        const lngMax = currentSale.lng + longitudeBand
+        const latMin = saleLat - latitudeBand
+        const latMax = saleLat + latitudeBand
+        const longitudeBand = latitudeBand / Math.max(Math.cos((saleLat * Math.PI) / 180), 0.1)
+        const lngMin = saleLng - longitudeBand
+        const lngMax = saleLng + longitudeBand
 
         const { data: boundedSales, error: queryError } = await applyPhase4PublicPublishedSaleReadFilters(
           supabase
@@ -897,11 +918,11 @@ export async function getNearestSalesForSale(
       const salesWithDistance = allSales
         .map((sale: any) => {
           const R = 6371000 // Earth's radius in meters
-          const dLat = ((sale.lat - currentSale.lat) * Math.PI) / 180
-          const dLng = ((sale.lng - currentSale.lng) * Math.PI) / 180
+          const dLat = ((sale.lat - saleLat) * Math.PI) / 180
+          const dLng = ((sale.lng - saleLng) * Math.PI) / 180
           const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos((currentSale.lat * Math.PI) / 180) *
+            Math.cos((saleLat * Math.PI) / 180) *
               Math.cos((sale.lat * Math.PI) / 180) *
               Math.sin(dLng / 2) *
               Math.sin(dLng / 2)

@@ -696,6 +696,6 @@ describe('buildIngestionDiagnostics', () => {
     expect(md).toContain('## Coverage tiered audit scheduler')
     expect(md).toContain('legacy cursor (cursor): 724')
     expect(md).toContain('## SEO operational readiness')
-    expect(md).toContain('## Duplicate canonical publish clusters')
+    expect(md).toContain('# Duplicate canonical publish clusters')
   })
 })

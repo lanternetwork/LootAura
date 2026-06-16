@@ -2,11 +2,13 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getNearestSalesForSale, type NearestSalesCoords } from '@/lib/data/salesAccess'
+import { type NearestSalesCoords } from '@/lib/data/salesAccess'
 import { getSaleWithItemsForRequest } from '@/lib/data/saleDetailLoader'
-import { getUserRatingForSeller } from '@/lib/data/ratingsAccess'
 import SaleDetailClient from './SaleDetailClient'
+import SaleDetailNearbySales from './SaleDetailNearbySales'
+import SaleDetailSellerActivity from './SaleDetailSellerActivity'
 import SaleDetailSsrContent from '@/components/seo/SaleDetailSsrContent'
+import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
@@ -15,7 +17,6 @@ import { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutTypes'
 import {
   buildListingBreadcrumbItems,
   buildListingGeoLinks,
-  buildNearbyListingLinks,
 } from '@/lib/seo/geoLinking'
 
 interface SaleDetailPageProps {
@@ -102,21 +103,17 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
   const saleCoords = getSaleNearestCoords(sale)
-  const nearbySalesForSeo = saleCoords
-    ? await getNearestSalesForSale(supabase, id, 6, saleCoords).catch(() => [])
-    : []
-  const nearbySales = nearbySalesForSeo.slice(0, 2)
   const listingGeoLinks = buildListingGeoLinks(sale)
-  const nearbyListingLinks = buildNearbyListingLinks(nearbySalesForSeo)
+  const viewerUserId = user?.id ?? null
 
-  // Fetch current user's rating for this seller (if authenticated)
-  let currentUserRating: number | null = null
-  if (sale.owner_id) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user && user.id !== sale.owner_id) {
-      currentUserRating = await getUserRatingForSeller(supabase, sale.owner_id, user.id).catch(() => null)
-    }
-  }
+  const sellerActivityFallback = (
+    <SellerActivityCard
+      ownerProfile={sale.owner_profile}
+      ownerStats={sale.owner_stats}
+      currentUserRating={null}
+      saleId={sale.id}
+    />
+  )
 
   // Create structured data for SEO
   const eventStructuredData = createSaleEventStructuredData(sale)
@@ -142,20 +139,35 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
           sale={sale}
           items={items}
           geoLinks={listingGeoLinks}
-          nearbyListingLinks={nearbyListingLinks}
+          nearbyListingLinks={[]}
         />
       </div>
-      <Suspense fallback={<div className="p-4">Loading...</div>}>
-        <SaleDetailClient
-          sale={sale}
-          displayCategories={displayCategories}
-          items={items}
-          nearbySales={nearbySales}
-          currentUserRating={currentUserRating}
-          promotionsEnabled={promotionsEnabled}
-          paymentsEnabled={paymentsEnabled}
-        />
-      </Suspense>
+      <SaleDetailClient
+        sale={sale}
+        displayCategories={displayCategories}
+        items={items}
+        promotionsEnabled={promotionsEnabled}
+        paymentsEnabled={paymentsEnabled}
+        sellerActivitySection={
+          <Suspense fallback={sellerActivityFallback}>
+            <SaleDetailSellerActivity sale={sale} viewerUserId={viewerUserId} />
+          </Suspense>
+        }
+        nearbySalesMobileSection={
+          saleCoords ? (
+            <Suspense fallback={null}>
+              <SaleDetailNearbySales saleId={id} coords={saleCoords} className="w-full" />
+            </Suspense>
+          ) : null
+        }
+        nearbySalesDesktopSection={
+          saleCoords ? (
+            <Suspense fallback={null}>
+              <SaleDetailNearbySales saleId={id} coords={saleCoords} />
+            </Suspense>
+          ) : null
+        }
+      />
     </div>
   )
 }

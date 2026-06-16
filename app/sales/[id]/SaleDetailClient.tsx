@@ -158,8 +158,13 @@ interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
   displayCategories?: string[]
   items?: SaleItem[]
+  /** @deprecated Prefer nearbySalesMobileSection / nearbySalesDesktopSection from deferred server boundaries. */
   nearbySales?: Array<Sale & { distance_m: number }>
+  /** @deprecated Prefer sellerActivitySection from deferred server boundary. */
   currentUserRating?: number | null
+  nearbySalesMobileSection?: React.ReactNode
+  nearbySalesDesktopSection?: React.ReactNode
+  sellerActivitySection?: React.ReactNode
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
 }
@@ -170,6 +175,9 @@ export default function SaleDetailClient({
   items = [],
   nearbySales = [],
   currentUserRating,
+  nearbySalesMobileSection,
+  nearbySalesDesktopSection,
+  sellerActivitySection,
   promotionsEnabled = false,
   paymentsEnabled = false,
 }: SaleDetailClientProps) {
@@ -1076,10 +1084,12 @@ export default function SaleDetailClient({
         )}
 
         {/* Nearby Sales - Mobile */}
-        {nearbySales.length > 0 && (
-          <div className="w-full">
-            <NearbySalesCard nearbySales={nearbySales} />
-          </div>
+        {nearbySalesMobileSection ?? (
+          nearbySales.length > 0 ? (
+            <div className="w-full">
+              <NearbySalesCard nearbySales={nearbySales} />
+            </div>
+          ) : null
         )}
 
         {/* Report Sale Link - Mobile */}
@@ -1423,12 +1433,14 @@ export default function SaleDetailClient({
           </div>
 
           {/* Seller Details Card */}
-          <SellerActivityCard
-            ownerProfile={sale.owner_profile}
-            ownerStats={sale.owner_stats}
-            currentUserRating={currentUserRating ?? null}
-            saleId={sale.id}
-          />
+          {sellerActivitySection ?? (
+            <SellerActivityCard
+              ownerProfile={sale.owner_profile}
+              ownerStats={sale.owner_stats}
+              currentUserRating={currentUserRating ?? null}
+              saleId={sale.id}
+            />
+          )}
 
           {/* Seller-only Promote panel (desktop/sidebar) */}
           {promotionsEnabled && isOwner && (
@@ -1540,7 +1552,9 @@ export default function SaleDetailClient({
 
           {/* Nearby Sales - Desktop: in sidebar */}
           <div className="hidden lg:block">
-            <NearbySalesCard nearbySales={nearbySales} />
+            {nearbySalesDesktopSection ?? (
+              nearbySales.length > 0 ? <NearbySalesCard nearbySales={nearbySales} /> : null
+            )}
           </div>
         </div>
       </div>

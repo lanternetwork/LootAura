@@ -384,7 +384,7 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
       telemetryCompletenessPct: 92,
       velocityPoolCounts: { HOT: 10, WARM: 40, COLD: 874 },
     }),
-  } as YstmCoverageMetricsResponse
+  } as unknown as YstmCoverageMetricsResponse
 }
 
 describe('buildIngestionDiagnosticCopyV1Sections', () => {

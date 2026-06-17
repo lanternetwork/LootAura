@@ -1,10 +1,16 @@
-import { diagnosticBullet, formatDiagnosticPct } from '@/lib/admin/diagnosticsMarkdown'
+import { diagnosticBullet } from '@/lib/admin/diagnosticsMarkdown'
 import { deriveDiscoveryFreshnessRisk } from '@/lib/admin/deriveDiscoveryFreshnessRisk'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 
 function formatHours(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—'
   return `${value.toFixed(1)}h`
+}
+
+/** Values already on a 0–100 scale (matches YstmDiscoveryFreshnessSection UI). */
+function formatPercentAlreadyScaled(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return `${value.toFixed(1)}%`
 }
 
 function formatVelocityPool(counts: { HOT: number; WARM: number; COLD: number }): string {
@@ -28,7 +34,7 @@ export function buildYstmDiscoveryFreshnessDiagnostics(
     diagnosticBullet('publish_latency_p50', formatHours(publish.p50)),
     diagnosticBullet('publish_latency_p90', formatHours(publish.p90)),
     diagnosticBullet('sample_count', discovery.sampleCount),
-    diagnosticBullet('telemetry_completeness', formatDiagnosticPct(freshness.telemetryCompletenessPct)),
+    diagnosticBullet('telemetry_completeness', formatPercentAlreadyScaled(freshness.telemetryCompletenessPct)),
     diagnosticBullet('velocity_pool', formatVelocityPool(freshness.velocityPoolCounts)),
     diagnosticBullet('freshness_risk', risk),
   ]

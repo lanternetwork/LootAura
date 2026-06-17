@@ -1,5 +1,6 @@
 export const NEEDS_CHECK_BLOCKER_CATEGORIES = [
-  'address_enrichment_dependent',
+  'address_enrichment_retryable',
+  'address_enrichment_terminal',
   'address_gated',
   'precision_gated',
   'geocode_blocked',

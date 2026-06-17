@@ -34,8 +34,9 @@ const OWNER_LABELS: Record<NeedsCheckRepairOwner, string> = {
 }
 
 const CATEGORY_LABELS: Record<NeedsCheckBlockerCategory, string> = {
-  address_enrichment_dependent: 'Address enrichment dependent',
-  address_gated: 'Address gated',
+  address_enrichment_retryable: 'Address enrichment retryable',
+  address_enrichment_terminal: 'Address enrichment terminal',
+  address_gated: 'Address gated (enrichment waiting)',
   precision_gated: 'Precision gated',
   geocode_blocked: 'Geocode blocked',
   publish_eligible_today: 'Publish eligible today',

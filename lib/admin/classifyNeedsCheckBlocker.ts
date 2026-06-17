@@ -21,17 +21,17 @@ export type NeedsCheckClassificationInput = {
 export const NEEDS_CHECK_CLASSIFICATION_RULES_SUMMARY = [
   'Mutually exclusive categories; first matching rule wins (precedence top → bottom).',
   '1. geocode_blocked — failure_details.geocode_dead_letter present.',
-  '2. address_gated — address_status = address_gated.',
-  '3. address_enrichment_dependent — address_status ∈ {address_enrichment_pending, address_enrichment_retry, address_unavailable_terminal}.',
-  '4. precision_gated — coordinate_precision ∈ {locality, city_centroid} (non-publishable precision policy).',
-  '5. publish_eligible_today — address_status = address_available, publishable precision, coordinates present, address passes publish validation, listing not past end date.',
-  '6. other — remainder.',
+  '2. address_gated — address_status = address_gated (enrichment waiting / schedule-gated).',
+  '3. address_enrichment_terminal — address_status = address_unavailable_terminal (enrichment exhausted).',
+  '4. address_enrichment_retryable — address_status ∈ {address_enrichment_pending, address_enrichment_retry}.',
+  '5. precision_gated — coordinate_precision ∈ {locality, city_centroid} (non-publishable precision policy).',
+  '6. publish_eligible_today — address_status = address_available, publishable precision, coordinates present, address passes publish validation, listing not past end date.',
+  '7. other — remainder.',
 ].join('\n')
 
-const ENRICHMENT_DEPENDENT_STATUSES = new Set([
+const ENRICHMENT_RETRYABLE_STATUSES = new Set([
   'address_enrichment_pending',
   'address_enrichment_retry',
-  'address_unavailable_terminal',
 ])
 
 function readFailureDetailsObject(value: unknown): Record<string, unknown> | null {
@@ -93,8 +93,12 @@ export function classifyNeedsCheckBlocker(input: NeedsCheckClassificationInput):
     return 'address_gated'
   }
 
-  if (ENRICHMENT_DEPENDENT_STATUSES.has(addressStatus)) {
-    return 'address_enrichment_dependent'
+  if (addressStatus === 'address_unavailable_terminal') {
+    return 'address_enrichment_terminal'
+  }
+
+  if (ENRICHMENT_RETRYABLE_STATUSES.has(addressStatus)) {
+    return 'address_enrichment_retryable'
   }
 
   if (!isCoordinatePrecisionPublishable(input.coordinatePrecision)) {
@@ -121,9 +125,11 @@ export function classifyNeedsCheckBlocker(input: NeedsCheckClassificationInput):
 
 export function blockerCategoryToRepairOwner(category: NeedsCheckBlockerCategory): NeedsCheckRepairOwner {
   switch (category) {
-    case 'address_enrichment_dependent':
+    case 'address_enrichment_retryable':
     case 'address_gated':
       return 'address_enrichment'
+    case 'address_enrichment_terminal':
+      return 'other'
     case 'precision_gated':
       return 'precision_handling'
     case 'geocode_blocked':
@@ -140,8 +146,10 @@ export function publishabilityProfileForCategory(category: NeedsCheckBlockerCate
     case 'publish_eligible_today':
       return 'publishable_today'
     case 'address_gated':
-    case 'address_enrichment_dependent':
+    case 'address_enrichment_retryable':
       return 'blocked_by_enrichment'
+    case 'address_enrichment_terminal':
+      return 'blocked_by_other'
     case 'precision_gated':
       return 'blocked_by_precision'
     case 'geocode_blocked':

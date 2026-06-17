@@ -27,6 +27,7 @@ import {
   resolveEnrichmentAddressCandidate,
 } from '@/lib/ingestion/address/resolveEnrichmentAddressCandidate'
 import { reconcileExhaustedAddressEnrichmentPending } from '@/lib/ingestion/address/reconcileExhaustedAddressEnrichmentPending'
+import { reconcileScheduleGatedAddressEnrichmentPending } from '@/lib/ingestion/address/reconcileScheduleGatedAddressEnrichmentPending'
 
 export { INGESTED_ADDRESS_ENRICHMENT_DETAILS_SCHEMA_VERSION } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
 
@@ -37,6 +38,7 @@ export type AddressEnrichmentWorkerSummary = {
   failedTerminal: number
   stillGated: number
   exhaustedReconciled: number
+  scheduleGatedReconciled: number
   byFailureReason: Partial<Record<AddressEnrichmentFailureReason, number>>
 }
 
@@ -335,8 +337,15 @@ export async function enrichPendingAddresses(options?: {
     failedTerminal: 0,
     stillGated: 0,
     exhaustedReconciled: 0,
+    scheduleGatedReconciled: 0,
     byFailureReason: {},
   }
+
+  const scheduleGatedSummary = await reconcileScheduleGatedAddressEnrichmentPending({
+    batchSize: Math.max(batchSize * 4, 100),
+    cooldownMinutes,
+  })
+  summary.scheduleGatedReconciled = scheduleGatedSummary.reconciled
 
   const reconcileSummary = await reconcileExhaustedAddressEnrichmentPending({
     batchSize: Math.max(batchSize * 4, 100),

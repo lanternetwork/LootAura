@@ -11,7 +11,8 @@ describe('buildNeedsCheckRootCauseDiagnostics', () => {
       total: 10,
       scanned: 10,
       byBlockerCategory: {
-        address_enrichment_dependent: 0,
+        address_enrichment_retryable: 0,
+        address_enrichment_terminal: 0,
         address_gated: 8,
         precision_gated: 2,
         geocode_blocked: 0,

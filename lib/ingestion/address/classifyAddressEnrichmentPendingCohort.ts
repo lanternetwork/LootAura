@@ -53,7 +53,7 @@ export function evaluateAddressEnrichmentClaimEligibility(
     | 'lastAddressEnrichmentAttemptAt'
   >,
   nowMs: number,
-  cooldownMinutes = DEFAULT_ADDRESS_ENRICHMENT_CLAIM_COOLDOWN_MINUTES
+  cooldownMinutes: number = DEFAULT_ADDRESS_ENRICHMENT_CLAIM_COOLDOWN_MINUTES
 ): AddressEnrichmentClaimEligibility {
   const status = row.addressStatus ?? ''
   if (!CLAIM_STATUSES.has(status)) {
@@ -127,7 +127,7 @@ export function mapAddressEnrichmentFailureSubtype(input: {
 export function classifyAddressEnrichmentPendingCohortRow(
   row: AddressEnrichmentDrainCohortRow,
   nowMs: number,
-  cooldownMinutes = DEFAULT_ADDRESS_ENRICHMENT_CLAIM_COOLDOWN_MINUTES
+  cooldownMinutes: number = DEFAULT_ADDRESS_ENRICHMENT_CLAIM_COOLDOWN_MINUTES
 ): AddressEnrichmentPendingCohortClassification {
   if (row.addressEnrichmentAttempts >= MAX_ADDRESS_ENRICHMENT_ATTEMPTS) {
     return 'exhausted'

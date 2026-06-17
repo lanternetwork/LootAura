@@ -30,7 +30,7 @@ export function shouldReclassifyScheduleGatedAddressEnrichmentPending(
     | 'last_address_enrichment_attempt_at'
   >,
   nowMs: number,
-  cooldownMinutes = DEFAULT_ADDRESS_ENRICHMENT_CLAIM_COOLDOWN_MINUTES
+  cooldownMinutes: number = DEFAULT_ADDRESS_ENRICHMENT_CLAIM_COOLDOWN_MINUTES
 ): boolean {
   if (row.address_status !== 'address_enrichment_pending') {
     return false

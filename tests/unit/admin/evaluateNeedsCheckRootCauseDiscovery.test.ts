@@ -9,7 +9,8 @@ function sampleAnalysis(overrides: Partial<NeedsCheckRootCauseAnalysis> = {}): N
     total: 100,
     scanned: 100,
     byBlockerCategory: {
-      address_enrichment_dependent: 0,
+      address_enrichment_retryable: 0,
+      address_enrichment_terminal: 0,
       address_gated: 70,
       precision_gated: 20,
       geocode_blocked: 5,

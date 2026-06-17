@@ -58,7 +58,8 @@ function minimalMetrics(
       total: 802,
       scanned: 802,
       byBlockerCategory: {
-        address_enrichment_dependent: 777,
+        address_enrichment_retryable: 777,
+        address_enrichment_terminal: 0,
         address_gated: 1,
         precision_gated: 0,
         geocode_blocked: 8,

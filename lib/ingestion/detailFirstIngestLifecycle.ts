@@ -39,19 +39,6 @@ export function resolveDetailFirstIngestLifecycle(input: {
     }
   }
 
-  if (input.nativeFirst) {
-    return {
-      status: 'needs_check',
-      lifecycle: {
-        addressStatus: 'address_enrichment_pending',
-        canonicalSourceUrl: input.addressLifecycle.canonicalSourceUrl,
-        addressUnlockAt: input.addressLifecycle.addressUnlockAt,
-        nextEnrichmentAttemptAt: input.addressLifecycle.nextEnrichmentAttemptAt,
-        ingestStatus: 'needs_check',
-      },
-    }
-  }
-
   const addressStatus =
     input.addressLifecycle.addressStatus === 'address_available'
       ? 'address_enrichment_pending'

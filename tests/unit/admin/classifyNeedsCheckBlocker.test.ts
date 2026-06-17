@@ -41,7 +41,7 @@ describe('classifyNeedsCheckBlocker', () => {
     ).toBe('address_gated')
   })
 
-  it('classifies address enrichment dependent statuses', () => {
+  it('classifies address enrichment retryable statuses', () => {
     expect(
       classifyNeedsCheckBlocker({
         ...base,
@@ -49,7 +49,18 @@ describe('classifyNeedsCheckBlocker', () => {
         lat: null,
         lng: null,
       })
-    ).toBe('address_enrichment_dependent')
+    ).toBe('address_enrichment_retryable')
+  })
+
+  it('classifies address enrichment terminal separately from retryable', () => {
+    expect(
+      classifyNeedsCheckBlocker({
+        ...base,
+        addressStatus: 'address_unavailable_terminal',
+        lat: null,
+        lng: null,
+      })
+    ).toBe('address_enrichment_terminal')
   })
 
   it('classifies precision gated for locality', () => {
@@ -85,6 +96,8 @@ describe('classifyNeedsCheckBlocker', () => {
 
   it('maps categories to repair owners', () => {
     expect(blockerCategoryToRepairOwner('address_gated')).toBe('address_enrichment')
+    expect(blockerCategoryToRepairOwner('address_enrichment_retryable')).toBe('address_enrichment')
+    expect(blockerCategoryToRepairOwner('address_enrichment_terminal')).toBe('other')
     expect(blockerCategoryToRepairOwner('precision_gated')).toBe('precision_handling')
     expect(blockerCategoryToRepairOwner('geocode_blocked')).toBe('geocoding')
     expect(blockerCategoryToRepairOwner('publish_eligible_today')).toBe('catalog_repair')

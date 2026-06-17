@@ -200,7 +200,7 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
       crawlableConfigs: 924,
       throttleRecommended: false,
       lastDiscoveryRun: { ok: true },
-    } as YstmCoverageMetricsResponse['graphEnumeration'],
+    } as unknown as YstmCoverageMetricsResponse['graphEnumeration'],
     operationalHealth: { healthy: false, alerts: [] },
     falseExclusionAudit: {
       tracedCount: 538,
@@ -230,24 +230,29 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
     canonicalSaleInstance: {
       canonicalCoveragePct: 90.1,
       externalActiveRowsWithCanonicalKey: 100,
-    } as YstmCoverageMetricsResponse['canonicalSaleInstance'],
+    } as unknown as YstmCoverageMetricsResponse['canonicalSaleInstance'],
     crossProviderShadow: {
       shadowRecords24h: 0,
       falseNegativeCount7d: 0,
     } as YstmCoverageMetricsResponse['crossProviderShadow'],
     sourceUrlAlias: { totalAliasRows: 0 },
     saleInstanceShadowReplay: {
+      generatedAt: '2026-06-17T10:00:00Z',
       replayedCount: 538,
+      oldSuppressCount: 526,
+      newSuppressCount: 358,
+      wouldPublishCount: 180,
       divergenceOldSuppressNewPublishCount: 168,
       ambiguousCount: 0,
-    } as YstmCoverageMetricsResponse['saleInstanceShadowReplay'],
+      sampleDivergences: [],
+    } as unknown as YstmCoverageMetricsResponse['saleInstanceShadowReplay'],
     falseExclusionSaleIdentity: {
       duplicateVisibleSaleClusters24h: 8,
       coverageWithoutMatchMethod: 1652,
       ambiguousRequiresReview: 0,
       healthy: false,
       alerts: [],
-    } as YstmCoverageMetricsResponse['falseExclusionSaleIdentity'],
+    } as unknown as YstmCoverageMetricsResponse['falseExclusionSaleIdentity'],
     coverageBootstrap: {
       enabled: true,
       enabledAt: '2026-05-24T20:12:03.068+00:00',
@@ -311,13 +316,15 @@ describe('buildIngestionDiagnostics copy v1 integration', () => {
   it('prepends synthesized sections before live backlog', () => {
     const md = buildIngestionDiagnostics(minimalMetrics(), { ystmCoverage: minimalCoverage() })
     expect(md.indexOf('## SYSTEM ASSESSMENT')).toBeLessThan(md.indexOf('## Live backlog'))
-    expect(md).toContain('## PROJECT LEDGER')
+    expect(md.indexOf('## PROJECT LEDGER')).toBeLessThan(md.indexOf('## Live backlog'))
+    expect(md).toContain('## TOP FINDINGS')
   })
 
   it('renders enrichment and needs_check deep sections without ystmCoverage.ok', () => {
     const md = buildIngestionDiagnostics(minimalMetrics(), { ystmCoverage: null })
-    expect(md).toContain('## ADDRESS ENRICHMENT_DRAIN_REPAIR')
+    expect(md).toContain('## ADDRESS_ENRICHMENT_DRAIN_REPAIR')
     expect(md).toContain('## NEEDS_CHECK_ROOT_CAUSE_DISCOVERY')
     expect(md).not.toContain('## External marketplace nationwide coverage')
+    expect(md).toContain('## ADDRESS ENRICHMENT')
   })
 })

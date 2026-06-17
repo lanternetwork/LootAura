@@ -198,6 +198,7 @@ describe('buildIngestionDiagnostics', () => {
     })
 
     expect(md).toContain('# Ingestion Diagnostics')
+    expect(md).toContain('## SYSTEM ASSESSMENT')
     expect(md).toContain('Timestamp: 2026-05-18T13:00:00.000Z')
     expect(md).toContain('Environment: test-env')
     expect(md).toContain('Current bottleneck: none')

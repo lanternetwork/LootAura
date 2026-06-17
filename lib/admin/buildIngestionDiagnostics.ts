@@ -1,4 +1,5 @@
 import { buildAddressEnrichmentDrainDiagnostics } from '@/lib/admin/buildAddressEnrichmentDrainDiagnostics'
+import { buildIngestionDiagnosticCopyV1Sections } from '@/lib/admin/buildIngestionDiagnosticCopyV1Sections'
 import { buildNeedsCheckRootCauseDiagnostics } from '@/lib/admin/buildNeedsCheckRootCauseDiagnostics'
 import { evaluateNeedsCheckRootCauseDiscovery } from '@/lib/admin/evaluateNeedsCheckRootCauseDiscovery'
 import { buildYstmIngestionRepairDiagnostics } from '@/lib/admin/buildYstmIngestionRepairDiagnostics'
@@ -85,6 +86,7 @@ export function buildIngestionDiagnostics(
   const environment = options.environment ?? 'unknown'
 
   const duplicateSkipped = stageCount(stages, 'duplicate_skipped')
+  const coverage = options.ystmCoverage ?? null
 
   const lines: string[] = [
     '# Ingestion Diagnostics',
@@ -97,6 +99,8 @@ export function buildIngestionDiagnostics(
       data.detailFirstMetricsBaselineAt ?? 'not set (full 24h/7d windows)'
     ),
     bullet('metrics generated at', data.generatedAt),
+    '',
+    ...buildIngestionDiagnosticCopyV1Sections(data, coverage),
     '',
     '## Live backlog',
     bullet('ingested_sales backlog', data.backlog),
@@ -344,22 +348,23 @@ export function buildIngestionDiagnostics(
     bullet('published/hour', hourly.publishSucceededPerHour)
   )
 
-  if (options.ystmCoverage?.ok) {
-    lines.push('', buildYstmCoverageDiagnostics(options.ystmCoverage))
-    lines.push('', buildYstmStabilizationDiagnostics(data, options.ystmCoverage))
-    lines.push('', buildYstmIngestionRepairDiagnostics(data, options.ystmCoverage))
-    if (data.addressEnrichmentDrainCohort) {
-      lines.push('', buildAddressEnrichmentDrainDiagnostics(data.addressEnrichmentDrainCohort))
-    }
-    if (data.needsCheckRootCauseAnalysis) {
-      const discovery = evaluateNeedsCheckRootCauseDiscovery(
-        data.needsCheckRootCauseAnalysis,
-        data,
-        options.ystmCoverage,
-        data.generatedAt
-      )
-      lines.push('', buildNeedsCheckRootCauseDiagnostics(discovery, data.needsCheckBreakdown))
-    }
+  if (coverage?.ok) {
+    lines.push('', buildYstmCoverageDiagnostics(coverage))
+    lines.push('', buildYstmStabilizationDiagnostics(data, coverage))
+    lines.push('', buildYstmIngestionRepairDiagnostics(data, coverage))
+  }
+
+  if (data.addressEnrichmentDrainCohort) {
+    lines.push('', buildAddressEnrichmentDrainDiagnostics(data.addressEnrichmentDrainCohort))
+  }
+  if (data.needsCheckRootCauseAnalysis) {
+    const discovery = evaluateNeedsCheckRootCauseDiscovery(
+      data.needsCheckRootCauseAnalysis,
+      data,
+      coverage,
+      data.generatedAt
+    )
+    lines.push('', buildNeedsCheckRootCauseDiagnostics(discovery, data.needsCheckBreakdown))
   }
 
   return lines.join('\n')

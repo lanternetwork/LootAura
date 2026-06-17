@@ -25,7 +25,7 @@ export function buildAddressEnrichmentDrainDiagnostics(
   ]
 
   for (const key of ADDRESS_ENRICHMENT_PENDING_COHORT_CLASSIFICATIONS) {
-    const count = analysis.byClassification[key]
+    const count = analysis.byClassification[key] ?? 0
     if (count <= 0 && key !== 'unclassified') continue
     lines.push(`- ${key}: ${count.toLocaleString()} (${pct(count, analysis.total)})`)
   }

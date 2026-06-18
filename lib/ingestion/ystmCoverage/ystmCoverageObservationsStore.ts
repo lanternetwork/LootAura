@@ -2,6 +2,10 @@ import {
   markYstmCoverageObservationFirstIngested,
   markYstmCoverageObservationFirstPublished,
 } from '@/lib/ingestion/ystmCoverage/discoveryFreshness/ystmCoverageLifecycleTimestamps'
+import {
+  MISSING_INGEST_FETCH_FAILED_MAX_REPLAY_FAILURES,
+  MISSING_INGEST_TERMINAL_FAILURE_REASON,
+} from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedRecoveryConfig'
 import type { YstmCoverageInvalidReason } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
@@ -66,6 +70,33 @@ export type YstmCoverageMissingIngestionOutcome =
   | 'published'
   | 'ingested'
   | 'failed'
+  | 'terminal'
+
+export function buildFetchFailedReplayFailurePatch(
+  currentReplayCount: number,
+  nowIso: string = new Date().toISOString()
+): {
+  outcome: YstmCoverageMissingIngestionOutcome
+  failureReason: string
+  missingIngestionReplayCount: number
+  missingIngestionLastRetryAt: string
+} {
+  const nextCount = currentReplayCount + 1
+  if (nextCount >= MISSING_INGEST_FETCH_FAILED_MAX_REPLAY_FAILURES) {
+    return {
+      outcome: 'terminal',
+      failureReason: MISSING_INGEST_TERMINAL_FAILURE_REASON,
+      missingIngestionReplayCount: nextCount,
+      missingIngestionLastRetryAt: nowIso,
+    }
+  }
+  return {
+    outcome: 'failed',
+    failureReason: 'fetch_failed',
+    missingIngestionReplayCount: nextCount,
+    missingIngestionLastRetryAt: nowIso,
+  }
+}
 
 export type YstmCoverageObservationAggregate = {
   validActiveYstmUrls: number
@@ -99,6 +130,9 @@ export function buildMissingIngestionObservationUpdate(
     outcome: YstmCoverageMissingIngestionOutcome
     failureReason?: string | null
     lootauraVisible?: boolean
+    missingIngestionReplayCount?: number
+    missingIngestionLastRetryAt?: string | null
+    resetFetchFailedReplay?: boolean
   },
   nowIso: string = new Date().toISOString()
 ): Record<string, unknown> {
@@ -107,6 +141,15 @@ export function buildMissingIngestionObservationUpdate(
     missing_ingestion_outcome: patch.outcome,
     missing_ingestion_failure_reason: patch.failureReason ?? null,
     updated_at: nowIso,
+  }
+  if (patch.resetFetchFailedReplay) {
+    update.missing_ingestion_replay_count = 0
+    update.missing_ingestion_last_retry_at = null
+  } else if (patch.missingIngestionReplayCount != null) {
+    update.missing_ingestion_replay_count = patch.missingIngestionReplayCount
+  }
+  if (patch.missingIngestionLastRetryAt !== undefined) {
+    update.missing_ingestion_last_retry_at = patch.missingIngestionLastRetryAt
   }
   if (patch.lootauraVisible === true) {
     update.lootaura_visible = true
@@ -130,6 +173,9 @@ export async function recordYstmCoverageMissingIngestionOutcome(
     outcome: YstmCoverageMissingIngestionOutcome
     failureReason?: string | null
     lootauraVisible?: boolean
+    missingIngestionReplayCount?: number
+    missingIngestionLastRetryAt?: string | null
+    resetFetchFailedReplay?: boolean
   }
 ): Promise<void> {
   const nowIso = new Date().toISOString()
@@ -199,6 +245,9 @@ export async function aggregateYstmCoverageMissingIngestion(
           break
         case 'skipped_existing':
           missingIngestionSkippedExisting += 1
+          break
+        case 'terminal':
+          missingIngestionFailed += 1
           break
         default:
           break

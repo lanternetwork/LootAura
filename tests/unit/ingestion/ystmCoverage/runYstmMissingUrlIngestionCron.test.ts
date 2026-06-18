@@ -9,6 +9,14 @@ const mockAttemptDetailFirst = vi.hoisted(() => vi.fn())
 const mockRecordOutcome = vi.hoisted(() => vi.fn())
 const mockFromBase = vi.hoisted(() => vi.fn())
 
+const mockFetchFetchFailedCandidates = vi.hoisted(() => vi.fn())
+const mockLoadWouldPublish = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates', () => ({
+  fetchMissingIngestFetchFailedCandidates: mockFetchFetchFailedCandidates,
+  loadWouldPublishShadowCanonicalUrls: mockLoadWouldPublish,
+}))
+
 vi.mock('@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode', () => ({
   fetchCoverageBootstrapEnabled: vi.fn().mockResolvedValue(false),
 }))
@@ -50,9 +58,13 @@ vi.mock('@/lib/ingestion/acquisition/ystmDetailFirstReady', () => ({
   },
 }))
 
-vi.mock('@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore', () => ({
-  recordYstmCoverageMissingIngestionOutcome: mockRecordOutcome,
-}))
+vi.mock('@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore')>()
+  return {
+    ...actual,
+    recordYstmCoverageMissingIngestionOutcome: mockRecordOutcome,
+  }
+})
 
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: vi.fn(() => ({})),
@@ -73,6 +85,8 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockAttemptDetailFirst.mockReset()
     mockRecordOutcome.mockReset()
     mockFromBase.mockReset()
+    mockFetchFetchFailedCandidates.mockReset()
+    mockLoadWouldPublish.mockReset()
 
     mockAcquireLease.mockResolvedValue({
       acquired: true,
@@ -120,6 +134,8 @@ describe('runYstmMissingUrlIngestionCron', () => {
       metrics: { attempted: 1, published: 1, succeeded: 1, fallback: 0, fetchFailed: 0 },
     })
     mockRecordOutcome.mockResolvedValue(undefined)
+    mockLoadWouldPublish.mockResolvedValue(new Set<string>())
+    mockFetchFetchFailedCandidates.mockResolvedValue([])
   })
 
   it('skips when orchestration lease is active', async () => {
@@ -172,6 +188,75 @@ describe('runYstmMissingUrlIngestionCron', () => {
       'ystm_coverage_missing_ingestion',
       expect.anything(),
       expect.objectContaining({ nextCursor: 0, markCompleted: true })
+    )
+  })
+
+  it('runs fetch_failed priority pass before general missing queue', async () => {
+    const fetchFailedUrl =
+      'https://yardsaletreasuremap.com/US/Texas/Austin/100-Main-St/99999999/userlisting.html'
+    mockFetchFetchFailedCandidates.mockResolvedValue([
+      {
+        canonicalUrl: fetchFailedUrl,
+        city: 'Austin',
+        state: 'TX',
+        configKey: 'TX|Austin',
+        missingIngestionOutcome: 'failed',
+        missingIngestionAttemptedAt: '2026-06-10T00:00:00.000Z',
+        missingIngestionReplayCount: 1,
+        missingIngestionLastRetryAt: null,
+      },
+    ])
+    mockFetchPage.mockResolvedValue({
+      candidates: [
+        {
+          canonicalUrl: DETAIL_URL,
+          city: 'Louisville',
+          state: 'KY',
+          configKey: 'KY|Louisville',
+          missingIngestionOutcome: null,
+          missingIngestionAttemptedAt: null,
+        },
+      ],
+      queueOffset: 0,
+      queueTotal: 2,
+      nextQueueOffset: 1,
+    })
+    mockAttemptDetailFirst
+      .mockResolvedValueOnce({
+        result: { outcome: 'failed', reason: 'fetch_failed' },
+        metrics: { attempted: 1, published: 0, succeeded: 0, fallback: 0, fetchFailed: 1 },
+      })
+      .mockResolvedValueOnce({
+        result: { outcome: 'ready', ingestedSaleId: 'sale-1', published: true },
+        metrics: { attempted: 1, published: 1, succeeded: 1, fallback: 0, fetchFailed: 0 },
+      })
+
+    const { runYstmMissingUrlIngestionCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const result = await runYstmMissingUrlIngestionCron({} as never, {
+      budgets: {
+        maxAttemptsPerRun: 5,
+        maxCandidatesScannedPerRun: 10,
+        failedRetryHours: 6,
+        leaseSeconds: 300,
+        maxRuntimeMs: 60_000,
+      },
+    })
+
+    expect(result.telemetry.fetchFailedPriorityClaimed).toBe(1)
+    expect(result.telemetry.fetchFailedPriorityAttempts).toBe(1)
+    expect(result.telemetry.fetchFailedPriorityFailed).toBe(1)
+    expect(result.telemetry.published).toBe(1)
+    expect(mockAttemptDetailFirst).toHaveBeenCalledTimes(2)
+    expect(mockRecordOutcome).toHaveBeenCalledWith(
+      expect.anything(),
+      fetchFailedUrl,
+      expect.objectContaining({
+        outcome: 'failed',
+        failureReason: 'fetch_failed',
+        missingIngestionReplayCount: 2,
+      })
     )
   })
 })

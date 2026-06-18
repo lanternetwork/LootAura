@@ -1,3 +1,4 @@
+import { buildMissingIngestFetchFailedDiagnostics } from '@/lib/admin/buildMissingIngestFetchFailedDiagnostics'
 import { buildTerminalDispositionDiagnostics } from '@/lib/admin/buildTerminalDispositionDiagnostics'
 import { buildAddressEnrichmentSummaryDiagnostics } from '@/lib/admin/buildAddressEnrichmentSummaryDiagnostics'
 import { buildCatalogRepairSummaryDiagnostics } from '@/lib/admin/buildCatalogRepairSummaryDiagnostics'
@@ -34,6 +35,11 @@ export function buildIngestionDiagnosticCopyV1Sections(
     buildTerminalDispositionDiagnostics(metrics),
     buildCatalogRepairSummaryDiagnostics(metrics, coverage)
   )
+
+  if (coverage?.ok) {
+    const fetchFailed = buildMissingIngestFetchFailedDiagnostics(coverage)
+    if (fetchFailed) sections.push(fetchFailed)
+  }
 
   if (coverage?.ok) {
     const metros = buildStrategicMetroGapDiagnostics(coverage)

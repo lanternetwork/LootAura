@@ -51,6 +51,15 @@ export function minimalYstmCoverageScoreboard(
       missingIngestionSkippedExisting: 0,
       missingIngestionNeverAttempted: 3,
     },
+    missingIngestFetchFailed: {
+      retryableCount: 0,
+      terminalized: 0,
+      retriedLast24h: 0,
+      successfulReplaysLast24h: 0,
+      failedReplaysLast24h: 0,
+      ageDistribution: {},
+      oldestLastAttemptAt: null,
+    },
     existingRefresh: {
       externalIngestedTotal: 0,
       ystmDetailIngestedTotal: 0,

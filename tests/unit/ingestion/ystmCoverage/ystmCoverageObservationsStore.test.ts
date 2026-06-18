@@ -146,6 +146,49 @@ describe('buildMissingIngestionObservationUpdate', () => {
 
     expect(update.lootaura_visible).toBe(true)
   })
+
+  it('records fetch_failed replay increment and terminal transition', async () => {
+    const { buildFetchFailedReplayFailurePatch, buildMissingIngestionObservationUpdate } =
+      await import('@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore')
+
+    const secondFailure = buildFetchFailedReplayFailurePatch(1, NOW)
+    expect(secondFailure).toEqual({
+      outcome: 'failed',
+      failureReason: 'fetch_failed',
+      missingIngestionReplayCount: 2,
+      missingIngestionLastRetryAt: NOW,
+    })
+
+    const terminal = buildFetchFailedReplayFailurePatch(2, NOW)
+    expect(terminal.outcome).toBe('terminal')
+    expect(terminal.failureReason).toBe('missing_ingest_terminal')
+    expect(terminal.missingIngestionReplayCount).toBe(3)
+
+    const update = buildMissingIngestionObservationUpdate(
+      {
+        outcome: terminal.outcome,
+        failureReason: terminal.failureReason,
+        missingIngestionReplayCount: terminal.missingIngestionReplayCount,
+        missingIngestionLastRetryAt: terminal.missingIngestionLastRetryAt,
+      },
+      NOW
+    )
+    expect(update.missing_ingestion_replay_count).toBe(3)
+    expect(update.missing_ingestion_outcome).toBe('terminal')
+  })
+
+  it('resets fetch_failed replay counters on success', async () => {
+    const { buildMissingIngestionObservationUpdate } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    const update = buildMissingIngestionObservationUpdate(
+      { outcome: 'published', resetFetchFailedReplay: true },
+      NOW
+    )
+    expect(update.missing_ingestion_replay_count).toBe(0)
+    expect(update.missing_ingestion_last_retry_at).toBeNull()
+  })
 })
 
 describe('recordYstmCoverageMissingIngestionOutcome', () => {

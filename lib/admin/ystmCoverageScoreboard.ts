@@ -1,4 +1,8 @@
 import {
+  aggregateMissingIngestFetchFailed,
+  type MissingIngestFetchFailedAggregate,
+} from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates'
+import {
   aggregateYstmCoverageMissingIngestion,
   aggregateYstmCoverageObservations,
   type YstmCoverageMissingIngestionAggregate,
@@ -115,6 +119,7 @@ export type YstmCoverageScoreboard = {
   } | null
   sourceExpansion: YstmSourceExpansionMetrics
   missingIngestion: YstmCoverageMissingIngestionAggregate
+  missingIngestFetchFailed: MissingIngestFetchFailedAggregate
   existingRefresh: YstmExistingUrlRefreshAggregate
   catalogRepair: YstmCatalogRepairAggregate
   pipelineBacklog: YstmCoveragePipelineBacklog
@@ -184,6 +189,7 @@ export async function buildYstmCoverageScoreboard(
     sourceUrlAlias,
     runsResult,
     discoveryFreshnessResult,
+    missingIngestFetchFailed,
   ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
@@ -207,6 +213,7 @@ export async function buildYstmCoverageScoreboard(
       .order('completed_at', { ascending: false })
       .limit(48),
     loadYstmDiscoveryFreshnessMetrics(admin, now.getTime()),
+    aggregateMissingIngestFetchFailed(admin, now.getTime()),
   ])
 
   if (runsResult.error) {
@@ -349,6 +356,7 @@ export async function buildYstmCoverageScoreboard(
     sourceExpansion,
     graphEnumeration,
     missingIngestion,
+    missingIngestFetchFailed,
     existingRefresh,
     catalogRepair,
     pipelineBacklog,

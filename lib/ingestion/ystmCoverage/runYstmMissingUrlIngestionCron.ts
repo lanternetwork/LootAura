@@ -25,6 +25,12 @@ import {
   type YstmCoverageMissingIngestionBudgets,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageMissingIngestionConfig'
 import {
+  fetchMissingIngestFetchFailedCandidates,
+  loadWouldPublishShadowCanonicalUrls,
+} from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates'
+import { MISSING_INGEST_FETCH_FAILED_MAX_CLAIM_PER_RUN } from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedRecoveryConfig'
+import {
+  buildFetchFailedReplayFailurePatch,
   recordYstmCoverageMissingIngestionOutcome,
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
@@ -47,6 +53,13 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   skippedExisting: number
   skippedCooldown: number
   overlapPrevented: boolean
+  fetchFailedPriorityClaimed: number
+  fetchFailedPriorityAttempts: number
+  fetchFailedPriorityPublished: number
+  fetchFailedPriorityIngested: number
+  fetchFailedPriorityFailed: number
+  fetchFailedPriorityTerminalized: number
+  fetchFailedPrioritySkippedCooldown: number
 }
 
 export type YstmMissingUrlIngestionCronResult = {
@@ -111,6 +124,13 @@ export async function runYstmMissingUrlIngestionCron(
         skippedExisting: 0,
         skippedCooldown: 0,
         overlapPrevented: true,
+        fetchFailedPriorityClaimed: 0,
+        fetchFailedPriorityAttempts: 0,
+        fetchFailedPriorityPublished: 0,
+        fetchFailedPriorityIngested: 0,
+        fetchFailedPriorityFailed: 0,
+        fetchFailedPriorityTerminalized: 0,
+        fetchFailedPrioritySkippedCooldown: 0,
       },
     }
   }
@@ -126,7 +146,15 @@ export async function runYstmMissingUrlIngestionCron(
   let skippedVisible = 0
   let skippedExisting = 0
   let skippedCooldown = 0
+  let fetchFailedPriorityClaimed = 0
+  let fetchFailedPriorityAttempts = 0
+  let fetchFailedPriorityPublished = 0
+  let fetchFailedPriorityIngested = 0
+  let fetchFailedPriorityFailed = 0
+  let fetchFailedPriorityTerminalized = 0
+  let fetchFailedPrioritySkippedCooldown = 0
   const detailFirstMetrics = emptyYstmDetailFirstRunMetrics()
+  const processedCanonicalUrls = new Set<string>()
 
   try {
     const publishedIndex = await loadLootAuraPublishedYstmIndex(admin)
@@ -163,13 +191,81 @@ export async function runYstmMissingUrlIngestionCron(
           skippedExisting: 0,
           skippedCooldown: 0,
           overlapPrevented: false,
+          fetchFailedPriorityClaimed: 0,
+          fetchFailedPriorityAttempts: 0,
+          fetchFailedPriorityPublished: 0,
+          fetchFailedPriorityIngested: 0,
+          fetchFailedPriorityFailed: 0,
+          fetchFailedPriorityTerminalized: 0,
+          fetchFailedPrioritySkippedCooldown: 0,
         },
+      }
+    }
+
+    const wouldPublishUrls = await loadWouldPublishShadowCanonicalUrls(admin)
+    const fetchFailedCandidates = await fetchMissingIngestFetchFailedCandidates(admin, {
+      limit: MISSING_INGEST_FETCH_FAILED_MAX_CLAIM_PER_RUN,
+      nowMs: Date.now(),
+      wouldPublishUrls,
+    })
+    fetchFailedPriorityClaimed = fetchFailedCandidates.length
+
+    for (const candidate of fetchFailedCandidates) {
+      if (detailFirstAttempts >= budgets.maxAttemptsPerRun) break
+      if (Date.now() - startedMs >= budgets.maxRuntimeMs) break
+
+      const outcome = await processMissingIngestCandidate({
+        admin,
+        candidate,
+        publishedIndex,
+        budgets,
+        startedMs,
+        detailFirstMetrics,
+        onAttempt: () => {
+          detailFirstAttempts += 1
+          fetchFailedPriorityAttempts += 1
+        },
+        isFetchFailedReplay: true,
+      })
+
+      processedCanonicalUrls.add(candidate.canonicalUrl)
+      if (outcome.kind === 'skipped_cooldown') {
+        fetchFailedPrioritySkippedCooldown += 1
+        continue
+      }
+      if (outcome.kind === 'skipped_visible') {
+        skippedVisible += 1
+        continue
+      }
+      if (outcome.kind === 'skipped_existing') {
+        skippedExisting += 1
+        continue
+      }
+      if (outcome.kind === 'published') {
+        published += 1
+        fetchFailedPriorityPublished += 1
+        continue
+      }
+      if (outcome.kind === 'ingested') {
+        ingested += 1
+        fetchFailedPriorityIngested += 1
+        continue
+      }
+      if (outcome.kind === 'failed') {
+        failed += 1
+        fetchFailedPriorityFailed += 1
+        continue
+      }
+      if (outcome.kind === 'terminalized') {
+        failed += 1
+        fetchFailedPriorityTerminalized += 1
       }
     }
 
     for (const candidate of page.candidates) {
       if (detailFirstAttempts >= budgets.maxAttemptsPerRun) break
       if (Date.now() - startedMs >= budgets.maxRuntimeMs) break
+      if (processedCanonicalUrls.has(candidate.canonicalUrl)) continue
 
       if (
         !isEligibleForMissingIngestionRetry(candidate, Date.now(), budgets.failedRetryHours)
@@ -178,61 +274,42 @@ export async function runYstmMissingUrlIngestionCron(
         continue
       }
 
-      const canonical = candidate.canonicalUrl
-      if (publishedIndex.visibleCanonicalUrls.has(canonical)) {
-        skippedVisible += 1
-        await recordOutcome(admin, canonical, 'skipped_visible', { lootauraVisible: true })
-        continue
-      }
-
-      const existingPublishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, canonical)
-      if (existingPublishedId) {
-        skippedVisible += 1
-        await recordOutcome(admin, canonical, 'skipped_visible', { lootauraVisible: true })
-        continue
-      }
-
-      if (await hasNonDuplicateIngestedSale(admin, canonical)) {
-        skippedExisting += 1
-        await recordOutcome(admin, canonical, 'skipped_existing')
-        continue
-      }
-
-      const { config, listSeed, rowPayload } = buildCoverageMissingIngestionContext({
-        canonicalUrl: canonical,
-        city: candidate.city,
-        state: candidate.state,
-      })
-
-      detailFirstAttempts += 1
-      const { result, metrics } = await attemptYstmDetailFirstReady({
-        config,
-        listSeed,
-        platform: 'external_page_source',
-        rowPayload,
-        pageIndex: 0,
-        telemetryContext: {
-          adapter: 'ystm_coverage_missing_ingest',
-          configKey: candidate.configKey,
+      const outcome = await processMissingIngestCandidate({
+        admin,
+        candidate,
+        publishedIndex,
+        budgets,
+        startedMs,
+        detailFirstMetrics,
+        onAttempt: () => {
+          detailFirstAttempts += 1
         },
+        isFetchFailedReplay: false,
       })
-      mergeYstmDetailFirstMetrics(detailFirstMetrics, metrics)
 
-      if (result.outcome === 'ready') {
-        if (result.published) {
-          published += 1
-          await recordOutcome(admin, canonical, 'published', { lootauraVisible: true })
-        } else {
-          ingested += 1
-          await recordOutcome(admin, canonical, 'ingested')
-        }
+      if (outcome.kind === 'skipped_cooldown') {
+        skippedCooldown += 1
         continue
       }
-
-      failed += 1
-      await recordOutcome(admin, canonical, 'failed', {
-        failureReason: result.reason,
-      })
+      if (outcome.kind === 'skipped_visible') {
+        skippedVisible += 1
+        continue
+      }
+      if (outcome.kind === 'skipped_existing') {
+        skippedExisting += 1
+        continue
+      }
+      if (outcome.kind === 'published') {
+        published += 1
+        continue
+      }
+      if (outcome.kind === 'ingested') {
+        ingested += 1
+        continue
+      }
+      if (outcome.kind === 'failed' || outcome.kind === 'terminalized') {
+        failed += 1
+      }
     }
 
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
@@ -252,6 +329,12 @@ export async function runYstmMissingUrlIngestionCron(
       failed,
       skippedVisible,
       skippedExisting,
+      fetchFailedPriorityClaimed,
+      fetchFailedPriorityAttempts,
+      fetchFailedPriorityPublished,
+      fetchFailedPriorityIngested,
+      fetchFailedPriorityFailed,
+      fetchFailedPriorityTerminalized,
     })
 
     return {
@@ -272,6 +355,13 @@ export async function runYstmMissingUrlIngestionCron(
         skippedExisting,
         skippedCooldown,
         overlapPrevented: false,
+        fetchFailedPriorityClaimed,
+        fetchFailedPriorityAttempts,
+        fetchFailedPriorityPublished,
+        fetchFailedPriorityIngested,
+        fetchFailedPriorityFailed,
+        fetchFailedPriorityTerminalized,
+        fetchFailedPrioritySkippedCooldown,
       },
     }
   } catch (err) {
@@ -284,15 +374,125 @@ export async function runYstmMissingUrlIngestionCron(
   }
 }
 
+type MissingIngestCandidateLike = {
+  canonicalUrl: string
+  city: string | null
+  state: string | null
+  configKey: string | null
+  missingIngestionReplayCount?: number
+}
+
+type ProcessMissingIngestOutcome =
+  | { kind: 'skipped_cooldown' }
+  | { kind: 'skipped_visible' }
+  | { kind: 'skipped_existing' }
+  | { kind: 'published' }
+  | { kind: 'ingested' }
+  | { kind: 'failed' }
+  | { kind: 'terminalized' }
+
+async function processMissingIngestCandidate(params: {
+  admin: ReturnType<typeof getAdminDb>
+  candidate: MissingIngestCandidateLike
+  publishedIndex: Awaited<ReturnType<typeof loadLootAuraPublishedYstmIndex>>
+  budgets: YstmCoverageMissingIngestionBudgets
+  startedMs: number
+  detailFirstMetrics: YstmDetailFirstRunMetrics
+  onAttempt: () => void
+  isFetchFailedReplay: boolean
+}): Promise<ProcessMissingIngestOutcome> {
+  const { admin, candidate, publishedIndex, detailFirstMetrics, onAttempt, isFetchFailedReplay } =
+    params
+  const canonical = candidate.canonicalUrl
+
+  if (publishedIndex.visibleCanonicalUrls.has(canonical)) {
+    await recordOutcome(admin, canonical, 'skipped_visible', { lootauraVisible: true })
+    return { kind: 'skipped_visible' }
+  }
+
+  const existingPublishedId = await findPublishedIngestedSaleIdForDetailFirst(admin, canonical)
+  if (existingPublishedId) {
+    await recordOutcome(admin, canonical, 'skipped_visible', { lootauraVisible: true })
+    return { kind: 'skipped_visible' }
+  }
+
+  if (await hasNonDuplicateIngestedSale(admin, canonical)) {
+    await recordOutcome(admin, canonical, 'skipped_existing')
+    return { kind: 'skipped_existing' }
+  }
+
+  const { config, listSeed, rowPayload } = buildCoverageMissingIngestionContext({
+    canonicalUrl: canonical,
+    city: candidate.city,
+    state: candidate.state,
+  })
+
+  onAttempt()
+  const { result, metrics } = await attemptYstmDetailFirstReady({
+    config,
+    listSeed,
+    platform: 'external_page_source',
+    rowPayload,
+    pageIndex: 0,
+    telemetryContext: {
+      adapter: isFetchFailedReplay
+        ? 'ystm_coverage_missing_ingest_fetch_failed_replay'
+        : 'ystm_coverage_missing_ingest',
+      configKey: candidate.configKey,
+    },
+  })
+  mergeYstmDetailFirstMetrics(detailFirstMetrics, metrics)
+
+  if (result.outcome === 'ready') {
+    if (result.published) {
+      await recordOutcome(admin, canonical, 'published', {
+        lootauraVisible: true,
+        resetFetchFailedReplay: isFetchFailedReplay,
+      })
+      return { kind: 'published' }
+    }
+    await recordOutcome(admin, canonical, 'ingested', {
+      resetFetchFailedReplay: isFetchFailedReplay,
+    })
+    return { kind: 'ingested' }
+  }
+
+  if (isFetchFailedReplay && result.reason === 'fetch_failed') {
+    const replayPatch = buildFetchFailedReplayFailurePatch(
+      candidate.missingIngestionReplayCount ?? 0
+    )
+    await recordOutcome(admin, canonical, replayPatch.outcome, {
+      failureReason: replayPatch.failureReason,
+      missingIngestionReplayCount: replayPatch.missingIngestionReplayCount,
+      missingIngestionLastRetryAt: replayPatch.missingIngestionLastRetryAt,
+    })
+    return replayPatch.outcome === 'terminal' ? { kind: 'terminalized' } : { kind: 'failed' }
+  }
+
+  await recordOutcome(admin, canonical, 'failed', {
+    failureReason: result.reason,
+  })
+  return { kind: 'failed' }
+}
+
 async function recordOutcome(
   admin: ReturnType<typeof getAdminDb>,
   canonicalUrl: string,
   outcome: YstmCoverageMissingIngestionOutcome,
-  extra?: { failureReason?: string; lootauraVisible?: boolean }
+  extra?: {
+    failureReason?: string
+    lootauraVisible?: boolean
+    missingIngestionReplayCount?: number
+    missingIngestionLastRetryAt?: string | null
+    resetFetchFailedReplay?: boolean
+  }
 ): Promise<void> {
   await recordYstmCoverageMissingIngestionOutcome(admin, canonicalUrl, {
     outcome,
     failureReason: extra?.failureReason ?? null,
     lootauraVisible: extra?.lootauraVisible,
+    missingIngestionReplayCount: extra?.missingIngestionReplayCount,
+    missingIngestionLastRetryAt: extra?.missingIngestionLastRetryAt,
+    resetFetchFailedReplay: extra?.resetFetchFailedReplay,
   })
 }

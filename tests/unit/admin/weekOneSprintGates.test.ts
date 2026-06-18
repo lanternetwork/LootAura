@@ -7,6 +7,7 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import type { YstmCatalogRepairAggregate } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairStore'
 import type { YstmCoverageMissingIngestionAggregate } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import type { MissingIngestFetchFailedAggregate } from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates'
+import type { YstmExistingUrlRefreshAggregate } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
 import {
   FALSE_EXCLUSION_TRACE_BUCKETS,
   type FalseExclusionTraceBucket,

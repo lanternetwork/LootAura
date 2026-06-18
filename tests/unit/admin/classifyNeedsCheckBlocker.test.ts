@@ -61,6 +61,22 @@ describe('classifyNeedsCheckBlocker', () => {
         lng: null,
       })
     ).toBe('address_enrichment_terminal')
+    expect(
+      classifyNeedsCheckBlocker({
+        ...base,
+        addressStatus: 'address_terminal_active',
+        lat: null,
+        lng: null,
+      })
+    ).toBe('address_enrichment_terminal')
+    expect(
+      classifyNeedsCheckBlocker({
+        ...base,
+        addressStatus: 'address_terminal_archived',
+        lat: null,
+        lng: null,
+      })
+    ).toBe('address_enrichment_terminal')
   })
 
   it('classifies precision gated for locality', () => {

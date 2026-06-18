@@ -17,6 +17,7 @@ describe('ystmCatalogRepairCandidates', () => {
         source_url: DETAIL_URL,
         status: 'needs_geocode',
         published_sale_id: null,
+        address_status: null,
       })
     ).toBe(true)
   })
@@ -27,6 +28,7 @@ describe('ystmCatalogRepairCandidates', () => {
         source_url: 'https://example.com/x',
         status: 'needs_geocode',
         published_sale_id: null,
+        address_status: null,
       })
     ).toBe(false)
   })
@@ -37,8 +39,31 @@ describe('ystmCatalogRepairCandidates', () => {
         source_url: DETAIL_URL,
         status: 'ready',
         published_sale_id: 'sale-1',
+        address_status: null,
       })
     ).toBe(false)
+  })
+
+  it('rejects terminal disposition rows from repair queue scans', () => {
+    expect(
+      isCatalogRepairCandidateRow(
+        {
+          source_url: DETAIL_URL,
+          status: 'needs_check',
+          published_sale_id: null,
+          address_status: 'address_terminal_active',
+        },
+        { excludeTerminalDisposition: true }
+      )
+    ).toBe(false)
+    expect(
+      isCatalogRepairCandidateRow({
+        source_url: DETAIL_URL,
+        status: 'needs_check',
+        published_sale_id: null,
+        address_status: 'address_terminal_active',
+      })
+    ).toBe(true)
   })
 
   it('prioritizes publish_failed before address-gated needs_check', () => {

@@ -1,4 +1,5 @@
 import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
+import { isCatalogRepairExcludedTerminalAddressStatus } from '@/lib/ingestion/address/terminalAddressDisposition'
 import {
   YSTM_CATALOG_REPAIRABLE_STATUSES,
   type YstmCatalogRepairBudgets,
@@ -78,7 +79,10 @@ export function compareCatalogRepairCandidatePriority(
 }
 
 export function isCatalogRepairCandidateRow(
-  row: Pick<IngestedRow, 'source_url' | 'status' | 'published_sale_id'>
+  row: Pick<IngestedRow, 'source_url' | 'status' | 'published_sale_id'> & {
+    address_status?: string | null
+  },
+  options?: { excludeTerminalDisposition?: boolean }
 ): boolean {
   if (!isYstmDetailListingUrl(row.source_url)) return false
   if (!YSTM_CATALOG_REPAIRABLE_STATUSES.includes(row.status as (typeof YSTM_CATALOG_REPAIRABLE_STATUSES)[number])) {
@@ -86,6 +90,12 @@ export function isCatalogRepairCandidateRow(
   }
   if (row.status === 'published') return false
   if (row.published_sale_id && row.status !== 'publish_failed') return false
+  if (
+    options?.excludeTerminalDisposition &&
+    isCatalogRepairExcludedTerminalAddressStatus(row.address_status)
+  ) {
+    return false
+  }
   return true
 }
 
@@ -95,7 +105,7 @@ async function countCatalogRepairQueueTotal(admin: ReturnType<typeof getAdminDb>
   let from = 0
   for (;;) {
     const { data, error } = await fromBase(admin, 'ingested_sales')
-      .select('id, source_url, status, published_sale_id')
+      .select('id, source_url, status, published_sale_id, address_status')
       .eq('source_platform', 'external_page_source')
       .eq('is_duplicate', false)
       .in('status', [...YSTM_CATALOG_REPAIRABLE_STATUSES])
@@ -106,7 +116,7 @@ async function countCatalogRepairQueueTotal(admin: ReturnType<typeof getAdminDb>
     }
     const chunk = (data ?? []) as IngestedRow[]
     for (const row of chunk) {
-      if (isCatalogRepairCandidateRow(row)) total += 1
+      if (isCatalogRepairCandidateRow(row, { excludeTerminalDisposition: true })) total += 1
     }
     if (chunk.length < pageSize) break
     from += pageSize
@@ -153,7 +163,7 @@ export async function fetchCatalogRepairCandidatePage(
 
     for (const row of chunk) {
       examined += 1
-      if (!isCatalogRepairCandidateRow(row)) continue
+      if (!isCatalogRepairCandidateRow(row, { excludeTerminalDisposition: true })) continue
       const mapped: YstmCatalogRepairCandidate = {
         ingestedSaleId: row.id,
         sourceUrl: row.source_url,

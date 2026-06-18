@@ -184,6 +184,12 @@ export interface IngestionMetricsStuckRowSample {
   last_geocode_attempt_at: string | null
 }
 
+export interface TerminalDispositionMetrics {
+  terminalActive: number
+  terminalArchived: number
+  needsCheckLegacyIncludingArchived: number
+}
+
 export interface IngestionMetricsResponse {
   ok: boolean
   generatedAt: string
@@ -211,6 +217,8 @@ export interface IngestionMetricsResponse {
   needsCheckRootCauseAnalysis: NeedsCheckRootCauseAnalysis | null
   /** Workstreams A–B — address_enrichment_pending × provider_native drain cohort. */
   addressEnrichmentDrainCohort: AddressEnrichmentDrainCohortAnalysis | null
+  /** Terminal address disposition inventory (active vs archived). */
+  terminalDisposition: TerminalDispositionMetrics | null
   timeseries: {
     publishedByHour: Array<{ bucket: string; count: number }>
     ingestedPublishedByHour: Array<{ bucket: string; count: number }>

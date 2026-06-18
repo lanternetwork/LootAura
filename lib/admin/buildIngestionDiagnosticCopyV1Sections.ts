@@ -1,3 +1,4 @@
+import { buildTerminalDispositionDiagnostics } from '@/lib/admin/buildTerminalDispositionDiagnostics'
 import { buildAddressEnrichmentSummaryDiagnostics } from '@/lib/admin/buildAddressEnrichmentSummaryDiagnostics'
 import { buildCatalogRepairSummaryDiagnostics } from '@/lib/admin/buildCatalogRepairSummaryDiagnostics'
 import { buildIngestionActiveInvestigationsDiagnostics } from '@/lib/admin/buildIngestionActiveInvestigationsDiagnostics'
@@ -30,6 +31,7 @@ export function buildIngestionDiagnosticCopyV1Sections(
 
   sections.push(
     buildAddressEnrichmentSummaryDiagnostics(metrics, coverage),
+    buildTerminalDispositionDiagnostics(metrics),
     buildCatalogRepairSummaryDiagnostics(metrics, coverage)
   )
 

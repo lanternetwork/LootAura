@@ -19,7 +19,7 @@ function thenableQuery(result: { data?: unknown; error?: unknown; count?: number
     data: Array.isArray(result.data) ? (result.data[0] ?? null) : (result.data ?? null),
     error: result.error ?? null,
   }
-  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'ilike', 'order', 'limit', 'range', 'gte']) {
+  for (const m of ['select', 'eq', 'neq', 'in', 'is', 'or', 'not', 'ilike', 'order', 'limit', 'range', 'gte', 'gt', 'lte', 'lt']) {
     q[m] = vi.fn(() => q)
   }
   q.maybeSingle = vi.fn(() => Promise.resolve(maybeSingleResult))
@@ -42,7 +42,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     mockFromBase.mockImplementation((_admin, table: string) => {
       switch (table) {
         case 'ystm_coverage_observations':
-          return thenableQuery({ data: [] })
+          return thenableQuery({ data: [], count: 0 })
         case 'ystm_coverage_audit_runs':
           return thenableQuery({ data: [] })
         case 'sales':

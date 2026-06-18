@@ -34,6 +34,7 @@ export type FalseExclusionSecondaryTag =
   | 'config_crawl_excluded'
   | 'missing_ingest_never_attempted'
   | 'missing_ingest_failed'
+  | 'missing_ingest_terminal'
   | 'catalog_repair_queue'
   | 'observation_stale'
 

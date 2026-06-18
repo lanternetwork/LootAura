@@ -3,7 +3,8 @@ export const ADDRESS_STATUSES = [
   'address_gated',
   'address_enrichment_pending',
   'address_enrichment_retry',
-  'address_unavailable_terminal',
+  'address_terminal_active',
+  'address_terminal_archived',
 ] as const
 
 export type AddressStatus = (typeof ADDRESS_STATUSES)[number]

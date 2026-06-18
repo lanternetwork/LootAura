@@ -1,5 +1,6 @@
 import { validateResolvedAddressForPublish } from '@/lib/ingestion/publishValidation'
 import { isCoordinatePrecisionPublishable } from '@/lib/geocode/geocodePrecisionPolicy'
+import { isTerminalAddressDisposition } from '@/lib/ingestion/address/terminalAddressDisposition'
 import type { FailureReason } from '@/lib/ingestion/types'
 import type { NeedsCheckBlockerCategory, NeedsCheckRepairOwner } from '@/lib/admin/needsCheckRootCauseTypes'
 
@@ -22,7 +23,7 @@ export const NEEDS_CHECK_CLASSIFICATION_RULES_SUMMARY = [
   'Mutually exclusive categories; first matching rule wins (precedence top → bottom).',
   '1. geocode_blocked — failure_details.geocode_dead_letter present.',
   '2. address_gated — address_status = address_gated (enrichment waiting / schedule-gated).',
-  '3. address_enrichment_terminal — address_status = address_unavailable_terminal (enrichment exhausted).',
+  '3. address_enrichment_terminal — address_status ∈ terminal disposition (active/archived/legacy unavailable).',
   '4. address_enrichment_retryable — address_status ∈ {address_enrichment_pending, address_enrichment_retry}.',
   '5. precision_gated — coordinate_precision ∈ {locality, city_centroid} (non-publishable precision policy).',
   '6. publish_eligible_today — address_status = address_available, publishable precision, coordinates present, address passes publish validation, listing not past end date.',
@@ -93,7 +94,7 @@ export function classifyNeedsCheckBlocker(input: NeedsCheckClassificationInput):
     return 'address_gated'
   }
 
-  if (addressStatus === 'address_unavailable_terminal') {
+  if (isTerminalAddressDisposition(addressStatus)) {
     return 'address_enrichment_terminal'
   }
 

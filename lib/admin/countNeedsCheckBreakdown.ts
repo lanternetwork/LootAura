@@ -1,4 +1,5 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { isArchivedTerminalAddressStatus, isActiveTerminalAddressStatus } from '@/lib/ingestion/address/terminalAddressDisposition'
 
 export type NeedsCheckBreakdownPair = {
   addressStatus: string
@@ -8,6 +9,9 @@ export type NeedsCheckBreakdownPair = {
 
 export type NeedsCheckBreakdown = {
   total: number
+  legacyTotalIncludingArchivedTerminal: number
+  terminalActive: number
+  terminalArchived: number
   scanned: number
   byAddressStatus: Record<string, number>
   byCoordinatePrecision: Record<string, number>
@@ -33,6 +37,9 @@ export async function countNeedsCheckBreakdown(): Promise<NeedsCheckBreakdown> {
   const byCoordinatePrecision: Record<string, number> = {}
   const pairCounts = new Map<string, NeedsCheckBreakdownPair>()
   let scanned = 0
+  let terminalActive = 0
+  let terminalArchived = 0
+  let activeTotal = 0
 
   for (;;) {
     const { data, error } = await fromBase(admin, 'ingested_sales')
@@ -51,7 +58,16 @@ export async function countNeedsCheckBreakdown(): Promise<NeedsCheckBreakdown> {
 
     for (const row of chunk) {
       scanned += 1
-      const addressStatus = bucketKey(row.address_status)
+      const addressStatusRaw = row.address_status
+      if (isArchivedTerminalAddressStatus(addressStatusRaw)) {
+        terminalArchived += 1
+        continue
+      }
+      if (isActiveTerminalAddressStatus(addressStatusRaw)) {
+        terminalActive += 1
+      }
+      activeTotal += 1
+      const addressStatus = bucketKey(addressStatusRaw)
       const coordinatePrecision = bucketKey(row.coordinate_precision)
       byAddressStatus[addressStatus] = (byAddressStatus[addressStatus] ?? 0) + 1
       byCoordinatePrecision[coordinatePrecision] =
@@ -76,7 +92,10 @@ export async function countNeedsCheckBreakdown(): Promise<NeedsCheckBreakdown> {
     .slice(0, 12)
 
   return {
-    total: scanned,
+    total: activeTotal,
+    legacyTotalIncludingArchivedTerminal: scanned,
+    terminalActive,
+    terminalArchived,
     scanned,
     byAddressStatus,
     byCoordinatePrecision,

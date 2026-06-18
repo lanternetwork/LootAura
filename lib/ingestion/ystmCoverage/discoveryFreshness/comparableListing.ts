@@ -8,6 +8,8 @@ export type ComparableListingObservationRow = {
 
 const TERMINAL_ADDRESS_BUCKETS = new Set([
   'address_unavailable_terminal',
+  'address_terminal_active',
+  'address_terminal_archived',
   'address_validation_failed_terminal',
 ])
 

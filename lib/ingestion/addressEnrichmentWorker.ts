@@ -26,8 +26,10 @@ import {
   isUnlockScheduledInFuture,
   resolveEnrichmentAddressCandidate,
 } from '@/lib/ingestion/address/resolveEnrichmentAddressCandidate'
+import { archiveCooledTerminalAddressDisposition } from '@/lib/ingestion/address/archiveTerminalAddressDisposition'
 import { reconcileExhaustedAddressEnrichmentPending } from '@/lib/ingestion/address/reconcileExhaustedAddressEnrichmentPending'
 import { reconcileScheduleGatedAddressEnrichmentPending } from '@/lib/ingestion/address/reconcileScheduleGatedAddressEnrichmentPending'
+import { terminalActiveAddressStatusForEntry } from '@/lib/ingestion/address/terminalAddressDisposition'
 
 export { INGESTED_ADDRESS_ENRICHMENT_DETAILS_SCHEMA_VERSION } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
 
@@ -39,6 +41,7 @@ export type AddressEnrichmentWorkerSummary = {
   stillGated: number
   exhaustedReconciled: number
   scheduleGatedReconciled: number
+  terminalArchived: number
   byFailureReason: Partial<Record<AddressEnrichmentFailureReason, number>>
 }
 
@@ -151,7 +154,9 @@ async function processAddressEnrichmentRow(
     const isTerminal =
       attemptCount >= MAX_ADDRESS_ENRICHMENT_ATTEMPTS ||
       (reason === 'not_found' && attemptCount >= ADDRESS_NOT_FOUND_TERMINAL_THRESHOLD)
-    const nextStatus: AddressStatus = isTerminal ? 'address_unavailable_terminal' : 'address_enrichment_retry'
+    const nextStatus: AddressStatus = isTerminal
+      ? terminalActiveAddressStatusForEntry()
+      : 'address_enrichment_retry'
     const nextAt = computeNextEnrichmentAttemptAt(null, now.getTime(), `${canonical}:${attemptCount}`)
     await persistRowAddressOutcome(admin, rowId, {
       address_status: nextStatus,
@@ -161,6 +166,7 @@ async function processAddressEnrichmentRow(
       failure_details: mergeAddressEnrichmentDetails(row.failure_details, {
         lastReason: reason,
         attemptCount,
+        ...(isTerminal ? { recordTerminalEntry: true } : {}),
       }),
     })
     emitObservabilityRecord(
@@ -245,7 +251,7 @@ async function processAddressEnrichmentRow(
     const terminal = reason === 'max_attempts_exceeded'
     const nextAt = terminal ? null : computeNextEnrichmentAttemptAt(null, now.getTime(), `${canonical}:parse:${attemptCount}`)
     await persistRowAddressOutcome(admin, rowId, {
-      address_status: terminal ? 'address_unavailable_terminal' : 'address_enrichment_retry',
+      address_status: terminal ? terminalActiveAddressStatusForEntry() : 'address_enrichment_retry',
       next_enrichment_attempt_at: nextAt?.toISOString() ?? null,
       address_enrichment_failure_reason: reason,
       status: 'needs_check',
@@ -253,6 +259,7 @@ async function processAddressEnrichmentRow(
         lastReason: reason,
         attemptCount,
         ...(resolvedAddress.source ? { resolvedAddressSource: resolvedAddress.source } : {}),
+        ...(terminal ? { recordTerminalEntry: true } : {}),
       }),
     })
     return { outcome: terminal ? 'terminal' : 'retriable', reason }
@@ -338,8 +345,14 @@ export async function enrichPendingAddresses(options?: {
     stillGated: 0,
     exhaustedReconciled: 0,
     scheduleGatedReconciled: 0,
+    terminalArchived: 0,
     byFailureReason: {},
   }
+
+  const archiveSummary = await archiveCooledTerminalAddressDisposition({
+    batchSize: Math.max(batchSize * 4, 100),
+  })
+  summary.terminalArchived = archiveSummary.archived
 
   const scheduleGatedSummary = await reconcileScheduleGatedAddressEnrichmentPending({
     batchSize: Math.max(batchSize * 4, 100),

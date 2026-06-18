@@ -22,7 +22,9 @@ export async function aggregateYstmCatalogRepair(
 
   for (;;) {
     const { data, error } = await fromBase(admin, 'ingested_sales')
-      .select('source_url, status, published_sale_id, catalog_repair_outcome, catalog_repair_attempted_at')
+      .select(
+        'source_url, status, published_sale_id, address_status, catalog_repair_outcome, catalog_repair_attempted_at'
+      )
       .eq('source_platform', 'external_page_source')
       .eq('is_duplicate', false)
       .in('status', [...YSTM_CATALOG_REPAIRABLE_STATUSES])
@@ -35,11 +37,12 @@ export async function aggregateYstmCatalogRepair(
       source_url: string
       status: string
       published_sale_id: string | null
+      address_status: string | null
       catalog_repair_outcome: string | null
       catalog_repair_attempted_at: string | null
     }>
     for (const row of chunk) {
-      if (!isCatalogRepairCandidateRow(row)) continue
+      if (!isCatalogRepairCandidateRow(row, { excludeTerminalDisposition: true })) continue
       repairQueueTotal += 1
       if (row.status === 'needs_geocode') needsGeocode += 1
       if (row.status === 'ready') readyUnpublished += 1

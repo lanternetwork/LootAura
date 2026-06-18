@@ -1,4 +1,5 @@
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { isArchivedTerminalAddressStatus } from '@/lib/ingestion/address/terminalAddressDisposition'
 import {
   classifyNeedsCheckBlocker,
   collectFailureSignals,
@@ -91,6 +92,7 @@ export async function analyzeNeedsCheckRootCause(now: Date = new Date()): Promis
   const failureSignals: Record<string, number> = {}
   const pairCounts = new Map<string, { addressStatus: string; coordinatePrecision: string; count: number }>()
   let scanned = 0
+  let terminalArchived = 0
 
   for (;;) {
     const { data, error } = await fromBase(admin, 'ingested_sales')
@@ -108,6 +110,10 @@ export async function analyzeNeedsCheckRootCause(now: Date = new Date()): Promis
 
     for (const row of chunk) {
       scanned += 1
+      if (isArchivedTerminalAddressStatus(row.address_status)) {
+        terminalArchived += 1
+        continue
+      }
       const input = toClassificationInput(row, nowMs)
       const category = classifyNeedsCheckBlocker(input)
       byBlockerCategory[category] += 1
@@ -139,7 +145,7 @@ export async function analyzeNeedsCheckRootCause(now: Date = new Date()): Promis
     from += pageSize
   }
 
-  const total = scanned
+  const total = scanned - terminalArchived
   const allPairs = [...pairCounts.values()]
     .sort((a, b) => b.count - a.count)
     .map((pair) => ({

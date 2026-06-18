@@ -524,8 +524,16 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
     const efficiency =
       claimed24h > 0 ? Math.round((published24h / claimed24h) * 1000) / 1000 : null
 
+    const terminalDisposition = {
+      terminalActive: addressLifecycleMetrics.byStatus.address_terminal_active ?? 0,
+      terminalArchived: addressLifecycleMetrics.byStatus.address_terminal_archived ?? 0,
+      needsCheckLegacyIncludingArchived: statusMap.needs_check,
+    }
+
     const failureBreakdown = {
-      needs_check: statusMap.needs_check,
+      needs_check:
+        needsCheckBreakdown?.total ??
+        Math.max(0, statusMap.needs_check - terminalDisposition.terminalArchived),
       publish_failed: statusMap.publish_failed,
       expired: statusMap.expired,
       ready: statusMap.ready,
@@ -733,6 +741,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       needsCheckBreakdown,
       needsCheckRootCauseAnalysis,
       addressEnrichmentDrainCohort,
+      terminalDisposition,
       timeseries: {
         publishedByHour: mapToSortedSeries(publishedByHour),
         ingestedPublishedByHour: mapToSortedSeries(ingestedPublishedByHour),

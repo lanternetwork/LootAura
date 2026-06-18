@@ -27,6 +27,7 @@ import {
   type CrawlSkipTaxonomyRollup,
 } from '@/lib/admin/crawlSkipTaxonomyMetrics'
 import { funnelIsoCutoff } from '@/lib/admin/ingestionMetricsBaseline'
+import { isTerminalAddressDisposition } from '@/lib/ingestion/address/terminalAddressDisposition'
 import { mergeDetailFirstInsertFailedByDbCode } from '@/lib/ingestion/acquisition/ystmDetailFirstReady'
 import {
   dedupeDenominatorFromAggregate,
@@ -255,7 +256,7 @@ export function hasCoordinates(row: Pick<IngestedSaleFunnelRow, 'lat' | 'lng'>):
 }
 
 export function hasInvalidAddress(row: IngestedSaleFunnelRow): boolean {
-  if (row.address_status === 'address_unavailable_terminal') return true
+  if (isTerminalAddressDisposition(row.address_status)) return true
   const reasons = failureReasonList(row.failure_reasons)
   return reasons.includes('missing_address') || reasons.includes('invalid_address_format')
 }

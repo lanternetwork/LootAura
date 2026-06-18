@@ -3,6 +3,7 @@ import {
   type AddressStatus,
 } from '@/lib/ingestion/address/addressLifecycleTypes'
 import { mergeAddressEnrichmentDetails } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
+import { terminalActiveAddressStatusForEntry } from '@/lib/ingestion/address/terminalAddressDisposition'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
@@ -48,7 +49,7 @@ export async function reconcileExhaustedAddressEnrichmentPending(options?: {
 
     const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
       .update({
-        address_status: 'address_unavailable_terminal',
+        address_status: terminalActiveAddressStatusForEntry(),
         address_enrichment_failure_reason: 'max_attempts_exceeded',
         next_enrichment_attempt_at: null,
         status: 'needs_check',
@@ -58,6 +59,7 @@ export async function reconcileExhaustedAddressEnrichmentPending(options?: {
             lastReason: 'max_attempts_exceeded',
             attemptCount: attempts,
             reconciledExhausted: true,
+            recordTerminalEntry: true,
           }
         ),
       })

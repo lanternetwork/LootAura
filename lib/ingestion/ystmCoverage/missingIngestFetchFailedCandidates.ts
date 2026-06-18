@@ -222,47 +222,46 @@ export async function aggregateMissingIngestFetchFailed(
     }
   }
 
-  const countQuery = async (filters: (q: ReturnType<typeof fromBase>) => ReturnType<typeof fromBase>) => {
-    const base = fromBase(admin, 'ystm_coverage_observations').select('canonical_url', {
-      count: 'exact',
-      head: true,
-    })
-    const { count, error } = await filters(base)
-    if (error) {
-      throw new Error(error.message)
-    }
-    return count ?? 0
+  const terminalizedResult = await fromBase(admin, 'ystm_coverage_observations')
+    .select('canonical_url', { count: 'exact', head: true })
+    .eq('missing_ingestion_outcome', 'terminal')
+    .eq('missing_ingestion_failure_reason', MISSING_INGEST_TERMINAL_FAILURE_REASON)
+  if (terminalizedResult.error) {
+    throw new Error(terminalizedResult.error.message)
   }
 
-  const [terminalized, retriedLast24h, successfulReplaysLast24h, failedReplaysLast24h] =
-    await Promise.all([
-      countQuery((q) =>
-        q
-          .eq('missing_ingestion_outcome', 'terminal')
-          .eq('missing_ingestion_failure_reason', MISSING_INGEST_TERMINAL_FAILURE_REASON)
-      ),
-      countQuery((q) => q.gte('missing_ingestion_last_retry_at', retriedCutoffIso)),
-      countQuery((q) =>
-        q
-          .gt('missing_ingestion_replay_count', 0)
-          .in('missing_ingestion_outcome', ['published', 'ingested'])
-          .gte('missing_ingestion_attempted_at', retriedCutoffIso)
-      ),
-      countQuery((q) =>
-        q
-          .eq('missing_ingestion_outcome', 'failed')
-          .eq('missing_ingestion_failure_reason', 'fetch_failed')
-          .gt('missing_ingestion_replay_count', 0)
-          .gte('missing_ingestion_last_retry_at', retriedCutoffIso)
-      ),
-    ])
+  const retriedLast24hResult = await fromBase(admin, 'ystm_coverage_observations')
+    .select('canonical_url', { count: 'exact', head: true })
+    .gte('missing_ingestion_last_retry_at', retriedCutoffIso)
+  if (retriedLast24hResult.error) {
+    throw new Error(retriedLast24hResult.error.message)
+  }
+
+  const successfulReplaysLast24hResult = await fromBase(admin, 'ystm_coverage_observations')
+    .select('canonical_url', { count: 'exact', head: true })
+    .gt('missing_ingestion_replay_count', 0)
+    .in('missing_ingestion_outcome', ['published', 'ingested'])
+    .gte('missing_ingestion_attempted_at', retriedCutoffIso)
+  if (successfulReplaysLast24hResult.error) {
+    throw new Error(successfulReplaysLast24hResult.error.message)
+  }
+
+  const failedReplaysLast24hResult = await fromBase(admin, 'ystm_coverage_observations')
+    .select('canonical_url', { count: 'exact', head: true })
+    .eq('missing_ingestion_outcome', 'failed')
+    .eq('missing_ingestion_failure_reason', 'fetch_failed')
+    .gt('missing_ingestion_replay_count', 0)
+    .gte('missing_ingestion_last_retry_at', retriedCutoffIso)
+  if (failedReplaysLast24hResult.error) {
+    throw new Error(failedReplaysLast24hResult.error.message)
+  }
 
   return {
     retryableCount: retryableCandidates.length,
-    terminalized,
-    retriedLast24h,
-    successfulReplaysLast24h,
-    failedReplaysLast24h,
+    terminalized: terminalizedResult.count ?? 0,
+    retriedLast24h: retriedLast24hResult.count ?? 0,
+    successfulReplaysLast24h: successfulReplaysLast24hResult.count ?? 0,
+    failedReplaysLast24h: failedReplaysLast24hResult.count ?? 0,
     ageDistribution,
     oldestLastAttemptAt,
   }

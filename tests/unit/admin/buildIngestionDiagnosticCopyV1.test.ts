@@ -197,6 +197,15 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
       configsWithoutSourcePages: 500,
     },
     missingIngestion: {} as YstmCoverageMetricsResponse['missingIngestion'],
+    missingIngestFetchFailed: {
+      retryableCount: 10,
+      terminalized: 0,
+      retriedLast24h: 2,
+      successfulReplaysLast24h: 1,
+      failedReplaysLast24h: 1,
+      ageDistribution: { '7-30d': 8, '30-90d': 2 },
+      oldestLastAttemptAt: '2026-05-20T10:00:00.000Z',
+    },
     existingRefresh: { staleOver12h: 22332 } as YstmCoverageMetricsResponse['existingRefresh'],
     catalogRepair: {
       repairQueueTotal: 805,
@@ -403,6 +412,7 @@ describe('buildIngestionDiagnosticCopyV1Sections', () => {
     const enrichment = md.indexOf('## ADDRESS ENRICHMENT')
     const terminal = md.indexOf('## TERMINAL ADDRESS DISPOSITION')
     const repair = md.indexOf('## CATALOG REPAIR')
+    const fetchFailed = md.indexOf('## MISSING INGEST FETCH FAILED')
     const metros = md.indexOf('## STRATEGIC METRO GAPS')
     const seo = md.indexOf('## SEO READINESS')
     const ledger = md.indexOf('## PROJECT LEDGER')
@@ -414,11 +424,13 @@ describe('buildIngestionDiagnosticCopyV1Sections', () => {
     expect(enrichment).toBeGreaterThan(freshness)
     expect(terminal).toBeGreaterThan(enrichment)
     expect(repair).toBeGreaterThan(terminal)
-    expect(metros).toBeGreaterThan(repair)
+    expect(fetchFailed).toBeGreaterThan(repair)
+    expect(metros).toBeGreaterThan(fetchFailed)
     expect(seo).toBeGreaterThan(metros)
     expect(ledger).toBeGreaterThan(seo)
     expect(md).toContain('95.5% of enrichment cohort never attempted')
     expect(md).toContain('freshness_risk')
+    expect(md).toContain('missing_ingest_fetch_failed_retryable')
     expect(md).toContain('phoenix-az')
   })
 })

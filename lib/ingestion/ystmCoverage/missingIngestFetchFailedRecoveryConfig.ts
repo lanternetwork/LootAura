@@ -1,0 +1,7 @@
+export const MISSING_INGEST_FETCH_FAILED_MAX_REPLAY_FAILURES = 3 as const
+
+export const MISSING_INGEST_FETCH_FAILED_MAX_CLAIM_PER_RUN = 100 as const
+
+export const MISSING_INGEST_FETCH_FAILED_MIN_RETRY_INTERVAL_HOURS = 24 as const
+
+export const MISSING_INGEST_TERMINAL_FAILURE_REASON = 'missing_ingest_terminal' as const

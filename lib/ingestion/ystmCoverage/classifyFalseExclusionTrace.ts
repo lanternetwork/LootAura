@@ -1,4 +1,5 @@
 import { isCatalogRepairCandidateRow } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairCandidates'
+import { MISSING_INGEST_TERMINAL_FAILURE_REASON } from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedRecoveryConfig'
 import {
   type FalseExclusionSecondaryTag,
   type FalseExclusionTraceBucket,
@@ -289,6 +290,16 @@ export function classifyFalseExclusionTrace(input: ClassifyFalseExclusionInput):
         primaryBucket: 'url_duplicate_suppressed',
         secondaryTags: tags,
         summary: 'Missing-ingest cron skipped: non-duplicate ingested row already exists for URL.',
+        evidence,
+      }
+    }
+
+    if (outcome === 'terminal' && observation.missingIngestionFailureReason === MISSING_INGEST_TERMINAL_FAILURE_REASON) {
+      tags.push('missing_ingest_terminal')
+      return {
+        primaryBucket: 'detail_first_fallback',
+        secondaryTags: tags,
+        summary: 'Missing-ingest fetch_failed exhausted bounded replays (terminal).',
         evidence,
       }
     }

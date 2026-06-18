@@ -6,6 +6,7 @@ import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import type { YstmCatalogRepairAggregate } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairStore'
 import type { YstmCoverageMissingIngestionAggregate } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+import type { MissingIngestFetchFailedAggregate } from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates'
 import type { YstmExistingUrlRefreshAggregate } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
 import {
   FALSE_EXCLUSION_TRACE_BUCKETS,
@@ -43,6 +44,16 @@ const missingIngestionFixture: YstmCoverageMissingIngestionAggregate = {
   missingIngestionSkippedVisible: 0,
   missingIngestionSkippedExisting: 0,
   missingIngestionNeverAttempted: 3,
+}
+
+const missingIngestFetchFailedFixture: MissingIngestFetchFailedAggregate = {
+  retryableCount: 0,
+  terminalized: 0,
+  retriedLast24h: 0,
+  successfulReplaysLast24h: 0,
+  failedReplaysLast24h: 0,
+  ageDistribution: {},
+  oldestLastAttemptAt: null,
 }
 
 const existingRefreshFixture: YstmExistingUrlRefreshAggregate = {
@@ -117,6 +128,7 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
     lastRun: null,
     sourceExpansion: sourceExpansionFixture,
     missingIngestion: missingIngestionFixture,
+    missingIngestFetchFailed: missingIngestFetchFailedFixture,
     existingRefresh: existingRefreshFixture,
     catalogRepair: catalogRepairFixture,
     pipelineBacklog: {

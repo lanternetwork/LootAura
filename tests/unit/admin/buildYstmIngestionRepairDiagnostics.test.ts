@@ -16,6 +16,9 @@ describe('buildYstmIngestionRepairDiagnostics', () => {
         },
         needsCheckBreakdown: {
           total: 3,
+          legacyTotalIncludingArchivedTerminal: 3,
+          terminalActive: 0,
+          terminalArchived: 0,
           scanned: 3,
           byAddressStatus: { address_gated: 2, address_available: 1 },
           byCoordinatePrecision: { locality: 2, rooftop: 1 },

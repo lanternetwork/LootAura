@@ -79,7 +79,9 @@ export function compareCatalogRepairCandidatePriority(
 }
 
 export function isCatalogRepairCandidateRow(
-  row: Pick<IngestedRow, 'source_url' | 'status' | 'published_sale_id' | 'address_status'>,
+  row: Pick<IngestedRow, 'source_url' | 'status' | 'published_sale_id'> & {
+    address_status?: string | null
+  },
   options?: { excludeTerminalDisposition?: boolean }
 ): boolean {
   if (!isYstmDetailListingUrl(row.source_url)) return false

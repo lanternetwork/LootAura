@@ -100,6 +100,11 @@ function minimalMetrics(
       },
       dominantFailureSubtype: 'never_attempted',
     },
+    terminalDisposition: {
+      terminalActive: 614,
+      terminalArchived: 0,
+      needsCheckLegacyIncludingArchived: 802,
+    },
     funnel: {
       '24h': {
         stages: [],
@@ -396,6 +401,7 @@ describe('buildIngestionDiagnosticCopyV1Sections', () => {
     const investigations = md.indexOf('## ACTIVE INVESTIGATIONS')
     const freshness = md.indexOf('## DISCOVERY FRESHNESS')
     const enrichment = md.indexOf('## ADDRESS ENRICHMENT')
+    const terminal = md.indexOf('## TERMINAL ADDRESS DISPOSITION')
     const repair = md.indexOf('## CATALOG REPAIR')
     const metros = md.indexOf('## STRATEGIC METRO GAPS')
     const seo = md.indexOf('## SEO READINESS')
@@ -406,7 +412,8 @@ describe('buildIngestionDiagnosticCopyV1Sections', () => {
     expect(investigations).toBeGreaterThan(findings)
     expect(freshness).toBeGreaterThan(investigations)
     expect(enrichment).toBeGreaterThan(freshness)
-    expect(repair).toBeGreaterThan(enrichment)
+    expect(terminal).toBeGreaterThan(enrichment)
+    expect(repair).toBeGreaterThan(terminal)
     expect(metros).toBeGreaterThan(repair)
     expect(seo).toBeGreaterThan(metros)
     expect(ledger).toBeGreaterThan(seo)

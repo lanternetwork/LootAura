@@ -42,6 +42,9 @@ describe('buildNeedsCheckRootCauseDiagnostics', () => {
       },
       needsCheckBreakdown: {
         total: 10,
+        legacyTotalIncludingArchivedTerminal: 10,
+        terminalActive: 0,
+        terminalArchived: 0,
         scanned: 10,
         byAddressStatus: { address_gated: 8, address_available: 2 },
         byCoordinatePrecision: { locality: 8, exact_address: 2 },

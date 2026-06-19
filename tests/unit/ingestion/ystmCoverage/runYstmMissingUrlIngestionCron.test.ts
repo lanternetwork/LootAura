@@ -14,6 +14,7 @@ const mockLoadWouldPublish = vi.hoisted(() => vi.fn())
 const mockCountHot = vi.hoisted(() => vi.fn())
 const mockCountCold = vi.hoisted(() => vi.fn())
 const mockFetchHot = vi.hoisted(() => vi.fn())
+const mockAttemptListFast = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates', () => ({
   fetchMissingIngestFetchFailedCandidates: mockFetchFetchFailedCandidates,
@@ -47,7 +48,7 @@ vi.mock('@/lib/ingestion/acquisition/promoteExistingIngestedSaleForDetailFirst',
 }))
 
 vi.mock('@/lib/ingestion/acquisition/ystmListFastPublish', () => ({
-  attemptYstmListFastPublish: vi.fn().mockResolvedValue({ outcome: 'failed', reason: 'test_skip' }),
+  attemptYstmListFastPublish: mockAttemptListFast,
 }))
 
 vi.mock('@/lib/ingestion/acquisition/ystmDetailFirstReady', () => ({
@@ -85,6 +86,30 @@ vi.mock('@/lib/supabase/clients', () => ({
 const DETAIL_URL =
   'https://yardsaletreasuremap.com/US/Kentucky/Louisville/1802-Devondale-Dr/38754131/userlisting.html'
 
+const HOT_URL =
+  'https://yardsaletreasuremap.com/US/Texas/Austin/100-Main-St/88888888/userlisting.html'
+
+const HOT_LIST_METADATA = {
+  sourceUrl: HOT_URL,
+  title: 'Hot queue sale',
+  address: '100 Main St',
+  startDate: '2026-07-01',
+  endDate: '2026-07-02',
+  lat: 30.27,
+  lng: -97.74,
+  description: null,
+  imageUrls: [],
+  postedAt: null,
+}
+
+const DEFAULT_BUDGETS = {
+  maxAttemptsPerRun: 5,
+  maxCandidatesScannedPerRun: 10,
+  failedRetryHours: 6,
+  leaseSeconds: 300,
+  maxRuntimeMs: 60_000,
+}
+
 describe('runYstmMissingUrlIngestionCron', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -98,6 +123,10 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockFromBase.mockReset()
     mockFetchFetchFailedCandidates.mockReset()
     mockLoadWouldPublish.mockReset()
+    mockCountHot.mockReset()
+    mockCountCold.mockReset()
+    mockFetchHot.mockReset()
+    mockAttemptListFast.mockReset()
 
     mockAcquireLease.mockResolvedValue({
       acquired: true,
@@ -150,6 +179,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockCountHot.mockResolvedValue(0)
     mockCountCold.mockResolvedValue(1)
     mockFetchHot.mockResolvedValue([])
+    mockAttemptListFast.mockResolvedValue({ outcome: 'failed', reason: 'test_skip' })
   })
 
   it('skips when orchestration lease is active', async () => {
@@ -164,13 +194,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
       '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
     )
     const result = await runYstmMissingUrlIngestionCron({} as never, {
-      budgets: {
-        maxAttemptsPerRun: 5,
-        maxCandidatesScannedPerRun: 10,
-        failedRetryHours: 6,
-        leaseSeconds: 300,
-        maxRuntimeMs: 60_000,
-      },
+      budgets: DEFAULT_BUDGETS,
     })
     expect(result.telemetry.skipped).toBe(true)
     expect(result.telemetry.overlapPrevented).toBe(true)
@@ -182,13 +206,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
       '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
     )
     const result = await runYstmMissingUrlIngestionCron({} as never, {
-      budgets: {
-        maxAttemptsPerRun: 5,
-        maxCandidatesScannedPerRun: 10,
-        failedRetryHours: 6,
-        leaseSeconds: 300,
-        maxRuntimeMs: 60_000,
-      },
+      budgets: DEFAULT_BUDGETS,
     })
     expect(result.telemetry.published).toBe(1)
     expect(result.telemetry.detailFirstAttempts).toBe(1)
@@ -249,13 +267,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
       '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
     )
     const result = await runYstmMissingUrlIngestionCron({} as never, {
-      budgets: {
-        maxAttemptsPerRun: 5,
-        maxCandidatesScannedPerRun: 10,
-        failedRetryHours: 6,
-        leaseSeconds: 300,
-        maxRuntimeMs: 60_000,
-      },
+      budgets: DEFAULT_BUDGETS,
     })
 
     expect(result.telemetry.fetchFailedPriorityClaimed).toBe(1)
@@ -272,5 +284,131 @@ describe('runYstmMissingUrlIngestionCron', () => {
         missingIngestionReplayCount: 2,
       })
     )
+  })
+
+  it('computes positive hot budget and fetch limit when hot queue exists', async () => {
+    mockCountHot.mockResolvedValue(54)
+    mockCountCold.mockResolvedValue(570)
+
+    const { runYstmMissingUrlIngestionCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const result = await runYstmMissingUrlIngestionCron({} as never, {
+      budgets: DEFAULT_BUDGETS,
+    })
+
+    expect(result.telemetry.hotQueueTotal).toBe(54)
+    expect(result.telemetry.reservedHotBudget).toBeGreaterThan(0)
+    expect(result.telemetry.hotFetchLimit).toBeGreaterThan(0)
+    expect(mockFetchHot).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ limit: result.telemetry.hotFetchLimit })
+    )
+    expect(mockFetchPage).not.toHaveBeenCalled()
+  })
+
+  it('processes hot candidates before cold and skips cold while hot queue exists', async () => {
+    mockCountHot.mockResolvedValue(2)
+    mockCountCold.mockResolvedValue(5)
+    mockFetchHot.mockResolvedValue([
+      {
+        canonicalUrl: HOT_URL,
+        city: 'Austin',
+        state: 'TX',
+        configKey: 'TX|Austin',
+        missingIngestionOutcome: null,
+        missingIngestionAttemptedAt: null,
+        discoveryPriority: 'hot',
+        listMetadataSnapshot: HOT_LIST_METADATA,
+        firstListSeenAt: '2026-06-19T20:00:00.000Z',
+      },
+    ])
+    mockAttemptListFast.mockResolvedValue({
+      outcome: 'published',
+      ingestedSaleId: 'sale-hot-1',
+    })
+
+    const { runYstmMissingUrlIngestionCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const result = await runYstmMissingUrlIngestionCron({} as never, {
+      budgets: DEFAULT_BUDGETS,
+    })
+
+    expect(mockFetchHot).toHaveBeenCalled()
+    expect(mockFetchPage).not.toHaveBeenCalled()
+    expect(result.telemetry.hotCandidatesScanned).toBe(1)
+    expect(result.telemetry.hotCandidatesAttempted).toBe(1)
+    expect(result.telemetry.listFastAttempts).toBe(1)
+    expect(result.telemetry.listFastPublished).toBe(1)
+    expect(mockAttemptDetailFirst).not.toHaveBeenCalled()
+  })
+
+  it('drains cold queue when hot queue is empty', async () => {
+    mockCountHot.mockResolvedValue(0)
+    mockCountCold.mockResolvedValue(3)
+
+    const { runYstmMissingUrlIngestionCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const result = await runYstmMissingUrlIngestionCron({} as never, {
+      budgets: DEFAULT_BUDGETS,
+    })
+
+    expect(mockFetchHot).not.toHaveBeenCalled()
+    expect(mockFetchPage).toHaveBeenCalled()
+    expect(result.telemetry.coldCandidatesScanned).toBe(1)
+    expect(result.telemetry.hotFetchLimit).toBe(0)
+  })
+
+  it('increments list-fast failure counters for hot list-fast failures', async () => {
+    mockCountHot.mockResolvedValue(1)
+    mockCountCold.mockResolvedValue(0)
+    mockFetchHot.mockResolvedValue([
+      {
+        canonicalUrl: HOT_URL,
+        city: 'Austin',
+        state: 'TX',
+        configKey: 'TX|Austin',
+        missingIngestionOutcome: null,
+        missingIngestionAttemptedAt: null,
+        discoveryPriority: 'hot',
+        listMetadataSnapshot: HOT_LIST_METADATA,
+        firstListSeenAt: '2026-06-19T20:00:00.000Z',
+      },
+    ])
+    mockAttemptListFast.mockResolvedValue({ outcome: 'failed', reason: 'test_skip' })
+
+    const { runYstmMissingUrlIngestionCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const result = await runYstmMissingUrlIngestionCron({} as never, {
+      budgets: DEFAULT_BUDGETS,
+    })
+
+    expect(result.telemetry.listFastAttempts).toBe(1)
+    expect(result.telemetry.listFastFailed).toBe(1)
+    expect(result.telemetry.listFastPublished).toBe(0)
+    expect(result.telemetry.failed).toBe(1)
+  })
+})
+
+describe('hot missing ingest budget helpers', () => {
+  it('computeReservedHotBudget returns zero when hot queue is empty', async () => {
+    const { computeReservedHotBudget, computeHotFetchLimit } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    expect(computeReservedHotBudget(0, 60)).toBe(0)
+    expect(computeHotFetchLimit(0, 0, 200)).toBe(0)
+  })
+
+  it('computeReservedHotBudget and computeHotFetchLimit stay positive when hot queue exists', async () => {
+    const { computeReservedHotBudget, computeHotFetchLimit } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const reserved = computeReservedHotBudget(54, 60)
+    const fetchLimit = computeHotFetchLimit(54, reserved, 200)
+    expect(reserved).toBe(51)
+    expect(fetchLimit).toBe(102)
   })
 })

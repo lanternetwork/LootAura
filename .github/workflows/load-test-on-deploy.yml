@@ -2,6 +2,7 @@ name: Load Tests on Deployment
 
 permissions:
   contents: read
+  actions: write
 
 on:
   deployment_status:

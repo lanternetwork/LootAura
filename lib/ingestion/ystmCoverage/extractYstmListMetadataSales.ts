@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
+import { extractDateRangeFromText } from '@/lib/ingestion/adapters/externalPageSource'
 import { isYstmIngestibleListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { parseYstmListMetadataDateValue } from '@/lib/ingestion/ystmCoverage/ystmListMetadataDate'
 
@@ -111,8 +112,6 @@ function resolveDates(sale: MetadataSaleShape): { startDate: string | null; endD
   if (!endDate && startDate) endDate = startDate
   return { startDate, endDate }
 }
-
-import { extractDateRangeFromText } from '@/lib/ingestion/saleWindowDates'
 
 function saleRowToMetadata(
   sale: MetadataSaleShape,

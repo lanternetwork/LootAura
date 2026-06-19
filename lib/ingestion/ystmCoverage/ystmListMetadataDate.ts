@@ -1,4 +1,4 @@
-import { extractDateRangeFromText } from '@/lib/ingestion/saleWindowDates'
+import { extractDateRangeFromText } from '@/lib/ingestion/adapters/externalPageSource'
 
 function epochSecondsToIsoDate(epoch: number): string | null {
   if (!Number.isFinite(epoch) || epoch <= 0) return null

@@ -1,5 +1,5 @@
 import { JSDOM } from 'jsdom'
-import { extractDateRangeFromText } from '@/lib/ingestion/saleWindowDates'
+import { extractDateRangeFromText } from '@/lib/ingestion/adapters/externalPageSource'
 import { parseYstmListMetadataDateValue } from '@/lib/ingestion/ystmCoverage/ystmListMetadataDate'
 
 export type YstmSalePhpParsed =

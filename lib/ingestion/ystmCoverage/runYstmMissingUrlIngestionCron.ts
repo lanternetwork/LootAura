@@ -16,6 +16,7 @@ import {
 import { loadLootAuraPublishedYstmIndex } from '@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex'
 import { buildCoverageMissingIngestionContext, buildListMetadataIngestionContext } from '@/lib/ingestion/ystmCoverage/ystmCoverageMissingListSeed'
 import {
+  countColdMissingQueueTotal,
   countHotMissingQueueTotal,
   fetchColdMissingIngestionCandidatePage,
   fetchHotMissingIngestionCandidates,
@@ -252,7 +253,14 @@ export async function runYstmMissingUrlIngestionCron(
 
         if (
           !opts.isFetchFailedReplay &&
-          !isEligibleForMissingIngestionRetry(candidate, Date.now(), budgets.failedRetryHours)
+          !isEligibleForMissingIngestionRetry(
+            {
+              missingIngestionOutcome: candidate.missingIngestionOutcome ?? null,
+              missingIngestionAttemptedAt: candidate.missingIngestionAttemptedAt ?? null,
+            },
+            Date.now(),
+            budgets.failedRetryHours
+          )
         ) {
           skippedCooldown += 1
           continue
@@ -421,6 +429,8 @@ type MissingIngestCandidateLike = {
   city: string | null
   state: string | null
   configKey: string | null
+  missingIngestionOutcome?: string | null
+  missingIngestionAttemptedAt?: string | null
   missingIngestionReplayCount?: number
   discoveryPriority?: string | null
   listMetadataSnapshot?: import('@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales').YstmListMetadataSale | null

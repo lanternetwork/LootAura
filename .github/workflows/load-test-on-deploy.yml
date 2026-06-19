@@ -1,7 +1,8 @@
-name: Load Tests on Deployment
+﻿name: Load Tests on Deployment
 
 permissions:
   contents: read
+  actions: write
 
 on:
   deployment_status:
@@ -42,7 +43,6 @@ jobs:
     uses: lanternetwork/LootAura/.github/workflows/load-test.yml@main
     if: needs.determine-url.result == 'success' && needs.determine-url.outputs.url != ''
     needs: determine-url
-    continue-on-error: true
     with:
       baseURL: ${{ needs.determine-url.outputs.url }}
       scenario: all

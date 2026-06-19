@@ -11,6 +11,9 @@ const mockFromBase = vi.hoisted(() => vi.fn())
 
 const mockFetchFetchFailedCandidates = vi.hoisted(() => vi.fn())
 const mockLoadWouldPublish = vi.hoisted(() => vi.fn())
+const mockCountHot = vi.hoisted(() => vi.fn())
+const mockCountCold = vi.hoisted(() => vi.fn())
+const mockFetchHot = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates', () => ({
   fetchMissingIngestFetchFailedCandidates: mockFetchFetchFailedCandidates,
@@ -27,9 +30,9 @@ vi.mock('@/lib/ingestion/ingestionOrchestrationLease', () => ({
 }))
 
 vi.mock('@/lib/ingestion/ystmCoverage/ystmCoverageMissingCandidates', () => ({
-  countHotMissingQueueTotal: vi.fn().mockResolvedValue(0),
-  countColdMissingQueueTotal: vi.fn().mockResolvedValue(1),
-  fetchHotMissingIngestionCandidates: vi.fn().mockResolvedValue([]),
+  countHotMissingQueueTotal: mockCountHot,
+  countColdMissingQueueTotal: mockCountCold,
+  fetchHotMissingIngestionCandidates: mockFetchHot,
   fetchColdMissingIngestionCandidatePage: mockFetchPage,
   fetchMissingIngestionCandidatePage: mockFetchPage,
   isEligibleForMissingIngestionRetry: vi.fn(() => true),
@@ -144,6 +147,9 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockRecordOutcome.mockResolvedValue(undefined)
     mockLoadWouldPublish.mockResolvedValue(new Set<string>())
     mockFetchFetchFailedCandidates.mockResolvedValue([])
+    mockCountHot.mockResolvedValue(0)
+    mockCountCold.mockResolvedValue(1)
+    mockFetchHot.mockResolvedValue([])
   })
 
   it('skips when orchestration lease is active', async () => {

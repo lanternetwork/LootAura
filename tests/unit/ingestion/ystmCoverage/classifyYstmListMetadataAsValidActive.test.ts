@@ -44,7 +44,7 @@ describe('classifyYstmListMetadataAsValidActive', () => {
   it('rejects gated-only rows', () => {
     const result = classifyYstmListMetadataAsValidActive(
       baseSale({
-        address: 'See source for address after 2026-05-08',
+        address: null,
         lat: null,
         lng: null,
       })

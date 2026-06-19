@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getRlsBaseClient, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { normalizeDraftPayload } from '@/lib/draft/normalize'
+import { sanitizeSaleDraftPayloadDescriptions } from '@/lib/sanitizePersistableDescription'
 import { ok, fail } from '@/lib/http/json'
 import { computePublishability, type DraftRecord } from '@/lib/drafts/computePublishability'
 import * as Sentry from '@sentry/nextjs'
@@ -256,7 +257,7 @@ async function postDraftHandler(request: NextRequest) {
       return fail(400, 'VALIDATION_ERROR', 'Invalid draft payload', validationResult.error)
     }
 
-    const validatedPayload = validationResult.data
+    const validatedPayload = sanitizeSaleDraftPayloadDescriptions(validationResult.data)
     const title = validatedPayload.formData?.title || null
 
     // Normalize payload for consistent hashing (server-side normalization)

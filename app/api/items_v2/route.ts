@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { fromBase } from '@/lib/supabase/clients'
 import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
+import {
+  sanitizePersistableDescription,
+  ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+} from '@/lib/sanitizePersistableDescription'
 import { logger } from '@/lib/log'
 import { z } from 'zod'
 
@@ -172,7 +176,7 @@ export async function POST(request: NextRequest) {
     const insertPayload: any = {
       sale_id: validatedBody.sale_id,
       name: itemTitle,
-      description: validatedBody.description,
+      description: sanitizePersistableDescription(validatedBody.description, ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH),
       price: validatedBody.price,
       category: validatedBody.category,
       condition: validatedBody.condition,
@@ -331,7 +335,10 @@ export async function PUT(request: NextRequest) {
       updatePayload.name = (validatedBody.title ?? validatedBody.name) as string
     }
     if (validatedBody.description !== undefined) {
-      updatePayload.description = validatedBody.description
+      updatePayload.description = sanitizePersistableDescription(
+        validatedBody.description,
+        ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH
+      )
     }
     if (validatedBody.price !== undefined) {
       updatePayload.price = validatedBody.price

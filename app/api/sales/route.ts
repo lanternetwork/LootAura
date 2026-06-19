@@ -14,6 +14,11 @@ import { z } from 'zod'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 import { sanitizePostgrestIlikeQuery } from '@/lib/sanitize'
+import {
+  sanitizePersistableDescription,
+  SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+  ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+} from '@/lib/sanitizePersistableDescription'
 import { buildSalesCacheKey, getSalesApiCache, setSalesApiCache } from '@/lib/cache/salesApiCache'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { isPostgrestMissingModerationStatusColumn } from '@/lib/sales/isPostgrestMissingModerationStatusColumn'
@@ -1196,7 +1201,8 @@ async function postHandler(request: NextRequest) {
       }, { status: 400 })
     }
     
-    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
+    const { title, description: rawDescription, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
+    const description = sanitizePersistableDescription(rawDescription, SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH)
     
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -1506,7 +1512,14 @@ async function postHandler(request: NextRequest) {
     // Use the same client instance for items insertion (RLS policy items_owner_insert ensures sale ownership)
     let itemCount = 0
     if (body.items?.length) {
-      const withSale = body.items.map((it: any) => ({ ...it, sale_id: data.id }))
+      const withSale = body.items.map((it: any) => ({
+        ...it,
+        sale_id: data.id,
+        description:
+          typeof it.description === 'string'
+            ? sanitizePersistableDescription(it.description, ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH)
+            : it.description ?? null,
+      }))
       const { error: iErr } = await fromBase(rls, 'items').insert(withSale)
       if (iErr) {
         const { logger } = await import('@/lib/log')

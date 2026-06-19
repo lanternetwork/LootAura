@@ -7,6 +7,11 @@ import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
 import { deleteSaleAndItemsForRollback } from '@/lib/data/draftsPublishRollback'
 import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
+import {
+  sanitizePersistableDescription,
+  SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+  ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+} from '@/lib/sanitizePersistableDescription'
 
 export const dynamic = 'force-dynamic'
 
@@ -303,7 +308,7 @@ export async function POST(request: NextRequest) {
     const salePayload = {
       owner_id: user.id,
       title: formData.title,
-      description: formData.description || null,
+      description: sanitizePersistableDescription(formData.description, SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH),
       address: formatSaleAddressForPersist(formData.address, formData.city, formData.state),
       city: formData.city,
       state: formData.state,
@@ -358,7 +363,7 @@ export async function POST(request: NextRequest) {
       const payload: any = {
         sale_id: createdSaleId,
         name: item.name,
-        description: item.description || null,
+        description: sanitizePersistableDescription(item.description, ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH),
         price: item.price || null,
         category: item.category || null,
         // Always set both fields for consistency (base table is authoritative)

@@ -114,6 +114,17 @@ export const BOOTSTRAP_COVERAGE_EXISTING_REFRESH: CoverageExistingRefreshBudgetP
   staleSyncHoursCap: 168,
 }
 
+export const FRESH_DISCOVERY: CoverageAuditBudgetProfile = {
+  maxConfigsPerRun: 120,
+  maxConfigsCap: 120,
+  maxListFetchesPerRun: 120,
+  maxListFetchesCap: 120,
+  maxDetailValidationsPerRun: 0,
+  maxDetailValidationsCap: 0,
+  maxUrlsPerListPage: 200,
+  maxUrlsPerListPageCap: 200,
+}
+
 /** Minimum hours bootstrap must run before auto-disable on exit criteria. */
 export const COVERAGE_BOOTSTRAP_MIN_ENABLED_HOURS = 24
 

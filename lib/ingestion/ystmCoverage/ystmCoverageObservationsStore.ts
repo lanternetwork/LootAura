@@ -11,6 +11,10 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 import type { YstmCoverageFootprintMatchMethod } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
 
+import type { YstmListMetadataSale } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
+
+export type YstmDiscoveryPriority = 'hot' | 'warm' | 'cold'
+
 export type YstmCoverageObservationUpsert = {
   canonicalUrl: string
   state: string
@@ -26,6 +30,11 @@ export type YstmCoverageObservationUpsert = {
   matchedIngestedSaleId?: string | null
   matchedSaleId?: string | null
   matchMethod?: YstmCoverageFootprintMatchMethod | null
+  listMetadataSnapshot?: YstmListMetadataSale | null
+  listMetadataHash?: string | null
+  discoveryPriority?: YstmDiscoveryPriority | null
+  appearanceSource?: string | null
+  ystmListingPostedAt?: string | null
 }
 
 export async function upsertYstmCoverageObservations(
@@ -49,6 +58,11 @@ export async function upsertYstmCoverageObservations(
     matched_ingested_sale_id: r.matchedIngestedSaleId ?? null,
     matched_sale_id: r.matchedSaleId ?? null,
     match_method: r.matchMethod ?? null,
+    list_metadata_snapshot: r.listMetadataSnapshot ?? null,
+    list_metadata_hash: r.listMetadataHash ?? null,
+    discovery_priority: r.discoveryPriority ?? null,
+    appearance_source: r.appearanceSource ?? null,
+    ystm_listing_posted_at: r.ystmListingPostedAt ?? null,
     updated_at: now,
   }))
 

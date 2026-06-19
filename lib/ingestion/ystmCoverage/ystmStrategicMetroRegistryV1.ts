@@ -15,7 +15,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Atlanta',
     state: 'GA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Georgia/Atlanta.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'austin-tx',
@@ -23,7 +23,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Austin',
     state: 'TX',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Texas/Austin.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'baltimore-md',
@@ -31,7 +31,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Baltimore',
     state: 'MD',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Maryland/Baltimore.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'boston-ma',
@@ -39,7 +39,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Boston',
     state: 'MA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Massachusetts/Boston.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'charlotte-nc',
@@ -47,7 +47,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Charlotte',
     state: 'NC',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/North-Carolina/Charlotte.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'chicago-il',
@@ -55,7 +55,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Chicago',
     state: 'IL',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Illinois/Chicago.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'cincinnati-oh',
@@ -63,7 +63,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Cincinnati',
     state: 'OH',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Ohio/Cincinnati.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'columbus-oh',
@@ -71,7 +71,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Columbus',
     state: 'OH',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Ohio/Columbus.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'dallas-tx',
@@ -79,7 +79,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Dallas',
     state: 'TX',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Texas/Dallas.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'detroit-mi',
@@ -87,7 +87,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Detroit',
     state: 'MI',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Michigan/Detroit.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'houston-tx',
@@ -95,7 +95,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Houston',
     state: 'TX',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Texas/Houston.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'indianapolis-in',
@@ -103,7 +103,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Indianapolis',
     state: 'IN',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Indiana/Indianapolis.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'jacksonville-fl',
@@ -111,7 +111,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Jacksonville',
     state: 'FL',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Florida/Jacksonville.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'kansas-city-mo',
@@ -119,7 +119,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Kansas City',
     state: 'MO',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Missouri/Kansas-City.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'las-vegas-nv',
@@ -127,7 +127,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Las Vegas',
     state: 'NV',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Nevada/Las-Vegas.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'los-angeles-ca',
@@ -135,7 +135,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Los Angeles',
     state: 'CA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/California/Los-Angeles.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'louisville-ky',
@@ -143,7 +143,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Louisville',
     state: 'KY',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Kentucky/Louisville.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'memphis-tn',
@@ -151,7 +151,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Memphis',
     state: 'TN',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Tennessee/Memphis.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'miami-fl',
@@ -159,7 +159,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Miami',
     state: 'FL',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Florida/Miami.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'minneapolis-mn',
@@ -167,7 +167,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Minneapolis',
     state: 'MN',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Minnesota/Minneapolis.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'nashville-tn',
@@ -175,7 +175,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Nashville',
     state: 'TN',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Tennessee/Nashville.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'new-orleans-la',
@@ -183,7 +183,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'New Orleans',
     state: 'LA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Louisiana/New-Orleans.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'new-york-city-ny',
@@ -191,7 +191,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'New York City',
     state: 'NY',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/New-York/New-York-City.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'oklahoma-city-ok',
@@ -199,7 +199,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Oklahoma City',
     state: 'OK',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Oklahoma/Oklahoma-City.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'orlando-fl',
@@ -207,7 +207,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Orlando',
     state: 'FL',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Florida/Orlando.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'philadelphia-pa',
@@ -215,7 +215,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Philadelphia',
     state: 'PA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Pennsylvania/Philadelphia.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'phoenix-az',
@@ -223,7 +223,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Phoenix',
     state: 'AZ',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Arizona/Phoenix.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'pittsburgh-pa',
@@ -231,7 +231,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Pittsburgh',
     state: 'PA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Pennsylvania/Pittsburgh.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'portland-or',
@@ -239,7 +239,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Portland',
     state: 'OR',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Oregon/Portland.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'raleigh-nc',
@@ -247,7 +247,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Raleigh',
     state: 'NC',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/North-Carolina/Raleigh.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'riverside-ca',
@@ -255,7 +255,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Riverside',
     state: 'CA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/California/Riverside.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'sacramento-ca',
@@ -263,7 +263,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Sacramento',
     state: 'CA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/California/Sacramento.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'saint-louis-mo',
@@ -271,7 +271,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Saint Louis',
     state: 'MO',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Missouri/Saint-Louis.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'san-antonio-tx',
@@ -279,7 +279,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'San Antonio',
     state: 'TX',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Texas/San-Antonio.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'san-diego-ca',
@@ -287,7 +287,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'San Diego',
     state: 'CA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/California/San-Diego.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'san-francisco-ca',
@@ -295,7 +295,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'San Francisco',
     state: 'CA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/California/San-Francisco.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'seattle-wa',
@@ -303,7 +303,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Seattle',
     state: 'WA',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Washington/Seattle.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'tampa-fl',
@@ -311,7 +311,7 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Tampa',
     state: 'FL',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/Florida/Tampa.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
   {
     slug: 'washington-dc',
@@ -319,6 +319,6 @@ export const YSTM_STRATEGIC_METRO_REGISTRY_V1: readonly YstmStrategicMetroRegist
     city: 'Washington',
     state: 'DC',
     principalPageUrl: 'https://yardsaletreasuremap.com/US/District-of-Columbia/Washington.html',
-    refreshTargetHours: 24,
+    refreshTargetHours: 2,
   },
 ] as const

@@ -16,6 +16,7 @@ describe('geocodePrecisionPolicy', () => {
     expect(isCoordinatePrecisionPublishable('city_centroid')).toBe(false)
     expect(isCoordinatePrecisionPublishable('exact_address')).toBe(true)
     expect(isCoordinatePrecisionPublishable('provider_native')).toBe(true)
+    expect(isCoordinatePrecisionPublishable('approximate')).toBe(true)
     expect(isCoordinatePrecisionPublishable(null)).toBe(true)
   })
 

@@ -206,7 +206,35 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
       'G4 hold days',
       `${data.sloAttainment.consecutiveDaysAtTarget}/${data.sloAttainment.requiredConsecutiveDays}`
     ),
-    bullet('footprintMeetsMinimum', data.sloAttainment.footprintMeetsProgramMinimum ? 'yes' : 'no')
+    bullet('footprintMeetsMinimum', data.sloAttainment.footprintMeetsProgramMinimum ? 'yes' : 'no'),
+    '',
+    '### YSTM_2HOUR_INGESTION',
+    bullet(
+      'p50 publish latency (hours)',
+      data.twoHourIngestion.p50PublishHours != null
+        ? data.twoHourIngestion.p50PublishHours.toFixed(2)
+        : '—'
+    ),
+    bullet(
+      'p95 publish latency (hours)',
+      data.twoHourIngestion.p95PublishHours != null
+        ? data.twoHourIngestion.p95PublishHours.toFixed(2)
+        : '—'
+    ),
+    bullet('hot queue depth', data.twoHourIngestion.hotQueueDepth),
+    bullet('warm queue depth', data.twoHourIngestion.warmQueueDepth),
+    bullet('cold queue depth', data.twoHourIngestion.coldQueueDepth),
+    bullet('over_2h_count', data.twoHourIngestion.over2hCount),
+    bullet(
+      'oldest hot age (hours)',
+      data.twoHourIngestion.oldestHotAgeHours?.toFixed(1) ?? '—'
+    ),
+    bullet('sale_php_unsupported_count', data.twoHourIngestion.salePhpUnsupportedCount),
+    bullet('list_fast_publish_success_count', data.twoHourIngestion.listFastPublishSuccessCount),
+    bullet('list_fast_publish_failure_count', data.twoHourIngestion.listFastPublishFailureCount),
+    bullet('SLA within 2h %', formatPct(data.twoHourIngestion.slaWithin2hPct)),
+    bullet('raw missing_valid', data.missingValidYstmUrls),
+    bullet('actionable missing valid', data.actionableMissingValid.actionableMissingValidYstmUrls)
   )
 
   return lines.join('\n')

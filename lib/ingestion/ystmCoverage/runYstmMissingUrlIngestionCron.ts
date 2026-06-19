@@ -181,11 +181,16 @@ export async function runYstmMissingUrlIngestionCron(
   const processedCanonicalUrls = new Set<string>()
 
   const steadyHotAttempts = Math.floor(STEADY_COVERAGE_MISSING_INGEST.maxAttemptsPerRun * HOT_MISSING_INGEST_BUDGET_RATIO)
-  const hotAttemptBudget = Math.max(
-    Math.floor(budgets.maxAttemptsPerRun * HOT_MISSING_INGEST_BUDGET_RATIO),
-    steadyHotAttempts
-  )
-  const coldAttemptBudget = Math.max(0, budgets.maxAttemptsPerRun - hotAttemptBudget)
+  const reservedHotBudget =
+    hotQueueTotal > 0
+      ? Math.min(
+          budgets.maxAttemptsPerRun,
+          Math.max(
+            Math.floor(budgets.maxAttemptsPerRun * HOT_MISSING_INGEST_BUDGET_RATIO),
+            Math.min(steadyHotAttempts, budgets.maxAttemptsPerRun)
+          )
+        )
+      : 0
 
   try {
     const publishedIndex = await loadLootAuraPublishedYstmIndex(admin)
@@ -332,7 +337,7 @@ export async function runYstmMissingUrlIngestionCron(
 
     if (hotQueueTotal > 0) {
       const hotCandidates = await fetchHotMissingIngestionCandidates(admin, {
-        limit: Math.min(budgets.maxCandidatesScannedPerRun, hotAttemptBudget * 2),
+        limit: Math.min(budgets.maxCandidatesScannedPerRun, reservedHotBudget * 2),
         budgets,
       })
       hotCandidatesScanned = hotCandidates.length
@@ -342,7 +347,7 @@ export async function runYstmMissingUrlIngestionCron(
       })
     }
 
-    if (hotQueueTotal === 0 && coldAttemptBudget > 0 && detailFirstAttempts < budgets.maxAttemptsPerRun) {
+    if (hotQueueTotal === 0 && detailFirstAttempts < budgets.maxAttemptsPerRun) {
       const coldPage = await fetchColdMissingIngestionCandidatePage(admin, {
         queueOffset: queueOffsetBefore,
         scanLimit: budgets.maxCandidatesScannedPerRun,

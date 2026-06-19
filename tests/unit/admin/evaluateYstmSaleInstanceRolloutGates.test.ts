@@ -6,7 +6,28 @@ import {
   evaluateYstmSaleInstanceRolloutGates,
 } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
+import { emptyMissingValidReconciliationClassCounts } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliationTypes'
 import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
+
+function minimalActionableMissingValid(rawMissing = 10) {
+  const byClass = emptyMissingValidReconciliationClassCounts()
+  byClass.RECOVERABLE = Math.min(rawMissing, 3)
+  return {
+    rawMissingValidYstmUrls: rawMissing,
+    effectiveMissingValidYstmUrls: byClass.RECOVERABLE,
+    actionableMissingValidYstmUrls: byClass.RECOVERABLE,
+    byReconciliationClass: byClass,
+    terminalDispositionCount: 0,
+    visibilityFilterZombieCount: 0,
+    expiredInventoryCount: 0,
+    staleObservationCount: 0,
+    recoverableCount: byClass.RECOVERABLE,
+    missingIngestFetchFailedRetryableCount: 0,
+    duplicateSuppressedCount: 0,
+    unknownActionableCount: 0,
+    unknownNonActionableCount: 0,
+  }
+}
 
 export function minimalYstmCoverageScoreboard(
   overrides: Partial<YstmCoverageMetricsResponse> = {}
@@ -60,6 +81,7 @@ export function minimalYstmCoverageScoreboard(
       ageDistribution: {},
       oldestLastAttemptAt: null,
     },
+    actionableMissingValid: minimalActionableMissingValid(10),
     existingRefresh: {
       externalIngestedTotal: 0,
       ystmDetailIngestedTotal: 0,

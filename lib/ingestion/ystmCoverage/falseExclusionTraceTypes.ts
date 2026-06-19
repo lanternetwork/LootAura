@@ -18,6 +18,7 @@ export const FALSE_EXCLUSION_TRACE_BUCKETS = [
   'publish_failed',
   'repair_pending',
   'repair_failed',
+  'terminal_disposition',
   'published_not_visible',
   'unknown',
 ] as const

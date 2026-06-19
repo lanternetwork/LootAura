@@ -1,5 +1,6 @@
 import { isCatalogRepairCandidateRow } from '@/lib/ingestion/ystmCoverage/ystmCatalogRepairCandidates'
 import { MISSING_INGEST_TERMINAL_FAILURE_REASON } from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedRecoveryConfig'
+import { isTerminalAddressDisposition } from '@/lib/ingestion/address/terminalAddressDisposition'
 import {
   type FalseExclusionSecondaryTag,
   type FalseExclusionTraceBucket,
@@ -96,11 +97,15 @@ function buildEvidence(input: ClassifyFalseExclusionInput): FalseExclusionTraceE
     missingIngestionFailureReason: input.observation.missingIngestionFailureReason,
     visibleInPublishedIndex,
     catalogRepairEligible: ingested
-      ? isCatalogRepairCandidateRow({
-          source_url: input.observation.canonicalUrl,
-          status: ingested.status,
-          published_sale_id: ingested.published_sale_id,
-        })
+      ? isCatalogRepairCandidateRow(
+          {
+            source_url: input.observation.canonicalUrl,
+            status: ingested.status,
+            published_sale_id: ingested.published_sale_id,
+            address_status: ingested.address_status,
+          },
+          { excludeTerminalDisposition: true }
+        )
       : false,
     sourceListingId: ingested?.source_listing_id ?? null,
     saleInstanceKey: ingested?.sale_instance_key ?? null,
@@ -205,6 +210,15 @@ export function classifyFalseExclusionTrace(input: ClassifyFalseExclusionInput):
     }
   }
 
+  if (ingested && isTerminalAddressDisposition(ingested.address_status)) {
+    return {
+      primaryBucket: 'terminal_disposition',
+      secondaryTags: tags,
+      summary: 'Ingested row has terminal address disposition; excluded from catalog repair queue.',
+      evidence,
+    }
+  }
+
   if (ingested && evidence.catalogRepairEligible) {
     tags.push('catalog_repair_queue')
     if (ingested.catalog_repair_outcome === 'failed') {
@@ -256,6 +270,14 @@ export function classifyFalseExclusionTrace(input: ClassifyFalseExclusionInput):
       ingested.status === 'needs_check' ||
       ingested.status === 'ready'
     ) {
+      if (isTerminalAddressDisposition(ingested.address_status)) {
+        return {
+          primaryBucket: 'terminal_disposition',
+          secondaryTags: tags,
+          summary: 'Terminal address disposition on ingested row (not repair-pending).',
+          evidence,
+        }
+      }
       return {
         primaryBucket: 'repair_pending',
         secondaryTags: tags,

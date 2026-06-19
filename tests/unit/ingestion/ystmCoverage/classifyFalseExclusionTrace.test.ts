@@ -104,6 +104,30 @@ describe('classifyFalseExclusionTrace', () => {
     expect(r.primaryBucket).toBe('repair_pending')
   })
 
+  it('classifies terminal disposition instead of repair_pending for terminal needs_check', () => {
+    const r = classifyFalseExclusionTrace({
+      observation: baseObservation,
+      ingested: {
+        id: 'row-3',
+        status: 'needs_check',
+        published_sale_id: null,
+        is_duplicate: false,
+        address_status: 'address_terminal_active',
+        failure_reasons: [],
+        date_start: '2026-05-20',
+        date_end: '2026-05-21',
+        catalog_repair_outcome: null,
+        source_listing_id: null,
+        sale_instance_key: null,
+      },
+      config: crawlableConfig,
+      visibleInPublishedIndex: false,
+      nowIso: '2026-05-22T10:00:00Z',
+    })
+    expect(r.primaryBucket).toBe('terminal_disposition')
+    expect(r.primaryBucket).not.toBe('repair_pending')
+  })
+
   it('flags observation_stale when visible in published index', () => {
     const r = classifyFalseExclusionTrace({
       observation: baseObservation,

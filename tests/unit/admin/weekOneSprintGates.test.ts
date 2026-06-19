@@ -13,6 +13,7 @@ import {
   type FalseExclusionTraceBucket,
 } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
+import { emptyMissingValidReconciliationClassCounts } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliationTypes'
 
 function emptyFalseExclusionBuckets(): Record<FalseExclusionTraceBucket, number> {
   return Object.fromEntries(
@@ -129,6 +130,26 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
     sourceExpansion: sourceExpansionFixture,
     missingIngestion: missingIngestionFixture,
     missingIngestFetchFailed: missingIngestFetchFailedFixture,
+    actionableMissingValid: (() => {
+      const byClass = emptyMissingValidReconciliationClassCounts()
+      byClass.RECOVERABLE = 3
+      byClass.UNKNOWN_NON_ACTIONABLE = 4
+      return {
+        rawMissingValidYstmUrls: 7,
+        effectiveMissingValidYstmUrls: 3,
+        actionableMissingValidYstmUrls: 3,
+        byReconciliationClass: byClass,
+        terminalDispositionCount: 0,
+        visibilityFilterZombieCount: 0,
+        expiredInventoryCount: 0,
+        staleObservationCount: 0,
+        recoverableCount: 3,
+        missingIngestFetchFailedRetryableCount: 0,
+        duplicateSuppressedCount: 0,
+        unknownActionableCount: 0,
+        unknownNonActionableCount: 4,
+      }
+    })(),
     existingRefresh: existingRefreshFixture,
     catalogRepair: catalogRepairFixture,
     pipelineBacklog: {

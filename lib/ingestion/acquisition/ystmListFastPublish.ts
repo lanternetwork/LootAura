@@ -28,7 +28,7 @@ export type YstmListFastPublishResult =
   | { outcome: 'skipped_invalid'; reason: string }
   | { outcome: 'failed'; reason: string }
 
-function detailScheduleFieldsForMetadata(sale: YstmListMetadataSale) {
+function detailScheduleFieldsForMetadata(_sale: YstmListMetadataSale) {
   return {
     time_start: null as string | null,
     time_end: null as string | null,

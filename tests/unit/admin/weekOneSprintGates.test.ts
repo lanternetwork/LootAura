@@ -13,6 +13,7 @@ import {
   type FalseExclusionTraceBucket,
 } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
+import { minimalYstm2HourIngestionDiagnostics } from '@/tests/unit/admin/minimalYstm2HourIngestionDiagnostics'
 import { emptyMissingValidReconciliationClassCounts } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliationTypes'
 
 function emptyFalseExclusionBuckets(): Record<FalseExclusionTraceBucket, number> {
@@ -271,6 +272,7 @@ function minimalScoreboard(overrides: Partial<YstmCoverageMetricsResponse> = {})
       exitCriteriaPreview: { met: false, reasons: [] },
     },
     discoveryFreshness: minimalYstmDiscoveryFreshnessMetrics(),
+    twoHourIngestion: minimalYstm2HourIngestionDiagnostics(),
     ...overrides,
   }
 }

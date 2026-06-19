@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { JSDOM } from 'jsdom'
 import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
 import { isYstmIngestibleListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 import { parseYstmListMetadataDateValue } from '@/lib/ingestion/ystmCoverage/ystmListMetadataDate'

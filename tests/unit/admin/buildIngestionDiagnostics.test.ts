@@ -5,6 +5,7 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
+import { minimalYstm2HourIngestionDiagnostics } from '@/tests/unit/admin/minimalYstm2HourIngestionDiagnostics'
 
 function stage(id: string, count: number) {
   return {
@@ -587,6 +588,7 @@ describe('buildIngestionDiagnostics', () => {
         exitCriteriaPreview: { met: false, reasons: [] },
       },
       discoveryFreshness: minimalYstmDiscoveryFreshnessMetrics(),
+      twoHourIngestion: minimalYstm2HourIngestionDiagnostics(),
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })

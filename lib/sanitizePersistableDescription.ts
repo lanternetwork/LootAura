@@ -16,8 +16,10 @@ export function sanitizePersistableDescription(
   maxLength: number
 ): string | null {
   if (value == null || typeof value !== 'string') return null
-  const sanitized = sanitizeHtml(value, { stripHtml: true, maxLength }).trim()
-  return sanitized.length > 0 ? sanitized : null
+  // DOMPurify removes dangerous tags (including script bodies); then strip all HTML for plain-text storage.
+  const purified = sanitizeHtml(value, { maxLength })
+  const plain = sanitizeHtml(purified, { stripHtml: true, maxLength }).trim()
+  return plain.length > 0 ? plain : null
 }
 
 /** Sanitize sale + item descriptions on a validated draft payload before autosave. */

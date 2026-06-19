@@ -14,8 +14,20 @@ export type Ystm2HourIngestionDiagnostics = {
   slaWithin2hPct: number | null
 }
 
-type LatencyRow = {
-  publish_latency_hours: number | null
+type ObservationLatencyRow = {
+  first_list_seen_at: string | null
+  ystm_listing_posted_at: string | null
+  first_published_at: string | null
+}
+
+function publishLatencyHours(row: ObservationLatencyRow): number | null {
+  const startRaw = row.ystm_listing_posted_at ?? row.first_list_seen_at
+  const endRaw = row.first_published_at
+  if (!startRaw || !endRaw) return null
+  const startMs = Date.parse(startRaw)
+  const endMs = Date.parse(endRaw)
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null
+  return (endMs - startMs) / (60 * 60 * 1000)
 }
 
 export async function loadYstm2HourIngestionDiagnostics(
@@ -41,8 +53,8 @@ export async function loadYstm2HourIngestionDiagnostics(
         .eq('ystm_valid_active', true)
         .eq('lootaura_visible', false)
         .or('discovery_priority.eq.cold,discovery_priority.is.null'),
-      fromBase(admin, 'ystm_discovery_latency_v1')
-        .select('publish_latency_hours')
+      fromBase(admin, 'ystm_coverage_observations')
+        .select('first_list_seen_at, ystm_listing_posted_at, first_published_at')
         .eq('ystm_valid_active', true)
         .not('first_published_at', 'is', null)
         .gte('first_list_seen_at', hotCutoff)
@@ -60,8 +72,8 @@ export async function loadYstm2HourIngestionDiagnostics(
         .eq('missing_ingestion_failure_reason', 'sale_php_unsupported'),
     ])
 
-  const latencies = ((latencyResult.data ?? []) as LatencyRow[])
-    .map((r) => r.publish_latency_hours)
+  const latencies = ((latencyResult.data ?? []) as ObservationLatencyRow[])
+    .map(publishLatencyHours)
     .filter((v): v is number => v != null && Number.isFinite(v))
     .sort((a, b) => a - b)
 

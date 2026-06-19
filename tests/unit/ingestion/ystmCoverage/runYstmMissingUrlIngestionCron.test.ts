@@ -27,6 +27,10 @@ vi.mock('@/lib/ingestion/ingestionOrchestrationLease', () => ({
 }))
 
 vi.mock('@/lib/ingestion/ystmCoverage/ystmCoverageMissingCandidates', () => ({
+  countHotMissingQueueTotal: vi.fn().mockResolvedValue(0),
+  countColdMissingQueueTotal: vi.fn().mockResolvedValue(1),
+  fetchHotMissingIngestionCandidates: vi.fn().mockResolvedValue([]),
+  fetchColdMissingIngestionCandidatePage: mockFetchPage,
   fetchMissingIngestionCandidatePage: mockFetchPage,
   isEligibleForMissingIngestionRetry: vi.fn(() => true),
 }))
@@ -37,6 +41,10 @@ vi.mock('@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex', () => ({
 
 vi.mock('@/lib/ingestion/acquisition/promoteExistingIngestedSaleForDetailFirst', () => ({
   findPublishedIngestedSaleIdForDetailFirst: mockFindPublished,
+}))
+
+vi.mock('@/lib/ingestion/acquisition/ystmListFastPublish', () => ({
+  attemptYstmListFastPublish: vi.fn().mockResolvedValue({ outcome: 'failed', reason: 'test_skip' }),
 }))
 
 vi.mock('@/lib/ingestion/acquisition/ystmDetailFirstReady', () => ({

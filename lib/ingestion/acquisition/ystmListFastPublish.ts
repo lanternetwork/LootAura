@@ -64,11 +64,7 @@ function metadataToListing(
   }
 }
 
-function spatialFromMetadata(
-  sale: YstmListMetadataSale,
-  city: string,
-  state: string
-): SpatialCoordinateResolution | null {
+function spatialFromMetadata(sale: YstmListMetadataSale): SpatialCoordinateResolution | null {
   if (sale.lat == null || sale.lng == null) return null
   if (!Number.isFinite(sale.lat) || !Number.isFinite(sale.lng)) return null
   return {
@@ -180,7 +176,7 @@ export async function attemptYstmListFastPublish(input: {
 
   const listing = metadataToListing(input.sale, input.city, input.state)
   const scheduleFields = detailScheduleFieldsForMetadata(input.sale)
-  const nativeSpatial = spatialFromMetadata(input.sale, input.city, input.state)
+  const nativeSpatial = spatialFromMetadata(input.sale)
   const nativeFirst = nativeSpatial != null
 
   let normalizedLine: string | null = null

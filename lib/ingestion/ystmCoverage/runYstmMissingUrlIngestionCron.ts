@@ -329,12 +329,8 @@ export async function runYstmMissingUrlIngestionCron(
       })
       hotCandidatesScanned = hotCandidates.length
       candidatesScanned += hotCandidates.length
-      let hotAttempts = 0
       await processCandidateLoop(hotCandidates, {
         isFetchFailedReplay: false,
-        onHotAttempt: () => {
-          hotAttempts += 1
-        },
       })
     }
 

@@ -7,7 +7,7 @@ import {
   isSaleWindowExpiredAtDiscovery,
 } from '@/lib/ingestion/saleWindowDates'
 import type { YstmListMetadataSale } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
-import type { YstmCoverageInvalidReason, YstmCoverageValidityResult } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
+import type { YstmCoverageValidityResult } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
 
 export function deriveYstmListMetadataTitle(sale: Pick<YstmListMetadataSale, 'title' | 'sourceUrl'>): string | null {
   if (sale.title?.trim()) return sale.title.trim()
@@ -54,10 +54,4 @@ export function classifyYstmListMetadataAsValidActive(
     return { valid: false, reason: 'gated_only' }
   }
   return { valid: true }
-}
-
-export function listMetadataInvalidReasonToCoverage(
-  reason: YstmCoverageInvalidReason
-): YstmCoverageInvalidReason {
-  return reason
 }

@@ -90,6 +90,7 @@ const HOT_URL =
   'https://yardsaletreasuremap.com/US/Texas/Austin/100-Main-St/88888888/userlisting.html'
 
 const HOT_LIST_METADATA = {
+  canonicalUrl: HOT_URL,
   sourceUrl: HOT_URL,
   title: 'Hot queue sale',
   address: '100 Main St',
@@ -98,7 +99,7 @@ const HOT_LIST_METADATA = {
   lat: 30.27,
   lng: -97.74,
   description: null,
-  imageUrls: [],
+  imageUrls: [] as string[],
   postedAt: null,
 }
 

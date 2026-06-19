@@ -351,12 +351,16 @@ export async function runYstmMissingUrlIngestionCron(
 
     if (hotQueueTotal > 0) {
       if (hotFetchLimit <= 0) {
-        logger.error('YSTM missing URL ingestion hot phase blocked: invalid hot fetch limit', {
-          ...logContext,
-          hotQueueTotal,
-          reservedHotBudget,
-          hotFetchLimit,
-        })
+        logger.error(
+          'YSTM missing URL ingestion hot phase blocked: invalid hot fetch limit',
+          undefined,
+          {
+            ...logContext,
+            hotQueueTotal,
+            reservedHotBudget,
+            hotFetchLimit,
+          }
+        )
       } else {
         const hotCandidates = await fetchHotMissingIngestionCandidates(admin, {
           limit: hotFetchLimit,

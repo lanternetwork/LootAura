@@ -486,6 +486,7 @@ describe('buildIngestionDiagnostics', () => {
           publish_failed: 1,
           repair_pending: 1,
           repair_failed: 0,
+          terminal_disposition: 0,
           published_not_visible: 0,
           unknown: 0,
         },

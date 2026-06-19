@@ -3,10 +3,53 @@ import { describe, expect, it } from 'vitest'
 import { classifyMissingValidReconciliation } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliation'
 import { buildActionableMissingValidAggregateFromTraces } from '@/lib/ingestion/ystmCoverage/buildActionableMissingValidAggregate'
 import { isActionableReconciliationClass } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliationTypes'
+import type {
+  FalseExclusionTraceEvidence,
+  FalseExclusionUrlTrace,
+} from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { isLinkedSaleVisibilityFiltered } from '@/lib/ingestion/ystmCoverage/linkedSaleVisibilityFilter'
 import { MISSING_INGEST_TERMINAL_FAILURE_REASON } from '@/lib/ingestion/ystmCoverage/missingIngestFetchFailedRecoveryConfig'
 
 const NOW_MS = Date.parse('2026-06-18T12:00:00.000Z')
+
+function minimalTraceEvidence(
+  overrides: Partial<FalseExclusionTraceEvidence> = {}
+): FalseExclusionTraceEvidence {
+  return {
+    hasIngestedRow: false,
+    ingestedStatus: null,
+    ingestedPublishedSaleId: null,
+    isDuplicate: false,
+    addressStatus: null,
+    configEnabled: null,
+    configHasSourcePages: null,
+    configCrawlExcluded: null,
+    configLastCrawlAt: null,
+    missingIngestionOutcome: null,
+    missingIngestionFailureReason: null,
+    visibleInPublishedIndex: false,
+    catalogRepairEligible: false,
+    sourceListingId: null,
+    saleInstanceKey: null,
+    ...overrides,
+  }
+}
+
+function minimalTrace(
+  partial: Pick<FalseExclusionUrlTrace, 'canonicalUrl' | 'primaryBucket'> &
+    Partial<Omit<FalseExclusionUrlTrace, 'canonicalUrl' | 'primaryBucket'>>
+): FalseExclusionUrlTrace {
+  return {
+    state: null,
+    city: null,
+    configKey: null,
+    secondaryTags: [],
+    summary: 'test trace',
+    tracedAt: '2026-06-18T12:00:00.000Z',
+    evidence: minimalTraceEvidence(),
+    ...partial,
+  }
+}
 
 describe('isLinkedSaleVisibilityFiltered', () => {
   it('flags archived linked sales', () => {
@@ -148,34 +191,19 @@ describe('classifyMissingValidReconciliation', () => {
   })
 
   it('partition integrity: raw equals sum of all reconciliation classes', () => {
-    const traces = [
-      {
+    const traces: FalseExclusionUrlTrace[] = [
+      minimalTrace({
         canonicalUrl: 'https://example.com/a',
-        primaryBucket: 'repair_pending' as const,
-        secondaryTags: [],
-        evidence: {
-          missingIngestionOutcome: null,
-          missingIngestionFailureReason: null,
-        },
-      },
-      {
+        primaryBucket: 'repair_pending',
+      }),
+      minimalTrace({
         canonicalUrl: 'https://example.com/b',
-        primaryBucket: 'terminal_disposition' as const,
-        secondaryTags: [],
-        evidence: {
-          missingIngestionOutcome: null,
-          missingIngestionFailureReason: null,
-        },
-      },
-      {
+        primaryBucket: 'terminal_disposition',
+      }),
+      minimalTrace({
         canonicalUrl: 'https://example.com/c',
-        primaryBucket: 'published_not_visible' as const,
-        secondaryTags: [],
-        evidence: {
-          missingIngestionOutcome: null,
-          missingIngestionFailureReason: null,
-        },
-      },
+        primaryBucket: 'published_not_visible',
+      }),
     ]
     const missingRows = traces.map((t) => ({
       canonical_url: t.canonicalUrl,

@@ -321,6 +321,7 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
         publish_failed: 0,
         repair_pending: 293,
         repair_failed: 0,
+        terminal_disposition: 0,
         published_not_visible: 162,
         unknown: 0,
       },

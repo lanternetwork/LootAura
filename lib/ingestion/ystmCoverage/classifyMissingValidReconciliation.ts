@@ -42,15 +42,13 @@ function isExpiredInventoryBucket(
   primaryBucket: FalseExclusionTraceBucket,
   ingested: ClassifyMissingValidReconciliationInput['ingested']
 ): boolean {
-  if (primaryBucket === 'url_reuse_suspected') return true
-  if (primaryBucket === 'expired_false_positive') return true
-  if (
-    ingested &&
-    isIngestedRowExpiredForDuplicate(ingested.status, ingested.failure_reasons)
-  ) {
-    return primaryBucket === 'url_reuse_suspected' || primaryBucket === 'expired_false_positive'
+  if (primaryBucket === 'url_reuse_suspected' || primaryBucket === 'expired_false_positive') {
+    return true
   }
-  return primaryBucket === 'url_reuse_suspected' || primaryBucket === 'expired_false_positive'
+  return (
+    ingested != null &&
+    isIngestedRowExpiredForDuplicate(ingested.status, ingested.failure_reasons)
+  )
 }
 
 function isStaleObservation(input: ClassifyMissingValidReconciliationInput): boolean {

@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom'
 import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
-import { isYstmDetailListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
+import { isYstmIngestibleListingUrl } from '@/lib/ingestion/images/ystmDetailListingUrl'
 
 export type ExtractedYstmListingUrl = {
   canonicalUrl: string
@@ -28,7 +28,7 @@ function pushListingUrl(
   } catch {
     return
   }
-  if (!isYstmDetailListingUrl(absolute)) return
+  if (!isYstmIngestibleListingUrl(absolute)) return
   const canonical = canonicalSourceUrl(absolute)
   if (seen.has(canonical)) return
   seen.add(canonical)
@@ -83,7 +83,7 @@ export function extractYstmListingUrlsFromListHtml(html: string, pageUrl: string
 
   const dom = new JSDOM(normalized, { url: pageUrl })
   const anchors = dom.window.document.querySelectorAll<HTMLAnchorElement>(
-    'a[href*="listing.html"], a[href*="userlisting.html"]'
+    'a[href*="listing.html"], a[href*="userlisting.html"], a[href*="sale.php"]'
   )
 
   for (const a of anchors) {

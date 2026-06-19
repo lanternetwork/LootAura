@@ -92,6 +92,10 @@ import {
   loadYstmDiscoveryFreshnessMetrics,
   type YstmDiscoveryFreshnessMetrics,
 } from '@/lib/ingestion/ystmCoverage/discoveryFreshness/loadYstmDiscoveryFreshnessMetrics'
+import {
+  loadYstm2HourIngestionDiagnostics,
+  type Ystm2HourIngestionDiagnostics,
+} from '@/lib/admin/loadYstm2HourIngestionDiagnostics'
 
 export type YstmCoverageTrendPoint = {
   completedAt: string
@@ -149,6 +153,7 @@ export type YstmCoverageScoreboard = {
     exitCriteriaPreview: { met: boolean; reasons: string[] }
   }
   discoveryFreshness: YstmDiscoveryFreshnessMetrics
+  twoHourIngestion: Ystm2HourIngestionDiagnostics
 }
 
 type AuditRunRow = {
@@ -198,6 +203,7 @@ export async function buildYstmCoverageScoreboard(
     runsResult,
     discoveryFreshnessResult,
     missingIngestFetchFailed,
+    twoHourIngestion,
   ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
@@ -226,6 +232,7 @@ export async function buildYstmCoverageScoreboard(
       .limit(48),
     loadYstmDiscoveryFreshnessMetrics(admin, now.getTime()),
     aggregateMissingIngestFetchFailed(admin, now.getTime()),
+    loadYstm2HourIngestionDiagnostics(admin, now.getTime()),
   ])
 
   if (runsResult.error) {
@@ -397,6 +404,7 @@ export async function buildYstmCoverageScoreboard(
       exitCriteriaPreview: esnetExitCriteriaPreview,
     },
     discoveryFreshness: discoveryFreshnessResult,
+    twoHourIngestion,
   }
 }
 

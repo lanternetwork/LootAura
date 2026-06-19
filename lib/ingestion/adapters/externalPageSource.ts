@@ -234,7 +234,7 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n)
 }
 
-function extractDateRangeFromText(text: string): { start?: string; end?: string } {
+export function extractDateRangeFromText(text: string): { start?: string; end?: string } {
   // Keep date values as pure YYYY-MM-DD strings; no Date object conversion to avoid timezone drift.
   const year = new Date().getUTCFullYear()
   function toIso(y: number, m: number, d: number): string | null {

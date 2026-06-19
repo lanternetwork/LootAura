@@ -6,6 +6,7 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
+import { minimalYstm2HourIngestionDiagnostics } from '@/tests/unit/admin/minimalYstm2HourIngestionDiagnostics'
 
 function minimalDetailFirst() {
   return {
@@ -427,6 +428,7 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
       telemetryCompletenessPct: 92,
       velocityPoolCounts: { HOT: 10, WARM: 40, COLD: 874 },
     }),
+    twoHourIngestion: minimalYstm2HourIngestionDiagnostics(),
   } as unknown as YstmCoverageMetricsResponse
 }
 

@@ -8,6 +8,7 @@ import {
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { emptyMissingValidReconciliationClassCounts } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliationTypes'
 import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
+import { minimalYstm2HourIngestionDiagnostics } from '@/tests/unit/admin/minimalYstm2HourIngestionDiagnostics'
 
 function minimalActionableMissingValid(rawMissing = 10) {
   const byClass = emptyMissingValidReconciliationClassCounts()
@@ -247,6 +248,7 @@ export function minimalYstmCoverageScoreboard(
       exitCriteriaPreview: { met: false, reasons: [] },
     },
     discoveryFreshness: minimalYstmDiscoveryFreshnessMetrics(),
+    twoHourIngestion: minimalYstm2HourIngestionDiagnostics(),
     ...overrides,
   }
 }

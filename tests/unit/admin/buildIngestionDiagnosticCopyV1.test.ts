@@ -206,6 +206,33 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
       ageDistribution: { '7-30d': 8, '30-90d': 2 },
       oldestLastAttemptAt: '2026-05-20T10:00:00.000Z',
     },
+    actionableMissingValid: {
+      rawMissingValidYstmUrls: 538,
+      effectiveMissingValidYstmUrls: 38,
+      actionableMissingValidYstmUrls: 38,
+      byReconciliationClass: {
+        TRUE_TERMINAL: 179,
+        MISSING_INGEST_TERMINAL: 0,
+        DUPLICATE_SUPPRESSED: 2,
+        VISIBILITY_FILTER: 170,
+        EXPIRED_INVENTORY: 64,
+        STALE_OBSERVATION: 12,
+        MISSING_INGEST_FETCH_FAILED_RETRYABLE: 10,
+        GATED_WAIT: 25,
+        RECOVERABLE: 1,
+        UNKNOWN_ACTIONABLE: 0,
+        UNKNOWN_NON_ACTIONABLE: 13,
+      },
+      terminalDispositionCount: 179,
+      visibilityFilterZombieCount: 170,
+      expiredInventoryCount: 64,
+      staleObservationCount: 12,
+      recoverableCount: 1,
+      missingIngestFetchFailedRetryableCount: 10,
+      duplicateSuppressedCount: 2,
+      unknownActionableCount: 0,
+      unknownNonActionableCount: 13,
+    },
     existingRefresh: { staleOver12h: 22332 } as YstmCoverageMetricsResponse['existingRefresh'],
     catalogRepair: {
       repairQueueTotal: 805,
@@ -412,6 +439,7 @@ describe('buildIngestionDiagnosticCopyV1Sections', () => {
     const enrichment = md.indexOf('## ADDRESS ENRICHMENT')
     const terminal = md.indexOf('## TERMINAL ADDRESS DISPOSITION')
     const repair = md.indexOf('## CATALOG REPAIR')
+    const actionable = md.indexOf('## ACTIONABLE MISSING VALID')
     const fetchFailed = md.indexOf('## MISSING INGEST FETCH FAILED')
     const metros = md.indexOf('## STRATEGIC METRO GAPS')
     const seo = md.indexOf('## SEO READINESS')
@@ -424,12 +452,14 @@ describe('buildIngestionDiagnosticCopyV1Sections', () => {
     expect(enrichment).toBeGreaterThan(freshness)
     expect(terminal).toBeGreaterThan(enrichment)
     expect(repair).toBeGreaterThan(terminal)
-    expect(fetchFailed).toBeGreaterThan(repair)
+    expect(actionable).toBeGreaterThan(repair)
+    expect(fetchFailed).toBeGreaterThan(actionable)
     expect(metros).toBeGreaterThan(fetchFailed)
     expect(seo).toBeGreaterThan(metros)
     expect(ledger).toBeGreaterThan(seo)
     expect(md).toContain('95.5% of enrichment cohort never attempted')
     expect(md).toContain('freshness_risk')
+    expect(md).toContain('effective_missing_valid')
     expect(md).toContain('missing_ingest_fetch_failed_retryable')
     expect(md).toContain('phoenix-az')
   })

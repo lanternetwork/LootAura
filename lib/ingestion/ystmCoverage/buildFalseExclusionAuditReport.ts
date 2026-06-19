@@ -22,6 +22,7 @@ type MissingObservationRow = {
   missing_ingestion_outcome: string | null
   missing_ingestion_attempted_at: string | null
   missing_ingestion_failure_reason: string | null
+  missing_ingestion_replay_count: number | null
   last_detail_checked_at: string | null
 }
 
@@ -39,7 +40,7 @@ export async function listMissingValidObservations(
   for (;;) {
     const { data, error } = await fromBase(admin, 'ystm_coverage_observations')
       .select(
-        'canonical_url, state, city, config_key, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, last_detail_checked_at'
+        'canonical_url, state, city, config_key, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, missing_ingestion_replay_count, last_detail_checked_at'
       )
       .eq('ystm_valid_active', true)
       .eq('lootaura_visible', false)
@@ -152,13 +153,18 @@ async function loadConfigsForObservations(
 }
 
 /**
- * Phase 1: trace every missing valid YSTM URL, persist buckets, return admin report.
+ * Trace every missing valid YSTM URL (full set for reconciliation + persistence).
  */
-export async function buildFalseExclusionAuditReport(
+export async function traceMissingValidFalseExclusions(
   admin: ReturnType<typeof getAdminDb>,
   now: Date = new Date(),
   preloadedMissingRows?: MissingObservationRow[]
-): Promise<FalseExclusionAuditReport> {
+): Promise<{
+  generatedAt: string
+  missingRows: MissingObservationRow[]
+  traces: FalseExclusionUrlTrace[]
+  byPrimaryBucket: Record<FalseExclusionTraceBucket, number>
+}> {
   const nowIso = now.toISOString()
   const missingRows = preloadedMissingRows ?? (await listMissingValidObservations(admin))
   const urls = missingRows.map((r) => r.canonical_url)
@@ -173,8 +179,7 @@ export async function buildFalseExclusionAuditReport(
 
   for (const row of missingRows) {
     const configKey =
-      row.config_key ??
-      (row.state && row.city ? `${row.state}|${row.city}` : null)
+      row.config_key ?? (row.state && row.city ? `${row.state}|${row.city}` : null)
     const config =
       configKey != null ? configByKey.get(configKey.toLowerCase()) ?? null : null
     const canonical = canonicalSourceUrl(row.canonical_url)
@@ -207,9 +212,13 @@ export async function buildFalseExclusionAuditReport(
     byPrimaryBucket[trace.primaryBucket] += 1
   }
 
-  await persistFalseExclusionTraces(admin, traces)
+  return { generatedAt: nowIso, missingRows, traces, byPrimaryBucket }
+}
 
-  const sorted = [...traces].sort((a, b) => {
+export function formatFalseExclusionAuditReport(
+  traced: Awaited<ReturnType<typeof traceMissingValidFalseExclusions>>
+): FalseExclusionAuditReport {
+  const sorted = [...traced.traces].sort((a, b) => {
     const bucketOrder =
       FALSE_EXCLUSION_TRACE_BUCKETS.indexOf(a.primaryBucket) -
       FALSE_EXCLUSION_TRACE_BUCKETS.indexOf(b.primaryBucket)
@@ -218,10 +227,23 @@ export async function buildFalseExclusionAuditReport(
   })
 
   return {
-    generatedAt: nowIso,
-    missingValidCount: missingRows.length,
-    tracedCount: traces.length,
-    byPrimaryBucket,
+    generatedAt: traced.generatedAt,
+    missingValidCount: traced.missingRows.length,
+    tracedCount: traced.traces.length,
+    byPrimaryBucket: traced.byPrimaryBucket,
     traces: sorted.slice(0, FALSE_EXCLUSION_SCOREBOARD_TRACE_LIMIT),
   }
+}
+
+/**
+ * Phase 1: trace every missing valid YSTM URL, persist buckets, return admin report.
+ */
+export async function buildFalseExclusionAuditReport(
+  admin: ReturnType<typeof getAdminDb>,
+  now: Date = new Date(),
+  preloadedMissingRows?: MissingObservationRow[]
+): Promise<FalseExclusionAuditReport> {
+  const traced = await traceMissingValidFalseExclusions(admin, now, preloadedMissingRows)
+  await persistFalseExclusionTraces(admin, traced.traces)
+  return formatFalseExclusionAuditReport(traced)
 }

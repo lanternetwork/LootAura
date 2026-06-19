@@ -95,6 +95,7 @@ export function evaluateYstmStabilizationExit(
   )
 
   const missing = coverage?.missingValidYstmUrls ?? null
+  const effectiveMissing = coverage?.actionableMissingValid?.effectiveMissingValidYstmUrls ?? null
   tier1.push(
     criterion(
       'missing_valid',
@@ -102,6 +103,16 @@ export function evaluateYstmStabilizationExit(
       1,
       missing != null && missing <= STABILIZATION_MISSING_VALID_NEAR_ZERO,
       missing == null ? 'Coverage unavailable' : missing.toLocaleString()
+    )
+  )
+  tier1.push(
+    criterion(
+      'missing_valid_actionable_preview',
+      `[preview] Effective missing valid URLs ≤${STABILIZATION_MISSING_VALID_NEAR_ZERO}`,
+      1,
+      effectiveMissing != null && effectiveMissing <= STABILIZATION_MISSING_VALID_NEAR_ZERO,
+      effectiveMissing == null ? 'Coverage unavailable' : effectiveMissing.toLocaleString(),
+      false
     )
   )
 
@@ -206,7 +217,7 @@ export function evaluateYstmStabilizationExit(
     )
   }
 
-  const tier1Ready = tier1.every((c) => c.status === 'pass')
+  const tier1Ready = tier1.filter((c) => !c.id.endsWith('_preview')).every((c) => c.status === 'pass')
   const tier2Ready = tier2.every((c) => c.status === 'pass')
 
   return {

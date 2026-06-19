@@ -124,6 +124,8 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.missingIngestion.missingQueueTotal).toBe(0)
     expect(json.missingIngestion.missingIngestionNeverAttempted).toBe(0)
     expect(json.missingIngestFetchFailed.retryableCount).toBe(0)
+    expect(json.actionableMissingValid.rawMissingValidYstmUrls).toBe(0)
+    expect(json.actionableMissingValid.effectiveMissingValidYstmUrls).toBe(0)
     expect(json.existingRefresh.ystmDetailIngestedTotal).toBe(0)
     expect(json.existingRefresh.neverSynced).toBe(0)
     expect(json.catalogRepair.repairQueueTotal).toBe(0)

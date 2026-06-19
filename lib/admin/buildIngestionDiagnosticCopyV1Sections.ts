@@ -1,3 +1,4 @@
+import { buildActionableMissingValidDiagnostics } from '@/lib/admin/buildActionableMissingValidDiagnostics'
 import { buildMissingIngestFetchFailedDiagnostics } from '@/lib/admin/buildMissingIngestFetchFailedDiagnostics'
 import { buildTerminalDispositionDiagnostics } from '@/lib/admin/buildTerminalDispositionDiagnostics'
 import { buildAddressEnrichmentSummaryDiagnostics } from '@/lib/admin/buildAddressEnrichmentSummaryDiagnostics'
@@ -37,6 +38,9 @@ export function buildIngestionDiagnosticCopyV1Sections(
   )
 
   if (coverage?.ok) {
+    const actionable = buildActionableMissingValidDiagnostics(coverage)
+    if (actionable) sections.push(actionable)
+
     const fetchFailed = buildMissingIngestFetchFailedDiagnostics(coverage)
     if (fetchFailed) sections.push(fetchFailed)
   }

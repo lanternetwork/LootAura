@@ -39,7 +39,10 @@ import {
   aggregateYstmExistingUrlRefresh,
   type YstmExistingUrlRefreshAggregate,
 } from '@/lib/ingestion/ystmCoverage/ystmExistingUrlRefreshMetrics'
-import { buildFalseExclusionAuditReport, listMissingValidObservations } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
+import { formatFalseExclusionAuditReport, listMissingValidObservations, traceMissingValidFalseExclusions } from '@/lib/ingestion/ystmCoverage/buildFalseExclusionAuditReport'
+import { buildActionableMissingValidAggregate } from '@/lib/ingestion/ystmCoverage/buildActionableMissingValidAggregate'
+import type { ActionableMissingValidAggregate } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliationTypes'
+import { persistFalseExclusionTraces } from '@/lib/ingestion/ystmCoverage/persistFalseExclusionTrace'
 import type { FalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { buildSaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
 import type { SaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
@@ -106,6 +109,7 @@ export type YstmCoverageScoreboard = {
   publishedActiveLootAuraYstmUrls: number
   publishedVisibleInAuditFootprint: number
   missingValidYstmUrls: number
+  actionableMissingValid: ActionableMissingValidAggregate
   coveragePct: number | null
   observationFootprintUrls: number
   missingByState: Record<string, number>
@@ -172,6 +176,10 @@ export async function buildYstmCoverageScoreboard(
 ): Promise<YstmCoverageScoreboard> {
   const now = new Date()
   const missingRows = await listMissingValidObservations(admin)
+  const traceArtifacts = await traceMissingValidFalseExclusions(admin, now, missingRows)
+  await persistFalseExclusionTraces(admin, traceArtifacts.traces)
+  const falseExclusionAudit = formatFalseExclusionAuditReport(traceArtifacts)
+
   const [
     agg,
     publishedIndex,
@@ -180,7 +188,7 @@ export async function buildYstmCoverageScoreboard(
     missingIngestion,
     existingRefresh,
     catalogRepair,
-    falseExclusionAudit,
+    actionableMissingValid,
     saleInstanceShadowReplay,
     saleInstanceIdentity,
     canonicalSaleInstance,
@@ -198,7 +206,11 @@ export async function buildYstmCoverageScoreboard(
     aggregateYstmCoverageMissingIngestion(admin),
     aggregateYstmExistingUrlRefresh(admin, now.getTime()),
     aggregateYstmCatalogRepair(admin, now.getTime()),
-    buildFalseExclusionAuditReport(admin, now, missingRows),
+    buildActionableMissingValidAggregate(admin, {
+      traces: traceArtifacts.traces,
+      missingRows: traceArtifacts.missingRows,
+      now,
+    }),
     buildSaleInstanceShadowReplayReport(admin, missingRows, now),
     loadSaleInstanceIdentityMetrics(),
     loadCanonicalSaleInstanceMetrics(),
@@ -340,6 +352,7 @@ export async function buildYstmCoverageScoreboard(
     publishedActiveLootAuraYstmUrls: publishedIndex.publishedActiveTotal,
     publishedVisibleInAuditFootprint: agg.publishedVisibleInAudit,
     missingValidYstmUrls: agg.missingValidYstmUrls,
+    actionableMissingValid,
     coveragePct,
     observationFootprintUrls: agg.observationCount,
     missingByState: topEntries(agg.missingByState, 20),

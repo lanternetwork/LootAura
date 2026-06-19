@@ -18,6 +18,7 @@ function evaluateSeoReadinessCriteria(
   const repairQueue =
     coverage?.catalogRepair.repairQueueTotal ?? coverage?.pipelineBacklog.catalogRepairQueue ?? 0
   const missing = coverage?.missingValidYstmUrls ?? null
+  const effectiveMissing = coverage?.actionableMissingValid?.effectiveMissingValidYstmUrls ?? null
   const duplicateClusters =
     coverage?.crossProviderConvergence.duplicatePublishedCanonicalClusters ?? null
   const detailFirstPass = metrics.detailFirstProof.passed
@@ -39,6 +40,11 @@ function evaluateSeoReadinessCriteria(
       label: `missing_valid < ${SEO_MISSING_VALID_MAX}`,
       pass: missing != null && missing < SEO_MISSING_VALID_MAX,
       actual: missing == null ? 'unavailable' : missing.toLocaleString(),
+    },
+    {
+      label: `[preview] effective_missing_valid < ${SEO_MISSING_VALID_MAX}`,
+      pass: effectiveMissing != null && effectiveMissing < SEO_MISSING_VALID_MAX,
+      actual: effectiveMissing == null ? 'unavailable' : effectiveMissing.toLocaleString(),
     },
     {
       label: 'duplicate_clusters == 0',
@@ -68,14 +74,14 @@ export function buildSeoReadinessDiagnostics(
   if (!coverage) return null
 
   const criteria = evaluateSeoReadinessCriteria(metrics, coverage)
-  const tier1Pass = criteria.every((row) => row.pass)
+  const tier1Pass = criteria.filter((row) => !row.label.startsWith('[preview]')).every((row) => row.pass)
 
   const lines = [
     '## SEO READINESS',
     diagnosticBullet('tier1 stabilization', tier1Pass ? 'PASS' : 'FAIL'),
     diagnosticBullet(
       'note',
-      'SEO unblock gate (missing_valid < 100). Stabilization Tier1 elsewhere uses missing_valid ≤ 15.'
+      'SEO unblock gate (missing_valid < 100). Stabilization Tier1 elsewhere uses missing_valid ≤ 15. [preview] rows use effective_missing_valid only — gate pass/fail unchanged until approved.'
     ),
     '',
     '### Criteria',

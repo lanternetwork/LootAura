@@ -12,6 +12,11 @@ import { getStripeClient, getStripeWebhookSecret } from '@/lib/stripe/client'
 import { logger } from '@/lib/log'
 import { fail, ok } from '@/lib/http/json'
 import { formatSaleAddressForPersist } from '@/lib/sales/formatSaleAddressForPersist'
+import {
+  sanitizePersistableDescription,
+  SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+  ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+} from '@/lib/sanitizePersistableDescription'
 
 export const dynamic = 'force-dynamic'
 
@@ -248,7 +253,7 @@ async function finalizeDraftPromotion(
   const salePayload = {
     owner_id: userId,
     title: formData.title,
-    description: formData.description || null,
+    description: sanitizePersistableDescription(formData.description, SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH),
     address: formatSaleAddressForPersist(formData.address, formData.city, formData.state),
     city: formData.city,
     state: formData.state,
@@ -292,7 +297,7 @@ async function finalizeDraftPromotion(
       return {
         sale_id: createdSaleId,
         name: item.name,
-        description: item.description || null,
+        description: sanitizePersistableDescription(item.description, ITEM_PERSISTABLE_DESCRIPTION_MAX_LENGTH),
         price: item.price || null,
         category: item.category || null,
         images: normalizedImages.images,

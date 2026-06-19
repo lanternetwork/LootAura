@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireCsrfToken } from '@/lib/csrf'
-import { sanitizeText, sanitizeHtml, sanitizeEmail, sanitizeUrl, sanitizeTags } from '@/lib/sanitize'
+import { sanitizeText, sanitizeEmail, sanitizeUrl, sanitizeTags } from '@/lib/sanitize'
+import {
+  sanitizePersistableDescription,
+  SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH,
+} from '@/lib/sanitizePersistableDescription'
 import { sanitizeErrorMessage } from '@/lib/errors/sanitize'
 import { fail } from '@/lib/http/json'
 import { logger } from '@/lib/log'
@@ -80,7 +84,7 @@ export function createSecureApiHandler(
 export function sanitizeSaleInput(input: any) {
   return {
     title: sanitizeText(input.title, 200),
-    description: sanitizeHtml(input.description, { maxLength: 2000 }),
+    description: sanitizePersistableDescription(input.description, SALE_PERSISTABLE_DESCRIPTION_MAX_LENGTH),
     address: sanitizeText(input.address, 500),
     city: sanitizeText(input.city, 100),
     state: sanitizeText(input.state, 50),

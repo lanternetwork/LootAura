@@ -20,14 +20,31 @@ export function parseGeocodeCronReplayMax429FromEnv(): number {
   return Math.min(parsed, 50)
 }
 
+export function sanitizeGeocodeQueueRedisErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const message = raw
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]')
+    .replace(/https?:\/\/[^\s]+/gi, '[redacted-url]')
+    .trim()
+  if (message.length > 200) {
+    return `${message.slice(0, 197)}...`
+  }
+  return message || 'Redis queue unavailable'
+}
+
+export type GeocodeCronPipelineQueueResult = {
+  processed: number
+  completed: number
+  requeued: number
+  failed: number
+  queueRedisError?: boolean
+  queueRedisErrorMessage?: string
+  queueDegraded?: boolean
+}
+
 export type GeocodeCronPipelineResult = {
   nativeCoord: NativeCoordinateRemediationSummary & { duration_ms: number; error: string | null }
-  queue: {
-    processed: number
-    completed: number
-    requeued: number
-    failed: number
-  }
+  queue: GeocodeCronPipelineQueueResult
   backlog: {
     batch_size: number
     claimed: number
@@ -88,9 +105,27 @@ export async function runGeocodeCronPipeline(params: {
     }
   }
 
-  const batch = await processGeocodeQueueBatch(params.queueBatchSize, {
-    telemetryContext: params.telemetryContext,
-  })
+  let batch = { dequeued: 0, completed: 0, requeued: 0 }
+  let queueRedisError = false
+  let queueRedisErrorMessage: string | undefined
+  let queueDegraded = false
+  try {
+    batch = await processGeocodeQueueBatch(params.queueBatchSize, {
+      telemetryContext: params.telemetryContext,
+    })
+  } catch (error) {
+    queueRedisError = true
+    queueDegraded = true
+    queueRedisErrorMessage = sanitizeGeocodeQueueRedisErrorMessage(error)
+    logger.warn('Geocode queue batch failed; continuing geocode pipeline', {
+      component: 'ingestion/geocodeCronPipeline',
+      operation: 'queue_batch_degraded',
+      queueRedisError: true,
+      queueDegraded: true,
+      queueRedisErrorMessage,
+      ...params.telemetryContext,
+    })
+  }
 
   const backlogStartedAt = Date.now()
   let backlog: Awaited<ReturnType<typeof geocodePendingSales>>
@@ -191,6 +226,13 @@ export async function runGeocodeCronPipeline(params: {
       completed: batch.completed,
       requeued: batch.requeued,
       failed: 0,
+      ...(queueDegraded
+        ? {
+            queueRedisError,
+            queueRedisErrorMessage,
+            queueDegraded,
+          }
+        : {}),
     },
     backlog: {
       batch_size: params.backlogBatchSize,

@@ -111,6 +111,55 @@ describe('runGeocodeCronPipeline', () => {
     expect(mockGeocodePendingSales).toHaveBeenCalled()
   })
 
+  it('continues geocode when Redis queue batch throws', async () => {
+    mockProcessGeocodeQueueBatch.mockRejectedValue(new Error('Redis rpop failed: 400'))
+    const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
+    const result = await runGeocodeCronPipeline({
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
+      telemetryContext: { jobType: 'cron.geocode' },
+    })
+
+    expect(result.queue).toEqual({
+      processed: 0,
+      completed: 0,
+      requeued: 0,
+      failed: 0,
+      queueRedisError: true,
+      queueDegraded: true,
+      queueRedisErrorMessage: 'Redis rpop failed: 400',
+    })
+    expect(mockGeocodePendingSales).toHaveBeenCalled()
+    expect(result.backlog.claimed).toBe(2)
+  })
+
+  it('continues geocode when Redis queue fails and backlog drain throws', async () => {
+    mockProcessGeocodeQueueBatch.mockRejectedValue(new Error('Redis rpop failed: 400'))
+    mockGeocodePendingSales.mockRejectedValue(new Error('claim rpc failed'))
+    const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')
+    const result = await runGeocodeCronPipeline({
+      queueBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeCronQueueBatchSize,
+      backlogBatchSize: INGESTION_ORCHESTRATION_DEFAULTS.geocodeBacklogBatchSize,
+      concurrencyCeiling: INGESTION_ORCHESTRATION_DEFAULTS.geocodeConcurrencyCeiling,
+      telemetryContext: { jobType: 'cron.geocode' },
+    })
+
+    expect(result.queue.queueDegraded).toBe(true)
+    expect(result.backlog.claimed).toBe(0)
+    expect(result.backlog.error).toBeNull()
+    expect(mockRunBoundedGeocodeDeadLetterReplay).toHaveBeenCalled()
+  })
+
+  it('sanitizes Redis queue error messages', async () => {
+    const { sanitizeGeocodeQueueRedisErrorMessage } = await import('@/lib/ingestion/geocodeCronPipeline')
+    expect(
+      sanitizeGeocodeQueueRedisErrorMessage(
+        new Error('Redis rpop failed: 400 at https://secret.upstash.io/rpop Bearer abc.def.ghi')
+      )
+    ).toBe('Redis rpop failed: 400 at [redacted-url] Bearer [redacted]')
+  })
+
   it('continues geocode when backlog drain throws', async () => {
     mockGeocodePendingSales.mockRejectedValue(new Error('claim rpc failed'))
     const { runGeocodeCronPipeline } = await import('@/lib/ingestion/geocodeCronPipeline')

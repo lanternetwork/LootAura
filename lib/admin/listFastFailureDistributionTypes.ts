@@ -142,7 +142,6 @@ export type ListFastIngestedJoinRow = {
   status: string | null
   published_sale_id: string | null
   sale_instance_key: string | null
-  archived_at: string | null
   address_status: string | null
 }
 

@@ -40,11 +40,11 @@ failed_join AS (
     i.id AS ingested_id,
     i.status AS ingested_status,
     i.published_sale_id,
-    i.archived_at AS ingested_archived_at,
     i.sale_instance_key AS ingested_sale_instance_key,
     s.ends_at,
     s.moderation_status,
-    s.archived_at AS sale_archived_at
+    s.archived_at AS sale_archived_at,
+    s.status AS sale_status
   FROM failed_hot f
   LEFT JOIN lootaura_v2.ingested_sales i
     ON i.source_url = f.canonical_url AND i.is_duplicate = false
@@ -96,8 +96,16 @@ SELECT 'D_suppression', 'existing_published_sale_linked',
 FROM failed_join
 UNION ALL
 SELECT 'D_suppression', 'archived_at_not_null',
-  COUNT(*) FILTER (WHERE ingested_archived_at IS NOT NULL OR sale_archived_at IS NOT NULL)::bigint,
-  ROUND(100.0 * COUNT(*) FILTER (WHERE ingested_archived_at IS NOT NULL OR sale_archived_at IS NOT NULL) / NULLIF((SELECT COUNT(*) FROM failed_hot), 0), 1),
+  COUNT(*) FILTER (
+    WHERE ingested_status IN ('archived', 'expired')
+      OR sale_archived_at IS NOT NULL
+      OR sale_status = 'archived'
+  )::bigint,
+  ROUND(100.0 * COUNT(*) FILTER (
+    WHERE ingested_status IN ('archived', 'expired')
+      OR sale_archived_at IS NOT NULL
+      OR sale_status = 'archived'
+  ) / NULLIF((SELECT COUNT(*) FROM failed_hot), 0), 1),
   (SELECT COUNT(*) FROM failed_hot)
 FROM failed_join
 UNION ALL

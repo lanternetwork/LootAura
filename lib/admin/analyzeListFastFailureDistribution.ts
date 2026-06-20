@@ -84,9 +84,7 @@ async function fetchIngestedBySourceUrls(
   for (let i = 0; i < sourceUrls.length; i += chunkSize) {
     const chunk = sourceUrls.slice(i, i + chunkSize)
     const { data, error } = await fromBase(admin, 'ingested_sales')
-      .select(
-        'id, source_url, status, published_sale_id, sale_instance_key, archived_at, address_status'
-      )
+      .select('id, source_url, status, published_sale_id, sale_instance_key, address_status')
       .in('source_url', chunk)
       .eq('is_duplicate', false)
 
@@ -166,12 +164,21 @@ function detectPublishSuppression(input: {
     signals.push('sale_instance_key_collision')
   }
 
+  let archivedSignal = false
   for (const ingested of ingestedRows) {
-    if (ingested.archived_at) {
-      signals.push('archived_at_not_null')
+    if (ingested.status === 'archived' || ingested.status === 'expired') {
+      archivedSignal = true
       break
     }
+    if (ingested.published_sale_id) {
+      const sale = salesById.get(ingested.published_sale_id)
+      if (sale?.archived_at || sale?.status === 'archived') {
+        archivedSignal = true
+        break
+      }
+    }
   }
+  if (archivedSignal) signals.push('archived_at_not_null')
 
   for (const ingested of ingestedRows) {
     if (!ingested.published_sale_id) continue

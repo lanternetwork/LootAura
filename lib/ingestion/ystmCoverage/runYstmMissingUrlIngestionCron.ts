@@ -22,7 +22,6 @@ import {
   fetchHotMissingIngestionCandidates,
   isEligibleForMissingIngestionRetry,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageMissingCandidates'
-import { STEADY_COVERAGE_MISSING_INGEST } from '@/lib/ingestion/ystmCoverage/coverageBudgetProfiles'
 import { HOT_MISSING_INGEST_BUDGET_RATIO } from '@/lib/ingestion/ystmCoverage/ystmFreshDiscoveryConfig'
 import { fetchCoverageBootstrapEnabled } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
 import {
@@ -68,10 +67,68 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   fetchFailedPrioritySkippedCooldown: number
   hotQueueTotal: number
   coldQueueTotal: number
+  reservedHotBudget: number
+  hotFetchLimit: number
   hotCandidatesScanned: number
+  hotCandidatesAttempted: number
   coldCandidatesScanned: number
   listFastAttempts: number
   listFastPublished: number
+  listFastFailed: number
+}
+
+export function computeReservedHotBudget(
+  hotQueueTotal: number,
+  maxAttemptsPerRun: number,
+  hotRatio: number = HOT_MISSING_INGEST_BUDGET_RATIO
+): number {
+  if (hotQueueTotal <= 0) return 0
+  return Math.min(maxAttemptsPerRun, Math.max(Math.floor(maxAttemptsPerRun * hotRatio), 1))
+}
+
+export function computeHotFetchLimit(
+  hotQueueTotal: number,
+  reservedHotBudget: number,
+  maxCandidatesScannedPerRun: number
+): number {
+  if (hotQueueTotal <= 0) return 0
+  return Math.min(maxCandidatesScannedPerRun, Math.max(reservedHotBudget * 2, 1))
+}
+
+function emptyMissingIngestTelemetry(
+  partial: Partial<YstmMissingUrlIngestionCronTelemetry> &
+    Pick<YstmMissingUrlIngestionCronTelemetry, 'skipped' | 'skipReason' | 'queueOffsetBefore' | 'queueOffsetAfter'>
+): YstmMissingUrlIngestionCronTelemetry {
+  return {
+    queueTotal: 0,
+    candidatesScanned: 0,
+    detailFirstAttempts: 0,
+    published: 0,
+    ingested: 0,
+    failed: 0,
+    skippedVisible: 0,
+    skippedExisting: 0,
+    skippedCooldown: 0,
+    overlapPrevented: false,
+    fetchFailedPriorityClaimed: 0,
+    fetchFailedPriorityAttempts: 0,
+    fetchFailedPriorityPublished: 0,
+    fetchFailedPriorityIngested: 0,
+    fetchFailedPriorityFailed: 0,
+    fetchFailedPriorityTerminalized: 0,
+    fetchFailedPrioritySkippedCooldown: 0,
+    hotQueueTotal: 0,
+    coldQueueTotal: 0,
+    reservedHotBudget: 0,
+    hotFetchLimit: 0,
+    hotCandidatesScanned: 0,
+    hotCandidatesAttempted: 0,
+    coldCandidatesScanned: 0,
+    listFastAttempts: 0,
+    listFastPublished: 0,
+    listFastFailed: 0,
+    ...partial,
+  }
 }
 
 export type YstmMissingUrlIngestionCronResult = {
@@ -121,35 +178,13 @@ export async function runYstmMissingUrlIngestionCron(
     return {
       ok: true,
       detailFirstMetrics: emptyMetrics,
-      telemetry: {
+      telemetry: emptyMissingIngestTelemetry({
         skipped: true,
         skipReason: lease.reason ?? 'active_lease',
         queueOffsetBefore: lease.cursor,
         queueOffsetAfter: lease.cursor,
-        queueTotal: 0,
-        candidatesScanned: 0,
-        detailFirstAttempts: 0,
-        published: 0,
-        ingested: 0,
-        failed: 0,
-        skippedVisible: 0,
-        skippedExisting: 0,
-        skippedCooldown: 0,
         overlapPrevented: true,
-        fetchFailedPriorityClaimed: 0,
-        fetchFailedPriorityAttempts: 0,
-        fetchFailedPriorityPublished: 0,
-        fetchFailedPriorityIngested: 0,
-        fetchFailedPriorityFailed: 0,
-        fetchFailedPriorityTerminalized: 0,
-        fetchFailedPrioritySkippedCooldown: 0,
-        hotQueueTotal: 0,
-        coldQueueTotal: 0,
-        hotCandidatesScanned: 0,
-        coldCandidatesScanned: 0,
-        listFastAttempts: 0,
-        listFastPublished: 0,
-      },
+      }),
     }
   }
 
@@ -173,30 +208,28 @@ export async function runYstmMissingUrlIngestionCron(
   let fetchFailedPrioritySkippedCooldown = 0
   let hotQueueTotal = 0
   let coldQueueTotal = 0
+  let reservedHotBudget = 0
+  let hotFetchLimit = 0
   let hotCandidatesScanned = 0
+  let hotCandidatesAttempted = 0
   let coldCandidatesScanned = 0
   let listFastAttempts = 0
   let listFastPublished = 0
+  let listFastFailed = 0
   const detailFirstMetrics = emptyYstmDetailFirstRunMetrics()
   const processedCanonicalUrls = new Set<string>()
-
-  const steadyHotAttempts = Math.floor(STEADY_COVERAGE_MISSING_INGEST.maxAttemptsPerRun * HOT_MISSING_INGEST_BUDGET_RATIO)
-  const reservedHotBudget =
-    hotQueueTotal > 0
-      ? Math.min(
-          budgets.maxAttemptsPerRun,
-          Math.max(
-            Math.floor(budgets.maxAttemptsPerRun * HOT_MISSING_INGEST_BUDGET_RATIO),
-            Math.min(steadyHotAttempts, budgets.maxAttemptsPerRun)
-          )
-        )
-      : 0
 
   try {
     const publishedIndex = await loadLootAuraPublishedYstmIndex(admin)
     hotQueueTotal = await countHotMissingQueueTotal(admin)
     coldQueueTotal = await countColdMissingQueueTotal(admin)
     queueTotal = hotQueueTotal + coldQueueTotal
+    reservedHotBudget = computeReservedHotBudget(hotQueueTotal, budgets.maxAttemptsPerRun)
+    hotFetchLimit = computeHotFetchLimit(
+      hotQueueTotal,
+      reservedHotBudget,
+      budgets.maxCandidatesScannedPerRun
+    )
 
     if (queueTotal === 0) {
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
@@ -207,35 +240,12 @@ export async function runYstmMissingUrlIngestionCron(
       return {
         ok: true,
         detailFirstMetrics,
-        telemetry: {
+        telemetry: emptyMissingIngestTelemetry({
           skipped: false,
           skipReason: 'empty_missing_queue',
           queueOffsetBefore,
           queueOffsetAfter: 0,
-          queueTotal: 0,
-          candidatesScanned: 0,
-          detailFirstAttempts: 0,
-          published: 0,
-          ingested: 0,
-          failed: 0,
-          skippedVisible: 0,
-          skippedExisting: 0,
-          skippedCooldown: 0,
-          overlapPrevented: false,
-          fetchFailedPriorityClaimed: 0,
-          fetchFailedPriorityAttempts: 0,
-          fetchFailedPriorityPublished: 0,
-          fetchFailedPriorityIngested: 0,
-          fetchFailedPriorityFailed: 0,
-          fetchFailedPriorityTerminalized: 0,
-          fetchFailedPrioritySkippedCooldown: 0,
-          hotQueueTotal: 0,
-          coldQueueTotal: 0,
-          hotCandidatesScanned: 0,
-          coldCandidatesScanned: 0,
-          listFastAttempts: 0,
-          listFastPublished: 0,
-        },
+        }),
       }
     }
 
@@ -249,7 +259,7 @@ export async function runYstmMissingUrlIngestionCron(
 
     const processCandidateLoop = async (
       candidates: Array<Parameters<typeof processMissingIngestCandidate>[0]['candidate']>,
-      opts: { isFetchFailedReplay: boolean; onHotAttempt?: () => void }
+      opts: { isFetchFailedReplay: boolean; isHotPass?: boolean; onHotAttempt?: () => void }
     ) => {
       for (const candidate of candidates) {
         if (detailFirstAttempts >= budgets.maxAttemptsPerRun) break
@@ -281,6 +291,7 @@ export async function runYstmMissingUrlIngestionCron(
           onAttempt: () => {
             detailFirstAttempts += 1
             opts.onHotAttempt?.()
+            if (opts.isHotPass) hotCandidatesAttempted += 1
           },
           isFetchFailedReplay: opts.isFetchFailedReplay,
           onListFastAttempt: () => {
@@ -288,6 +299,9 @@ export async function runYstmMissingUrlIngestionCron(
           },
           onListFastPublished: () => {
             listFastPublished += 1
+          },
+          onListFastFailed: () => {
+            listFastFailed += 1
           },
         })
 
@@ -336,15 +350,29 @@ export async function runYstmMissingUrlIngestionCron(
     })
 
     if (hotQueueTotal > 0) {
-      const hotCandidates = await fetchHotMissingIngestionCandidates(admin, {
-        limit: Math.min(budgets.maxCandidatesScannedPerRun, reservedHotBudget * 2),
-        budgets,
-      })
-      hotCandidatesScanned = hotCandidates.length
-      candidatesScanned += hotCandidates.length
-      await processCandidateLoop(hotCandidates, {
-        isFetchFailedReplay: false,
-      })
+      if (hotFetchLimit <= 0) {
+        logger.error(
+          'YSTM missing URL ingestion hot phase blocked: invalid hot fetch limit',
+          undefined,
+          {
+            ...logContext,
+            hotQueueTotal,
+            reservedHotBudget,
+            hotFetchLimit,
+          }
+        )
+      } else {
+        const hotCandidates = await fetchHotMissingIngestionCandidates(admin, {
+          limit: hotFetchLimit,
+          budgets,
+        })
+        hotCandidatesScanned = hotCandidates.length
+        candidatesScanned += hotCandidates.length
+        await processCandidateLoop(hotCandidates, {
+          isFetchFailedReplay: false,
+          isHotPass: true,
+        })
+      }
     }
 
     if (hotQueueTotal === 0 && detailFirstAttempts < budgets.maxAttemptsPerRun) {
@@ -384,6 +412,16 @@ export async function runYstmMissingUrlIngestionCron(
       fetchFailedPriorityIngested,
       fetchFailedPriorityFailed,
       fetchFailedPriorityTerminalized,
+      hotQueueTotal,
+      coldQueueTotal,
+      reservedHotBudget,
+      hotFetchLimit,
+      hotCandidatesScanned,
+      hotCandidatesAttempted,
+      coldCandidatesScanned,
+      listFastAttempts,
+      listFastPublished,
+      listFastFailed,
     })
 
     return {
@@ -413,10 +451,14 @@ export async function runYstmMissingUrlIngestionCron(
         fetchFailedPrioritySkippedCooldown,
         hotQueueTotal,
         coldQueueTotal,
+        reservedHotBudget,
+        hotFetchLimit,
         hotCandidatesScanned,
+        hotCandidatesAttempted,
         coldCandidatesScanned,
         listFastAttempts,
         listFastPublished,
+        listFastFailed,
       },
     }
   } catch (err) {
@@ -467,6 +509,7 @@ async function processMissingIngestCandidate(params: {
   isFetchFailedReplay: boolean
   onListFastAttempt?: () => void
   onListFastPublished?: () => void
+  onListFastFailed?: () => void
 }): Promise<ProcessMissingIngestOutcome> {
   const {
     admin,
@@ -477,6 +520,7 @@ async function processMissingIngestCandidate(params: {
     isFetchFailedReplay,
     onListFastAttempt,
     onListFastPublished,
+    onListFastFailed,
   } = params
   const canonical = candidate.canonicalUrl
 
@@ -530,9 +574,11 @@ async function processMissingIngestCandidate(params: {
       return { kind: 'skipped_visible' }
     }
     if (listFast.outcome === 'skipped_invalid') {
+      onListFastFailed?.()
       await recordOutcome(admin, canonical, 'failed', { failureReason: listFast.reason })
       return { kind: 'failed' }
     }
+    onListFastFailed?.()
     await recordOutcome(admin, canonical, 'failed', { failureReason: listFast.reason })
     return { kind: 'failed' }
   }

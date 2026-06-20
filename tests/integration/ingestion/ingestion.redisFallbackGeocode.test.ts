@@ -342,6 +342,9 @@ describe('Redis-unavailable geocode ingestion fallback', () => {
   afterEach(() => {
     vi.useRealTimers()
     delete process.env.GEOCODE_CONCURRENCY
+    delete process.env.UPSTASH_REDIS_REST_URL
+    delete process.env.UPSTASH_REDIS_REST_TOKEN
+    vi.unstubAllGlobals()
   })
 
   it('enqueue and processGeocodeQueueBatch degrade gracefully when Redis is not configured', async () => {
@@ -427,6 +430,48 @@ describe('Redis-unavailable geocode ingestion fallback', () => {
       completed: 0,
       requeued: 0,
       failed: 0,
+    })
+    expect(data.backlog.claimed).toBe(1)
+    expect(data.backlog.failed).toBe(0)
+    expect(ctx.store.row.status).toBe('ready')
+    expect(ctx.publishReadyIngestedSaleById).toHaveBeenCalledWith(ROW_ID)
+  })
+
+  it('GET /api/cron/geocode runs backlog when Redis rpop fails', async () => {
+    process.env.UPSTASH_REDIS_REST_URL = 'https://fake.upstash.io'
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token-secret'
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.includes('/llen')) {
+        return new Response(JSON.stringify({ result: 0 }), { status: 200 })
+      }
+      if (url.includes('/rpop')) {
+        return new Response('bad request', { status: 400 })
+      }
+      return new Response(JSON.stringify({ result: null }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { assertCronAuthorized } = await import('@/lib/auth/cron')
+    vi.mocked(assertCronAuthorized).mockImplementation(() => {})
+
+    const { GET } = await import('@/app/api/cron/geocode/route')
+
+    const req = new NextRequest('http://localhost/api/cron/geocode', { method: 'GET' })
+    const res = await GET(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.queue).toEqual({
+      processed: 0,
+      completed: 0,
+      requeued: 0,
+      failed: 0,
+      queueRedisError: true,
+      queueDegraded: true,
+      queueRedisErrorMessage: 'Redis rpop failed: 400',
     })
     expect(data.backlog.claimed).toBe(1)
     expect(data.backlog.failed).toBe(0)

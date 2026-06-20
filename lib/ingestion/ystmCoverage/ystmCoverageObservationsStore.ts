@@ -12,6 +12,7 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import type { YstmCoverageFootprintMatchMethod } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
 
 import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
+import type { YstmListMetadataSale } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
 
 export type YstmDiscoveryPriority = 'hot' | 'warm' | 'cold'
 

@@ -231,8 +231,8 @@ describe('invokeGeocodeCronAtDeploymentUrlWithRetry', () => {
   it('retries after 401 and succeeds on second attempt', async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce(unauthorizedResponse())
-      .mockResolvedValueOnce(okResponse())
+      .mockImplementationOnce(() => Promise.resolve(unauthorizedResponse()))
+      .mockImplementationOnce(() => Promise.resolve(okResponse()))
     const sleepMs = vi.fn().mockResolvedValue(undefined)
     const log = vi.fn()
 
@@ -256,9 +256,9 @@ describe('invokeGeocodeCronAtDeploymentUrlWithRetry', () => {
   it('retries twice after 401 and succeeds on third attempt', async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce(unauthorizedResponse())
-      .mockResolvedValueOnce(unauthorizedResponse())
-      .mockResolvedValueOnce(okResponse())
+      .mockImplementationOnce(() => Promise.resolve(unauthorizedResponse()))
+      .mockImplementationOnce(() => Promise.resolve(unauthorizedResponse()))
+      .mockImplementationOnce(() => Promise.resolve(okResponse()))
     const sleepMs = vi.fn().mockResolvedValue(undefined)
     const log = vi.fn()
 
@@ -280,7 +280,7 @@ describe('invokeGeocodeCronAtDeploymentUrlWithRetry', () => {
   })
 
   it('fails after three 401 responses', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(unauthorizedResponse())
+    const fetchImpl = vi.fn().mockImplementation(() => Promise.resolve(unauthorizedResponse()))
     const sleepMs = vi.fn().mockResolvedValue(undefined)
     const log = vi.fn()
 

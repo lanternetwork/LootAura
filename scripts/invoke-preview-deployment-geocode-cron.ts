@@ -39,6 +39,13 @@ export type InvokeGeocodeCronResult =
       responseSnippet?: string
     }
 
+/** Delay before each attempt: immediate, then 10s, then 30s. */
+export const GEOCODE_INVOKE_RETRY_DELAYS_MS = [0, 10_000, 30_000] as const
+
+const RETRYABLE_HTTP_STATUSES = new Set([
+  401, 403, 408, 409, 425, 429, 500, 502, 503, 504,
+])
+
 /** Shared with workflow curl steps for consistent cron auth headers. */
 export function buildPreviewCronRequestHeaders(
   cronSecret: string,
@@ -70,6 +77,61 @@ function parseErrorCode(responseSnippet: string): string | undefined {
   } catch {
     return undefined
   }
+}
+
+function parseShortResponseMessage(responseSnippet?: string): string | undefined {
+  if (!responseSnippet) return undefined
+  try {
+    const parsed = JSON.parse(responseSnippet) as { error?: unknown; message?: unknown }
+    if (typeof parsed.error === 'string') return parsed.error
+    if (typeof parsed.message === 'string') return parsed.message
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
+export function isRetryableInvokeResult(
+  result: Extract<InvokeGeocodeCronResult, { ok: false }>
+): boolean {
+  if (
+    result.reason === 'missing_secret' ||
+    result.reason === 'missing_url' ||
+    result.reason === 'invalid_url'
+  ) {
+    return false
+  }
+  if (result.reason === 'network_error') {
+    return true
+  }
+  if (result.reason === 'http_error' && result.httpStatus != null) {
+    return RETRYABLE_HTTP_STATUSES.has(result.httpStatus)
+  }
+  return false
+}
+
+export function formatInvokeAttemptLogLine(params: {
+  attempt: number
+  result: Extract<InvokeGeocodeCronResult, { ok: false }>
+  retrying: boolean
+}): string {
+  const { attempt, result, retrying } = params
+  const url = result.url ?? 'geocode cron'
+  const codePart = result.errorCode ? ` code=${result.errorCode}` : ''
+
+  if (result.reason === 'network_error') {
+    return `attempt=${attempt} status=network message="network error" retrying=${retrying ? 'yes' : 'no'} url=${url}`
+  }
+
+  const status = result.httpStatus ?? 'unknown'
+  let message: string
+  if (result.httpStatus === 401) {
+    message = 'auth rejected'
+  } else {
+    message = parseShortResponseMessage(result.responseSnippet) ?? 'request failed'
+  }
+
+  return `attempt=${attempt} status=${status}${codePart} message="${message}" retrying=${retrying ? 'yes' : 'no'} url=${url}`
 }
 
 export function formatInvokeGeocodeCronFailure(result: Extract<InvokeGeocodeCronResult, { ok: false }>): string {
@@ -155,11 +217,73 @@ export async function invokeGeocodeCronAtDeploymentUrl(
   }
 }
 
+export type InvokeGeocodeCronWithRetryOptions = {
+  fetchImpl?: typeof fetch
+  bypassSecret?: string
+  sleepMs?: (ms: number) => Promise<void>
+  log?: (line: string) => void
+}
+
+/**
+ * Invokes geocode cron with bounded retry/backoff for transient deployment readiness failures.
+ */
+export async function invokeGeocodeCronAtDeploymentUrlWithRetry(
+  deploymentBaseUrl: string,
+  cronSecret: string,
+  options: InvokeGeocodeCronWithRetryOptions = {}
+): Promise<InvokeGeocodeCronResult> {
+  const fetchImpl = options.fetchImpl ?? fetch
+  const sleepMs = options.sleepMs ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
+  const log = options.log ?? ((line: string) => console.error(line))
+
+  let lastResult: InvokeGeocodeCronResult = { ok: false, reason: 'missing_url' }
+
+  for (let i = 0; i < GEOCODE_INVOKE_RETRY_DELAYS_MS.length; i++) {
+    const attempt = i + 1
+    if (i > 0) {
+      await sleepMs(GEOCODE_INVOKE_RETRY_DELAYS_MS[i])
+    }
+
+    const result = await invokeGeocodeCronAtDeploymentUrl(
+      deploymentBaseUrl,
+      cronSecret,
+      fetchImpl,
+      options.bypassSecret
+    )
+    if (result.ok) {
+      return result
+    }
+
+    lastResult = result
+
+    if (
+      result.reason === 'missing_secret' ||
+      result.reason === 'missing_url' ||
+      result.reason === 'invalid_url'
+    ) {
+      return result
+    }
+
+    const willRetry =
+      attempt < GEOCODE_INVOKE_RETRY_DELAYS_MS.length && isRetryableInvokeResult(result)
+    log(formatInvokeAttemptLogLine({ attempt, result, retrying: willRetry }))
+
+    if (!willRetry) {
+      return result
+    }
+  }
+
+  return lastResult
+}
+
 async function main(): Promise<void> {
   const url = process.env.PREVIEW_DEPLOYMENT_URL ?? ''
   const secret = process.env.CRON_SECRET ?? ''
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-  const result = await invokeGeocodeCronAtDeploymentUrl(url, secret, fetch, bypass)
+  const result = await invokeGeocodeCronAtDeploymentUrlWithRetry(url, secret, {
+    fetchImpl: fetch,
+    bypassSecret: bypass,
+  })
   if (!result.ok) {
     console.error(`invoke-preview-deployment-geocode-cron: ${formatInvokeGeocodeCronFailure(result)}`)
   }

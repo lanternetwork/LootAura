@@ -103,6 +103,7 @@ jobs:
         env:
           PREVIEW_DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npm run preview:invoke-deployment-geocode-cron
 
       - name: Invoke /api/cron/daily?mode=ingestion (bounded orchestration)
@@ -110,13 +111,17 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           URL="${DEPLOYMENT_URL%/}/api/cron/daily?mode=ingestion"
           echo "::notice::Invoking bounded ingestion orchestration at ${URL}"
-          STATUS="$(curl -sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${URL}")"
+          CURL_ARGS=(-sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            CURL_ARGS+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
+          fi
+          STATUS="$(curl "${CURL_ARGS[@]}" "${URL}")"
           echo "::notice::Ingestion orchestration HTTP status: ${STATUS}"
           if [ "${STATUS}" -lt 200 ] || [ "${STATUS}" -ge 300 ]; then
             echo "::error::Ingestion orchestration invocation failed with status ${STATUS}"
@@ -203,19 +208,24 @@ jobs:
         env:
           PREVIEW_DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npm run preview:invoke-deployment-geocode-cron
 
       - name: Invoke /api/cron/daily?mode=ingestion (bounded orchestration)
         env:
           DEPLOYMENT_URL: ${{ steps.resolve.outputs.deployment_url }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           URL="${DEPLOYMENT_URL%/}/api/cron/daily?mode=ingestion"
           echo "::notice::Invoking bounded ingestion orchestration at ${URL}"
-          STATUS="$(curl -sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${URL}")"
+          CURL_ARGS=(-sS -o /tmp/ingestion-orchestration-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            CURL_ARGS+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
+          fi
+          STATUS="$(curl "${CURL_ARGS[@]}" "${URL}")"
           echo "::notice::Ingestion orchestration HTTP status: ${STATUS}"
           if [ "${STATUS}" -lt 200 ] || [ "${STATUS}" -ge 300 ]; then
             echo "::error::Ingestion orchestration invocation failed with status ${STATUS}"

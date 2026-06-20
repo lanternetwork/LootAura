@@ -12,6 +12,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/log'
 
+function parseCronBearerToken(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const token = authHeader.slice('Bearer '.length).trim()
+  return token.length > 0 ? token : null
+}
+
 /**
  * Assert that the request is authorized with a valid CRON_SECRET Bearer token
  * Throws NextResponse with 401 if unauthorized
@@ -21,7 +27,7 @@ import { logger } from '@/lib/log'
  */
 export function assertCronAuthorized(request: NextRequest): void {
   const authHeader = request.headers.get('authorization')
-  const expectedSecret = process.env.CRON_SECRET
+  const expectedSecret = process.env.CRON_SECRET?.trim()
   const component = 'auth/cron'
   const operation = 'assert_cron_authorized'
   const route = request.nextUrl.pathname
@@ -49,9 +55,8 @@ export function assertCronAuthorized(request: NextRequest): void {
     )
   }
 
-  // Check for Bearer token: Authorization: Bearer ${CRON_SECRET}
-  const expectedAuthHeader = `Bearer ${expectedSecret}`
-  if (!authHeader || authHeader !== expectedAuthHeader) {
+  const token = parseCronBearerToken(authHeader)
+  if (!token || token !== expectedSecret) {
     logger.warn('Cron authentication failed: header mismatch', {
       component,
       operation,
@@ -61,7 +66,7 @@ export function assertCronAuthorized(request: NextRequest): void {
       deploymentEnv,
       hasAuthorizationHeader: !!authHeader,
       headerLength: authHeader?.length || 0,
-      expectedLength: expectedAuthHeader.length,
+      expectedLength: expectedSecret.length,
     })
     throw NextResponse.json(
       {
@@ -92,13 +97,13 @@ export function assertCronAuthorized(request: NextRequest): void {
  * @returns true if authorized, false otherwise
  */
 export function isCronAuthorized(request: NextRequest): boolean {
-  const authHeader = request.headers.get('authorization')
-  const expectedSecret = process.env.CRON_SECRET
+  const expectedSecret = process.env.CRON_SECRET?.trim()
 
   if (!expectedSecret) {
     return false
   }
 
-  return authHeader === `Bearer ${expectedSecret}`
+  const token = parseCronBearerToken(request.headers.get('authorization'))
+  return token === expectedSecret
 }
 

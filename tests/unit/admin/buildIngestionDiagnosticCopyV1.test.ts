@@ -76,6 +76,7 @@ function minimalMetrics(
       failureSignals: {},
       allPairs: [],
     },
+    listFastFailureDistributionAnalysis: null,
     addressEnrichmentDrainCohort: {
       cohortKey: 'address_enrichment_pending_x_provider_native',
       total: 178,

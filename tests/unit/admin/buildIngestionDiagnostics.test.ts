@@ -67,6 +67,7 @@ describe('buildIngestionDiagnostics', () => {
       },
       needsCheckBreakdown: null,
       needsCheckRootCauseAnalysis: null,
+      listFastFailureDistributionAnalysis: null,
       addressEnrichmentDrainCohort: null,
     terminalDisposition: null,
       timeseries: {} as IngestionMetricsResponse['timeseries'],
@@ -269,6 +270,7 @@ describe('buildIngestionDiagnostics', () => {
       },
       needsCheckBreakdown: null,
       needsCheckRootCauseAnalysis: null,
+      listFastFailureDistributionAnalysis: null,
       addressEnrichmentDrainCohort: null,
     terminalDisposition: null,
       funnel: {

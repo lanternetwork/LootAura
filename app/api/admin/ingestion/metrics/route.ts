@@ -31,6 +31,7 @@ import {
 import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestrationMetrics'
 import { countNeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import { analyzeNeedsCheckRootCause } from '@/lib/admin/analyzeNeedsCheckRootCause'
+import { analyzeListFastFailureDistribution } from '@/lib/admin/analyzeListFastFailureDistribution'
 import { analyzeAddressEnrichmentDrainCohort } from '@/lib/admin/analyzeAddressEnrichmentDrainCohort'
 import { countGeocodeDeadLetterReplayBuckets } from '@/lib/geocode/geocodeDeadLetterReplay'
 import {
@@ -377,6 +378,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
     const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
     const needsCheckBreakdownPromise = countNeedsCheckBreakdown()
     const needsCheckRootCauseAnalysisPromise = analyzeNeedsCheckRootCause(now)
+    const listFastFailureDistributionAnalysisPromise = analyzeListFastFailureDistribution(now)
     const addressEnrichmentDrainCohortPromise = analyzeAddressEnrichmentDrainCohort(now)
     const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
 
@@ -429,6 +431,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       geocodeDeadLetterBuckets,
       needsCheckBreakdown,
       needsCheckRootCauseAnalysis,
+      listFastFailureDistributionAnalysis,
       addressEnrichmentDrainCohort,
       acquisitionRegistry,
     ] = await Promise.all([
@@ -468,6 +471,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       geocodeDeadLetterBucketsPromise,
       needsCheckBreakdownPromise,
       needsCheckRootCauseAnalysisPromise,
+      listFastFailureDistributionAnalysisPromise,
       addressEnrichmentDrainCohortPromise,
       acquisitionRegistryPromise,
     ])
@@ -740,6 +744,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       failureBreakdown,
       needsCheckBreakdown,
       needsCheckRootCauseAnalysis,
+      listFastFailureDistributionAnalysis,
       addressEnrichmentDrainCohort,
       terminalDisposition,
       timeseries: {

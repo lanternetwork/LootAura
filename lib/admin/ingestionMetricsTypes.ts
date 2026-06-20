@@ -1,10 +1,12 @@
 import type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
+import type { ListFastFailureDistributionAnalysis } from '@/lib/admin/listFastFailureDistributionTypes'
 import type { AddressEnrichmentDrainCohortAnalysis } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 
 export type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 export type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
+export type { ListFastFailureDistributionAnalysis } from '@/lib/admin/listFastFailureDistributionTypes'
 export type { AddressEnrichmentDrainCohortAnalysis } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'
 import type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import type {
@@ -215,6 +217,8 @@ export interface IngestionMetricsResponse {
   needsCheckBreakdown: NeedsCheckBreakdown | null
   /** Workstream A2/B read-only scan — blocker classification inputs for discovery. */
   needsCheckRootCauseAnalysis: NeedsCheckRootCauseAnalysis | null
+  /** LIST_FAST_FAILURE_DISTRIBUTION_V1 — hot list-fast failure audit (24h). */
+  listFastFailureDistributionAnalysis: ListFastFailureDistributionAnalysis | null
   /** Workstreams A–B — address_enrichment_pending × provider_native drain cohort. */
   addressEnrichmentDrainCohort: AddressEnrichmentDrainCohortAnalysis | null
   /** Terminal address disposition inventory (active vs archived). */

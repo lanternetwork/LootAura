@@ -46,6 +46,19 @@ function emptyAnalysis(
     ingestedByStatus: {},
     ingestedNeedsGeocodeCount: 0,
     ingestedPublishFailedCount: 0,
+    insertFailureDetail: {
+      totalInsertFailed: 0,
+      rowsWithInsertDetail: 0,
+      byMessageClass: {},
+      byConstraint: {},
+      sameSourceUrlMatchCount: 0,
+      sameInstanceKeyMatchCount: 0,
+      sameInstanceKeyDifferentUrlCount: 0,
+      publishedMatchCount: 0,
+      duplicateMatchCount: 0,
+      expiredMatchCount: 0,
+      noCollisionMatchCount: 0,
+    },
     ...overrides,
   }
 }

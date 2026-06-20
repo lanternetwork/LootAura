@@ -39,7 +39,8 @@ import {
   recordYstmCoverageMissingIngestionOutcome,
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
-import { findPrimaryIngestedSaleBySourceUrl, pickPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
+import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
+import { findPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
@@ -575,11 +576,18 @@ async function processMissingIngestCandidate(params: {
     }
     if (listFast.outcome === 'skipped_invalid') {
       onListFastFailed?.()
-      await recordOutcome(admin, canonical, 'failed', { failureReason: listFast.reason })
+      await recordOutcome(admin, canonical, 'failed', {
+        failureReason: listFast.reason,
+        missingIngestionFailureDetails: null,
+      })
       return { kind: 'failed' }
     }
     onListFastFailed?.()
-    await recordOutcome(admin, canonical, 'failed', { failureReason: listFast.reason })
+    await recordOutcome(admin, canonical, 'failed', {
+      failureReason: listFast.reason,
+      missingIngestionFailureDetails:
+        listFast.outcome === 'failed' ? (listFast.missingIngestionFailureDetails ?? null) : null,
+    })
     return { kind: 'failed' }
   }
 
@@ -652,6 +660,7 @@ async function recordOutcome(
   outcome: YstmCoverageMissingIngestionOutcome,
   extra?: {
     failureReason?: string
+    missingIngestionFailureDetails?: MissingIngestionFailureDetails | null
     lootauraVisible?: boolean
     missingIngestionReplayCount?: number
     missingIngestionLastRetryAt?: string | null
@@ -661,6 +670,7 @@ async function recordOutcome(
   await recordYstmCoverageMissingIngestionOutcome(admin, canonicalUrl, {
     outcome,
     failureReason: extra?.failureReason ?? null,
+    missingIngestionFailureDetails: extra?.missingIngestionFailureDetails,
     lootauraVisible: extra?.lootauraVisible,
     missingIngestionReplayCount: extra?.missingIngestionReplayCount,
     missingIngestionLastRetryAt: extra?.missingIngestionLastRetryAt,

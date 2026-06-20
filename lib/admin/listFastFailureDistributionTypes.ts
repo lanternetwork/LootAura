@@ -107,6 +107,21 @@ export type ListFastFailureDistributionAnalysis = {
   ingestedByStatus: Record<string, number>
   ingestedNeedsGeocodeCount: number
   ingestedPublishFailedCount: number
+  insertFailureDetail: ListFastInsertFailureDetailAnalysis
+}
+
+export type ListFastInsertFailureDetailAnalysis = {
+  totalInsertFailed: number
+  rowsWithInsertDetail: number
+  byMessageClass: Record<string, number>
+  byConstraint: Record<string, number>
+  sameSourceUrlMatchCount: number
+  sameInstanceKeyMatchCount: number
+  sameInstanceKeyDifferentUrlCount: number
+  publishedMatchCount: number
+  duplicateMatchCount: number
+  expiredMatchCount: number
+  noCollisionMatchCount: number
 }
 
 export type ListFastFailureDistributionDiscovery = {
@@ -134,6 +149,7 @@ export type ListFastFailureObservationRow = {
   sale_instance_key: string | null
   lootaura_visible: boolean | null
   discovery_priority: string | null
+  missing_ingestion_failure_details: unknown
 }
 
 export type ListFastIngestedJoinRow = {
@@ -143,6 +159,8 @@ export type ListFastIngestedJoinRow = {
   published_sale_id: string | null
   sale_instance_key: string | null
   address_status: string | null
+  is_duplicate?: boolean | null
+  superseded_by_ingested_sale_id?: string | null
 }
 
 export type ListFastSaleJoinRow = {

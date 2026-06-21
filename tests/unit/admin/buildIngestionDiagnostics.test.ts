@@ -6,6 +6,7 @@ import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetric
 import { evaluateDetailFirstProofProtocol } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import { minimalYstmDiscoveryFreshnessMetrics } from '@/tests/unit/admin/minimalYstmDiscoveryFreshnessMetrics'
 import { minimalYstm2HourIngestionDiagnostics } from '@/tests/unit/admin/minimalYstm2HourIngestionDiagnostics'
+import { minimalMissingIngestCronHealth } from '@/tests/unit/admin/minimalMissingIngestCronHealth'
 
 function stage(id: string, count: number) {
   return {
@@ -591,10 +592,12 @@ describe('buildIngestionDiagnostics', () => {
       },
       discoveryFreshness: minimalYstmDiscoveryFreshnessMetrics(),
       twoHourIngestion: minimalYstm2HourIngestionDiagnostics(),
+      missingIngestCronHealth: minimalMissingIngestCronHealth(),
     } as YstmCoverageMetricsResponse
 
     const md = buildIngestionDiagnostics(data, { ystmCoverage })
     expect(md).toContain('## External marketplace nationwide coverage')
+    expect(md).toContain('### YSTM_MISSING_INGEST_HEALTH')
     expect(md).toContain('### Sale-instance identity (Phase 3)')
     expect(md).toContain('### Source URL alias history (Phase 4)')
     expect(md).toContain('### Sale-instance shadow replay (Phase 9)')

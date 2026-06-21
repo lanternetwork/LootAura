@@ -152,5 +152,7 @@ describe('GET /api/admin/ingestion/ystm-coverage', () => {
     expect(json.esnetIngest.enabled).toBe(false)
     expect(json.esnetBootstrap.enabled).toBe(false)
     expect(json.falseExclusionSaleIdentity.healthy).toBe(true)
+    expect(json.missingIngestCronHealth.lastError).toBe('unavailable_log_only_v1')
+    expect(json.missingIngestCronHealth.lastErrorSource).toBe('runtime_logs')
   })
 })

@@ -96,6 +96,8 @@ import {
   loadYstm2HourIngestionDiagnostics,
   type Ystm2HourIngestionDiagnostics,
 } from '@/lib/admin/loadYstm2HourIngestionDiagnostics'
+import type { MissingIngestCronHealth } from '@/lib/admin/evaluateMissingIngestCronHealth'
+import { loadMissingIngestCronHealth } from '@/lib/admin/loadMissingIngestCronHealth'
 
 export type YstmCoverageTrendPoint = {
   completedAt: string
@@ -154,7 +156,10 @@ export type YstmCoverageScoreboard = {
   }
   discoveryFreshness: YstmDiscoveryFreshnessMetrics
   twoHourIngestion: Ystm2HourIngestionDiagnostics
+  missingIngestCronHealth: MissingIngestCronHealth
 }
+
+export type { MissingIngestCronHealth }
 
 type AuditRunRow = {
   completed_at: string | null
@@ -204,6 +209,7 @@ export async function buildYstmCoverageScoreboard(
     discoveryFreshnessResult,
     missingIngestFetchFailed,
     twoHourIngestion,
+    missingIngestCronHealth,
   ] = await Promise.all([
     aggregateYstmCoverageObservations(admin),
     loadLootAuraPublishedYstmIndex(admin, now),
@@ -233,6 +239,7 @@ export async function buildYstmCoverageScoreboard(
     loadYstmDiscoveryFreshnessMetrics(admin, now.getTime()),
     aggregateMissingIngestFetchFailed(admin, now.getTime()),
     loadYstm2HourIngestionDiagnostics(admin, now.getTime()),
+    loadMissingIngestCronHealth(admin, now.getTime()),
   ])
 
   if (runsResult.error) {
@@ -405,6 +412,7 @@ export async function buildYstmCoverageScoreboard(
     },
     discoveryFreshness: discoveryFreshnessResult,
     twoHourIngestion,
+    missingIngestCronHealth,
   }
 }
 

@@ -1,3 +1,4 @@
+import { buildMissingIngestCronHealthDiagnostics } from '@/lib/admin/buildMissingIngestCronHealthDiagnostics'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateWeekOneSprintGates } from '@/lib/admin/weekOneSprintGates'
 import { evaluateYstmSaleInstanceRolloutGates } from '@/lib/admin/evaluateYstmSaleInstanceRolloutGates'
@@ -207,6 +208,8 @@ export function buildYstmCoverageDiagnostics(data: YstmCoverageMetricsResponse):
       `${data.sloAttainment.consecutiveDaysAtTarget}/${data.sloAttainment.requiredConsecutiveDays}`
     ),
     bullet('footprintMeetsMinimum', data.sloAttainment.footprintMeetsProgramMinimum ? 'yes' : 'no'),
+    '',
+    buildMissingIngestCronHealthDiagnostics(data.missingIngestCronHealth),
     '',
     '### YSTM_2HOUR_INGESTION',
     bullet(

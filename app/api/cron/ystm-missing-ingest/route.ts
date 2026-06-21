@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { logMissingIngestCronFailure } from '@/lib/admin/logMissingIngestCronFailure'
 import { assertCronAuthorized, isCronAuthorized } from '@/lib/auth/cron'
 import { runYstmMissingUrlIngestionCron } from '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
 import { getAdminDb } from '@/lib/supabase/clients'
@@ -70,7 +71,7 @@ async function runMissingIngestCron(request: NextRequest) {
     const result = await runYstmMissingUrlIngestionCron(getAdminDb())
     return NextResponse.json(missingIngestCronJsonBody(result))
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = logMissingIngestCronFailure(err)
     return NextResponse.json(
       {
         ok: false,

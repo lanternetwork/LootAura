@@ -36,7 +36,7 @@ describe('POST /api/admin/ingestion/run', () => {
 
   it('rejects unknown job keys', async () => {
     const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
-    vi.mocked(assertAdminOrThrow).mockResolvedValue(undefined)
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1', email: 'admin@test.com' } })
 
     const { POST } = await import('@/app/api/admin/ingestion/run/route')
     const res = await POST(
@@ -52,7 +52,7 @@ describe('POST /api/admin/ingestion/run', () => {
 
   it('returns runner failure payload', async () => {
     const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
-    vi.mocked(assertAdminOrThrow).mockResolvedValue(undefined)
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1', email: 'admin@test.com' } })
     mockRunAdminIngestionJob.mockResolvedValue({
       ok: false,
       job: 'missing_ingest',
@@ -79,7 +79,7 @@ describe('POST /api/admin/ingestion/run', () => {
 
   it('returns success payload', async () => {
     const { assertAdminOrThrow } = await import('@/lib/auth/adminGate')
-    vi.mocked(assertAdminOrThrow).mockResolvedValue(undefined)
+    vi.mocked(assertAdminOrThrow).mockResolvedValue({ user: { id: 'admin-1', email: 'admin@test.com' } })
     mockRunAdminIngestionJob.mockResolvedValue({
       ok: true,
       job: 'shadow_replay',

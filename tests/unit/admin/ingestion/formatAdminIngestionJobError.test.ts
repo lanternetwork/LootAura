@@ -20,7 +20,9 @@ describe('formatAdminIngestionJobError', () => {
 })
 
 describe('extractSanitizedStackTop', () => {
-  it('returns null when stack is missing', () => {
-    expect(extractSanitizedStackTop(new Error('no stack'))).toBeNull()
+  it('returns null when stack is absent', () => {
+    const err = new Error('no stack')
+    err.stack = undefined
+    expect(extractSanitizedStackTop(err)).toBeNull()
   })
 })

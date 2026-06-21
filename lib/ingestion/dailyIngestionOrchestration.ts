@@ -1,5 +1,5 @@
 ﻿import { createHash } from 'crypto'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observability/emit'
 import { ObservabilityEvents } from '@/lib/observability/events'

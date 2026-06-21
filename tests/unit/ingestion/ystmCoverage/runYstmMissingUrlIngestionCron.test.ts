@@ -15,6 +15,11 @@ const mockCountHot = vi.hoisted(() => vi.fn())
 const mockCountCold = vi.hoisted(() => vi.fn())
 const mockFetchHot = vi.hoisted(() => vi.fn())
 const mockAttemptListFast = vi.hoisted(() => vi.fn())
+const mockBackfillExpired = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation', () => ({
+  backfillExpiredListFastObservationInvalidation: mockBackfillExpired,
+}))
 
 vi.mock('@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates', () => ({
   fetchMissingIngestFetchFailedCandidates: mockFetchFetchFailedCandidates,
@@ -128,6 +133,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockCountCold.mockReset()
     mockFetchHot.mockReset()
     mockAttemptListFast.mockReset()
+    mockBackfillExpired.mockReset()
 
     mockAcquireLease.mockResolvedValue({
       acquired: true,
@@ -181,6 +187,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockCountCold.mockResolvedValue(1)
     mockFetchHot.mockResolvedValue([])
     mockAttemptListFast.mockResolvedValue({ outcome: 'failed', reason: 'test_skip' })
+    mockBackfillExpired.mockResolvedValue({ updated: 0 })
   })
 
   it('skips when orchestration lease is active', async () => {
@@ -391,6 +398,68 @@ describe('runYstmMissingUrlIngestionCron', () => {
     expect(result.telemetry.listFastFailed).toBe(1)
     expect(result.telemetry.listFastPublished).toBe(0)
     expect(result.telemetry.failed).toBe(1)
+  })
+
+  it('records list-fast skipped_invalid expired without detail-first fallback', async () => {
+    mockCountHot.mockResolvedValue(1)
+    mockCountCold.mockResolvedValue(0)
+    mockFetchHot.mockResolvedValue([
+      {
+        canonicalUrl: HOT_URL,
+        city: 'Austin',
+        state: 'TX',
+        configKey: 'TX|Austin',
+        missingIngestionOutcome: null,
+        missingIngestionAttemptedAt: null,
+        discoveryPriority: 'hot',
+        listMetadataSnapshot: {
+          ...HOT_LIST_METADATA,
+          startDate: '2020-01-01',
+          endDate: '2020-01-02',
+        },
+        firstListSeenAt: '2026-06-19T20:00:00.000Z',
+      },
+    ])
+    mockAttemptListFast.mockResolvedValue({ outcome: 'skipped_invalid', reason: 'expired' })
+
+    const { runYstmMissingUrlIngestionCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const result = await runYstmMissingUrlIngestionCron({} as never, {
+      budgets: DEFAULT_BUDGETS,
+    })
+
+    expect(mockAttemptListFast).toHaveBeenCalledTimes(1)
+    expect(mockAttemptDetailFirst).not.toHaveBeenCalled()
+    expect(mockRecordOutcome).toHaveBeenCalledWith(
+      expect.anything(),
+      HOT_URL,
+      expect.objectContaining({
+        outcome: 'failed',
+        failureReason: 'expired',
+        missingIngestionFailureDetails: null,
+      })
+    )
+    expect(result.telemetry.listFastFailed).toBe(1)
+    expect(result.telemetry.failed).toBe(1)
+    expect(result.telemetry.expiredObservationBackfillUpdated).toBe(0)
+    expect(mockBackfillExpired).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs expired observation backfill after successful pass', async () => {
+    mockBackfillExpired.mockResolvedValue({ updated: 48 })
+    mockCountHot.mockResolvedValue(0)
+    mockCountCold.mockResolvedValue(0)
+
+    const { runYstmMissingUrlIngestionCron } = await import(
+      '@/lib/ingestion/ystmCoverage/runYstmMissingUrlIngestionCron'
+    )
+    const result = await runYstmMissingUrlIngestionCron({} as never, {
+      budgets: DEFAULT_BUDGETS,
+    })
+
+    expect(mockBackfillExpired).toHaveBeenCalledTimes(1)
+    expect(result.telemetry.expiredObservationBackfillUpdated).toBe(48)
   })
 })
 

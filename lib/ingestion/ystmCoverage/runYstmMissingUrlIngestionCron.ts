@@ -39,6 +39,7 @@ import {
   recordYstmCoverageMissingIngestionOutcome,
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+import { backfillExpiredListFastObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation'
 import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import { findPrimaryIngestedSaleBySourceUrl, pickPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
@@ -76,6 +77,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   listFastAttempts: number
   listFastPublished: number
   listFastFailed: number
+  expiredObservationBackfillUpdated: number
 }
 
 export function computeReservedHotBudget(
@@ -128,6 +130,7 @@ function emptyMissingIngestTelemetry(
     listFastAttempts: 0,
     listFastPublished: 0,
     listFastFailed: 0,
+    expiredObservationBackfillUpdated: 0,
     ...partial,
   }
 }
@@ -390,6 +393,8 @@ export async function runYstmMissingUrlIngestionCron(
       queueOffsetAfter = queueOffsetBefore
     }
 
+    const backfill = await backfillExpiredListFastObservationInvalidation(admin)
+
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
       owner: lease.owner,
       nextCursor: queueOffsetAfter,
@@ -423,6 +428,7 @@ export async function runYstmMissingUrlIngestionCron(
       listFastAttempts,
       listFastPublished,
       listFastFailed,
+      expiredObservationBackfillUpdated: backfill.updated,
     })
 
     return {
@@ -460,6 +466,7 @@ export async function runYstmMissingUrlIngestionCron(
         listFastAttempts,
         listFastPublished,
         listFastFailed,
+        expiredObservationBackfillUpdated: backfill.updated,
       },
     }
   } catch (err) {

@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import IngestionWorkstreamsPanel from '@/app/admin/ingestion/IngestionWorkstreamsPanel'
+import IngestionOperationsSection from '@/app/admin/ingestion/IngestionOperationsSection'
 import YstmCoverageScoreboardSection from '@/app/admin/ingestion/YstmCoverageScoreboardSection'
 
 type Props = {
@@ -72,6 +73,8 @@ export default function IngestionControlsPanel({
           </p>
         )}
       </section>
+
+      <IngestionOperationsSection />
 
       <IngestionWorkstreamsPanel
         metrics={metrics}

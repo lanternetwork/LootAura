@@ -236,6 +236,7 @@ export async function runYstmMissingUrlIngestionCron(
     )
 
     if (queueTotal === 0) {
+      const backfill = await backfillExpiredListFastObservationInvalidation(admin)
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
         owner: lease.owner,
         nextCursor: 0,
@@ -249,6 +250,7 @@ export async function runYstmMissingUrlIngestionCron(
           skipReason: 'empty_missing_queue',
           queueOffsetBefore,
           queueOffsetAfter: 0,
+          expiredObservationBackfillUpdated: backfill.updated,
         }),
       }
     }

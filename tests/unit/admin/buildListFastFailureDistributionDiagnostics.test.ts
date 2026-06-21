@@ -42,6 +42,19 @@ describe('buildListFastFailureDistributionDiagnostics', () => {
       ingestedByStatus: { needs_geocode: 1 },
       ingestedNeedsGeocodeCount: 1,
       ingestedPublishFailedCount: 0,
+      insertFailureDetail: {
+        totalInsertFailed: 2,
+        rowsWithInsertDetail: 2,
+        byMessageClass: { collision_resolution_failed: 2 },
+        byConstraint: { ingested_sales_active_sale_instance_key_uniq: 2 },
+        sameSourceUrlMatchCount: 0,
+        sameInstanceKeyMatchCount: 2,
+        sameInstanceKeyDifferentUrlCount: 2,
+        publishedMatchCount: 0,
+        duplicateMatchCount: 0,
+        expiredMatchCount: 0,
+        noCollisionMatchCount: 0,
+      },
     }
 
     const markdown = buildListFastFailureDistributionDiagnostics(
@@ -51,6 +64,8 @@ describe('buildListFastFailureDistributionDiagnostics', () => {
     expect(markdown).toContain('## LIST_FAST_FAILURE_DISTRIBUTION_V1')
     expect(markdown).toContain('### Section A — Cohort')
     expect(markdown).toContain('### Section G — Recommendation')
+    expect(markdown).toContain('### Section H — Insert failure detail')
+    expect(markdown).toContain('collision_resolution_failed')
     expect(markdown).toContain('geocode_unavailable')
   })
 })

@@ -11,6 +11,7 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 import type { YstmCoverageFootprintMatchMethod } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
 
+import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import type { YstmListMetadataSale } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
 
 export type YstmDiscoveryPriority = 'hot' | 'warm' | 'cold'
@@ -143,6 +144,7 @@ export function buildMissingIngestionObservationUpdate(
   patch: {
     outcome: YstmCoverageMissingIngestionOutcome
     failureReason?: string | null
+    missingIngestionFailureDetails?: MissingIngestionFailureDetails | null
     lootauraVisible?: boolean
     missingIngestionReplayCount?: number
     missingIngestionLastRetryAt?: string | null
@@ -155,6 +157,16 @@ export function buildMissingIngestionObservationUpdate(
     missing_ingestion_outcome: patch.outcome,
     missing_ingestion_failure_reason: patch.failureReason ?? null,
     updated_at: nowIso,
+  }
+  if (patch.missingIngestionFailureDetails !== undefined) {
+    update.missing_ingestion_failure_details = patch.missingIngestionFailureDetails
+  } else if (
+    patch.outcome === 'published' ||
+    patch.outcome === 'ingested' ||
+    patch.outcome === 'skipped_visible' ||
+    patch.outcome === 'skipped_existing'
+  ) {
+    update.missing_ingestion_failure_details = null
   }
   if (patch.resetFetchFailedReplay) {
     update.missing_ingestion_replay_count = 0
@@ -186,6 +198,7 @@ export async function recordYstmCoverageMissingIngestionOutcome(
   patch: {
     outcome: YstmCoverageMissingIngestionOutcome
     failureReason?: string | null
+    missingIngestionFailureDetails?: MissingIngestionFailureDetails | null
     lootauraVisible?: boolean
     missingIngestionReplayCount?: number
     missingIngestionLastRetryAt?: string | null

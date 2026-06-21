@@ -16,6 +16,12 @@ import { publishReadyIngestedSaleById } from '@/lib/ingestion/publishWorker'
 import { lookupSpatialCoordinates, type SpatialCoordinateResolution } from '@/lib/ingestion/spatial/resolveSpatialCoordinates'
 import { normalizeAddressForPublish } from '@/lib/ingestion/normalizeAddressForPublish'
 import { ingestedSaleTimeSourceForDb } from '@/lib/ingestion/ingestedSaleDbConstraints'
+import {
+  buildListFastInsertFailureDetail,
+  buildListFastInsertFailureLogFieldsWithUrl,
+  deriveListFastSnapshotCompleteness,
+} from '@/lib/ingestion/ystmCoverage/buildListFastInsertFailureDetail'
+import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
@@ -26,7 +32,11 @@ export type YstmListFastPublishResult =
   | { outcome: 'ingested'; ingestedSaleId: string }
   | { outcome: 'skipped_duplicate' }
   | { outcome: 'skipped_invalid'; reason: string }
-  | { outcome: 'failed'; reason: string }
+  | {
+      outcome: 'failed'
+      reason: string
+      missingIngestionFailureDetails?: MissingIngestionFailureDetails
+    }
 
 function detailScheduleFieldsForMetadata(_sale: YstmListMetadataSale) {
   return {
@@ -232,13 +242,18 @@ export async function attemptYstmListFastPublish(input: {
     rowPayload,
   })
 
+  const snapshotCompleteness = deriveListFastSnapshotCompleteness(input.sale)
+
   const { data: insertedRow, error: insErr } = await fromBase(admin, 'ingested_sales')
     .insert(ingestRow)
     .select('id, status')
     .maybeSingle()
 
   let ingestedSaleId = insertedRow?.id ? String(insertedRow.id) : null
+  let collisionResolutionAttempted = false
+  let collisionResolutionSucceeded = false
   if (!ingestedSaleId) {
+    collisionResolutionAttempted = true
     const resolved = await resolveIngestedSaleInsertCollision(admin, {
       sourceUrl: listing.sourceUrl,
       row: ingestRow,
@@ -248,15 +263,32 @@ export async function attemptYstmListFastPublish(input: {
     }
     if (resolved?.id) {
       ingestedSaleId = resolved.id
+      collisionResolutionSucceeded = true
     }
   }
 
   if (!ingestedSaleId) {
+    const missingIngestionFailureDetails = buildListFastInsertFailureDetail({
+      sale: input.sale,
+      ingestRow,
+      insertError: insErr,
+      insertReturnedRow: Boolean(insertedRow?.id),
+      collisionResolutionAttempted,
+      collisionResolutionSucceeded,
+      snapshotCompleteness,
+    })
     logger.warn('ystm list-fast publish insert failed', {
       component: 'ingestion/acquisition/ystmListFastPublish',
-      message: insErr?.message ?? 'insert_failed',
+      messageClass: missingIngestionFailureDetails.list_fast_insert?.messageClass ?? 'unknown_db_error',
+      code: missingIngestionFailureDetails.list_fast_insert?.code ?? null,
+      constraint: missingIngestionFailureDetails.list_fast_insert?.constraint ?? null,
+      ...buildListFastInsertFailureLogFieldsWithUrl(input.sale.canonicalUrl, missingIngestionFailureDetails),
     })
-    return { outcome: 'failed', reason: 'insert_failed' }
+    return {
+      outcome: 'failed',
+      reason: 'insert_failed',
+      missingIngestionFailureDetails,
+    }
   }
 
   await recordIngestedSaleSourceUrl(admin, {

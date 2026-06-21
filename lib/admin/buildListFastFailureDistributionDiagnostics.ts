@@ -89,5 +89,42 @@ export function buildListFastFailureDistributionDiagnostics(
     '_No repairs implemented in this audit PR._'
   )
 
+  const sectionH = analysis.insertFailureDetail
+  if (sectionH.totalInsertFailed > 0) {
+    lines.push('', '### Section H — Insert failure detail')
+    lines.push(bullet('total_insert_failed', sectionH.totalInsertFailed))
+    lines.push(
+      bullet(
+        'rows_with_insert_detail',
+        `${sectionH.rowsWithInsertDetail} / ${sectionH.totalInsertFailed}`
+      )
+    )
+    lines.push('', '#### By messageClass')
+    for (const [messageClass, count] of Object.entries(sectionH.byMessageClass).sort(
+      (a, b) => b[1] - a[1]
+    )) {
+      lines.push(`- ${messageClass}: ${count.toLocaleString()}`)
+    }
+    if (Object.keys(sectionH.byConstraint).length > 0) {
+      lines.push('', '#### By constraint')
+      for (const [constraint, count] of Object.entries(sectionH.byConstraint).sort(
+        (a, b) => b[1] - a[1]
+      )) {
+        lines.push(`- ${constraint}: ${count.toLocaleString()}`)
+      }
+    }
+    lines.push(
+      '',
+      '#### Collision drilldown',
+      bullet('same_source_url_match_count', sectionH.sameSourceUrlMatchCount),
+      bullet('same_instance_key_match_count', sectionH.sameInstanceKeyMatchCount),
+      bullet('same_instance_key_different_url_count', sectionH.sameInstanceKeyDifferentUrlCount),
+      bullet('published_match_count', sectionH.publishedMatchCount),
+      bullet('duplicate_match_count', sectionH.duplicateMatchCount),
+      bullet('expired_match_count', sectionH.expiredMatchCount),
+      bullet('no_collision_match_count', sectionH.noCollisionMatchCount)
+    )
+  }
+
   return lines.join('\n')
 }

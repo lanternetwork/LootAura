@@ -2,6 +2,7 @@ import {
   classifyListFastSnapshotCompleteness,
   parseListMetadataSnapshotForAudit,
 } from '@/lib/admin/classifyListFastSnapshotForAudit'
+import { classifyListFastInsertCollisionDrilldown } from '@/lib/admin/classifyListFastInsertCollisionDrilldown'
 import {
   LIST_FAST_GEOCODE_IMPACT_BUCKETS,
   LIST_FAST_PUBLISH_SUPPRESSION_SIGNALS,
@@ -10,10 +11,12 @@ import {
   type ListFastFailureObservationRow,
   type ListFastGeocodeImpactBucket,
   type ListFastIngestedJoinRow,
+  type ListFastInsertFailureDetailAnalysis,
   type ListFastPublishSuppressionSignal,
   type ListFastSaleJoinRow,
   type ListFastSnapshotCompletenessBucket,
 } from '@/lib/admin/listFastFailureDistributionTypes'
+import { parseListFastInsertFailureDetail } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import { isLinkedSaleVisibilityFiltered } from '@/lib/ingestion/ystmCoverage/linkedSaleVisibilityFilter'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
@@ -47,7 +50,7 @@ async function fetchObservationCohort(
   for (;;) {
     let query = fromBase(admin, 'ystm_coverage_observations')
       .select(
-        'canonical_url, missing_ingestion_failure_reason, missing_ingestion_attempted_at, list_metadata_snapshot, sale_instance_key, lootaura_visible, discovery_priority'
+        'canonical_url, missing_ingestion_failure_reason, missing_ingestion_attempted_at, list_metadata_snapshot, sale_instance_key, lootaura_visible, discovery_priority, missing_ingestion_failure_details'
       )
       .eq('ystm_valid_active', true)
       .eq('lootaura_visible', false)
@@ -84,9 +87,10 @@ async function fetchIngestedBySourceUrls(
   for (let i = 0; i < sourceUrls.length; i += chunkSize) {
     const chunk = sourceUrls.slice(i, i + chunkSize)
     const { data, error } = await fromBase(admin, 'ingested_sales')
-      .select('id, source_url, status, published_sale_id, sale_instance_key, address_status')
+      .select(
+        'id, source_url, status, published_sale_id, sale_instance_key, address_status, is_duplicate, superseded_by_ingested_sale_id'
+      )
       .in('source_url', chunk)
-      .eq('is_duplicate', false)
 
     if (error) throw new Error(error.message)
 
@@ -99,6 +103,54 @@ async function fetchIngestedBySourceUrls(
   }
 
   return byUrl
+}
+
+async function fetchIngestedBySaleInstanceKeys(
+  admin: ReturnType<typeof getAdminDb>,
+  keys: Array<{ sourcePlatform: string; saleInstanceKey: string }>
+): Promise<Map<string, ListFastIngestedJoinRow[]>> {
+  const byKey = new Map<string, ListFastIngestedJoinRow[]>()
+  if (keys.length === 0) return byKey
+
+  const chunkSize = 50
+  for (let i = 0; i < keys.length; i += chunkSize) {
+    const chunk = keys.slice(i, i + chunkSize)
+    for (const entry of chunk) {
+      const { data, error } = await fromBase(admin, 'ingested_sales')
+        .select(
+          'id, source_url, status, published_sale_id, sale_instance_key, address_status, is_duplicate, superseded_by_ingested_sale_id'
+        )
+        .eq('source_platform', entry.sourcePlatform)
+        .eq('sale_instance_key', entry.saleInstanceKey)
+        .is('superseded_by_ingested_sale_id', null)
+        .limit(20)
+
+      if (error) throw new Error(error.message)
+
+      const mapKey = `${entry.sourcePlatform}\0${entry.saleInstanceKey}`
+      const existing = byKey.get(mapKey) ?? []
+      existing.push(...((Array.isArray(data) ? data : []) as ListFastIngestedJoinRow[]))
+      byKey.set(mapKey, existing)
+    }
+  }
+
+  return byKey
+}
+
+function emptyInsertFailureDetailAnalysis(): ListFastInsertFailureDetailAnalysis {
+  return {
+    totalInsertFailed: 0,
+    rowsWithInsertDetail: 0,
+    byMessageClass: {},
+    byConstraint: {},
+    sameSourceUrlMatchCount: 0,
+    sameInstanceKeyMatchCount: 0,
+    sameInstanceKeyDifferentUrlCount: 0,
+    publishedMatchCount: 0,
+    duplicateMatchCount: 0,
+    expiredMatchCount: 0,
+    noCollisionMatchCount: 0,
+  }
 }
 
 async function fetchSalesByIds(
@@ -326,6 +378,55 @@ export async function analyzeListFastFailureDistribution(
 
   ages.sort((a, b) => a - b)
 
+  const insertFailedRows = failedHotRows.filter(
+    (row) => row.missing_ingestion_failure_reason === 'insert_failed'
+  )
+  const insertFailureDetail = emptyInsertFailureDetailAnalysis()
+  insertFailureDetail.totalInsertFailed = insertFailedRows.length
+
+  const instanceKeyLookups = [
+    ...new Map(
+      insertFailedRows
+        .map((row) => row.sale_instance_key?.trim())
+        .filter((key): key is string => Boolean(key))
+        .map((key) => [`external_page_source\0${key}`, { sourcePlatform: 'external_page_source', saleInstanceKey: key }] as const)
+    ).values(),
+  ]
+  const ingestedByInstanceKey = await fetchIngestedBySaleInstanceKeys(admin, instanceKeyLookups)
+
+  for (const row of insertFailedRows) {
+    const detail = parseListFastInsertFailureDetail(row.missing_ingestion_failure_details)
+    if (detail) {
+      insertFailureDetail.rowsWithInsertDetail += 1
+      increment(insertFailureDetail.byMessageClass, detail.messageClass)
+      increment(insertFailureDetail.byConstraint, detail.constraint ?? '(null)')
+    }
+
+    const sourceMatches = ingestedByUrl.get(row.canonical_url) ?? []
+    const saleInstanceKey = row.sale_instance_key?.trim() ?? null
+    const instanceMatches =
+      saleInstanceKey != null
+        ? ingestedByInstanceKey.get(`external_page_source\0${saleInstanceKey}`) ?? []
+        : []
+
+    const drilldown = classifyListFastInsertCollisionDrilldown({
+      canonicalUrl: row.canonical_url,
+      saleInstanceKey,
+      sourceUrlMatches: sourceMatches,
+      instanceKeyMatches: instanceMatches,
+      salesById,
+      nowMs,
+    })
+
+    if (drilldown.sameSourceUrlMatch) insertFailureDetail.sameSourceUrlMatchCount += 1
+    if (drilldown.sameInstanceKeyMatch) insertFailureDetail.sameInstanceKeyMatchCount += 1
+    if (drilldown.sameInstanceKeyDifferentUrl) insertFailureDetail.sameInstanceKeyDifferentUrlCount += 1
+    if (drilldown.publishedMatch) insertFailureDetail.publishedMatchCount += 1
+    if (drilldown.duplicateMatch) insertFailureDetail.duplicateMatchCount += 1
+    if (drilldown.expiredMatch) insertFailureDetail.expiredMatchCount += 1
+    if (drilldown.noCollisionMatch) insertFailureDetail.noCollisionMatchCount += 1
+  }
+
   return {
     generatedAt: now.toISOString(),
     cohortWindowHours: COHORT_WINDOW_HOURS,
@@ -342,5 +443,6 @@ export async function analyzeListFastFailureDistribution(
     ingestedByStatus,
     ingestedNeedsGeocodeCount,
     ingestedPublishFailedCount,
+    insertFailureDetail,
   }
 }

@@ -8,8 +8,10 @@ import {
   type PostgresInsertErrorLike,
 } from '@/lib/ingestion/acquisition/classifyPostgresInsertError'
 import { coerceIngestedDateToYyyyMmDd } from '@/lib/ingestion/saleWindowDates'
-import type { YstmListMetadataSale } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
-import { hashYstmListMetadataSnapshot } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
+import {
+  hashYstmListMetadataSnapshot,
+  type YstmListMetadataSale,
+} from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
 import type {
   ListFastInsertFailureDetail,
   MissingIngestionFailureDetails,

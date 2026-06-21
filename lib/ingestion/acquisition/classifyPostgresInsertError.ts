@@ -105,7 +105,7 @@ export function classifyPostgresInsertError(
 
   if (/duplicate key|unique constraint|violates unique constraint/i.test(dbMessage ?? '')) {
     return {
-      code: code ?? '23505',
+      code,
       messageClass: 'unique_violation',
       constraint,
     }

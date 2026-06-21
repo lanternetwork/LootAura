@@ -130,7 +130,10 @@ describe('buildMissingIngestionObservationUpdate', () => {
       NOW
     )
 
-    expect(update).toEqual(baseMissingIngestionFields('ingested', 'expired_after_detail'))
+    expect(update).toEqual({
+      ...baseMissingIngestionFields('ingested', 'expired_after_detail'),
+      missing_ingestion_failure_details: null,
+    })
     expect(update).not.toHaveProperty('ystm_valid_active')
   })
 

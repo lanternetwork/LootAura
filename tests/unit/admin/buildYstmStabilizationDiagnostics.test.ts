@@ -49,6 +49,7 @@ function minimalMetrics(): IngestionMetricsResponse {
     needsCheckBreakdown: null,
     needsCheckRootCauseAnalysis: null,
     listFastFailureDistributionAnalysis: null,
+    publishedNotVisibleDistributionAnalysis: null,
     addressEnrichmentDrainCohort: null,
     terminalDisposition: null,
     timeseries: {} as IngestionMetricsResponse['timeseries'],

@@ -71,10 +71,17 @@ function classify(input: {
     input.linkedSale?.id ??
     null
 
+  const linkedSale =
+    'linkedSale' in input
+      ? input.linkedSale
+      : linkedSaleId
+        ? sale({ id: linkedSaleId })
+        : null
+
   return classifyPublishedNotVisibleBucket({
     observation: obs,
     ingested: ing,
-    linkedSale: input.linkedSale ?? (linkedSaleId ? sale({ id: linkedSaleId }) : null),
+    linkedSale,
     linkedSaleId,
     visibleInPublishedIndex: input.visibleInPublishedIndex ?? false,
     nowMs: NOW_MS,

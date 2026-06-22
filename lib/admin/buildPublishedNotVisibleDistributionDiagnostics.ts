@@ -1,14 +1,14 @@
 import type { PublishedNotVisibleDistributionDiscovery } from '@/lib/admin/publishedNotVisibleDistributionTypes'
 
 function bullet(label: string, value: string | number | boolean): string {
-  const rendered =
-    typeof value === 'number'
-      ? value.toLocaleString('en-US')
-      : typeof value === 'boolean'
-        ? value
-          ? 'yes'
-          : 'no'
-        : value
+  let rendered: string
+  if (typeof value === 'number') {
+    rendered = value.toLocaleString('en-US')
+  } else if (typeof value === 'boolean') {
+    rendered = value ? 'yes' : 'no'
+  } else {
+    rendered = value
+  }
   return `- ${label}: ${rendered}`
 }
 

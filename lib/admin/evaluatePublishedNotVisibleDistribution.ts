@@ -116,7 +116,6 @@ function deriveVerdict(analysis: PublishedNotVisibleDistributionAnalysis): {
   const publishHook = analysis.publishHookCount
 
   const dispositionPct = pct(disposition, total)
-  const stalePct = pct(stale, total)
   const matchingPct = pct(matching, total)
   const publishHookPct = pct(publishHook, total)
 

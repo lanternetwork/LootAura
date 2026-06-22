@@ -10,6 +10,10 @@ import {
 } from '@/lib/admin/publishedNotVisibleDistributionTypes'
 
 const SAMPLE_SIZE = 10
+const VISIBILITY_FILTER_ZOMBIE_DISPOSITION_THRESHOLD = 0.95
+const IMMATERIAL_VISIBLE_SALE_THRESHOLD = 0.01
+const DOMINANT_STALE_SHARE_THRESHOLD = 0.5
+const DOMINANT_MATCHING_SHARE_THRESHOLD = 0.5
 
 function pct(count: number, total: number): number {
   return total > 0 ? count / total : 0
@@ -20,7 +24,9 @@ function bucketRows(analysis: PublishedNotVisibleDistributionAnalysis): Publishe
     bucket,
     count: analysis.byBucket[bucket],
     pct: pct(analysis.byBucket[bucket], analysis.cohortTotal),
-  })).filter((row) => row.count > 0)
+  }))
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count)
 }
 
 function reconciliationRows(
@@ -91,6 +97,17 @@ function selectSampleRows(
   return samples
 }
 
+function secondaryAuditBugNote(analysis: PublishedNotVisibleDistributionAnalysis, total: number): string {
+  const visibleSaleCount = analysis.byBucket.VISIBLE_SALE
+  if (visibleSaleCount <= 0) return ''
+  const visibleSalePct = pct(visibleSaleCount, total)
+  if (visibleSalePct > IMMATERIAL_VISIBLE_SALE_THRESHOLD) return ''
+  return (
+    ` Secondary audit signal: ${visibleSaleCount} row(s) with Phase-4-visible linked sales ` +
+    `(COVERAGE_VISIBILITY_AUDIT_BUG_V1).`
+  )
+}
+
 function deriveVerdict(analysis: PublishedNotVisibleDistributionAnalysis): {
   verdict: PublishedNotVisibleVerdict
   rationale: string
@@ -103,10 +120,32 @@ function deriveVerdict(analysis: PublishedNotVisibleDistributionAnalysis): {
     }
   }
 
-  if (analysis.byBucket.VISIBLE_SALE > 0) {
+  const visibleSaleCount = analysis.byBucket.VISIBLE_SALE
+  const visibleSalePct = pct(visibleSaleCount, total)
+  const visibilityFilterZombiePct = pct(analysis.visibilityFilterZombieCount, total)
+  const auditBugNote = secondaryAuditBugNote(analysis, total)
+
+  if (
+    visibilityFilterZombiePct >= VISIBILITY_FILTER_ZOMBIE_DISPOSITION_THRESHOLD &&
+    visibleSalePct <= IMMATERIAL_VISIBLE_SALE_THRESHOLD
+  ) {
+    const disposition = dispositionCount(analysis)
+    const dispositionPct = pct(disposition, total)
+    return {
+      verdict: 'PUBLISHED_NOT_VISIBLE_DISPOSITION_REPAIR_V1',
+      rationale:
+        `visibility_filter_zombie=${analysis.visibilityFilterZombieCount}/${total} ` +
+        `(${(visibilityFilterZombiePct * 100).toFixed(1)}%). ` +
+        `Disposition buckets (ARCHIVED+EXPIRED+MODERATION_HIDDEN)=${disposition}/${total} ` +
+        `(${(dispositionPct * 100).toFixed(1)}%).` +
+        auditBugNote,
+    }
+  }
+
+  if (visibleSaleCount > 0 && visibleSalePct > IMMATERIAL_VISIBLE_SALE_THRESHOLD) {
     return {
       verdict: 'COVERAGE_VISIBILITY_AUDIT_BUG_V1',
-      rationale: `${analysis.byBucket.VISIBLE_SALE} row(s) have linked sales passing Phase 4 visibility while observations remain lootaura_visible=false.`,
+      rationale: `${visibleSaleCount} row(s) (${(visibleSalePct * 100).toFixed(1)}%) have linked sales passing Phase 4 visibility while observations remain lootaura_visible=false.`,
     }
   }
 
@@ -118,58 +157,49 @@ function deriveVerdict(analysis: PublishedNotVisibleDistributionAnalysis): {
   const dispositionPct = pct(disposition, total)
   const matchingPct = pct(matching, total)
   const publishHookPct = pct(publishHook, total)
+  const staleSignalPct = pct(stale + publishHook, total)
 
-  const shares = [
-    {
-      key: 'disposition' as const,
-      count: disposition,
-      pct: dispositionPct,
-      verdict: 'PUBLISHED_NOT_VISIBLE_DISPOSITION_REPAIR_V1' as const,
-    },
-    {
-      key: 'stale' as const,
-      count: stale + publishHook,
-      pct: pct(stale + publishHook, total),
-      verdict: 'PUBLISHED_NOT_VISIBLE_RECONCILIATION_REPAIR_V1' as const,
-    },
-    {
-      key: 'matching' as const,
-      count: matching,
-      pct: matchingPct,
-      verdict: 'PUBLISHED_NOT_VISIBLE_MATCHING_REPAIR_V1' as const,
-    },
-  ].sort((a, b) => b.pct - a.pct)
-
-  const leader = shares[0]
-  if (!leader || leader.pct <= 0) {
+  if (staleSignalPct >= DOMINANT_STALE_SHARE_THRESHOLD) {
     return {
-      verdict: 'OTHER',
-      rationale: 'No dominant pattern among disposition, stale, or matching buckets.',
-    }
-  }
-
-  if (leader.key === 'disposition') {
-    return {
-      verdict: leader.verdict,
-      rationale:
-        `Disposition buckets (ARCHIVED+EXPIRED+MODERATION_HIDDEN) account for ${disposition} / ${total} ` +
-        `(${(dispositionPct * 100).toFixed(1)}%). visibility_filter_zombie=${analysis.visibilityFilterZombieCount}.`,
-    }
-  }
-
-  if (leader.key === 'stale') {
-    return {
-      verdict: leader.verdict,
+      verdict: 'PUBLISHED_NOT_VISIBLE_RECONCILIATION_REPAIR_V1',
       rationale:
         `Stale/reconciliation signals account for ${stale + publishHook} / ${total} ` +
-        `(${(leader.pct * 100).toFixed(1)}%); STALE_OBSERVATION=${stale}, publish_hook=${publishHook} ` +
-        `(${(publishHookPct * 100).toFixed(1)}%).`,
+        `(${(staleSignalPct * 100).toFixed(1)}%); STALE_OBSERVATION=${stale}, publish_hook=${publishHook} ` +
+        `(${(publishHookPct * 100).toFixed(1)}%).` +
+        auditBugNote,
+    }
+  }
+
+  if (matchingPct >= DOMINANT_MATCHING_SHARE_THRESHOLD) {
+    return {
+      verdict: 'PUBLISHED_NOT_VISIBLE_MATCHING_REPAIR_V1',
+      rationale:
+        `Matching buckets (MISMATCH+NO_MATCHED_SALE) account for ${matching} / ${total} ` +
+        `(${(matchingPct * 100).toFixed(1)}%).` +
+        auditBugNote,
+    }
+  }
+
+  if (dispositionPct > 0) {
+    return {
+      verdict: 'PUBLISHED_NOT_VISIBLE_DISPOSITION_REPAIR_V1',
+      rationale:
+        `Disposition buckets (ARCHIVED+EXPIRED+MODERATION_HIDDEN) account for ${disposition} / ${total} ` +
+        `(${(dispositionPct * 100).toFixed(1)}%). visibility_filter_zombie=${analysis.visibilityFilterZombieCount}.` +
+        auditBugNote,
+    }
+  }
+
+  if (visibleSaleCount > 0) {
+    return {
+      verdict: 'COVERAGE_VISIBILITY_AUDIT_BUG_V1',
+      rationale: `${visibleSaleCount} row(s) have linked sales passing Phase 4 visibility while observations remain lootaura_visible=false.`,
     }
   }
 
   return {
-    verdict: leader.verdict,
-    rationale: `Matching buckets (MISMATCH+NO_MATCHED_SALE) account for ${matching} / ${total} (${(matchingPct * 100).toFixed(1)}%).`,
+    verdict: 'OTHER',
+    rationale: 'No dominant pattern among disposition, stale, or matching buckets.',
   }
 }
 

@@ -170,6 +170,63 @@ describe('classifyPublishedNotVisibleBucket', () => {
         linkedSale: sale({ id: 'sale-b', ends_at: '2026-06-17T00:00:00.000Z' }),
         linkedSaleId: 'sale-b',
       })
+    ).toBe('EXPIRED')
+  })
+
+  it('classifies archived sale before URL-string mismatch (observation_proxy skew)', () => {
+    expect(
+      detectPublishedNotVisibleMismatch({
+        observation: observation({
+          canonical_url: 'https://yardsaletreasuremap.com/349537495/listing.html',
+          appearance_source: 'observation_proxy',
+        }),
+        ingested: ingested({
+          source_url: 'https://www.yardsaletreasuremap.com/38791675/userlisting.html?s=tl',
+          published_sale_id: 'sale-archived',
+        }),
+        linkedSale: sale({
+          id: 'sale-archived',
+          status: 'archived',
+          archived_at: '2026-01-01T00:00:00.000Z',
+        }),
+        linkedSaleId: 'sale-archived',
+        visibleInPublishedIndex: false,
+        nowMs: NOW_MS,
+      })
+    ).toBe(false)
+
+    expect(
+      classify({
+        observation: {
+          canonical_url: 'https://yardsaletreasuremap.com/349537495/listing.html',
+          appearance_source: 'observation_proxy',
+        },
+        ingested: {
+          id: 'ingested-proxy',
+          source_url: 'https://www.yardsaletreasuremap.com/38791675/userlisting.html?s=tl',
+          status: 'published',
+          published_sale_id: 'sale-archived',
+          sale_instance_key: null,
+          is_duplicate: false,
+        },
+        linkedSale: sale({
+          id: 'sale-archived',
+          status: 'archived',
+          archived_at: '2026-01-01T00:00:00.000Z',
+        }),
+        linkedSaleId: 'sale-archived',
+      })
+    ).toBe('ARCHIVED')
+  })
+
+  it('classifies true identity mismatch when linked sale is not phase4-visible', () => {
+    expect(
+      classify({
+        observation: { matched_sale_id: 'sale-a', sale_instance_key: 'key-a' },
+        ingested: ingested({ published_sale_id: 'sale-b', sale_instance_key: 'key-b' }),
+        linkedSale: sale({ id: 'sale-b', status: 'needs_check' }),
+        linkedSaleId: 'sale-b',
+      })
     ).toBe('MISMATCH')
   })
 

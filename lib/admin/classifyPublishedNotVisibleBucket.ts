@@ -58,7 +58,8 @@ function hasResolvableLinkage(input: ClassifyPublishedNotVisibleBucketInput): bo
 }
 
 export function detectPublishedNotVisibleMismatch(input: ClassifyPublishedNotVisibleBucketInput): boolean {
-  const { observation, ingested } = input
+  const { observation, ingested, linkedSale } = input
+  const nowMs = input.nowMs ?? Date.now()
   if (!ingested) return false
 
   const publishedId = ingested.published_sale_id?.trim() || null
@@ -71,7 +72,12 @@ export function detectPublishedNotVisibleMismatch(input: ClassifyPublishedNotVis
 
   const canonicalObs = canonicalSourceUrl(observation.canonical_url)
   const canonicalIngested = canonicalSourceUrl(ingested.source_url)
-  if (canonicalObs && canonicalIngested && canonicalObs !== canonicalIngested) return true
+  if (canonicalObs && canonicalIngested && canonicalObs !== canonicalIngested) {
+    if (linkedSale && !passesPhase4PublicVisibility(linkedSale, nowMs)) {
+      return false
+    }
+    return true
+  }
 
   return false
 }
@@ -108,14 +114,14 @@ export function classifyPublishedNotVisibleBucket(
     return 'NO_MATCHED_SALE'
   }
 
-  if (detectPublishedNotVisibleMismatch(input)) {
-    return 'MISMATCH'
-  }
-
   if (linkedSale) {
     if (isArchivedSale(linkedSale)) return 'ARCHIVED'
     if (isModerationHiddenSale(linkedSale)) return 'MODERATION_HIDDEN'
     if (isExpiredSale(linkedSale, nowMs)) return 'EXPIRED'
+  }
+
+  if (detectPublishedNotVisibleMismatch(input)) {
+    return 'MISMATCH'
   }
 
   if (isStaleObservation(input, nowMs)) {

@@ -34,7 +34,52 @@ describe('evaluatePublishedNotVisibleDistribution', () => {
     expect(discovery.dispositionSharePct).toBeCloseTo(653 / 654, 4)
   })
 
-  it('flags audit bug when visible sale rows exist', () => {
+  it('recommends disposition repair for production-like visibility_filter_zombie cohort', () => {
+    const analysis: PublishedNotVisibleDistributionAnalysis = {
+      generatedAt: '2026-06-22T09:57:00.000Z',
+      cohortTotal: 224,
+      byBucket: {
+        ...emptyBuckets(),
+        VISIBLE_SALE: 1,
+        ARCHIVED: 186,
+        EXPIRED: 37,
+        MISMATCH: 0,
+      },
+      byReconciliationClass: { VISIBILITY_FILTER: 223, STALE_OBSERVATION: 1 },
+      visibilityFilterZombieCount: 223,
+      observationStaleTagCount: 1,
+      publishHookCount: 2,
+    }
+
+    const discovery = evaluatePublishedNotVisibleDistribution(analysis)
+    expect(discovery.verdict).toBe('PUBLISHED_NOT_VISIBLE_DISPOSITION_REPAIR_V1')
+    expect(discovery.dominantBucket).toBe('ARCHIVED')
+    expect(discovery.verdictRationale).toContain('COVERAGE_VISIBILITY_AUDIT_BUG_V1')
+  })
+
+  it('sorts dominant bucket by count', () => {
+    const analysis: PublishedNotVisibleDistributionAnalysis = {
+      generatedAt: '2026-06-22T00:00:00.000Z',
+      cohortTotal: 100,
+      byBucket: {
+        ...emptyBuckets(),
+        VISIBLE_SALE: 1,
+        MISMATCH: 10,
+        ARCHIVED: 70,
+        EXPIRED: 19,
+      },
+      byReconciliationClass: { VISIBILITY_FILTER: 99 },
+      visibilityFilterZombieCount: 99,
+      observationStaleTagCount: 0,
+      publishHookCount: 0,
+    }
+
+    const discovery = evaluatePublishedNotVisibleDistribution(analysis)
+    expect(discovery.dominantBucket).toBe('ARCHIVED')
+    expect(discovery.bucketRows[0]?.bucket).toBe('ARCHIVED')
+  })
+
+  it('flags audit bug when visible sale rows are material', () => {
     const analysis: PublishedNotVisibleDistributionAnalysis = {
       generatedAt: '2026-06-22T00:00:00.000Z',
       cohortTotal: 3,

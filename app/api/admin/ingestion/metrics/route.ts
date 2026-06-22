@@ -32,6 +32,7 @@ import { fetchLastSuccessfulExternalIngestionAt } from '@/lib/ingestion/orchestr
 import { countNeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import { analyzeNeedsCheckRootCause } from '@/lib/admin/analyzeNeedsCheckRootCause'
 import { analyzeListFastFailureDistribution } from '@/lib/admin/analyzeListFastFailureDistribution'
+import { analyzePublishedNotVisibleDistribution } from '@/lib/admin/analyzePublishedNotVisibleDistribution'
 import { analyzeAddressEnrichmentDrainCohort } from '@/lib/admin/analyzeAddressEnrichmentDrainCohort'
 import { countGeocodeDeadLetterReplayBuckets } from '@/lib/geocode/geocodeDeadLetterReplay'
 import {
@@ -379,6 +380,8 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
     const needsCheckBreakdownPromise = countNeedsCheckBreakdown()
     const needsCheckRootCauseAnalysisPromise = analyzeNeedsCheckRootCause(now)
     const listFastFailureDistributionAnalysisPromise = analyzeListFastFailureDistribution(now)
+    const publishedNotVisibleDistributionAnalysisPromise =
+      analyzePublishedNotVisibleDistribution(now)
     const addressEnrichmentDrainCohortPromise = analyzeAddressEnrichmentDrainCohort(now)
     const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
 
@@ -432,6 +435,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       needsCheckBreakdown,
       needsCheckRootCauseAnalysis,
       listFastFailureDistributionAnalysis,
+      publishedNotVisibleDistributionAnalysis,
       addressEnrichmentDrainCohort,
       acquisitionRegistry,
     ] = await Promise.all([
@@ -472,6 +476,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       needsCheckBreakdownPromise,
       needsCheckRootCauseAnalysisPromise,
       listFastFailureDistributionAnalysisPromise,
+      publishedNotVisibleDistributionAnalysisPromise,
       addressEnrichmentDrainCohortPromise,
       acquisitionRegistryPromise,
     ])
@@ -745,6 +750,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       needsCheckBreakdown,
       needsCheckRootCauseAnalysis,
       listFastFailureDistributionAnalysis,
+      publishedNotVisibleDistributionAnalysis,
       addressEnrichmentDrainCohort,
       terminalDisposition,
       timeseries: {

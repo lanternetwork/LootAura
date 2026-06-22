@@ -1,6 +1,7 @@
 import { buildAddressEnrichmentDrainDiagnostics } from '@/lib/admin/buildAddressEnrichmentDrainDiagnostics'
 import { buildIngestionDiagnosticCopyV1Sections } from '@/lib/admin/buildIngestionDiagnosticCopyV1Sections'
 import { buildListFastFailureDistributionDiagnostics } from '@/lib/admin/buildListFastFailureDistributionDiagnostics'
+import { buildPublishedNotVisibleDistributionDiagnostics } from '@/lib/admin/buildPublishedNotVisibleDistributionDiagnostics'
 import { evaluateListFastFailureDistribution } from '@/lib/admin/evaluateListFastFailureDistribution'
 import { buildNeedsCheckRootCauseDiagnostics } from '@/lib/admin/buildNeedsCheckRootCauseDiagnostics'
 import { evaluateNeedsCheckRootCauseDiscovery } from '@/lib/admin/evaluateNeedsCheckRootCauseDiscovery'
@@ -372,6 +373,13 @@ export function buildIngestionDiagnostics(
   if (data.listFastFailureDistributionAnalysis) {
     const listFastDiscovery = evaluateListFastFailureDistribution(data.listFastFailureDistributionAnalysis)
     lines.push('', buildListFastFailureDistributionDiagnostics(listFastDiscovery))
+  }
+
+  if (data.publishedNotVisibleDistributionAnalysis) {
+    lines.push(
+      '',
+      buildPublishedNotVisibleDistributionDiagnostics(data.publishedNotVisibleDistributionAnalysis)
+    )
   }
 
   return lines.join('\n')

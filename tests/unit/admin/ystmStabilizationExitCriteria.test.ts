@@ -50,6 +50,7 @@ export function minimalMetrics(overrides: Partial<IngestionMetricsResponse> = {}
     needsCheckBreakdown: null,
     needsCheckRootCauseAnalysis: null,
     listFastFailureDistributionAnalysis: null,
+    publishedNotVisibleDistributionAnalysis: null,
     addressEnrichmentDrainCohort: null,
     terminalDisposition: null,
     timeseries: {

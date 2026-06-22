@@ -133,11 +133,35 @@ export type YstmCoverageMissingIngestionAggregate = {
   missingIngestionNeverAttempted: number
 }
 
+export function shouldInvalidateObservationForExpiredMissingIngest(
+  outcome: YstmCoverageMissingIngestionOutcome,
+  failureReason?: string | null
+): boolean {
+  return (
+    outcome === 'failed' &&
+    (failureReason === 'expired' || failureReason === 'expired_after_detail')
+  )
+}
+
+/** @deprecated Prefer {@link shouldInvalidateObservationForExpiredMissingIngest}. */
 export function shouldInvalidateObservationForExpiredAfterDetail(
   outcome: YstmCoverageMissingIngestionOutcome,
   failureReason?: string | null
 ): boolean {
-  return outcome === 'failed' && failureReason === 'expired_after_detail'
+  return shouldInvalidateObservationForExpiredMissingIngest(outcome, failureReason)
+}
+
+export function buildExpiredObservationInvalidationFields(): Record<string, unknown> {
+  return {
+    ystm_valid_active: false,
+    ystm_invalid_reason: 'expired',
+    discovery_priority: 'cold',
+    false_exclusion_primary_bucket: null,
+    false_exclusion_secondary_tags: [],
+    false_exclusion_evidence: null,
+    false_exclusion_summary: null,
+    false_exclusion_traced_at: null,
+  }
 }
 
 export function buildMissingIngestionObservationUpdate(
@@ -180,14 +204,8 @@ export function buildMissingIngestionObservationUpdate(
   if (patch.lootauraVisible === true) {
     update.lootaura_visible = true
   }
-  if (shouldInvalidateObservationForExpiredAfterDetail(patch.outcome, patch.failureReason)) {
-    update.ystm_valid_active = false
-    update.ystm_invalid_reason = 'expired'
-    update.false_exclusion_primary_bucket = null
-    update.false_exclusion_secondary_tags = []
-    update.false_exclusion_evidence = null
-    update.false_exclusion_summary = null
-    update.false_exclusion_traced_at = null
+  if (shouldInvalidateObservationForExpiredMissingIngest(patch.outcome, patch.failureReason)) {
+    Object.assign(update, buildExpiredObservationInvalidationFields())
   }
   return update
 }

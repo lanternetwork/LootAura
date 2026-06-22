@@ -13,6 +13,7 @@ const NOW = '2026-06-07T12:00:00.000Z'
 const EXPIRED_INVALIDATION_FIELDS = {
   ystm_valid_active: false,
   ystm_invalid_reason: 'expired',
+  discovery_priority: 'cold',
   false_exclusion_primary_bucket: null,
   false_exclusion_secondary_tags: [],
   false_exclusion_evidence: null,
@@ -58,6 +59,22 @@ describe('buildMissingIngestionObservationUpdate', () => {
     })
   })
 
+  it('failed + list-fast expired invalidates with the same bundle as expired_after_detail', async () => {
+    const { buildMissingIngestionObservationUpdate } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    const update = buildMissingIngestionObservationUpdate(
+      { outcome: 'failed', failureReason: 'expired' },
+      NOW
+    )
+
+    expect(update).toEqual({
+      ...baseMissingIngestionFields('failed', 'expired'),
+      ...EXPIRED_INVALIDATION_FIELDS,
+    })
+  })
+
   it('scenario 2 — failed + fetch_failed does not invalidate', async () => {
     const { buildMissingIngestionObservationUpdate } = await import(
       '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
@@ -85,6 +102,48 @@ describe('buildMissingIngestionObservationUpdate', () => {
     )
 
     expect(update).toEqual(baseMissingIngestionFields('failed', 'insert_failed'))
+    expect(update).not.toHaveProperty('ystm_valid_active')
+  })
+
+  it('failed + geocode_unavailable does not invalidate', async () => {
+    const { buildMissingIngestionObservationUpdate } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    const update = buildMissingIngestionObservationUpdate(
+      { outcome: 'failed', failureReason: 'geocode_unavailable' },
+      NOW
+    )
+
+    expect(update).toEqual(baseMissingIngestionFields('failed', 'geocode_unavailable'))
+    expect(update).not.toHaveProperty('ystm_valid_active')
+  })
+
+  it('failed + gated_only does not invalidate', async () => {
+    const { buildMissingIngestionObservationUpdate } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    const update = buildMissingIngestionObservationUpdate(
+      { outcome: 'failed', failureReason: 'gated_only' },
+      NOW
+    )
+
+    expect(update).toEqual(baseMissingIngestionFields('failed', 'gated_only'))
+    expect(update).not.toHaveProperty('ystm_valid_active')
+  })
+
+  it('failed + missing_dates does not invalidate', async () => {
+    const { buildMissingIngestionObservationUpdate } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    const update = buildMissingIngestionObservationUpdate(
+      { outcome: 'failed', failureReason: 'missing_dates' },
+      NOW
+    )
+
+    expect(update).toEqual(baseMissingIngestionFields('failed', 'missing_dates'))
     expect(update).not.toHaveProperty('ystm_valid_active')
   })
 
@@ -220,6 +279,24 @@ describe('recordYstmCoverageMissingIngestionOutcome', () => {
     expect(mockFromBase).toHaveBeenCalledWith({}, 'ystm_coverage_observations')
     expect(update).toHaveBeenCalledWith({
       ...baseMissingIngestionFields('failed', 'expired_after_detail'),
+      ...EXPIRED_INVALIDATION_FIELDS,
+    })
+    expect(eq).toHaveBeenCalledWith('canonical_url', CANONICAL_URL)
+  })
+
+  it('persists atomic invalidation for list-fast expired', async () => {
+    const { update, eq } = setupUpdateMock()
+    const { recordYstmCoverageMissingIngestionOutcome } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    await recordYstmCoverageMissingIngestionOutcome({} as never, CANONICAL_URL, {
+      outcome: 'failed',
+      failureReason: 'expired',
+    })
+
+    expect(update).toHaveBeenCalledWith({
+      ...baseMissingIngestionFields('failed', 'expired'),
       ...EXPIRED_INVALIDATION_FIELDS,
     })
     expect(eq).toHaveBeenCalledWith('canonical_url', CANONICAL_URL)

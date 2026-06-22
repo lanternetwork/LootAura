@@ -16,9 +16,14 @@ const mockCountCold = vi.hoisted(() => vi.fn())
 const mockFetchHot = vi.hoisted(() => vi.fn())
 const mockAttemptListFast = vi.hoisted(() => vi.fn())
 const mockBackfillExpired = vi.hoisted(() => vi.fn())
+const mockBackfillPnvDisposition = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation', () => ({
   backfillExpiredListFastObservationInvalidation: mockBackfillExpired,
+}))
+
+vi.mock('@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation', () => ({
+  backfillPublishedNotVisibleDispositionInvalidation: mockBackfillPnvDisposition,
 }))
 
 vi.mock('@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates', () => ({
@@ -134,6 +139,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockFetchHot.mockReset()
     mockAttemptListFast.mockReset()
     mockBackfillExpired.mockReset()
+    mockBackfillPnvDisposition.mockReset()
 
     mockAcquireLease.mockResolvedValue({
       acquired: true,
@@ -188,6 +194,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockFetchHot.mockResolvedValue([])
     mockAttemptListFast.mockResolvedValue({ outcome: 'failed', reason: 'test_skip' })
     mockBackfillExpired.mockResolvedValue({ updated: 0 })
+    mockBackfillPnvDisposition.mockResolvedValue({ updated: 0, archived: 0, expired: 0 })
   })
 
   it('skips when orchestration lease is active', async () => {
@@ -443,11 +450,14 @@ describe('runYstmMissingUrlIngestionCron', () => {
     expect(result.telemetry.listFastFailed).toBe(1)
     expect(result.telemetry.failed).toBe(1)
     expect(result.telemetry.expiredObservationBackfillUpdated).toBe(0)
+    expect(result.telemetry.publishedNotVisibleDispositionBackfillUpdated).toBe(0)
     expect(mockBackfillExpired).toHaveBeenCalledTimes(1)
+    expect(mockBackfillPnvDisposition).toHaveBeenCalledTimes(1)
   })
 
-  it('runs expired observation backfill after successful pass', async () => {
+  it('runs observation invalidation backfills after successful pass', async () => {
     mockBackfillExpired.mockResolvedValue({ updated: 48 })
+    mockBackfillPnvDisposition.mockResolvedValue({ updated: 226, archived: 224, expired: 2 })
     mockCountHot.mockResolvedValue(0)
     mockCountCold.mockResolvedValue(0)
 
@@ -459,7 +469,9 @@ describe('runYstmMissingUrlIngestionCron', () => {
     })
 
     expect(mockBackfillExpired).toHaveBeenCalledTimes(1)
+    expect(mockBackfillPnvDisposition).toHaveBeenCalledTimes(1)
     expect(result.telemetry.expiredObservationBackfillUpdated).toBe(48)
+    expect(result.telemetry.publishedNotVisibleDispositionBackfillUpdated).toBe(226)
   })
 })
 

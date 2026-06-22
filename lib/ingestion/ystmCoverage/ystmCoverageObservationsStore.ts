@@ -151,10 +151,14 @@ export function shouldInvalidateObservationForExpiredAfterDetail(
   return shouldInvalidateObservationForExpiredMissingIngest(outcome, failureReason)
 }
 
-export function buildExpiredObservationInvalidationFields(): Record<string, unknown> {
+export type PublishedNotVisibleDispositionInvalidReason = 'archived' | 'expired'
+
+export function buildPublishedNotVisibleDispositionInvalidationFields(
+  reason: PublishedNotVisibleDispositionInvalidReason
+): Record<string, unknown> {
   return {
     ystm_valid_active: false,
-    ystm_invalid_reason: 'expired',
+    ystm_invalid_reason: reason,
     discovery_priority: 'cold',
     false_exclusion_primary_bucket: null,
     false_exclusion_secondary_tags: [],
@@ -162,6 +166,14 @@ export function buildExpiredObservationInvalidationFields(): Record<string, unkn
     false_exclusion_summary: null,
     false_exclusion_traced_at: null,
   }
+}
+
+export function buildArchivedObservationInvalidationFields(): Record<string, unknown> {
+  return buildPublishedNotVisibleDispositionInvalidationFields('archived')
+}
+
+export function buildExpiredObservationInvalidationFields(): Record<string, unknown> {
+  return buildPublishedNotVisibleDispositionInvalidationFields('expired')
 }
 
 export function buildMissingIngestionObservationUpdate(

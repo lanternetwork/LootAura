@@ -46,6 +46,21 @@ function isExpiredSale(sale: PublishedNotVisibleSaleRow, nowMs: number): boolean
   return Number.isFinite(endsAtMs) && endsAtMs <= nowMs
 }
 
+export type PublishedNotVisibleDispositionInvalidReason = 'archived' | 'expired'
+
+/** Invalidation reason when linked sale fails Phase 4 for archived/expired only (v1 scope). */
+export function resolvePublishedNotVisibleDispositionInvalidReason(
+  linkedSale: PublishedNotVisibleSaleRow | null,
+  nowMs: number = Date.now()
+): PublishedNotVisibleDispositionInvalidReason | null {
+  if (!linkedSale) return null
+  if (passesPhase4PublicVisibility(linkedSale, nowMs)) return null
+  if (isModerationHiddenSale(linkedSale)) return null
+  if (isArchivedSale(linkedSale)) return 'archived'
+  if (isExpiredSale(linkedSale, nowMs)) return 'expired'
+  return null
+}
+
 function hasResolvableLinkage(input: ClassifyPublishedNotVisibleBucketInput): boolean {
   const { observation, ingested, linkedSaleId } = input
   return Boolean(

@@ -3,7 +3,6 @@ import { buildIngestionDiagnosticCopyV1Sections } from '@/lib/admin/buildIngesti
 import { buildListFastFailureDistributionDiagnostics } from '@/lib/admin/buildListFastFailureDistributionDiagnostics'
 import { buildPublishedNotVisibleDistributionDiagnostics } from '@/lib/admin/buildPublishedNotVisibleDistributionDiagnostics'
 import { evaluateListFastFailureDistribution } from '@/lib/admin/evaluateListFastFailureDistribution'
-import { evaluatePublishedNotVisibleDistribution } from '@/lib/admin/evaluatePublishedNotVisibleDistribution'
 import { buildNeedsCheckRootCauseDiagnostics } from '@/lib/admin/buildNeedsCheckRootCauseDiagnostics'
 import { evaluateNeedsCheckRootCauseDiscovery } from '@/lib/admin/evaluateNeedsCheckRootCauseDiscovery'
 import { buildYstmIngestionRepairDiagnostics } from '@/lib/admin/buildYstmIngestionRepairDiagnostics'
@@ -377,10 +376,10 @@ export function buildIngestionDiagnostics(
   }
 
   if (data.publishedNotVisibleDistributionAnalysis) {
-    const publishedNotVisibleDiscovery = evaluatePublishedNotVisibleDistribution(
-      data.publishedNotVisibleDistributionAnalysis
+    lines.push(
+      '',
+      buildPublishedNotVisibleDistributionDiagnostics(data.publishedNotVisibleDistributionAnalysis)
     )
-    lines.push('', buildPublishedNotVisibleDistributionDiagnostics(publishedNotVisibleDiscovery))
   }
 
   return lines.join('\n')

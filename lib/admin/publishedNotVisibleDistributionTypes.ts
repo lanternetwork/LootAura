@@ -92,7 +92,6 @@ export type PublishedNotVisibleDistributionAnalysis = {
   visibilityFilterZombieCount: number
   observationStaleTagCount: number
   publishHookCount: number
-  classifiedRows: PublishedNotVisibleClassifiedRow[]
 }
 
 export type PublishedNotVisibleDistributionDiscovery = {

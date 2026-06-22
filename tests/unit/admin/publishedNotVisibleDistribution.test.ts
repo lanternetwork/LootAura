@@ -27,7 +27,6 @@ describe('evaluatePublishedNotVisibleDistribution', () => {
       visibilityFilterZombieCount: 653,
       observationStaleTagCount: 1,
       publishHookCount: 12,
-      classifiedRows: [],
     }
 
     const discovery = evaluatePublishedNotVisibleDistribution(analysis)
@@ -48,7 +47,6 @@ describe('evaluatePublishedNotVisibleDistribution', () => {
       visibilityFilterZombieCount: 2,
       observationStaleTagCount: 1,
       publishHookCount: 0,
-      classifiedRows: [],
     }
 
     const discovery = evaluatePublishedNotVisibleDistribution(analysis)
@@ -71,33 +69,32 @@ describe('buildPublishedNotVisibleDistributionDiagnostics', () => {
       visibilityFilterZombieCount: 3,
       observationStaleTagCount: 1,
       publishHookCount: 1,
-      classifiedRows: [
-        {
-          canonicalUrl: 'https://www.yardsaletreasuremap.com/sale/a',
-          bucket: 'EXPIRED',
-          reconciliationClass: 'VISIBILITY_FILTER',
-          visibilityFilterZombie: true,
-          observationStaleTag: false,
-          passesPhase4PublicVisibility: false,
-          matchedSaleId: 'sale-a',
-          matchedIngestedSaleId: null,
-          ingestedSaleId: 'ing-1',
-          ingestedPublishedSaleId: 'sale-a',
-          saleId: 'sale-a',
-          appearanceSource: 'publish_hook',
-          matchMethod: 'url',
-          secondaryTags: [],
-          endsAt: '2026-01-01T00:00:00.000Z',
-          archivedAt: null,
-          moderationStatus: null,
-          saleStatus: 'published',
-        },
-      ],
     }
 
-    const markdown = buildPublishedNotVisibleDistributionDiagnostics(
-      evaluatePublishedNotVisibleDistribution(analysis)
-    )
+    const discovery = evaluatePublishedNotVisibleDistribution(analysis, [
+      {
+        canonicalUrl: 'https://www.yardsaletreasuremap.com/sale/a',
+        bucket: 'EXPIRED',
+        reconciliationClass: 'VISIBILITY_FILTER',
+        visibilityFilterZombie: true,
+        observationStaleTag: false,
+        passesPhase4PublicVisibility: false,
+        matchedSaleId: 'sale-a',
+        matchedIngestedSaleId: null,
+        ingestedSaleId: 'ing-1',
+        ingestedPublishedSaleId: 'sale-a',
+        saleId: 'sale-a',
+        appearanceSource: 'publish_hook',
+        matchMethod: 'url',
+        secondaryTags: [],
+        endsAt: '2026-01-01T00:00:00.000Z',
+        archivedAt: null,
+        moderationStatus: null,
+        saleStatus: 'published',
+      },
+    ])
+
+    const markdown = buildPublishedNotVisibleDistributionDiagnostics(discovery)
 
     expect(markdown).toContain('## PUBLISHED_NOT_VISIBLE_DISTRIBUTION_V2')
     expect(markdown).toContain('### Section A — Cohort Summary')

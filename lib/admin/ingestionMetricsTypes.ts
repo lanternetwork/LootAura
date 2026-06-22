@@ -1,14 +1,14 @@
 import type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 import type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
 import type { ListFastFailureDistributionAnalysis } from '@/lib/admin/listFastFailureDistributionTypes'
-import type { PublishedNotVisibleDistributionAnalysis } from '@/lib/admin/publishedNotVisibleDistributionTypes'
+import type { PublishedNotVisibleDistributionDiscovery } from '@/lib/admin/publishedNotVisibleDistributionTypes'
 import type { AddressEnrichmentDrainCohortAnalysis } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'
 import type { IngestionBottleneck } from '@/lib/admin/ingestionVolumeMetricsHelpers'
 
 export type { NeedsCheckBreakdown } from '@/lib/admin/countNeedsCheckBreakdown'
 export type { NeedsCheckRootCauseAnalysis } from '@/lib/admin/needsCheckRootCauseTypes'
 export type { ListFastFailureDistributionAnalysis } from '@/lib/admin/listFastFailureDistributionTypes'
-export type { PublishedNotVisibleDistributionAnalysis } from '@/lib/admin/publishedNotVisibleDistributionTypes'
+export type { PublishedNotVisibleDistributionDiscovery } from '@/lib/admin/publishedNotVisibleDistributionTypes'
 export type { AddressEnrichmentDrainCohortAnalysis } from '@/lib/ingestion/address/addressEnrichmentDrainTypes'
 import type { DetailFirstProofEvaluation } from '@/lib/ingestion/acquisition/detailFirstProofProtocol'
 import type {
@@ -222,7 +222,7 @@ export interface IngestionMetricsResponse {
   /** LIST_FAST_FAILURE_DISTRIBUTION_V1 — hot list-fast failure audit (24h). */
   listFastFailureDistributionAnalysis: ListFastFailureDistributionAnalysis | null
   /** PUBLISHED_NOT_VISIBLE_DISTRIBUTION_V2 — published_not_visible false-exclusion audit. */
-  publishedNotVisibleDistributionAnalysis: PublishedNotVisibleDistributionAnalysis | null
+  publishedNotVisibleDistributionAnalysis: PublishedNotVisibleDistributionDiscovery | null
   /** Workstreams A–B — address_enrichment_pending × provider_native drain cohort. */
   addressEnrichmentDrainCohort: AddressEnrichmentDrainCohortAnalysis | null
   /** Terminal address disposition inventory (active vs archived). */

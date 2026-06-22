@@ -6,6 +6,7 @@ import {
   PUBLISHED_NOT_VISIBLE_BUCKETS,
   type PublishedNotVisibleClassifiedRow,
   type PublishedNotVisibleDistributionAnalysis,
+  type PublishedNotVisibleDistributionDiscovery,
   type PublishedNotVisibleIngestedRow,
   type PublishedNotVisibleObservationRow,
   type PublishedNotVisibleSaleRow,
@@ -14,6 +15,7 @@ import { canonicalSourceUrl } from '@/lib/ingestion/address/canonicalSourceUrl'
 import { classifyMissingValidReconciliation } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliation'
 import { loadLootAuraPublishedYstmIndex } from '@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import { evaluatePublishedNotVisibleDistribution } from '@/lib/admin/evaluatePublishedNotVisibleDistribution'
 
 const PAGE_SIZE = 500
 
@@ -201,7 +203,7 @@ function classifyRow(input: {
  */
 export async function analyzePublishedNotVisibleDistribution(
   now: Date = new Date()
-): Promise<PublishedNotVisibleDistributionAnalysis> {
+): Promise<PublishedNotVisibleDistributionDiscovery> {
   const admin = getAdminDb()
   const nowMs = now.getTime()
 
@@ -257,7 +259,7 @@ export async function analyzePublishedNotVisibleDistribution(
     if (observation.appearance_source === 'publish_hook') publishHookCount += 1
   }
 
-  return {
+  const analysis: PublishedNotVisibleDistributionAnalysis = {
     generatedAt: now.toISOString(),
     cohortTotal: cohort.length,
     byBucket,
@@ -265,6 +267,7 @@ export async function analyzePublishedNotVisibleDistribution(
     visibilityFilterZombieCount,
     observationStaleTagCount,
     publishHookCount,
-    classifiedRows,
   }
+
+  return evaluatePublishedNotVisibleDistribution(analysis, classifiedRows)
 }

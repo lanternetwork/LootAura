@@ -177,7 +177,8 @@ function deriveVerdict(analysis: PublishedNotVisibleDistributionAnalysis): {
  * Sections F/G — pure evaluation from read-only analysis aggregates.
  */
 export function evaluatePublishedNotVisibleDistribution(
-  analysis: PublishedNotVisibleDistributionAnalysis
+  analysis: PublishedNotVisibleDistributionAnalysis,
+  classifiedRows: PublishedNotVisibleClassifiedRow[] = []
 ): PublishedNotVisibleDistributionDiscovery {
   const rows = bucketRows(analysis)
   const dominantBucket = rows[0]?.bucket ?? null
@@ -199,7 +200,7 @@ export function evaluatePublishedNotVisibleDistribution(
     publishHookSharePct: pct(analysis.publishHookCount, total),
     verdict,
     verdictRationale: rationale,
-    sampleRows: selectSampleRows(analysis.classifiedRows, dominantBucket),
+    sampleRows: selectSampleRows(classifiedRows, dominantBucket),
     auditComplete: total > 0 && dominantBucket != null,
   }
 }

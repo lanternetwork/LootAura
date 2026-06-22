@@ -4,6 +4,7 @@ import {
   classifyPublishedNotVisibleBucket,
   detectPublishedNotVisibleMismatch,
   passesPhase4PublicVisibility,
+  resolvePublishedNotVisibleDispositionInvalidReason,
 } from '@/lib/admin/classifyPublishedNotVisibleBucket'
 import type {
   PublishedNotVisibleIngestedRow,
@@ -283,5 +284,55 @@ describe('classifyPublishedNotVisibleBucket', () => {
         linkedSaleId: 'missing-sale',
       })
     ).toBe('OTHER')
+  })
+})
+
+describe('resolvePublishedNotVisibleDispositionInvalidReason', () => {
+  it('returns archived for archived linked sale', () => {
+    expect(
+      resolvePublishedNotVisibleDispositionInvalidReason(
+        sale({ status: 'archived', archived_at: '2026-01-01T00:00:00.000Z' }),
+        NOW_MS
+      )
+    ).toBe('archived')
+  })
+
+  it('returns expired for expired linked sale', () => {
+    expect(
+      resolvePublishedNotVisibleDispositionInvalidReason(
+        sale({ ends_at: '2026-06-17T00:00:00.000Z' }),
+        NOW_MS
+      )
+    ).toBe('expired')
+  })
+
+  it('returns null for visible linked sale', () => {
+    expect(resolvePublishedNotVisibleDispositionInvalidReason(sale(), NOW_MS)).toBeNull()
+  })
+
+  it('returns null for moderation hidden linked sale (v1 out of scope)', () => {
+    expect(
+      resolvePublishedNotVisibleDispositionInvalidReason(
+        sale({ moderation_status: 'hidden_by_admin' }),
+        NOW_MS
+      )
+    ).toBeNull()
+  })
+
+  it('prefers archived over expired when both apply', () => {
+    expect(
+      resolvePublishedNotVisibleDispositionInvalidReason(
+        sale({
+          status: 'archived',
+          archived_at: '2026-01-01T00:00:00.000Z',
+          ends_at: '2026-06-17T00:00:00.000Z',
+        }),
+        NOW_MS
+      )
+    ).toBe('archived')
+  })
+
+  it('returns null when linked sale is missing', () => {
+    expect(resolvePublishedNotVisibleDispositionInvalidReason(null, NOW_MS)).toBeNull()
   })
 })

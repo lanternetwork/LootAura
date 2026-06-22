@@ -40,6 +40,7 @@ import {
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import { backfillExpiredListFastObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation'
+import { backfillPublishedNotVisibleDispositionInvalidation } from '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation'
 import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import { findPrimaryIngestedSaleBySourceUrl, pickPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
@@ -78,6 +79,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   listFastPublished: number
   listFastFailed: number
   expiredObservationBackfillUpdated: number
+  publishedNotVisibleDispositionBackfillUpdated: number
 }
 
 export function computeReservedHotBudget(
@@ -131,8 +133,17 @@ function emptyMissingIngestTelemetry(
     listFastPublished: 0,
     listFastFailed: 0,
     expiredObservationBackfillUpdated: 0,
+    publishedNotVisibleDispositionBackfillUpdated: 0,
     ...partial,
   }
+}
+
+async function runObservationInvalidationBackfills(admin: ReturnType<typeof getAdminDb>) {
+  const [expiredBackfill, publishedNotVisibleDispositionBackfill] = await Promise.all([
+    backfillExpiredListFastObservationInvalidation(admin),
+    backfillPublishedNotVisibleDispositionInvalidation(admin),
+  ])
+  return { expiredBackfill, publishedNotVisibleDispositionBackfill }
 }
 
 export type YstmMissingUrlIngestionCronResult = {
@@ -236,7 +247,8 @@ export async function runYstmMissingUrlIngestionCron(
     )
 
     if (queueTotal === 0) {
-      const backfill = await backfillExpiredListFastObservationInvalidation(admin)
+      const { expiredBackfill, publishedNotVisibleDispositionBackfill } =
+        await runObservationInvalidationBackfills(admin)
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
         owner: lease.owner,
         nextCursor: 0,
@@ -250,7 +262,9 @@ export async function runYstmMissingUrlIngestionCron(
           skipReason: 'empty_missing_queue',
           queueOffsetBefore,
           queueOffsetAfter: 0,
-          expiredObservationBackfillUpdated: backfill.updated,
+          expiredObservationBackfillUpdated: expiredBackfill.updated,
+          publishedNotVisibleDispositionBackfillUpdated:
+            publishedNotVisibleDispositionBackfill.updated,
         }),
       }
     }
@@ -395,7 +409,8 @@ export async function runYstmMissingUrlIngestionCron(
       queueOffsetAfter = queueOffsetBefore
     }
 
-    const backfill = await backfillExpiredListFastObservationInvalidation(admin)
+    const { expiredBackfill, publishedNotVisibleDispositionBackfill } =
+      await runObservationInvalidationBackfills(admin)
 
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
       owner: lease.owner,
@@ -430,7 +445,13 @@ export async function runYstmMissingUrlIngestionCron(
       listFastAttempts,
       listFastPublished,
       listFastFailed,
-      expiredObservationBackfillUpdated: backfill.updated,
+      expiredObservationBackfillUpdated: expiredBackfill.updated,
+      publishedNotVisibleDispositionBackfillUpdated:
+        publishedNotVisibleDispositionBackfill.updated,
+      publishedNotVisibleDispositionBackfillArchived:
+        publishedNotVisibleDispositionBackfill.archived,
+      publishedNotVisibleDispositionBackfillExpired:
+        publishedNotVisibleDispositionBackfill.expired,
     })
 
     return {
@@ -468,7 +489,9 @@ export async function runYstmMissingUrlIngestionCron(
         listFastAttempts,
         listFastPublished,
         listFastFailed,
-        expiredObservationBackfillUpdated: backfill.updated,
+        expiredObservationBackfillUpdated: expiredBackfill.updated,
+        publishedNotVisibleDispositionBackfillUpdated:
+          publishedNotVisibleDispositionBackfill.updated,
       },
     }
   } catch (err) {

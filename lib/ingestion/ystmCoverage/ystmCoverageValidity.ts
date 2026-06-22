@@ -16,6 +16,7 @@ export type YstmCoverageInvalidReason =
   | 'missing_title'
   | 'missing_dates'
   | 'expired'
+  | 'archived'
   | 'gated_only'
   | 'insufficient_visible_content'
 

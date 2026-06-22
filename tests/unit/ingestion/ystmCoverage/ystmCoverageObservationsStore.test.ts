@@ -21,6 +21,11 @@ const EXPIRED_INVALIDATION_FIELDS = {
   false_exclusion_traced_at: null,
 } as const
 
+const ARCHIVED_INVALIDATION_FIELDS = {
+  ...EXPIRED_INVALIDATION_FIELDS,
+  ystm_invalid_reason: 'archived',
+} as const
+
 function baseMissingIngestionFields(outcome: string, failureReason: string | null) {
   return {
     missing_ingestion_attempted_at: NOW,
@@ -328,5 +333,32 @@ describe('recordYstmCoverageMissingIngestionOutcome', () => {
         failureReason: 'expired_after_detail',
       })
     ).rejects.toThrow('connection refused')
+  })
+})
+
+describe('published not visible disposition invalidation fields', () => {
+  it('buildArchivedObservationInvalidationFields clears trace and sets archived reason', async () => {
+    const {
+      buildArchivedObservationInvalidationFields,
+      buildPublishedNotVisibleDispositionInvalidationFields,
+    } = await import('@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore')
+
+    expect(buildArchivedObservationInvalidationFields()).toEqual(ARCHIVED_INVALIDATION_FIELDS)
+    expect(buildPublishedNotVisibleDispositionInvalidationFields('expired')).toEqual(
+      EXPIRED_INVALIDATION_FIELDS
+    )
+    expect(buildPublishedNotVisibleDispositionInvalidationFields('archived')).toEqual(
+      ARCHIVED_INVALIDATION_FIELDS
+    )
+  })
+
+  it('repeated archived invalidation fields are idempotent', async () => {
+    const { buildPublishedNotVisibleDispositionInvalidationFields } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    const first = buildPublishedNotVisibleDispositionInvalidationFields('archived')
+    const second = buildPublishedNotVisibleDispositionInvalidationFields('archived')
+    expect(second).toEqual(first)
   })
 })

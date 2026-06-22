@@ -71,8 +71,8 @@ function classify(input: {
     input.linkedSale?.id ??
     null
 
-  const linkedSale =
-    'linkedSale' in input
+  const linkedSale: PublishedNotVisibleSaleRow | null =
+    input.linkedSale !== undefined
       ? input.linkedSale
       : linkedSaleId
         ? sale({ id: linkedSaleId })

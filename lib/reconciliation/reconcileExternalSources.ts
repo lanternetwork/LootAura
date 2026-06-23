@@ -49,6 +49,7 @@ import type {
   SourceRefreshCapability,
   SourceSyncStatus,
 } from '@/lib/reconciliation/types'
+import { reconciliationPersistPatchUnchanged } from '@/lib/reconciliation/reconciliationPersistGuard'
 
 const DEFAULT_BATCH_LIMIT = 25
 /** Global hard cap for reconciliation batch size (Phase 1B admin runner). */
@@ -95,6 +96,8 @@ type IngestRowDb = {
   status: string
   is_duplicate: boolean | null
   last_source_change_at: string | null
+  source_reconciliation_details: unknown
+  source_cancelled_detected: boolean | null
 }
 
 function fingerprintFromIngestRow(row: IngestRowDb): IngestFingerprint {
@@ -238,6 +241,13 @@ function mapRpcIngestRowToIngestRowDb(r: RpcIngestRow): IngestRowDb | null {
         ? null
         : typeof r.last_source_change_at === 'string'
           ? r.last_source_change_at
+          : null,
+    source_reconciliation_details: r.source_reconciliation_details ?? null,
+    source_cancelled_detected:
+      r.source_cancelled_detected === true
+        ? true
+        : r.source_cancelled_detected === false
+          ? false
           : null,
   }
 }
@@ -575,15 +585,14 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         skipReason: 'refresh_capability_not_server' as const,
       }
       const status = resolveSyncStatus({ parseFailed: false, fetchFailed: false, classes: classification.classes })
-      if (!dryRun) {
-        const { error: upErr } = await fromBase(admin, 'ingested_sales')
-          .update({
-            last_source_sync_at: new Date(nowMs).toISOString(),
-            source_reconciliation_details: details,
-            source_sync_status: status,
-            source_cancelled_detected: false,
-          })
-          .eq('id', row.id)
+      const patch = {
+        last_source_sync_at: new Date(nowMs).toISOString(),
+        source_reconciliation_details: details,
+        source_sync_status: status,
+        source_cancelled_detected: false,
+      }
+      if (!dryRun && !reconciliationPersistPatchUnchanged(row, patch)) {
+        const { error: upErr } = await fromBase(admin, 'ingested_sales').update(patch).eq('id', row.id)
         if (upErr) {
           failed += 1
           if (!aggregateOnly) {
@@ -653,18 +662,17 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
         primaryChange: classification.primary,
         parseMatched: false,
       }
-      if (!dryRun) {
-        const { error: upErr } = await fromBase(admin, 'ingested_sales')
-          .update({
-            last_source_sync_at: new Date(nowMs).toISOString(),
-            source_sync_attempt_count: attempts,
-            source_sync_failure_count: failureCount,
-            source_missing_count: missingCount,
-            source_sync_status: status,
-            source_reconciliation_details: details,
-            source_cancelled_detected: false,
-          })
-          .eq('id', row.id)
+      const patch = {
+        last_source_sync_at: new Date(nowMs).toISOString(),
+        source_sync_attempt_count: attempts,
+        source_sync_failure_count: failureCount,
+        source_missing_count: missingCount,
+        source_sync_status: status,
+        source_reconciliation_details: details,
+        source_cancelled_detected: false,
+      }
+      if (!dryRun && !reconciliationPersistPatchUnchanged(row, patch)) {
+        const { error: upErr } = await fromBase(admin, 'ingested_sales').update(patch).eq('id', row.id)
 
         if (upErr) {
           failed += 1
@@ -815,36 +823,37 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
     const nextFailureCount = parseFailed ? (row.source_sync_failure_count ?? 0) + 1 : 0
 
     if (!dryRun) {
-      const { error: upErr } = await fromBase(admin, 'ingested_sales')
-        .update({
-          last_source_sync_at: new Date(nowMs).toISOString(),
-          last_source_change_at: nextLastChangeAt,
-          source_sync_attempt_count: attempts,
-          source_sync_failure_count: nextFailureCount,
-          source_missing_count: 0,
-          source_content_hash: nextFingerprint.contentHash,
-          source_schedule_hash: nextFingerprint.scheduleHash,
-          source_image_hash: nextFingerprint.imageHash,
-          source_placeholder_detected: nextPlaceholder,
-          source_sync_status: status,
-          source_reconciliation_details: details,
-          source_cancelled_detected: false,
-        })
-        .eq('id', row.id)
-
-      if (upErr) {
-        failed += 1
-        if (!aggregateOnly) {
-          emitReconciliationRowFailed({
-            hostHash,
-            reason: 'db_update_failed',
-            durationMs: Date.now() - rowStarted,
-            telemetryContext: options?.telemetryContext,
-          })
-        }
-        continue
+      const patch = {
+        last_source_sync_at: new Date(nowMs).toISOString(),
+        last_source_change_at: nextLastChangeAt,
+        source_sync_attempt_count: attempts,
+        source_sync_failure_count: nextFailureCount,
+        source_missing_count: 0,
+        source_content_hash: nextFingerprint.contentHash,
+        source_schedule_hash: nextFingerprint.scheduleHash,
+        source_image_hash: nextFingerprint.imageHash,
+        source_placeholder_detected: nextPlaceholder,
+        source_sync_status: status,
+        source_reconciliation_details: details,
+        source_cancelled_detected: false,
       }
-      persistenceWrites += 1
+      if (!reconciliationPersistPatchUnchanged(row, patch)) {
+        const { error: upErr } = await fromBase(admin, 'ingested_sales').update(patch).eq('id', row.id)
+
+        if (upErr) {
+          failed += 1
+          if (!aggregateOnly) {
+            emitReconciliationRowFailed({
+              hostHash,
+              reason: 'db_update_failed',
+              durationMs: Date.now() - rowStarted,
+              telemetryContext: options?.telemetryContext,
+            })
+          }
+          continue
+        }
+        persistenceWrites += 1
+      }
     }
 
     const fpDiff = fingerprintsDifferMaterially(priorFp, nextFingerprint)
@@ -920,12 +929,16 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
             typeof details.manual_review_reason === 'string' ? details.manual_review_reason : 'schedule_conflict',
           schedule_mutation_inhibited_reason: syncRes.scheduleMutationInhibitedReason ?? 'unknown',
         }
-        const { error: detErr } = await fromBase(admin, 'ingested_sales')
-          .update({ source_reconciliation_details: mergedDetails })
-          .eq('id', row.id)
-        if (!detErr) {
-          persistenceWrites += 1
-          manualReviewRequired += 1
+        if (
+          !reconciliationPersistPatchUnchanged(row, { source_reconciliation_details: mergedDetails })
+        ) {
+          const { error: detErr } = await fromBase(admin, 'ingested_sales')
+            .update({ source_reconciliation_details: mergedDetails })
+            .eq('id', row.id)
+          if (!detErr) {
+            persistenceWrites += 1
+            manualReviewRequired += 1
+          }
         }
       }
 
@@ -939,11 +952,15 @@ export async function reconcileExternalSources(options?: ReconcileExternalSource
           schedule_drift_from_bundle: syncRes.scheduleDriftFromBundle === true,
           schedule_bundle_reason: syncRes.scheduleBundleReason,
         }
-        const { error: detErr } = await fromBase(admin, 'ingested_sales')
-          .update({ source_reconciliation_details: mergedDetails })
-          .eq('id', row.id)
-        if (!detErr) {
-          persistenceWrites += 1
+        if (
+          !reconciliationPersistPatchUnchanged(row, { source_reconciliation_details: mergedDetails })
+        ) {
+          const { error: detErr } = await fromBase(admin, 'ingested_sales')
+            .update({ source_reconciliation_details: mergedDetails })
+            .eq('id', row.id)
+          if (!detErr) {
+            persistenceWrites += 1
+          }
         }
       }
     }

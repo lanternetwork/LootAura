@@ -28,6 +28,7 @@ import type {
   GeocodeMethod,
 } from '@/lib/geocode/geocodePrecisionPolicy'
 import { logger } from '@/lib/log'
+import { failureDetailsSemanticallyEqual } from '@/lib/ingestion/failureDetailsSemanticEquality'
 import { normalizeLocalityForGeocodeQuery } from '@/lib/ingestion/normalizeIngestionLocation'
 import { buildGeocodeAttemptPlan } from '@/lib/ingestion/geocodeAttemptPlan'
 import { publishReadyIngestedSaleById, type PublishReadyByIdResult } from '@/lib/ingestion/publishWorker'
@@ -568,6 +569,9 @@ async function persistGeocodeAttemptFailureDetails(
     (prior as { failure_details?: unknown }).failure_details,
     details
   )
+  if (failureDetailsSemanticallyEqual((prior as { failure_details?: unknown }).failure_details, merged)) {
+    return
+  }
   const { error: upErr } = await fromBase(admin, 'ingested_sales')
     .update({ failure_details: merged })
     .eq('id', rowId)
@@ -608,6 +612,9 @@ async function persistGeocodeDeadLetterMetadata(
     (prior as { failure_details?: unknown }).failure_details,
     envelope
   )
+  if (failureDetailsSemanticallyEqual((prior as { failure_details?: unknown }).failure_details, merged)) {
+    return
+  }
   const { error: upErr } = await fromBase(admin, 'ingested_sales')
     .update({ failure_details: merged })
     .eq('id', rowId)
@@ -1044,24 +1051,44 @@ async function processGeocodeAttempt(
 
     if (variantResult.localityMetadataOnly) {
       const lm = variantResult.localityMetadataOnly
-      await fromBase(admin, 'ingested_sales')
-        .update({
-          geocode_confidence: lm.geocodeConfidence,
-          coordinate_precision: lm.coordinatePrecision,
-          geocode_method: lm.geocodeMethod,
-          failure_details: mergeD2GeocodeFailureDetails(row.failure_details, {
-            schema_version: INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_D2,
-            recorded_at: new Date().toISOString(),
-            attemptCount,
-            attempts: attemptDiagnostics,
-            providerCalls,
-            localityMetadataOnly: true,
-            queryFingerprint: lm.queryFingerprint,
-            lastStructuredReason: 'broad_locality_match',
-          }),
-        })
+      const mergedFailureDetails = mergeD2GeocodeFailureDetails(row.failure_details, {
+        schema_version: INGESTED_GEOCODE_FAILURE_DETAILS_SCHEMA_VERSION_D2,
+        recorded_at: new Date().toISOString(),
+        attemptCount,
+        attempts: attemptDiagnostics,
+        providerCalls,
+        localityMetadataOnly: true,
+        queryFingerprint: lm.queryFingerprint,
+        lastStructuredReason: 'broad_locality_match',
+      })
+      const { data: priorLocality, error: priorLocalityErr } = await fromBase(admin, 'ingested_sales')
+        .select('geocode_confidence, coordinate_precision, geocode_method, failure_details')
         .eq('id', rowId)
         .eq('status', 'needs_geocode')
+        .maybeSingle()
+      const localityUnchanged =
+        !priorLocalityErr &&
+        priorLocality != null &&
+        (priorLocality as { geocode_confidence?: string | null }).geocode_confidence ===
+          lm.geocodeConfidence &&
+        (priorLocality as { coordinate_precision?: string | null }).coordinate_precision ===
+          lm.coordinatePrecision &&
+        (priorLocality as { geocode_method?: string | null }).geocode_method === lm.geocodeMethod &&
+        failureDetailsSemanticallyEqual(
+          (priorLocality as { failure_details?: unknown }).failure_details,
+          mergedFailureDetails
+        )
+      if (!localityUnchanged) {
+        await fromBase(admin, 'ingested_sales')
+          .update({
+            geocode_confidence: lm.geocodeConfidence,
+            coordinate_precision: lm.coordinatePrecision,
+            geocode_method: lm.geocodeMethod,
+            failure_details: mergedFailureDetails,
+          })
+          .eq('id', rowId)
+          .eq('status', 'needs_geocode')
+      }
     }
   }
 

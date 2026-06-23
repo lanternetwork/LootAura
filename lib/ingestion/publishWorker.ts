@@ -1419,6 +1419,7 @@ export async function publishReadyIngestedSaleById(ingestedSaleId: string): Prom
     }
 
     const updatePayload = buildPublishedIngestedRowUpdatePayload(saleId, crossProviderLink)
+    // Error-only retry: second UPDATE runs only when first fails (no success-path duplicate write).
     const firstUpdate = await fromBase(admin, 'ingested_sales').update(updatePayload).eq('id', claimed.id)
     if (firstUpdate.error) {
       const secondUpdate = await fromBase(admin, 'ingested_sales').update(updatePayload).eq('id', claimed.id)
@@ -1617,6 +1618,7 @@ export async function publishReadyIngestedSales(options?: {
       }
 
       const updatePayload = buildPublishedIngestedRowUpdatePayload(saleId, crossProviderLink)
+      // Error-only retry: second UPDATE runs only when first fails (no success-path duplicate write).
       const firstUpdate = await fromBase(admin, 'ingested_sales')
         .update(updatePayload)
         .eq('id', row.id)

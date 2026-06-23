@@ -69,8 +69,8 @@ describe('classifyListFastSnapshotForAudit', () => {
       {
         sourceUrl: 'https://yardsaletreasuremap.com/US/MA/Boston/x/1/userlisting.html',
         title: 'Garage sale',
-        startDate: '2026-06-21',
-        endDate: '2026-06-22',
+        startDate: '2027-06-21',
+        endDate: '2027-06-22',
       },
       'https://yardsaletreasuremap.com/US/MA/Boston/x/1/userlisting.html'
     )
@@ -83,8 +83,8 @@ describe('classifyListFastSnapshotForAudit', () => {
       {
         sourceUrl: 'https://yardsaletreasuremap.com/US/MA/Boston/x/2/userlisting.html',
         title: 'Moving sale',
-        startDate: '2026-06-21',
-        endDate: '2026-06-22',
+        startDate: '2027-06-21',
+        endDate: '2027-06-22',
         lat: 42.36,
         lng: -71.05,
       },

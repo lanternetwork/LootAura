@@ -28,16 +28,20 @@ describe('archiveCooledTerminalAddressDisposition', () => {
       return {
         select: vi.fn().mockReturnValue({
           in: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue({
-              data: [
-                {
-                  id: 'row-1',
-                  failure_details: { address_enrichment: { terminalEnteredAt: oldEnteredAt } },
-                  updated_at: oldEnteredAt,
-                  address_status: 'address_terminal_active',
-                },
-              ],
-              error: null,
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'row-1',
+                      failure_details: { address_enrichment: { terminalEnteredAt: oldEnteredAt } },
+                      updated_at: oldEnteredAt,
+                      address_status: 'address_terminal_active',
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
             }),
           }),
         }),

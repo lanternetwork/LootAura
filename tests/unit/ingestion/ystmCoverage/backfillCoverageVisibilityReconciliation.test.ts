@@ -1,3 +1,4 @@
+import type { PublishedNotVisibleSaleRow } from '@/lib/admin/publishedNotVisibleDistributionTypes'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockFromBase = vi.hoisted(() => vi.fn())
@@ -21,7 +22,7 @@ const RECONCILIATION_FIELDS = {
   updated_at: NOW_ISO,
 } as const
 
-const PUBLISHED_SALE = {
+const PUBLISHED_SALE: PublishedNotVisibleSaleRow = {
   id: SALE_ID,
   status: 'published',
   archived_at: null,
@@ -29,7 +30,7 @@ const PUBLISHED_SALE = {
   moderation_status: null,
 }
 
-const ARCHIVED_SALE = {
+const ARCHIVED_SALE: PublishedNotVisibleSaleRow = {
   id: SALE_ID,
   status: 'archived',
   archived_at: '2026-06-01T00:00:00.000Z',
@@ -50,7 +51,7 @@ function setupBackfillMocks(options: {
   cohort: ReturnType<typeof observationRow>[]
   ingestedByUrl?: Record<string, { id: string; source_url: string; status: string; published_sale_id: string | null; sale_instance_key: string | null; is_duplicate: boolean }>
   ingestedById?: Record<string, { id: string; source_url: string; status: string; published_sale_id: string | null; sale_instance_key: string | null; is_duplicate: boolean }>
-  salesById?: Record<string, typeof PUBLISHED_SALE>
+  salesById?: Record<string, PublishedNotVisibleSaleRow>
   updateResults?: Array<{ error: { message: string } | null }>
 }) {
   const {

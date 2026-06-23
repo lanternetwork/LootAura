@@ -223,6 +223,7 @@ function minimalCoverage(): YstmCoverageMetricsResponse {
         STALE_OBSERVATION: 12,
         MISSING_INGEST_FETCH_FAILED_RETRYABLE: 10,
         GATED_WAIT: 25,
+        SCHEDULE_WAIT: 0,
         RECOVERABLE: 1,
         UNKNOWN_ACTIONABLE: 0,
         UNKNOWN_NON_ACTIONABLE: 13,

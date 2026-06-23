@@ -396,6 +396,7 @@ describe('buildIngestionDiagnostics', () => {
           STALE_OBSERVATION: 0,
           MISSING_INGEST_FETCH_FAILED_RETRYABLE: 0,
           GATED_WAIT: 0,
+          SCHEDULE_WAIT: 0,
           RECOVERABLE: 3,
           UNKNOWN_ACTIONABLE: 0,
           UNKNOWN_NON_ACTIONABLE: 4,

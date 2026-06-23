@@ -379,3 +379,34 @@ describe('terminal disposition observation invalidation fields', () => {
     )
   })
 })
+
+describe('coverage visibility reconciliation fields', () => {
+  const COVERAGE_VISIBILITY_RECONCILIATION_FIELDS = {
+    lootaura_visible: true,
+    false_exclusion_primary_bucket: null,
+    false_exclusion_secondary_tags: [],
+    false_exclusion_evidence: null,
+    false_exclusion_summary: null,
+    false_exclusion_traced_at: null,
+  } as const
+
+  it('buildCoverageVisibilityReconciliationFields clears trace and sets visible', async () => {
+    const { buildCoverageVisibilityReconciliationFields } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    expect(buildCoverageVisibilityReconciliationFields()).toEqual(
+      COVERAGE_VISIBILITY_RECONCILIATION_FIELDS
+    )
+  })
+
+  it('repeated reconciliation fields are idempotent', async () => {
+    const { buildCoverageVisibilityReconciliationFields } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    expect(buildCoverageVisibilityReconciliationFields()).toEqual(
+      buildCoverageVisibilityReconciliationFields()
+    )
+  })
+})

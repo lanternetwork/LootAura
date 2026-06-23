@@ -28,6 +28,7 @@ import {
 } from '@/lib/ingestion/address/resolveEnrichmentAddressCandidate'
 import { archiveCooledTerminalAddressDisposition } from '@/lib/ingestion/address/archiveTerminalAddressDisposition'
 import { reconcileExhaustedAddressEnrichmentPending } from '@/lib/ingestion/address/reconcileExhaustedAddressEnrichmentPending'
+import { reconcileAddressEnrichmentOwnedNeedsCheck } from '@/lib/ingestion/address/reconcileAddressEnrichmentOwnedNeedsCheck'
 import { reconcileScheduleGatedAddressEnrichmentPending } from '@/lib/ingestion/address/reconcileScheduleGatedAddressEnrichmentPending'
 import { terminalActiveAddressStatusForEntry } from '@/lib/ingestion/address/terminalAddressDisposition'
 
@@ -41,6 +42,8 @@ export type AddressEnrichmentWorkerSummary = {
   stillGated: number
   exhaustedReconciled: number
   scheduleGatedReconciled: number
+  enrichmentOwnedReclassifiedPending: number
+  enrichmentOwnedTerminalized: number
   terminalArchived: number
   byFailureReason: Partial<Record<AddressEnrichmentFailureReason, number>>
 }
@@ -345,6 +348,8 @@ export async function enrichPendingAddresses(options?: {
     stillGated: 0,
     exhaustedReconciled: 0,
     scheduleGatedReconciled: 0,
+    enrichmentOwnedReclassifiedPending: 0,
+    enrichmentOwnedTerminalized: 0,
     terminalArchived: 0,
     byFailureReason: {},
   }
@@ -364,6 +369,13 @@ export async function enrichPendingAddresses(options?: {
     batchSize: Math.max(batchSize * 4, 100),
   })
   summary.exhaustedReconciled = reconcileSummary.reconciled
+
+  const enrichmentOwnedSummary = await reconcileAddressEnrichmentOwnedNeedsCheck({
+    batchSize: Math.max(batchSize * 4, 100),
+    cooldownMinutes,
+  })
+  summary.enrichmentOwnedReclassifiedPending = enrichmentOwnedSummary.reclassifiedPending
+  summary.enrichmentOwnedTerminalized = enrichmentOwnedSummary.terminalized
 
   const { data, error } = await (admin as any).rpc('claim_ingested_sales_for_address_enrichment', {
     p_batch_size: batchSize,

@@ -26,6 +26,11 @@ const ARCHIVED_INVALIDATION_FIELDS = {
   ystm_invalid_reason: 'archived',
 } as const
 
+const ADDRESS_TERMINAL_INVALIDATION_FIELDS = {
+  ...EXPIRED_INVALIDATION_FIELDS,
+  ystm_invalid_reason: 'address_terminal',
+} as const
+
 function baseMissingIngestionFields(outcome: string, failureReason: string | null) {
   return {
     missing_ingestion_attempted_at: NOW,
@@ -360,5 +365,17 @@ describe('published not visible disposition invalidation fields', () => {
     const first = buildPublishedNotVisibleDispositionInvalidationFields('archived')
     const second = buildPublishedNotVisibleDispositionInvalidationFields('archived')
     expect(second).toEqual(first)
+  })
+})
+
+describe('terminal disposition observation invalidation fields', () => {
+  it('buildTerminalDispositionObservationInvalidationFields clears trace and sets address_terminal', async () => {
+    const { buildTerminalDispositionObservationInvalidationFields } = await import(
+      '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+    )
+
+    expect(buildTerminalDispositionObservationInvalidationFields()).toEqual(
+      ADDRESS_TERMINAL_INVALIDATION_FIELDS
+    )
   })
 })

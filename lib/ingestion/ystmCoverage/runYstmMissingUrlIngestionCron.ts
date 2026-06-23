@@ -41,6 +41,7 @@ import {
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import { backfillExpiredListFastObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation'
 import { backfillPublishedNotVisibleDispositionInvalidation } from '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation'
+import { backfillTerminalDispositionObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillTerminalDispositionObservationInvalidation'
 import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import { findPrimaryIngestedSaleBySourceUrl, pickPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
@@ -80,6 +81,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   listFastFailed: number
   expiredObservationBackfillUpdated: number
   publishedNotVisibleDispositionBackfillUpdated: number
+  terminalDispositionBackfillUpdated: number
 }
 
 export function computeReservedHotBudget(
@@ -134,16 +136,19 @@ function emptyMissingIngestTelemetry(
     listFastFailed: 0,
     expiredObservationBackfillUpdated: 0,
     publishedNotVisibleDispositionBackfillUpdated: 0,
+    terminalDispositionBackfillUpdated: 0,
     ...partial,
   }
 }
 
 async function runObservationInvalidationBackfills(admin: ReturnType<typeof getAdminDb>) {
-  const [expiredBackfill, publishedNotVisibleDispositionBackfill] = await Promise.all([
-    backfillExpiredListFastObservationInvalidation(admin),
-    backfillPublishedNotVisibleDispositionInvalidation(admin),
-  ])
-  return { expiredBackfill, publishedNotVisibleDispositionBackfill }
+  const [expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill] =
+    await Promise.all([
+      backfillExpiredListFastObservationInvalidation(admin),
+      backfillPublishedNotVisibleDispositionInvalidation(admin),
+      backfillTerminalDispositionObservationInvalidation(admin),
+    ])
+  return { expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill }
 }
 
 export type YstmMissingUrlIngestionCronResult = {
@@ -247,7 +252,7 @@ export async function runYstmMissingUrlIngestionCron(
     )
 
     if (queueTotal === 0) {
-      const { expiredBackfill, publishedNotVisibleDispositionBackfill } =
+      const { expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill } =
         await runObservationInvalidationBackfills(admin)
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
         owner: lease.owner,
@@ -265,6 +270,7 @@ export async function runYstmMissingUrlIngestionCron(
           expiredObservationBackfillUpdated: expiredBackfill.updated,
           publishedNotVisibleDispositionBackfillUpdated:
             publishedNotVisibleDispositionBackfill.updated,
+          terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
         }),
       }
     }
@@ -409,7 +415,7 @@ export async function runYstmMissingUrlIngestionCron(
       queueOffsetAfter = queueOffsetBefore
     }
 
-    const { expiredBackfill, publishedNotVisibleDispositionBackfill } =
+    const { expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill } =
       await runObservationInvalidationBackfills(admin)
 
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
@@ -452,6 +458,8 @@ export async function runYstmMissingUrlIngestionCron(
         publishedNotVisibleDispositionBackfill.archived,
       publishedNotVisibleDispositionBackfillExpired:
         publishedNotVisibleDispositionBackfill.expired,
+      terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
+      terminalDispositionBackfillSkipped: terminalDispositionBackfill.skipped,
     })
 
     return {
@@ -492,6 +500,7 @@ export async function runYstmMissingUrlIngestionCron(
         expiredObservationBackfillUpdated: expiredBackfill.updated,
         publishedNotVisibleDispositionBackfillUpdated:
           publishedNotVisibleDispositionBackfill.updated,
+        terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
       },
     }
   } catch (err) {

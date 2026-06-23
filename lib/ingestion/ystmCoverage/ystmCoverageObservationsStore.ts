@@ -176,6 +176,19 @@ export function buildExpiredObservationInvalidationFields(): Record<string, unkn
   return buildPublishedNotVisibleDispositionInvalidationFields('expired')
 }
 
+export function buildTerminalDispositionObservationInvalidationFields(): Record<string, unknown> {
+  return {
+    ystm_valid_active: false,
+    ystm_invalid_reason: 'address_terminal',
+    discovery_priority: 'cold',
+    false_exclusion_primary_bucket: null,
+    false_exclusion_secondary_tags: [],
+    false_exclusion_evidence: null,
+    false_exclusion_summary: null,
+    false_exclusion_traced_at: null,
+  }
+}
+
 export function buildMissingIngestionObservationUpdate(
   patch: {
     outcome: YstmCoverageMissingIngestionOutcome

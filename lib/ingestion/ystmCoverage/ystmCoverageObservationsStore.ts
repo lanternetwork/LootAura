@@ -189,6 +189,18 @@ export function buildTerminalDispositionObservationInvalidationFields(): Record<
   }
 }
 
+/** COVERAGE_VISIBILITY_RECONCILIATION_V1 — mark observation visible; do not invalidate. */
+export function buildCoverageVisibilityReconciliationFields(): Record<string, unknown> {
+  return {
+    lootaura_visible: true,
+    false_exclusion_primary_bucket: null,
+    false_exclusion_secondary_tags: [],
+    false_exclusion_evidence: null,
+    false_exclusion_summary: null,
+    false_exclusion_traced_at: null,
+  }
+}
+
 export function buildMissingIngestionObservationUpdate(
   patch: {
     outcome: YstmCoverageMissingIngestionOutcome

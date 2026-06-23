@@ -39,6 +39,7 @@ import {
   recordYstmCoverageMissingIngestionOutcome,
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+import { backfillCoverageVisibilityReconciliation } from '@/lib/ingestion/ystmCoverage/backfillCoverageVisibilityReconciliation'
 import { backfillExpiredListFastObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation'
 import { backfillPublishedNotVisibleDispositionInvalidation } from '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation'
 import { backfillTerminalDispositionObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillTerminalDispositionObservationInvalidation'
@@ -82,6 +83,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   expiredObservationBackfillUpdated: number
   publishedNotVisibleDispositionBackfillUpdated: number
   terminalDispositionBackfillUpdated: number
+  coverageVisibilityReconciliationUpdated: number
 }
 
 export function computeReservedHotBudget(
@@ -137,18 +139,24 @@ function emptyMissingIngestTelemetry(
     expiredObservationBackfillUpdated: 0,
     publishedNotVisibleDispositionBackfillUpdated: 0,
     terminalDispositionBackfillUpdated: 0,
+    coverageVisibilityReconciliationUpdated: 0,
     ...partial,
   }
 }
 
 async function runObservationInvalidationBackfills(admin: ReturnType<typeof getAdminDb>) {
-  const [expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill] =
-    await Promise.all([
-      backfillExpiredListFastObservationInvalidation(admin),
-      backfillPublishedNotVisibleDispositionInvalidation(admin),
-      backfillTerminalDispositionObservationInvalidation(admin),
-    ])
-  return { expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill }
+  const expiredBackfill = await backfillExpiredListFastObservationInvalidation(admin)
+  const publishedNotVisibleDispositionBackfill =
+    await backfillPublishedNotVisibleDispositionInvalidation(admin)
+  const terminalDispositionBackfill =
+    await backfillTerminalDispositionObservationInvalidation(admin)
+  const coverageVisibilityReconciliation = await backfillCoverageVisibilityReconciliation(admin)
+  return {
+    expiredBackfill,
+    publishedNotVisibleDispositionBackfill,
+    terminalDispositionBackfill,
+    coverageVisibilityReconciliation,
+  }
 }
 
 export type YstmMissingUrlIngestionCronResult = {
@@ -252,8 +260,12 @@ export async function runYstmMissingUrlIngestionCron(
     )
 
     if (queueTotal === 0) {
-      const { expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill } =
-        await runObservationInvalidationBackfills(admin)
+      const {
+        expiredBackfill,
+        publishedNotVisibleDispositionBackfill,
+        terminalDispositionBackfill,
+        coverageVisibilityReconciliation,
+      } = await runObservationInvalidationBackfills(admin)
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
         owner: lease.owner,
         nextCursor: 0,
@@ -271,6 +283,7 @@ export async function runYstmMissingUrlIngestionCron(
           publishedNotVisibleDispositionBackfillUpdated:
             publishedNotVisibleDispositionBackfill.updated,
           terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
+          coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
         }),
       }
     }
@@ -415,8 +428,12 @@ export async function runYstmMissingUrlIngestionCron(
       queueOffsetAfter = queueOffsetBefore
     }
 
-    const { expiredBackfill, publishedNotVisibleDispositionBackfill, terminalDispositionBackfill } =
-      await runObservationInvalidationBackfills(admin)
+    const {
+      expiredBackfill,
+      publishedNotVisibleDispositionBackfill,
+      terminalDispositionBackfill,
+      coverageVisibilityReconciliation,
+    } = await runObservationInvalidationBackfills(admin)
 
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
       owner: lease.owner,
@@ -460,6 +477,8 @@ export async function runYstmMissingUrlIngestionCron(
         publishedNotVisibleDispositionBackfill.expired,
       terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
       terminalDispositionBackfillSkipped: terminalDispositionBackfill.skipped,
+      coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
+      coverageVisibilityReconciliationScanned: coverageVisibilityReconciliation.scanned,
     })
 
     return {
@@ -501,6 +520,7 @@ export async function runYstmMissingUrlIngestionCron(
         publishedNotVisibleDispositionBackfillUpdated:
           publishedNotVisibleDispositionBackfill.updated,
         terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
+        coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
       },
     }
   } catch (err) {

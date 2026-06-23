@@ -48,6 +48,7 @@ describe('classifyFalseExclusionTrace', () => {
       observation: baseObservation,
       ingested: {
         id: 'row-1',
+        source_url: baseObservation.canonicalUrl,
         status: 'expired',
         published_sale_id: null,
         is_duplicate: false,
@@ -58,6 +59,10 @@ describe('classifyFalseExclusionTrace', () => {
         catalog_repair_outcome: null,
         source_listing_id: '1',
         sale_instance_key: null,
+        address_enrichment_attempts: null,
+        next_enrichment_attempt_at: null,
+        address_unlock_at: null,
+        last_address_enrichment_attempt_at: null,
       },
       config: crawlableConfig,
       visibleInPublishedIndex: false,
@@ -86,6 +91,7 @@ describe('classifyFalseExclusionTrace', () => {
       observation: baseObservation,
       ingested: {
         id: 'row-2',
+        source_url: baseObservation.canonicalUrl,
         status: 'ready',
         published_sale_id: null,
         is_duplicate: false,
@@ -96,6 +102,10 @@ describe('classifyFalseExclusionTrace', () => {
         catalog_repair_outcome: null,
         source_listing_id: null,
         sale_instance_key: 'external_page_source:TX|austin|no_addr:2026-05-20|2026-05-21:content:abc',
+        address_enrichment_attempts: null,
+        next_enrichment_attempt_at: null,
+        address_unlock_at: null,
+        last_address_enrichment_attempt_at: null,
       },
       config: crawlableConfig,
       visibleInPublishedIndex: false,
@@ -109,6 +119,7 @@ describe('classifyFalseExclusionTrace', () => {
       observation: baseObservation,
       ingested: {
         id: 'row-3',
+        source_url: baseObservation.canonicalUrl,
         status: 'needs_check',
         published_sale_id: null,
         is_duplicate: false,
@@ -119,6 +130,10 @@ describe('classifyFalseExclusionTrace', () => {
         catalog_repair_outcome: null,
         source_listing_id: null,
         sale_instance_key: null,
+        address_enrichment_attempts: null,
+        next_enrichment_attempt_at: null,
+        address_unlock_at: null,
+        last_address_enrichment_attempt_at: null,
       },
       config: crawlableConfig,
       visibleInPublishedIndex: false,
@@ -138,5 +153,65 @@ describe('classifyFalseExclusionTrace', () => {
     })
     expect(r.primaryBucket).toBe('published_not_visible')
     expect(r.secondaryTags).toContain('observation_stale')
+  })
+
+  it('classifies schedule_wait for address-gated unlock schedule waits', () => {
+    const unlockUrl =
+      'https://yardsaletreasuremap.com/US/Texas/Austin/See-source-for-address-after-2026-06-06-14%3A00%3A00/1/listing.html'
+    const r = classifyFalseExclusionTrace({
+      observation: { ...baseObservation, canonicalUrl: unlockUrl },
+      ingested: {
+        id: 'row-gated',
+        source_url: unlockUrl,
+        status: 'needs_check',
+        published_sale_id: null,
+        is_duplicate: false,
+        address_status: 'address_gated',
+        failure_reasons: [],
+        date_start: '2026-05-20',
+        date_end: '2026-05-21',
+        catalog_repair_outcome: null,
+        source_listing_id: null,
+        sale_instance_key: null,
+        address_enrichment_attempts: 1,
+        next_enrichment_attempt_at: null,
+        address_unlock_at: '2026-06-06T13:00:00.000Z',
+        last_address_enrichment_attempt_at: null,
+      },
+      config: crawlableConfig,
+      visibleInPublishedIndex: false,
+      nowIso: '2026-06-06T12:00:00.000Z',
+    })
+    expect(r.primaryBucket).toBe('schedule_wait')
+  })
+
+  it('classifies residual gated_false_positive when unlock elapsed', () => {
+    const unlockUrl =
+      'https://yardsaletreasuremap.com/US/Texas/Austin/See-source-for-address-after-2026-06-06-14%3A00%3A00/1/listing.html'
+    const r = classifyFalseExclusionTrace({
+      observation: { ...baseObservation, canonicalUrl: unlockUrl },
+      ingested: {
+        id: 'row-gated',
+        source_url: unlockUrl,
+        status: 'needs_check',
+        published_sale_id: null,
+        is_duplicate: false,
+        address_status: 'address_gated',
+        failure_reasons: [],
+        date_start: '2026-05-20',
+        date_end: '2026-05-21',
+        catalog_repair_outcome: null,
+        source_listing_id: null,
+        sale_instance_key: null,
+        address_enrichment_attempts: 1,
+        next_enrichment_attempt_at: null,
+        address_unlock_at: '2026-06-06T10:00:00.000Z',
+        last_address_enrichment_attempt_at: null,
+      },
+      config: crawlableConfig,
+      visibleInPublishedIndex: false,
+      nowIso: '2026-06-06T15:00:00.000Z',
+    })
+    expect(r.primaryBucket).toBe('gated_false_positive')
   })
 })

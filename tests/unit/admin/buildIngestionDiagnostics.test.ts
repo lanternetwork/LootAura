@@ -485,6 +485,7 @@ describe('buildIngestionDiagnostics', () => {
           soft_dedupe_suppressed: 0,
           expired_false_positive: 0,
           gated_false_positive: 0,
+          schedule_wait: 0,
           detail_first_fallback: 1,
           address_validation_failed: 0,
           spatial_lookup_failed: 0,

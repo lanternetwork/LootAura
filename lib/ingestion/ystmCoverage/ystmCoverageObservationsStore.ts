@@ -201,6 +201,17 @@ export function buildCoverageVisibilityReconciliationFields(): Record<string, un
   }
 }
 
+/** GATED_FALSE_POSITIVE_RECONCILIATION_V1 — re-bucket expected unlock schedule waits. */
+export function buildScheduleWaitReconciliationFields(): Record<string, unknown> {
+  return {
+    false_exclusion_primary_bucket: 'schedule_wait',
+    false_exclusion_secondary_tags: [],
+    false_exclusion_evidence: null,
+    false_exclusion_summary: null,
+    false_exclusion_traced_at: null,
+  }
+}
+
 export function buildMissingIngestionObservationUpdate(
   patch: {
     outcome: YstmCoverageMissingIngestionOutcome

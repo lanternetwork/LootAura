@@ -40,6 +40,7 @@ import {
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import { backfillCoverageVisibilityReconciliation } from '@/lib/ingestion/ystmCoverage/backfillCoverageVisibilityReconciliation'
+import { backfillGatedFalsePositiveScheduleWaitReconciliation } from '@/lib/ingestion/ystmCoverage/backfillGatedFalsePositiveScheduleWaitReconciliation'
 import { backfillExpiredListFastObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation'
 import { backfillPublishedNotVisibleDispositionInvalidation } from '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation'
 import { backfillTerminalDispositionObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillTerminalDispositionObservationInvalidation'
@@ -84,6 +85,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   publishedNotVisibleDispositionBackfillUpdated: number
   terminalDispositionBackfillUpdated: number
   coverageVisibilityReconciliationUpdated: number
+  scheduleWaitReconciliationUpdated: number
 }
 
 export function computeReservedHotBudget(
@@ -140,6 +142,7 @@ function emptyMissingIngestTelemetry(
     publishedNotVisibleDispositionBackfillUpdated: 0,
     terminalDispositionBackfillUpdated: 0,
     coverageVisibilityReconciliationUpdated: 0,
+    scheduleWaitReconciliationUpdated: 0,
     ...partial,
   }
 }
@@ -151,11 +154,14 @@ async function runObservationInvalidationBackfills(admin: ReturnType<typeof getA
   const terminalDispositionBackfill =
     await backfillTerminalDispositionObservationInvalidation(admin)
   const coverageVisibilityReconciliation = await backfillCoverageVisibilityReconciliation(admin)
+  const scheduleWaitReconciliation =
+    await backfillGatedFalsePositiveScheduleWaitReconciliation(admin)
   return {
     expiredBackfill,
     publishedNotVisibleDispositionBackfill,
     terminalDispositionBackfill,
     coverageVisibilityReconciliation,
+    scheduleWaitReconciliation,
   }
 }
 
@@ -265,6 +271,7 @@ export async function runYstmMissingUrlIngestionCron(
         publishedNotVisibleDispositionBackfill,
         terminalDispositionBackfill,
         coverageVisibilityReconciliation,
+        scheduleWaitReconciliation,
       } = await runObservationInvalidationBackfills(admin)
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
         owner: lease.owner,
@@ -284,6 +291,7 @@ export async function runYstmMissingUrlIngestionCron(
             publishedNotVisibleDispositionBackfill.updated,
           terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
           coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
+          scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
         }),
       }
     }
@@ -433,6 +441,7 @@ export async function runYstmMissingUrlIngestionCron(
       publishedNotVisibleDispositionBackfill,
       terminalDispositionBackfill,
       coverageVisibilityReconciliation,
+      scheduleWaitReconciliation,
     } = await runObservationInvalidationBackfills(admin)
 
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
@@ -479,6 +488,8 @@ export async function runYstmMissingUrlIngestionCron(
       terminalDispositionBackfillSkipped: terminalDispositionBackfill.skipped,
       coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
       coverageVisibilityReconciliationScanned: coverageVisibilityReconciliation.scanned,
+      scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
+      scheduleWaitReconciliationScanned: scheduleWaitReconciliation.scanned,
     })
 
     return {
@@ -521,6 +532,7 @@ export async function runYstmMissingUrlIngestionCron(
           publishedNotVisibleDispositionBackfill.updated,
         terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
         coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
+        scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
       },
     }
   } catch (err) {

@@ -128,6 +128,10 @@ export function classifyMissingValidReconciliation(
     return 'MISSING_INGEST_FETCH_FAILED_RETRYABLE'
   }
 
+  if (input.primaryBucket === 'schedule_wait') {
+    return 'SCHEDULE_WAIT'
+  }
+
   if (input.primaryBucket === 'gated_false_positive') {
     return 'GATED_WAIT'
   }
@@ -147,5 +151,6 @@ export function isActionableMissingValidReconciliationClass(
     reconciliationClass !== 'DUPLICATE_SUPPRESSED' &&
     reconciliationClass !== 'VISIBILITY_FILTER' &&
     reconciliationClass !== 'EXPIRED_INVENTORY' &&
+    reconciliationClass !== 'SCHEDULE_WAIT' &&
     reconciliationClass !== 'UNKNOWN_NON_ACTIONABLE'
 }

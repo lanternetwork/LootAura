@@ -11,6 +11,7 @@ export const FALSE_EXCLUSION_TRACE_BUCKETS = [
   'soft_dedupe_suppressed',
   'expired_false_positive',
   'gated_false_positive',
+  'schedule_wait',
   'detail_first_fallback',
   'address_validation_failed',
   'spatial_lookup_failed',

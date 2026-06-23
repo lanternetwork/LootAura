@@ -7,6 +7,7 @@ export type MissingValidReconciliationClass =
   | 'STALE_OBSERVATION'
   | 'MISSING_INGEST_FETCH_FAILED_RETRYABLE'
   | 'GATED_WAIT'
+  | 'SCHEDULE_WAIT'
   | 'RECOVERABLE'
   | 'UNKNOWN_ACTIONABLE'
   | 'UNKNOWN_NON_ACTIONABLE'
@@ -17,6 +18,7 @@ export const NON_ACTIONABLE_RECONCILIATION_CLASSES = [
   'DUPLICATE_SUPPRESSED',
   'VISIBILITY_FILTER',
   'EXPIRED_INVENTORY',
+  'SCHEDULE_WAIT',
 ] as const satisfies readonly MissingValidReconciliationClass[]
 
 export const ACTIONABLE_RECONCILIATION_CLASSES = [
@@ -39,6 +41,7 @@ export function emptyMissingValidReconciliationClassCounts(): MissingValidReconc
     STALE_OBSERVATION: 0,
     MISSING_INGEST_FETCH_FAILED_RETRYABLE: 0,
     GATED_WAIT: 0,
+    SCHEDULE_WAIT: 0,
     RECOVERABLE: 0,
     UNKNOWN_ACTIONABLE: 0,
     UNKNOWN_NON_ACTIONABLE: 0,

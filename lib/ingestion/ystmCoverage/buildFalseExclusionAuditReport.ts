@@ -68,7 +68,7 @@ async function loadIngestedByUrls(
     const slice = urls.slice(i, i + chunkSize)
     const { data, error } = await fromBase(admin, 'ingested_sales')
       .select(
-        'id, source_url, status, published_sale_id, is_duplicate, address_status, failure_reasons, date_start, date_end, catalog_repair_outcome, source_listing_id, sale_instance_key'
+        'id, source_url, status, published_sale_id, is_duplicate, address_status, failure_reasons, date_start, date_end, catalog_repair_outcome, source_listing_id, sale_instance_key, address_enrichment_attempts, next_enrichment_attempt_at, address_unlock_at, last_address_enrichment_attempt_at'
       )
       .in('source_url', slice)
     if (error) throw new Error(error.message)
@@ -86,9 +86,14 @@ async function loadIngestedByUrls(
         catalog_repair_outcome: string | null
         source_listing_id: string | null
         sale_instance_key: string | null
+        address_enrichment_attempts: number | null
+        next_enrichment_attempt_at: string | null
+        address_unlock_at: string | null
+        last_address_enrichment_attempt_at: string | null
       }
-      map.set(r.source_url, {
+      const snapshot = {
         id: r.id,
+        source_url: r.source_url,
         status: r.status,
         published_sale_id: r.published_sale_id,
         is_duplicate: r.is_duplicate,
@@ -99,7 +104,13 @@ async function loadIngestedByUrls(
         catalog_repair_outcome: r.catalog_repair_outcome,
         source_listing_id: r.source_listing_id,
         sale_instance_key: r.sale_instance_key,
-      })
+        address_enrichment_attempts: r.address_enrichment_attempts,
+        next_enrichment_attempt_at: r.next_enrichment_attempt_at,
+        address_unlock_at: r.address_unlock_at,
+        last_address_enrichment_attempt_at: r.last_address_enrichment_attempt_at,
+      }
+      map.set(r.source_url, snapshot)
+      map.set(canonicalSourceUrl(r.source_url), snapshot)
     }
   }
   return map
@@ -194,7 +205,7 @@ export async function traceMissingValidFalseExclusions(
         missingIngestionFailureReason: row.missing_ingestion_failure_reason,
         lastDetailCheckedAt: row.last_detail_checked_at,
       },
-      ingested: ingestedByUrl.get(row.canonical_url) ?? null,
+      ingested: ingestedByUrl.get(row.canonical_url) ?? ingestedByUrl.get(canonical) ?? null,
       config,
       visibleInPublishedIndex: publishedIndex.visibleCanonicalUrls.has(canonical),
       nowIso,

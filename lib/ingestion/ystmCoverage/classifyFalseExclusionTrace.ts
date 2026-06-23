@@ -8,6 +8,7 @@ import {
   type FalseExclusionUrlTrace,
 } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { isIngestedRowExpiredForDuplicate } from '@/lib/ingestion/acquisition/duplicateSkipKinds'
+import { isScheduleWaitFalseExclusion } from '@/lib/ingestion/ystmCoverage/resolveScheduleWaitFalseExclusion'
 import { partitionCrawlableExternalCityConfigs } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 
 export type FalseExclusionObservationInput = {
@@ -23,6 +24,7 @@ export type FalseExclusionObservationInput = {
 
 export type FalseExclusionIngestedRowSnapshot = {
   id: string
+  source_url: string
   status: string
   published_sale_id: string | null
   is_duplicate: boolean
@@ -33,6 +35,10 @@ export type FalseExclusionIngestedRowSnapshot = {
   catalog_repair_outcome: string | null
   source_listing_id: string | null
   sale_instance_key: string | null
+  address_enrichment_attempts: number | null
+  next_enrichment_attempt_at: string | null
+  address_unlock_at: string | null
+  last_address_enrichment_attempt_at: string | null
 }
 
 export type FalseExclusionConfigSnapshot = {
@@ -202,6 +208,23 @@ export function classifyFalseExclusionTrace(input: ClassifyFalseExclusionInput):
   }
 
   if (ingested && ingested.address_status === 'address_gated') {
+    const nowMs = Date.parse(input.nowIso)
+    const resolvedNowMs = Number.isFinite(nowMs) ? nowMs : Date.now()
+    if (
+      isScheduleWaitFalseExclusion({
+        ingested,
+        sourceUrl: input.observation.canonicalUrl,
+        nowMs: resolvedNowMs,
+      })
+    ) {
+      return {
+        primaryBucket: 'schedule_wait',
+        secondaryTags: tags,
+        summary:
+          'Ingested row is address-gated with unlock scheduled in the future; expected schedule wait.',
+        evidence,
+      }
+    }
     return {
       primaryBucket: 'gated_false_positive',
       secondaryTags: tags,

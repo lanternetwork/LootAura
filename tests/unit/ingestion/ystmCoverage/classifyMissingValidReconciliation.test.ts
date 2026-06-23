@@ -180,6 +180,38 @@ describe('classifyMissingValidReconciliation', () => {
     ).toBe('RECOVERABLE')
   })
 
+  it('classifies schedule_wait as non-actionable SCHEDULE_WAIT', () => {
+    const reconciliationClass = classifyMissingValidReconciliation({
+      ...base,
+      primaryBucket: 'schedule_wait',
+      ingested: {
+        address_status: 'address_gated',
+        status: 'needs_check',
+        published_sale_id: null,
+        is_duplicate: false,
+        failure_reasons: [],
+      },
+    })
+    expect(reconciliationClass).toBe('SCHEDULE_WAIT')
+    expect(isActionableReconciliationClass(reconciliationClass)).toBe(false)
+  })
+
+  it('classifies gated_false_positive as actionable GATED_WAIT', () => {
+    const reconciliationClass = classifyMissingValidReconciliation({
+      ...base,
+      primaryBucket: 'gated_false_positive',
+      ingested: {
+        address_status: 'address_gated',
+        status: 'needs_check',
+        published_sale_id: null,
+        is_duplicate: false,
+        failure_reasons: [],
+      },
+    })
+    expect(reconciliationClass).toBe('GATED_WAIT')
+    expect(isActionableReconciliationClass(reconciliationClass)).toBe(true)
+  })
+
   it('classifies unknown with would_publish as actionable', () => {
     expect(
       classifyMissingValidReconciliation({

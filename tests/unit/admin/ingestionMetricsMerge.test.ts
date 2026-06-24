@@ -17,7 +17,7 @@ describe('mergeIngestionMetricsWithDiagnostics', () => {
       failureBreakdown: { ...core.failureBreakdown, needs_check: 42 },
       needsCheckBreakdown: {
         total: 42,
-        legacyTotalIncludingArchived: 42,
+        legacyTotalIncludingArchivedTerminal: 42,
         terminalActive: 0,
         terminalArchived: 0,
         scanned: 42,
@@ -32,7 +32,7 @@ describe('mergeIngestionMetricsWithDiagnostics', () => {
         byAgeBucket: {} as never,
         byPublishability: {},
         failureSignals: {},
-        topPairs: [],
+        allPairs: [],
       },
       listFastFailureDistributionAnalysis: null,
       publishedNotVisibleDistributionAnalysis: null,

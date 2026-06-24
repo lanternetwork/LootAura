@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server'
 import { GET as getYstmCoverage } from '@/app/api/admin/ingestion/ystm-coverage/route'
-import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { evaluateSeoIndexAllowlist, type SeoIndexAllowlistSnapshot } from '@/lib/seo/indexAllowlist'
 import { buildSeoIngestionGateMetrics } from '@/lib/seo/buildSeoIngestionGateMetrics'

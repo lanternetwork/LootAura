@@ -4,14 +4,25 @@ import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes
 
 type Props = {
   metrics: IngestionMetricsResponse
+  diagnosticsLoading?: boolean
 }
 
 function pct(count: number, total: number): string {
   return total > 0 ? `${((count / total) * 100).toFixed(1)}%` : '0.0%'
 }
 
-export default function AddressEnrichmentDrainSection({ metrics }: Props) {
+export default function AddressEnrichmentDrainSection({
+  metrics,
+  diagnosticsLoading = false,
+}: Props) {
   const analysis = metrics.addressEnrichmentDrainCohort
+  if (diagnosticsLoading && !analysis) {
+    return (
+      <section className="rounded-lg border border-teal-200 bg-teal-50/30 p-5 text-sm text-teal-900">
+        Loading address enrichment drain diagnostics…
+      </section>
+    )
+  }
   if (!analysis || analysis.total === 0) {
     return null
   }

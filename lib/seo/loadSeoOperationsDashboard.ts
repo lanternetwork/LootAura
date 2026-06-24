@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server'
-import { GET as getIngestionMetrics } from '@/app/api/admin/ingestion/metrics/route'
 import { GET as getYstmCoverage } from '@/app/api/admin/ingestion/ystm-coverage/route'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { buildSeoOperationalSnapshot } from '@/lib/seo/buildSeoOperationalSnapshot'
 import { buildSeoOperationsDashboard } from '@/lib/seo/buildSeoOperationsDashboard'
+import { buildSeoIngestionGateMetrics } from '@/lib/seo/buildSeoIngestionGateMetrics'
 import type {
   SeoInternalLinkSample,
   SeoOperationsDashboard,
@@ -34,19 +34,18 @@ async function loadIngestionInputs(
   metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse
 }> {
-  const [coverageRes, metricsRes] = await Promise.all([
+  const [coverageRes, metrics] = await Promise.all([
     getYstmCoverage(request),
-    getIngestionMetrics(request),
+    buildSeoIngestionGateMetrics(),
   ])
 
-  if (!coverageRes.ok || !metricsRes.ok) {
+  if (!coverageRes.ok) {
     throw new SeoOperationalGateUnavailableError(
-      `Operational gate inputs unavailable (coverage HTTP ${coverageRes.status}, metrics HTTP ${metricsRes.status})`
+      `Operational gate inputs unavailable (coverage HTTP ${coverageRes.status})`
     )
   }
 
   const coverage = (await coverageRes.json()) as YstmCoverageMetricsResponse
-  const metrics = (await metricsRes.json()) as IngestionMetricsResponse
 
   if (!coverage.ok || !metrics.ok) {
     throw new SeoOperationalGateUnavailableError('Ingestion operational metrics reported failure')

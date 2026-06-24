@@ -32,6 +32,8 @@ type Props = {
   coverageLoading: boolean
   coverageError: string | null
   onCoverageRefresh: () => void | Promise<void>
+  diagnosticsLoading?: boolean
+  onRefreshDiagnostics?: () => void
 }
 
 function formatHourLabel(iso: string) {
@@ -50,6 +52,8 @@ export default function IngestionDebugPanel({
   coverageLoading,
   coverageError,
   onCoverageRefresh,
+  diagnosticsLoading = false,
+  onRefreshDiagnostics,
 }: Props) {
   const backlogChartData = snapshots.map((p, i) => ({
     i,
@@ -115,6 +119,23 @@ export default function IngestionDebugPanel({
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="text-sm text-slate-700">
+          {diagnosticsLoading
+            ? 'Refreshing expensive diagnostics (funnel cohort, needs_check scans)…'
+            : 'Full funnel cohort diagnostics load on demand or every 5 minutes.'}
+        </p>
+        {onRefreshDiagnostics && (
+          <button
+            type="button"
+            onClick={onRefreshDiagnostics}
+            disabled={diagnosticsLoading}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          >
+            Refresh diagnostics
+          </button>
+        )}
+      </div>
       <YstmCoverageScoreboardSection
         variant="debug"
         coverage={coverage}

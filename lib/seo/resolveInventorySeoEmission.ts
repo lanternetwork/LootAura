@@ -1,4 +1,4 @@
-import { buildIngestionMetricsResponse } from '@/app/api/admin/ingestion/metrics/route'
+import { buildSeoIngestionGateMetrics } from '@/lib/seo/buildSeoIngestionGateMetrics'
 import { buildYstmCoverageScoreboard } from '@/lib/admin/ystmCoverageScoreboard'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
@@ -45,7 +45,7 @@ export const getInventorySeoEmissionForRequest = requestCache(
       const [rolloutState, metroSnapshot, metrics, coverageBoard] = await Promise.all([
         fetchSeoRolloutState(admin),
         fetchNationwideSeoMetroInventory(),
-        buildIngestionMetricsResponse(),
+        buildSeoIngestionGateMetrics(),
         buildYstmCoverageScoreboard(admin),
       ])
 

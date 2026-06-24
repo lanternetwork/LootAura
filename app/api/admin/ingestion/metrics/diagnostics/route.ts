@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
-import { buildIngestionCoreMetricsResponse } from '@/lib/admin/ingestionMetricsBuilder'
+import { buildIngestionDiagnosticsMetricsResponse } from '@/lib/admin/buildIngestionDiagnosticsMetrics'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const body = await buildIngestionCoreMetricsResponse()
+    const body = await buildIngestionDiagnosticsMetricsResponse()
     return NextResponse.json(body)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return jsonError(500, 'METRICS_FAILED', message)
+    return jsonError(500, 'DIAGNOSTICS_METRICS_FAILED', message)
   }
 }

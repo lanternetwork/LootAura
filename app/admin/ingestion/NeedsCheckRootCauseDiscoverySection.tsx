@@ -11,14 +11,26 @@ import {
 type Props = {
   metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse | null
+  diagnosticsLoading?: boolean
 }
 
 function pct(value: number): string {
   return `${(value * 100).toFixed(1)}%`
 }
 
-export default function NeedsCheckRootCauseDiscoverySection({ metrics, coverage }: Props) {
+export default function NeedsCheckRootCauseDiscoverySection({
+  metrics,
+  coverage,
+  diagnosticsLoading = false,
+}: Props) {
   const analysis = metrics.needsCheckRootCauseAnalysis
+  if (diagnosticsLoading && !analysis) {
+    return (
+      <section className="rounded-lg border border-violet-200 bg-violet-50/30 p-5 text-sm text-violet-900">
+        Loading needs_check root-cause diagnostics…
+      </section>
+    )
+  }
   if (!analysis || analysis.total === 0) {
     return null
   }

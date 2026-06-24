@@ -194,6 +194,31 @@ export interface TerminalDispositionMetrics {
   needsCheckLegacyIncludingArchived: number
 }
 
+/** Expensive diagnostics patch — loaded on demand from `/api/admin/ingestion/metrics/diagnostics`. */
+export interface IngestionMetricsDiagnosticsResponse {
+  ok: true
+  generatedAt: string
+  diagnosticsLoaded: true
+  detailFirstProof: DetailFirstProofEvaluation
+  funnel: IngestionFunnelMetrics
+  failureBreakdown: {
+    needs_check: number
+    publish_failed: number
+    expired: number
+    ready: number
+    publishing: number
+  }
+  needsCheckBreakdown: NeedsCheckBreakdown
+  needsCheckRootCauseAnalysis: NeedsCheckRootCauseAnalysis
+  listFastFailureDistributionAnalysis: ListFastFailureDistributionAnalysis
+  publishedNotVisibleDistributionAnalysis: PublishedNotVisibleDistributionDiscovery
+  addressEnrichmentDrainCohort: AddressEnrichmentDrainCohortAnalysis
+  geocodeDeadLetter: {
+    replayableTransientNeedsCheck: number
+    terminalGeocodeNeedsCheck: number
+  }
+}
+
 export interface IngestionMetricsResponse {
   ok: boolean
   generatedAt: string

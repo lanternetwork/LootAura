@@ -20,6 +20,7 @@ const mockBackfillPnvDisposition = vi.hoisted(() => vi.fn())
 const mockBackfillTerminalDisposition = vi.hoisted(() => vi.fn())
 const mockBackfillCoverageVisibility = vi.hoisted(() => vi.fn())
 const mockBackfillScheduleWait = vi.hoisted(() => vi.fn())
+const mockBackfillUrlReuseExpiredInventory = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation', () => ({
   backfillExpiredListFastObservationInvalidation: mockBackfillExpired,
@@ -39,6 +40,10 @@ vi.mock('@/lib/ingestion/ystmCoverage/backfillCoverageVisibilityReconciliation',
 
 vi.mock('@/lib/ingestion/ystmCoverage/backfillGatedFalsePositiveScheduleWaitReconciliation', () => ({
   backfillGatedFalsePositiveScheduleWaitReconciliation: mockBackfillScheduleWait,
+}))
+
+vi.mock('@/lib/ingestion/ystmCoverage/backfillUrlReuseExpiredInventoryReclassification', () => ({
+  backfillUrlReuseExpiredInventoryReclassification: mockBackfillUrlReuseExpiredInventory,
 }))
 
 vi.mock('@/lib/ingestion/ystmCoverage/missingIngestFetchFailedCandidates', () => ({
@@ -158,6 +163,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockBackfillTerminalDisposition.mockReset()
     mockBackfillCoverageVisibility.mockReset()
     mockBackfillScheduleWait.mockReset()
+    mockBackfillUrlReuseExpiredInventory.mockReset()
 
     mockAcquireLease.mockResolvedValue({
       acquired: true,
@@ -216,6 +222,12 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockBackfillTerminalDisposition.mockResolvedValue({ updated: 0, skipped: 0 })
     mockBackfillCoverageVisibility.mockResolvedValue({ scanned: 0, updated: 0 })
     mockBackfillScheduleWait.mockResolvedValue({ scanned: 0, updated: 0 })
+    mockBackfillUrlReuseExpiredInventory.mockResolvedValue({
+      scanned: 0,
+      updated: 0,
+      terminalDispositionUpdated: 0,
+      expiredFalsePositiveUpdated: 0,
+    })
   })
 
   it('skips when orchestration lease is active', async () => {

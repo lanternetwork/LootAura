@@ -212,6 +212,20 @@ export function buildScheduleWaitReconciliationFields(): Record<string, unknown>
   }
 }
 
+/** URL_REUSE_EXPIRED_INVENTORY_RECLASSIFICATION_V1 — expired skipped-existing inventory. */
+export function buildUrlReuseExpiredInventoryReclassificationFields(
+  bucket: 'terminal_disposition' | 'expired_false_positive',
+  summary: string
+): Record<string, unknown> {
+  return {
+    false_exclusion_primary_bucket: bucket,
+    false_exclusion_secondary_tags: [],
+    false_exclusion_evidence: null,
+    false_exclusion_summary: summary,
+    false_exclusion_traced_at: null,
+  }
+}
+
 export function buildMissingIngestionObservationUpdate(
   patch: {
     outcome: YstmCoverageMissingIngestionOutcome

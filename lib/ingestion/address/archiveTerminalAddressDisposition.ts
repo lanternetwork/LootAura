@@ -1,4 +1,5 @@
 import { mergeAddressEnrichmentDetails } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
+import { failureDetailsSemanticallyEqual } from '@/lib/ingestion/failureDetailsSemanticEquality'
 import {
   ADDRESS_TERMINAL_ACTIVE_STATUS,
   ADDRESS_TERMINAL_ARCHIVED_STATUS,
@@ -50,6 +51,8 @@ export async function archiveCooledTerminalAddressDisposition(options?: {
   const { data, error } = await fromBase(admin, 'ingested_sales')
     .select('id, failure_details, updated_at, address_status')
     .in('address_status', [...ACTIVE_TERMINAL_STATUSES])
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .limit(batchSize)
 
   if (error) {
@@ -71,12 +74,21 @@ export async function archiveCooledTerminalAddressDisposition(options?: {
       continue
     }
 
+    const mergedFailureDetails = mergeAddressEnrichmentDetails(failureDetails, {
+      archivedAt: new Date(nowMs).toISOString(),
+    })
+    if (
+      addressStatus === ADDRESS_TERMINAL_ARCHIVED_STATUS &&
+      failureDetailsSemanticallyEqual(failureDetails, mergedFailureDetails)
+    ) {
+      summary.skipped += 1
+      continue
+    }
+
     const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
       .update({
         address_status: ADDRESS_TERMINAL_ARCHIVED_STATUS,
-        failure_details: mergeAddressEnrichmentDetails(failureDetails, {
-          archivedAt: new Date(nowMs).toISOString(),
-        }),
+        failure_details: mergedFailureDetails,
       })
       .eq('id', rowId)
       .in('address_status', [...ACTIVE_TERMINAL_STATUSES])

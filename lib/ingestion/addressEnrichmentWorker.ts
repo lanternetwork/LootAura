@@ -22,6 +22,7 @@ import { buildTelemetryRecord, emitObservabilityRecord } from '@/lib/observabili
 import { ObservabilityEvents } from '@/lib/observability/events'
 
 import { mergeAddressEnrichmentDetails } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
+import { failureDetailsSemanticallyEqual } from '@/lib/ingestion/failureDetailsSemanticEquality'
 import {
   isUnlockScheduledInFuture,
   resolveEnrichmentAddressCandidate,
@@ -94,10 +95,24 @@ function classifyFetchFailure(error: unknown): AddressEnrichmentFailureReason {
 async function persistRowAddressOutcome(
   admin: ReturnType<typeof getAdminDb>,
   rowId: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  options?: { priorFailureDetails?: unknown }
 ): Promise<boolean> {
+  let effectivePayload = payload
+  if (
+    effectivePayload.failure_details !== undefined &&
+    options?.priorFailureDetails !== undefined &&
+    failureDetailsSemanticallyEqual(options.priorFailureDetails, effectivePayload.failure_details)
+  ) {
+    const { failure_details: _omit, ...rest } = effectivePayload
+    effectivePayload = rest
+  }
+  if (Object.keys(effectivePayload).length === 0) {
+    return true
+  }
+
   const { data, error } = await fromBase(admin, 'ingested_sales')
-    .update(payload)
+    .update(effectivePayload)
     .eq('id', rowId)
     .select('id')
     .maybeSingle()
@@ -131,7 +146,10 @@ async function processAddressEnrichmentRow(
 
   if (unlockAt && unlockAt.getTime() > now.getTime()) {
     const nextAt = computeNextEnrichmentAttemptAt(unlockAt, now.getTime(), canonical)
-    await persistRowAddressOutcome(admin, rowId, {
+    await persistRowAddressOutcome(
+      admin,
+      rowId,
+      {
       address_status: 'address_gated',
       address_unlock_at: unlockAt.toISOString(),
       next_enrichment_attempt_at: nextAt.toISOString(),
@@ -140,7 +158,9 @@ async function processAddressEnrichmentRow(
         lastReason: 'still_gated',
         attemptCount,
       }),
-    })
+    },
+      { priorFailureDetails: row.failure_details }
+    )
     return { outcome: 'still_gated', reason: 'still_gated' }
   }
 
@@ -161,7 +181,10 @@ async function processAddressEnrichmentRow(
       ? terminalActiveAddressStatusForEntry()
       : 'address_enrichment_retry'
     const nextAt = computeNextEnrichmentAttemptAt(null, now.getTime(), `${canonical}:${attemptCount}`)
-    await persistRowAddressOutcome(admin, rowId, {
+    await persistRowAddressOutcome(
+      admin,
+      rowId,
+      {
       address_status: nextStatus,
       next_enrichment_attempt_at: nextAt.toISOString(),
       address_enrichment_failure_reason: reason,
@@ -171,7 +194,9 @@ async function processAddressEnrichmentRow(
         attemptCount,
         ...(isTerminal ? { recordTerminalEntry: true } : {}),
       }),
-    })
+    },
+      { priorFailureDetails: row.failure_details }
+    )
     emitObservabilityRecord(
       buildTelemetryRecord(ObservabilityEvents.ingestion.addressEnrichmentRow, {
         ...(telemetryContext ?? {}),
@@ -185,7 +210,10 @@ async function processAddressEnrichmentRow(
 
   if (isBlockedOrCaptchaHtml(html)) {
     const nextAt = computeNextEnrichmentAttemptAt(null, now.getTime(), `${canonical}:blocked:${attemptCount}`)
-    await persistRowAddressOutcome(admin, rowId, {
+    await persistRowAddressOutcome(
+      admin,
+      rowId,
+      {
       address_status: 'address_enrichment_retry',
       next_enrichment_attempt_at: nextAt.toISOString(),
       address_enrichment_failure_reason: 'fetch_blocked',
@@ -193,7 +221,9 @@ async function processAddressEnrichmentRow(
         lastReason: 'fetch_blocked',
         attemptCount,
       }),
-    })
+    },
+      { priorFailureDetails: row.failure_details }
+    )
     return { outcome: 'retriable', reason: 'fetch_blocked' }
   }
 
@@ -236,7 +266,10 @@ async function processAddressEnrichmentRow(
     if (unlockInFuture && !isAddressGeocodeReady(addressRaw)) {
       const nextUnlock = gatedAfter.unlockAt ?? parseSeeSourceUnlockAtFromListingUrl(row.source_url)
       const nextAt = computeNextEnrichmentAttemptAt(nextUnlock, now.getTime(), canonical)
-      await persistRowAddressOutcome(admin, rowId, {
+      await persistRowAddressOutcome(
+        admin,
+        rowId,
+        {
         address_status: nextUnlock && nextUnlock.getTime() > now.getTime() ? 'address_gated' : 'address_enrichment_retry',
         address_unlock_at: nextUnlock?.toISOString() ?? row.address_unlock_at,
         next_enrichment_attempt_at: nextAt.toISOString(),
@@ -245,7 +278,9 @@ async function processAddressEnrichmentRow(
           lastReason: 'still_gated',
           attemptCount,
         }),
-      })
+      },
+        { priorFailureDetails: row.failure_details }
+      )
       return { outcome: 'still_gated', reason: 'still_gated' }
     }
 
@@ -253,7 +288,10 @@ async function processAddressEnrichmentRow(
       attemptCount >= MAX_ADDRESS_ENRICHMENT_ATTEMPTS ? 'max_attempts_exceeded' : 'parse_no_address'
     const terminal = reason === 'max_attempts_exceeded'
     const nextAt = terminal ? null : computeNextEnrichmentAttemptAt(null, now.getTime(), `${canonical}:parse:${attemptCount}`)
-    await persistRowAddressOutcome(admin, rowId, {
+    await persistRowAddressOutcome(
+      admin,
+      rowId,
+      {
       address_status: terminal ? terminalActiveAddressStatusForEntry() : 'address_enrichment_retry',
       next_enrichment_attempt_at: nextAt?.toISOString() ?? null,
       address_enrichment_failure_reason: reason,
@@ -264,7 +302,9 @@ async function processAddressEnrichmentRow(
         ...(resolvedAddress.source ? { resolvedAddressSource: resolvedAddress.source } : {}),
         ...(terminal ? { recordTerminalEntry: true } : {}),
       }),
-    })
+    },
+      { priorFailureDetails: row.failure_details }
+    )
     return { outcome: terminal ? 'terminal' : 'retriable', reason }
   }
 
@@ -281,7 +321,10 @@ async function processAddressEnrichmentRow(
     telemetryContext,
   })
 
-  const ok = await persistRowAddressOutcome(admin, rowId, {
+  const ok = await persistRowAddressOutcome(
+    admin,
+    rowId,
+    {
     address_raw: addressRaw,
     normalized_address: normalized,
     address_status: 'address_available',
@@ -297,7 +340,9 @@ async function processAddressEnrichmentRow(
         : {}),
       ...(resolvedAddress.source ? { resolvedAddressSource: resolvedAddress.source } : {}),
     }),
-  })
+  },
+    { priorFailureDetails: row.failure_details }
+  )
 
   if (!ok) {
     return { outcome: 'retriable', reason: 'fetch_failed' }

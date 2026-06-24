@@ -2,6 +2,7 @@ import {
   MAX_ADDRESS_ENRICHMENT_ATTEMPTS,
 } from '@/lib/ingestion/address/addressLifecycleTypes'
 import { mergeAddressEnrichmentDetails } from '@/lib/ingestion/address/addressEnrichmentFailureDetails'
+import { failureDetailsSemanticallyEqual } from '@/lib/ingestion/failureDetailsSemanticEquality'
 import {
   DEFAULT_ADDRESS_ENRICHMENT_CLAIM_COOLDOWN_MINUTES,
   evaluateAddressEnrichmentClaimEligibility,
@@ -35,6 +36,7 @@ type ReconcileRow = {
   next_enrichment_attempt_at: string | null
   address_unlock_at: string | null
   last_address_enrichment_attempt_at: string | null
+  address_enrichment_failure_reason: string | null
   failure_details: unknown
 }
 
@@ -123,10 +125,12 @@ export async function reconcileAddressEnrichmentOwnedNeedsCheck(options?: {
 
   const { data, error } = await fromBase(admin, 'ingested_sales')
     .select(
-      'id, status, address_status, source_url, address_enrichment_attempts, next_enrichment_attempt_at, address_unlock_at, last_address_enrichment_attempt_at, failure_details'
+      'id, status, address_status, source_url, address_enrichment_attempts, next_enrichment_attempt_at, address_unlock_at, last_address_enrichment_attempt_at, address_enrichment_failure_reason, failure_details'
     )
     .eq('status', 'needs_check')
     .in('address_status', ['address_gated', 'address_enrichment_retry'])
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .limit(batchSize)
 
   if (error) {
@@ -145,6 +149,11 @@ export async function reconcileAddressEnrichmentOwnedNeedsCheck(options?: {
     const attempts = row.address_enrichment_attempts ?? 0
 
     if (action === 'reclassify_pending') {
+      if (row.address_status === 'address_enrichment_pending') {
+        summary.skipped += 1
+        continue
+      }
+
       const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
         .update({ address_status: 'address_enrichment_pending' })
         .eq('id', rowId)
@@ -174,18 +183,31 @@ export async function reconcileAddressEnrichmentOwnedNeedsCheck(options?: {
       continue
     }
 
+    const terminalStatus = terminalActiveAddressStatusForEntry()
+    const mergedFailureDetails = mergeAddressEnrichmentDetails(row.failure_details, {
+      lastReason: 'max_attempts_exceeded',
+      attemptCount: attempts,
+      reconciledExhausted: true,
+      recordTerminalEntry: true,
+    })
+    if (
+      row.address_status === terminalStatus &&
+      row.address_enrichment_failure_reason === 'max_attempts_exceeded' &&
+      row.next_enrichment_attempt_at == null &&
+      row.status === 'needs_check' &&
+      failureDetailsSemanticallyEqual(row.failure_details, mergedFailureDetails)
+    ) {
+      summary.skipped += 1
+      continue
+    }
+
     const { data: updated, error: updateError } = await fromBase(admin, 'ingested_sales')
       .update({
-        address_status: terminalActiveAddressStatusForEntry(),
+        address_status: terminalStatus,
         address_enrichment_failure_reason: 'max_attempts_exceeded',
         next_enrichment_attempt_at: null,
         status: 'needs_check',
-        failure_details: mergeAddressEnrichmentDetails(row.failure_details, {
-          lastReason: 'max_attempts_exceeded',
-          attemptCount: attempts,
-          reconciledExhausted: true,
-          recordTerminalEntry: true,
-        }),
+        failure_details: mergedFailureDetails,
       })
       .eq('id', rowId)
       .eq('status', 'needs_check')

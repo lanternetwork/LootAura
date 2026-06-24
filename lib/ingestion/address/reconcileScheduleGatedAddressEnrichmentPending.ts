@@ -82,6 +82,8 @@ export async function reconcileScheduleGatedAddressEnrichmentPending(options?: {
       'id, address_status, address_enrichment_attempts, next_enrichment_attempt_at, address_unlock_at, last_address_enrichment_attempt_at'
     )
     .eq('address_status', 'address_enrichment_pending')
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .limit(batchSize)
 
   if (error) {
@@ -91,6 +93,11 @@ export async function reconcileScheduleGatedAddressEnrichmentPending(options?: {
   for (const row of (data ?? []) as ReconcileRow[]) {
     summary.scanned += 1
     if (!shouldReclassifyScheduleGatedAddressEnrichmentPending(row, nowMs, cooldownMinutes)) {
+      summary.skipped += 1
+      continue
+    }
+
+    if (row.address_status === 'address_gated') {
       summary.skipped += 1
       continue
     }

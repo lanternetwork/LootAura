@@ -41,6 +41,7 @@ import {
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import { backfillCoverageVisibilityReconciliation } from '@/lib/ingestion/ystmCoverage/backfillCoverageVisibilityReconciliation'
 import { backfillGatedFalsePositiveScheduleWaitReconciliation } from '@/lib/ingestion/ystmCoverage/backfillGatedFalsePositiveScheduleWaitReconciliation'
+import { backfillUrlReuseExpiredInventoryReclassification } from '@/lib/ingestion/ystmCoverage/backfillUrlReuseExpiredInventoryReclassification'
 import { backfillExpiredListFastObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation'
 import { backfillPublishedNotVisibleDispositionInvalidation } from '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation'
 import { backfillTerminalDispositionObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillTerminalDispositionObservationInvalidation'
@@ -86,6 +87,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   terminalDispositionBackfillUpdated: number
   coverageVisibilityReconciliationUpdated: number
   scheduleWaitReconciliationUpdated: number
+  urlReuseExpiredInventoryReclassificationUpdated: number
 }
 
 export function computeReservedHotBudget(
@@ -143,6 +145,7 @@ function emptyMissingIngestTelemetry(
     terminalDispositionBackfillUpdated: 0,
     coverageVisibilityReconciliationUpdated: 0,
     scheduleWaitReconciliationUpdated: 0,
+    urlReuseExpiredInventoryReclassificationUpdated: 0,
     ...partial,
   }
 }
@@ -156,12 +159,15 @@ async function runObservationInvalidationBackfills(admin: ReturnType<typeof getA
   const coverageVisibilityReconciliation = await backfillCoverageVisibilityReconciliation(admin)
   const scheduleWaitReconciliation =
     await backfillGatedFalsePositiveScheduleWaitReconciliation(admin)
+  const urlReuseExpiredInventoryReclassification =
+    await backfillUrlReuseExpiredInventoryReclassification(admin)
   return {
     expiredBackfill,
     publishedNotVisibleDispositionBackfill,
     terminalDispositionBackfill,
     coverageVisibilityReconciliation,
     scheduleWaitReconciliation,
+    urlReuseExpiredInventoryReclassification,
   }
 }
 
@@ -272,6 +278,7 @@ export async function runYstmMissingUrlIngestionCron(
         terminalDispositionBackfill,
         coverageVisibilityReconciliation,
         scheduleWaitReconciliation,
+        urlReuseExpiredInventoryReclassification,
       } = await runObservationInvalidationBackfills(admin)
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
         owner: lease.owner,
@@ -292,6 +299,8 @@ export async function runYstmMissingUrlIngestionCron(
           terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
           coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
           scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
+          urlReuseExpiredInventoryReclassificationUpdated:
+            urlReuseExpiredInventoryReclassification.updated,
         }),
       }
     }
@@ -442,6 +451,7 @@ export async function runYstmMissingUrlIngestionCron(
       terminalDispositionBackfill,
       coverageVisibilityReconciliation,
       scheduleWaitReconciliation,
+      urlReuseExpiredInventoryReclassification,
     } = await runObservationInvalidationBackfills(admin)
 
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
@@ -490,6 +500,14 @@ export async function runYstmMissingUrlIngestionCron(
       coverageVisibilityReconciliationScanned: coverageVisibilityReconciliation.scanned,
       scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
       scheduleWaitReconciliationScanned: scheduleWaitReconciliation.scanned,
+      urlReuseExpiredInventoryReclassificationUpdated:
+        urlReuseExpiredInventoryReclassification.updated,
+      urlReuseExpiredInventoryReclassificationScanned:
+        urlReuseExpiredInventoryReclassification.scanned,
+      urlReuseExpiredInventoryReclassificationTerminalDisposition:
+        urlReuseExpiredInventoryReclassification.terminalDispositionUpdated,
+      urlReuseExpiredInventoryReclassificationExpiredFalsePositive:
+        urlReuseExpiredInventoryReclassification.expiredFalsePositiveUpdated,
     })
 
     return {
@@ -533,6 +551,8 @@ export async function runYstmMissingUrlIngestionCron(
         terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
         coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
         scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
+        urlReuseExpiredInventoryReclassificationUpdated:
+          urlReuseExpiredInventoryReclassification.updated,
       },
     }
   } catch (err) {

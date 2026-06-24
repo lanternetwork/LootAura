@@ -61,6 +61,39 @@ function failureReasonList(raw: unknown): string[] {
   return raw.filter((r): r is string => typeof r === 'string')
 }
 
+/** URL_REUSE_EXPIRED_INVENTORY_RECLASSIFICATION_V1 — known expired row skipped by missing-ingest. */
+export function isExpiredSkippedExistingInventoryFalseExclusion(input: {
+  observation: Pick<FalseExclusionObservationInput, 'missingIngestionOutcome'>
+  ingested: Pick<
+    FalseExclusionIngestedRowSnapshot,
+    'status' | 'failure_reasons' | 'published_sale_id'
+  > | null
+  visibleInPublishedIndex: boolean
+}): boolean {
+  const { observation, ingested, visibleInPublishedIndex } = input
+  if (!ingested || visibleInPublishedIndex) return false
+  if (ingested.published_sale_id) return false
+  if (observation.missingIngestionOutcome !== 'skipped_existing') return false
+  return isIngestedRowExpiredForDuplicate(ingested.status, ingested.failure_reasons)
+}
+
+export function resolveExpiredSkippedExistingInventoryBucket(
+  addressStatus: string | null | undefined
+): 'terminal_disposition' | 'expired_false_positive' {
+  return isTerminalAddressDisposition(addressStatus)
+    ? 'terminal_disposition'
+    : 'expired_false_positive'
+}
+
+export function summaryForExpiredSkippedExistingInventoryBucket(
+  bucket: 'terminal_disposition' | 'expired_false_positive'
+): string {
+  if (bucket === 'terminal_disposition') {
+    return 'Expired ingested row with terminal address disposition; missing-ingest skipped existing row (not URL reuse).'
+  }
+  return 'Expired ingested row; missing-ingest skipped existing row (not URL reuse).'
+}
+
 function mapMissingIngestFailureToBucket(reason: string | null): FalseExclusionTraceBucket {
   const r = (reason ?? '').toLowerCase()
   if (r.includes('address_validation')) return 'address_validation_failed'
@@ -190,6 +223,23 @@ export function classifyFalseExclusionTrace(input: ClassifyFalseExclusionInput):
       primaryBucket: 'soft_dedupe_suppressed',
       secondaryTags: tags,
       summary: 'Ingested row marked duplicate; not published as distinct listing.',
+      evidence,
+    }
+  }
+
+  if (
+    isExpiredSkippedExistingInventoryFalseExclusion({
+      observation,
+      ingested,
+      visibleInPublishedIndex,
+    }) &&
+    ingested
+  ) {
+    const primaryBucket = resolveExpiredSkippedExistingInventoryBucket(ingested.address_status)
+    return {
+      primaryBucket,
+      secondaryTags: tags,
+      summary: summaryForExpiredSkippedExistingInventoryBucket(primaryBucket),
       evidence,
     }
   }

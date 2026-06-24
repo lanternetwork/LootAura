@@ -43,7 +43,7 @@ describe('classifyFalseExclusionTrace', () => {
     expect(r.secondaryTags).toContain('missing_ingest_never_attempted')
   })
 
-  it('classifies url_reuse_suspected when ingested expired but YSTM valid-active', () => {
+  it('classifies url_reuse_suspected when ingested expired without skipped_existing', () => {
     const r = classifyFalseExclusionTrace({
       observation: baseObservation,
       ingested: {
@@ -69,6 +69,72 @@ describe('classifyFalseExclusionTrace', () => {
       nowIso: '2026-05-22T10:00:00Z',
     })
     expect(r.primaryBucket).toBe('url_reuse_suspected')
+  })
+
+  it('classifies terminal_disposition for expired skipped_existing with terminal address', () => {
+    const r = classifyFalseExclusionTrace({
+      observation: {
+        ...baseObservation,
+        missingIngestionAttemptedAt: '2026-05-22T09:00:00Z',
+        missingIngestionOutcome: 'skipped_existing',
+      },
+      ingested: {
+        id: 'row-terminal-expired',
+        source_url: baseObservation.canonicalUrl,
+        status: 'expired',
+        published_sale_id: null,
+        is_duplicate: false,
+        address_status: 'address_terminal_archived',
+        failure_reasons: ['sale_expired'],
+        date_start: '2026-05-10',
+        date_end: '2026-05-11',
+        catalog_repair_outcome: null,
+        source_listing_id: '1',
+        sale_instance_key: 'external_page_source:TX|austin|addr:2026-05-10|2026-05-11:1',
+        address_enrichment_attempts: null,
+        next_enrichment_attempt_at: null,
+        address_unlock_at: null,
+        last_address_enrichment_attempt_at: null,
+      },
+      config: crawlableConfig,
+      visibleInPublishedIndex: false,
+      nowIso: '2026-05-22T10:00:00Z',
+    })
+    expect(r.primaryBucket).toBe('terminal_disposition')
+    expect(r.primaryBucket).not.toBe('url_reuse_suspected')
+  })
+
+  it('classifies expired_false_positive for expired skipped_existing with non-terminal address', () => {
+    const r = classifyFalseExclusionTrace({
+      observation: {
+        ...baseObservation,
+        missingIngestionAttemptedAt: '2026-05-22T09:00:00Z',
+        missingIngestionOutcome: 'skipped_existing',
+      },
+      ingested: {
+        id: 'row-expired-available',
+        source_url: baseObservation.canonicalUrl,
+        status: 'expired',
+        published_sale_id: null,
+        is_duplicate: false,
+        address_status: 'address_available',
+        failure_reasons: ['sale_expired'],
+        date_start: '2026-05-10',
+        date_end: '2026-05-11',
+        catalog_repair_outcome: null,
+        source_listing_id: '1',
+        sale_instance_key: 'external_page_source:TX|austin|addr:2026-05-10|2026-05-11:1',
+        address_enrichment_attempts: null,
+        next_enrichment_attempt_at: null,
+        address_unlock_at: null,
+        last_address_enrichment_attempt_at: null,
+      },
+      config: crawlableConfig,
+      visibleInPublishedIndex: false,
+      nowIso: '2026-05-22T10:00:00Z',
+    })
+    expect(r.primaryBucket).toBe('expired_false_positive')
+    expect(r.primaryBucket).not.toBe('url_reuse_suspected')
   })
 
   it('classifies url_duplicate_suppressed from missing-ingest skipped_existing', () => {

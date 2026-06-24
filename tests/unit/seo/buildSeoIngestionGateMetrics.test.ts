@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 const mockCore = vi.hoisted(() => vi.fn())
 
-vi.mock('@/app/api/admin/ingestion/metrics/route', () => ({
+vi.mock('@/lib/admin/ingestionMetricsBuilder', () => ({
   buildIngestionCoreMetricsResponse: (...args: unknown[]) => mockCore(...args),
   buildIngestionFullMetricsResponse: vi.fn(),
   buildIngestionMetricsResponse: vi.fn(),

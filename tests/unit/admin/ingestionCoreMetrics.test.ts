@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 describe('buildIngestionCoreMetricsResponse', () => {
-  it('skips expensive diagnostics by default in metrics route', () => {
+  it('skips expensive diagnostics by default in metrics builder', () => {
     const source = readFileSync(
-      resolve(process.cwd(), 'app/api/admin/ingestion/metrics/route.ts'),
+      resolve(process.cwd(), 'lib/admin/ingestionMetricsBuilder.ts'),
       'utf8'
     )
     expect(source).toContain('includeExpensiveDiagnostics')
@@ -15,11 +15,12 @@ describe('buildIngestionCoreMetricsResponse', () => {
   })
 
   it('GET handler uses core metrics only', () => {
-    const source = readFileSync(
+    const routeSource = readFileSync(
       resolve(process.cwd(), 'app/api/admin/ingestion/metrics/route.ts'),
       'utf8'
     )
-    expect(source).toContain('buildIngestionCoreMetricsResponse()')
-    expect(source).not.toMatch(/GET[\s\S]*buildIngestionFullMetricsResponse/)
+    expect(routeSource).toContain('buildIngestionCoreMetricsResponse')
+    expect(routeSource).toContain('buildIngestionCoreMetricsResponse()')
+    expect(routeSource).not.toContain('buildIngestionFullMetricsResponse')
   })
 })

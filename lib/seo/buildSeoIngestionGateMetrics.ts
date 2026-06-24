@@ -1,4 +1,4 @@
-import { buildIngestionCoreMetricsResponse } from '@/app/api/admin/ingestion/metrics/route'
+import { buildIngestionCoreMetricsResponse } from '@/lib/admin/ingestionMetricsBuilder'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 
 /**

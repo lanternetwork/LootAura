@@ -1,17 +1,24 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
+import type {
+  IngestionMetricsDiagnosticsResponse,
+  IngestionMetricsResponse,
+} from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import type { IngestionDashboardMode } from '@/lib/admin/ingestionDashboardOverview'
+import {
+  INGESTION_CORE_METRICS_POLL_MS,
+  INGESTION_DIAGNOSTICS_POLL_MS,
+} from '@/lib/admin/ingestionDashboardPolling'
+import { mergeIngestionMetricsWithDiagnostics } from '@/lib/admin/ingestionMetricsMerge'
 import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
 import IngestionOverviewPanel from '@/app/admin/ingestion/IngestionOverviewPanel'
 import IngestionDebugPanel from '@/app/admin/ingestion/IngestionDebugPanel'
 import IngestionControlsPanel from '@/app/admin/ingestion/IngestionControlsPanel'
 
-const METRICS_POLL_MS = 5000
 const COVERAGE_POLL_MS = 30_000
 const MAX_SNAPSHOT_POINTS = 360
 
@@ -32,6 +39,9 @@ export default function IngestionDashboardClient() {
   const [data, setData] = useState<IngestionMetricsResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
+  const [diagnosticsLoaded, setDiagnosticsLoaded] = useState(false)
   const [snapshots, setSnapshots] = useState<SnapshotPoint[]>([])
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
   const [copyRefreshing, setCopyRefreshing] = useState(false)
@@ -42,28 +52,91 @@ export default function IngestionDashboardClient() {
   const [coverageLoading, setCoverageLoading] = useState(true)
   const [coverageError, setCoverageError] = useState<string | null>(null)
 
-  const loadMetrics = useCallback(async () => {
+  const coreInFlightRef = useRef(false)
+  const diagnosticsInFlightRef = useRef(false)
+  const coreDataRef = useRef<IngestionMetricsResponse | null>(null)
+  const diagnosticsDataRef = useRef<IngestionMetricsDiagnosticsResponse | null>(null)
+
+  const applyMergedMetrics = useCallback(
+    (core: IngestionMetricsResponse, diagnostics?: IngestionMetricsDiagnosticsResponse | null) => {
+      coreDataRef.current = core
+      const merged = diagnostics ? mergeIngestionMetricsWithDiagnostics(core, diagnostics) : core
+      setData(merged)
+      const now = Date.now()
+      setSnapshots((prev) =>
+        [...prev, { t: now, backlog: merged.backlog, efficiency: merged.efficiency }].slice(
+          -MAX_SNAPSHOT_POINTS
+        )
+      )
+    },
+    []
+  )
+
+  const loadCoreMetrics = useCallback(async (): Promise<IngestionMetricsResponse | null> => {
+    if (coreInFlightRef.current) {
+      return coreDataRef.current
+    }
+    coreInFlightRef.current = true
     try {
       const res = await fetch('/api/admin/ingestion/metrics', { credentials: 'include' })
-      const json = (await res.json()) as IngestionMetricsResponse & { code?: string; message?: string }
+      const json = (await res.json()) as IngestionMetricsResponse & {
+        code?: string
+        message?: string
+      }
 
       if (!res.ok || !json.ok) {
         throw new Error((json as { message?: string }).message || `HTTP ${res.status}`)
       }
 
-      setData(json)
       setError(null)
-
-      const now = Date.now()
-      setSnapshots((prev) =>
-        [...prev, { t: now, backlog: json.backlog, efficiency: json.efficiency }].slice(-MAX_SNAPSHOT_POINTS)
-      )
+      applyMergedMetrics(json, diagnosticsDataRef.current)
+      return json
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      return null
     } finally {
+      coreInFlightRef.current = false
       setLoading(false)
     }
-  }, [])
+  }, [applyMergedMetrics])
+
+  const loadDiagnostics = useCallback(
+    async (options?: { force?: boolean }): Promise<IngestionMetricsDiagnosticsResponse | null> => {
+      if (diagnosticsInFlightRef.current && !options?.force) {
+        return null
+      }
+      diagnosticsInFlightRef.current = true
+      setDiagnosticsLoading(true)
+      setDiagnosticsError(null)
+      try {
+        const res = await fetch('/api/admin/ingestion/metrics/diagnostics', {
+          credentials: 'include',
+        })
+        const json = (await res.json()) as IngestionMetricsDiagnosticsResponse & {
+          code?: string
+          message?: string
+        }
+        if (!res.ok || !json.ok) {
+          throw new Error((json as { message?: string }).message || `HTTP ${res.status}`)
+        }
+        const core = coreDataRef.current
+        diagnosticsDataRef.current = json
+        if (core) {
+          applyMergedMetrics(core, json)
+        }
+        setDiagnosticsLoaded(true)
+        return json
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        setDiagnosticsError(message)
+        return null
+      } finally {
+        diagnosticsInFlightRef.current = false
+        setDiagnosticsLoading(false)
+      }
+    },
+    [applyMergedMetrics]
+  )
 
   const loadCoverage = useCallback(async () => {
     try {
@@ -85,16 +158,46 @@ export default function IngestionDashboardClient() {
   }, [])
 
   useEffect(() => {
-    void loadMetrics()
-    const id = window.setInterval(() => void loadMetrics(), METRICS_POLL_MS)
-    return () => window.clearInterval(id)
-  }, [loadMetrics])
+    void loadCoreMetrics()
+    void loadDiagnostics()
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      void loadCoreMetrics()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    const coreId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void loadCoreMetrics()
+    }, INGESTION_CORE_METRICS_POLL_MS)
+
+    const diagnosticsId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void loadDiagnostics()
+    }, INGESTION_DIAGNOSTICS_POLL_MS)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.clearInterval(coreId)
+      window.clearInterval(diagnosticsId)
+    }
+  }, [loadCoreMetrics, loadDiagnostics])
 
   useEffect(() => {
     void loadCoverage()
-    const id = window.setInterval(() => void loadCoverage(), COVERAGE_POLL_MS)
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void loadCoverage()
+    }, COVERAGE_POLL_MS)
     return () => window.clearInterval(id)
   }, [loadCoverage])
+
+  useEffect(() => {
+    if (mode === 'debug' && !diagnosticsLoaded && !diagnosticsLoading) {
+      void loadDiagnostics({ force: true })
+    }
+  }, [mode, diagnosticsLoaded, diagnosticsLoading, loadDiagnostics])
 
   const resetMetricsBaseline = useCallback(async () => {
     setBaselineState('loading')
@@ -115,7 +218,8 @@ export default function IngestionDashboardClient() {
         throw new Error(json.message || json.error || `HTTP ${res.status}`)
       }
       setBaselineState('done')
-      await loadMetrics()
+      await loadCoreMetrics()
+      await loadDiagnostics({ force: true })
       window.setTimeout(() => setBaselineState('idle'), 3000)
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
@@ -124,20 +228,29 @@ export default function IngestionDashboardClient() {
       window.setTimeout(() => setBaselineState('idle'), 5000)
       throw e
     }
-  }, [loadMetrics])
+  }, [loadCoreMetrics, loadDiagnostics])
 
   const copyDiagnostics = useCallback(async () => {
     if (!data) return
     setCopyError(null)
     setCopyRefreshing(true)
+    let metricsForCopy = data
     let freshCoverage = coverage
     try {
-      const res = await fetch('/api/admin/ingestion/ystm-coverage', { credentials: 'include' })
-      const json = (await res.json()) as YstmCoverageMetricsResponse & {
+      const [diag, coverageRes] = await Promise.all([
+        loadDiagnostics({ force: true }),
+        fetch('/api/admin/ingestion/ystm-coverage', { credentials: 'include' }),
+      ])
+      const core = coreDataRef.current
+      if (core && diag) {
+        metricsForCopy = mergeIngestionMetricsWithDiagnostics(core, diag)
+        setData(metricsForCopy)
+      }
+      const json = (await coverageRes.json()) as YstmCoverageMetricsResponse & {
         ok?: boolean
         message?: string
       }
-      if (res.ok && json.ok) {
+      if (coverageRes.ok && json.ok) {
         freshCoverage = json
         setCoverage(json)
         setCoverageError(null)
@@ -152,7 +265,7 @@ export default function IngestionDashboardClient() {
       process.env.NEXT_PUBLIC_VERCEL_ENV ??
       process.env.NODE_ENV ??
       (typeof window !== 'undefined' ? window.location.hostname : 'unknown')
-    const text = buildIngestionDiagnostics(data, {
+    const text = buildIngestionDiagnostics(metricsForCopy, {
       environment,
       copiedAt: new Date().toISOString(),
       ystmCoverage: freshCoverage,
@@ -167,7 +280,13 @@ export default function IngestionDashboardClient() {
       setCopyState('error')
       window.setTimeout(() => setCopyState('idle'), 5000)
     }
-  }, [data, coverage])
+  }, [data, coverage, loadDiagnostics])
+
+  const refreshAll = useCallback(() => {
+    setLoading(true)
+    void loadCoreMetrics()
+    void loadDiagnostics({ force: true })
+  }, [loadCoreMetrics, loadDiagnostics])
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 text-gray-900">
@@ -176,15 +295,26 @@ export default function IngestionDashboardClient() {
           <div>
             <h1 className="text-3xl font-bold">Ingestion</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Metrics every {METRICS_POLL_MS / 1000}s · Coverage every {COVERAGE_POLL_MS / 1000}s
+              Core metrics every {INGESTION_CORE_METRICS_POLL_MS / 1000}s · Diagnostics every{' '}
+              {INGESTION_DIAGNOSTICS_POLL_MS / 1000}s (paused when tab hidden) · Coverage every{' '}
+              {COVERAGE_POLL_MS / 1000}s
             </p>
           </div>
-          <Link
-            href="/admin/tools"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"
-          >
-            ← Admin tools
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => refreshAll()}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"
+            >
+              Refresh now
+            </button>
+            <Link
+              href="/admin/tools"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"
+            >
+              ← Admin tools
+            </Link>
+          </div>
         </div>
 
         <nav
@@ -207,6 +337,12 @@ export default function IngestionDashboardClient() {
           ))}
         </nav>
 
+        {diagnosticsError && (
+          <p className="mb-4 text-sm text-amber-800" role="status">
+            Diagnostics refresh failed: {diagnosticsError}
+          </p>
+        )}
+
         {copyError && mode !== 'overview' && (
           <p className="mb-4 text-sm text-red-700" role="alert">
             Copy diagnostics: {copyError}
@@ -227,7 +363,7 @@ export default function IngestionDashboardClient() {
               type="button"
               onClick={() => {
                 setLoading(true)
-                void loadMetrics()
+                refreshAll()
               }}
               className="mt-3 rounded bg-red-700 px-3 py-1.5 text-sm text-white hover:bg-red-800"
             >
@@ -241,6 +377,7 @@ export default function IngestionDashboardClient() {
             metrics={data}
             coverage={coverage}
             coverageError={coverageError}
+            diagnosticsLoading={diagnosticsLoading && !diagnosticsLoaded}
             onCopyDiagnostics={() => void copyDiagnostics()}
             copyState={copyState}
             copyDisabled={loading || copyRefreshing}
@@ -258,6 +395,8 @@ export default function IngestionDashboardClient() {
             coverageLoading={coverageLoading}
             coverageError={coverageError}
             onCoverageRefresh={loadCoverage}
+            diagnosticsLoading={diagnosticsLoading && !diagnosticsLoaded}
+            onRefreshDiagnostics={() => void loadDiagnostics({ force: true })}
           />
         )}
 

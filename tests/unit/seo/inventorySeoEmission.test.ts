@@ -13,13 +13,13 @@ import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstance
 import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
 import { TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
-const mockBuildMetrics = vi.hoisted(() => vi.fn())
+const mockBuildGateMetrics = vi.hoisted(() => vi.fn())
 const mockFetchRollout = vi.hoisted(() => vi.fn())
 const mockFetchInventory = vi.hoisted(() => vi.fn())
 const mockCoverage = vi.hoisted(() => vi.fn())
 
-vi.mock('@/app/api/admin/ingestion/metrics/route', () => ({
-  buildIngestionMetricsResponse: (...args: unknown[]) => mockBuildMetrics(...args),
+vi.mock('@/lib/seo/buildSeoIngestionGateMetrics', () => ({
+  buildSeoIngestionGateMetrics: (...args: unknown[]) => mockBuildGateMetrics(...args),
 }))
 
 vi.mock('@/lib/seo/seoRolloutState', () => ({
@@ -96,7 +96,7 @@ describe('inventory SEO emission policy (R)', () => {
       inventoryBySlug: qualifiedMetroInventory,
     })
     mockCoverage.mockResolvedValue(minimalYstmCoverageScoreboard())
-    mockBuildMetrics.mockResolvedValue(minimalMetrics())
+    mockBuildGateMetrics.mockResolvedValue(minimalMetrics())
   })
 
   it('scenario 1 — attestations true, allowlist false', () => {
@@ -254,7 +254,7 @@ describe('inventory SEO emission policy (R)', () => {
   })
 
   it('scenario 4 — metrics unavailable fails closed via shared resolver', async () => {
-    mockBuildMetrics.mockResolvedValue({ ok: false, error: 'db down' })
+    mockBuildGateMetrics.mockResolvedValue({ ok: false, error: 'db down' })
 
     const { getInventorySeoEmissionForRequest } = await import('@/lib/seo/resolveInventorySeoEmission')
     const emission = await getInventorySeoEmissionForRequest()

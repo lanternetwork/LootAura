@@ -122,8 +122,26 @@ async function countExternalDiscoveryStatus(
   return count ?? 0
 }
 
-/** Server-side metrics snapshot (no admin gate) — used by SEO inventory emission evaluation. */
-export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsResponse> {
+export type BuildIngestionMetricsOptions = {
+  /** When true, runs funnel cohort + needs_check scans + dead-letter counter (slow). Default false. */
+  includeExpensiveDiagnostics?: boolean
+}
+
+/** Lightweight counters for dashboard shell and SEO gates (no expensive diagnostic scans). */
+export async function buildIngestionCoreMetricsResponse(): Promise<IngestionMetricsResponse> {
+  return buildIngestionMetricsResponse({ includeExpensiveDiagnostics: false })
+}
+
+/** Full bundle — core + expensive diagnostics (tests, explicit export only). */
+export async function buildIngestionFullMetricsResponse(): Promise<IngestionMetricsResponse> {
+  return buildIngestionMetricsResponse({ includeExpensiveDiagnostics: true })
+}
+
+/** Server-side metrics snapshot (no admin gate). */
+export async function buildIngestionMetricsResponse(
+  options: BuildIngestionMetricsOptions = {}
+): Promise<IngestionMetricsResponse> {
+  const includeExpensiveDiagnostics = options.includeExpensiveDiagnostics === true
   const admin = getAdminDb()
   const now = new Date()
   const nowMs = now.getTime()
@@ -236,7 +254,7 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
 
     const funnelConfigRowsPromise = fetchFunnelLeaderboardConfigRows(admin)
 
-    const funnelCohortRowsPromise = fetchAllRows<{
+    type FunnelCohortRow = {
       created_at: string
       source_platform: string | null
       canonical_source_url: string | null
@@ -251,7 +269,9 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       failure_reasons: unknown
       published_at: string | null
       is_duplicate: boolean | null
-    }>(admin, 'ingested_sales', [
+    }
+
+    const funnelCohortSelect = [
       'created_at',
       'source_platform',
       'canonical_source_url',
@@ -266,7 +286,13 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       'failure_reasons',
       'published_at',
       'is_duplicate',
-    ].join(', '), (q) => q.gte('created_at', isoFunnelCohort))
+    ].join(', ')
+
+    const funnelCohortRowsPromise = includeExpensiveDiagnostics
+      ? fetchAllRows<FunnelCohortRow>(admin, 'ingested_sales', funnelCohortSelect, (q) =>
+          q.gte('created_at', isoFunnelCohort)
+        )
+      : Promise.resolve([] as FunnelCohortRow[])
 
     const lastSuccessfulFetchPromise = fetchLastSuccessfulExternalIngestionAt()
 
@@ -376,13 +402,29 @@ export async function buildIngestionMetricsResponse(): Promise<IngestionMetricsR
       .eq('geocode_method', 'ystm_provider_native')
       .gte('published_at', iso24h)
 
-    const geocodeDeadLetterBucketsPromise = countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
-    const needsCheckBreakdownPromise = countNeedsCheckBreakdown()
-    const needsCheckRootCauseAnalysisPromise = analyzeNeedsCheckRootCause(now)
-    const listFastFailureDistributionAnalysisPromise = analyzeListFastFailureDistribution(now)
-    const publishedNotVisibleDistributionAnalysisPromise =
-      analyzePublishedNotVisibleDistribution(now)
-    const addressEnrichmentDrainCohortPromise = analyzeAddressEnrichmentDrainCohort(now)
+    const emptyDeadLetterBuckets = {
+      replayableTransientNeedsCheck: 0,
+      terminalGeocodeNeedsCheck: 0,
+      scanned: 0,
+    }
+    const geocodeDeadLetterBucketsPromise = includeExpensiveDiagnostics
+      ? countGeocodeDeadLetterReplayBuckets({ scanCap: 500 })
+      : Promise.resolve(emptyDeadLetterBuckets)
+    const needsCheckBreakdownPromise = includeExpensiveDiagnostics
+      ? countNeedsCheckBreakdown()
+      : Promise.resolve(null)
+    const needsCheckRootCauseAnalysisPromise = includeExpensiveDiagnostics
+      ? analyzeNeedsCheckRootCause(now)
+      : Promise.resolve(null)
+    const listFastFailureDistributionAnalysisPromise = includeExpensiveDiagnostics
+      ? analyzeListFastFailureDistribution(now)
+      : Promise.resolve(null)
+    const publishedNotVisibleDistributionAnalysisPromise = includeExpensiveDiagnostics
+      ? analyzePublishedNotVisibleDistribution(now)
+      : Promise.resolve(null)
+    const addressEnrichmentDrainCohortPromise = includeExpensiveDiagnostics
+      ? analyzeAddressEnrichmentDrainCohort(now)
+      : Promise.resolve(null)
     const acquisitionRegistryPromise = fetchAcquisitionRegistrySummary(admin, nowMs)
 
     const imageFailureReasonCountPromises = IMAGE_ENRICHMENT_FAILURE_REASONS.map(
@@ -905,7 +947,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const body = await buildIngestionMetricsResponse()
+    const body = await buildIngestionCoreMetricsResponse()
     return NextResponse.json(body)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

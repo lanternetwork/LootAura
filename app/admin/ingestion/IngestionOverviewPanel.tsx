@@ -33,6 +33,7 @@ type Props = {
   metrics: IngestionMetricsResponse
   coverage: YstmCoverageMetricsResponse | null
   coverageError: string | null
+  diagnosticsLoading?: boolean
   onCopyDiagnostics: () => void
   copyState: 'idle' | 'copied' | 'error'
   copyDisabled: boolean
@@ -45,6 +46,7 @@ export default function IngestionOverviewPanel({
   metrics,
   coverage,
   coverageError,
+  diagnosticsLoading = false,
   onCopyDiagnostics,
   copyState,
   copyDisabled,
@@ -138,9 +140,19 @@ export default function IngestionOverviewPanel({
         onOpenControls={onOpenControls}
       />
 
-      <NeedsCheckRootCauseDiscoverySection metrics={metrics} coverage={coverage} />
+      {diagnosticsLoading && (
+        <p className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          Loading expensive diagnostics (needs_check scans, funnel cohort)…
+        </p>
+      )}
 
-      <AddressEnrichmentDrainSection metrics={metrics} />
+      <NeedsCheckRootCauseDiscoverySection
+        metrics={metrics}
+        coverage={coverage}
+        diagnosticsLoading={diagnosticsLoading}
+      />
+
+      <AddressEnrichmentDrainSection metrics={metrics} diagnosticsLoading={diagnosticsLoading} />
 
       <SeoOperationalPanel metrics={metrics} coverage={coverage} />
 

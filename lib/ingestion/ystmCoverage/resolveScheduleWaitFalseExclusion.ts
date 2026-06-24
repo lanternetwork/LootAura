@@ -10,8 +10,12 @@ export type ScheduleWaitFalseExclusionIngestedSnapshot = {
   last_address_enrichment_attempt_at: string | null
 }
 
+const SCHEDULE_WAIT_SKIP_REASONS = new Set(['unlock_scheduled', 'next_attempt_scheduled'])
+
 /**
  * GATED_FALSE_POSITIVE_RECONCILIATION_V1 — expected address-gated unlock schedule waits.
+ * GATED_FALSE_POSITIVE_SCHEDULE_WAIT_PRECEDENCE_REPAIR_V1 — include next_attempt_scheduled
+ * when unlock is still in the future (eligibility precedence may prefer next_attempt).
  */
 export function isScheduleWaitFalseExclusion(input: {
   ingested: ScheduleWaitFalseExclusionIngestedSnapshot | null
@@ -35,7 +39,11 @@ export function isScheduleWaitFalseExclusion(input: {
     input.nowMs
   )
 
-  if (eligibility.claimable || eligibility.skipReason !== 'unlock_scheduled') {
+  if (
+    eligibility.claimable ||
+    eligibility.skipReason == null ||
+    !SCHEDULE_WAIT_SKIP_REASONS.has(eligibility.skipReason)
+  ) {
     return false
   }
 

@@ -251,6 +251,37 @@ describe('classifyFalseExclusionTrace', () => {
     expect(r.primaryBucket).toBe('schedule_wait')
   })
 
+  it('classifies schedule_wait when next_attempt_scheduled with future unlock', () => {
+    const unlockUrl =
+      'https://yardsaletreasuremap.com/US/Texas/Austin/See-source-for-address-after-2026-06-06-14%3A00%3A00/1/listing.html'
+    const r = classifyFalseExclusionTrace({
+      observation: { ...baseObservation, canonicalUrl: unlockUrl },
+      ingested: {
+        id: 'row-gated-next-attempt',
+        source_url: unlockUrl,
+        status: 'needs_check',
+        published_sale_id: null,
+        is_duplicate: false,
+        address_status: 'address_gated',
+        failure_reasons: [],
+        date_start: '2026-05-20',
+        date_end: '2026-05-21',
+        catalog_repair_outcome: null,
+        source_listing_id: null,
+        sale_instance_key: null,
+        address_enrichment_attempts: 1,
+        next_enrichment_attempt_at: '2026-06-06T13:30:00.000Z',
+        address_unlock_at: '2026-06-06T13:00:00.000Z',
+        last_address_enrichment_attempt_at: null,
+      },
+      config: crawlableConfig,
+      visibleInPublishedIndex: false,
+      nowIso: '2026-06-06T12:00:00.000Z',
+    })
+    expect(r.primaryBucket).toBe('schedule_wait')
+    expect(r.primaryBucket).not.toBe('gated_false_positive')
+  })
+
   it('classifies residual gated_false_positive when unlock elapsed', () => {
     const unlockUrl =
       'https://yardsaletreasuremap.com/US/Texas/Austin/See-source-for-address-after-2026-06-06-14%3A00%3A00/1/listing.html'

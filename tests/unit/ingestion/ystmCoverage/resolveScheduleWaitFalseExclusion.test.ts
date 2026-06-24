@@ -3,6 +3,8 @@ import { isScheduleWaitFalseExclusion } from '@/lib/ingestion/ystmCoverage/resol
 
 const UNLOCK_URL =
   'https://yardsaletreasuremap.com/US/Texas/Austin/See-source-for-address-after-2026-06-06-14%3A00%3A00/1/listing.html'
+const STREET_URL =
+  'https://yardsaletreasuremap.com/US/Texas/Austin/100-Main-St/1/listing.html'
 
 function gatedIngested(overrides: Record<string, unknown> = {}) {
   return {
@@ -29,6 +31,33 @@ describe('isScheduleWaitFalseExclusion', () => {
     ).toBe(true)
   })
 
+  it('returns true for next_attempt_scheduled with future unlock (production shape)', () => {
+    expect(
+      isScheduleWaitFalseExclusion({
+        ingested: gatedIngested({
+          next_enrichment_attempt_at: '2026-06-06T13:30:00.000Z',
+          address_unlock_at: '2026-06-06T13:00:00.000Z',
+        }),
+        sourceUrl: UNLOCK_URL,
+        nowMs,
+      })
+    ).toBe(true)
+  })
+
+  it('returns false when next_attempt_scheduled but unlock has elapsed (row and URL)', () => {
+    expect(
+      isScheduleWaitFalseExclusion({
+        ingested: gatedIngested({
+          source_url: STREET_URL,
+          next_enrichment_attempt_at: '2026-06-06T16:00:00.000Z',
+          address_unlock_at: '2026-06-06T10:00:00.000Z',
+        }),
+        sourceUrl: STREET_URL,
+        nowMs: Date.parse('2026-06-06T15:00:00.000Z'),
+      })
+    ).toBe(false)
+  })
+
   it('returns false when unlock has elapsed', () => {
     expect(
       isScheduleWaitFalseExclusion({
@@ -39,7 +68,21 @@ describe('isScheduleWaitFalseExclusion', () => {
     ).toBe(false)
   })
 
-  it('returns false when cooldown is active', () => {
+  it('returns false when claimable after unlock elapsed', () => {
+    expect(
+      isScheduleWaitFalseExclusion({
+        ingested: gatedIngested({
+          source_url: STREET_URL,
+          address_unlock_at: '2026-06-06T10:00:00.000Z',
+          next_enrichment_attempt_at: null,
+        }),
+        sourceUrl: STREET_URL,
+        nowMs: Date.parse('2026-06-06T15:00:00.000Z'),
+      })
+    ).toBe(false)
+  })
+
+  it('returns false when cooldown is active without future unlock', () => {
     expect(
       isScheduleWaitFalseExclusion({
         ingested: gatedIngested({
@@ -48,6 +91,19 @@ describe('isScheduleWaitFalseExclusion', () => {
         }),
         sourceUrl: UNLOCK_URL,
         nowMs: Date.parse('2026-06-06T15:00:00.000Z'),
+      })
+    ).toBe(false)
+  })
+
+  it('returns false when attempts are exhausted', () => {
+    expect(
+      isScheduleWaitFalseExclusion({
+        ingested: gatedIngested({
+          address_enrichment_attempts: 5,
+          next_enrichment_attempt_at: '2026-06-06T13:30:00.000Z',
+        }),
+        sourceUrl: UNLOCK_URL,
+        nowMs,
       })
     ).toBe(false)
   })

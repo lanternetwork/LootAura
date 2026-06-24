@@ -139,6 +139,31 @@ describe('backfillGatedFalsePositiveScheduleWaitReconciliation', () => {
     expect(updates).toEqual([RECONCILIATION_FIELDS])
   })
 
+  it('re-buckets production-shape rows with next_attempt_scheduled and future unlock', async () => {
+    const { updates } = setupBackfillMocks({
+      cohort: [observationRow()],
+      ingestedByUrl: {
+        [UNLOCK_URL]: scheduleWaitIngested({
+          next_enrichment_attempt_at: '2026-06-06T13:30:00.000Z',
+          address_unlock_at: '2026-06-06T13:00:00.000Z',
+        }),
+      },
+    })
+
+    const { backfillGatedFalsePositiveScheduleWaitReconciliation } = await import(
+      '@/lib/ingestion/ystmCoverage/backfillGatedFalsePositiveScheduleWaitReconciliation'
+    )
+
+    const result = await backfillGatedFalsePositiveScheduleWaitReconciliation(
+      {} as never,
+      NOW_ISO,
+      NOW_MS
+    )
+
+    expect(result).toEqual({ scanned: 1, updated: 1 })
+    expect(updates).toEqual([RECONCILIATION_FIELDS])
+  })
+
   it('skips when linked ingested row is not an expected schedule wait', async () => {
     const { updates } = setupBackfillMocks({
       cohort: [observationRow()],

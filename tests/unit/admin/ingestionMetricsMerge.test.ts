@@ -41,7 +41,7 @@ describe('mergeIngestionMetricsWithDiagnostics', () => {
         replayableTransientNeedsCheck: 3,
         terminalGeocodeNeedsCheck: 7,
       },
-    } as IngestionMetricsDiagnosticsResponse
+    } as unknown as IngestionMetricsDiagnosticsResponse
 
     const merged = mergeIngestionMetricsWithDiagnostics(core, diagnostics)
     expect(merged.failureBreakdown.needs_check).toBe(42)

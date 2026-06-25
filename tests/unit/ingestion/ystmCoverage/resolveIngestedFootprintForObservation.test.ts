@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { IngestedFootprintRow } from '@/lib/ingestion/ystmCoverage/resolveIngestedFootprintForObservation'
 import {
   buildObservationFootprintInput,
   resolveIngestedFootprintForObservation,
+  type IngestedFootprintRow,
   type IngestedFootprintResolverIndex,
 } from '@/lib/ingestion/ystmCoverage/resolveIngestedFootprintForObservation'
 

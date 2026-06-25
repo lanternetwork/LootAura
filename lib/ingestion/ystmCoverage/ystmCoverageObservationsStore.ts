@@ -226,6 +226,17 @@ export function buildUrlReuseExpiredInventoryReclassificationFields(
   }
 }
 
+/** PUBLISHED_NOT_VISIBLE_MATCHING_REPAIR_V1 — observation↔ingested linkage columns only. */
+export function buildIngestedFootprintLinkageFields(params: {
+  matchedIngestedSaleId: string
+  matchMethod: YstmCoverageFootprintMatchMethod
+}): Record<string, unknown> {
+  return {
+    matched_ingested_sale_id: params.matchedIngestedSaleId,
+    match_method: params.matchMethod,
+  }
+}
+
 /** NEVER_CRAWLED_LINKAGE_REPAIR_V1 — visible linked sale after ingested footprint match. */
 export function buildNeverCrawledVisibleLinkageFields(params: {
   matchedIngestedSaleId: string

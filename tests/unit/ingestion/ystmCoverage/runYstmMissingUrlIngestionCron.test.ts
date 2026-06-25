@@ -17,6 +17,7 @@ const mockFetchHot = vi.hoisted(() => vi.fn())
 const mockAttemptListFast = vi.hoisted(() => vi.fn())
 const mockBackfillExpired = vi.hoisted(() => vi.fn())
 const mockBackfillPnvDisposition = vi.hoisted(() => vi.fn())
+const mockBackfillPnvMatching = vi.hoisted(() => vi.fn())
 const mockBackfillTerminalDisposition = vi.hoisted(() => vi.fn())
 const mockBackfillCoverageVisibility = vi.hoisted(() => vi.fn())
 const mockBackfillScheduleWait = vi.hoisted(() => vi.fn())
@@ -29,6 +30,10 @@ vi.mock('@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalida
 
 vi.mock('@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation', () => ({
   backfillPublishedNotVisibleDispositionInvalidation: mockBackfillPnvDisposition,
+}))
+
+vi.mock('@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleMatchingReconciliation', () => ({
+  backfillPublishedNotVisibleMatchingReconciliation: mockBackfillPnvMatching,
 }))
 
 vi.mock('@/lib/ingestion/ystmCoverage/backfillTerminalDispositionObservationInvalidation', () => ({
@@ -165,6 +170,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockAttemptListFast.mockReset()
     mockBackfillExpired.mockReset()
     mockBackfillPnvDisposition.mockReset()
+    mockBackfillPnvMatching.mockReset()
     mockBackfillTerminalDisposition.mockReset()
     mockBackfillCoverageVisibility.mockReset()
     mockBackfillScheduleWait.mockReset()
@@ -225,6 +231,13 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockAttemptListFast.mockResolvedValue({ outcome: 'failed', reason: 'test_skip' })
     mockBackfillExpired.mockResolvedValue({ updated: 0 })
     mockBackfillPnvDisposition.mockResolvedValue({ updated: 0, archived: 0, expired: 0 })
+    mockBackfillPnvMatching.mockResolvedValue({
+      scanned: 0,
+      updated: 0,
+      linkageUpdated: 0,
+      reclassifyOnlyUpdated: 0,
+      visibleUpdated: 0,
+    })
     mockBackfillTerminalDisposition.mockResolvedValue({ updated: 0, skipped: 0 })
     mockBackfillCoverageVisibility.mockResolvedValue({ scanned: 0, updated: 0 })
     mockBackfillScheduleWait.mockResolvedValue({ scanned: 0, updated: 0 })
@@ -502,6 +515,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     expect(result.telemetry.scheduleWaitReconciliationUpdated).toBe(0)
     expect(mockBackfillExpired).toHaveBeenCalledTimes(1)
     expect(mockBackfillPnvDisposition).toHaveBeenCalledTimes(1)
+    expect(mockBackfillPnvMatching).toHaveBeenCalledTimes(1)
     expect(mockBackfillTerminalDisposition).toHaveBeenCalledTimes(1)
     expect(mockBackfillCoverageVisibility).toHaveBeenCalledTimes(1)
     expect(mockBackfillScheduleWait).toHaveBeenCalledTimes(1)
@@ -510,6 +524,13 @@ describe('runYstmMissingUrlIngestionCron', () => {
   it('runs observation invalidation backfills after successful pass', async () => {
     mockBackfillExpired.mockResolvedValue({ updated: 48 })
     mockBackfillPnvDisposition.mockResolvedValue({ updated: 1, archived: 0, expired: 1 })
+    mockBackfillPnvMatching.mockResolvedValue({
+      scanned: 17,
+      updated: 16,
+      linkageUpdated: 16,
+      reclassifyOnlyUpdated: 16,
+      visibleUpdated: 0,
+    })
     mockBackfillTerminalDisposition.mockResolvedValue({ updated: 146, skipped: 0 })
     mockBackfillCoverageVisibility.mockResolvedValue({ scanned: 7, updated: 7 })
     mockBackfillScheduleWait.mockResolvedValue({ scanned: 71, updated: 65 })
@@ -525,6 +546,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
 
     expect(mockBackfillExpired).toHaveBeenCalledTimes(1)
     expect(mockBackfillPnvDisposition).toHaveBeenCalledTimes(1)
+    expect(mockBackfillPnvMatching).toHaveBeenCalledTimes(1)
     expect(mockBackfillTerminalDisposition).toHaveBeenCalledTimes(1)
     expect(mockBackfillCoverageVisibility).toHaveBeenCalledTimes(1)
     expect(mockBackfillScheduleWait).toHaveBeenCalledTimes(1)
@@ -532,6 +554,9 @@ describe('runYstmMissingUrlIngestionCron', () => {
       mockBackfillPnvDisposition.mock.invocationCallOrder[0]
     )
     expect(mockBackfillPnvDisposition.mock.invocationCallOrder[0]).toBeLessThan(
+      mockBackfillPnvMatching.mock.invocationCallOrder[0]
+    )
+    expect(mockBackfillPnvMatching.mock.invocationCallOrder[0]).toBeLessThan(
       mockBackfillTerminalDisposition.mock.invocationCallOrder[0]
     )
     expect(mockBackfillTerminalDisposition.mock.invocationCallOrder[0]).toBeLessThan(
@@ -542,6 +567,7 @@ describe('runYstmMissingUrlIngestionCron', () => {
     )
     expect(result.telemetry.expiredObservationBackfillUpdated).toBe(48)
     expect(result.telemetry.publishedNotVisibleDispositionBackfillUpdated).toBe(1)
+    expect(result.telemetry.publishedNotVisibleMatchingReconciliationUpdated).toBe(16)
     expect(result.telemetry.terminalDispositionBackfillUpdated).toBe(146)
     expect(result.telemetry.coverageVisibilityReconciliationUpdated).toBe(7)
     expect(result.telemetry.scheduleWaitReconciliationUpdated).toBe(65)

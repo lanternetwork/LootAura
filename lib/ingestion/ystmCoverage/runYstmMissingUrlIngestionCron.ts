@@ -45,6 +45,7 @@ import { backfillGatedFalsePositiveScheduleWaitReconciliation } from '@/lib/inge
 import { backfillUrlReuseExpiredInventoryReclassification } from '@/lib/ingestion/ystmCoverage/backfillUrlReuseExpiredInventoryReclassification'
 import { backfillExpiredListFastObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation'
 import { backfillPublishedNotVisibleDispositionInvalidation } from '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleDispositionInvalidation'
+import { backfillPublishedNotVisibleMatchingReconciliation } from '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleMatchingReconciliation'
 import { backfillTerminalDispositionObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillTerminalDispositionObservationInvalidation'
 import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import { findPrimaryIngestedSaleBySourceUrl, pickPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
@@ -85,6 +86,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   listFastFailed: number
   expiredObservationBackfillUpdated: number
   publishedNotVisibleDispositionBackfillUpdated: number
+  publishedNotVisibleMatchingReconciliationUpdated: number
   terminalDispositionBackfillUpdated: number
   coverageVisibilityReconciliationUpdated: number
   scheduleWaitReconciliationUpdated: number
@@ -144,6 +146,7 @@ function emptyMissingIngestTelemetry(
     listFastFailed: 0,
     expiredObservationBackfillUpdated: 0,
     publishedNotVisibleDispositionBackfillUpdated: 0,
+    publishedNotVisibleMatchingReconciliationUpdated: 0,
     terminalDispositionBackfillUpdated: 0,
     coverageVisibilityReconciliationUpdated: 0,
     scheduleWaitReconciliationUpdated: 0,
@@ -157,6 +160,8 @@ async function runObservationInvalidationBackfills(admin: ReturnType<typeof getA
   const expiredBackfill = await backfillExpiredListFastObservationInvalidation(admin)
   const publishedNotVisibleDispositionBackfill =
     await backfillPublishedNotVisibleDispositionInvalidation(admin)
+  const publishedNotVisibleMatchingReconciliation =
+    await backfillPublishedNotVisibleMatchingReconciliation(admin)
   const terminalDispositionBackfill =
     await backfillTerminalDispositionObservationInvalidation(admin)
   const coverageVisibilityReconciliation = await backfillCoverageVisibilityReconciliation(admin)
@@ -169,6 +174,7 @@ async function runObservationInvalidationBackfills(admin: ReturnType<typeof getA
   return {
     expiredBackfill,
     publishedNotVisibleDispositionBackfill,
+    publishedNotVisibleMatchingReconciliation,
     terminalDispositionBackfill,
     coverageVisibilityReconciliation,
     scheduleWaitReconciliation,
@@ -281,6 +287,7 @@ export async function runYstmMissingUrlIngestionCron(
       const {
         expiredBackfill,
         publishedNotVisibleDispositionBackfill,
+        publishedNotVisibleMatchingReconciliation,
         terminalDispositionBackfill,
         coverageVisibilityReconciliation,
         scheduleWaitReconciliation,
@@ -303,6 +310,8 @@ export async function runYstmMissingUrlIngestionCron(
           expiredObservationBackfillUpdated: expiredBackfill.updated,
           publishedNotVisibleDispositionBackfillUpdated:
             publishedNotVisibleDispositionBackfill.updated,
+          publishedNotVisibleMatchingReconciliationUpdated:
+            publishedNotVisibleMatchingReconciliation.updated,
           terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
           coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
           scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
@@ -457,6 +466,7 @@ export async function runYstmMissingUrlIngestionCron(
     const {
       expiredBackfill,
       publishedNotVisibleDispositionBackfill,
+      publishedNotVisibleMatchingReconciliation,
       terminalDispositionBackfill,
       coverageVisibilityReconciliation,
       scheduleWaitReconciliation,
@@ -504,6 +514,16 @@ export async function runYstmMissingUrlIngestionCron(
         publishedNotVisibleDispositionBackfill.archived,
       publishedNotVisibleDispositionBackfillExpired:
         publishedNotVisibleDispositionBackfill.expired,
+      publishedNotVisibleMatchingReconciliationUpdated:
+        publishedNotVisibleMatchingReconciliation.updated,
+      publishedNotVisibleMatchingReconciliationScanned:
+        publishedNotVisibleMatchingReconciliation.scanned,
+      publishedNotVisibleMatchingReconciliationLinkageUpdated:
+        publishedNotVisibleMatchingReconciliation.linkageUpdated,
+      publishedNotVisibleMatchingReconciliationReclassifyUpdated:
+        publishedNotVisibleMatchingReconciliation.reclassifyOnlyUpdated,
+      publishedNotVisibleMatchingReconciliationVisibleUpdated:
+        publishedNotVisibleMatchingReconciliation.visibleUpdated,
       terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
       terminalDispositionBackfillSkipped: terminalDispositionBackfill.skipped,
       coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
@@ -562,6 +582,8 @@ export async function runYstmMissingUrlIngestionCron(
         expiredObservationBackfillUpdated: expiredBackfill.updated,
         publishedNotVisibleDispositionBackfillUpdated:
           publishedNotVisibleDispositionBackfill.updated,
+        publishedNotVisibleMatchingReconciliationUpdated:
+          publishedNotVisibleMatchingReconciliation.updated,
         terminalDispositionBackfillUpdated: terminalDispositionBackfill.updated,
         coverageVisibilityReconciliationUpdated: coverageVisibilityReconciliation.updated,
         scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,

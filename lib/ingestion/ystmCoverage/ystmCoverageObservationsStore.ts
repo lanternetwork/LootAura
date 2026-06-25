@@ -226,6 +226,51 @@ export function buildUrlReuseExpiredInventoryReclassificationFields(
   }
 }
 
+/** NEVER_CRAWLED_LINKAGE_REPAIR_V1 — visible linked sale after ingested footprint match. */
+export function buildNeverCrawledVisibleLinkageFields(params: {
+  matchedIngestedSaleId: string
+  matchedSaleId: string
+  matchMethod: YstmCoverageFootprintMatchMethod
+}): Record<string, unknown> {
+  return {
+    matched_ingested_sale_id: params.matchedIngestedSaleId,
+    matched_sale_id: params.matchedSaleId,
+    match_method: params.matchMethod,
+    lootaura_visible: true,
+    false_exclusion_primary_bucket: null,
+    false_exclusion_secondary_tags: [],
+    false_exclusion_evidence: null,
+    false_exclusion_summary: null,
+    false_exclusion_traced_at: null,
+  }
+}
+
+/** NEVER_CRAWLED_LINKAGE_REPAIR_V1 — linkage + trace reclassify (not visible). */
+export function buildNeverCrawledLinkageReclassifyFields(params: {
+  matchedIngestedSaleId?: string
+  matchMethod?: YstmCoverageFootprintMatchMethod
+  primaryBucket: string
+  secondaryTags: unknown[]
+  evidence: unknown
+  summary: string
+  tracedAt: string
+  linkageOnly?: boolean
+}): Record<string, unknown> {
+  const fields: Record<string, unknown> = {
+    lootaura_visible: false,
+    false_exclusion_primary_bucket: params.primaryBucket,
+    false_exclusion_secondary_tags: params.secondaryTags,
+    false_exclusion_evidence: params.evidence,
+    false_exclusion_summary: params.summary,
+    false_exclusion_traced_at: params.tracedAt,
+  }
+  if (!params.linkageOnly) {
+    fields.matched_ingested_sale_id = params.matchedIngestedSaleId ?? null
+    fields.match_method = params.matchMethod ?? null
+  }
+  return fields
+}
+
 export function buildMissingIngestionObservationUpdate(
   patch: {
     outcome: YstmCoverageMissingIngestionOutcome

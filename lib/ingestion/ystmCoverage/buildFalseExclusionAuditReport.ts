@@ -6,6 +6,12 @@ import {
   type FalseExclusionTraceBucket,
   type FalseExclusionUrlTrace,
 } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+import type { YstmListMetadataSale } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
+import {
+  buildObservationFootprintInput,
+  loadIngestedFootprintResolverIndex,
+  resolveIngestedFootprintForObservation,
+} from '@/lib/ingestion/ystmCoverage/resolveIngestedFootprintForObservation'
 import { loadLootAuraPublishedYstmIndex } from '@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex'
 import { persistFalseExclusionTraces } from '@/lib/ingestion/ystmCoverage/persistFalseExclusionTrace'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
@@ -19,11 +25,15 @@ type MissingObservationRow = {
   state: string | null
   city: string | null
   config_key: string | null
+  sale_instance_key: string | null
+  source_listing_id: string | null
+  matched_ingested_sale_id: string | null
   missing_ingestion_outcome: string | null
   missing_ingestion_attempted_at: string | null
   missing_ingestion_failure_reason: string | null
   missing_ingestion_replay_count: number | null
   last_detail_checked_at: string | null
+  list_metadata_snapshot: YstmListMetadataSale | null
 }
 
 function emptyBucketCounts(): Record<FalseExclusionTraceBucket, number> {
@@ -40,7 +50,7 @@ export async function listMissingValidObservations(
   for (;;) {
     const { data, error } = await fromBase(admin, 'ystm_coverage_observations')
       .select(
-        'canonical_url, state, city, config_key, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, missing_ingestion_replay_count, last_detail_checked_at'
+        'canonical_url, state, city, config_key, sale_instance_key, source_listing_id, matched_ingested_sale_id, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, missing_ingestion_replay_count, last_detail_checked_at, list_metadata_snapshot'
       )
       .eq('ystm_valid_active', true)
       .eq('lootaura_visible', false)
@@ -53,67 +63,6 @@ export async function listMissingValidObservations(
     from += MISSING_PAGE_SIZE
   }
   return out
-}
-
-async function loadIngestedByUrls(
-  admin: ReturnType<typeof getAdminDb>,
-  urls: string[]
-): Promise<Map<string, import('@/lib/ingestion/ystmCoverage/classifyFalseExclusionTrace').FalseExclusionIngestedRowSnapshot>> {
-  const map = new Map<
-    string,
-    import('@/lib/ingestion/ystmCoverage/classifyFalseExclusionTrace').FalseExclusionIngestedRowSnapshot
-  >()
-  const chunkSize = 100
-  for (let i = 0; i < urls.length; i += chunkSize) {
-    const slice = urls.slice(i, i + chunkSize)
-    const { data, error } = await fromBase(admin, 'ingested_sales')
-      .select(
-        'id, source_url, status, published_sale_id, is_duplicate, address_status, failure_reasons, date_start, date_end, catalog_repair_outcome, source_listing_id, sale_instance_key, address_enrichment_attempts, next_enrichment_attempt_at, address_unlock_at, last_address_enrichment_attempt_at'
-      )
-      .in('source_url', slice)
-    if (error) throw new Error(error.message)
-    for (const row of data ?? []) {
-      const r = row as {
-        id: string
-        source_url: string
-        status: string
-        published_sale_id: string | null
-        is_duplicate: boolean
-        address_status: string | null
-        failure_reasons: unknown
-        date_start: string | null
-        date_end: string | null
-        catalog_repair_outcome: string | null
-        source_listing_id: string | null
-        sale_instance_key: string | null
-        address_enrichment_attempts: number | null
-        next_enrichment_attempt_at: string | null
-        address_unlock_at: string | null
-        last_address_enrichment_attempt_at: string | null
-      }
-      const snapshot = {
-        id: r.id,
-        source_url: r.source_url,
-        status: r.status,
-        published_sale_id: r.published_sale_id,
-        is_duplicate: r.is_duplicate,
-        address_status: r.address_status,
-        failure_reasons: r.failure_reasons,
-        date_start: r.date_start,
-        date_end: r.date_end,
-        catalog_repair_outcome: r.catalog_repair_outcome,
-        source_listing_id: r.source_listing_id,
-        sale_instance_key: r.sale_instance_key,
-        address_enrichment_attempts: r.address_enrichment_attempts,
-        next_enrichment_attempt_at: r.next_enrichment_attempt_at,
-        address_unlock_at: r.address_unlock_at,
-        last_address_enrichment_attempt_at: r.last_address_enrichment_attempt_at,
-      }
-      map.set(r.source_url, snapshot)
-      map.set(canonicalSourceUrl(r.source_url), snapshot)
-    }
-  }
-  return map
 }
 
 async function loadConfigsForObservations(
@@ -178,9 +127,8 @@ export async function traceMissingValidFalseExclusions(
 }> {
   const nowIso = now.toISOString()
   const missingRows = preloadedMissingRows ?? (await listMissingValidObservations(admin))
-  const urls = missingRows.map((r) => r.canonical_url)
-  const [ingestedByUrl, configByKey, publishedIndex] = await Promise.all([
-    loadIngestedByUrls(admin, urls),
+  const [ingestedIndex, configByKey, publishedIndex] = await Promise.all([
+    loadIngestedFootprintResolverIndex(admin, missingRows),
     loadConfigsForObservations(admin, missingRows),
     loadLootAuraPublishedYstmIndex(admin, now),
   ])
@@ -205,7 +153,11 @@ export async function traceMissingValidFalseExclusions(
         missingIngestionFailureReason: row.missing_ingestion_failure_reason,
         lastDetailCheckedAt: row.last_detail_checked_at,
       },
-      ingested: ingestedByUrl.get(row.canonical_url) ?? ingestedByUrl.get(canonical) ?? null,
+      ingested:
+        resolveIngestedFootprintForObservation(
+          buildObservationFootprintInput(row),
+          ingestedIndex
+        )?.ingested ?? null,
       config,
       visibleInPublishedIndex: publishedIndex.visibleCanonicalUrls.has(canonical),
       nowIso,

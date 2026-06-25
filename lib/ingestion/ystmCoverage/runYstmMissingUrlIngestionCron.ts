@@ -39,6 +39,7 @@ import {
   recordYstmCoverageMissingIngestionOutcome,
   type YstmCoverageMissingIngestionOutcome,
 } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
+import { backfillNeverCrawledLinkageReconciliation } from '@/lib/ingestion/ystmCoverage/backfillNeverCrawledLinkageReconciliation'
 import { backfillCoverageVisibilityReconciliation } from '@/lib/ingestion/ystmCoverage/backfillCoverageVisibilityReconciliation'
 import { backfillGatedFalsePositiveScheduleWaitReconciliation } from '@/lib/ingestion/ystmCoverage/backfillGatedFalsePositiveScheduleWaitReconciliation'
 import { backfillUrlReuseExpiredInventoryReclassification } from '@/lib/ingestion/ystmCoverage/backfillUrlReuseExpiredInventoryReclassification'
@@ -88,6 +89,7 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   coverageVisibilityReconciliationUpdated: number
   scheduleWaitReconciliationUpdated: number
   urlReuseExpiredInventoryReclassificationUpdated: number
+  neverCrawledLinkageReconciliationUpdated: number
 }
 
 export function computeReservedHotBudget(
@@ -146,6 +148,7 @@ function emptyMissingIngestTelemetry(
     coverageVisibilityReconciliationUpdated: 0,
     scheduleWaitReconciliationUpdated: 0,
     urlReuseExpiredInventoryReclassificationUpdated: 0,
+    neverCrawledLinkageReconciliationUpdated: 0,
     ...partial,
   }
 }
@@ -161,6 +164,8 @@ async function runObservationInvalidationBackfills(admin: ReturnType<typeof getA
     await backfillGatedFalsePositiveScheduleWaitReconciliation(admin)
   const urlReuseExpiredInventoryReclassification =
     await backfillUrlReuseExpiredInventoryReclassification(admin)
+  const neverCrawledLinkageReconciliation =
+    await backfillNeverCrawledLinkageReconciliation(admin)
   return {
     expiredBackfill,
     publishedNotVisibleDispositionBackfill,
@@ -168,6 +173,7 @@ async function runObservationInvalidationBackfills(admin: ReturnType<typeof getA
     coverageVisibilityReconciliation,
     scheduleWaitReconciliation,
     urlReuseExpiredInventoryReclassification,
+    neverCrawledLinkageReconciliation,
   }
 }
 
@@ -279,6 +285,7 @@ export async function runYstmMissingUrlIngestionCron(
         coverageVisibilityReconciliation,
         scheduleWaitReconciliation,
         urlReuseExpiredInventoryReclassification,
+        neverCrawledLinkageReconciliation,
       } = await runObservationInvalidationBackfills(admin)
       await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
         owner: lease.owner,
@@ -301,6 +308,8 @@ export async function runYstmMissingUrlIngestionCron(
           scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
           urlReuseExpiredInventoryReclassificationUpdated:
             urlReuseExpiredInventoryReclassification.updated,
+          neverCrawledLinkageReconciliationUpdated:
+            neverCrawledLinkageReconciliation.updated,
         }),
       }
     }
@@ -452,6 +461,7 @@ export async function runYstmMissingUrlIngestionCron(
       coverageVisibilityReconciliation,
       scheduleWaitReconciliation,
       urlReuseExpiredInventoryReclassification,
+      neverCrawledLinkageReconciliation,
     } = await runObservationInvalidationBackfills(admin)
 
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
@@ -508,6 +518,10 @@ export async function runYstmMissingUrlIngestionCron(
         urlReuseExpiredInventoryReclassification.terminalDispositionUpdated,
       urlReuseExpiredInventoryReclassificationExpiredFalsePositive:
         urlReuseExpiredInventoryReclassification.expiredFalsePositiveUpdated,
+      neverCrawledLinkageReconciliationUpdated:
+        neverCrawledLinkageReconciliation.updated,
+      neverCrawledLinkageReconciliationScanned:
+        neverCrawledLinkageReconciliation.scanned,
     })
 
     return {
@@ -553,9 +567,10 @@ export async function runYstmMissingUrlIngestionCron(
         scheduleWaitReconciliationUpdated: scheduleWaitReconciliation.updated,
         urlReuseExpiredInventoryReclassificationUpdated:
           urlReuseExpiredInventoryReclassification.updated,
+        neverCrawledLinkageReconciliationUpdated:
+          neverCrawledLinkageReconciliation.updated,
       },
     }
-  } catch (err) {
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
       owner: lease.owner,
       nextCursor: queueOffsetAfter,

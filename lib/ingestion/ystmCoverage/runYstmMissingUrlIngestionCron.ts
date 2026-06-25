@@ -571,6 +571,7 @@ export async function runYstmMissingUrlIngestionCron(
           neverCrawledLinkageReconciliation.updated,
       },
     }
+  } catch (err) {
     await releaseIngestionOrchestrationLease(YSTM_COVERAGE_MISSING_INGESTION_STATE_KEY, logContext, {
       owner: lease.owner,
       nextCursor: queueOffsetAfter,

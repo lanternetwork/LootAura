@@ -66,15 +66,21 @@ function ingestedSnapshot(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function classified(ingested: ReturnType<typeof ingestedSnapshot>) {
+function classified(
+  ingested: ReturnType<typeof ingestedSnapshot>,
+  observationOverrides: Partial<{
+    missingIngestionOutcome: string | null
+    missingIngestionAttemptedAt: string | null
+  }> = {}
+) {
   return classifyFalseExclusionTrace({
     observation: {
       canonicalUrl: URL,
       state: 'TX',
       city: 'Austin',
       configKey: 'TX|Austin',
-      missingIngestionOutcome: null,
-      missingIngestionAttemptedAt: null,
+      missingIngestionOutcome: observationOverrides.missingIngestionOutcome ?? null,
+      missingIngestionAttemptedAt: observationOverrides.missingIngestionAttemptedAt ?? null,
       missingIngestionFailureReason: null,
       lastDetailCheckedAt: '2026-05-22T06:00:00Z',
     },
@@ -83,6 +89,11 @@ function classified(ingested: ReturnType<typeof ingestedSnapshot>) {
     visibleInPublishedIndex: false,
     nowIso: NOW_ISO,
   })
+}
+
+const skippedExistingObservation = {
+  missingIngestionOutcome: 'skipped_existing',
+  missingIngestionAttemptedAt: '2026-05-22T09:00:00Z',
 }
 
 const VISIBLE_SALE: PublishedNotVisibleSaleRow = {
@@ -128,7 +139,7 @@ describe('buildNeverCrawledLinkageReconciliationUpdate', () => {
     })
     const patch = buildNeverCrawledLinkageReconciliationUpdate({
       resolved: { ingested, matchMethod: 'sale_instance_key' },
-      classified: classified(ingested),
+      classified: classified(ingested, skippedExistingObservation),
       linkedSale: null,
       nowIso: NOW_ISO,
       nowMs: NOW_MS,
@@ -149,7 +160,7 @@ describe('buildNeverCrawledLinkageReconciliationUpdate', () => {
     })
     const patch = buildNeverCrawledLinkageReconciliationUpdate({
       resolved: { ingested, matchMethod: 'sale_instance_key' },
-      classified: classified(ingested),
+      classified: classified(ingested, skippedExistingObservation),
       linkedSale: null,
       nowIso: NOW_ISO,
       nowMs: NOW_MS,
@@ -163,7 +174,7 @@ describe('buildNeverCrawledLinkageReconciliationUpdate', () => {
     const ingested = ingestedSnapshot({ status: 'expired', failure_reasons: ['sale_expired'] })
     const patch = buildNeverCrawledLinkageReconciliationUpdate({
       resolved: { ingested, matchMethod: 'sale_instance_key' },
-      classified: classified(ingested),
+      classified: classified(ingested, skippedExistingObservation),
       linkedSale: null,
       nowIso: NOW_ISO,
       nowMs: NOW_MS,

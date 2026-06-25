@@ -296,12 +296,23 @@ function setupBackfillMocks(options: {
           updatedTables.push(table)
           const result = updateResults[updateCallIndex] ?? { error: null }
           updateCallIndex += 1
+          function updateTerminal() {
+            const terminal = {
+              is: vi.fn().mockResolvedValue(result),
+              then(
+                onFulfilled: (value: { data: unknown; error: typeof result.error }) => unknown,
+                onRejected?: (reason: unknown) => unknown
+              ) {
+                return Promise.resolve({ data: null, error: result.error }).then(onFulfilled, onRejected)
+              },
+            }
+            return terminal
+          }
           return {
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
                 eq: vi.fn(() => ({
-                  is: vi.fn().mockResolvedValue(result),
-                  eq: vi.fn().mockResolvedValue(result),
+                  eq: vi.fn(() => updateTerminal()),
                 })),
               })),
             })),

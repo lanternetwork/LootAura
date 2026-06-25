@@ -368,7 +368,7 @@ describe('backfillPublishedNotVisibleMatchingReconciliation', () => {
     mockFromBase.mockReset()
   })
 
-  it('pass 1 links published_not_visible row via source_url_alias', async () => {
+  it('pass 1 links published_not_visible row via footprint resolver', async () => {
     const observation = baseObservation()
     const { updates } = setupBackfillMocks({
       linkageCohort: [observation],
@@ -387,7 +387,7 @@ describe('backfillPublishedNotVisibleMatchingReconciliation', () => {
     expect(result.linkageUpdated).toBe(1)
     expect(updates[0]).toMatchObject({
       matched_ingested_sale_id: INGESTED_ID,
-      match_method: 'source_url_alias',
+      match_method: 'sale_instance_key',
     })
     expect(updates[0]).not.toHaveProperty('false_exclusion_primary_bucket')
   })

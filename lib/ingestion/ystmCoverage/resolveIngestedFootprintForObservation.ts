@@ -273,15 +273,6 @@ function emptyResolverIndex(): IngestedFootprintResolverIndex {
   }
 }
 
-async function fetchIngestedRows(
-  admin: ReturnType<typeof getAdminDb>,
-  filter: (q: ReturnType<typeof fromBase>) => ReturnType<typeof fromBase>
-): Promise<IngestedFootprintRow[]> {
-  const { data, error } = await filter(fromBase(admin, 'ingested_sales').select(INGESTED_FOOTPRINT_SELECT))
-  if (error) throw new Error(error.message)
-  return (Array.isArray(data) ? data : []) as IngestedFootprintRow[]
-}
-
 async function fetchIngestedByIds(
   admin: ReturnType<typeof getAdminDb>,
   ids: string[]
@@ -291,11 +282,11 @@ async function fetchIngestedByIds(
   const chunkSize = 100
   for (let i = 0; i < ids.length; i += chunkSize) {
     const chunk = ids.slice(i, i + chunkSize)
-    out.push(
-      ...(await fetchIngestedRows(admin, (q) =>
-        q.in('id', chunk)
-      ))
-    )
+    const { data, error } = await fromBase(admin, 'ingested_sales')
+      .select(INGESTED_FOOTPRINT_SELECT)
+      .in('id', chunk)
+    if (error) throw new Error(error.message)
+    out.push(...((Array.isArray(data) ? data : []) as IngestedFootprintRow[]))
   }
   return out
 }
@@ -309,13 +300,12 @@ async function fetchIngestedBySaleInstanceKeys(
   const chunkSize = 100
   for (let i = 0; i < keys.length; i += chunkSize) {
     const chunk = keys.slice(i, i + chunkSize)
-    out.push(
-      ...(await fetchIngestedRows(admin, (q) =>
-        q
-          .eq('source_platform', 'external_page_source')
-          .in('sale_instance_key', chunk)
-      ))
-    )
+    const { data, error } = await fromBase(admin, 'ingested_sales')
+      .select(INGESTED_FOOTPRINT_SELECT)
+      .eq('source_platform', 'external_page_source')
+      .in('sale_instance_key', chunk)
+    if (error) throw new Error(error.message)
+    out.push(...((Array.isArray(data) ? data : []) as IngestedFootprintRow[]))
   }
   return out
 }
@@ -329,11 +319,11 @@ async function fetchIngestedBySourceListingIds(
   const chunkSize = 100
   for (let i = 0; i < listingIds.length; i += chunkSize) {
     const chunk = listingIds.slice(i, i + chunkSize)
-    out.push(
-      ...(await fetchIngestedRows(admin, (q) =>
-        q.in('source_listing_id', chunk)
-      ))
-    )
+    const { data, error } = await fromBase(admin, 'ingested_sales')
+      .select(INGESTED_FOOTPRINT_SELECT)
+      .in('source_listing_id', chunk)
+    if (error) throw new Error(error.message)
+    out.push(...((Array.isArray(data) ? data : []) as IngestedFootprintRow[]))
   }
   return out
 }
@@ -348,10 +338,17 @@ async function fetchIngestedBySourceUrls(
   for (let i = 0; i < urls.length; i += chunkSize) {
     const chunk = urls.slice(i, i + chunkSize)
     const [bySourceUrl, byCanonicalUrl] = await Promise.all([
-      fetchIngestedRows(admin, (q) => q.in('source_url', chunk)),
-      fetchIngestedRows(admin, (q) => q.in('canonical_source_url', chunk)),
+      fromBase(admin, 'ingested_sales').select(INGESTED_FOOTPRINT_SELECT).in('source_url', chunk),
+      fromBase(admin, 'ingested_sales')
+        .select(INGESTED_FOOTPRINT_SELECT)
+        .in('canonical_source_url', chunk),
     ])
-    out.push(...bySourceUrl, ...byCanonicalUrl)
+    if (bySourceUrl.error) throw new Error(bySourceUrl.error.message)
+    if (byCanonicalUrl.error) throw new Error(byCanonicalUrl.error.message)
+    out.push(
+      ...((Array.isArray(bySourceUrl.data) ? bySourceUrl.data : []) as IngestedFootprintRow[]),
+      ...((Array.isArray(byCanonicalUrl.data) ? byCanonicalUrl.data : []) as IngestedFootprintRow[])
+    )
   }
   return out
 }
@@ -396,11 +393,11 @@ async function fetchIngestedByNormalizedAddresses(
   const chunkSize = 100
   for (let i = 0; i < addresses.length; i += chunkSize) {
     const chunk = addresses.slice(i, i + chunkSize)
-    out.push(
-      ...(await fetchIngestedRows(admin, (q) =>
-        q.in('normalized_address', chunk)
-      ))
-    )
+    const { data, error } = await fromBase(admin, 'ingested_sales')
+      .select(INGESTED_FOOTPRINT_SELECT)
+      .in('normalized_address', chunk)
+    if (error) throw new Error(error.message)
+    out.push(...((Array.isArray(data) ? data : []) as IngestedFootprintRow[]))
   }
   return out
 }

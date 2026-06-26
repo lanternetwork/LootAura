@@ -11,6 +11,7 @@ import {
   buildObservationFootprintInput,
   loadIngestedFootprintResolverIndex,
   resolveIngestedFootprintForObservation,
+  type IngestedFootprintResolverIndex,
 } from '@/lib/ingestion/ystmCoverage/resolveIngestedFootprintForObservation'
 import { loadLootAuraPublishedYstmIndex } from '@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex'
 import type { LinkedSaleVisibilitySnapshot } from '@/lib/ingestion/ystmCoverage/linkedSaleVisibilityFilter'
@@ -18,7 +19,6 @@ import {
   persistFalseExclusionTraces,
   type FalseExclusionTracePersistEntry,
 } from '@/lib/ingestion/ystmCoverage/persistFalseExclusionTrace'
-import type { IngestedFootprintResolverIndex } from '@/lib/ingestion/ystmCoverage/resolveIngestedFootprintForObservation'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 const MISSING_PAGE_SIZE = 500

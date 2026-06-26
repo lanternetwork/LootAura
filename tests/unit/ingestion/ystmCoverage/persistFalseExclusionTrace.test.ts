@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FalseExclusionUrlTrace } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
+import type {
+  FalseExclusionTraceEvidence,
+  FalseExclusionUrlTrace,
+} from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 
 const mockFromBase = vi.hoisted(() => vi.fn())
 const mockUpdate = vi.hoisted(() => vi.fn())
@@ -13,6 +16,24 @@ const NOW_MS = Date.parse('2026-06-17T12:00:00.000Z')
 const NOW_ISO = '2026-06-17T12:00:00.000Z'
 const URL = 'https://yardsaletreasuremap.com/US/TX/Granbury/1/listing.html'
 
+const baseEvidence: FalseExclusionTraceEvidence = {
+  hasIngestedRow: true,
+  ingestedStatus: 'needs_check',
+  ingestedPublishedSaleId: 'sale-1',
+  isDuplicate: false,
+  addressStatus: 'address_available',
+  configEnabled: true,
+  configHasSourcePages: true,
+  configCrawlExcluded: false,
+  configLastCrawlAt: null,
+  missingIngestionOutcome: null,
+  missingIngestionFailureReason: null,
+  visibleInPublishedIndex: false,
+  catalogRepairEligible: false,
+  sourceListingId: '1',
+  saleInstanceKey: 'external_page_source:TX|granbury|addr:2026-06-10|2026-06-11:1',
+}
+
 function baseTrace(overrides: Partial<FalseExclusionUrlTrace> = {}): FalseExclusionUrlTrace {
   return {
     canonicalUrl: URL,
@@ -23,7 +44,7 @@ function baseTrace(overrides: Partial<FalseExclusionUrlTrace> = {}): FalseExclus
     primaryBucket: 'published_not_visible',
     secondaryTags: [],
     summary: 'published not visible',
-    evidence: { hasIngestedRow: true },
+    evidence: baseEvidence,
     ...overrides,
   }
 }
@@ -177,9 +198,12 @@ describe('persistFalseExclusionTraces', () => {
     )
 
     const trace = baseTrace({
-      secondaryTags: ['ingested'],
+      secondaryTags: ['catalog_repair_queue'],
       summary: 'sale not in published index',
-      evidence: { hasIngestedRow: true, publishedSaleId: 'sale-1' },
+      evidence: {
+        ...baseEvidence,
+        ingestedPublishedSaleId: 'sale-1',
+      },
     })
 
     await persistFalseExclusionTraces(
@@ -203,9 +227,9 @@ describe('persistFalseExclusionTraces', () => {
 
     expect(mockUpdate).toHaveBeenCalledWith({
       false_exclusion_primary_bucket: 'published_not_visible',
-      false_exclusion_secondary_tags: ['ingested'],
+      false_exclusion_secondary_tags: ['catalog_repair_queue'],
       false_exclusion_summary: 'sale not in published index',
-      false_exclusion_evidence: { hasIngestedRow: true, publishedSaleId: 'sale-1' },
+      false_exclusion_evidence: trace.evidence,
       false_exclusion_traced_at: NOW_ISO,
       updated_at: NOW_ISO,
     })

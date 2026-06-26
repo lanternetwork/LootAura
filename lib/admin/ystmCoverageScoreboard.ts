@@ -187,7 +187,7 @@ export async function buildYstmCoverageScoreboard(
   const now = new Date()
   const missingRows = await listMissingValidObservations(admin)
   const traceArtifacts = await traceMissingValidFalseExclusions(admin, now, missingRows)
-  await persistFalseExclusionTraces(admin, traceArtifacts.traces)
+  await persistFalseExclusionTraces(admin, traceArtifacts.persistEntries, now.getTime())
   const falseExclusionAudit = formatFalseExclusionAuditReport(traceArtifacts)
 
   const [

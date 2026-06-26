@@ -33,6 +33,7 @@ type MissingObservationRow = {
   missing_ingestion_failure_reason: string | null
   missing_ingestion_replay_count: number | null
   last_detail_checked_at: string | null
+  false_exclusion_primary_bucket: string | null
   list_metadata_snapshot: YstmListMetadataSale | null
 }
 
@@ -50,7 +51,7 @@ export async function listMissingValidObservations(
   for (;;) {
     const { data, error } = await fromBase(admin, 'ystm_coverage_observations')
       .select(
-        'canonical_url, state, city, config_key, sale_instance_key, source_listing_id, matched_ingested_sale_id, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, missing_ingestion_replay_count, last_detail_checked_at, list_metadata_snapshot'
+        'canonical_url, state, city, config_key, sale_instance_key, source_listing_id, matched_ingested_sale_id, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, missing_ingestion_replay_count, last_detail_checked_at, false_exclusion_primary_bucket, list_metadata_snapshot'
       )
       .eq('ystm_valid_active', true)
       .eq('lootaura_visible', false)

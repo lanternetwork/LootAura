@@ -31,10 +31,12 @@ export type PublishedNotVisibleMatchingReconciliationBackfillResult = {
   visibleUpdated: number
 }
 
-export type PublishedNotVisibleMatchingObservationRow = NeverCrawledLinkageObservationRow
+export type PublishedNotVisibleMatchingObservationRow = NeverCrawledLinkageObservationRow & {
+  false_exclusion_primary_bucket: string | null
+}
 
 const OBSERVATION_SELECT =
-  'canonical_url, state, city, config_key, sale_instance_key, source_listing_id, matched_ingested_sale_id, matched_sale_id, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, last_detail_checked_at, list_metadata_snapshot'
+  'canonical_url, state, city, config_key, sale_instance_key, source_listing_id, matched_ingested_sale_id, matched_sale_id, missing_ingestion_outcome, missing_ingestion_attempted_at, missing_ingestion_failure_reason, last_detail_checked_at, list_metadata_snapshot, false_exclusion_primary_bucket'
 
 async function fetchLinkageCohort(
   admin: ReturnType<typeof getAdminDb>

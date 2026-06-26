@@ -43,6 +43,7 @@ function baseObservation(
     missing_ingestion_failure_reason: null,
     last_detail_checked_at: '2026-05-22T06:00:00Z',
     list_metadata_snapshot: null,
+    false_exclusion_primary_bucket: 'published_not_visible',
     ...overrides,
   }
 }
@@ -254,12 +255,14 @@ function setupBackfillMocks(options: {
   linkageCohort: PublishedNotVisibleMatchingObservationRow[]
   reclassifyCohort?: PublishedNotVisibleMatchingObservationRow[]
   ingestedRows?: ReturnType<typeof ingestedDbRow>[]
+  aliasRows?: Array<{ ingested_sale_id: string; canonical_source_url: string }>
   updateResults?: Array<{ error: { message: string } | null }>
 }) {
   const {
     linkageCohort,
     reclassifyCohort = [],
     ingestedRows = [ingestedDbRow()],
+    aliasRows = [],
     updateResults = [],
   } = options
 
@@ -345,7 +348,7 @@ function setupBackfillMocks(options: {
     if (table === 'ingested_sale_source_urls') {
       return {
         select: vi.fn(() => ({
-          in: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockResolvedValue({ data: aliasRows, error: null }),
         })),
       }
     }
@@ -390,6 +393,48 @@ describe('backfillPublishedNotVisibleMatchingReconciliation', () => {
       match_method: 'sale_instance_key',
     })
     expect(updates[0]).not.toHaveProperty('false_exclusion_primary_bucket')
+  })
+
+  it('pass 1 links via source_url_alias when sale_instance_key is stale (V2)', async () => {
+    const PA_URL = 'https://yardsaletreasuremap.com/US/CA/Palo%20Alto/1/listing.html'
+    const STALE_KEY = 'external_page_source:CA|scotts valley|addr:2026-06-10|2026-06-11:1'
+    const INGESTED_KEY = 'external_page_source:CA|palo alto|addr:2026-06-10|2026-06-11:1'
+
+    const observation = baseObservation({
+      canonical_url: PA_URL,
+      state: 'CA',
+      city: 'Palo Alto',
+      config_key: 'CA|Palo Alto',
+      sale_instance_key: STALE_KEY,
+    })
+
+    const { updates } = setupBackfillMocks({
+      linkageCohort: [observation],
+      reclassifyCohort: [{ ...observation, matched_ingested_sale_id: INGESTED_ID }],
+      ingestedRows: [
+        ingestedDbRow({
+          source_url: 'https://other.example/listing.html',
+          canonical_source_url: 'https://other.example/listing.html',
+          sale_instance_key: INGESTED_KEY,
+        }),
+      ],
+      aliasRows: [{ ingested_sale_id: INGESTED_ID, canonical_source_url: PA_URL }],
+    })
+
+    const { backfillPublishedNotVisibleMatchingReconciliation } = await import(
+      '@/lib/ingestion/ystmCoverage/backfillPublishedNotVisibleMatchingReconciliation'
+    )
+
+    const result = await backfillPublishedNotVisibleMatchingReconciliation(
+      {} as never,
+      NOW_ISO,
+      NOW_MS
+    )
+    expect(result.linkageUpdated).toBe(1)
+    expect(updates[0]).toMatchObject({
+      matched_ingested_sale_id: INGESTED_ID,
+      match_method: 'source_url_alias',
+    })
   })
 
   it('pass 2 reclassifies linked row out of published_not_visible', async () => {

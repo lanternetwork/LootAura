@@ -187,7 +187,7 @@ describe('resolveIngestedFootprintForObservation', () => {
     expect(resolved?.ingested.id).toBe('ing-1')
   })
 
-  it('alias rejects stale key mismatch without PNV bypass context', () => {
+  it('alias rejects stale key mismatch when bucket field absent', () => {
     const row = ingestedRow({
       source_url: PA_URL,
       sale_instance_key: INGESTED_KEY,
@@ -201,6 +201,29 @@ describe('resolveIngestedFootprintForObservation', () => {
         normalizedAddress: null,
         dateStart: '2026-06-10',
         dateEnd: '2026-06-11',
+        missingIngestionOutcome: 'ingested',
+      },
+      indexWith({ aliasByCanonicalUrl: { [PA_URL]: [row] } })
+    )
+    expect(resolved).toBeNull()
+  })
+
+  it('alias rejects stale key mismatch for never_crawled bucket', () => {
+    const row = ingestedRow({
+      source_url: PA_URL,
+      sale_instance_key: INGESTED_KEY,
+      source_listing_id: '1',
+    })
+    const resolved = resolveIngestedFootprintForObservation(
+      {
+        canonicalUrl: PA_URL,
+        saleInstanceKey: STALE_KEY,
+        sourceListingId: '1',
+        normalizedAddress: null,
+        dateStart: '2026-06-10',
+        dateEnd: '2026-06-11',
+        falseExclusionPrimaryBucket: 'never_crawled',
+        missingIngestionOutcome: 'ingested',
       },
       indexWith({ aliasByCanonicalUrl: { [PA_URL]: [row] } })
     )

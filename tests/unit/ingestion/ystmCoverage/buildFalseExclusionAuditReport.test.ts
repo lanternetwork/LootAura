@@ -51,6 +51,7 @@ describe('traceMissingValidFalseExclusions', () => {
       missing_ingestion_failure_reason: null,
       missing_ingestion_replay_count: null,
       last_detail_checked_at: '2026-05-22T06:00:00Z',
+      false_exclusion_primary_bucket: null,
       list_metadata_snapshot: null,
     }
 

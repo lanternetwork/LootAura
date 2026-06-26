@@ -4,12 +4,14 @@ import {
   isSaleSeoIndexEligible,
 } from '@/lib/seo/isSaleSeoIndexEligible'
 
+const YSTM_LISTING_URL = 'https://yardsaletreasuremap.com/US/KY/Louisville/1/listing.html'
+
 const baseSale = {
   status: 'published',
   archived_at: null,
   moderation_status: 'approved',
   ends_at: null,
-  external_source_url: 'https://www.yardsaletreasuremap.com/sale/abc123',
+  external_source_url: YSTM_LISTING_URL,
   lat: 32.78,
   lng: -96.8,
   ingestedIsDuplicate: false,

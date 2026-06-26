@@ -160,7 +160,9 @@ describe('inventory SEO emission policy (SEO_ENABLEMENT_V2.1)', () => {
 
     const listingPlan = resolveSeoSitemapPlan(500, rollout.seoEmissionAllowed)
     expect(listingPlan.indexingEnabled).toBe(true)
-    expect(listingPlan.segmentIds).not.toContain('cities')
+    const geoPlan = resolveSeoSitemapPlan(500, rollout.indexingAllowed)
+    expect(geoPlan.indexingEnabled).toBe(false)
+    expect(geoPlan.segmentIds).toEqual(['static'])
 
     const snapshot = buildSeoOperationalSnapshot({
       metrics: minimalMetrics(),

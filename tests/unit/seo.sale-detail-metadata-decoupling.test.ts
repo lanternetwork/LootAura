@@ -43,7 +43,7 @@ describe('sale detail metadata SEO emission', () => {
         updated_at: '2026-06-01T00:00:00Z',
         moderation_status: 'approved',
         archived_at: null,
-        external_source_url: 'https://www.yardsaletreasuremap.com/sale/abc123',
+        external_source_url: 'https://yardsaletreasuremap.com/US/KY/Louisville/1/listing.html',
         lat: 38.25,
         lng: -85.76,
         ...overrides,

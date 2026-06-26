@@ -3,6 +3,17 @@ import { NextRequest } from 'next/server'
 import { enabledSeoRolloutState } from '../../unit/seo/seoRolloutTestHelpers'
 import { TEST_SEO_METRO_DALLAS } from '../../unit/seo/seoTestFixtures'
 
+function stubInfrastructure(overrides: Record<string, unknown> = {}) {
+  return {
+    enablementSnapshotAgeMinutes: 5,
+    qualifiedMetroSnapshotAgeMinutes: 5,
+    inventorySnapshotAgeMinutes: 5,
+    qualifiedMetroCount: 1,
+    sitemapInventoryCount: 10,
+    ...overrides,
+  }
+}
+
 function stubOperationalSnapshot(overrides: {
   rollout?: Record<string, unknown>
   enablement?: Record<string, unknown>
@@ -147,6 +158,7 @@ describe('GET /api/admin/seo/operations-dashboard', () => {
         nearbySampleSize: 10,
         label: 'Sample estimate (10 listings; nearby from 10)',
       },
+      infrastructure: stubInfrastructure(),
       snapshot: stubOperationalSnapshot(),
       crawlSmoke: null,
     })
@@ -206,6 +218,10 @@ describe('GET /api/admin/seo/operations-dashboard', () => {
         nearbySampleSize: 0,
         label: 'Sample estimate (0 listings)',
       },
+      infrastructure: stubInfrastructure({
+        qualifiedMetroCount: 0,
+        sitemapInventoryCount: 0,
+      }),
       snapshot: stubOperationalSnapshot({
         enablement: {
           metricGatePass: true,

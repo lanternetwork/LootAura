@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { evaluateSeoEnablementMetricGate } from '@/lib/seo/evaluateSeoEnablementGate'
+import { evaluateSeoEnablementMetricGateFromSnapshotFields } from '@/lib/seo/evaluateSeoEnablementGate'
 import { buildSeoEnablementSnapshot } from '@/lib/seo/snapshots/buildSeoEnablementSnapshot'
 import { buildSeoQualifiedMetrosSnapshot } from '@/lib/seo/snapshots/buildSeoQualifiedMetrosSnapshot'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
@@ -104,15 +104,14 @@ describe('resolveSeoSitemapPlan split gates', () => {
   })
 })
 
-describe('evaluateSeoEnablementMetricGate with snapshot-shaped coverage', () => {
+describe('evaluateSeoEnablementMetricGateFromSnapshotFields', () => {
   it('passes with healthy snapshot metrics', () => {
-    const metric = evaluateSeoEnablementMetricGate({
-      ok: true,
+    const metric = evaluateSeoEnablementMetricGateFromSnapshotFields({
       coveragePct: 98.6,
-      publishedActiveLootAuraYstmUrls: 2581,
-      crossProviderConvergence: { duplicatePublishedCanonicalClusters: 0 },
-      actionableMissingValid: { effectiveMissingValidYstmUrls: 36 },
-    } as never)
+      effectiveMissingValid: 36,
+      duplicateCanonicalClusters: 0,
+      publishedActiveInventory: 2581,
+    })
     expect(metric.metricGatePass).toBe(true)
   })
 })

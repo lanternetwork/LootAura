@@ -11,7 +11,6 @@ export type SeoQualifiedMetroSnapshotRow = {
 }
 
 export async function buildSeoQualifiedMetrosSnapshot(
-  admin: ReturnType<typeof getAdminDb> = getAdminDb(),
   now: Date = new Date()
 ): Promise<SeoQualifiedMetroSnapshotRow[]> {
   const { metros, inventoryBySlug } = await fetchNationwideSeoMetroInventory()
@@ -62,7 +61,7 @@ export async function persistSeoQualifiedMetrosSnapshot(
 export async function refreshSeoQualifiedMetrosSnapshotCron(
   admin: ReturnType<typeof getAdminDb> = getAdminDb()
 ): Promise<{ rowCount: number; qualifiedCount: number }> {
-  const rows = await buildSeoQualifiedMetrosSnapshot(admin)
+  const rows = await buildSeoQualifiedMetrosSnapshot()
   await persistSeoQualifiedMetrosSnapshot(rows, admin)
   return {
     rowCount: rows.length,

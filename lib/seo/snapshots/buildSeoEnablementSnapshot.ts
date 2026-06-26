@@ -7,7 +7,7 @@ import { buildActionableMissingValidAggregate } from '@/lib/ingestion/ystmCovera
 import { loadLootAuraPublishedYstmIndex } from '@/lib/ingestion/ystmCoverage/ystmCoveragePublishedIndex'
 import { aggregateYstmCoverageObservations } from '@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore'
 import { computeCoveragePct } from '@/lib/ingestion/ystmCoverage/ystmCoverageValidity'
-import { evaluateSeoEnablementMetricGate } from '@/lib/seo/evaluateSeoEnablementGate'
+import { evaluateSeoEnablementMetricGateFromSnapshotFields } from '@/lib/seo/evaluateSeoEnablementGate'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type SeoEnablementSnapshotBuildResult = {
@@ -45,17 +45,12 @@ export async function buildSeoEnablementSnapshot(
     now,
   })
 
-  const coverage = {
-    ok: true as const,
+  const metric = evaluateSeoEnablementMetricGateFromSnapshotFields({
     coveragePct,
-    publishedActiveLootAuraYstmUrls: publishedIndex.publishedActiveTotal,
-    crossProviderConvergence: {
-      duplicatePublishedCanonicalClusters: duplicateClusters,
-    },
-    actionableMissingValid,
-  }
-
-  const metric = evaluateSeoEnablementMetricGate(coverage)
+    effectiveMissingValid: actionableMissingValid.effectiveMissingValidYstmUrls,
+    duplicateCanonicalClusters: duplicateClusters,
+    publishedActiveInventory: publishedIndex.publishedActiveTotal,
+  })
   const updatedAt = now.toISOString()
 
   return {

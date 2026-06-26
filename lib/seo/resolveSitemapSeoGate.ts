@@ -1,7 +1,7 @@
-import { evaluateSeoEnablementGate } from '@/lib/seo/evaluateSeoEnablementGate'
+import { evaluateSeoEnablementGateFromSnapshotFields } from '@/lib/seo/evaluateSeoEnablementGate'
 import { requestCache } from '@/lib/seo/requestCache'
 import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
-import { buildCoverageFromEnablementSnapshot } from '@/lib/seo/snapshots/coverageFromEnablementSnapshot'
+import { buildMetricGateFieldsFromEnablementSnapshot } from '@/lib/seo/snapshots/coverageFromEnablementSnapshot'
 import { SEO_SNAPSHOT_MAX_AGE_MS } from '@/lib/seo/snapshots/constants'
 import {
   isEnablementSnapshotFresh,
@@ -41,8 +41,8 @@ export const resolveSitemapSeoGate = requestCache(async (): Promise<SitemapSeoGa
       return FAIL_CLOSED
     }
 
-    const coverage = buildCoverageFromEnablementSnapshot(snapshot)
-    const enablement = evaluateSeoEnablementGate(coverage, rolloutState)
+    const metricFields = buildMetricGateFieldsFromEnablementSnapshot(snapshot)
+    const enablement = evaluateSeoEnablementGateFromSnapshotFields(metricFields, rolloutState)
     const seoEmissionAllowed = enablement.seoEmissionAllowed
     const indexingAllowed = seoEmissionAllowed && qualifiedMetroCount >= 1
 

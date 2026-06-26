@@ -105,7 +105,6 @@ describe('inventory SEO emission policy (SEO_ENABLEMENT_V2.1)', () => {
     })
 
     const rollout = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
       coverage,
       metros: qualifiedMetros,
       inventoryByMetroSlug: qualifiedMetroInventory,
@@ -143,7 +142,6 @@ describe('inventory SEO emission policy (SEO_ENABLEMENT_V2.1)', () => {
   it('scenario 2 — emission on, 0 qualified metros (listings index, geo blocked)', () => {
     const coverage = healthyEnablementCoverage()
     const rollout = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
       coverage,
       metros: [TEST_SEO_METRO_DALLAS],
       inventoryByMetroSlug: {
@@ -199,7 +197,6 @@ describe('inventory SEO emission policy (SEO_ENABLEMENT_V2.1)', () => {
   it('scenario 3 — emission on, qualified metros > 0', () => {
     const coverage = healthyEnablementCoverage()
     const rollout = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
       coverage,
       metros: qualifiedMetros,
       inventoryByMetroSlug: qualifiedMetroInventory,

@@ -2,13 +2,13 @@ import type { MetadataRoute } from 'next'
 import { buildStaticSitemapEntries } from '@/lib/seo/sitemap/staticEntries'
 import {
   buildListingSitemapEntriesForChunk,
+  countListingSitemapChunks,
   listingSitemapChunkId,
   parseListingSitemapChunkId,
 } from '@/lib/seo/sitemap/listingEntries'
 import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPublishedListingRows'
 import { buildCitySitemapEntries } from '@/lib/seo/sitemap/cityEntries'
 import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
-import { countListingSitemapChunks } from '@/lib/seo/sitemap/listingEntries'
 import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
 import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
 import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'

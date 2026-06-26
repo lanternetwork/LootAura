@@ -59,7 +59,6 @@ describe('seo index rollout', () => {
 
   it('rollout readiness blocks without Phase 5 attestations', () => {
     const result = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
       coverage: minimalYstmCoverageScoreboard(),
       metros: [TEST_SEO_METRO_DALLAS],
       rolloutState: enabledSeoRolloutState({
@@ -81,7 +80,6 @@ describe('seo index rollout', () => {
       { slug: 'houston-tx', city: 'Houston', state: 'TX', timezone: 'America/Chicago', minActiveListings: 25 },
     ]
     const result = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
       coverage: healthyEnablementCoverage(),
       metros,
       rolloutState: enabledSeoRolloutState(),

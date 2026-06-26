@@ -2,15 +2,15 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockGetInventorySeoEmissionForRequest = vi.hoisted(() => vi.fn())
+const mockResolveSitemapSeoGate = vi.hoisted(() => vi.fn())
 const mockLoadIngestedFlags = vi.hoisted(() => vi.fn())
 const mockGetSaleWithItemsForRequest = vi.hoisted(() => vi.fn())
 const mockCreateSupabaseServerClient = vi.hoisted(() => vi.fn())
 
 const saleDetailPageSourcePath = path.join(process.cwd(), 'app/sales/[id]/page.tsx')
 
-vi.mock('@/lib/seo/resolveInventorySeoEmission', () => ({
-  getInventorySeoEmissionForRequest: (...args: unknown[]) => mockGetInventorySeoEmissionForRequest(...args),
+vi.mock('@/lib/seo/resolveSitemapSeoGate', () => ({
+  resolveSitemapSeoGate: (...args: unknown[]) => mockResolveSitemapSeoGate(...args),
 }))
 
 vi.mock('@/lib/seo/sitemap/fetchPublishedListingRows', () => ({
@@ -54,11 +54,11 @@ describe('sale detail metadata SEO emission', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGetInventorySeoEmissionForRequest.mockResolvedValue({
+    mockResolveSitemapSeoGate.mockResolvedValue({
       seoEmissionAllowed: false,
       indexingAllowed: false,
-      metricsAvailable: true,
-      rollout: { seoEmissionAllowed: false, indexingAllowed: false, blockers: [] },
+      snapshotFresh: false,
+      qualifiedMetroCount: 0,
     })
     mockLoadIngestedFlags.mockResolvedValue({
       ingestedIsDuplicate: false,
@@ -72,44 +72,44 @@ describe('sale detail metadata SEO emission', () => {
     setupSale()
   })
 
-  it('uses shared inventory emission resolver for listing robots', async () => {
+  it('uses shared sitemap SEO gate for listing robots', async () => {
     const page = await import('@/app/sales/[id]/page')
     await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
-    expect(mockGetInventorySeoEmissionForRequest).toHaveBeenCalledTimes(1)
+    expect(mockResolveSitemapSeoGate).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps emission resolver and cohort eligibility in sale detail page source', () => {
+  it('keeps sitemap SEO gate and cohort eligibility in sale detail page source', () => {
     const source = readFileSync(saleDetailPageSourcePath, 'utf8')
-    expect(source).toContain('getInventorySeoEmissionForRequest')
+    expect(source).toContain('resolveSitemapSeoGate')
     expect(source).toContain('isSaleSeoIndexEligible')
     expect(source).toContain('loadIngestedEligibilityFlagsForPublishedSale')
   })
 
-  it('returns noindex when emission resolver fails', async () => {
-    mockGetInventorySeoEmissionForRequest.mockRejectedValueOnce(new Error('emission unavailable'))
+  it('returns noindex when sitemap SEO gate fails', async () => {
+    mockResolveSitemapSeoGate.mockRejectedValueOnce(new Error('gate unavailable'))
     const page = await import('@/app/sales/[id]/page')
     const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
     expect(metadata.robots).toMatchObject({ index: false, follow: true })
   })
 
-  it('returns noindex when national emission is blocked', async () => {
-    mockGetInventorySeoEmissionForRequest.mockResolvedValueOnce({
+  it('returns noindex when sitemap SEO gate blocks emission', async () => {
+    mockResolveSitemapSeoGate.mockResolvedValueOnce({
       seoEmissionAllowed: false,
       indexingAllowed: false,
-      metricsAvailable: true,
-      rollout: { seoEmissionAllowed: false, indexingAllowed: false, blockers: [] },
+      snapshotFresh: false,
+      qualifiedMetroCount: 0,
     })
     const page = await import('@/app/sales/[id]/page')
     const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
     expect(metadata.robots).toMatchObject({ index: false, follow: true })
   })
 
-  it('can return index when emission is allowed and sale is cohort-eligible', async () => {
-    mockGetInventorySeoEmissionForRequest.mockResolvedValueOnce({
+  it('can return index when sitemap gate allows emission and sale is cohort-eligible', async () => {
+    mockResolveSitemapSeoGate.mockResolvedValueOnce({
       seoEmissionAllowed: true,
       indexingAllowed: true,
-      metricsAvailable: true,
-      rollout: { seoEmissionAllowed: true, indexingAllowed: true, blockers: [] },
+      snapshotFresh: true,
+      qualifiedMetroCount: 3,
     })
     const page = await import('@/app/sales/[id]/page')
     const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
@@ -117,11 +117,11 @@ describe('sale detail metadata SEO emission', () => {
   })
 
   it('returns noindex when sale fails cohort eligibility', async () => {
-    mockGetInventorySeoEmissionForRequest.mockResolvedValueOnce({
+    mockResolveSitemapSeoGate.mockResolvedValueOnce({
       seoEmissionAllowed: true,
       indexingAllowed: true,
-      metricsAvailable: true,
-      rollout: { seoEmissionAllowed: true, indexingAllowed: true, blockers: [] },
+      snapshotFresh: true,
+      qualifiedMetroCount: 3,
     })
     setupSale({ status: 'draft', external_source_url: null, lat: null, lng: null })
     const page = await import('@/app/sales/[id]/page')

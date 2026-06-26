@@ -19,6 +19,7 @@ import { SeoOperationalGateUnavailableError } from '@/lib/seo/loadSeoIndexAllowl
 import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPublishedListingRows'
 import { computeSeoSitemapCounts } from '@/lib/seo/sitemap/computeSitemapCounts'
 import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
+import { loadSeoInfrastructureDiagnostics } from '@/lib/seo/snapshots/loadSeoInfrastructureDiagnostics'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 import { adminSupabase } from '@/lib/supabase/admin'
@@ -166,9 +167,10 @@ export async function loadSeoOperationsDashboard(
     rolloutState,
   })
 
-  const [internalLinks, crawlSmoke] = await Promise.all([
+  const [internalLinks, crawlSmoke, infrastructure] = await Promise.all([
     sampleInternalLinkCounts(metros),
     options?.runCrawlSmoke ? runSeoCrawlSmokeChecks() : Promise.resolve(null as CrawlSmokeReport | null),
+    loadSeoInfrastructureDiagnostics(getAdminDb()),
   ])
 
   return buildSeoOperationsDashboard({
@@ -178,5 +180,6 @@ export async function loadSeoOperationsDashboard(
     configuredSiteUrl: process.env.NEXT_PUBLIC_SITE_URL,
     internalLinks,
     crawlSmoke,
+    infrastructure,
   })
 }

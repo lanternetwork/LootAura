@@ -5,7 +5,7 @@ import {
   buildSitemapSegmentUrl,
 } from '@/lib/seo/sitemap/buildSitemapIndexXml'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 /**
  * Explicit sitemap index — Next.js 15 generateSitemaps() child segments work at

@@ -241,6 +241,41 @@ export default function SeoOperationsDashboardClient() {
                 <Row label="Qualified metro URLs" value={String(dashboard.sitemap.cityUrlCount)} />
                 <Row label="Weekend URLs" value={String(dashboard.sitemap.weekendUrlCount)} />
               </Card>
+
+              <Card title="SEO Infrastructure">
+                <Row
+                  label="Enablement snapshot age"
+                  value={
+                    dashboard.infrastructure.enablementSnapshotAgeMinutes == null
+                      ? 'n/a'
+                      : `${dashboard.infrastructure.enablementSnapshotAgeMinutes} min`
+                  }
+                />
+                <Row
+                  label="Qualified metro snapshot age"
+                  value={
+                    dashboard.infrastructure.qualifiedMetroSnapshotAgeMinutes == null
+                      ? 'n/a'
+                      : `${dashboard.infrastructure.qualifiedMetroSnapshotAgeMinutes} min`
+                  }
+                />
+                <Row
+                  label="Inventory snapshot age"
+                  value={
+                    dashboard.infrastructure.inventorySnapshotAgeMinutes == null
+                      ? 'n/a'
+                      : `${dashboard.infrastructure.inventorySnapshotAgeMinutes} min`
+                  }
+                />
+                <Row
+                  label="Qualified metros (snapshot)"
+                  value={String(dashboard.infrastructure.qualifiedMetroCount)}
+                />
+                <Row
+                  label="Sitemap inventory count"
+                  value={String(dashboard.infrastructure.sitemapInventoryCount)}
+                />
+              </Card>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">

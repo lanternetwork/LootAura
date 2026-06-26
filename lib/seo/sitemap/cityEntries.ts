@@ -3,6 +3,16 @@ import { getCityPageCanonicalUrl } from '@/lib/seo/canonical'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
 import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 
+export function buildCitySitemapEntriesFromQualifiedSlugs(slugs: string[]): MetadataRoute.Sitemap {
+  const now = new Date()
+  return slugs.map((slug) => ({
+    url: getCityPageCanonicalUrl(slug),
+    lastModified: now,
+    changeFrequency: 'hourly' as const,
+    priority: 0.85,
+  }))
+}
+
 /**
  * City sitemap entries — nationwide metros that pass operational qualification.
  */

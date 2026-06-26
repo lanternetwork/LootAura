@@ -5,10 +5,18 @@ import {
   isSaleSeoIndexEligible,
   type SaleSeoIndexEligibilityInput,
 } from '@/lib/seo/isSaleSeoIndexEligible'
+import { resolveSeoMetroForSale } from '@/lib/seo/metroCatalog'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 import type { ListingSitemapRow } from '@/lib/seo/sitemap/listingEntries'
+
+export type SeoSitemapInventoryBuildRow = {
+  sale_id: string
+  canonical_url: string
+  city_slug: string | null
+  updated_at: string
+}
 
 const PAGE_SIZE = 1000
 const INGESTED_CHUNK = 100
@@ -16,6 +24,8 @@ const INGESTED_CHUNK = 100
 type SaleRow = SaleSeoIndexEligibilityInput & {
   id: string
   updated_at: string
+  city?: string | null
+  state?: string | null
 }
 
 type IngestedLinkRow = {
@@ -149,6 +159,67 @@ export async function fetchPublishedListingRowsForSitemap(
     if (!isSaleSeoIndexEligible(toEligibilityInput(row, ingestedFlags), nowMs)) continue
     seenCanonical.add(canonical)
     out.push({ id: row.id, updated_at: row.updated_at })
+  }
+
+  return out
+}
+
+/**
+ * Full inventory cohort for seo_sitemap_inventory snapshot (cron only).
+ * Reuses isSaleSeoIndexEligible + canonical dedupe from fetchPublishedListingRowsForSitemap.
+ */
+export async function fetchPublishedListingInventoryForSnapshot(
+  now: Date = new Date()
+): Promise<SeoSitemapInventoryBuildRow[]> {
+  const admin = getAdminDb()
+  const candidates: SaleRow[] = []
+  let from = 0
+
+  for (;;) {
+    let q = fromBase(admin, T.sales).select(
+      'id, updated_at, status, archived_at, moderation_status, ends_at, external_source_url, lat, lng, city, state'
+    )
+    q = applyPhase4PublicPublishedSaleReadFilters(q, { now })
+    const { data, error } = await q.order('updated_at', { ascending: false }).range(from, from + PAGE_SIZE - 1)
+
+    if (error) {
+      console.error('[SEO_SITEMAP] Failed to fetch published listings for inventory snapshot:', error.message)
+      return []
+    }
+
+    const chunk = (Array.isArray(data) ? data : []) as SaleRow[]
+    for (const row of chunk) {
+      const url = row.external_source_url?.trim()
+      if (!url || !isYstmDetailListingUrl(url)) continue
+      if (row.lat == null || row.lng == null) continue
+      candidates.push(row)
+    }
+
+    if (chunk.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+
+  const ingestedFlags = await loadIngestedFlagsByPublishedSaleId(
+    admin,
+    candidates.map((row) => row.id)
+  )
+
+  const seenCanonical = new Set<string>()
+  const out: SeoSitemapInventoryBuildRow[] = []
+  const nowMs = now.getTime()
+
+  for (const row of candidates) {
+    const canonical = canonicalSourceUrl(row.external_source_url!.trim())
+    if (seenCanonical.has(canonical)) continue
+    if (!isSaleSeoIndexEligible(toEligibilityInput(row, ingestedFlags), nowMs)) continue
+    seenCanonical.add(canonical)
+    const metro = resolveSeoMetroForSale({ city: row.city, state: row.state })
+    out.push({
+      sale_id: row.id,
+      canonical_url: canonical,
+      city_slug: metro?.slug ?? null,
+      updated_at: row.updated_at,
+    })
   }
 
   return out

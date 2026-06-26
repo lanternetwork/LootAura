@@ -64,7 +64,10 @@ function assertListingEmissionBlocked(seoEmissionAllowed: boolean, publishedCoun
   expect(seoEmissionAllowed).toBe(false)
   expect(resolveListingIndexRobots(seoEmissionAllowed)).toEqual({ index: false, follow: true })
 
-  const plan = resolveSeoSitemapPlan(publishedCount, seoEmissionAllowed)
+  const plan = resolveSeoSitemapPlan(publishedCount, {
+    seoEmissionAllowed,
+    indexingAllowed: false,
+  })
   expect(plan.indexingEnabled).toBe(false)
   expect(plan.segmentIds).toEqual(['static'])
   expect(plan.listingChunkCount).toBe(0)
@@ -158,11 +161,14 @@ describe('inventory SEO emission policy (SEO_ENABLEMENT_V2.1)', () => {
     expect(rollout.indexingAllowed).toBe(false)
     expect(resolveListingIndexRobots(rollout.seoEmissionAllowed)).toEqual({ index: true, follow: true })
 
-    const listingPlan = resolveSeoSitemapPlan(500, rollout.seoEmissionAllowed)
+    const listingPlan = resolveSeoSitemapPlan(500, {
+      seoEmissionAllowed: rollout.seoEmissionAllowed,
+      indexingAllowed: rollout.indexingAllowed,
+    })
     expect(listingPlan.indexingEnabled).toBe(true)
-    const geoPlan = resolveSeoSitemapPlan(500, rollout.indexingAllowed)
-    expect(geoPlan.indexingEnabled).toBe(false)
-    expect(geoPlan.segmentIds).toEqual(['static'])
+    expect(listingPlan.listingChunkCount).toBeGreaterThan(0)
+    expect(listingPlan.segmentIds).not.toContain('cities')
+    expect(listingPlan.segmentIds).not.toContain('weekends')
 
     const snapshot = buildSeoOperationalSnapshot({
       metrics: minimalMetrics(),
@@ -209,7 +215,10 @@ describe('inventory SEO emission policy (SEO_ENABLEMENT_V2.1)', () => {
     expect(rollout.indexingAllowed).toBe(true)
     expect(resolveListingIndexRobots(rollout.seoEmissionAllowed)).toEqual({ index: true, follow: true })
 
-    const geoPlan = resolveSeoSitemapPlan(2500, rollout.indexingAllowed)
+    const geoPlan = resolveSeoSitemapPlan(2500, {
+      seoEmissionAllowed: rollout.seoEmissionAllowed,
+      indexingAllowed: rollout.indexingAllowed,
+    })
     expect(geoPlan.indexingEnabled).toBe(true)
     expect(geoPlan.segmentIds).toContain('cities')
     expect(geoPlan.segmentIds).toContain('weekends')

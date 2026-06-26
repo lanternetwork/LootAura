@@ -13,7 +13,7 @@ import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
 import { isSaleSeoIndexEligible } from '@/lib/seo/isSaleSeoIndexEligible'
-import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
+import { resolveSitemapSeoGate } from '@/lib/seo/resolveSitemapSeoGate'
 import { loadIngestedEligibilityFlagsForPublishedSale } from '@/lib/seo/sitemap/fetchPublishedListingRows'
 import {
   buildListingBreadcrumbItems,
@@ -209,8 +209,8 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
   let seoEmissionAllowed = false
   let saleIndexEligible = isSaleLocallySeoEligible(result.sale)
   try {
-    const emission = await getInventorySeoEmissionForRequest()
-    seoEmissionAllowed = emission.seoEmissionAllowed
+    const gate = await resolveSitemapSeoGate()
+    seoEmissionAllowed = gate.seoEmissionAllowed
     if (saleIndexEligible) {
       const ingestedFlags = await loadIngestedEligibilityFlagsForPublishedSale(String(result.sale.id))
       saleIndexEligible = isSaleSeoIndexEligible({

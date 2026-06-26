@@ -23,7 +23,7 @@ import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 import { adminSupabase } from '@/lib/supabase/admin'
 import type { Sale } from '@/lib/types'
-import type { SeoMetro } from '@/lib/seo/types'
+import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 
 const GEO_LINK_SAMPLE_SIZE = 100
 const NEARBY_LINK_SAMPLE_SIZE = 20
@@ -109,6 +109,21 @@ async function sampleInternalLinkCounts(metros: SeoMetro[]): Promise<SeoInternal
   }
 }
 
+function computeSitemapCountsForSnapshot(
+  publishedListingCount: number,
+  rollout: { seoEmissionAllowed: boolean; indexingAllowed: boolean },
+  metros: SeoMetro[],
+  inventoryBySlug: Record<string, SeoInventorySummary>
+) {
+  return computeSeoSitemapCounts({
+    totalPublishedListings: publishedListingCount,
+    listingIndexingAllowed: rollout.seoEmissionAllowed,
+    geoIndexingAllowed: rollout.indexingAllowed,
+    metros,
+    inventoryBySlug,
+  })
+}
+
 export async function loadSeoOperationsDashboard(
   request: NextRequest,
   options?: { runCrawlSmoke?: boolean }
@@ -126,12 +141,12 @@ export async function loadSeoOperationsDashboard(
   const provisional = buildSeoOperationalSnapshot({
     metrics,
     coverage,
-    sitemapCounts: computeSeoSitemapCounts({
-      totalPublishedListings: publishedListingCount,
-      inventoryIndexingAllowed: false,
+    sitemapCounts: computeSitemapCountsForSnapshot(
+      publishedListingCount,
+      { seoEmissionAllowed: false, indexingAllowed: false },
       metros,
-      inventoryBySlug,
-    }),
+      inventoryBySlug
+    ),
     metros,
     inventoryByMetroSlug: inventoryBySlug,
     rolloutState,
@@ -140,12 +155,12 @@ export async function loadSeoOperationsDashboard(
   const snapshot = buildSeoOperationalSnapshot({
     metrics,
     coverage,
-    sitemapCounts: computeSeoSitemapCounts({
-      totalPublishedListings: publishedListingCount,
-      inventoryIndexingAllowed: provisional.rollout.indexingAllowed,
+    sitemapCounts: computeSitemapCountsForSnapshot(
+      publishedListingCount,
+      provisional.rollout,
       metros,
-      inventoryBySlug,
-    }),
+      inventoryBySlug
+    ),
     metros,
     inventoryByMetroSlug: inventoryBySlug,
     rolloutState,

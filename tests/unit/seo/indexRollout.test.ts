@@ -7,7 +7,7 @@ import {
 import { isSeoIndexRolloutReady, SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
-import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
+import { enabledSeoRolloutState, healthyEnablementCoverage } from './seoRolloutTestHelpers'
 import { TEST_SEO_METRO_AUSTIN, TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 const healthyInventory = {
@@ -59,7 +59,6 @@ describe('seo index rollout', () => {
 
   it('rollout readiness blocks without Phase 5 attestations', () => {
     const result = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
       coverage: minimalYstmCoverageScoreboard(),
       metros: [TEST_SEO_METRO_DALLAS],
       rolloutState: enabledSeoRolloutState({
@@ -81,8 +80,7 @@ describe('seo index rollout', () => {
       { slug: 'houston-tx', city: 'Houston', state: 'TX', timezone: 'America/Chicago', minActiveListings: 25 },
     ]
     const result = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
-      coverage: minimalYstmCoverageScoreboard(),
+      coverage: healthyEnablementCoverage(),
       metros,
       rolloutState: enabledSeoRolloutState(),
       inventoryByMetroSlug: {

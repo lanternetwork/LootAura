@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return createCityPageMetadata({
     metro,
     inventory: summary,
-    robots: resolveMetroPageRobots(metro, summary, emission.indexingAllowed),
+    robots: resolveMetroPageRobots(metro, summary, emission.seoEmissionAllowed),
   })
 }
 

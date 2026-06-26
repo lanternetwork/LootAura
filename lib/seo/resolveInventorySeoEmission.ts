@@ -12,7 +12,9 @@ import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { getAdminDb } from '@/lib/supabase/clients'
 
 export type InventorySeoEmissionState = {
-  /** R — evaluateSeoIndexRolloutReadiness(...).indexingAllowed */
+  /** National metrics + attestations (listing robots / listing sitemap). */
+  seoEmissionAllowed: boolean
+  /** National emission + qualified metros (geo sitemaps / metro robots). */
   indexingAllowed: boolean
   metricsAvailable: boolean
   rollout: SeoIndexRolloutSnapshot
@@ -20,6 +22,7 @@ export type InventorySeoEmissionState = {
 
 const FAIL_CLOSED_ROLLOUT: SeoIndexRolloutSnapshot = {
   generatedAt: new Date(0).toISOString(),
+  seoEmissionAllowed: false,
   indexingAllowed: false,
   blockers: ['SEO operational inputs unavailable'],
   gates: [],
@@ -29,6 +32,7 @@ const FAIL_CLOSED_ROLLOUT: SeoIndexRolloutSnapshot = {
 }
 
 const FAIL_CLOSED: InventorySeoEmissionState = {
+  seoEmissionAllowed: false,
   indexingAllowed: false,
   metricsAvailable: false,
   rollout: FAIL_CLOSED_ROLLOUT,
@@ -55,7 +59,6 @@ export const getInventorySeoEmissionForRequest = requestCache(
 
       const coverage: YstmCoverageMetricsResponse = { ok: true, ...coverageBoard }
       const rollout = evaluateSeoIndexRolloutReadiness({
-        metrics,
         coverage,
         metros: metroSnapshot.metros,
         inventoryByMetroSlug: metroSnapshot.inventoryBySlug,
@@ -63,6 +66,7 @@ export const getInventorySeoEmissionForRequest = requestCache(
       })
 
       return {
+        seoEmissionAllowed: rollout.seoEmissionAllowed,
         indexingAllowed: rollout.indexingAllowed,
         metricsAvailable: true,
         rollout,

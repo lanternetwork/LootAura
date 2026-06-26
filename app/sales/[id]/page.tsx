@@ -12,8 +12,9 @@ import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import { createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 import { createListingSeoMetadata } from '@/lib/seo/metadata'
 import { resolveListingIndexRobots } from '@/lib/seo/indexRollout'
-import { getSeoRolloutStateForRequest } from '@/lib/seo/loadSeoRolloutState'
-import { isSeoIndexRolloutReady } from '@/lib/seo/seoRolloutTypes'
+import { isSaleSeoIndexEligible } from '@/lib/seo/isSaleSeoIndexEligible'
+import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
+import { loadIngestedEligibilityFlagsForPublishedSale } from '@/lib/seo/sitemap/fetchPublishedListingRows'
 import {
   buildListingBreadcrumbItems,
   buildListingGeoLinks,
@@ -24,18 +25,15 @@ interface SaleDetailPageProps {
 }
 
 function isSaleLocallySeoEligible(sale: any): boolean {
-  // Fail closed unless this record is a publicly indexable listing shape.
-  return (
-    sale?.status === 'published' &&
-    sale?.moderation_status !== 'hidden_by_admin' &&
-    typeof sale?.title === 'string' &&
-    sale.title.trim().length > 0 &&
-    typeof sale?.city === 'string' &&
-    sale.city.trim().length > 0 &&
-    typeof sale?.state === 'string' &&
-    sale.state.trim().length > 0 &&
-    !sale?.archived_at
-  )
+  return isSaleSeoIndexEligible({
+    status: sale?.status,
+    archived_at: sale?.archived_at,
+    moderation_status: sale?.moderation_status,
+    ends_at: sale?.ends_at,
+    external_source_url: sale?.external_source_url,
+    lat: sale?.lat,
+    lng: sale?.lng,
+  })
 }
 
 function getSaleNearestCoords(sale: { lat?: number | null; lng?: number | null }): NearestSalesCoords | undefined {
@@ -208,18 +206,31 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
   const itemCats = result.items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  const saleLocallyEligible = isSaleLocallySeoEligible(result.sale)
-  let rolloutReady = false
+  let seoEmissionAllowed = false
+  let saleIndexEligible = isSaleLocallySeoEligible(result.sale)
   try {
-    const rolloutState = await getSeoRolloutStateForRequest()
-    rolloutReady = isSeoIndexRolloutReady(rolloutState)
+    const emission = await getInventorySeoEmissionForRequest()
+    seoEmissionAllowed = emission.seoEmissionAllowed
+    if (saleIndexEligible) {
+      const ingestedFlags = await loadIngestedEligibilityFlagsForPublishedSale(String(result.sale.id))
+      saleIndexEligible = isSaleSeoIndexEligible({
+        status: result.sale.status,
+        archived_at: (result.sale as any).archived_at,
+        moderation_status: (result.sale as any).moderation_status,
+        ends_at: (result.sale as any).ends_at,
+        external_source_url: (result.sale as any).external_source_url,
+        lat: (result.sale as any).lat,
+        lng: (result.sale as any).lng,
+        ingestedIsDuplicate: ingestedFlags.ingestedIsDuplicate,
+        ingestedSuperseded: ingestedFlags.ingestedSuperseded,
+      })
+    }
   } catch {
-    // Fail closed: metadata generation should not over-index when rollout state cannot be loaded.
-    rolloutReady = false
+    seoEmissionAllowed = false
   }
 
   return createListingSeoMetadata(result.sale, {
     categories: displayCategories,
-    robots: resolveListingIndexRobots(rolloutReady && saleLocallyEligible),
+    robots: resolveListingIndexRobots(seoEmissionAllowed && saleIndexEligible),
   })
 }

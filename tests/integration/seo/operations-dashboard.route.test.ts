@@ -3,6 +3,97 @@ import { NextRequest } from 'next/server'
 import { enabledSeoRolloutState } from '../../unit/seo/seoRolloutTestHelpers'
 import { TEST_SEO_METRO_DALLAS } from '../../unit/seo/seoTestFixtures'
 
+function stubOperationalSnapshot(overrides: {
+  rollout?: Record<string, unknown>
+  enablement?: Record<string, unknown>
+  allowlist?: Record<string, unknown>
+  sitemap?: Record<string, unknown>
+  metroParticipation?: Record<string, unknown>
+} = {}) {
+  const rolloutState = enabledSeoRolloutState()
+  return {
+    generatedAt: '2026-06-02T00:00:00.000Z',
+    enablement: {
+      generatedAt: '2026-06-02T00:00:00.000Z',
+      metricGatePass: true,
+      seoEmissionAllowed: true,
+      readyForIndexing: true,
+      gates: [],
+      blockers: [],
+      ...overrides.enablement,
+    },
+    allowlist: {
+      generatedAt: '2026-06-02T00:00:00.000Z',
+      indexingAllowed: true,
+      phase0Pass: true,
+      tier1Ready: true,
+      tier2Ready: true,
+      enforcementReady: true,
+      gates: [],
+      blockers: [],
+      ...overrides.allowlist,
+    },
+    stabilization: {
+      tier1Ready: true,
+      tier2Ready: true,
+      tier1Criteria: [],
+      tier2Criteria: [],
+      holdNote: '',
+    },
+    rollout: {
+      generatedAt: '2026-06-02T00:00:00.000Z',
+      seoEmissionAllowed: true,
+      indexingAllowed: true,
+      blockers: [],
+      gates: [],
+      qualifiedMetroSlugs: ['dallas-tx'],
+      qualifiedPilotMetros: ['dallas-tx'],
+      rolloutState,
+      ...overrides.rollout,
+    },
+    metroQualification: [],
+    metroParticipation: {
+      generatedAt: '2026-06-02T00:00:00.000Z',
+      participatingMetroSlugs: ['dallas-tx'],
+      rows: [
+        {
+          slug: 'dallas-tx',
+          qualified: true,
+          score: 100,
+          reasons: [],
+          metro: TEST_SEO_METRO_DALLAS,
+          inventory: {
+            activeListingCount: 50,
+            lastUpdatedAt: '2026-06-02T00:00:00.000Z',
+            crawlableInventoryPct: 1,
+          },
+        },
+      ],
+      ...overrides.metroParticipation,
+    },
+    sitemap: {
+      staticUrlCount: 3,
+      listingChunkCount: 1,
+      listingUrlCount: 10,
+      cityUrlCount: 1,
+      weekendUrlCount: 1,
+      indexingEnabled: true,
+      listingIndexingEnabled: true,
+      ...overrides.sitemap,
+    },
+    metrics: {
+      indexedMetros: 1,
+      crawlableInventoryPct: 1,
+      staleInventoryPct: null,
+      canonicalCoveragePct: null,
+      duplicateCanonicalClusters: null,
+      duplicateVisibleClusters: null,
+      catalogRepairQueue: null,
+      missingValidUrls: null,
+    },
+  }
+}
+
 vi.mock('@/lib/auth/adminGate', () => ({
   assertAdminOrThrow: vi.fn(),
 }))
@@ -56,65 +147,7 @@ describe('GET /api/admin/seo/operations-dashboard', () => {
         nearbySampleSize: 10,
         label: 'Sample estimate (10 listings; nearby from 10)',
       },
-      snapshot: {
-        generatedAt: '2026-06-02T00:00:00.000Z',
-        allowlist: {
-          generatedAt: '2026-06-02T00:00:00.000Z',
-          indexingAllowed: true,
-          phase0Pass: true,
-          tier1Ready: true,
-          tier2Ready: true,
-          enforcementReady: true,
-          gates: [],
-          blockers: [],
-        },
-        rollout: {
-          generatedAt: '2026-06-02T00:00:00.000Z',
-          indexingAllowed: true,
-          blockers: [],
-          gates: [],
-          qualifiedMetroSlugs: ['dallas-tx'],
-          qualifiedPilotMetros: ['dallas-tx'],
-          rolloutState: enabledSeoRolloutState(),
-        },
-        metroQualification: [],
-        metroParticipation: {
-          generatedAt: '2026-06-02T00:00:00.000Z',
-          participatingMetroSlugs: ['dallas-tx'],
-          rows: [
-            {
-              slug: 'dallas-tx',
-              qualified: true,
-              score: 100,
-              reasons: [],
-              metro: TEST_SEO_METRO_DALLAS,
-              inventory: {
-                activeListingCount: 50,
-                lastUpdatedAt: '2026-06-02T00:00:00.000Z',
-                crawlableInventoryPct: 1,
-              },
-            },
-          ],
-        },
-        sitemap: {
-          staticUrlCount: 3,
-          listingChunkCount: 1,
-          listingUrlCount: 10,
-          cityUrlCount: 1,
-          weekendUrlCount: 1,
-          indexingEnabled: true,
-        },
-        metrics: {
-          indexedMetros: 1,
-          crawlableInventoryPct: 1,
-          staleInventoryPct: null,
-          canonicalCoveragePct: null,
-          duplicateCanonicalClusters: null,
-          duplicateVisibleClusters: null,
-          catalogRepairQueue: null,
-          missingValidUrls: null,
-        },
-      },
+      snapshot: stubOperationalSnapshot(),
       crawlSmoke: null,
     })
 
@@ -173,52 +206,42 @@ describe('GET /api/admin/seo/operations-dashboard', () => {
         nearbySampleSize: 0,
         label: 'Sample estimate (0 listings)',
       },
-      snapshot: {
-        generatedAt: '2026-06-02T00:00:00.000Z',
+      snapshot: stubOperationalSnapshot({
+        enablement: {
+          metricGatePass: true,
+          seoEmissionAllowed: false,
+          readyForIndexing: false,
+          blockers: ['Crawl validation not attested (admin)'],
+        },
         allowlist: {
-          generatedAt: '2026-06-02T00:00:00.000Z',
           indexingAllowed: false,
           phase0Pass: false,
           tier1Ready: false,
           tier2Ready: false,
           enforcementReady: false,
-          gates: [],
           blockers: ['Tier 1: example'],
         },
         rollout: {
-          generatedAt: '2026-06-02T00:00:00.000Z',
+          seoEmissionAllowed: false,
           indexingAllowed: false,
           blockers: ['Crawl validation not attested (admin)'],
-          gates: [],
           qualifiedMetroSlugs: [],
           qualifiedPilotMetros: [],
           rolloutState: enabledSeoRolloutState({ crawlValidationPassed: false }),
         },
-        metroQualification: [],
         metroParticipation: {
-          generatedAt: '2026-06-02T00:00:00.000Z',
           participatingMetroSlugs: [],
           rows: [],
         },
         sitemap: {
-          staticUrlCount: 3,
           listingChunkCount: 0,
           listingUrlCount: 0,
           cityUrlCount: 0,
           weekendUrlCount: 0,
           indexingEnabled: false,
+          listingIndexingEnabled: false,
         },
-        metrics: {
-          indexedMetros: 0,
-          crawlableInventoryPct: null,
-          staleInventoryPct: null,
-          canonicalCoveragePct: null,
-          duplicateCanonicalClusters: null,
-          duplicateVisibleClusters: null,
-          catalogRepairQueue: null,
-          missingValidUrls: null,
-        },
-      },
+      }),
       crawlSmoke: {
         generatedAt: '2026-06-02T00:00:00.000Z',
         baseUrl: 'https://lootaura.app',

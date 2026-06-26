@@ -10,7 +10,7 @@ import { computeSeoSitemapCounts } from '@/lib/seo/sitemap/computeSitemapCounts'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
-import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
+import { enabledSeoRolloutState, healthyEnablementCoverage } from './seoRolloutTestHelpers'
 import { TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 const mockBuildGateMetrics = vi.hoisted(() => vi.fn())
@@ -60,33 +60,32 @@ const qualifiedMetros = [
   { slug: 'houston-tx', city: 'Houston', state: 'TX', timezone: 'America/Chicago', minActiveListings: 25 },
 ]
 
-function assertNonReadyInventoryEmission(indexingAllowed: boolean, publishedCount = 1000) {
-  expect(indexingAllowed).toBe(false)
-  expect(resolveListingIndexRobots(indexingAllowed)).toEqual({ index: false, follow: true })
+function assertListingEmissionBlocked(seoEmissionAllowed: boolean, publishedCount = 1000) {
+  expect(seoEmissionAllowed).toBe(false)
+  expect(resolveListingIndexRobots(seoEmissionAllowed)).toEqual({ index: false, follow: true })
 
-  const plan = resolveSeoSitemapPlan(publishedCount, indexingAllowed)
+  const plan = resolveSeoSitemapPlan(publishedCount, seoEmissionAllowed)
   expect(plan.indexingEnabled).toBe(false)
   expect(plan.segmentIds).toEqual(['static'])
   expect(plan.listingChunkCount).toBe(0)
 
   const counts = computeSeoSitemapCounts({
     totalPublishedListings: publishedCount,
-    inventoryIndexingAllowed: indexingAllowed,
+    listingIndexingAllowed: seoEmissionAllowed,
+    geoIndexingAllowed: false,
     metros: qualifiedMetros,
     inventoryBySlug: qualifiedMetroInventory,
   })
   expect(counts.listingUrlCount).toBe(0)
-  expect(counts.cityUrlCount).toBe(0)
-  expect(counts.weekendUrlCount).toBe(0)
 
-  expect(buildListingFootprint(publishedCount, indexingAllowed)).toEqual({
+  expect(buildListingFootprint(publishedCount, seoEmissionAllowed)).toEqual({
     published: publishedCount,
     indexable: 0,
     noindex: publishedCount,
   })
 }
 
-describe('inventory SEO emission policy (R)', () => {
+describe('inventory SEO emission policy (SEO_ENABLEMENT_V2.1)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
@@ -95,48 +94,33 @@ describe('inventory SEO emission policy (R)', () => {
       metros: qualifiedMetros,
       inventoryBySlug: qualifiedMetroInventory,
     })
-    mockCoverage.mockResolvedValue(minimalYstmCoverageScoreboard())
+    mockCoverage.mockResolvedValue(healthyEnablementCoverage())
     mockBuildGateMetrics.mockResolvedValue(minimalMetrics())
   })
 
-  it('scenario 1 — attestations true, allowlist false', () => {
+  it('scenario 1 — attestations true, metric gate false', () => {
     const coverage = minimalYstmCoverageScoreboard({
-      catalogRepair: {
-        repairQueueTotal: 150,
-        needsGeocode: 0,
-        readyUnpublished: 0,
-        publishFailed: 0,
-        needsCheck: 0,
-        repairedPublishedLast24h: 0,
-        repairFailed: 0,
-      },
-      pipelineBacklog: {
-        missingValidUrls: 10,
-        missingIngestionQueue: 10,
-        missingIngestionNeverAttempted: 3,
-        catalogRepairQueue: 150,
-        existingRefreshStale: 0,
-      },
+      coveragePct: 85,
+      publishedActiveLootAuraYstmUrls: 500,
     })
 
     const rollout = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
       coverage,
       metros: qualifiedMetros,
       inventoryByMetroSlug: qualifiedMetroInventory,
       rolloutState: enabledSeoRolloutState(),
     })
 
-    expect(rollout.rolloutState.crawlValidationPassed).toBe(true)
-    expect(rollout.rolloutState.searchConsoleValidationPassed).toBe(true)
-    assertNonReadyInventoryEmission(rollout.indexingAllowed)
+    expect(rollout.seoEmissionAllowed).toBe(false)
+    assertListingEmissionBlocked(rollout.seoEmissionAllowed)
 
     const snapshot = buildSeoOperationalSnapshot({
       metrics: minimalMetrics(),
       coverage,
       sitemapCounts: computeSeoSitemapCounts({
         totalPublishedListings: 1000,
-        inventoryIndexingAllowed: rollout.indexingAllowed,
+        listingIndexingAllowed: rollout.seoEmissionAllowed,
+        geoIndexingAllowed: rollout.indexingAllowed,
         metros: qualifiedMetros,
         inventoryBySlug: qualifiedMetroInventory,
       }),
@@ -153,13 +137,12 @@ describe('inventory SEO emission policy (R)', () => {
     })
     expect(dashboard.health).toBe('BLOCKED')
     expect(dashboard.indexability.listings).toBe('NOINDEX')
-    expect(dashboard.listingFootprint.indexable).toBe(0)
   })
 
-  it('scenario 2 — attestations true, allowlist true, 0 qualified metros', () => {
+  it('scenario 2 — emission on, 0 qualified metros (listings index, geo blocked)', () => {
+    const coverage = healthyEnablementCoverage()
     const rollout = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
-      coverage: minimalYstmCoverageScoreboard(),
+      coverage,
       metros: [TEST_SEO_METRO_DALLAS],
       inventoryByMetroSlug: {
         'dallas-tx': {
@@ -171,15 +154,23 @@ describe('inventory SEO emission policy (R)', () => {
       rolloutState: enabledSeoRolloutState(),
     })
 
+    expect(rollout.seoEmissionAllowed).toBe(true)
     expect(rollout.indexingAllowed).toBe(false)
-    assertNonReadyInventoryEmission(rollout.indexingAllowed)
+    expect(resolveListingIndexRobots(rollout.seoEmissionAllowed)).toEqual({ index: true, follow: true })
+
+    const listingPlan = resolveSeoSitemapPlan(500, rollout.seoEmissionAllowed)
+    expect(listingPlan.indexingEnabled).toBe(true)
+    const geoPlan = resolveSeoSitemapPlan(500, rollout.indexingAllowed)
+    expect(geoPlan.indexingEnabled).toBe(false)
+    expect(geoPlan.segmentIds).toEqual(['static'])
 
     const snapshot = buildSeoOperationalSnapshot({
       metrics: minimalMetrics(),
-      coverage: minimalYstmCoverageScoreboard(),
+      coverage,
       sitemapCounts: computeSeoSitemapCounts({
         totalPublishedListings: 500,
-        inventoryIndexingAllowed: rollout.indexingAllowed,
+        listingIndexingAllowed: rollout.seoEmissionAllowed,
+        geoIndexingAllowed: rollout.indexingAllowed,
         metros: [TEST_SEO_METRO_DALLAS],
         inventoryBySlug: {
           'dallas-tx': {
@@ -200,31 +191,33 @@ describe('inventory SEO emission policy (R)', () => {
       rolloutState: enabledSeoRolloutState(),
     })
 
-    expect(snapshot.allowlist.indexingAllowed).toBe(true)
     expect(deriveSeoHealthState(snapshot)).toBe('ACTION_REQUIRED')
+    expect(snapshot.sitemap.listingIndexingEnabled).toBe(true)
+    expect(snapshot.sitemap.indexingEnabled).toBe(false)
   })
 
-  it('scenario 3 — attestations true, allowlist true, qualified metros > 0', () => {
+  it('scenario 3 — emission on, qualified metros > 0', () => {
+    const coverage = healthyEnablementCoverage()
     const rollout = evaluateSeoIndexRolloutReadiness({
-      metrics: minimalMetrics(),
-      coverage: minimalYstmCoverageScoreboard(),
+      coverage,
       metros: qualifiedMetros,
       inventoryByMetroSlug: qualifiedMetroInventory,
       rolloutState: enabledSeoRolloutState(),
     })
 
+    expect(rollout.seoEmissionAllowed).toBe(true)
     expect(rollout.indexingAllowed).toBe(true)
-    expect(resolveListingIndexRobots(rollout.indexingAllowed)).toEqual({ index: true, follow: true })
+    expect(resolveListingIndexRobots(rollout.seoEmissionAllowed)).toEqual({ index: true, follow: true })
 
-    const plan = resolveSeoSitemapPlan(2500, rollout.indexingAllowed)
-    expect(plan.indexingEnabled).toBe(true)
-    expect(plan.listingChunkCount).toBeGreaterThan(0)
-    expect(plan.segmentIds).toContain('cities')
-    expect(plan.segmentIds).toContain('weekends')
+    const geoPlan = resolveSeoSitemapPlan(2500, rollout.indexingAllowed)
+    expect(geoPlan.indexingEnabled).toBe(true)
+    expect(geoPlan.segmentIds).toContain('cities')
+    expect(geoPlan.segmentIds).toContain('weekends')
 
     const counts = computeSeoSitemapCounts({
       totalPublishedListings: 2500,
-      inventoryIndexingAllowed: rollout.indexingAllowed,
+      listingIndexingAllowed: rollout.seoEmissionAllowed,
+      geoIndexingAllowed: rollout.indexingAllowed,
       metros: qualifiedMetros,
       inventoryBySlug: qualifiedMetroInventory,
     })
@@ -234,7 +227,7 @@ describe('inventory SEO emission policy (R)', () => {
 
     const snapshot = buildSeoOperationalSnapshot({
       metrics: minimalMetrics(),
-      coverage: minimalYstmCoverageScoreboard(),
+      coverage,
       sitemapCounts: counts,
       metros: qualifiedMetros,
       inventoryByMetroSlug: qualifiedMetroInventory,
@@ -260,7 +253,8 @@ describe('inventory SEO emission policy (R)', () => {
     const emission = await getInventorySeoEmissionForRequest()
 
     expect(emission.metricsAvailable).toBe(false)
+    expect(emission.seoEmissionAllowed).toBe(false)
     expect(emission.indexingAllowed).toBe(false)
-    assertNonReadyInventoryEmission(emission.indexingAllowed)
+    assertListingEmissionBlocked(emission.seoEmissionAllowed)
   })
 })

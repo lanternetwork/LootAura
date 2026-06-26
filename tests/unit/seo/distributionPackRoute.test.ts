@@ -48,14 +48,24 @@ describe('GET /api/admin/seo/distribution-pack', () => {
       },
     ])
     mockLoadAllowlist.mockResolvedValue({
-      indexingAllowed: false,
-      phase0Pass: false,
-      tier1Ready: true,
-      tier2Ready: true,
-      enforcementReady: true,
-      gates: [],
-      blockers: ['SEO public indexing is not enabled by admin (Phase 0)'],
-      generatedAt: new Date().toISOString(),
+      allowlist: {
+        indexingAllowed: false,
+        phase0Pass: false,
+        tier1Ready: true,
+        tier2Ready: true,
+        enforcementReady: true,
+        gates: [],
+        blockers: ['SEO public indexing is not enabled by admin (Phase 0)'],
+        generatedAt: new Date().toISOString(),
+      },
+      enablement: {
+        generatedAt: new Date().toISOString(),
+        metricGatePass: true,
+        seoEmissionAllowed: false,
+        readyForIndexing: false,
+        gates: [],
+        blockers: ['SEO public indexing is not enabled by admin (Phase 0)'],
+      },
     })
     mockFetchMetroInventory.mockResolvedValue({
       sales: [],

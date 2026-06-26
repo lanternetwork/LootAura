@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     metro,
     inventory: summary,
     weekendLabel: weekend.label,
-    robots: resolveMetroPageRobots(metro, summary, emission.indexingAllowed),
+    robots: resolveMetroPageRobots(metro, summary, emission.seoEmissionAllowed),
   })
 }
 

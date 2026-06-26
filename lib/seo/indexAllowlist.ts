@@ -22,7 +22,7 @@ export type SeoIndexGate = {
   label: string
   status: SeoIndexGateStatus
   detail: string
-  source: 'tier1' | 'tier2' | 'phase14' | 'seo_kill_switch'
+  source: 'tier1' | 'tier2' | 'phase14' | 'seo_kill_switch' | 'seo_enablement'
 }
 
 export type SeoIndexAllowlistSnapshot = {

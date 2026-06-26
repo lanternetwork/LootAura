@@ -2,12 +2,13 @@ import type { MetadataRoute } from 'next'
 import { buildStaticSitemapEntries } from '@/lib/seo/sitemap/staticEntries'
 import {
   buildListingSitemapEntriesForChunk,
+  countListingSitemapChunks,
+  listingSitemapChunkId,
   parseListingSitemapChunkId,
 } from '@/lib/seo/sitemap/listingEntries'
 import { fetchPublishedListingRowsForSitemap } from '@/lib/seo/sitemap/fetchPublishedListingRows'
 import { buildCitySitemapEntries } from '@/lib/seo/sitemap/cityEntries'
 import { buildWeekendSitemapEntries } from '@/lib/seo/sitemap/weekendEntries'
-import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
 import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
 import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
 import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
@@ -28,12 +29,20 @@ async function loadNationwideMetroSnapshotForSitemap(): Promise<{
 export async function generateSitemaps() {
   try {
     const emission = await getInventorySeoEmissionForRequest()
-    if (!resolveSeoSitemapPlan(0, emission.indexingAllowed).indexingEnabled) {
+    if (!emission.seoEmissionAllowed) {
       return [{ id: 'static' }]
     }
+
     const rows = await fetchPublishedListingRowsForSitemap()
-    const plan = resolveSeoSitemapPlan(rows.length, emission.indexingAllowed)
-    return plan.segmentIds.map((segmentId) => ({ id: segmentId }))
+    const segmentIds: Array<{ id: string }> = [{ id: 'static' }]
+    const listingChunkCount = countListingSitemapChunks(rows.length)
+    for (let i = 0; i < listingChunkCount; i++) {
+      segmentIds.push({ id: listingSitemapChunkId(i) })
+    }
+    if (emission.indexingAllowed) {
+      segmentIds.push({ id: 'cities' }, { id: 'weekends' })
+    }
+    return segmentIds
   } catch {
     return [{ id: 'static' }]
   }
@@ -50,17 +59,20 @@ export default async function sitemap({
 
   if (id === 'cities' || id === 'weekends') {
     const emission = await getInventorySeoEmissionForRequest()
+    if (!emission.indexingAllowed) {
+      return []
+    }
     const { metros, inventoryBySlug } = await loadNationwideMetroSnapshotForSitemap()
     if (id === 'cities') {
       return buildCitySitemapEntries({
         metros,
-        nationalIndexingAllowed: emission.indexingAllowed,
+        nationalIndexingAllowed: true,
         inventoryBySlug,
       })
     }
     return buildWeekendSitemapEntries({
       metros,
-      nationalIndexingAllowed: emission.indexingAllowed,
+      nationalIndexingAllowed: true,
       inventoryBySlug,
     })
   }
@@ -68,7 +80,7 @@ export default async function sitemap({
   const chunkIndex = parseListingSitemapChunkId(id)
   if (chunkIndex != null) {
     const emission = await getInventorySeoEmissionForRequest()
-    if (!emission.indexingAllowed) {
+    if (!emission.seoEmissionAllowed) {
       return []
     }
     const rows = await fetchPublishedListingRowsForSitemap()

@@ -1,7 +1,9 @@
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
-import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
+import { evaluateYstmStabilizationExit } from '@/lib/admin/ystmStabilizationExitCriteria'
+import { evaluateSeoEnablementGate } from '@/lib/seo/evaluateSeoEnablementGate'
 import { evaluateSeoIndexRolloutReadiness } from '@/lib/seo/indexRollout'
+import { evaluateSeoIndexAllowlist } from '@/lib/seo/indexAllowlist'
 import { evaluateSeoMetroParticipation } from '@/lib/seo/metroParticipation'
 import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
@@ -9,7 +11,10 @@ import type { SeoInventorySummary, SeoMetro } from '@/lib/seo/types'
 
 export type SeoOperationalSnapshot = {
   generatedAt: string
+  enablement: ReturnType<typeof evaluateSeoEnablementGate>
+  /** Legacy stabilization allowlist — unchanged for YSTM tier display. */
   allowlist: ReturnType<typeof evaluateSeoIndexAllowlist>
+  stabilization: ReturnType<typeof evaluateYstmStabilizationExit>
   rollout: ReturnType<typeof evaluateSeoIndexRolloutReadiness>
   metroQualification: ReturnType<typeof qualifyAllSeoMetros>
   metroParticipation: ReturnType<typeof evaluateSeoMetroParticipation>
@@ -20,6 +25,7 @@ export type SeoOperationalSnapshot = {
     cityUrlCount: number
     weekendUrlCount: number
     indexingEnabled: boolean
+    listingIndexingEnabled: boolean
   }
   metrics: {
     indexedMetros: number
@@ -51,9 +57,10 @@ export function buildSeoOperationalSnapshot(options: {
 }): SeoOperationalSnapshot {
   const { metrics, coverage, sitemapCounts, metros, inventoryByMetroSlug = {}, rolloutState } =
     options
+  const enablement = evaluateSeoEnablementGate(coverage, rolloutState)
   const allowlist = evaluateSeoIndexAllowlist(metrics, coverage, rolloutState)
+  const stabilization = evaluateYstmStabilizationExit(metrics, coverage)
   const rollout = evaluateSeoIndexRolloutReadiness({
-    metrics,
     coverage,
     metros,
     inventoryByMetroSlug,
@@ -61,12 +68,12 @@ export function buildSeoOperationalSnapshot(options: {
   })
   const metroQualification = qualifyAllSeoMetros({
     metros,
-    nationalIndexingAllowed: rollout.indexingAllowed,
+    nationalIndexingAllowed: rollout.seoEmissionAllowed,
     inventoryBySlug: inventoryByMetroSlug,
   })
   const metroParticipation = evaluateSeoMetroParticipation({
     metros,
-    nationalIndexingAllowed: rollout.indexingAllowed,
+    nationalIndexingAllowed: rollout.seoEmissionAllowed,
     inventoryBySlug: inventoryByMetroSlug,
   })
 
@@ -84,13 +91,16 @@ export function buildSeoOperationalSnapshot(options: {
 
   return {
     generatedAt: new Date().toISOString(),
+    enablement,
     allowlist,
+    stabilization,
     rollout,
     metroQualification,
     metroParticipation,
     sitemap: {
       ...sitemapCounts,
       indexingEnabled: rollout.indexingAllowed,
+      listingIndexingEnabled: rollout.seoEmissionAllowed,
     },
     metrics: {
       indexedMetros: rollout.qualifiedMetroSlugs.length,

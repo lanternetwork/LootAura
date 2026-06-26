@@ -8,6 +8,7 @@ function stubOperationalSnapshot(overrides: {
   enablement?: Record<string, unknown>
   allowlist?: Record<string, unknown>
   sitemap?: Record<string, unknown>
+  metroParticipation?: Record<string, unknown>
 } = {}) {
   const rolloutState = enabledSeoRolloutState()
   return {
@@ -68,6 +69,7 @@ function stubOperationalSnapshot(overrides: {
           },
         },
       ],
+      ...overrides.metroParticipation,
     },
     sitemap: {
       staticUrlCount: 3,

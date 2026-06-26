@@ -168,16 +168,16 @@ describe('resolveIngestedFootprintForObservation', () => {
     const row = ingestedRow({
       source_url: PA_URL,
       sale_instance_key: INGESTED_KEY,
-      source_listing_id: '1',
+      source_listing_id: '38821937',
     })
     const resolved = resolveIngestedFootprintForObservation(
       {
         canonicalUrl: PA_URL,
         saleInstanceKey: STALE_KEY,
-        sourceListingId: '1',
+        sourceListingId: '38821937',
         normalizedAddress: null,
-        dateStart: '2026-06-10',
-        dateEnd: '2026-06-11',
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
         falseExclusionPrimaryBucket: 'published_not_visible',
         missingIngestionOutcome: 'ingested',
       },
@@ -191,16 +191,16 @@ describe('resolveIngestedFootprintForObservation', () => {
     const row = ingestedRow({
       source_url: PA_URL,
       sale_instance_key: INGESTED_KEY,
-      source_listing_id: '1',
+      source_listing_id: '38821937',
     })
     const resolved = resolveIngestedFootprintForObservation(
       {
         canonicalUrl: PA_URL,
         saleInstanceKey: STALE_KEY,
-        sourceListingId: '1',
+        sourceListingId: '38821937',
         normalizedAddress: null,
-        dateStart: '2026-06-10',
-        dateEnd: '2026-06-11',
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
         missingIngestionOutcome: 'ingested',
       },
       indexWith({ aliasByCanonicalUrl: { [PA_URL]: [row] } })
@@ -212,16 +212,16 @@ describe('resolveIngestedFootprintForObservation', () => {
     const row = ingestedRow({
       source_url: PA_URL,
       sale_instance_key: INGESTED_KEY,
-      source_listing_id: '1',
+      source_listing_id: '38821937',
     })
     const resolved = resolveIngestedFootprintForObservation(
       {
         canonicalUrl: PA_URL,
         saleInstanceKey: STALE_KEY,
-        sourceListingId: '1',
+        sourceListingId: '38821937',
         normalizedAddress: null,
-        dateStart: '2026-06-10',
-        dateEnd: '2026-06-11',
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
         falseExclusionPrimaryBucket: 'never_crawled',
         missingIngestionOutcome: 'ingested',
       },
@@ -256,16 +256,16 @@ describe('resolveIngestedFootprintForObservation', () => {
     const row = ingestedRow({
       source_url: PA_URL,
       sale_instance_key: INGESTED_KEY,
-      source_listing_id: '1',
+      source_listing_id: '38821937',
     })
     const resolved = resolveIngestedFootprintForObservation(
       {
         canonicalUrl: PA_URL,
         saleInstanceKey: STALE_KEY,
-        sourceListingId: '1',
+        sourceListingId: '38821937',
         normalizedAddress: null,
-        dateStart: '2026-06-10',
-        dateEnd: '2026-06-11',
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
         falseExclusionPrimaryBucket: 'published_not_visible',
         missingIngestionOutcome: 'ingested',
       },

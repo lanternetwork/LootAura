@@ -128,16 +128,17 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
   )
 
   const snapshot = useMemo(() => {
-    const sitemapCounts = computeSeoSitemapCounts({
+    const provisionalCounts = computeSeoSitemapCounts({
       totalPublishedListings: publishedListingCount,
-      inventoryIndexingAllowed: false,
+      listingIndexingAllowed: false,
+      geoIndexingAllowed: false,
       metros,
       inventoryBySlug,
     })
     const provisional = buildSeoOperationalSnapshot({
       metrics,
       coverage,
-      sitemapCounts,
+      sitemapCounts: provisionalCounts,
       metros,
       inventoryByMetroSlug: inventoryBySlug,
       rolloutState,
@@ -147,7 +148,8 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       coverage,
       sitemapCounts: computeSeoSitemapCounts({
         totalPublishedListings: publishedListingCount,
-        inventoryIndexingAllowed: provisional.rollout.indexingAllowed,
+        listingIndexingAllowed: provisional.rollout.seoEmissionAllowed,
+        geoIndexingAllowed: provisional.rollout.indexingAllowed,
         metros,
         inventoryBySlug,
       }),
@@ -163,10 +165,8 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <div>
           <h2 className="text-lg font-semibold text-slate-900">SEO operational readiness</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Index allowlist derives from ingestion gates. Rollout attestations are stored in{' '}
-            <code className="text-xs">ingestion_orchestration_state</code> (key{' '}
-            <code className="text-xs">seo_rollout</code>). Metros are discovered nationwide from published
-            inventory; participation is gated by operational thresholds only. Read-only diagnostics:{' '}
+            SEO emission uses the enablement metric gate plus rollout attestations. YSTM stabilization
+            tiers remain for ingestion diagnostics only. Read-only diagnostics:{' '}
             <Link href="/admin/seo" className="font-medium text-purple-700 hover:text-purple-900">
               SEO Operations
             </Link>
@@ -176,12 +176,16 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <div className="flex flex-col items-end gap-1">
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
-              snapshot.allowlist.indexingAllowed
+              snapshot.enablement.seoEmissionAllowed
                 ? 'bg-emerald-100 text-emerald-900'
                 : 'bg-amber-100 text-amber-900'
             }`}
           >
-            {snapshot.allowlist.indexingAllowed ? 'ops allowlist pass' : 'ops allowlist blocked'}
+            {snapshot.enablement.readyForIndexing
+              ? 'SEO_READY_FOR_INDEXING'
+              : snapshot.enablement.metricGatePass
+                ? 'enablement blocked (attestations)'
+                : 'enablement metric gate blocked'}
           </span>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
@@ -190,7 +194,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
                 : 'bg-amber-100 text-amber-900'
             }`}
           >
-            {snapshot.rollout.indexingAllowed ? 'index rollout ready' : 'index rollout blocked'}
+            {snapshot.rollout.indexingAllowed ? 'geo index ready' : 'geo index blocked'}
           </span>
         </div>
       </div>
@@ -355,6 +359,21 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       <SeoDistributionPilotPanel metros={metros} />
 
       <div className="mt-4">
+        <p className="text-sm font-semibold text-slate-900">SEO enablement gates</p>
+        <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+          {snapshot.enablement.gates.map((gate) => (
+            <li
+              key={gate.id}
+              className={`rounded border px-3 py-2 text-xs ${GATE_STYLE[gate.status]}`}
+            >
+              <span className="font-semibold uppercase">{gate.status}</span> [{gate.source}]: {gate.label}{' '}
+              — {gate.detail}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-4">
         <p className="text-sm font-semibold text-slate-900">Index rollout gates</p>
         <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
           {snapshot.rollout.gates.map((gate) => (
@@ -370,7 +389,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
       </div>
 
       <div className="mt-4">
-        <p className="text-sm font-semibold text-slate-900">Operational allowlist gates</p>
+        <p className="text-sm font-semibold text-slate-900">YSTM stabilization allowlist (display only)</p>
         <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
           {snapshot.allowlist.gates.map((gate) => (
             <li

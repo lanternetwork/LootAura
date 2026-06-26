@@ -8,15 +8,14 @@ import {
 } from '@/lib/seo/buildSeoOperationsDashboard'
 import { buildSeoOperationalSnapshot } from '@/lib/seo/buildSeoOperationalSnapshot'
 import { SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
-import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
+import { enabledSeoRolloutState, healthyEnablementCoverage } from './seoRolloutTestHelpers'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
-import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
 import { TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 function buildTestSnapshot(rolloutState = SEO_ROLLOUT_DISABLED_STATE) {
   return buildSeoOperationalSnapshot({
     metrics: minimalMetrics(),
-    coverage: minimalYstmCoverageScoreboard(),
+    coverage: healthyEnablementCoverage(),
     sitemapCounts: {
       staticUrlCount: 3,
       listingChunkCount: 0,
@@ -52,19 +51,38 @@ describe('seo operations dashboard', () => {
     expect(deriveSeoHealthState(snapshot)).toBe('READY')
   })
 
-  it('derives BLOCKED when ingestion allowlist fails', () => {
-    const snapshot = buildTestSnapshot(SEO_ROLLOUT_DISABLED_STATE)
+  it('derives BLOCKED when enablement metric gate fails', () => {
+    const snapshot = buildSeoOperationalSnapshot({
+      metrics: minimalMetrics(),
+      coverage: healthyEnablementCoverage({ coveragePct: 80 }),
+      sitemapCounts: {
+        staticUrlCount: 3,
+        listingChunkCount: 0,
+        listingUrlCount: 0,
+        cityUrlCount: 0,
+        weekendUrlCount: 0,
+      },
+      metros: [TEST_SEO_METRO_DALLAS],
+      inventoryByMetroSlug: {
+        'dallas-tx': {
+          activeListingCount: 50,
+          lastUpdatedAt: '2026-05-30T00:00:00.000Z',
+          crawlableInventoryPct: 0.95,
+        },
+      },
+      rolloutState: SEO_ROLLOUT_DISABLED_STATE,
+    })
     expect(deriveSeoHealthState(snapshot)).toBe('BLOCKED')
   })
 
-  it('derives ACTION_REQUIRED when allowlist passes but rollout attestations are incomplete', () => {
+  it('derives ACTION_REQUIRED when metric gate passes but attestations are incomplete', () => {
     const snapshot = buildTestSnapshot(
       enabledSeoRolloutState({
         crawlValidationPassed: false,
         searchConsoleValidationPassed: false,
       })
     )
-    expect(snapshot.allowlist.indexingAllowed).toBe(true)
+    expect(snapshot.enablement.metricGatePass).toBe(true)
     expect(deriveSeoHealthState(snapshot)).toBe('ACTION_REQUIRED')
   })
 
@@ -81,7 +99,7 @@ describe('seo operations dashboard', () => {
     expect(summary.configuredEnv).toBe('https://lootaura.com')
   })
 
-  it('listing footprint is binary with rollout state', () => {
+  it('listing footprint is binary with seo emission state', () => {
     expect(buildListingFootprint(1248, true)).toEqual({
       published: 1248,
       indexable: 1248,
@@ -103,13 +121,14 @@ describe('seo operations dashboard', () => {
     })
     const text = formatSeoDiagnosticsText(dashboard)
     expect(text).toContain('SEO HEALTH: READY')
+    expect(text).toContain('SEO emission allowed: yes')
     expect(text).toContain('Public Indexing: true')
     expect(text).toContain('Listings: INDEX')
     expect(text).toContain('Published: 1248')
     expect(text).toContain('Indexable: 1248')
   })
 
-  it('never shows INDEX listings with zero indexable footprint when R is false', () => {
+  it('never shows INDEX listings with zero indexable footprint when emission is false', () => {
     const snapshot = buildTestSnapshot(
       enabledSeoRolloutState({
         crawlValidationPassed: false,
@@ -123,7 +142,7 @@ describe('seo operations dashboard', () => {
       configuredSiteUrl: 'https://lootaura.com',
     })
 
-    expect(snapshot.rollout.indexingAllowed).toBe(false)
+    expect(snapshot.rollout.seoEmissionAllowed).toBe(false)
     expect(dashboard.indexability.listings).toBe('NOINDEX')
     expect(dashboard.listingFootprint.indexable).toBe(0)
     expect(dashboard.listingFootprint.noindex).toBe(1248)

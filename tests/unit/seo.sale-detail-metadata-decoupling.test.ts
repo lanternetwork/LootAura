@@ -2,30 +2,19 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockBuildIngestionMetricsResponse = vi.hoisted(() => vi.fn())
-const mockBuildYstmCoverageScoreboard = vi.hoisted(() => vi.fn())
-const mockFetchNationwideSeoMetroInventory = vi.hoisted(() => vi.fn())
 const mockGetInventorySeoEmissionForRequest = vi.hoisted(() => vi.fn())
+const mockLoadIngestedFlags = vi.hoisted(() => vi.fn())
 const mockGetSaleWithItemsForRequest = vi.hoisted(() => vi.fn())
 const mockCreateSupabaseServerClient = vi.hoisted(() => vi.fn())
-const mockGetSeoRolloutStateForRequest = vi.hoisted(() => vi.fn())
 
 const saleDetailPageSourcePath = path.join(process.cwd(), 'app/sales/[id]/page.tsx')
 
-vi.mock('@/app/api/admin/ingestion/metrics/route', () => ({
-  buildIngestionMetricsResponse: (...args: unknown[]) => mockBuildIngestionMetricsResponse(...args),
-}))
-
-vi.mock('@/lib/admin/ystmCoverageScoreboard', () => ({
-  buildYstmCoverageScoreboard: (...args: unknown[]) => mockBuildYstmCoverageScoreboard(...args),
-}))
-
-vi.mock('@/lib/seo/fetchAllSeoMetroInventory', () => ({
-  fetchNationwideSeoMetroInventory: (...args: unknown[]) => mockFetchNationwideSeoMetroInventory(...args),
-}))
-
 vi.mock('@/lib/seo/resolveInventorySeoEmission', () => ({
   getInventorySeoEmissionForRequest: (...args: unknown[]) => mockGetInventorySeoEmissionForRequest(...args),
+}))
+
+vi.mock('@/lib/seo/sitemap/fetchPublishedListingRows', () => ({
+  loadIngestedEligibilityFlagsForPublishedSale: (...args: unknown[]) => mockLoadIngestedFlags(...args),
 }))
 
 vi.mock('@/lib/data/saleDetailLoader', () => ({
@@ -36,16 +25,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) => mockCreateSupabaseServerClient(...args),
 }))
 
-vi.mock('@/lib/seo/loadSeoRolloutState', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/seo/loadSeoRolloutState')>('@/lib/seo/loadSeoRolloutState')
-  return {
-    ...actual,
-    getSeoRolloutStateForRequest: (...args: unknown[]) => mockGetSeoRolloutStateForRequest(...args),
-    getSeoMetrosForRequest: vi.fn().mockResolvedValue([]),
-  }
-})
-
-describe('sale detail metadata decoupling', () => {
+describe('sale detail metadata SEO emission', () => {
   function setupSale(overrides: Record<string, unknown> = {}) {
     mockGetSaleWithItemsForRequest.mockResolvedValue({
       sale: {
@@ -63,6 +43,9 @@ describe('sale detail metadata decoupling', () => {
         updated_at: '2026-06-01T00:00:00Z',
         moderation_status: 'approved',
         archived_at: null,
+        external_source_url: 'https://www.yardsaletreasuremap.com/sale/abc123',
+        lat: 38.25,
+        lng: -85.76,
         ...overrides,
       },
       items: [],
@@ -71,106 +54,79 @@ describe('sale detail metadata decoupling', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockBuildIngestionMetricsResponse.mockResolvedValue({ ok: true })
-    mockBuildYstmCoverageScoreboard.mockResolvedValue({})
-    mockFetchNationwideSeoMetroInventory.mockResolvedValue({ metros: [], inventoryBySlug: {} })
     mockGetInventorySeoEmissionForRequest.mockResolvedValue({
+      seoEmissionAllowed: false,
       indexingAllowed: false,
       metricsAvailable: true,
-      rollout: { indexingAllowed: false, blockers: [] },
+      rollout: { seoEmissionAllowed: false, indexingAllowed: false, blockers: [] },
     })
-    mockGetSeoRolloutStateForRequest.mockResolvedValue({
-      publicIndexingEnabled: false,
-      publicIndexingEnabledAt: null,
-      publicIndexingDisabledAt: null,
-      crawlValidationPassed: false,
-      crawlValidationPassedAt: null,
-      searchConsoleValidationPassed: false,
-      searchConsoleValidationPassedAt: null,
+    mockLoadIngestedFlags.mockResolvedValue({
+      ingestedIsDuplicate: false,
+      ingestedSuperseded: false,
     })
-
     mockCreateSupabaseServerClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
       },
     })
-
     setupSale()
   })
 
-  it('does not execute admin telemetry dependencies during sale metadata generation', async () => {
+  it('uses shared inventory emission resolver for listing robots', async () => {
     const page = await import('@/app/sales/[id]/page')
-    const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
-
-    expect(metadata).toBeDefined()
-    expect(mockGetSeoRolloutStateForRequest).toHaveBeenCalledTimes(1)
-    expect(mockGetInventorySeoEmissionForRequest).not.toHaveBeenCalled()
-    expect(mockBuildIngestionMetricsResponse).not.toHaveBeenCalled()
-    expect(mockBuildYstmCoverageScoreboard).not.toHaveBeenCalled()
-    expect(mockFetchNationwideSeoMetroInventory).not.toHaveBeenCalled()
+    await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
+    expect(mockGetInventorySeoEmissionForRequest).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps inventory emission and admin telemetry out of sale detail page source', () => {
+  it('keeps emission resolver and cohort eligibility in sale detail page source', () => {
     const source = readFileSync(saleDetailPageSourcePath, 'utf8')
-    expect(source).not.toContain('getInventorySeoEmissionForRequest')
-    expect(source).not.toContain('buildIngestionMetricsResponse')
-    expect(source).not.toContain('buildYstmCoverageScoreboard')
-    expect(source).not.toContain('fetchNationwideSeoMetroInventory')
-    expect(source).toContain('getSeoRolloutStateForRequest')
-    expect(source).toContain('isSeoIndexRolloutReady')
+    expect(source).toContain('getInventorySeoEmissionForRequest')
+    expect(source).toContain('isSaleSeoIndexEligible')
+    expect(source).toContain('loadIngestedEligibilityFlagsForPublishedSale')
   })
 
-  it('returns noindex when rollout state is unavailable', async () => {
-    mockGetSeoRolloutStateForRequest.mockRejectedValueOnce(new Error('rollout unavailable'))
+  it('returns noindex when emission resolver fails', async () => {
+    mockGetInventorySeoEmissionForRequest.mockRejectedValueOnce(new Error('emission unavailable'))
     const page = await import('@/app/sales/[id]/page')
     const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
     expect(metadata.robots).toMatchObject({ index: false, follow: true })
   })
 
-  it('returns noindex when rollout is disabled or not ready', async () => {
-    mockGetSeoRolloutStateForRequest.mockResolvedValueOnce({
-      publicIndexingEnabled: false,
-      publicIndexingEnabledAt: null,
-      publicIndexingDisabledAt: null,
-      crawlValidationPassed: true,
-      crawlValidationPassedAt: '2026-06-01T00:00:00Z',
-      searchConsoleValidationPassed: true,
-      searchConsoleValidationPassedAt: '2026-06-01T00:00:00Z',
+  it('returns noindex when national emission is blocked', async () => {
+    mockGetInventorySeoEmissionForRequest.mockResolvedValueOnce({
+      seoEmissionAllowed: false,
+      indexingAllowed: false,
+      metricsAvailable: true,
+      rollout: { seoEmissionAllowed: false, indexingAllowed: false, blockers: [] },
     })
     const page = await import('@/app/sales/[id]/page')
     const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
     expect(metadata.robots).toMatchObject({ index: false, follow: true })
   })
 
-  it('can return index when rollout is ready and sale is locally eligible', async () => {
-    mockGetSeoRolloutStateForRequest.mockResolvedValueOnce({
-      publicIndexingEnabled: true,
-      publicIndexingEnabledAt: '2026-06-01T00:00:00Z',
-      publicIndexingDisabledAt: null,
-      crawlValidationPassed: true,
-      crawlValidationPassedAt: '2026-06-01T00:00:00Z',
-      searchConsoleValidationPassed: true,
-      searchConsoleValidationPassedAt: '2026-06-01T00:00:00Z',
+  it('can return index when emission is allowed and sale is cohort-eligible', async () => {
+    mockGetInventorySeoEmissionForRequest.mockResolvedValueOnce({
+      seoEmissionAllowed: true,
+      indexingAllowed: true,
+      metricsAvailable: true,
+      rollout: { seoEmissionAllowed: true, indexingAllowed: true, blockers: [] },
     })
-    setupSale({ status: 'published', moderation_status: 'approved', archived_at: null })
     const page = await import('@/app/sales/[id]/page')
     const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
     expect(metadata.robots).toMatchObject({ index: true, follow: true })
   })
 
-  it('returns noindex when sale is locally ineligible', async () => {
-    mockGetSeoRolloutStateForRequest.mockResolvedValueOnce({
-      publicIndexingEnabled: true,
-      publicIndexingEnabledAt: '2026-06-01T00:00:00Z',
-      publicIndexingDisabledAt: null,
-      crawlValidationPassed: true,
-      crawlValidationPassedAt: '2026-06-01T00:00:00Z',
-      searchConsoleValidationPassed: true,
-      searchConsoleValidationPassedAt: '2026-06-01T00:00:00Z',
+  it('returns noindex when sale fails cohort eligibility', async () => {
+    mockGetInventorySeoEmissionForRequest.mockResolvedValueOnce({
+      seoEmissionAllowed: true,
+      indexingAllowed: true,
+      metricsAvailable: true,
+      rollout: { seoEmissionAllowed: true, indexingAllowed: true, blockers: [] },
     })
-    setupSale({ status: 'draft' })
+    setupSale({ status: 'draft', external_source_url: null, lat: null, lng: null })
     const page = await import('@/app/sales/[id]/page')
     const metadata = await page.generateMetadata({ params: Promise.resolve({ id: 'sale-1' }) })
     expect(metadata.robots).toMatchObject({ index: false, follow: true })
+    expect(mockLoadIngestedFlags).not.toHaveBeenCalled()
   })
 })

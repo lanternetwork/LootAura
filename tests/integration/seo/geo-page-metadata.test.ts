@@ -16,9 +16,15 @@ vi.mock('@/lib/seo/loadSeoRolloutState', () => ({
 
 vi.mock('@/lib/seo/resolveInventorySeoEmission', () => ({
   getInventorySeoEmissionForRequest: vi.fn(async () => ({
+    seoEmissionAllowed: true,
     indexingAllowed: true,
     metricsAvailable: true,
-    rollout: { indexingAllowed: true, blockers: [], qualifiedMetroSlugs: ['dallas-tx'] },
+    rollout: {
+      seoEmissionAllowed: true,
+      indexingAllowed: true,
+      blockers: [],
+      qualifiedMetroSlugs: ['dallas-tx'],
+    },
   })),
 }))
 

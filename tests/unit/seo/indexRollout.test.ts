@@ -7,7 +7,7 @@ import {
 import { isSeoIndexRolloutReady, SEO_ROLLOUT_DISABLED_STATE } from '@/lib/seo/seoRolloutTypes'
 import { minimalMetrics } from '../admin/ystmStabilizationExitCriteria.test'
 import { minimalYstmCoverageScoreboard } from '../admin/evaluateYstmSaleInstanceRolloutGates.test'
-import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
+import { enabledSeoRolloutState, healthyEnablementCoverage } from './seoRolloutTestHelpers'
 import { TEST_SEO_METRO_AUSTIN, TEST_SEO_METRO_DALLAS } from './seoTestFixtures'
 
 const healthyInventory = {
@@ -82,7 +82,7 @@ describe('seo index rollout', () => {
     ]
     const result = evaluateSeoIndexRolloutReadiness({
       metrics: minimalMetrics(),
-      coverage: minimalYstmCoverageScoreboard(),
+      coverage: healthyEnablementCoverage(),
       metros,
       rolloutState: enabledSeoRolloutState(),
       inventoryByMetroSlug: {

@@ -21,8 +21,11 @@ export function deriveSeoHealthState(snapshot: SeoOperationalSnapshot): SeoHealt
   if (snapshot.rollout.indexingAllowed) {
     return 'READY'
   }
-  if (!snapshot.allowlist.indexingAllowed) {
+  if (!snapshot.enablement.metricGatePass) {
     return 'BLOCKED'
+  }
+  if (!snapshot.enablement.seoEmissionAllowed) {
+    return 'ACTION_REQUIRED'
   }
   return 'ACTION_REQUIRED'
 }
@@ -31,11 +34,11 @@ export function buildSeoHealthBlockers(snapshot: SeoOperationalSnapshot): SeoHea
   const blockers: SeoHealthBlocker[] = []
   const seen = new Set<string>()
 
-  for (const text of snapshot.allowlist.blockers) {
-    const key = `ingestion:${text}`
+  for (const text of snapshot.enablement.blockers) {
+    const key = `enablement:${text}`
     if (!seen.has(key)) {
       seen.add(key)
-      blockers.push({ source: 'ingestion', text })
+      blockers.push({ source: 'rollout', text })
     }
   }
 
@@ -70,7 +73,7 @@ export function buildCanonicalSummary(
 }
 
 export function buildIndexabilitySummary(snapshot: SeoOperationalSnapshot): SeoIndexabilitySummary {
-  const listingRobots = resolveListingIndexRobots(snapshot.rollout.indexingAllowed)
+  const listingRobots = resolveListingIndexRobots(snapshot.rollout.seoEmissionAllowed)
   const qualifiedMetroCount = snapshot.metroParticipation.participatingMetroSlugs.length
   const totalMetroCount = snapshot.metroParticipation.rows.length
   const blockedMetroCount = totalMetroCount - qualifiedMetroCount
@@ -108,12 +111,21 @@ export function buildSitemapDiagnostics(
   publishedCount: number
 ): SeoSitemapDiagnostics {
   const baseUrl = getSeoBaseUrl()
-  const plan = resolveSeoSitemapPlan(publishedCount, snapshot.rollout.indexingAllowed)
+  const listingPlan = resolveSeoSitemapPlan(publishedCount, snapshot.rollout.seoEmissionAllowed)
+  const geoPlan = resolveSeoSitemapPlan(publishedCount, snapshot.rollout.indexingAllowed)
+  const segmentSet = new Set<string>(['static'])
+  for (const id of listingPlan.segmentIds) {
+    if (String(id).startsWith('listings-')) segmentSet.add(String(id))
+  }
+  if (geoPlan.indexingEnabled) {
+    segmentSet.add('cities')
+    segmentSet.add('weekends')
+  }
 
   return {
     sitemapUrl: `${baseUrl}/sitemap.xml`,
-    indexingEnabled: plan.indexingEnabled,
-    segments: plan.segmentIds.map(String),
+    indexingEnabled: snapshot.rollout.indexingAllowed || snapshot.rollout.seoEmissionAllowed,
+    segments: [...segmentSet],
     staticUrlCount: snapshot.sitemap.staticUrlCount,
     listingUrlCount: snapshot.sitemap.listingUrlCount,
     cityUrlCount: snapshot.sitemap.cityUrlCount,
@@ -138,6 +150,14 @@ export function buildMetricsUnavailableSeoOperationsDashboard(options?: {
 }): SeoOperationsDashboard {
   const snapshot: SeoOperationalSnapshot = {
     generatedAt: new Date().toISOString(),
+    enablement: {
+      generatedAt: new Date().toISOString(),
+      metricGatePass: false,
+      seoEmissionAllowed: false,
+      readyForIndexing: false,
+      gates: [],
+      blockers: ['SEO operational inputs unavailable'],
+    },
     allowlist: {
       generatedAt: new Date().toISOString(),
       indexingAllowed: false,
@@ -148,8 +168,16 @@ export function buildMetricsUnavailableSeoOperationsDashboard(options?: {
       gates: [],
       blockers: ['SEO operational inputs unavailable'],
     },
+    stabilization: {
+      tier1Ready: false,
+      tier2Ready: false,
+      tier1Criteria: [],
+      tier2Criteria: [],
+      holdNote: '',
+    },
     rollout: {
       generatedAt: new Date().toISOString(),
+      seoEmissionAllowed: false,
       indexingAllowed: false,
       blockers: ['SEO operational inputs unavailable'],
       gates: [],
@@ -170,6 +198,7 @@ export function buildMetricsUnavailableSeoOperationsDashboard(options?: {
       cityUrlCount: 0,
       weekendUrlCount: 0,
       indexingEnabled: false,
+      listingIndexingEnabled: false,
     },
     metrics: {
       indexedMetros: 0,
@@ -238,7 +267,7 @@ export function buildSeoOperationsDashboard(options: {
     indexability: buildIndexabilitySummary(snapshot),
     listingFootprint: buildListingFootprint(
       publishedListingCount,
-      snapshot.rollout.indexingAllowed
+      snapshot.rollout.seoEmissionAllowed
     ),
     sitemap: buildSitemapDiagnostics(snapshot, publishedListingCount),
     internalLinks,
@@ -260,6 +289,15 @@ export function formatSeoDiagnosticsText(dashboard: SeoOperationsDashboard): str
     }
     lines.push('')
   }
+
+  lines.push('Enablement:')
+  lines.push(
+    `- SEO emission allowed: ${dashboard.snapshot.enablement.seoEmissionAllowed ? 'yes' : 'no'}`
+  )
+  lines.push(
+    `- Ready for indexing: ${dashboard.snapshot.enablement.readyForIndexing ? 'yes' : 'no'}`
+  )
+  lines.push('')
 
   lines.push('Rollout:')
   lines.push(`- Public Indexing: ${dashboard.rolloutState.publicIndexingEnabled}`)

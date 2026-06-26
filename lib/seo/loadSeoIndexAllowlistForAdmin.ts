@@ -1,6 +1,10 @@
 import type { NextRequest } from 'next/server'
 import { GET as getYstmCoverage } from '@/app/api/admin/ingestion/ystm-coverage/route'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
+import {
+  evaluateSeoEnablementGate,
+  type SeoEnablementGateSnapshot,
+} from '@/lib/seo/evaluateSeoEnablementGate'
 import { evaluateSeoIndexAllowlist, type SeoIndexAllowlistSnapshot } from '@/lib/seo/indexAllowlist'
 import { buildSeoIngestionGateMetrics } from '@/lib/seo/buildSeoIngestionGateMetrics'
 import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
@@ -13,13 +17,17 @@ export class SeoOperationalGateUnavailableError extends Error {
   }
 }
 
+export type SeoOperationalGateSnapshot = {
+  allowlist: SeoIndexAllowlistSnapshot
+  enablement: SeoEnablementGateSnapshot
+}
+
 /**
- * Loads the same SEO index allowlist snapshot as the ingestion dashboard by reusing
- * the admin metrics + coverage API handlers (single source of truth, server-side only).
+ * Loads SEO operational gates for admin surfaces (ingestion panel, distribution pack).
  */
 export async function loadSeoIndexAllowlistForAdmin(
   request: NextRequest
-): Promise<SeoIndexAllowlistSnapshot> {
+): Promise<SeoOperationalGateSnapshot> {
   const [coverageRes, metrics, rolloutState] = await Promise.all([
     getYstmCoverage(request),
     buildSeoIngestionGateMetrics(),
@@ -38,10 +46,13 @@ export async function loadSeoIndexAllowlistForAdmin(
     throw new SeoOperationalGateUnavailableError('Ingestion operational metrics reported failure')
   }
 
-  return evaluateSeoIndexAllowlist(metrics, coverage, rolloutState)
+  return {
+    allowlist: evaluateSeoIndexAllowlist(metrics, coverage, rolloutState),
+    enablement: evaluateSeoEnablementGate(coverage, rolloutState),
+  }
 }
 
-/** National operational allowlist pass — mirrors SeoOperationalPanel / metro expansion wiring. */
-export function resolveSeoNationalIndexingAllowed(allowlist: SeoIndexAllowlistSnapshot): boolean {
-  return allowlist.indexingAllowed
+/** National SEO emission — SEO_ENABLEMENT_V2.1 metric gate + attestations. */
+export function resolveSeoNationalIndexingAllowed(snapshot: SeoOperationalGateSnapshot): boolean {
+  return snapshot.enablement.seoEmissionAllowed
 }

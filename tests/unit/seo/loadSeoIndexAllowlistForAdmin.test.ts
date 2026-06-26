@@ -48,12 +48,12 @@ describe('loadSeoIndexAllowlistForAdmin', () => {
     const { loadSeoIndexAllowlistForAdmin, resolveSeoNationalIndexingAllowed } = await import(
       '@/lib/seo/loadSeoIndexAllowlistForAdmin'
     )
-    const allowlist = await loadSeoIndexAllowlistForAdmin(request)
+    const gates = await loadSeoIndexAllowlistForAdmin(request)
 
     expect(mockGetCoverage).toHaveBeenCalledWith(request)
     expect(mockBuildGateMetrics).toHaveBeenCalledTimes(1)
-    expect(allowlist.tier1Ready).toBe(true)
-    expect(resolveSeoNationalIndexingAllowed(allowlist)).toBe(allowlist.indexingAllowed)
+    expect(gates.allowlist.tier1Ready).toBe(true)
+    expect(resolveSeoNationalIndexingAllowed(gates)).toBe(gates.enablement.seoEmissionAllowed)
   })
 
   it('fails closed when operational HTTP responses are not ok', async () => {

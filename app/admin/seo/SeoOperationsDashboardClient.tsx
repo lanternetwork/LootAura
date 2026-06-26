@@ -181,7 +181,29 @@ export default function SeoOperationsDashboardClient() {
               </Card>
             </div>
 
-            <Card title="Operational Allowlist">
+            <Card title="SEO Enablement">
+              <p className="mb-2 text-xs text-slate-600">
+                {dashboard.snapshot.enablement.readyForIndexing
+                  ? 'SEO_READY_FOR_INDEXING'
+                  : dashboard.snapshot.enablement.metricGatePass
+                    ? 'Metric gate pass — awaiting attestations'
+                    : 'Metric gate blocked'}
+              </p>
+              <ul className="max-h-64 space-y-1 overflow-y-auto text-sm text-slate-700">
+                {dashboard.snapshot.enablement.gates.map((gate) => (
+                  <li key={gate.id} className="flex flex-wrap gap-2">
+                    <span className={`font-semibold uppercase ${gateStatusClass(gate.status)}`}>
+                      {gate.status}
+                    </span>
+                    <span className="text-slate-500">[{gate.source}]</span>
+                    <span>{gate.label}</span>
+                    <span className="text-slate-500">— {gate.detail}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
+            <Card title="YSTM Stabilization (display only)">
               <ul className="max-h-64 space-y-1 overflow-y-auto text-sm text-slate-700">
                 {dashboard.snapshot.allowlist.gates.map((gate) => (
                   <li key={gate.id} className="flex flex-wrap gap-2">

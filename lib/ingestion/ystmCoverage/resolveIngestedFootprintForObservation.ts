@@ -24,6 +24,8 @@ export type ObservationIngestedFootprintInput = {
   normalizedAddress: string | null
   dateStart: string | null
   dateEnd: string | null
+  missingIngestionOutcome?: string | null
+  falseExclusionPrimaryBucket?: string | null
 }
 
 export type ObservationFootprintSourceRow = {
@@ -31,6 +33,8 @@ export type ObservationFootprintSourceRow = {
   sale_instance_key?: string | null
   source_listing_id?: string | null
   matched_ingested_sale_id?: string | null
+  missing_ingestion_outcome?: string | null
+  false_exclusion_primary_bucket?: string | null
   list_metadata_snapshot?: YstmListMetadataSale | null
 }
 
@@ -91,6 +95,19 @@ function instanceAgreesWithFootprint(
   }
 
   return !key && !listingId
+}
+
+/** PNV + ingested: alias path may link despite stale observation sale_instance_key. */
+export function allowStaleInstanceKeyAliasBypass(
+  input: Pick<
+    ObservationIngestedFootprintInput,
+    'falseExclusionPrimaryBucket' | 'missingIngestionOutcome'
+  >
+): boolean {
+  return (
+    input.falseExclusionPrimaryBucket === 'published_not_visible' &&
+    input.missingIngestionOutcome === 'ingested'
+  )
 }
 
 export function toIngestedFootprintSnapshot(row: IngestedFootprintRow): FalseExclusionIngestedRowSnapshot {
@@ -176,6 +193,8 @@ export function buildObservationFootprintInput(
     normalizedAddress: meta?.address ? normalizeAddressLine(meta.address) : null,
     dateStart: meta?.startDate ?? null,
     dateEnd: meta?.endDate ?? null,
+    missingIngestionOutcome: row.missing_ingestion_outcome ?? null,
+    falseExclusionPrimaryBucket: row.false_exclusion_primary_bucket ?? null,
   }
 }
 
@@ -184,8 +203,11 @@ function matchByUrlFootprint(
   rows: readonly IngestedFootprintRow[],
   matchMethod: 'source_url_alias' | 'source_url_visible'
 ): ResolvedIngestedFootprint | null {
+  const aliasBypass =
+    matchMethod === 'source_url_alias' && allowStaleInstanceKeyAliasBypass(input)
+
   for (const row of rows) {
-    if (instanceAgreesWithFootprint(input, row)) {
+    if (aliasBypass || instanceAgreesWithFootprint(input, row)) {
       return {
         ingested: toIngestedFootprintSnapshot(row),
         matchMethod,

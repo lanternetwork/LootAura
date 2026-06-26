@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  allowStaleInstanceKeyAliasBypass,
   buildObservationFootprintInput,
   resolveIngestedFootprintForObservation,
   type IngestedFootprintRow,
@@ -7,7 +8,10 @@ import {
 } from '@/lib/ingestion/ystmCoverage/resolveIngestedFootprintForObservation'
 
 const BASE_URL = 'https://yardsaletreasuremap.com/US/TX/Austin/1/listing.html'
+const PA_URL = 'https://yardsaletreasuremap.com/US/CA/Palo%20Alto/1/listing.html'
 const ALT_URL = 'https://yardsaletreasuremap.com/US/TX/Austin/alt/listing.html'
+const STALE_KEY = 'external_page_source:CA|scotts valley|addr:2026-06-10|2026-06-11:1'
+const INGESTED_KEY = 'external_page_source:CA|palo alto|addr:2026-06-10|2026-06-11:1'
 
 function ingestedRow(overrides: Partial<IngestedFootprintRow> = {}): IngestedFootprintRow {
   return {
@@ -137,5 +141,147 @@ describe('resolveIngestedFootprintForObservation', () => {
     })
     expect(input.normalizedAddress).toBe('456 oak st')
     expect(input.dateStart).toBe('2026-06-12')
+  })
+
+  it('allowStaleInstanceKeyAliasBypass is true only for PNV + ingested', () => {
+    expect(
+      allowStaleInstanceKeyAliasBypass({
+        falseExclusionPrimaryBucket: 'published_not_visible',
+        missingIngestionOutcome: 'ingested',
+      })
+    ).toBe(true)
+    expect(
+      allowStaleInstanceKeyAliasBypass({
+        falseExclusionPrimaryBucket: 'published_not_visible',
+        missingIngestionOutcome: null,
+      })
+    ).toBe(false)
+    expect(
+      allowStaleInstanceKeyAliasBypass({
+        falseExclusionPrimaryBucket: 'never_crawled',
+        missingIngestionOutcome: 'ingested',
+      })
+    ).toBe(false)
+  })
+
+  it('alias bypass resolves PNV row with stale sale_instance_key (V2)', () => {
+    const row = ingestedRow({
+      source_url: PA_URL,
+      sale_instance_key: INGESTED_KEY,
+      source_listing_id: '38821937',
+    })
+    const resolved = resolveIngestedFootprintForObservation(
+      {
+        canonicalUrl: PA_URL,
+        saleInstanceKey: STALE_KEY,
+        sourceListingId: '38821937',
+        normalizedAddress: null,
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
+        falseExclusionPrimaryBucket: 'published_not_visible',
+        missingIngestionOutcome: 'ingested',
+      },
+      indexWith({ aliasByCanonicalUrl: { [PA_URL]: [row] } })
+    )
+    expect(resolved?.matchMethod).toBe('source_url_alias')
+    expect(resolved?.ingested.id).toBe('ing-1')
+  })
+
+  it('alias rejects stale key mismatch when bucket field absent', () => {
+    const row = ingestedRow({
+      source_url: PA_URL,
+      sale_instance_key: INGESTED_KEY,
+      source_listing_id: '38821937',
+    })
+    const resolved = resolveIngestedFootprintForObservation(
+      {
+        canonicalUrl: PA_URL,
+        saleInstanceKey: STALE_KEY,
+        sourceListingId: '38821937',
+        normalizedAddress: null,
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
+        missingIngestionOutcome: 'ingested',
+      },
+      indexWith({ aliasByCanonicalUrl: { [PA_URL]: [row] } })
+    )
+    expect(resolved).toBeNull()
+  })
+
+  it('alias rejects stale key mismatch for never_crawled bucket', () => {
+    const row = ingestedRow({
+      source_url: PA_URL,
+      sale_instance_key: INGESTED_KEY,
+      source_listing_id: '38821937',
+    })
+    const resolved = resolveIngestedFootprintForObservation(
+      {
+        canonicalUrl: PA_URL,
+        saleInstanceKey: STALE_KEY,
+        sourceListingId: '38821937',
+        normalizedAddress: null,
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
+        falseExclusionPrimaryBucket: 'never_crawled',
+        missingIngestionOutcome: 'ingested',
+      },
+      indexWith({ aliasByCanonicalUrl: { [PA_URL]: [row] } })
+    )
+    expect(resolved).toBeNull()
+  })
+
+  it('sale_instance_key still takes precedence when keys align', () => {
+    const row = ingestedRow()
+    const resolved = resolveIngestedFootprintForObservation(
+      {
+        canonicalUrl: BASE_URL,
+        saleInstanceKey: 'key-1',
+        sourceListingId: null,
+        normalizedAddress: null,
+        dateStart: null,
+        dateEnd: null,
+        falseExclusionPrimaryBucket: 'published_not_visible',
+        missingIngestionOutcome: 'ingested',
+      },
+      indexWith({
+        bySaleInstanceKey: { 'key-1': [row] },
+        aliasByCanonicalUrl: { [BASE_URL]: [ingestedRow({ id: 'ing-alias' })] },
+      })
+    )
+    expect(resolved?.matchMethod).toBe('sale_instance_key')
+    expect(resolved?.ingested.id).toBe('ing-1')
+  })
+
+  it('direct source_url_visible path stays strict without alias bypass', () => {
+    const row = ingestedRow({
+      source_url: PA_URL,
+      sale_instance_key: INGESTED_KEY,
+      source_listing_id: '38821937',
+    })
+    const resolved = resolveIngestedFootprintForObservation(
+      {
+        canonicalUrl: PA_URL,
+        saleInstanceKey: STALE_KEY,
+        sourceListingId: '38821937',
+        normalizedAddress: null,
+        dateStart: '2026-06-01',
+        dateEnd: '2026-06-02',
+        falseExclusionPrimaryBucket: 'published_not_visible',
+        missingIngestionOutcome: 'ingested',
+      },
+      indexWith({ directByCanonicalUrl: { [PA_URL]: [row] } })
+    )
+    expect(resolved).toBeNull()
+  })
+
+  it('buildObservationFootprintInput passes PNV bypass fields from source row', () => {
+    const input = buildObservationFootprintInput({
+      canonical_url: PA_URL,
+      sale_instance_key: STALE_KEY,
+      missing_ingestion_outcome: 'ingested',
+      false_exclusion_primary_bucket: 'published_not_visible',
+    })
+    expect(input.missingIngestionOutcome).toBe('ingested')
+    expect(input.falseExclusionPrimaryBucket).toBe('published_not_visible')
   })
 })

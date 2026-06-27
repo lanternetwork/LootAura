@@ -16,6 +16,14 @@ export type SeoEnablementGateSnapshot = {
   blockers: string[]
 }
 
+/** Minimal metric inputs — no full YstmCoverageScoreboard required. */
+export type SeoEnablementMetricGateFields = {
+  coveragePct: number | null
+  effectiveMissingValid: number | null
+  duplicateCanonicalClusters: number | null
+  publishedActiveInventory: number | null
+}
+
 function gate(
   id: string,
   label: string,
@@ -38,13 +46,13 @@ function attestationGate(
 /**
  * SEO_ENABLEMENT_GATE_V1 — decoupled from YSTM stabilization exit criteria.
  */
-export function evaluateSeoEnablementMetricGate(
-  coverage: YstmCoverageMetricsResponse | null
+export function evaluateSeoEnablementMetricGateFromSnapshotFields(
+  fields: SeoEnablementMetricGateFields | null
 ): Pick<SeoEnablementGateSnapshot, 'metricGatePass' | 'gates' | 'blockers'> {
   const gates: SeoIndexGate[] = []
   const blockers: string[] = []
 
-  const duplicateClusters = coverage?.crossProviderConvergence?.duplicatePublishedCanonicalClusters ?? null
+  const duplicateClusters = fields?.duplicateCanonicalClusters ?? null
   const duplicateOk = duplicateClusters === 0
   gates.push(
     gate(
@@ -58,7 +66,7 @@ export function evaluateSeoEnablementMetricGate(
     blockers.push('Duplicate published canonical clusters must be 0')
   }
 
-  const coveragePct = coverage?.coveragePct ?? null
+  const coveragePct = fields?.coveragePct ?? null
   const coverageOk = coveragePct != null && coveragePct >= SEO_ENABLEMENT_COVERAGE_MIN_PCT
   gates.push(
     gate(
@@ -72,7 +80,7 @@ export function evaluateSeoEnablementMetricGate(
     blockers.push(`Coverage must be ≥${SEO_ENABLEMENT_COVERAGE_MIN_PCT}%`)
   }
 
-  const effectiveMissing = coverage?.actionableMissingValid?.effectiveMissingValidYstmUrls ?? null
+  const effectiveMissing = fields?.effectiveMissingValid ?? null
   const effectiveOk =
     effectiveMissing != null && effectiveMissing <= SEO_ENABLEMENT_EFFECTIVE_MISSING_MAX
   gates.push(
@@ -87,7 +95,7 @@ export function evaluateSeoEnablementMetricGate(
     blockers.push(`Effective missing valid must be ≤${SEO_ENABLEMENT_EFFECTIVE_MISSING_MAX}`)
   }
 
-  const publishedActive = coverage?.publishedActiveLootAuraYstmUrls ?? null
+  const publishedActive = fields?.publishedActiveInventory ?? null
   const publishedOk =
     publishedActive != null && publishedActive >= SEO_ENABLEMENT_PUBLISHED_ACTIVE_MIN
   gates.push(
@@ -117,11 +125,27 @@ export function evaluateSeoEnablementMetricGate(
   return { metricGatePass, gates, blockers }
 }
 
-export function evaluateSeoEnablementGate(
-  coverage: YstmCoverageMetricsResponse | null,
+export function evaluateSeoEnablementMetricGate(
+  coverage: YstmCoverageMetricsResponse | null
+): Pick<SeoEnablementGateSnapshot, 'metricGatePass' | 'gates' | 'blockers'> {
+  if (coverage == null) {
+    return evaluateSeoEnablementMetricGateFromSnapshotFields(null)
+  }
+
+  return evaluateSeoEnablementMetricGateFromSnapshotFields({
+    coveragePct: coverage.coveragePct ?? null,
+    effectiveMissingValid:
+      coverage.actionableMissingValid?.effectiveMissingValidYstmUrls ?? null,
+    duplicateCanonicalClusters:
+      coverage.crossProviderConvergence?.duplicatePublishedCanonicalClusters ?? null,
+    publishedActiveInventory: coverage.publishedActiveLootAuraYstmUrls ?? null,
+  })
+}
+
+function evaluateSeoEnablementGateFromMetric(
+  metric: Pick<SeoEnablementGateSnapshot, 'metricGatePass' | 'gates' | 'blockers'>,
   rolloutState: SeoRolloutRuntimeState
 ): SeoEnablementGateSnapshot {
-  const metric = evaluateSeoEnablementMetricGate(coverage)
   const gates: SeoIndexGate[] = [...metric.gates]
   const blockers = [...metric.blockers]
 
@@ -184,4 +208,21 @@ export function evaluateSeoEnablementGate(
     gates,
     blockers: seoEmissionAllowed ? [] : [...new Set(blockers)],
   }
+}
+
+export function evaluateSeoEnablementGateFromSnapshotFields(
+  fields: SeoEnablementMetricGateFields | null,
+  rolloutState: SeoRolloutRuntimeState
+): SeoEnablementGateSnapshot {
+  return evaluateSeoEnablementGateFromMetric(
+    evaluateSeoEnablementMetricGateFromSnapshotFields(fields),
+    rolloutState
+  )
+}
+
+export function evaluateSeoEnablementGate(
+  coverage: YstmCoverageMetricsResponse | null,
+  rolloutState: SeoRolloutRuntimeState
+): SeoEnablementGateSnapshot {
+  return evaluateSeoEnablementGateFromMetric(evaluateSeoEnablementMetricGate(coverage), rolloutState)
 }

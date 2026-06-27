@@ -1,5 +1,6 @@
 import type { CrawlSmokeReport } from '@/lib/seo/crawlSmoke'
 import type { SeoOperationalSnapshot } from '@/lib/seo/buildSeoOperationalSnapshot'
+import type { SeoInfrastructureDiagnostics } from '@/lib/seo/snapshots/types'
 import type { SeoRolloutRuntimeState } from '@/lib/seo/seoRolloutTypes'
 
 export type SeoHealthState = 'READY' | 'ACTION_REQUIRED' | 'BLOCKED'
@@ -58,6 +59,7 @@ export type SeoOperationsDashboard = {
   indexability: SeoIndexabilitySummary
   listingFootprint: SeoListingFootprint
   sitemap: SeoSitemapDiagnostics
+  infrastructure: SeoInfrastructureDiagnostics
   internalLinks: SeoInternalLinkSample
   snapshot: SeoOperationalSnapshot
   crawlSmoke: CrawlSmokeReport | null

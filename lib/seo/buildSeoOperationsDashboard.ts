@@ -14,6 +14,7 @@ import type {
   SeoOperationsDashboard,
   SeoSitemapDiagnostics,
 } from '@/lib/seo/seoOperationsDashboardTypes'
+import type { SeoInfrastructureDiagnostics } from '@/lib/seo/snapshots/types'
 
 const SEO_CANONICAL_FALLBACK = 'https://lootaura.app'
 
@@ -111,16 +112,16 @@ export function buildSitemapDiagnostics(
   publishedCount: number
 ): SeoSitemapDiagnostics {
   const baseUrl = getSeoBaseUrl()
-  const listingPlan = resolveSeoSitemapPlan(publishedCount, snapshot.rollout.seoEmissionAllowed)
-  const geoPlan = resolveSeoSitemapPlan(publishedCount, snapshot.rollout.indexingAllowed)
+  const plan = resolveSeoSitemapPlan(publishedCount, {
+    seoEmissionAllowed: snapshot.rollout.seoEmissionAllowed,
+    indexingAllowed: snapshot.rollout.indexingAllowed,
+  })
   const segmentSet = new Set<string>(['static'])
-  for (const id of listingPlan.segmentIds) {
+  for (const id of plan.segmentIds) {
     if (String(id).startsWith('listings-')) segmentSet.add(String(id))
   }
-  if (geoPlan.indexingEnabled) {
-    segmentSet.add('cities')
-    segmentSet.add('weekends')
-  }
+  if (plan.segmentIds.includes('cities')) segmentSet.add('cities')
+  if (plan.segmentIds.includes('weekends')) segmentSet.add('weekends')
 
   return {
     sitemapUrl: `${baseUrl}/sitemap.xml`,
@@ -235,6 +236,13 @@ export function buildMetricsUnavailableSeoOperationsDashboard(options?: {
       cityUrlCount: 0,
       weekendUrlCount: 0,
     },
+    infrastructure: {
+      enablementSnapshotAgeMinutes: null,
+      qualifiedMetroSnapshotAgeMinutes: null,
+      inventorySnapshotAgeMinutes: null,
+      qualifiedMetroCount: 0,
+      sitemapInventoryCount: 0,
+    },
     internalLinks: emptyInternalLinkSample(),
     snapshot,
     crawlSmoke: null,
@@ -248,6 +256,7 @@ export function buildSeoOperationsDashboard(options: {
   configuredSiteUrl?: string | null
   internalLinks?: SeoInternalLinkSample
   crawlSmoke?: CrawlSmokeReport | null
+  infrastructure?: SeoInfrastructureDiagnostics
 }): SeoOperationsDashboard {
   const {
     snapshot,
@@ -256,6 +265,13 @@ export function buildSeoOperationsDashboard(options: {
     configuredSiteUrl,
     internalLinks = emptyInternalLinkSample(),
     crawlSmoke = null,
+    infrastructure = {
+      enablementSnapshotAgeMinutes: null,
+      qualifiedMetroSnapshotAgeMinutes: null,
+      inventorySnapshotAgeMinutes: null,
+      qualifiedMetroCount: 0,
+      sitemapInventoryCount: 0,
+    },
   } = options
 
   return {
@@ -270,6 +286,7 @@ export function buildSeoOperationsDashboard(options: {
       snapshot.rollout.seoEmissionAllowed
     ),
     sitemap: buildSitemapDiagnostics(snapshot, publishedListingCount),
+    infrastructure,
     internalLinks,
     snapshot,
     crawlSmoke,
@@ -335,6 +352,20 @@ export function formatSeoDiagnosticsText(dashboard: SeoOperationsDashboard): str
   lines.push(`- Listings: ${dashboard.sitemap.listingUrlCount}`)
   lines.push(`- Metros: ${dashboard.sitemap.cityUrlCount}`)
   lines.push(`- Weekends: ${dashboard.sitemap.weekendUrlCount}`)
+  lines.push('')
+
+  lines.push('SEO Infrastructure (snapshots):')
+  lines.push(
+    `- Enablement snapshot age: ${dashboard.infrastructure.enablementSnapshotAgeMinutes ?? 'n/a'} min`
+  )
+  lines.push(
+    `- Qualified metro snapshot age: ${dashboard.infrastructure.qualifiedMetroSnapshotAgeMinutes ?? 'n/a'} min`
+  )
+  lines.push(
+    `- Inventory snapshot age: ${dashboard.infrastructure.inventorySnapshotAgeMinutes ?? 'n/a'} min`
+  )
+  lines.push(`- Qualified metros (snapshot): ${dashboard.infrastructure.qualifiedMetroCount}`)
+  lines.push(`- Sitemap inventory count: ${dashboard.infrastructure.sitemapInventoryCount}`)
   lines.push('')
 
   lines.push('Metro Coverage:')

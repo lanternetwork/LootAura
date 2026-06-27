@@ -6,7 +6,7 @@ import {
 export type SeoSitemapSegmentId = 'static' | string
 
 export type SeoSitemapPlan = {
-  /** Whether listing/city/weekend segments may appear in sitemaps. */
+  /** Whether any non-static segments may appear in sitemaps. */
   indexingEnabled: boolean
   segmentIds: SeoSitemapSegmentId[]
   listingChunkCount: number
@@ -15,22 +15,27 @@ export type SeoSitemapPlan = {
 
 export function resolveSeoSitemapPlan(
   totalPublishedListings: number,
-  inventoryIndexingAllowed: boolean
+  options: {
+    seoEmissionAllowed: boolean
+    indexingAllowed: boolean
+  }
 ): SeoSitemapPlan {
-  const indexingEnabled = inventoryIndexingAllowed
   const segmentIds: SeoSitemapSegmentId[] = ['static']
-
   let listingChunkCount = 0
-  if (indexingEnabled && totalPublishedListings > 0) {
+
+  if (options.seoEmissionAllowed && totalPublishedListings > 0) {
     listingChunkCount = countListingSitemapChunks(totalPublishedListings)
     for (let i = 0; i < listingChunkCount; i++) {
       segmentIds.push(listingSitemapChunkId(i))
     }
+  }
+
+  if (options.indexingAllowed) {
     segmentIds.push('cities', 'weekends')
   }
 
   return {
-    indexingEnabled,
+    indexingEnabled: options.seoEmissionAllowed || options.indexingAllowed,
     segmentIds,
     listingChunkCount,
     totalPublishedListings,

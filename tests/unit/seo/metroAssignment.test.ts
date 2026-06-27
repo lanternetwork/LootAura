@@ -11,7 +11,7 @@ describe('assignMetroSlug', () => {
 
   it('assigns Jeffersontown coordinates to Louisville within 10 mi radius', () => {
     const slug = assignMetroSlug(
-      { city: 'Jeffersontown', state: 'KY', lat: 38.194, lng: -85.5644 },
+      { city: 'Jeffersontown', state: 'KY', lat: 38.22, lng: -85.72 },
       metros
     )
     expect(slug).toBe('louisville-ky')

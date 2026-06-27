@@ -12,9 +12,13 @@ vi.mock('@/lib/seo/metroCatalog', async (importOriginal) => {
   }
 })
 
-vi.mock('@/lib/seo/snapshots/loadSeoMetroGeography', () => ({
-  loadSeoMetroGeographyBySlugs: (...args: unknown[]) => mockLoadGeographyBySlugs(...args),
-}))
+vi.mock('@/lib/seo/snapshots/loadSeoMetroGeography', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seo/snapshots/loadSeoMetroGeography')>()
+  return {
+    ...actual,
+    loadSeoMetroGeographyBySlugs: (...args: unknown[]) => mockLoadGeographyBySlugs(...args),
+  }
+})
 
 vi.mock('@/lib/admin/social/socialMetroInventory', () => ({
   loadSocialWeekendInventoryFromSnapshot: vi.fn(),

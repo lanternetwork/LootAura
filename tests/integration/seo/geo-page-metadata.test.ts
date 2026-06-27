@@ -16,6 +16,8 @@ describe('yard-sales metro page metadata', () => {
     loadMetroPageContextMock.mockResolvedValue({
       metro: TEST_SEO_METRO_DALLAS,
       metroQualified: true,
+      qualified: true,
+      robots: 'index,follow',
       gate: { seoEmissionAllowed: true, indexingAllowed: true, snapshotFresh: true, qualifiedMetroCount: 1 },
       inventory: {
         sales: [],
@@ -50,6 +52,8 @@ describe('yard-sales-this-weekend metro page metadata', () => {
     loadMetroPageContextMock.mockResolvedValue({
       metro: TEST_SEO_METRO_DALLAS,
       metroQualified: true,
+      qualified: true,
+      robots: 'index,follow',
       gate: { seoEmissionAllowed: true, indexingAllowed: true, snapshotFresh: true, qualifiedMetroCount: 1 },
       inventory: {
         sales: [],

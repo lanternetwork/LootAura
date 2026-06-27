@@ -5,7 +5,6 @@ import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
 import { buildMetroWeekendInventoryFromResult } from '@/lib/seo/buildMetroWeekendInventory'
 import { formatFreshnessSignalLabel } from '@/lib/seo/fetchMetroWeekendInventory'
 import { createWeekendPageMetadata } from '@/lib/seo/metadata'
-import { resolveMetroPageRobotsFromSnapshot } from '@/lib/seo/indexRollout'
 import { loadMetroPageContext } from '@/lib/seo/snapshots/loadMetroPageContext'
 import {
   createWeekendPageStructuredDataBundle,
@@ -18,7 +17,7 @@ import {
   buildWeekendPageH1,
   buildWeekendPageSupportingCopy,
 } from '@/lib/seo/copy/weekendPageCopy'
-import { formatFreshnessLabel } from '@/lib/seo/copy/cityPageCopy'
+import { buildCityPageEmptyInventoryMessage, formatFreshnessLabel } from '@/lib/seo/copy/cityPageCopy'
 
 export const revalidate = 3600
 export const dynamicParams = true
@@ -27,19 +26,23 @@ type PageProps = {
   params: Promise<{ metroSlug: string }>
 }
 
+function robotsDirectiveToMetadata(robots: 'index,follow' | 'noindex,follow') {
+  return { index: robots === 'index,follow', follow: true as const }
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { metroSlug } = await params
   const context = await loadMetroPageContext(metroSlug)
   if (!context) {
     return { title: 'Yard sales this weekend · Loot Aura' }
   }
-  const { metro, inventory, gate, metroQualified } = context
+  const { metro, inventory, robots } = context
   const { summary, weekend } = buildMetroWeekendInventoryFromResult(metro, inventory)
   return createWeekendPageMetadata({
     metro,
     inventory: summary,
     weekendLabel: weekend.label,
-    robots: resolveMetroPageRobotsFromSnapshot(gate.seoEmissionAllowed, metroQualified),
+    robots: robotsDirectiveToMetadata(robots),
   })
 }
 
@@ -64,6 +67,7 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
     inventory: summary,
     items: sales.slice(0, 50).map(saleToInventoryListItem),
     weekendLabel: weekend.label,
+    includeInventoryList: sales.length > 0,
   })
 
   return (
@@ -92,19 +96,26 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
         <p className="mt-2 text-sm text-gray-600">{weekend.label}</p>
         <p className="mt-1 text-xs text-gray-500">Dates in {metro.timezone}</p>
 
-        <p className="mt-2 text-sm font-medium text-emerald-800">
-          {formatFreshnessLabel(summary.lastUpdatedAt)}
-        </p>
+        {sales.length > 0 && (
+          <p className="mt-2 text-sm font-medium text-emerald-800">
+            {formatFreshnessLabel(summary.lastUpdatedAt)}
+          </p>
+        )}
 
         <SeoGeoDiscoveryLinks links={geoLinks} showPrimary={false} />
 
         <section className="mt-8 rounded-lg border border-gray-200 bg-white px-4">
           <h2 className="sr-only">This weekend listings</h2>
           {sales.length === 0 ? (
-            <p className="py-8 text-center text-gray-600">
-              No listings scheduled for this weekend in {metro.city} yet. Check the city page for
-              upcoming sales.
-            </p>
+            <div className="py-8 text-center text-gray-600">
+              {buildCityPageEmptyInventoryMessage()
+                .split('\n\n')
+                .map((paragraph) => (
+                  <p key={paragraph} className="mt-2 first:mt-0">
+                    {paragraph}
+                  </p>
+                ))}
+            </div>
           ) : (
             <ul>
               {sales.map((sale) => (
@@ -118,11 +129,13 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
           )}
         </section>
 
-        <section className="prose prose-sm mt-10 max-w-none text-gray-700">
-          {supportingCopy.split('\n\n').map((paragraph) => (
-            <p key={paragraph.slice(0, 48)}>{paragraph}</p>
-          ))}
-        </section>
+        {sales.length > 0 && (
+          <section className="prose prose-sm mt-10 max-w-none text-gray-700">
+            {supportingCopy.split('\n\n').map((paragraph) => (
+              <p key={paragraph.slice(0, 48)}>{paragraph}</p>
+            ))}
+          </section>
+        )}
       </main>
     </div>
   )

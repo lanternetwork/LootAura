@@ -42,6 +42,22 @@ export async function countSeoMetroInventory(
   return count ?? 0
 }
 
+/** Existence tier — not fail-closed on snapshot age (CITY_PAGE_COVERAGE_V2.1). */
+export async function countMetroInventoryBySlug(
+  metroSlug: string,
+  admin: ReturnType<typeof getAdminDb> = getAdminDb()
+): Promise<number> {
+  const { count, error } = await fromBase(admin, 'seo_metro_inventory')
+    .select('sale_id', { count: 'exact', head: true })
+    .eq('metro_slug', metroSlug)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return count ?? 0
+}
+
 function metroInventoryRowToSale(row: SeoMetroInventoryRow): Sale {
   return {
     id: row.sale_id,

@@ -9,7 +9,7 @@ import {
 import { buildCitySitemapEntriesFromQualifiedSlugs } from '@/lib/seo/sitemap/cityEntries'
 import { buildWeekendSitemapEntriesFromQualifiedSlugs } from '@/lib/seo/sitemap/weekendEntries'
 import { resolveSitemapSeoGate } from '@/lib/seo/resolveSitemapSeoGate'
-import { loadQualifiedMetroSlugs } from '@/lib/seo/snapshots/loadSeoQualifiedMetros'
+import { loadGeoSitemapMetroSlugs } from '@/lib/seo/snapshots/loadGeoSitemapMetroSlugs'
 import {
   countSeoSitemapInventory,
   loadSeoSitemapInventoryChunk,
@@ -58,7 +58,7 @@ export default async function sitemap({
     if (!gate.indexingAllowed || !gate.snapshotFresh) {
       return []
     }
-    const slugs = await loadQualifiedMetroSlugs(getAdminDb())
+    const slugs = await loadGeoSitemapMetroSlugs(gate.seoEmissionAllowed, getAdminDb())
     if (id === 'cities') {
       return buildCitySitemapEntriesFromQualifiedSlugs(slugs)
     }

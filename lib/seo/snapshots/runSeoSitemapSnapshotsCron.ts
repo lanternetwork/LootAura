@@ -1,3 +1,4 @@
+import { refreshSeoMetroHistorySnapshotCron } from '@/lib/seo/snapshots/buildSeoMetroHistorySnapshot'
 import { refreshSeoEnablementSnapshotCron } from '@/lib/seo/snapshots/buildSeoEnablementSnapshot'
 import { refreshSeoMetroInventorySnapshotCron } from '@/lib/seo/snapshots/buildSeoMetroInventorySnapshot'
 import { refreshSeoQualifiedMetrosSnapshotCron } from '@/lib/seo/snapshots/buildSeoQualifiedMetrosSnapshot'
@@ -11,16 +12,18 @@ export type SeoSitemapSnapshotsCronResult = {
   qualifiedMetros: Awaited<ReturnType<typeof refreshSeoQualifiedMetrosSnapshotCron>>
   inventory: Awaited<ReturnType<typeof refreshSeoSitemapInventorySnapshotCron>>
   metroInventory: Awaited<ReturnType<typeof refreshSeoMetroInventorySnapshotCron>>
+  metroHistory: Awaited<ReturnType<typeof refreshSeoMetroHistorySnapshotCron>>
   completedAt: string
 }
 
 export async function runSeoSitemapSnapshotsCron(): Promise<SeoSitemapSnapshotsCronResult> {
   const admin = getAdminDb()
   const enablement = await refreshSeoEnablementSnapshotCron(admin)
-  const [qualifiedMetros, inventory, metroInventory] = await Promise.all([
+  const [qualifiedMetros, inventory, metroInventory, metroHistory] = await Promise.all([
     refreshSeoQualifiedMetrosSnapshotCron(admin),
     refreshSeoSitemapInventorySnapshotCron(admin),
     refreshSeoMetroInventorySnapshotCron(admin),
+    refreshSeoMetroHistorySnapshotCron(admin),
   ])
 
   return {
@@ -30,6 +33,7 @@ export async function runSeoSitemapSnapshotsCron(): Promise<SeoSitemapSnapshotsC
     qualifiedMetros,
     inventory,
     metroInventory,
+    metroHistory,
     completedAt: new Date().toISOString(),
   }
 }

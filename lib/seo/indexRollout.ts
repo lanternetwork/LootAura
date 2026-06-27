@@ -89,9 +89,10 @@ export function resolveMetroPageRobots(
  */
 export function resolveMetroPageRobotsFromSnapshot(
   seoEmissionAllowed: boolean,
-  metroQualified: boolean
+  metroQualified: boolean,
+  seededMajor = false
 ): SeoRobotsDirective {
-  if (!seoEmissionAllowed || !metroQualified) {
+  if (!seoEmissionAllowed || (!metroQualified && !seededMajor)) {
     return { index: false, follow: true }
   }
   return { index: true, follow: true }

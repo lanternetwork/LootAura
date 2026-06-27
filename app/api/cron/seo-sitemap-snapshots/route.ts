@@ -1,7 +1,7 @@
 /**
  * GET/POST /api/cron/seo-sitemap-snapshots
  *
- * Hourly refresh of SEO enablement, qualified metros, and sitemap inventory snapshots.
+ * Hourly refresh of SEO enablement, qualified metros, sitemap inventory, and metro inventory snapshots.
  * Auth: CRON_SECRET Bearer only.
  */
 

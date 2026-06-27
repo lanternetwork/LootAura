@@ -268,12 +268,24 @@ export default function SeoOperationsDashboardClient() {
                   }
                 />
                 <Row
+                  label="Metro inventory snapshot age"
+                  value={
+                    dashboard.infrastructure.metroInventorySnapshotAgeMinutes == null
+                      ? 'n/a'
+                      : `${dashboard.infrastructure.metroInventorySnapshotAgeMinutes} min`
+                  }
+                />
+                <Row
                   label="Qualified metros (snapshot)"
                   value={String(dashboard.infrastructure.qualifiedMetroCount)}
                 />
                 <Row
                   label="Sitemap inventory count"
                   value={String(dashboard.infrastructure.sitemapInventoryCount)}
+                />
+                <Row
+                  label="Metro inventory count"
+                  value={String(dashboard.infrastructure.metroInventoryCount)}
                 />
               </Card>
             </div>

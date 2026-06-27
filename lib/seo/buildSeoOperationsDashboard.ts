@@ -240,8 +240,10 @@ export function buildMetricsUnavailableSeoOperationsDashboard(options?: {
       enablementSnapshotAgeMinutes: null,
       qualifiedMetroSnapshotAgeMinutes: null,
       inventorySnapshotAgeMinutes: null,
+      metroInventorySnapshotAgeMinutes: null,
       qualifiedMetroCount: 0,
       sitemapInventoryCount: 0,
+      metroInventoryCount: 0,
     },
     internalLinks: emptyInternalLinkSample(),
     snapshot,
@@ -269,8 +271,10 @@ export function buildSeoOperationsDashboard(options: {
       enablementSnapshotAgeMinutes: null,
       qualifiedMetroSnapshotAgeMinutes: null,
       inventorySnapshotAgeMinutes: null,
+      metroInventorySnapshotAgeMinutes: null,
       qualifiedMetroCount: 0,
       sitemapInventoryCount: 0,
+      metroInventoryCount: 0,
     },
   } = options
 
@@ -364,8 +368,12 @@ export function formatSeoDiagnosticsText(dashboard: SeoOperationsDashboard): str
   lines.push(
     `- Inventory snapshot age: ${dashboard.infrastructure.inventorySnapshotAgeMinutes ?? 'n/a'} min`
   )
+  lines.push(
+    `- Metro inventory snapshot age: ${dashboard.infrastructure.metroInventorySnapshotAgeMinutes ?? 'n/a'} min`
+  )
   lines.push(`- Qualified metros (snapshot): ${dashboard.infrastructure.qualifiedMetroCount}`)
   lines.push(`- Sitemap inventory count: ${dashboard.infrastructure.sitemapInventoryCount}`)
+  lines.push(`- Metro inventory count: ${dashboard.infrastructure.metroInventoryCount}`)
   lines.push('')
 
   lines.push('Metro Coverage:')

@@ -53,7 +53,15 @@ describe('seo snapshot builders', () => {
     traceMock.mockResolvedValue({ traces: [] })
     actionableMock.mockResolvedValue({ effectiveMissingValidYstmUrls: 36 })
     fetchNationwideMock.mockResolvedValue({
-      metros: [{ slug: 'dallas-tx', city: 'Dallas', state: 'TX', minActiveListings: 25 }],
+      metros: [
+        {
+          slug: 'dallas-tx',
+          city: 'Dallas',
+          state: 'TX',
+          timezone: 'America/Chicago',
+          minActiveListings: 25,
+        },
+      ],
       inventoryBySlug: {
         'dallas-tx': {
           activeListingCount: 50,
@@ -80,6 +88,9 @@ describe('seo snapshot builders', () => {
     expect(rows[0]?.slug).toBe('dallas-tx')
     expect(rows[0]?.qualified).toBe(true)
     expect(rows[0]?.listing_count).toBe(50)
+    expect(rows[0]?.city).toBe('Dallas')
+    expect(rows[0]?.state).toBe('TX')
+    expect(rows[0]?.timezone).toBe('America/Chicago')
   })
 })
 

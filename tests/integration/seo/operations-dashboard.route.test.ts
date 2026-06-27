@@ -8,8 +8,10 @@ function stubInfrastructure(overrides: Record<string, unknown> = {}) {
     enablementSnapshotAgeMinutes: 5,
     qualifiedMetroSnapshotAgeMinutes: 5,
     inventorySnapshotAgeMinutes: 5,
+    metroInventorySnapshotAgeMinutes: 5,
     qualifiedMetroCount: 1,
     sitemapInventoryCount: 10,
+    metroInventoryCount: 42,
     ...overrides,
   }
 }

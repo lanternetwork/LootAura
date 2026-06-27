@@ -83,3 +83,16 @@ export function resolveMetroPageRobots(
   })
   return { index: result.qualified, follow: true }
 }
+
+/**
+ * Metro/weekend robots from precomputed snapshot qualification (request-time city pages).
+ */
+export function resolveMetroPageRobotsFromSnapshot(
+  seoEmissionAllowed: boolean,
+  metroQualified: boolean
+): SeoRobotsDirective {
+  if (!seoEmissionAllowed || !metroQualified) {
+    return { index: false, follow: true }
+  }
+  return { index: true, follow: true }
+}

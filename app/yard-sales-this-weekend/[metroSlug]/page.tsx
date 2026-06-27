@@ -2,15 +2,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
-import { getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
-import {
-  fetchMetroWeekendInventory,
-  formatFreshnessSignalLabel,
-} from '@/lib/seo/fetchMetroWeekendInventory'
+import { buildMetroWeekendInventoryFromResult } from '@/lib/seo/buildMetroWeekendInventory'
+import { formatFreshnessSignalLabel } from '@/lib/seo/fetchMetroWeekendInventory'
 import { createWeekendPageMetadata } from '@/lib/seo/metadata'
-import { resolveMetroPageRobots } from '@/lib/seo/indexRollout'
-import { getSeoMetrosForRequest } from '@/lib/seo/loadSeoRolloutState'
-import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
+import { resolveMetroPageRobotsFromSnapshot } from '@/lib/seo/indexRollout'
+import { loadMetroPageContext } from '@/lib/seo/snapshots/loadMetroPageContext'
 import {
   createWeekendPageStructuredDataBundle,
   saleToInventoryListItem,
@@ -24,7 +20,7 @@ import {
 } from '@/lib/seo/copy/weekendPageCopy'
 import { formatFreshnessLabel } from '@/lib/seo/copy/cityPageCopy'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 export const dynamicParams = true
 
 type PageProps = {
@@ -33,33 +29,34 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { metroSlug } = await params
-  const metros = await getSeoMetrosForRequest()
-  const metro = getSeoMetroBySlug(metros, metroSlug)
-  if (!metro) {
+  const context = await loadMetroPageContext(metroSlug)
+  if (!context) {
     return { title: 'Yard sales this weekend · Loot Aura' }
   }
-  const [emission, { summary, weekend }] = await Promise.all([
-    getInventorySeoEmissionForRequest(),
-    fetchMetroWeekendInventory(metro),
-  ])
+  const { metro, inventory, gate, metroQualified } = context
+  const { summary, weekend } = buildMetroWeekendInventoryFromResult(metro, inventory)
   return createWeekendPageMetadata({
     metro,
     inventory: summary,
     weekendLabel: weekend.label,
-    robots: resolveMetroPageRobots(metro, summary, emission.seoEmissionAllowed),
+    robots: resolveMetroPageRobotsFromSnapshot(gate.seoEmissionAllowed, metroQualified),
   })
 }
 
 export default async function YardSalesThisWeekendMetroPage({ params }: PageProps) {
   const { metroSlug } = await params
-  const metros = await getSeoMetrosForRequest()
-  const metro = getSeoMetroBySlug(metros, metroSlug)
-  if (!metro) {
+  const context = await loadMetroPageContext(metroSlug)
+  if (!context) {
     notFound()
   }
 
-  const { sales, summary, weekend, freshnessBySaleId } = await fetchMetroWeekendInventory(metro)
-  const geoLinks = buildMetroGeoLinks(metro, metros)
+  const { metro, inventory, nearbyMetros } = context
+  const { sales, summary, weekend, freshnessBySaleId } = buildMetroWeekendInventoryFromResult(
+    metro,
+    inventory
+  )
+  const allMetros = [metro, ...nearbyMetros]
+  const geoLinks = buildMetroGeoLinks(metro, allMetros)
   const h1 = buildWeekendPageH1(metro, summary, weekend)
   const supportingCopy = buildWeekendPageSupportingCopy({ metro, inventory: summary, weekend })
   const structuredData = createWeekendPageStructuredDataBundle({

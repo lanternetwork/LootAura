@@ -2,17 +2,18 @@ import type { MetroInventoryResult } from '@/lib/seo/fetchMetroInventory'
 import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
 import { resolveMetroPageRobotsFromSnapshot } from '@/lib/seo/indexRollout'
 import { requestCache } from '@/lib/seo/requestCache'
-import {
-  getSeededMajorMetroBySlug,
-  seededMetroToSeoMetro,
-} from '@/lib/seo/seededMajorMetros'
 import { resolveMetroExistence } from '@/lib/seo/resolveMetroExistence'
+import { isSeededMajorMetroSlug } from '@/lib/seo/seededMajorMetros'
 import { resolveSitemapSeoGate, type SitemapSeoGateState } from '@/lib/seo/resolveSitemapSeoGate'
 import {
   countMetroInventoryBySlug,
   loadMetroInventoryFromSnapshot,
 } from '@/lib/seo/snapshots/loadSeoMetroInventory'
 import { loadSeoMetroHistoryBySlug } from '@/lib/seo/snapshots/loadSeoMetroHistory'
+import {
+  geographyRowToSeoMetro,
+  loadSeoMetroGeographyBySlug,
+} from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import {
   loadNearbyQualifiedMetros,
   loadSeoQualifiedMetroBySlug,
@@ -28,7 +29,9 @@ export type MetroPageContext = {
   state: string
   timezone: string
   exists: boolean
+  /** @deprecated use qualifiedOverride */
   seededMajor: boolean
+  qualifiedOverride: boolean
   qualified: boolean
   inventoryCount: number
   historicalCount90d: number
@@ -61,12 +64,12 @@ function qualifiedMetroRowToSeoMetro(row: {
 
 function resolveMetroIdentity(
   slug: string,
-  seeded: ReturnType<typeof getSeededMajorMetroBySlug>,
+  geography: Awaited<ReturnType<typeof loadSeoMetroGeographyBySlug>>,
   metroRow: Awaited<ReturnType<typeof loadSeoQualifiedMetroBySlug>>,
   historyRow: Awaited<ReturnType<typeof loadSeoMetroHistoryBySlug>>
 ): SeoMetro | null {
-  if (seeded) {
-    return seededMetroToSeoMetro(seeded)
+  if (geography) {
+    return geographyRowToSeoMetro(geography)
   }
   if (metroRow) {
     const fromQualified = qualifiedMetroRowToSeoMetro(metroRow)
@@ -87,9 +90,13 @@ function resolveMetroIdentity(
 function robotsDirectiveFromGate(
   seoEmissionAllowed: boolean,
   qualified: boolean,
-  seededMajor: boolean
+  qualifiedOverride: boolean
 ): MetroPageRobotsDirective {
-  const robots = resolveMetroPageRobotsFromSnapshot(seoEmissionAllowed, qualified, seededMajor)
+  const robots = resolveMetroPageRobotsFromSnapshot(
+    seoEmissionAllowed,
+    qualified,
+    qualifiedOverride
+  )
   return robots.index ? 'index,follow' : 'noindex,follow'
 }
 
@@ -99,33 +106,35 @@ function robotsDirectiveFromGate(
 export const loadMetroPageContext = requestCache(
   async (metroSlug: string): Promise<MetroPageContext | null> => {
     const admin = getAdminDb()
-    const seeded = getSeededMajorMetroBySlug(metroSlug)
 
-    const [gate, metroRow, historyRow, inventoryDbCount] = await Promise.all([
+    const [gate, geography, metroRow, historyRow, inventoryDbCount] = await Promise.all([
       resolveSitemapSeoGate(),
+      loadSeoMetroGeographyBySlug(metroSlug, admin),
       loadSeoQualifiedMetroBySlug(metroSlug, admin),
       loadSeoMetroHistoryBySlug(metroSlug, admin),
       countMetroInventoryBySlug(metroSlug, admin),
     ])
 
     const historicalCount90d = historyRow?.inventory_count_90d ?? 0
+    const qualifiedOverride =
+      geography?.qualified_override ?? isSeededMajorMetroSlug(metroSlug)
     const existence = resolveMetroExistence({
       slug: metroSlug,
       inventoryDbCount,
       historicalCount90d,
+      qualifiedOverride,
     })
 
     if (!existence.exists) {
       return null
     }
 
-    const metro = resolveMetroIdentity(metroSlug, seeded, metroRow, historyRow)
+    const metro = resolveMetroIdentity(metroSlug, geography, metroRow, historyRow)
     if (!metro) {
       return null
     }
 
     const qualified = metroRow?.qualified ?? false
-    const seededMajor = existence.seededMajor
 
     const [inventory, nearbyRows] = await Promise.all([
       loadMetroInventoryFromSnapshot(metroSlug, admin),
@@ -137,7 +146,7 @@ export const loadMetroPageContext = requestCache(
       .filter((m): m is SeoMetro => m != null)
 
     const inventoryCount = inventory.summary.activeListingCount
-    const robots = robotsDirectiveFromGate(gate.seoEmissionAllowed, qualified, seededMajor)
+    const robots = robotsDirectiveFromGate(gate.seoEmissionAllowed, qualified, qualifiedOverride)
 
     return {
       slug: metro.slug,
@@ -145,7 +154,8 @@ export const loadMetroPageContext = requestCache(
       state: metro.state,
       timezone: metro.timezone,
       exists: true,
-      seededMajor,
+      seededMajor: qualifiedOverride,
+      qualifiedOverride,
       qualified,
       inventoryCount,
       historicalCount90d,

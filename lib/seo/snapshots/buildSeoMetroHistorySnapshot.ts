@@ -1,5 +1,6 @@
-import { resolveSeoMetroForSale } from '@/lib/seo/metroCatalog'
+import { assignMetroSlug } from '@/lib/seo/metroAssignment'
 import { applyPublishedSaleCityStateFootprint } from '@/lib/seo/publishedSaleCityStateQuery'
+import { loadAllSeoMetroGeography } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
 
@@ -24,6 +25,8 @@ export async function buildSeoMetroHistorySnapshot(
   now: Date = new Date()
 ): Promise<SeoMetroHistorySnapshotRow[]> {
   const admin = getAdminDb()
+  const geography = await loadAllSeoMetroGeography(admin)
+  const geographyBySlug = new Map(geography.map((row) => [row.slug, row]))
   const cutoff = new Date(now.getTime() - NINETY_DAYS_MS).toISOString()
   const updatedAt = now.toISOString()
   const bySlug = new Map<
@@ -34,7 +37,7 @@ export async function buildSeoMetroHistorySnapshot(
   let offset = 0
   for (;;) {
     const { data, error } = await applyPublishedSaleCityStateFootprint(
-      fromBase(admin, T.sales).select('city, state, updated_at')
+      fromBase(admin, T.sales).select('city, state, lat, lng, updated_at')
     )
       .gte('updated_at', cutoff)
       .order('id', { ascending: true })
@@ -49,10 +52,15 @@ export async function buildSeoMetroHistorySnapshot(
     for (const row of chunk) {
       const city = (row as { city?: string }).city
       const state = (row as { state?: string }).state
+      const lat = (row as { lat?: number | null }).lat
+      const lng = (row as { lng?: number | null }).lng
       const updated = (row as { updated_at?: string }).updated_at
-      if (!city?.trim() || !state?.trim() || !updated?.trim()) continue
+      if (!updated?.trim()) continue
 
-      const metro = resolveSeoMetroForSale({ city, state })
+      const metroSlug = assignMetroSlug({ city, state, lat, lng }, geography)
+      if (!metroSlug) continue
+
+      const metro = geographyBySlug.get(metroSlug)
       if (!metro) continue
 
       const existing = bySlug.get(metro.slug)

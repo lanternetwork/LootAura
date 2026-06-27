@@ -12,6 +12,8 @@ function stubInfrastructure(overrides: Record<string, unknown> = {}) {
     qualifiedMetroCount: 1,
     sitemapInventoryCount: 10,
     metroInventoryCount: 42,
+    metroGeographyCount: 13,
+    geographyOverrideCount: 12,
     ...overrides,
   }
 }

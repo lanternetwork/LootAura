@@ -1,9 +1,6 @@
-import { buildMetroSlug } from '@/lib/seo/metroCatalog'
-import { haversineMeters } from '@/lib/geo/distance'
+import { assignMetroSlug } from '@/lib/seo/metroAssignment'
+import type { SeoMetroGeographyRow } from '@/lib/seo/metroGeographyTypes'
 import type { SeoMetro } from '@/lib/seo/types'
-
-/** Market-area radius around metro anchor (~35 mi). */
-export const METRO_MARKET_RADIUS_METERS = 56_000
 
 export type MetroMarketAnchor = {
   lat: number
@@ -24,19 +21,8 @@ type SaleGeoRow = {
   lng?: number | null
 }
 
-/** Canonical anchors for major metros (city center). */
-const KNOWN_METRO_ANCHORS: Partial<Record<string, MetroMarketAnchor>> = {
-  'chicago-il': { lat: 41.8781, lng: -87.6298 },
-  'dallas-tx': { lat: 32.7767, lng: -96.797 },
-  'houston-tx': { lat: 29.7604, lng: -95.3698 },
-  'phoenix-az': { lat: 33.4484, lng: -112.074 },
-  'atlanta-ga': { lat: 33.749, lng: -84.388 },
-  'austin-tx': { lat: 30.2672, lng: -97.7431 },
-  'louisville-ky': { lat: 38.2527, lng: -85.7585 },
-}
-
-export function getKnownMetroMarketAnchor(slug: string): MetroMarketAnchor | null {
-  return KNOWN_METRO_ANCHORS[slug] ?? null
+export function geographyRowToAnchor(row: SeoMetroGeographyRow): MetroMarketAnchor {
+  return { lat: row.center_lat, lng: row.center_lng }
 }
 
 /** Centroid of city/state-matched sales with coordinates. */
@@ -56,27 +42,31 @@ export function computeCentroidAnchor(rows: SaleGeoRow[]): MetroMarketAnchor | n
 
 export function resolveMetroMarketAnchor(
   metro: SeoMetro,
+  geography: SeoMetroGeographyRow | null,
   cityMatchedRows: SaleGeoRow[]
 ): MetroMarketAnchor | null {
-  return getKnownMetroMarketAnchor(metro.slug) ?? computeCentroidAnchor(cityMatchedRows)
+  if (geography) return geographyRowToAnchor(geography)
+  return computeCentroidAnchor(cityMatchedRows)
 }
 
-/** Known metro anchors for market-area assignment (no DB). */
 export function buildMetroMarketAnchorsBySlug(
-  metros: SeoMetro[]
+  geographyRows: SeoMetroGeographyRow[]
 ): Record<string, MetroMarketAnchor | null> {
   const anchors: Record<string, MetroMarketAnchor | null> = {}
-  for (const metro of metros) {
-    anchors[metro.slug] = getKnownMetroMarketAnchor(metro.slug)
+  for (const row of geographyRows) {
+    anchors[row.slug] = geographyRowToAnchor(row)
   }
   return anchors
 }
 
-/** ~56 km market bbox around a metro anchor (same radius as inventory assignment). */
-export function buildMarketBoundsAroundAnchor(anchor: MetroMarketAnchor): MetroMarketBounds {
-  const latDelta = METRO_MARKET_RADIUS_METERS / 111_000
-  const lngDelta =
-    METRO_MARKET_RADIUS_METERS / (111_000 * Math.cos((anchor.lat * Math.PI) / 180))
+/** Bbox around metro anchor using geography radius. */
+export function buildMarketBoundsAroundGeography(
+  geography: SeoMetroGeographyRow
+): MetroMarketBounds {
+  const radiusMeters = geography.radius_miles * 1609.344
+  const anchor = geographyRowToAnchor(geography)
+  const latDelta = radiusMeters / 111_000
+  const lngDelta = radiusMeters / (111_000 * Math.cos((anchor.lat * Math.PI) / 180))
   return {
     south: anchor.lat - latDelta,
     north: anchor.lat + latDelta,
@@ -102,44 +92,18 @@ export function buildBoundsFromCoords(
   return { west, south, east, north }
 }
 
-/**
- * Assign a sale to a metro slug using market geography:
- * 1. With coords: nearest metro anchor within radius (nationwide).
- * 2. Without coords: literal city/state slug when in catalog.
- */
+/** @deprecated Use assignMetroSlug from lib/seo/metroAssignment */
 export function resolveMetroSlugForSale(
   sale: SaleGeoRow,
-  metros: SeoMetro[],
-  anchorsBySlug: Record<string, MetroMarketAnchor | null>
+  geographyRows: SeoMetroGeographyRow[]
 ): string | null {
-  const lat = sale.lat
-  const lng = sale.lng
-  if (typeof lat === 'number' && typeof lng === 'number') {
-    let bestSlug: string | null = null
-    let bestDistance = Infinity
-    for (const metro of metros) {
-      const anchor = anchorsBySlug[metro.slug]
-      if (!anchor) continue
-      const distance = haversineMeters(lat, lng, anchor.lat, anchor.lng)
-      if (distance <= METRO_MARKET_RADIUS_METERS && distance < bestDistance) {
-        bestDistance = distance
-        bestSlug = metro.slug
-      }
-    }
-    if (bestSlug) return bestSlug
-  }
-
-  if (!sale.city?.trim() || !sale.state?.trim()) return null
-  const slug = buildMetroSlug(sale.city, sale.state)
-  return metros.some((m) => m.slug === slug) ? slug : null
+  return assignMetroSlug(sale, geographyRows)
 }
 
 export function saleBelongsToMetroMarket(
   sale: SaleGeoRow,
-  metro: SeoMetro,
-  anchor: MetroMarketAnchor | null,
-  metros: SeoMetro[],
-  anchorsBySlug: Record<string, MetroMarketAnchor | null>
+  metroSlug: string,
+  geographyRows: SeoMetroGeographyRow[]
 ): boolean {
-  return resolveMetroSlugForSale(sale, metros, anchorsBySlug) === metro.slug
+  return assignMetroSlug(sale, geographyRows) === metroSlug
 }

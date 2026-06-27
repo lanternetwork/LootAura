@@ -13,20 +13,22 @@ import {
 import { resolveSocialReportViewportForMetro } from '@/lib/admin/social/resolveSocialReportViewport'
 import type { SocialReportFormatSlug } from '@/lib/admin/social/socialReportFormats'
 import { listSocialReportRankingPresetSlugs } from '@/lib/admin/social/socialReportViewportPresets'
-import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
 import {
-  fetchPresetViewportWeekendCountsBySlug,
-  fetchWeekendSalesInViewport,
-} from '@/lib/admin/social/weekendInventoryQuery'
+  fetchPresetWeekendCountsBySlugFromSnapshot,
+  loadSocialWeekendInventoryFromSnapshot,
+} from '@/lib/admin/social/socialMetroInventory'
+import type { SocialCityReport, SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
+import { loadSeoMetroGeographyBySlugs } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 
 export function formatSocialMetroLabel(city: string, state: string): string {
   return `${city}, ${state}`
 }
 
 export function buildSocialMetroOptions(
-  discoveredMetros: Awaited<ReturnType<typeof discoverSeoMetrosFromPublishedSales>>
+  discoveredMetros: Awaited<ReturnType<typeof discoverSeoMetrosFromPublishedSales>>,
+  geographyBySlug: Map<string, import('@/lib/seo/metroGeographyTypes').SeoMetroGeographyRow>
 ): SocialMetroOption[] {
-  return mergeSocialMetroOptions(discoveredMetros, formatSocialMetroLabel)
+  return mergeSocialMetroOptions(discoveredMetros, geographyBySlug, formatSocialMetroLabel)
 }
 
 export async function buildSocialCityReport(
@@ -39,8 +41,12 @@ export async function buildSocialCityReport(
     throw new SocialCityReportError('CITY_SLUG_REQUIRED', 'citySlug is required', 400)
   }
 
+  const slugsToLoad = [...new Set([normalizedSlug, ...listSocialReportRankingPresetSlugs()])]
+  const geographyRows = await loadSeoMetroGeographyBySlugs(slugsToLoad)
+  const geographyBySlug = new Map(geographyRows.map((row) => [row.slug, row]))
+
   const discoveredMetros = await discoverSeoMetrosFromPublishedSales()
-  const metro = resolveSocialReportMetro(normalizedSlug, discoveredMetros)
+  const metro = resolveSocialReportMetro(normalizedSlug, discoveredMetros, geographyBySlug)
   if (!metro) {
     throw new SocialCityReportError(
       'METRO_NOT_FOUND',
@@ -49,13 +55,11 @@ export async function buildSocialCityReport(
     )
   }
 
-  const viewport = resolveSocialReportViewportForMetro(metro, format)
+  const geography = geographyBySlug.get(metro.slug) ?? null
+  const viewport = resolveSocialReportViewportForMetro(metro, format, geography)
   const [inventory, presetCounts] = await Promise.all([
-    fetchWeekendSalesInViewport(
-      { bounds: viewport.bounds, timezone: viewport.timezone },
-      now
-    ),
-    fetchPresetViewportWeekendCountsBySlug(format, now),
+    loadSocialWeekendInventoryFromSnapshot(metro.slug, viewport.timezone, now),
+    fetchPresetWeekendCountsBySlugFromSnapshot(now),
   ])
 
   const cityRank = viewport.isRankingPreset

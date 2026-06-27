@@ -4,6 +4,7 @@ import {
   buildSocialMetroOptions,
 } from '@/lib/admin/social/buildSocialCityReport'
 import { discoverSeoMetrosFromPublishedSales } from '@/lib/seo/metroCatalog'
+import { loadAllSeoMetroGeography } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,10 +24,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const metros = await discoverSeoMetrosFromPublishedSales()
+    const [metros, geographyRows] = await Promise.all([
+      discoverSeoMetrosFromPublishedSales(),
+      loadAllSeoMetroGeography(),
+    ])
+    const geographyBySlug = new Map(geographyRows.map((row) => [row.slug, row]))
     return NextResponse.json({
       ok: true,
-      metros: buildSocialMetroOptions(metros),
+      metros: buildSocialMetroOptions(metros, geographyBySlug),
       generatedAt: new Date().toISOString(),
     })
   } catch (error) {

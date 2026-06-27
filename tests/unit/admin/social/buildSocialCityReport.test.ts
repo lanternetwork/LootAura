@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { TEST_GEO_CHICAGO } from '../../seo/metroGeographyTestFixtures'
 
 const mockDiscoverMetros = vi.hoisted(() => vi.fn())
+const mockLoadGeographyBySlugs = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/seo/metroCatalog', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/seo/metroCatalog')>()
@@ -10,9 +12,17 @@ vi.mock('@/lib/seo/metroCatalog', async (importOriginal) => {
   }
 })
 
-vi.mock('@/lib/admin/social/weekendInventoryQuery', () => ({
-  fetchWeekendSalesInViewport: vi.fn(),
-  fetchPresetViewportWeekendCountsBySlug: vi.fn(),
+vi.mock('@/lib/seo/snapshots/loadSeoMetroGeography', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seo/snapshots/loadSeoMetroGeography')>()
+  return {
+    ...actual,
+    loadSeoMetroGeographyBySlugs: (...args: unknown[]) => mockLoadGeographyBySlugs(...args),
+  }
+})
+
+vi.mock('@/lib/admin/social/socialMetroInventory', () => ({
+  loadSocialWeekendInventoryFromSnapshot: vi.fn(),
+  fetchPresetWeekendCountsBySlugFromSnapshot: vi.fn(),
 }))
 
 describe('buildSocialCityReport', () => {
@@ -20,21 +30,22 @@ describe('buildSocialCityReport', () => {
     vi.clearAllMocks()
     vi.resetModules()
     mockDiscoverMetros.mockResolvedValue([])
+    mockLoadGeographyBySlugs.mockResolvedValue([TEST_GEO_CHICAGO])
   })
 
   it('builds a Chicago preset report when discovery is empty', async () => {
     const {
-      fetchWeekendSalesInViewport,
-      fetchPresetViewportWeekendCountsBySlug,
-    } = await import('@/lib/admin/social/weekendInventoryQuery')
+      loadSocialWeekendInventoryFromSnapshot,
+      fetchPresetWeekendCountsBySlugFromSnapshot,
+    } = await import('@/lib/admin/social/socialMetroInventory')
     const { buildSocialCityReport } = await import('@/lib/admin/social/buildSocialCityReport')
-    vi.mocked(fetchWeekendSalesInViewport).mockResolvedValue({
+    vi.mocked(loadSocialWeekendInventoryFromSnapshot).mockResolvedValue({
       pins: [{ id: 'sale-1', lat: 41.88, lng: -87.63, title: 'Estate Sale', is_featured: false }],
       activeSales: 39,
       estateSales: 10,
       yardSales: 29,
     })
-    vi.mocked(fetchPresetViewportWeekendCountsBySlug).mockResolvedValue({
+    vi.mocked(fetchPresetWeekendCountsBySlugFromSnapshot).mockResolvedValue({
       'chicago-il': 39,
       'dallas-tx': 20,
       'houston-tx': 15,
@@ -55,6 +66,7 @@ describe('buildSocialCityReport', () => {
   })
 
   it('returns METRO_NOT_FOUND for unknown non-preset slugs', async () => {
+    mockLoadGeographyBySlugs.mockResolvedValue([])
     const { buildSocialCityReport, SocialCityReportError } = await import(
       '@/lib/admin/social/buildSocialCityReport'
     )

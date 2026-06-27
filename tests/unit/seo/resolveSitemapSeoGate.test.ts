@@ -6,6 +6,7 @@ import { enabledSeoRolloutState } from './seoRolloutTestHelpers'
 const loadSeoEnablementSnapshotMock = vi.fn()
 const fetchSeoRolloutStateMock = vi.fn()
 const countQualifiedSeoMetrosMock = vi.fn()
+const countGeographyQualifiedOverridesMock = vi.fn()
 
 vi.mock('@/lib/seo/snapshots/loadSeoEnablementSnapshot', () => ({
   loadSeoEnablementSnapshot: (...args: unknown[]) => loadSeoEnablementSnapshotMock(...args),
@@ -22,6 +23,11 @@ vi.mock('@/lib/seo/seoRolloutState', () => ({
 
 vi.mock('@/lib/seo/snapshots/loadSeoQualifiedMetros', () => ({
   countQualifiedSeoMetros: (...args: unknown[]) => countQualifiedSeoMetrosMock(...args),
+}))
+
+vi.mock('@/lib/seo/snapshots/loadSeoMetroGeography', () => ({
+  countGeographyQualifiedOverrides: (...args: unknown[]) =>
+    countGeographyQualifiedOverridesMock(...args),
 }))
 
 function freshSnapshot(overrides: Record<string, unknown> = {}) {
@@ -42,6 +48,7 @@ describe('resolveSitemapSeoGate', () => {
     vi.clearAllMocks()
     fetchSeoRolloutStateMock.mockResolvedValue(enabledSeoRolloutState())
     countQualifiedSeoMetrosMock.mockResolvedValue(3)
+    countGeographyQualifiedOverridesMock.mockResolvedValue(12)
   })
 
   it('fail-closed when enablement snapshot is missing', async () => {

@@ -244,6 +244,8 @@ export function buildMetricsUnavailableSeoOperationsDashboard(options?: {
       qualifiedMetroCount: 0,
       sitemapInventoryCount: 0,
       metroInventoryCount: 0,
+      metroGeographyCount: 0,
+      geographyOverrideCount: 0,
     },
     internalLinks: emptyInternalLinkSample(),
     snapshot,
@@ -275,6 +277,8 @@ export function buildSeoOperationsDashboard(options: {
       qualifiedMetroCount: 0,
       sitemapInventoryCount: 0,
       metroInventoryCount: 0,
+      metroGeographyCount: 0,
+      geographyOverrideCount: 0,
     },
   } = options
 
@@ -374,6 +378,8 @@ export function formatSeoDiagnosticsText(dashboard: SeoOperationsDashboard): str
   lines.push(`- Qualified metros (snapshot): ${dashboard.infrastructure.qualifiedMetroCount}`)
   lines.push(`- Sitemap inventory count: ${dashboard.infrastructure.sitemapInventoryCount}`)
   lines.push(`- Metro inventory count: ${dashboard.infrastructure.metroInventoryCount}`)
+  lines.push(`- Metro geography rows: ${dashboard.infrastructure.metroGeographyCount}`)
+  lines.push(`- Geography override metros: ${dashboard.infrastructure.geographyOverrideCount}`)
   lines.push('')
 
   lines.push('Metro Coverage:')

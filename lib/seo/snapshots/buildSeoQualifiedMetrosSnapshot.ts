@@ -1,4 +1,3 @@
-import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
 import { buildInventorySummary } from '@/lib/seo/inventorySummary'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
 import {

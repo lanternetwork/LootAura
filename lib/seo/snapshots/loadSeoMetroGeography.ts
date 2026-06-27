@@ -1,7 +1,21 @@
 import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
 import type { SeoMetroGeographyRow } from '@/lib/seo/metroGeographyTypes'
+import {
+  getSeededMajorMetroCount,
+  getSeededMajorMetroSlugs,
+} from '@/lib/seo/seededMajorMetros'
 import type { SeoMetro } from '@/lib/seo/types'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+
+function isMissingGeographyTableError(error: { message?: string }): boolean {
+  const message = error.message?.toLowerCase() ?? ''
+  return (
+    message.includes('seo_metro_geography') &&
+    (message.includes('could not find') ||
+      message.includes('does not exist') ||
+      message.includes('schema cache'))
+  )
+}
 
 function rowFromDb(row: Record<string, unknown>): SeoMetroGeographyRow {
   return {
@@ -55,6 +69,9 @@ export async function loadSeoMetroGeographyBySlug(
     .maybeSingle()
 
   if (error) {
+    if (isMissingGeographyTableError(error)) {
+      return null
+    }
     throw new Error(error.message)
   }
 
@@ -75,6 +92,9 @@ export async function loadSeoMetroGeographyBySlugs(
     .in('slug', normalized)
 
   if (error) {
+    if (isMissingGeographyTableError(error)) {
+      return []
+    }
     throw new Error(error.message)
   }
 
@@ -89,6 +109,9 @@ export async function countGeographyQualifiedOverrides(
     .eq('qualified_override', true)
 
   if (error) {
+    if (isMissingGeographyTableError(error)) {
+      return getSeededMajorMetroCount()
+    }
     throw new Error(error.message)
   }
 
@@ -104,6 +127,9 @@ export async function loadGeographyQualifiedOverrideSlugs(
     .order('slug', { ascending: true })
 
   if (error) {
+    if (isMissingGeographyTableError(error)) {
+      return getSeededMajorMetroSlugs()
+    }
     throw new Error(error.message)
   }
 

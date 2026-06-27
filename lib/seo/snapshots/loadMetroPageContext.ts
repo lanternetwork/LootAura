@@ -3,6 +3,7 @@ import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
 import { resolveMetroPageRobotsFromSnapshot } from '@/lib/seo/indexRollout'
 import { requestCache } from '@/lib/seo/requestCache'
 import { resolveMetroExistence } from '@/lib/seo/resolveMetroExistence'
+import { isSeededMajorMetroSlug } from '@/lib/seo/seededMajorMetros'
 import { resolveSitemapSeoGate, type SitemapSeoGateState } from '@/lib/seo/resolveSitemapSeoGate'
 import {
   countMetroInventoryBySlug,
@@ -115,7 +116,8 @@ export const loadMetroPageContext = requestCache(
     ])
 
     const historicalCount90d = historyRow?.inventory_count_90d ?? 0
-    const qualifiedOverride = geography?.qualified_override ?? false
+    const qualifiedOverride =
+      geography?.qualified_override ?? isSeededMajorMetroSlug(metroSlug)
     const existence = resolveMetroExistence({
       slug: metroSlug,
       inventoryDbCount,

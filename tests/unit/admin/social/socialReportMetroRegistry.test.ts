@@ -7,10 +7,9 @@ import {
 import { listSocialReportRankingPresetSlugs } from '@/lib/admin/social/socialReportViewportPresets'
 import {
   geographyBySlugFromRows,
-  TEST_GEO_CHICAGO,
   TEST_SOCIAL_PRESET_GEOGRAPHY,
 } from '../../seo/metroGeographyTestFixtures'
-import { TEST_SEO_METRO_DALLAS } from '../../seo/seoTestFixtures'
+import { TEST_SEO_METRO_CHICAGO, TEST_SEO_METRO_DALLAS } from '../../seo/seoTestFixtures'
 
 describe('socialReportMetroRegistry', () => {
   const geographyBySlug = geographyBySlugFromRows(TEST_SOCIAL_PRESET_GEOGRAPHY)
@@ -42,12 +41,8 @@ describe('socialReportMetroRegistry', () => {
 
   it('prefers registry over discovery for the same slug', () => {
     const discoveredChicago = {
-      ...TEST_GEO_CHICAGO,
-      slug: 'chicago-il',
+      ...TEST_SEO_METRO_CHICAGO,
       city: 'Chicago Heights',
-      state: 'IL',
-      timezone: 'America/Chicago',
-      minActiveListings: 25,
     }
     expect(resolveSocialReportMetro('chicago-il', [discoveredChicago], geographyBySlug)).toEqual(
       expect.objectContaining({ city: 'Chicago' })
@@ -56,7 +51,7 @@ describe('socialReportMetroRegistry', () => {
 
   it('merges preset metros first and dedupes discovered overlaps', () => {
     const options = mergeSocialMetroOptions(
-      [TEST_SEO_METRO_DALLAS, { ...TEST_GEO_CHICAGO, slug: 'chicago-il', minActiveListings: 25 }],
+      [TEST_SEO_METRO_DALLAS, TEST_SEO_METRO_CHICAGO],
       geographyBySlug,
       (city, state) => `${city}, ${state}`
     )

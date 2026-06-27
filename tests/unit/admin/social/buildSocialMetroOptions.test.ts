@@ -3,6 +3,7 @@ import { buildSocialMetroOptions } from '@/lib/admin/social/buildSocialCityRepor
 import { listSocialReportRankingPresetSlugs } from '@/lib/admin/social/socialReportViewportPresets'
 import {
   geographyBySlugFromRows,
+  TEST_GEO_CHICAGO,
   TEST_SOCIAL_PRESET_GEOGRAPHY,
 } from '../../seo/metroGeographyTestFixtures'
 

@@ -1,4 +1,3 @@
-import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
 import { geographyRowToSeoMetro } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import type { SeoMetroGeographyRow } from '@/lib/seo/metroGeographyTypes'
 import type { SeoMetro } from '@/lib/seo/types'
@@ -58,15 +57,4 @@ export function mergeSocialMetroOptions(
     .sort((a, b) => a.label.localeCompare(b.label))
 
   return [...presetOptions, ...additionalOptions]
-}
-
-/** @deprecated test helper only */
-export function seoMetroFromGeographyRow(row: SeoMetroGeographyRow): SeoMetro {
-  return {
-    slug: row.slug,
-    city: row.city,
-    state: row.state,
-    timezone: row.timezone,
-    minActiveListings: SEO_METRO_MIN_ACTIVE_LISTINGS,
-  }
 }

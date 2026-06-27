@@ -2,17 +2,14 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
-import { getSeoMetroBySlug } from '@/lib/seo/metroCatalog'
-import { fetchMetroInventory } from '@/lib/seo/fetchMetroInventory'
 import { createCityPageMetadata } from '@/lib/seo/metadata'
-import { resolveMetroPageRobots } from '@/lib/seo/indexRollout'
-import { getSeoMetrosForRequest } from '@/lib/seo/loadSeoRolloutState'
-import { getInventorySeoEmissionForRequest } from '@/lib/seo/resolveInventorySeoEmission'
+import { resolveMetroPageRobotsFromSnapshot } from '@/lib/seo/indexRollout'
+import { loadMetroPageContext } from '@/lib/seo/snapshots/loadMetroPageContext'
 import {
   createCityPageStructuredDataBundle,
   saleToInventoryListItem,
 } from '@/lib/seo/structuredData'
-import { buildMetroGeoLinks, getNearbyPilotMetros } from '@/lib/seo/geoLinking'
+import { buildMetroGeoLinks } from '@/lib/seo/geoLinking'
 import SeoGeoDiscoveryLinks from '@/components/seo/SeoGeoDiscoveryLinks'
 import {
   buildCityPageH1,
@@ -20,7 +17,7 @@ import {
   formatFreshnessLabel,
 } from '@/lib/seo/copy/cityPageCopy'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 export const dynamicParams = true
 
 type PageProps = {
@@ -29,37 +26,34 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { metroSlug } = await params
-  const metros = await getSeoMetrosForRequest()
-  const metro = getSeoMetroBySlug(metros, metroSlug)
-  if (!metro) {
+  const context = await loadMetroPageContext(metroSlug)
+  if (!context) {
     return { title: 'Yard sales · Loot Aura' }
   }
-  const [emission, { summary }] = await Promise.all([
-    getInventorySeoEmissionForRequest(),
-    fetchMetroInventory(metro),
-  ])
+  const { metro, inventory, gate, metroQualified } = context
   return createCityPageMetadata({
     metro,
-    inventory: summary,
-    robots: resolveMetroPageRobots(metro, summary, emission.seoEmissionAllowed),
+    inventory: inventory.summary,
+    robots: resolveMetroPageRobotsFromSnapshot(gate.seoEmissionAllowed, metroQualified),
   })
 }
 
 export default async function YardSalesMetroPage({ params }: PageProps) {
   const { metroSlug } = await params
-  const metros = await getSeoMetrosForRequest()
-  const metro = getSeoMetroBySlug(metros, metroSlug)
-  if (!metro) {
+  const context = await loadMetroPageContext(metroSlug)
+  if (!context) {
     notFound()
   }
 
-  const { sales, summary } = await fetchMetroInventory(metro)
-  const geoLinks = buildMetroGeoLinks(metro, metros)
+  const { metro, inventory, nearbyMetros } = context
+  const { sales, summary } = inventory
+  const allMetros = [metro, ...nearbyMetros]
+  const geoLinks = buildMetroGeoLinks(metro, allMetros)
   const h1 = buildCityPageH1(metro, summary)
   const supportingCopy = buildCityPageSupportingCopy({
     metro,
     inventory: summary,
-    nearbyMetros: getNearbyPilotMetros(metro, metros),
+    nearbyMetros,
   })
   const structuredData = createCityPageStructuredDataBundle({
     metro,

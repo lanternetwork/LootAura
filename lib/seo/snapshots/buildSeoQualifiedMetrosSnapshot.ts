@@ -1,5 +1,6 @@
 import { fetchNationwideSeoMetroInventory } from '@/lib/seo/fetchAllSeoMetroInventory'
 import { qualifyAllSeoMetros } from '@/lib/seo/metroQualification'
+import type { SeoMetro } from '@/lib/seo/types'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 
 export type SeoQualifiedMetroSnapshotRow = {
@@ -7,6 +8,9 @@ export type SeoQualifiedMetroSnapshotRow = {
   qualified: boolean
   listing_count: number
   crawlable_ratio: number
+  city: string
+  state: string
+  timezone: string
   updated_at: string
 }
 
@@ -22,6 +26,7 @@ export async function buildSeoQualifiedMetrosSnapshot(
   const updatedAt = now.toISOString()
 
   return qualifiedResults.map((result) => {
+    const metro = metros.find((m) => m.slug === result.slug) as SeoMetro
     const inventory = inventoryBySlug[result.slug] ?? {
       activeListingCount: 0,
       crawlableInventoryPct: 0,
@@ -32,6 +37,9 @@ export async function buildSeoQualifiedMetrosSnapshot(
       qualified: result.qualified,
       listing_count: inventory.activeListingCount,
       crawlable_ratio: inventory.crawlableInventoryPct,
+      city: metro.city,
+      state: metro.state,
+      timezone: metro.timezone,
       updated_at: updatedAt,
     }
   })

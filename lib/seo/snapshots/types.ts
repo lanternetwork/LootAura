@@ -13,6 +13,23 @@ export type SeoQualifiedMetroRow = {
   qualified: boolean
   listing_count: number
   crawlable_ratio: number
+  city: string | null
+  state: string | null
+  timezone: string | null
+  updated_at: string
+}
+
+export type SeoMetroInventoryRow = {
+  metro_slug: string
+  sale_id: string
+  canonical_url: string
+  title: string
+  city: string
+  state: string
+  starts_at: string
+  ends_at: string | null
+  latitude: number
+  longitude: number
   updated_at: string
 }
 
@@ -28,6 +45,8 @@ export type SeoInfrastructureDiagnostics = {
   enablementSnapshotAgeMinutes: number | null
   qualifiedMetroSnapshotAgeMinutes: number | null
   inventorySnapshotAgeMinutes: number | null
+  metroInventorySnapshotAgeMinutes: number | null
   qualifiedMetroCount: number
   sitemapInventoryCount: number
+  metroInventoryCount: number
 }

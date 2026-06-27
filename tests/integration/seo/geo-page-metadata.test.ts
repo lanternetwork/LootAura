@@ -1,47 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TEST_SEO_METRO_DALLAS } from '../../unit/seo/seoTestFixtures'
 
-vi.mock('@/lib/seo/loadSeoRolloutState', () => ({
-  getSeoMetrosForRequest: vi.fn(),
-  getSeoRolloutStateForRequest: vi.fn(async () => ({
-    publicIndexingEnabled: true,
-    crawlValidationPassed: true,
-    searchConsoleValidationPassed: true,
-    publicIndexingEnabledAt: null,
-    publicIndexingDisabledAt: null,
-    crawlValidationPassedAt: null,
-    searchConsoleValidationPassedAt: null,
-  })),
-}))
+const loadMetroPageContextMock = vi.fn()
 
-vi.mock('@/lib/seo/resolveInventorySeoEmission', () => ({
-  getInventorySeoEmissionForRequest: vi.fn(async () => ({
-    seoEmissionAllowed: true,
-    indexingAllowed: true,
-    metricsAvailable: true,
-    rollout: {
-      seoEmissionAllowed: true,
-      indexingAllowed: true,
-      blockers: [],
-      qualifiedMetroSlugs: ['dallas-tx'],
-    },
-  })),
-}))
-
-vi.mock('@/lib/seo/fetchMetroInventory', () => ({
-  fetchMetroInventory: vi.fn(async () => ({
-    sales: [],
-    summary: { activeListingCount: 0, lastUpdatedAt: null, crawlableInventoryPct: 0 },
-  })),
-}))
-
-vi.mock('@/lib/seo/fetchMetroWeekendInventory', () => ({
-  fetchMetroWeekendInventory: vi.fn(async () => ({
-    sales: [],
-    summary: { activeListingCount: 0, lastUpdatedAt: null, crawlableInventoryPct: 0 },
-    weekend: { label: 'This Weekend', start: '2026-05-30', end: '2026-06-01' },
-    freshnessBySaleId: {},
-  })),
+vi.mock('@/lib/seo/snapshots/loadMetroPageContext', () => ({
+  loadMetroPageContext: (...args: unknown[]) => loadMetroPageContextMock(...args),
 }))
 
 describe('yard-sales metro page metadata', () => {
@@ -50,18 +13,26 @@ describe('yard-sales metro page metadata', () => {
   })
 
   it('returns city page metadata when metro is in catalog', async () => {
-    const { getSeoMetrosForRequest } = await import('@/lib/seo/loadSeoRolloutState')
-    vi.mocked(getSeoMetrosForRequest).mockResolvedValue([TEST_SEO_METRO_DALLAS])
+    loadMetroPageContextMock.mockResolvedValue({
+      metro: TEST_SEO_METRO_DALLAS,
+      metroQualified: true,
+      gate: { seoEmissionAllowed: true, indexingAllowed: true, snapshotFresh: true, qualifiedMetroCount: 1 },
+      inventory: {
+        sales: [],
+        summary: { activeListingCount: 0, lastUpdatedAt: null, crawlableInventoryPct: 0 },
+      },
+      nearbyMetros: [],
+    })
 
     const { generateMetadata } = await import('@/app/yard-sales/[metroSlug]/page')
     const metadata = await generateMetadata({ params: Promise.resolve({ metroSlug: 'dallas-tx' }) })
 
     expect(String(metadata.title)).toContain('Dallas')
+    expect(loadMetroPageContextMock).toHaveBeenCalledWith('dallas-tx')
   })
 
   it('returns fallback title when metro is missing from catalog', async () => {
-    const { getSeoMetrosForRequest } = await import('@/lib/seo/loadSeoRolloutState')
-    vi.mocked(getSeoMetrosForRequest).mockResolvedValue([])
+    loadMetroPageContextMock.mockResolvedValue(null)
 
     const { generateMetadata } = await import('@/app/yard-sales/[metroSlug]/page')
     const metadata = await generateMetadata({ params: Promise.resolve({ metroSlug: 'unknown-zz' }) })
@@ -76,12 +47,21 @@ describe('yard-sales-this-weekend metro page metadata', () => {
   })
 
   it('returns weekend page metadata when metro is in catalog', async () => {
-    const { getSeoMetrosForRequest } = await import('@/lib/seo/loadSeoRolloutState')
-    vi.mocked(getSeoMetrosForRequest).mockResolvedValue([TEST_SEO_METRO_DALLAS])
+    loadMetroPageContextMock.mockResolvedValue({
+      metro: TEST_SEO_METRO_DALLAS,
+      metroQualified: true,
+      gate: { seoEmissionAllowed: true, indexingAllowed: true, snapshotFresh: true, qualifiedMetroCount: 1 },
+      inventory: {
+        sales: [],
+        summary: { activeListingCount: 0, lastUpdatedAt: null, crawlableInventoryPct: 0 },
+      },
+      nearbyMetros: [],
+    })
 
     const { generateMetadata } = await import('@/app/yard-sales-this-weekend/[metroSlug]/page')
     const metadata = await generateMetadata({ params: Promise.resolve({ metroSlug: 'dallas-tx' }) })
 
     expect(String(metadata.title)).toContain('Dallas')
+    expect(loadMetroPageContextMock).toHaveBeenCalledWith('dallas-tx')
   })
 })

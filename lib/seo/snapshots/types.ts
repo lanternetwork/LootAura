@@ -59,4 +59,6 @@ export type SeoInfrastructureDiagnostics = {
   qualifiedMetroCount: number
   sitemapInventoryCount: number
   metroInventoryCount: number
+  metroGeographyCount: number
+  geographyOverrideCount: number
 }

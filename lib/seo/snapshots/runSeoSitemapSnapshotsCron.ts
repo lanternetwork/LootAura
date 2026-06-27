@@ -19,10 +19,10 @@ export type SeoSitemapSnapshotsCronResult = {
 export async function runSeoSitemapSnapshotsCron(): Promise<SeoSitemapSnapshotsCronResult> {
   const admin = getAdminDb()
   const enablement = await refreshSeoEnablementSnapshotCron(admin)
-  const [qualifiedMetros, inventory, metroInventory, metroHistory] = await Promise.all([
+  const metroInventory = await refreshSeoMetroInventorySnapshotCron(admin)
+  const [qualifiedMetros, inventory, metroHistory] = await Promise.all([
     refreshSeoQualifiedMetrosSnapshotCron(admin),
     refreshSeoSitemapInventorySnapshotCron(admin),
-    refreshSeoMetroInventorySnapshotCron(admin),
     refreshSeoMetroHistorySnapshotCron(admin),
   ])
 

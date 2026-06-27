@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getSeededMajorMetroSlugs } from '@/lib/seo/seededMajorMetros'
 
 const loadQualifiedMetroSlugsMock = vi.fn()
+const loadGeographyQualifiedOverrideSlugsMock = vi.fn()
 
 vi.mock('@/lib/seo/snapshots/loadSeoQualifiedMetros', () => ({
   loadQualifiedMetroSlugs: (...args: unknown[]) => loadQualifiedMetroSlugsMock(...args),
+}))
+
+vi.mock('@/lib/seo/snapshots/loadSeoMetroGeography', () => ({
+  loadGeographyQualifiedOverrideSlugs: (...args: unknown[]) =>
+    loadGeographyQualifiedOverrideSlugsMock(...args),
 }))
 
 describe('loadGeoSitemapMetroSlugs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     loadQualifiedMetroSlugsMock.mockResolvedValue(['dallas-tx'])
+    loadGeographyQualifiedOverrideSlugsMock.mockResolvedValue(['louisville-ky', 'chicago-il'])
   })
 
   it('returns empty when national emission is off', async () => {
@@ -19,10 +25,9 @@ describe('loadGeoSitemapMetroSlugs', () => {
     expect(slugs).toEqual([])
   })
 
-  it('unions qualified and seeded slugs when emission is on', async () => {
+  it('unions qualified and geography override slugs when emission is on', async () => {
     const { loadGeoSitemapMetroSlugs } = await import('@/lib/seo/snapshots/loadGeoSitemapMetroSlugs')
     const slugs = await loadGeoSitemapMetroSlugs(true)
-    const expected = [...new Set(['dallas-tx', ...getSeededMajorMetroSlugs()])].sort()
-    expect(slugs.sort()).toEqual(expected)
+    expect(slugs.sort()).toEqual(['chicago-il', 'dallas-tx', 'louisville-ky'])
   })
 })

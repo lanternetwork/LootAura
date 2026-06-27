@@ -5,7 +5,9 @@ import {
   isSaleSeoIndexEligible,
   type SaleSeoIndexEligibilityInput,
 } from '@/lib/seo/isSaleSeoIndexEligible'
+import { assignMetroSlug } from '@/lib/seo/metroAssignment'
 import { resolveSeoMetroForSale } from '@/lib/seo/metroCatalog'
+import { loadAllSeoMetroGeography } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { T } from '@/lib/supabase/tables'
@@ -253,12 +255,14 @@ export async function fetchPublishedListingInventoryForSnapshot(
 
 /**
  * Full metro inventory cohort for seo_metro_inventory snapshot (cron only).
- * Reuses isSaleSeoIndexEligible + canonical dedupe; assigns metro_slug via buildMetroSlug(city, state).
+ * Reuses isSaleSeoIndexEligible + canonical dedupe; assigns metro_slug via assignMetroSlug().
  */
 export async function fetchPublishedMetroInventoryForSnapshot(
   now: Date = new Date()
 ): Promise<SeoMetroInventoryBuildRow[]> {
   const admin = getAdminDb()
+  const geography = await loadAllSeoMetroGeography(admin)
+  const geographyBySlug = new Map(geography.map((row) => [row.slug, row]))
   const candidates: MetroInventorySaleRow[] = []
   let from = 0
 
@@ -301,7 +305,12 @@ export async function fetchPublishedMetroInventoryForSnapshot(
     if (seenCanonical.has(canonical)) continue
     if (!isSaleSeoIndexEligible(toEligibilityInput(row, ingestedFlags), nowMs)) continue
     seenCanonical.add(canonical)
-    const metro = resolveSeoMetroForSale({ city: row.city, state: row.state })
+    const metroSlug = assignMetroSlug(
+      { city: row.city, state: row.state, lat: row.lat, lng: row.lng },
+      geography
+    )
+    if (!metroSlug) continue
+    const metro = geographyBySlug.get(metroSlug)
     if (!metro) continue
     out.push({
       metro_slug: metro.slug,

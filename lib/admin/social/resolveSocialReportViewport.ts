@@ -6,11 +6,11 @@ import {
   getSocialReportMapViewportPixelSize,
   type SocialReportFormatSlug,
 } from '@/lib/admin/social/socialReportFormats'
-import { getKnownMetroMarketAnchor } from '@/lib/admin/social/metroMarketGeography'
 import {
-  getSocialReportViewportPreset,
+  getSocialReportZoomPreset,
   SOCIAL_REPORT_DEFAULT_ZOOM,
 } from '@/lib/admin/social/socialReportViewportPresets'
+import type { SeoMetroGeographyRow } from '@/lib/seo/metroGeographyTypes'
 import type { SeoMetro } from '@/lib/seo/types'
 
 const US_CENTER = { lat: 39.8283, lng: -98.5795 }
@@ -51,33 +51,36 @@ function buildResolvedViewport(options: {
   }
 }
 
-/** Resolve screenshot viewport for a metro (preset or conservative fallback). */
+/** Resolve screenshot viewport for a metro (preset zoom + geography center, or fallback). */
 export function resolveSocialReportViewportForMetro(
   metro: SeoMetro,
-  format: SocialReportFormatSlug
+  format: SocialReportFormatSlug,
+  geography: SeoMetroGeographyRow | null | undefined
 ): ResolvedSocialReportViewport {
-  const preset = getSocialReportViewportPreset(metro.slug)
-  if (preset) {
+  const zoomPreset = getSocialReportZoomPreset(metro.slug)
+  if (zoomPreset && geography) {
     return buildResolvedViewport({
-      citySlug: preset.citySlug,
-      centerLat: preset.centerLat,
-      centerLng: preset.centerLng,
-      zoom: preset.zoom,
-      timezone: preset.timezone,
+      citySlug: metro.slug,
+      centerLat: geography.center_lat,
+      centerLng: geography.center_lng,
+      zoom: zoomPreset.zoom,
+      timezone: geography.timezone,
       isRankingPreset: true,
       format,
     })
   }
 
-  const anchor = getKnownMetroMarketAnchor(metro.slug)
-  const center = anchor ?? US_CENTER
+  const center =
+    geography != null
+      ? { lat: geography.center_lat, lng: geography.center_lng }
+      : US_CENTER
 
   return buildResolvedViewport({
     citySlug: metro.slug,
     centerLat: center.lat,
     centerLng: center.lng,
-    zoom: SOCIAL_REPORT_DEFAULT_ZOOM,
-    timezone: metro.timezone,
+    zoom: zoomPreset?.zoom ?? SOCIAL_REPORT_DEFAULT_ZOOM,
+    timezone: geography?.timezone ?? metro.timezone,
     isRankingPreset: false,
     format,
   })

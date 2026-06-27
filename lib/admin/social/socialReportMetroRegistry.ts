@@ -1,26 +1,30 @@
 import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
+import { geographyRowToSeoMetro } from '@/lib/seo/snapshots/loadSeoMetroGeography'
+import type { SeoMetroGeographyRow } from '@/lib/seo/metroGeographyTypes'
 import type { SeoMetro } from '@/lib/seo/types'
 import type { SocialMetroOption } from '@/lib/admin/social/socialCityReportTypes'
-import { SOCIAL_REPORT_VIEWPORT_PRESETS } from '@/lib/admin/social/socialReportViewportPresets'
+import { listSocialReportRankingPresetSlugs } from '@/lib/admin/social/socialReportViewportPresets'
 
-/** Curated social report metros — authoritative for /admin/social regardless of discovery. */
-export function listSocialReportRegistryMetros(): SeoMetro[] {
-  return SOCIAL_REPORT_VIEWPORT_PRESETS.map((preset) => ({
-    slug: preset.citySlug,
-    city: preset.city,
-    state: preset.state,
-    timezone: preset.timezone,
-    minActiveListings: SEO_METRO_MIN_ACTIVE_LISTINGS,
-  }))
+/** Curated social report metros — authoritative when present in seo_metro_geography. */
+export function listSocialReportRegistryMetros(
+  geographyBySlug: Map<string, SeoMetroGeographyRow>
+): SeoMetro[] {
+  return listSocialReportRankingPresetSlugs()
+    .map((slug) => geographyBySlug.get(slug))
+    .filter((row): row is SeoMetroGeographyRow => row != null)
+    .map(geographyRowToSeoMetro)
 }
 
 /** Registry first, then discovered catalog (discovery cannot block presets). */
 export function resolveSocialReportMetro(
   slug: string,
-  discoveredMetros: SeoMetro[]
+  discoveredMetros: SeoMetro[],
+  geographyBySlug: Map<string, SeoMetroGeographyRow>
 ): SeoMetro | undefined {
   const normalizedSlug = slug.trim().toLowerCase()
-  const fromRegistry = listSocialReportRegistryMetros().find((metro) => metro.slug === normalizedSlug)
+  const fromRegistry = listSocialReportRegistryMetros(geographyBySlug).find(
+    (metro) => metro.slug === normalizedSlug
+  )
   if (fromRegistry) {
     return fromRegistry
   }
@@ -30,9 +34,10 @@ export function resolveSocialReportMetro(
 /** Preset metros first (registry order), then additional discovered metros alphabetically. */
 export function mergeSocialMetroOptions(
   discoveredMetros: SeoMetro[],
+  geographyBySlug: Map<string, SeoMetroGeographyRow>,
   formatLabel: (city: string, state: string) => string
 ): SocialMetroOption[] {
-  const registry = listSocialReportRegistryMetros()
+  const registry = listSocialReportRegistryMetros(geographyBySlug)
   const presetSlugs = new Set(registry.map((metro) => metro.slug))
 
   const presetOptions: SocialMetroOption[] = registry.map((metro) => ({
@@ -53,4 +58,15 @@ export function mergeSocialMetroOptions(
     .sort((a, b) => a.label.localeCompare(b.label))
 
   return [...presetOptions, ...additionalOptions]
+}
+
+/** @deprecated test helper only */
+export function seoMetroFromGeographyRow(row: SeoMetroGeographyRow): SeoMetro {
+  return {
+    slug: row.slug,
+    city: row.city,
+    state: row.state,
+    timezone: row.timezone,
+    minActiveListings: SEO_METRO_MIN_ACTIVE_LISTINGS,
+  }
 }

@@ -1,9 +1,9 @@
-import { getSeededMajorMetroSlugs } from '@/lib/seo/seededMajorMetros'
+import { loadGeographyQualifiedOverrideSlugs } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import { loadQualifiedMetroSlugs } from '@/lib/seo/snapshots/loadSeoQualifiedMetros'
 import { getAdminDb } from '@/lib/supabase/clients'
 
 /**
- * Geo sitemap slugs: qualified metros ∪ seeded majors when national emission is on.
+ * Geo sitemap slugs: qualified metros ∪ geography qualified_override when national emission is on.
  */
 export async function loadGeoSitemapMetroSlugs(
   seoEmissionAllowed: boolean,
@@ -13,10 +13,10 @@ export async function loadGeoSitemapMetroSlugs(
     return []
   }
 
-  const [qualified, seeded] = await Promise.all([
+  const [qualified, overrideSlugs] = await Promise.all([
     loadQualifiedMetroSlugs(admin),
-    Promise.resolve(getSeededMajorMetroSlugs()),
+    loadGeographyQualifiedOverrideSlugs(admin),
   ])
 
-  return [...new Set([...qualified, ...seeded])].sort((a, b) => a.localeCompare(b))
+  return [...new Set([...qualified, ...overrideSlugs])].sort((a, b) => a.localeCompare(b))
 }

@@ -1,3 +1,7 @@
+/**
+ * @deprecated Identity fields moved to seo_metro_geography. Use loadSeoMetroGeography / qualified_override.
+ * Retained for migration parity and tests referencing override slug set.
+ */
 import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
 import type { SeoMetro } from '@/lib/seo/types'
 
@@ -8,41 +12,47 @@ export type SeededMetro = {
   timezone: string
 }
 
-const SEEDED_MAJOR_METROS: SeededMetro[] = [
-  { slug: 'louisville-ky', city: 'Louisville', state: 'KY', timezone: 'America/New_York' },
-  { slug: 'lexington-ky', city: 'Lexington', state: 'KY', timezone: 'America/New_York' },
-  { slug: 'cincinnati-oh', city: 'Cincinnati', state: 'OH', timezone: 'America/New_York' },
-  { slug: 'indianapolis-in', city: 'Indianapolis', state: 'IN', timezone: 'America/Indiana/Indianapolis' },
-  { slug: 'nashville-tn', city: 'Nashville', state: 'TN', timezone: 'America/Chicago' },
-  { slug: 'st-louis-mo', city: 'St. Louis', state: 'MO', timezone: 'America/Chicago' },
-  { slug: 'chicago-il', city: 'Chicago', state: 'IL', timezone: 'America/Chicago' },
-  { slug: 'atlanta-ga', city: 'Atlanta', state: 'GA', timezone: 'America/New_York' },
-  { slug: 'dallas-tx', city: 'Dallas', state: 'TX', timezone: 'America/Chicago' },
-  { slug: 'houston-tx', city: 'Houston', state: 'TX', timezone: 'America/Chicago' },
-  { slug: 'san-antonio-tx', city: 'San Antonio', state: 'TX', timezone: 'America/Chicago' },
-  { slug: 'austin-tx', city: 'Austin', state: 'TX', timezone: 'America/Chicago' },
-]
+/** Slugs seeded with qualified_override=true in migration 232. */
+export const QUALIFIED_OVERRIDE_METRO_SLUGS = [
+  'louisville-ky',
+  'lexington-ky',
+  'cincinnati-oh',
+  'indianapolis-in',
+  'nashville-tn',
+  'st-louis-mo',
+  'chicago-il',
+  'atlanta-ga',
+  'dallas-tx',
+  'houston-tx',
+  'san-antonio-tx',
+  'austin-tx',
+] as const
 
-const BY_SLUG = new Map(SEEDED_MAJOR_METROS.map((metro) => [metro.slug, metro]))
+const QUALIFIED_OVERRIDE_SET = new Set<string>(QUALIFIED_OVERRIDE_METRO_SLUGS)
 
+/** @deprecated Use loadGeographyQualifiedOverrideSlugs() */
 export function getSeededMajorMetros(): readonly SeededMetro[] {
-  return SEEDED_MAJOR_METROS
+  return []
 }
 
+/** @deprecated Use countGeographyQualifiedOverrides() */
 export function getSeededMajorMetroCount(): number {
-  return SEEDED_MAJOR_METROS.length
+  return QUALIFIED_OVERRIDE_METRO_SLUGS.length
 }
 
+/** @deprecated Use loadGeographyQualifiedOverrideSlugs() */
 export function getSeededMajorMetroSlugs(): string[] {
-  return SEEDED_MAJOR_METROS.map((metro) => metro.slug)
+  return [...QUALIFIED_OVERRIDE_METRO_SLUGS]
 }
 
-export function getSeededMajorMetroBySlug(slug: string): SeededMetro | undefined {
-  return BY_SLUG.get(slug)
+/** @deprecated Use loadSeoMetroGeographyBySlug() */
+export function getSeededMajorMetroBySlug(_slug: string): SeededMetro | undefined {
+  return undefined
 }
 
+/** @deprecated Use geography row qualified_override */
 export function isSeededMajorMetroSlug(slug: string): boolean {
-  return BY_SLUG.has(slug)
+  return QUALIFIED_OVERRIDE_SET.has(slug.trim().toLowerCase())
 }
 
 export function seededMetroToSeoMetro(seeded: SeededMetro): SeoMetro {

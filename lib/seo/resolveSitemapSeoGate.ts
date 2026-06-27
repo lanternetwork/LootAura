@@ -1,4 +1,3 @@
-import { getSeededMajorMetroCount } from '@/lib/seo/seededMajorMetros'
 import { evaluateSeoEnablementGateFromSnapshotFields } from '@/lib/seo/evaluateSeoEnablementGate'
 import { requestCache } from '@/lib/seo/requestCache'
 import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
@@ -8,6 +7,7 @@ import {
   isEnablementSnapshotFresh,
   loadSeoEnablementSnapshot,
 } from '@/lib/seo/snapshots/loadSeoEnablementSnapshot'
+import { countGeographyQualifiedOverrides } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import { countQualifiedSeoMetros } from '@/lib/seo/snapshots/loadSeoQualifiedMetros'
 import { getAdminDb } from '@/lib/supabase/clients'
 
@@ -32,10 +32,11 @@ const FAIL_CLOSED: SitemapSeoGateState = {
 export const resolveSitemapSeoGate = requestCache(async (): Promise<SitemapSeoGateState> => {
   try {
     const admin = getAdminDb()
-    const [snapshot, rolloutState, qualifiedMetroCount] = await Promise.all([
+    const [snapshot, rolloutState, qualifiedMetroCount, geographyOverrideCount] = await Promise.all([
       loadSeoEnablementSnapshot(admin),
       fetchSeoRolloutState(admin),
       countQualifiedSeoMetros(admin),
+      countGeographyQualifiedOverrides(admin),
     ])
 
     if (!snapshot || !isEnablementSnapshotFresh(snapshot.updated_at, Date.now(), SEO_SNAPSHOT_MAX_AGE_MS)) {
@@ -46,8 +47,7 @@ export const resolveSitemapSeoGate = requestCache(async (): Promise<SitemapSeoGa
     const enablement = evaluateSeoEnablementGateFromSnapshotFields(metricFields, rolloutState)
     const seoEmissionAllowed = enablement.seoEmissionAllowed
     const indexingAllowed =
-      seoEmissionAllowed &&
-      (qualifiedMetroCount >= 1 || getSeededMajorMetroCount() >= 1)
+      seoEmissionAllowed && (qualifiedMetroCount >= 1 || geographyOverrideCount >= 1)
 
     return {
       seoEmissionAllowed,

@@ -3,6 +3,7 @@ import { evaluateSeoEnablementMetricGateFromSnapshotFields } from '@/lib/seo/eva
 import { buildSeoEnablementSnapshot } from '@/lib/seo/snapshots/buildSeoEnablementSnapshot'
 import { buildSeoQualifiedMetrosSnapshot } from '@/lib/seo/snapshots/buildSeoQualifiedMetrosSnapshot'
 import { resolveSeoSitemapPlan } from '@/lib/seo/sitemap/resolveSitemapPlan'
+import { TEST_GEO_DALLAS } from './metroGeographyTestFixtures'
 
 const aggregateMock = vi.fn()
 const publishedIndexMock = vi.fn()
@@ -10,7 +11,8 @@ const duplicateMock = vi.fn()
 const listMissingMock = vi.fn()
 const traceMock = vi.fn()
 const actionableMock = vi.fn()
-const fetchNationwideMock = vi.fn()
+const loadAllGeographyMock = vi.fn()
+const fromBaseSelectMock = vi.fn()
 
 vi.mock('@/lib/ingestion/ystmCoverage/ystmCoverageObservationsStore', () => ({
   aggregateYstmCoverageObservations: (...args: unknown[]) => aggregateMock(...args),
@@ -33,8 +35,19 @@ vi.mock('@/lib/ingestion/ystmCoverage/buildActionableMissingValidAggregate', () 
   buildActionableMissingValidAggregate: (...args: unknown[]) => actionableMock(...args),
 }))
 
-vi.mock('@/lib/seo/fetchAllSeoMetroInventory', () => ({
-  fetchNationwideSeoMetroInventory: (...args: unknown[]) => fetchNationwideMock(...args),
+vi.mock('@/lib/seo/snapshots/loadSeoMetroGeography', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seo/snapshots/loadSeoMetroGeography')>()
+  return {
+    ...actual,
+    loadAllSeoMetroGeography: (...args: unknown[]) => loadAllGeographyMock(...args),
+  }
+})
+
+vi.mock('@/lib/supabase/clients', () => ({
+  getAdminDb: vi.fn(() => ({})),
+  fromBase: vi.fn(() => ({
+    select: fromBaseSelectMock,
+  })),
 }))
 
 describe('seo snapshot builders', () => {
@@ -52,23 +65,17 @@ describe('seo snapshot builders', () => {
     listMissingMock.mockResolvedValue([])
     traceMock.mockResolvedValue({ traces: [] })
     actionableMock.mockResolvedValue({ effectiveMissingValidYstmUrls: 36 })
-    fetchNationwideMock.mockResolvedValue({
-      metros: [
-        {
-          slug: 'dallas-tx',
-          city: 'Dallas',
-          state: 'TX',
-          timezone: 'America/Chicago',
-          minActiveListings: 25,
-        },
-      ],
-      inventoryBySlug: {
-        'dallas-tx': {
-          activeListingCount: 50,
-          crawlableInventoryPct: 0.95,
-          lastUpdatedAt: '2026-06-01T00:00:00.000Z',
-        },
-      },
+    loadAllGeographyMock.mockResolvedValue([TEST_GEO_DALLAS])
+    const inventoryRows = Array.from({ length: 50 }, (_, index) => ({
+      metro_slug: 'dallas-tx',
+      starts_at: '2026-06-01',
+      ends_at: null,
+      updated_at: '2026-06-01T00:00:00.000Z',
+      id: `sale-${index}`,
+    }))
+    fromBaseSelectMock.mockReturnValue({
+      data: inventoryRows,
+      error: null,
     })
   })
 

@@ -8,14 +8,18 @@ import {
   loadLatestQualifiedMetroSnapshotUpdatedAt,
 } from '@/lib/seo/snapshots/loadSeoQualifiedMetros'
 import {
-  countSeoMetroInventory,
-  loadLatestSeoMetroInventoryUpdatedAt,
-} from '@/lib/seo/snapshots/loadSeoMetroInventory'
+  countGeographyQualifiedOverrides,
+  loadAllSeoMetroGeography,
+} from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import {
   countSeoSitemapInventory,
   loadLatestSeoSitemapInventoryUpdatedAt,
 } from '@/lib/seo/snapshots/loadSeoSitemapInventory'
 import type { SeoInfrastructureDiagnostics } from '@/lib/seo/snapshots/types'
+import {
+  countSeoMetroInventory,
+  loadLatestSeoMetroInventoryUpdatedAt,
+} from '@/lib/seo/snapshots/loadSeoMetroInventory'
 
 export async function loadSeoInfrastructureDiagnostics(
   admin = getAdminDb(),
@@ -30,6 +34,8 @@ export async function loadSeoInfrastructureDiagnostics(
       qualifiedMetroUpdatedAt,
       inventoryUpdatedAt,
       metroInventoryUpdatedAt,
+      geographyRows,
+      geographyOverrideCount,
     ] = await Promise.all([
       loadSeoEnablementSnapshot(admin),
       countQualifiedSeoMetros(admin),
@@ -38,6 +44,8 @@ export async function loadSeoInfrastructureDiagnostics(
       loadLatestQualifiedMetroSnapshotUpdatedAt(admin),
       loadLatestSeoSitemapInventoryUpdatedAt(admin),
       loadLatestSeoMetroInventoryUpdatedAt(admin),
+      loadAllSeoMetroGeography(admin),
+      countGeographyQualifiedOverrides(admin),
     ])
 
     return {
@@ -48,6 +56,8 @@ export async function loadSeoInfrastructureDiagnostics(
       qualifiedMetroCount,
       sitemapInventoryCount: inventoryCount,
       metroInventoryCount,
+      metroGeographyCount: geographyRows.length,
+      geographyOverrideCount,
     }
   } catch {
     return {
@@ -58,6 +68,8 @@ export async function loadSeoInfrastructureDiagnostics(
       qualifiedMetroCount: 0,
       sitemapInventoryCount: 0,
       metroInventoryCount: 0,
+      metroGeographyCount: 0,
+      geographyOverrideCount: 0,
     }
   }
 }

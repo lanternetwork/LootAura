@@ -1,94 +1,34 @@
-export type SocialReportViewportPreset = {
+export type SocialReportZoomPreset = {
   citySlug: string
-  city: string
-  state: string
-  centerLat: number
-  centerLng: number
   zoom: number
-  timezone: string
 }
 
 export const SOCIAL_REPORT_DEFAULT_ZOOM = 10
 
-/** Ranked / preset-driven screenshot viewports (code-maintained). */
-export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportViewportPreset[] = [
-  /** zoom 8: tighter metro framing to match social report template */
-  {
-    citySlug: 'chicago-il',
-    city: 'Chicago',
-    state: 'IL',
-    centerLat: 41.8781,
-    centerLng: -87.6298,
-    zoom: 8,
-    timezone: 'America/Chicago',
-  },
-  /** zoom 8: tighter DFW metro framing to match social report template */
-  {
-    citySlug: 'dallas-tx',
-    city: 'Dallas',
-    state: 'TX',
-    centerLat: 32.7767,
-    centerLng: -96.797,
-    zoom: 8,
-    timezone: 'America/Chicago',
-  },
-  {
-    citySlug: 'houston-tx',
-    city: 'Houston',
-    state: 'TX',
-    centerLat: 29.7604,
-    centerLng: -95.3698,
-    zoom: 9,
-    timezone: 'America/Chicago',
-  },
-  {
-    citySlug: 'phoenix-az',
-    city: 'Phoenix',
-    state: 'AZ',
-    centerLat: 33.4484,
-    centerLng: -112.074,
-    zoom: 9,
-    timezone: 'America/Phoenix',
-  },
-  {
-    citySlug: 'atlanta-ga',
-    city: 'Atlanta',
-    state: 'GA',
-    centerLat: 33.749,
-    centerLng: -84.388,
-    zoom: 9,
-    timezone: 'America/New_York',
-  },
-  {
-    citySlug: 'austin-tx',
-    city: 'Austin',
-    state: 'TX',
-    centerLat: 30.2672,
-    centerLng: -97.7431,
-    zoom: 9,
-    timezone: 'America/Chicago',
-  },
-  {
-    citySlug: 'louisville-ky',
-    city: 'Louisville',
-    state: 'KY',
-    centerLat: 38.2527,
-    centerLng: -85.7585,
-    zoom: 9,
-    timezone: 'America/New_York',
-  },
+/** Map framing zoom per ranked social metro (center from seo_metro_geography). */
+export const SOCIAL_REPORT_VIEWPORT_PRESETS: SocialReportZoomPreset[] = [
+  { citySlug: 'chicago-il', zoom: 8 },
+  { citySlug: 'dallas-tx', zoom: 8 },
+  { citySlug: 'houston-tx', zoom: 9 },
+  { citySlug: 'phoenix-az', zoom: 9 },
+  { citySlug: 'atlanta-ga', zoom: 9 },
+  { citySlug: 'austin-tx', zoom: 9 },
+  { citySlug: 'louisville-ky', zoom: 9 },
 ]
 
-const PRESET_BY_SLUG: Record<string, SocialReportViewportPreset> = Object.fromEntries(
+const PRESET_BY_SLUG: Record<string, SocialReportZoomPreset> = Object.fromEntries(
   SOCIAL_REPORT_VIEWPORT_PRESETS.map((preset) => [preset.citySlug, preset])
 )
 
-export function getSocialReportViewportPreset(
-  citySlug: string
-): SocialReportViewportPreset | null {
+export function getSocialReportZoomPreset(citySlug: string): SocialReportZoomPreset | null {
   return PRESET_BY_SLUG[citySlug.trim().toLowerCase()] ?? null
 }
 
 export function listSocialReportRankingPresetSlugs(): string[] {
   return SOCIAL_REPORT_VIEWPORT_PRESETS.map((preset) => preset.citySlug)
+}
+
+/** @deprecated Use getSocialReportZoomPreset */
+export function getSocialReportViewportPreset(citySlug: string): SocialReportZoomPreset | null {
+  return getSocialReportZoomPreset(citySlug)
 }

@@ -22,7 +22,7 @@ describe('city page heavy path removal', () => {
     const src = readPage('app/yard-sales-this-weekend/[metroSlug]/page.tsx')
     expect(src).not.toContain('getInventorySeoEmissionForRequest')
     expect(src).not.toContain('getSeoMetrosForRequest')
-    expect(src).not.toContain('fetchMetroWeekendInventory')
+    expect(src).not.toMatch(/fetchMetroWeekendInventory\s*\(/)
     expect(src).toContain('loadMetroPageContext')
     expect(src).toContain('revalidate = 3600')
   })

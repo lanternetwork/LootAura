@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
 import { createCityPageMetadata } from '@/lib/seo/metadata'
-import { resolveMetroPageRobotsFromSnapshot } from '@/lib/seo/indexRollout'
 import { loadMetroPageContext } from '@/lib/seo/snapshots/loadMetroPageContext'
 import {
   createCityPageStructuredDataBundle,
@@ -12,6 +11,7 @@ import {
 import { buildMetroGeoLinks } from '@/lib/seo/geoLinking'
 import SeoGeoDiscoveryLinks from '@/components/seo/SeoGeoDiscoveryLinks'
 import {
+  buildCityPageEmptyInventoryMessage,
   buildCityPageH1,
   buildCityPageSupportingCopy,
   formatFreshnessLabel,
@@ -24,17 +24,21 @@ type PageProps = {
   params: Promise<{ metroSlug: string }>
 }
 
+function robotsDirectiveToMetadata(robots: 'index,follow' | 'noindex,follow') {
+  return { index: robots === 'index,follow', follow: true as const }
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { metroSlug } = await params
   const context = await loadMetroPageContext(metroSlug)
   if (!context) {
     return { title: 'Yard sales · Loot Aura' }
   }
-  const { metro, inventory, gate, metroQualified } = context
+  const { metro, inventory, robots } = context
   return createCityPageMetadata({
     metro,
     inventory: inventory.summary,
-    robots: resolveMetroPageRobotsFromSnapshot(gate.seoEmissionAllowed, metroQualified),
+    robots: robotsDirectiveToMetadata(robots),
   })
 }
 
@@ -45,20 +49,27 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
     notFound()
   }
 
-  const { metro, inventory, nearbyMetros } = context
+  const { metro, inventory, nearbyMetros, inventoryCount } = context
   const { sales, summary } = inventory
   const allMetros = [metro, ...nearbyMetros]
   const geoLinks = buildMetroGeoLinks(metro, allMetros)
-  const h1 = buildCityPageH1(metro, summary)
-  const supportingCopy = buildCityPageSupportingCopy({
-    metro,
-    inventory: summary,
-    nearbyMetros,
-  })
+  const h1 =
+    inventoryCount === 0
+      ? buildCityPageH1(metro, summary, 'This Weekend', { stableTitleWhenEmpty: true })
+      : buildCityPageH1(metro, summary)
+  const supportingCopy =
+    inventoryCount === 0
+      ? buildCityPageEmptyInventoryMessage()
+      : buildCityPageSupportingCopy({
+          metro,
+          inventory: summary,
+          nearbyMetros,
+        })
   const structuredData = createCityPageStructuredDataBundle({
     metro,
     inventory: summary,
     items: sales.slice(0, 50).map(saleToInventoryListItem),
+    includeInventoryList: inventoryCount > 0,
   })
 
   return (
@@ -80,7 +91,11 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
 
         <h1 className="mt-4 text-2xl font-bold text-gray-900 sm:text-3xl">{h1}</h1>
 
-        <p className="mt-2 text-sm font-medium text-emerald-800">{formatFreshnessLabel(summary.lastUpdatedAt)}</p>
+        {inventoryCount > 0 && (
+          <p className="mt-2 text-sm font-medium text-emerald-800">
+            {formatFreshnessLabel(summary.lastUpdatedAt)}
+          </p>
+        )}
 
         <SeoGeoDiscoveryLinks links={geoLinks} />
 
@@ -96,7 +111,15 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
         <section className="mt-8 rounded-lg border border-gray-200 bg-white px-4">
           <h2 className="sr-only">Active listings</h2>
           {sales.length === 0 ? (
-            <p className="py-8 text-center text-gray-600">No active listings in this area right now.</p>
+            <div className="py-8 text-center text-gray-600">
+              {buildCityPageEmptyInventoryMessage()
+                .split('\n\n')
+                .map((paragraph) => (
+                  <p key={paragraph} className="mt-2 first:mt-0">
+                    {paragraph}
+                  </p>
+                ))}
+            </div>
           ) : (
             <ul>
               {sales.map((sale) => (
@@ -106,11 +129,13 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
           )}
         </section>
 
-        <section className="prose prose-sm mt-10 max-w-none text-gray-700">
-          {supportingCopy.split('\n\n').map((paragraph) => (
-            <p key={paragraph.slice(0, 48)}>{paragraph}</p>
-          ))}
-        </section>
+        {inventoryCount > 0 && (
+          <section className="prose prose-sm mt-10 max-w-none text-gray-700">
+            {supportingCopy.split('\n\n').map((paragraph) => (
+              <p key={paragraph.slice(0, 48)}>{paragraph}</p>
+            ))}
+          </section>
+        )}
       </main>
     </div>
   )

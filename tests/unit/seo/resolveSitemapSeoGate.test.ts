@@ -76,12 +76,12 @@ describe('resolveSitemapSeoGate', () => {
     expect(gate.indexingAllowed).toBe(false)
   })
 
-  it('indexingAllowed requires seoEmissionAllowed and qualified metros', async () => {
+  it('indexingAllowed allows geo segments when seeded majors exist even with zero qualified metros', async () => {
     loadSeoEnablementSnapshotMock.mockResolvedValue(freshSnapshot())
     countQualifiedSeoMetrosMock.mockResolvedValue(0)
     const gate = await resolveSitemapSeoGate()
     expect(gate.seoEmissionAllowed).toBe(true)
-    expect(gate.indexingAllowed).toBe(false)
+    expect(gate.indexingAllowed).toBe(true)
     expect(gate.qualifiedMetroCount).toBe(0)
   })
 

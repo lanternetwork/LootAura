@@ -1,10 +1,23 @@
 import type { SeoInventorySummary, SeoPilotMetro } from '@/lib/seo/types'
+
 export function buildCityPageH1(
   metro: SeoPilotMetro,
   inventory: SeoInventorySummary,
-  weekendLabel = 'This Weekend'
+  weekendLabel = 'This Weekend',
+  options?: { stableTitleWhenEmpty?: boolean }
 ): string {
+  if (options?.stableTitleWhenEmpty && inventory.activeListingCount === 0) {
+    return `${metro.city} Yard Sales`
+  }
   return `${inventory.activeListingCount} Yard Sales ${weekendLabel} in ${metro.city}, ${metro.state}`
+}
+
+export function buildCityPageEmptyInventoryMessage(): string {
+  return [
+    'No active yard sales found today.',
+    'Many yard sales happen Friday through Sunday.',
+    'Check back this weekend.',
+  ].join('\n\n')
 }
 
 export function buildCityPageSupportingCopy(options: {

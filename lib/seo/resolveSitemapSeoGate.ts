@@ -1,3 +1,4 @@
+import { getSeededMajorMetroCount } from '@/lib/seo/seededMajorMetros'
 import { evaluateSeoEnablementGateFromSnapshotFields } from '@/lib/seo/evaluateSeoEnablementGate'
 import { requestCache } from '@/lib/seo/requestCache'
 import { fetchSeoRolloutState } from '@/lib/seo/seoRolloutState'
@@ -44,7 +45,9 @@ export const resolveSitemapSeoGate = requestCache(async (): Promise<SitemapSeoGa
     const metricFields = buildMetricGateFieldsFromEnablementSnapshot(snapshot)
     const enablement = evaluateSeoEnablementGateFromSnapshotFields(metricFields, rolloutState)
     const seoEmissionAllowed = enablement.seoEmissionAllowed
-    const indexingAllowed = seoEmissionAllowed && qualifiedMetroCount >= 1
+    const indexingAllowed =
+      seoEmissionAllowed &&
+      (qualifiedMetroCount >= 1 || getSeededMajorMetroCount() >= 1)
 
     return {
       seoEmissionAllowed,

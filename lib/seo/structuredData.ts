@@ -81,24 +81,34 @@ export function createCityPageStructuredDataBundle(options: {
   metro: SeoPilotMetro
   inventory: SeoInventorySummary
   items: InventoryListItem[]
+  includeInventoryList?: boolean
 }) {
   const { metro, inventory, items } = options
+  const includeInventoryList = options.includeInventoryList ?? items.length > 0
   const pageUrl = getCityPageCanonicalUrl(metro.slug as SeoMetroSlug)
   const listName = `Yard sales in ${metro.city}, ${metro.state}`
 
-  return [
-    createMetroPlaceStructuredData(metro),
-    createInventoryItemListStructuredData({
-      name: listName,
-      description: `${inventory.activeListingCount} active yard sales and estate sales in ${metro.city}, ${metro.state}.`,
-      items,
-      pageUrl,
-    }),
+  const blocks: Record<string, unknown>[] = [createMetroPlaceStructuredData(metro)]
+
+  if (includeInventoryList) {
+    blocks.push(
+      createInventoryItemListStructuredData({
+        name: listName,
+        description: `${inventory.activeListingCount} active yard sales and estate sales in ${metro.city}, ${metro.state}.`,
+        items,
+        pageUrl,
+      })
+    )
+  }
+
+  blocks.push(
     createBreadcrumbStructuredData([
       { name: 'Home', url: '/' },
       { name: metro.city, url: getCityPageCanonicalUrl(metro.slug as SeoMetroSlug).replace(getSeoBaseUrl(), '') },
-    ]),
-  ]
+    ])
+  )
+
+  return blocks
 }
 
 export function createWeekendPageStructuredDataBundle(options: {
@@ -106,20 +116,28 @@ export function createWeekendPageStructuredDataBundle(options: {
   inventory: SeoInventorySummary
   items: InventoryListItem[]
   weekendLabel?: string
+  includeInventoryList?: boolean
 }) {
   const { metro, inventory, items } = options
+  const includeInventoryList = options.includeInventoryList ?? items.length > 0
   const weekendLabel = options.weekendLabel ?? 'This Weekend'
   const pageUrl = getWeekendPageCanonicalUrl(metro.slug as SeoMetroSlug)
   const listName = `Yard sales ${weekendLabel} in ${metro.city}, ${metro.state}`
 
-  return [
-    createMetroPlaceStructuredData(metro),
-    createInventoryItemListStructuredData({
-      name: listName,
-      description: `${inventory.activeListingCount} yard sales ${weekendLabel.toLowerCase()} in ${metro.city}, ${metro.state}.`,
-      items,
-      pageUrl,
-    }),
+  const blocks: Record<string, unknown>[] = [createMetroPlaceStructuredData(metro)]
+
+  if (includeInventoryList) {
+    blocks.push(
+      createInventoryItemListStructuredData({
+        name: listName,
+        description: `${inventory.activeListingCount} yard sales ${weekendLabel.toLowerCase()} in ${metro.city}, ${metro.state}.`,
+        items,
+        pageUrl,
+      })
+    )
+  }
+
+  blocks.push(
     createBreadcrumbStructuredData([
       { name: 'Home', url: '/' },
       {
@@ -130,8 +148,10 @@ export function createWeekendPageStructuredDataBundle(options: {
         name: weekendLabel,
         url: getWeekendPageCanonicalUrl(metro.slug as SeoMetroSlug).replace(getSeoBaseUrl(), ''),
       },
-    ]),
-  ]
+    ])
+  )
+
+  return blocks
 }
 
 export function createListingPageStructuredDataBundle(sale: Sale) {

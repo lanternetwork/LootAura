@@ -6,8 +6,15 @@ describe('resolveMetroPageRobotsFromSnapshot', () => {
     expect(resolveMetroPageRobotsFromSnapshot(false, true)).toEqual({ index: false, follow: true })
   })
 
-  it('noindex when metro is not qualified', () => {
-    expect(resolveMetroPageRobotsFromSnapshot(true, false)).toEqual({ index: false, follow: true })
+  it('noindex when metro is not qualified and not seeded', () => {
+    expect(resolveMetroPageRobotsFromSnapshot(true, false, false)).toEqual({
+      index: false,
+      follow: true,
+    })
+  })
+
+  it('index when seeded major even if not qualified', () => {
+    expect(resolveMetroPageRobotsFromSnapshot(true, false, true)).toEqual({ index: true, follow: true })
   })
 
   it('index when gate and metro qualification pass', () => {

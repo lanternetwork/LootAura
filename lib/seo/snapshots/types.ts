@@ -33,6 +33,16 @@ export type SeoMetroInventoryRow = {
   updated_at: string
 }
 
+export type SeoMetroHistoryRow = {
+  slug: string
+  city: string
+  state: string
+  timezone: string
+  inventory_count_90d: number
+  last_seen_at: string | null
+  updated_at: string
+}
+
 export type SeoSitemapInventoryRow = {
   sale_id: string
   canonical_url: string

@@ -5,6 +5,7 @@ import {
   isSaleSeoIndexEligible,
   type SaleSeoIndexEligibilityInput,
 } from '@/lib/seo/isSaleSeoIndexEligible'
+import { getSeoBaseUrl, SEO_LISTING_PATH_PREFIX } from '@/lib/seo/constants'
 import { assignMetroSlug } from '@/lib/seo/metroAssignment'
 import { resolveSeoMetroForSale } from '@/lib/seo/metroCatalog'
 import { loadAllSeoMetroGeography } from '@/lib/seo/snapshots/loadSeoMetroGeography'
@@ -117,6 +118,16 @@ export async function loadIngestedEligibilityFlagsForPublishedSale(
   const admin = getAdminDb()
   const map = await loadIngestedFlagsByPublishedSaleId(admin, [saleId])
   return map.get(saleId) ?? { ingestedIsDuplicate: false, ingestedSuperseded: false }
+}
+
+/** Canonical URL stored on metro inventory rows (public discovery; not listing-sitemap dedupe). */
+export function resolveMetroInventoryCanonicalUrl(
+  saleId: string,
+  externalSourceUrl?: string | null
+): string {
+  const external = externalSourceUrl?.trim()
+  if (external) return external
+  return `${getSeoBaseUrl()}${SEO_LISTING_PATH_PREFIX}/${saleId}`
 }
 
 function toEligibilityInput(
@@ -255,7 +266,8 @@ export async function fetchPublishedListingInventoryForSnapshot(
 
 /**
  * Full metro inventory cohort for seo_metro_inventory snapshot (cron only).
- * Reuses isSaleSeoIndexEligible + canonical dedupe; assigns metro_slug via assignMetroSlug().
+ * Public discovery cohort: Phase 4 + markers-style date_end + assignMetroSlug().
+ * Does not apply YSTM, isSaleSeoIndexEligible, ingested flags, or canonical dedupe.
  */
 export async function fetchPublishedMetroInventoryForSnapshot(
   now: Date = new Date()
@@ -263,7 +275,8 @@ export async function fetchPublishedMetroInventoryForSnapshot(
   const admin = getAdminDb()
   const geography = await loadAllSeoMetroGeography(admin)
   const geographyBySlug = new Map(geography.map((row) => [row.slug, row]))
-  const candidates: MetroInventorySaleRow[] = []
+  const todayStr = now.toISOString().split('T')[0]!
+  const out: SeoMetroInventoryBuildRow[] = []
   let from = 0
 
   for (;;) {
@@ -271,6 +284,8 @@ export async function fetchPublishedMetroInventoryForSnapshot(
       'id, title, updated_at, status, archived_at, moderation_status, ends_at, external_source_url, lat, lng, city, state, date_start, date_end, address, cover_image_url'
     )
     q = applyPhase4PublicPublishedSaleReadFilters(q, { now })
+    q = q.or(`date_end.is.null,date_end.gte.${todayStr}`)
+    q = q.not('lat', 'is', null).not('lng', 'is', null)
     const { data, error } = await q.order('updated_at', { ascending: false }).range(from, from + PAGE_SIZE - 1)
 
     if (error) {
@@ -280,53 +295,36 @@ export async function fetchPublishedMetroInventoryForSnapshot(
 
     const chunk = (Array.isArray(data) ? data : []) as MetroInventorySaleRow[]
     for (const row of chunk) {
-      const url = row.external_source_url?.trim()
-      if (!url || !isYstmDetailListingUrl(url)) continue
       if (row.lat == null || row.lng == null) continue
       if (!row.city?.trim() || !row.state?.trim() || !row.date_start?.trim()) continue
-      candidates.push(row)
+
+      const metroSlug = assignMetroSlug(
+        { city: row.city, state: row.state, lat: row.lat, lng: row.lng },
+        geography
+      )
+      if (!metroSlug) continue
+      const metro = geographyBySlug.get(metroSlug)
+      if (!metro) continue
+
+      out.push({
+        metro_slug: metro.slug,
+        sale_id: row.id,
+        canonical_url: resolveMetroInventoryCanonicalUrl(row.id, row.external_source_url),
+        title: row.title?.trim() || 'Yard Sale',
+        city: row.city.trim(),
+        state: row.state.trim().toUpperCase(),
+        starts_at: row.date_start.trim(),
+        ends_at: row.date_end?.trim() || null,
+        latitude: row.lat,
+        longitude: row.lng,
+        updated_at: row.updated_at,
+        address: row.address?.trim() || null,
+        cover_image_url: row.cover_image_url ?? null,
+      })
     }
 
     if (chunk.length < PAGE_SIZE) break
     from += PAGE_SIZE
-  }
-
-  const ingestedFlags = await loadIngestedFlagsByPublishedSaleId(
-    admin,
-    candidates.map((row) => row.id)
-  )
-
-  const seenCanonical = new Set<string>()
-  const out: SeoMetroInventoryBuildRow[] = []
-  const nowMs = now.getTime()
-
-  for (const row of candidates) {
-    const canonical = canonicalSourceUrl(row.external_source_url!.trim())
-    if (seenCanonical.has(canonical)) continue
-    if (!isSaleSeoIndexEligible(toEligibilityInput(row, ingestedFlags), nowMs)) continue
-    seenCanonical.add(canonical)
-    const metroSlug = assignMetroSlug(
-      { city: row.city, state: row.state, lat: row.lat, lng: row.lng },
-      geography
-    )
-    if (!metroSlug) continue
-    const metro = geographyBySlug.get(metroSlug)
-    if (!metro) continue
-    out.push({
-      metro_slug: metro.slug,
-      sale_id: row.id,
-      canonical_url: canonical,
-      title: row.title?.trim() || 'Yard Sale',
-      city: row.city!.trim(),
-      state: row.state!.trim().toUpperCase(),
-      starts_at: row.date_start!.trim(),
-      ends_at: row.date_end?.trim() || null,
-      latitude: row.lat!,
-      longitude: row.lng!,
-      updated_at: row.updated_at,
-      address: row.address?.trim() || null,
-      cover_image_url: row.cover_image_url ?? null,
-    })
   }
 
   out.sort((a, b) => {

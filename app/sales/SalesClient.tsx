@@ -39,6 +39,7 @@ import {
 import { resolveInitialViewport } from '@/lib/map/initialViewportResolver'
 import { saveViewportState } from '@/lib/map/viewportPersistence'
 import { requestGeolocation, isGeolocationDenied, isGeolocationAvailable, logLocationFallback } from '@/lib/map/geolocation'
+import { useUserLocationWatch } from '@/lib/hooks/useUserLocationWatch'
 import { flipToUserAuthority, isUserAuthority, setMapAuthority } from '@/lib/map/authority'
 import UseMyLocationButton from '@/components/map/UseMyLocationButton'
 import { haversineMeters } from '@/lib/geo/distance'
@@ -113,6 +114,20 @@ export default function SalesClient({
       })
     }
   }, [])
+
+  // Live GPS blue dot — one watchPosition per session; no recenter/cookie/fetch on ticks
+  useUserLocationWatch({
+    enabled: hasLocationPermission && isGeolocationAvailable(),
+    onUpdate: (update) => {
+      setLastUserLocation({
+        lat: update.lat,
+        lng: update.lng,
+        source: 'gps',
+        timestamp: update.timestamp,
+      })
+    },
+    onPermissionLost: () => setHasLocationPermission(false),
+  })
 
   // Centralized, validated, debounced la_loc cookie writer
   // Only persists high-confidence sources (GPS, user actions) - NOT IP-derived initialCenter on mobile

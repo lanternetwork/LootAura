@@ -307,7 +307,22 @@ export default function SaleDetailClient({
       setIsGalleryImageLoading(false)
       return
     }
-    setIsGalleryImageLoading(!loadedGalleryUrls.has(selectedImageUrl))
+    if (loadedGalleryUrls.has(selectedImageUrl)) {
+      setIsGalleryImageLoading(false)
+      return
+    }
+
+    // Cached or SSR-hydrated images can paint before onLoad handlers attach.
+    if (typeof window !== 'undefined') {
+      const cachedProbe = new window.Image()
+      cachedProbe.src = selectedImageUrl
+      if (cachedProbe.complete && cachedProbe.naturalWidth > 0) {
+        markGalleryImageLoaded(selectedImageUrl)
+        return
+      }
+    }
+
+    setIsGalleryImageLoading(true)
   }, [selectedImageUrl, loadedGalleryUrls, failedGalleryUrls])
 
   useEffect(() => {

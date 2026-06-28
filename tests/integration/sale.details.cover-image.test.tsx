@@ -223,6 +223,27 @@ describe('SaleDetailClient cover image rendering', () => {
     }
   })
 
+  it('clears loading overlay when initial image is already cached', () => {
+    const url = 'https://res.cloudinary.com/demo/image/upload/v1/cover.jpg'
+    mockGetSaleCoverUrl.mockReturnValue({
+      url,
+      alt: 'Trusted image',
+    })
+
+    const OriginalImage = window.Image
+    const imageSpy = vi.spyOn(window, 'Image').mockImplementation(function (this: HTMLImageElement) {
+      const img = new OriginalImage()
+      Object.defineProperty(img, 'complete', { get: () => true, configurable: true })
+      Object.defineProperty(img, 'naturalWidth', { get: () => 800, configurable: true })
+      return img
+    })
+
+    render(<SaleDetailClient sale={mockSale as any} displayCategories={[]} items={[]} />)
+
+    expect(screen.queryByText('Loading image...')).not.toBeInTheDocument()
+    imageSpy.mockRestore()
+  })
+
   it('shows placeholder when cover image fails to load', () => {
     mockGetSaleCoverUrl.mockReturnValue({
       url: 'https://images.example.net/broken-cover.jpg',

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import { isEstateSaleTitle } from '@/lib/admin/social/isEstateSaleTitle'
 import { getListingCanonicalPath } from '@/lib/seo/canonical'
 import { getSaleCoverUrl } from '@/lib/images/cover'
@@ -27,15 +28,6 @@ function streetLine(sale: Sale): string | null {
   return stripTrailingUsCountryFromAddressLine(trimmed)
 }
 
-function BrandedPlaceholder() {
-  return (
-    <div className="flex aspect-[4/3] flex-col items-center justify-center bg-gradient-to-br from-[#3A2268] via-[#4a2f7a] to-[#2f1a52] px-4 text-center">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-purple-200">LootAura</p>
-      <p className="mt-2 text-sm font-semibold text-white sm:text-base">Yard sale listing</p>
-    </div>
-  )
-}
-
 /** Lightweight SEO listing card — snapshot-backed, no marketplace interactions. */
 export default function SeoSaleListItem({ sale, badges = [] }: Props) {
   const href = getListingCanonicalPath(sale.id)
@@ -57,8 +49,10 @@ export default function SeoSaleListItem({ sale, badges = [] }: Props) {
             />
           </Link>
         ) : (
-          <Link href={href} className="block overflow-hidden">
-            <BrandedPlaceholder />
+          <Link href={href} className="relative block aspect-[4/3] overflow-hidden bg-gray-100 lg:aspect-[16/10]">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
+              <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.69]" />
+            </div>
           </Link>
         )}
 

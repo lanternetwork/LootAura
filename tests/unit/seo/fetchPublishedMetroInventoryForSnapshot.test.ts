@@ -128,6 +128,72 @@ describe('fetchPublishedMetroInventoryForSnapshot', () => {
     expect(rows.map((row) => row.sale_id).sort()).toEqual(['ystm-sale-a', 'ystm-sale-b'])
   })
 
+  it('includes Jeffersontown suburb sales within Louisville 25 mi radius', async () => {
+    rangeMock.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'jeffersontown-sale',
+          external_source_url: NON_YSTM_URL,
+          ...basePublishedRow,
+          title: 'Jeffersontown Yard Sale',
+          lat: 38.22,
+          lng: -85.72,
+          city: 'Jeffersontown',
+          state: 'KY',
+        },
+      ],
+      error: null,
+    })
+
+    const { fetchPublishedMetroInventoryForSnapshot } = await import(
+      '@/lib/seo/sitemap/fetchPublishedListingRows'
+    )
+    const rows = await fetchPublishedMetroInventoryForSnapshot(new Date('2026-06-17T15:00:00.000Z'))
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.metro_slug).toBe('louisville-ky')
+    expect(rows[0]?.city).toBe('Jeffersontown')
+  })
+
+  it('emits a row per metro when a sale falls within multiple radii', async () => {
+    const overlapA = {
+      ...TEST_GEO_LOUISVILLE,
+      slug: 'alpha-metro',
+      center_lat: 40,
+      center_lng: -86,
+      radius_miles: 25,
+    }
+    const overlapB = {
+      ...TEST_GEO_LOUISVILLE,
+      slug: 'beta-metro',
+      center_lat: 40.2,
+      center_lng: -86.2,
+      radius_miles: 25,
+    }
+    loadAllGeographyMock.mockResolvedValue([overlapB, overlapA])
+
+    rangeMock.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'overlap-sale',
+          external_source_url: NON_YSTM_URL,
+          ...basePublishedRow,
+          lat: 40.1,
+          lng: -86.1,
+        },
+      ],
+      error: null,
+    })
+
+    const { fetchPublishedMetroInventoryForSnapshot } = await import(
+      '@/lib/seo/sitemap/fetchPublishedListingRows'
+    )
+    const rows = await fetchPublishedMetroInventoryForSnapshot(new Date('2026-06-17T15:00:00.000Z'))
+
+    expect(rows.map((row) => row.metro_slug).sort()).toEqual(['alpha-metro', 'beta-metro'])
+    expect(rows.every((row) => row.sale_id === 'overlap-sale')).toBe(true)
+  })
+
   it('excludes sales outside metro radius', async () => {
     rangeMock.mockResolvedValueOnce({
       data: [

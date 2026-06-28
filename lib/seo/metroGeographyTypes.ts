@@ -6,6 +6,7 @@ export type SeoMetroGeographyRow = {
   center_lat: number
   center_lng: number
   radius_miles: number
+  inventory_limit: number
   qualified_override: boolean
   updated_at: string
 }

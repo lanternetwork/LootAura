@@ -18,6 +18,7 @@ function isMissingGeographyTableError(error: { message?: string }): boolean {
 }
 
 function rowFromDb(row: Record<string, unknown>): SeoMetroGeographyRow {
+  const inventoryLimit = Number(row.inventory_limit)
   return {
     slug: String(row.slug),
     city: String(row.city),
@@ -26,6 +27,10 @@ function rowFromDb(row: Record<string, unknown>): SeoMetroGeographyRow {
     center_lat: Number(row.center_lat),
     center_lng: Number(row.center_lng),
     radius_miles: Number(row.radius_miles),
+    inventory_limit:
+      Number.isFinite(inventoryLimit) && inventoryLimit > 0
+        ? inventoryLimit
+        : 250,
     qualified_override: row.qualified_override === true,
     updated_at: String(row.updated_at),
   }
@@ -46,7 +51,7 @@ export async function loadAllSeoMetroGeography(
 ): Promise<SeoMetroGeographyRow[]> {
   const { data, error } = await fromBase(admin, 'seo_metro_geography')
     .select(
-      'slug, city, state, timezone, center_lat, center_lng, radius_miles, qualified_override, updated_at'
+      'slug, city, state, timezone, center_lat, center_lng, radius_miles, inventory_limit, qualified_override, updated_at'
     )
     .order('slug', { ascending: true })
 
@@ -63,7 +68,7 @@ export async function loadSeoMetroGeographyBySlug(
 ): Promise<SeoMetroGeographyRow | null> {
   const { data, error } = await fromBase(admin, 'seo_metro_geography')
     .select(
-      'slug, city, state, timezone, center_lat, center_lng, radius_miles, qualified_override, updated_at'
+      'slug, city, state, timezone, center_lat, center_lng, radius_miles, inventory_limit, qualified_override, updated_at'
     )
     .eq('slug', slug.trim().toLowerCase())
     .maybeSingle()
@@ -87,7 +92,7 @@ export async function loadSeoMetroGeographyBySlugs(
 
   const { data, error } = await fromBase(admin, 'seo_metro_geography')
     .select(
-      'slug, city, state, timezone, center_lat, center_lng, radius_miles, qualified_override, updated_at'
+      'slug, city, state, timezone, center_lat, center_lng, radius_miles, inventory_limit, qualified_override, updated_at'
     )
     .in('slug', normalized)
 

@@ -28,7 +28,7 @@ export async function buildSeoMetroInventorySnapshot(
     ends_at: row.ends_at,
     latitude: row.latitude,
     longitude: row.longitude,
-    updated_at: row.updated_at,
+    updated_at: updatedAt,
     cover_image_url: row.cover_image_url ?? null,
     address: row.address ?? null,
   }))

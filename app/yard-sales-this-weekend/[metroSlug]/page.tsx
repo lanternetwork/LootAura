@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import MetroHelpfulContent from '@/components/metro/MetroHelpfulContent'
+import MetroMapSection from '@/components/metro/MetroMapSection'
+import MetroPageFaq from '@/components/metro/MetroPageFaq'
+import MetroPageHero, { metroFreshnessLabel } from '@/components/metro/MetroPageHero'
+import MetroPageMapCta from '@/components/metro/MetroPageMapCta'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
 import { buildMetroWeekendInventoryFromResult } from '@/lib/seo/buildMetroWeekendInventory'
 import { formatFreshnessSignalLabel } from '@/lib/seo/fetchMetroWeekendInventory'
@@ -17,7 +22,14 @@ import {
   buildWeekendPageH1,
   buildWeekendPageSupportingCopy,
 } from '@/lib/seo/copy/weekendPageCopy'
-import { buildCityPageEmptyInventoryMessage, formatFreshnessLabel } from '@/lib/seo/copy/cityPageCopy'
+import { buildCityPageEmptyInventoryMessage } from '@/lib/seo/copy/cityPageCopy'
+import {
+  buildMetroFaqItems,
+  buildMetroHeroSubtitle,
+  buildWeekendMetroHelpfulContentParagraphs,
+  buildWeekendMetroHeroHeadline,
+} from '@/lib/seo/copy/metroPageCopy'
+import { salesToMetroMapPins } from '@/lib/seo/metroMapViewport'
 
 export const revalidate = 3600
 export const dynamicParams = true
@@ -53,15 +65,34 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
     notFound()
   }
 
-  const { metro, inventory, nearbyMetros } = context
+  const { metro, inventory, nearbyMetros, radiusMiles, mapViewport } = context
   const { sales, summary, weekend, freshnessBySaleId } = buildMetroWeekendInventoryFromResult(
     metro,
     inventory
   )
   const allMetros = [metro, ...nearbyMetros]
   const geoLinks = buildMetroGeoLinks(metro, allMetros)
-  const h1 = buildWeekendPageH1(metro, summary, weekend)
+  const interactiveMapHref = `/sales?city=${encodeURIComponent(metro.city)}`
+  const cityPageHref = getCityPagePath(metro.slug)
+  const headline = sales.length === 0 ? buildWeekendPageH1(metro, summary, weekend) : buildWeekendMetroHeroHeadline(metro)
+  const heroSubtitle = buildMetroHeroSubtitle({
+    activeListingCount: sales.length,
+    radiusMiles,
+    city: metro.city,
+    weekend: true,
+  })
   const supportingCopy = buildWeekendPageSupportingCopy({ metro, inventory: summary, weekend })
+  const helpfulParagraphs =
+    sales.length > 0
+      ? buildWeekendMetroHelpfulContentParagraphs({
+          metro,
+          radiusMiles,
+          weekendLabel: weekend.label,
+          cityPageHref,
+        })
+      : []
+  const faqItems = buildMetroFaqItems({ metro, radiusMiles })
+  const mapPins = salesToMetroMapPins(sales)
   const structuredData = createWeekendPageStructuredDataBundle({
     metro,
     inventory: summary,
@@ -80,9 +111,9 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
         />
       ))}
 
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <p className="text-sm text-gray-500">
-          <Link href={getCityPagePath(metro.slug)} className="text-purple-700 hover:text-purple-900">
+          <Link href={cityPageHref} className="text-purple-700 hover:text-purple-900">
             All {metro.city} yard sales
           </Link>
           {' · '}
@@ -91,23 +122,34 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
           </Link>
         </p>
 
-        <h1 className="mt-4 text-2xl font-bold text-gray-900 sm:text-3xl">{h1}</h1>
+        <div className="mt-4">
+          <MetroPageHero
+            headline={headline}
+            subtitle={heroSubtitle}
+            freshnessLabel={metroFreshnessLabel(summary.lastUpdatedAt, sales.length)}
+            interactiveMapHref={interactiveMapHref}
+          />
+        </div>
 
-        <p className="mt-2 text-sm text-gray-600">{weekend.label}</p>
+        <p className="mt-3 text-sm text-gray-600">{weekend.label}</p>
         <p className="mt-1 text-xs text-gray-500">Dates in {metro.timezone}</p>
-
-        {sales.length > 0 && (
-          <p className="mt-2 text-sm font-medium text-emerald-800">
-            {formatFreshnessLabel(summary.lastUpdatedAt)}
-          </p>
-        )}
 
         <SeoGeoDiscoveryLinks links={geoLinks} showPrimary={false} />
 
-        <section className="mt-8 rounded-lg border border-gray-200 bg-white px-4">
-          <h2 className="sr-only">This weekend listings</h2>
+        {mapViewport && (
+          <MetroMapSection
+            pins={mapPins}
+            viewport={mapViewport}
+            heading={`${metro.city} weekend yard sales map`}
+          />
+        )}
+
+        <section className="mt-10" aria-labelledby="weekend-listings-heading">
+          <h2 id="weekend-listings-heading" className="text-2xl font-bold text-gray-900">
+            This weekend listings
+          </h2>
           {sales.length === 0 ? (
-            <div className="py-8 text-center text-gray-600">
+            <div className="mt-6 rounded-xl border border-gray-200 bg-white px-6 py-10 text-center text-gray-600">
               {buildCityPageEmptyInventoryMessage()
                 .split('\n\n')
                 .map((paragraph) => (
@@ -117,7 +159,7 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
                 ))}
             </div>
           ) : (
-            <ul>
+            <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {sales.map((sale) => (
                 <SeoSaleListItem
                   key={sale.id}
@@ -130,12 +172,18 @@ export default async function YardSalesThisWeekendMetroPage({ params }: PageProp
         </section>
 
         {sales.length > 0 && (
-          <section className="prose prose-sm mt-10 max-w-none text-gray-700">
-            {supportingCopy.split('\n\n').map((paragraph) => (
-              <p key={paragraph.slice(0, 48)}>{paragraph}</p>
-            ))}
-          </section>
+          <>
+            <MetroPageMapCta href={interactiveMapHref} />
+            <MetroHelpfulContent paragraphs={helpfulParagraphs} interactiveMapHref={interactiveMapHref} />
+            <section className="prose prose-sm mt-10 max-w-none text-gray-700">
+              {supportingCopy.split('\n\n').map((paragraph) => (
+                <p key={paragraph.slice(0, 48)}>{paragraph}</p>
+              ))}
+            </section>
+          </>
         )}
+
+        <MetroPageFaq items={faqItems} />
       </main>
     </div>
   )

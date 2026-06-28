@@ -1,23 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
-import dynamic from 'next/dynamic'
+import MetroMapSnapshot from '@/components/metro/MetroMapSnapshot'
 import type {
   SocialCityReportMapPin,
   SocialCityReportMapViewport,
 } from '@/lib/admin/social/socialCityReportTypes'
-
-const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), { ssr: false })
-
-/** PinPoint-compatible rows for PinsOverlay (includes is_featured for marker styling). */
-function mapPinsToPinPoints(pins: SocialCityReportMapPin[]) {
-  return pins.map((pin) => ({
-    id: pin.id,
-    lat: pin.lat,
-    lng: pin.lng,
-    is_featured: pin.is_featured,
-  }))
-}
 
 type SocialReportMapProps = {
   mapPins: SocialCityReportMapPin[]
@@ -33,28 +20,18 @@ export default function SocialReportMap({
   className,
   onMapIdle,
 }: SocialReportMapProps) {
-  const center = useMemo(
-    () => ({ lat: mapViewport.centerLat, lng: mapViewport.centerLng }),
-    [mapViewport.centerLat, mapViewport.centerLng]
-  )
-  const pinPoints = useMemo(() => mapPinsToPinPoints(mapPins), [mapPins])
-  const pinsProp = useMemo(() => ({ sales: pinPoints }), [pinPoints])
-
-  const containerClass =
-    className ?? 'h-64 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100'
-
   return (
-    <div className={containerClass}>
-      <SimpleMap
-        center={center}
-        zoom={mapViewport.zoom}
-        interactive={false}
-        attributionControl={false}
-        showOSMAttribution={false}
-        pins={pinsProp}
-        preserveDrawingBuffer={true}
-        onMapIdle={onMapIdle}
-      />
-    </div>
+    <MetroMapSnapshot
+      pins={mapPins.map((pin) => ({
+        id: pin.id,
+        lat: pin.lat,
+        lng: pin.lng,
+        is_featured: pin.is_featured,
+      }))}
+      viewport={mapViewport}
+      className={className ?? 'h-64 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100'}
+      preserveDrawingBuffer
+      onMapIdle={onMapIdle}
+    />
   )
 }

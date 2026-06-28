@@ -107,6 +107,12 @@ describe('loadMetroPageContext', () => {
 
     expect(context?.metro).toEqual(TEST_SEO_METRO_DALLAS)
     expect(context?.qualified).toBe(true)
+    expect(context?.radiusMiles).toBe(TEST_GEO_DALLAS.radius_miles)
+    expect(context?.mapViewport).toEqual({
+      centerLat: TEST_GEO_DALLAS.center_lat,
+      centerLng: TEST_GEO_DALLAS.center_lng,
+      zoom: 8,
+    })
     expect(context?.gate.seoEmissionAllowed).toBe(true)
     expect(loadMetroInventoryFromSnapshotMock).toHaveBeenCalledWith('dallas-tx', expect.anything())
     expect(resolveSitemapSeoGateMock).toHaveBeenCalledTimes(1)

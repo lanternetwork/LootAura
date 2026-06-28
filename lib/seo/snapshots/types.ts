@@ -31,6 +31,8 @@ export type SeoMetroInventoryRow = {
   latitude: number
   longitude: number
   updated_at: string
+  cover_image_url?: string | null
+  address?: string | null
 }
 
 export type SeoMetroHistoryRow = {

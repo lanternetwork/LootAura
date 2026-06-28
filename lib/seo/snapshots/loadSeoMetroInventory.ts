@@ -66,6 +66,8 @@ function metroInventoryRowToSale(row: SeoMetroInventoryRow): Sale {
     title: row.title,
     city: row.city,
     state: row.state,
+    address: row.address ?? undefined,
+    cover_image_url: row.cover_image_url ?? undefined,
     lat: row.latitude,
     lng: row.longitude,
     date_start: row.starts_at,
@@ -98,7 +100,7 @@ export async function loadMetroInventoryFromSnapshot(
 
   const { data, error } = await fromBase(admin, 'seo_metro_inventory')
     .select(
-      'metro_slug, sale_id, canonical_url, title, city, state, starts_at, ends_at, latitude, longitude, updated_at'
+      'metro_slug, sale_id, canonical_url, title, city, state, starts_at, ends_at, latitude, longitude, updated_at, cover_image_url, address'
     )
     .eq('metro_slug', metroSlug)
     .order('starts_at', { ascending: true })

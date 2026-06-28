@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const fetchPublishedMetroInventoryForSnapshotMock = vi.fn()
-const fromBaseMock = vi.fn()
-const getAdminDbMock = vi.fn(() => ({}))
+const { adminMock, fromBaseMock, fetchPublishedMetroInventoryForSnapshotMock } = vi.hoisted(() => ({
+  adminMock: {} as ReturnType<typeof import('@/lib/supabase/clients').getAdminDb>,
+  fromBaseMock: vi.fn(),
+  fetchPublishedMetroInventoryForSnapshotMock: vi.fn(),
+}))
 
 vi.mock('@/lib/seo/sitemap/fetchPublishedListingRows', () => ({
   fetchPublishedMetroInventoryForSnapshot: (...args: unknown[]) =>
@@ -10,7 +12,7 @@ vi.mock('@/lib/seo/sitemap/fetchPublishedListingRows', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getAdminDb: () => getAdminDbMock(),
+  getAdminDb: () => adminMock,
   fromBase: (...args: unknown[]) => fromBaseMock(...args),
 }))
 
@@ -60,7 +62,7 @@ describe('buildSeoMetroInventorySnapshot', () => {
     const { buildSeoMetroInventorySnapshot } = await import(
       '@/lib/seo/snapshots/buildSeoMetroInventorySnapshot'
     )
-    const result = await buildSeoMetroInventorySnapshot(getAdminDbMock(), cronNow)
+    const result = await buildSeoMetroInventorySnapshot(adminMock, cronNow)
 
     expect(result.rowCount).toBe(1)
     expect(result.updatedAt).toBe('2026-06-28T03:00:00.000Z')
@@ -71,7 +73,8 @@ describe('buildSeoMetroInventorySnapshot', () => {
         updated_at: '2026-06-28T03:00:00.000Z',
       }),
     ])
-    expect(insertSpy.mock.calls[0]?.[0]?.[0]?.updated_at).not.toBe(STALE_SALE_UPDATED_AT)
+    const insertedRows = insertSpy.mock.calls[0]?.[0] as Array<{ updated_at: string }>
+    expect(insertedRows[0]?.updated_at).not.toBe(STALE_SALE_UPDATED_AT)
   })
 
   it('advances snapshot freshness on repeated rebuilds even when sale rows are unchanged', async () => {
@@ -89,8 +92,8 @@ describe('buildSeoMetroInventorySnapshot', () => {
     const firstRun = new Date('2026-06-28T03:00:00.000Z')
     const secondRun = new Date('2026-06-28T04:00:00.000Z')
 
-    await buildSeoMetroInventorySnapshot(getAdminDbMock(), firstRun)
-    await buildSeoMetroInventorySnapshot(getAdminDbMock(), secondRun)
+    await buildSeoMetroInventorySnapshot(adminMock, firstRun)
+    await buildSeoMetroInventorySnapshot(adminMock, secondRun)
 
     expect(insertedPayloads).toHaveLength(2)
     expect(insertedPayloads[0]?.[0]?.updated_at).toBe('2026-06-28T03:00:00.000Z')

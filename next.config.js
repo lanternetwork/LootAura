@@ -138,6 +138,15 @@ const nextConfig = {
           },
         ],
       },
+      {
+        source: '/.well-known/apple-app-site-association',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/json; charset=utf-8',
+          },
+        ],
+      },
     ]
   },
   // Transpile Supabase packages to fix ESM/CJS interop issues

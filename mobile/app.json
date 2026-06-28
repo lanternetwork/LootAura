@@ -68,11 +68,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lootaura.app",
+      "buildNumber": "235",
       "associatedDomains": [
         "applinks:lootaura.com"
       ],
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "LootAura uses your location to show nearby yard sales."
+        "NSLocationWhenInUseUsageDescription": "LootAura uses your location to show nearby yard sales.",
+        "NSCameraUsageDescription": "LootAura uses your camera to add photos when you list a yard sale.",
+        "NSPhotoLibraryUsageDescription": "LootAura uses your photo library to add images when you list a yard sale.",
+        "NSPhotoLibraryAddUsageDescription": "LootAura saves yard sale listing photos you choose to upload."
       }
     },
     "web": {

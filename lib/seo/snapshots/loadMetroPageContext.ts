@@ -3,6 +3,7 @@ import { SEO_METRO_MIN_ACTIVE_LISTINGS } from '@/lib/seo/metroCatalog'
 import { resolveMetroPageRobotsFromSnapshot } from '@/lib/seo/indexRollout'
 import { requestCache } from '@/lib/seo/requestCache'
 import { resolveMetroExistence } from '@/lib/seo/resolveMetroExistence'
+import { resolveMetroMapViewport, type MetroMapViewport } from '@/lib/seo/metroMapViewport'
 import { isSeededMajorMetroSlug } from '@/lib/seo/seededMajorMetros'
 import { resolveSitemapSeoGate, type SitemapSeoGateState } from '@/lib/seo/resolveSitemapSeoGate'
 import {
@@ -42,6 +43,8 @@ export type MetroPageContext = {
   gate: SitemapSeoGateState
   inventory: MetroInventoryResult
   nearbyMetros: SeoMetro[]
+  radiusMiles: number
+  mapViewport: MetroMapViewport | null
 }
 
 function qualifiedMetroRowToSeoMetro(row: {
@@ -165,6 +168,8 @@ export const loadMetroPageContext = requestCache(
       gate,
       inventory,
       nearbyMetros,
+      radiusMiles: geography?.radius_miles ?? 25,
+      mapViewport: resolveMetroMapViewport(metroSlug, geography),
     }
   }
 )

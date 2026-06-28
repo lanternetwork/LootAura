@@ -29,6 +29,8 @@ export async function buildSeoMetroInventorySnapshot(
     latitude: row.latitude,
     longitude: row.longitude,
     updated_at: row.updated_at,
+    cover_image_url: row.cover_image_url ?? null,
+    address: row.address ?? null,
   }))
 
   const chunkSize = 200

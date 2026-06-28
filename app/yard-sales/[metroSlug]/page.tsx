@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import MetroHelpfulContent from '@/components/metro/MetroHelpfulContent'
+import MetroMapSection from '@/components/metro/MetroMapSection'
+import MetroPageFaq from '@/components/metro/MetroPageFaq'
+import MetroPageHero, { metroFreshnessLabel } from '@/components/metro/MetroPageHero'
+import MetroPageMapCta from '@/components/metro/MetroPageMapCta'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
 import { createCityPageMetadata } from '@/lib/seo/metadata'
 import { loadMetroPageContext } from '@/lib/seo/snapshots/loadMetroPageContext'
@@ -14,8 +19,14 @@ import {
   buildCityPageEmptyInventoryMessage,
   buildCityPageH1,
   buildCityPageSupportingCopy,
-  formatFreshnessLabel,
 } from '@/lib/seo/copy/cityPageCopy'
+import {
+  buildMetroFaqItems,
+  buildMetroHelpfulContentParagraphs,
+  buildMetroHeroHeadline,
+  buildMetroHeroSubtitle,
+} from '@/lib/seo/copy/metroPageCopy'
+import { salesToMetroMapPins } from '@/lib/seo/metroMapViewport'
 
 export const revalidate = 3600
 export const dynamicParams = true
@@ -49,14 +60,20 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
     notFound()
   }
 
-  const { metro, inventory, nearbyMetros, inventoryCount } = context
+  const { metro, inventory, nearbyMetros, inventoryCount, radiusMiles, mapViewport } = context
   const { sales, summary } = inventory
   const allMetros = [metro, ...nearbyMetros]
   const geoLinks = buildMetroGeoLinks(metro, allMetros)
-  const h1 =
+  const interactiveMapHref = `/sales?city=${encodeURIComponent(metro.city)}`
+  const headline =
     inventoryCount === 0
       ? buildCityPageH1(metro, summary, 'This Weekend', { stableTitleWhenEmpty: true })
-      : buildCityPageH1(metro, summary)
+      : buildMetroHeroHeadline(metro)
+  const heroSubtitle = buildMetroHeroSubtitle({
+    activeListingCount: inventoryCount,
+    radiusMiles,
+    city: metro.city,
+  })
   const supportingCopy =
     inventoryCount === 0
       ? buildCityPageEmptyInventoryMessage()
@@ -65,6 +82,16 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
           inventory: summary,
           nearbyMetros,
         })
+  const helpfulParagraphs =
+    inventoryCount > 0
+      ? buildMetroHelpfulContentParagraphs({
+          metro,
+          radiusMiles,
+          interactiveMapHref,
+        })
+      : []
+  const faqItems = buildMetroFaqItems({ metro, radiusMiles })
+  const mapPins = salesToMetroMapPins(sales)
   const structuredData = createCityPageStructuredDataBundle({
     metro,
     inventory: summary,
@@ -82,36 +109,34 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
         />
       ))}
 
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <p className="text-sm text-gray-500">
           <Link href="/sales" className="text-purple-700 hover:text-purple-900">
             Interactive map
           </Link>
         </p>
 
-        <h1 className="mt-4 text-2xl font-bold text-gray-900 sm:text-3xl">{h1}</h1>
-
-        {inventoryCount > 0 && (
-          <p className="mt-2 text-sm font-medium text-emerald-800">
-            {formatFreshnessLabel(summary.lastUpdatedAt)}
-          </p>
-        )}
+        <div className="mt-4">
+          <MetroPageHero
+            headline={headline}
+            subtitle={heroSubtitle}
+            freshnessLabel={metroFreshnessLabel(summary.lastUpdatedAt, inventoryCount)}
+            interactiveMapHref={interactiveMapHref}
+          />
+        </div>
 
         <SeoGeoDiscoveryLinks links={geoLinks} />
 
-        <p className="mt-2">
-          <Link
-            href={`/sales?city=${encodeURIComponent(metro.city)}`}
-            className="text-sm font-medium text-purple-700 hover:text-purple-900"
-          >
-            View on interactive map →
-          </Link>
-        </p>
+        {mapViewport && (
+          <MetroMapSection pins={mapPins} viewport={mapViewport} heading={`${metro.city} yard sales map`} />
+        )}
 
-        <section className="mt-8 rounded-lg border border-gray-200 bg-white px-4">
-          <h2 className="sr-only">Active listings</h2>
+        <section className="mt-10" aria-labelledby="active-listings-heading">
+          <h2 id="active-listings-heading" className="text-2xl font-bold text-gray-900">
+            Active listings
+          </h2>
           {sales.length === 0 ? (
-            <div className="py-8 text-center text-gray-600">
+            <div className="mt-6 rounded-xl border border-gray-200 bg-white px-6 py-10 text-center text-gray-600">
               {buildCityPageEmptyInventoryMessage()
                 .split('\n\n')
                 .map((paragraph) => (
@@ -121,7 +146,7 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
                 ))}
             </div>
           ) : (
-            <ul>
+            <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {sales.map((sale) => (
                 <SeoSaleListItem key={sale.id} sale={sale} />
               ))}
@@ -130,12 +155,18 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
         </section>
 
         {inventoryCount > 0 && (
-          <section className="prose prose-sm mt-10 max-w-none text-gray-700">
-            {supportingCopy.split('\n\n').map((paragraph) => (
-              <p key={paragraph.slice(0, 48)}>{paragraph}</p>
-            ))}
-          </section>
+          <>
+            <MetroPageMapCta href={interactiveMapHref} />
+            <MetroHelpfulContent paragraphs={helpfulParagraphs} interactiveMapHref={interactiveMapHref} />
+            <section className="prose prose-sm mt-10 max-w-none text-gray-700">
+              {supportingCopy.split('\n\n').map((paragraph) => (
+                <p key={paragraph.slice(0, 48)}>{paragraph}</p>
+              ))}
+            </section>
+          </>
         )}
+
+        <MetroPageFaq items={faqItems} />
       </main>
     </div>
   )

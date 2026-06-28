@@ -42,4 +42,47 @@ describe('loadMetroInventoryFromSnapshot', () => {
     expect(result.sales).toEqual([])
     expect(result.summary.activeListingCount).toBe(0)
   })
+
+  it('maps snapshot display fields onto Sale objects', async () => {
+    const freshUpdatedAt = new Date().toISOString()
+    let call = 0
+    fromBaseMock.mockImplementation(() => {
+      call += 1
+      if (call === 1) {
+        return chainMock({ data: { updated_at: freshUpdatedAt }, error: null })
+      }
+      if (call === 2) {
+        return chainMock({
+          data: { inventory_limit: 250 },
+          error: null,
+        })
+      }
+      return chainMock({
+        data: [
+          {
+            metro_slug: 'louisville-ky',
+            sale_id: 'sale-1',
+            canonical_url: 'https://lootaura.app/sales/sale-1',
+            title: 'Garage Sale',
+            city: 'Louisville',
+            state: 'KY',
+            starts_at: '2026-06-20',
+            ends_at: '2026-06-21',
+            latitude: 38.25,
+            longitude: -85.75,
+            updated_at: freshUpdatedAt,
+            cover_image_url: 'https://cdn.example/cover.jpg',
+            address: '123 Main St',
+          },
+        ],
+        error: null,
+      })
+    })
+
+    const { loadMetroInventoryFromSnapshot } = await import('@/lib/seo/snapshots/loadSeoMetroInventory')
+    const result = await loadMetroInventoryFromSnapshot('louisville-ky')
+
+    expect(result.sales[0]?.cover_image_url).toBe('https://cdn.example/cover.jpg')
+    expect(result.sales[0]?.address).toBe('123 Main St')
+  })
 })

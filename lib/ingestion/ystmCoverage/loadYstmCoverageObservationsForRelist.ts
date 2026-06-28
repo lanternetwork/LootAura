@@ -5,10 +5,12 @@ import type { YstmListMetadataSale } from '@/lib/ingestion/ystmCoverage/extractY
 export type YstmCoverageObservationRelistRow = YstmObservationRelistState & {
   canonicalUrl: string
   needsDetailRefresh: boolean
+  relistDetectedAt: string | null
+  relistReason: string | null
 }
 
 const SELECT =
-  'canonical_url, ystm_invalid_reason, last_detail_checked_at, list_metadata_snapshot, relist_previous_start_date, relist_previous_end_date, relist_current_start_date, relist_current_end_date, needs_detail_refresh'
+  'canonical_url, ystm_invalid_reason, last_detail_checked_at, list_metadata_snapshot, relist_previous_start_date, relist_previous_end_date, relist_current_start_date, relist_current_end_date, needs_detail_refresh, relist_detected_at, relist_reason'
 
 function mapRow(row: {
   canonical_url: string
@@ -20,6 +22,8 @@ function mapRow(row: {
   relist_current_start_date: string | null
   relist_current_end_date: string | null
   needs_detail_refresh: boolean
+  relist_detected_at: string | null
+  relist_reason: string | null
 }): YstmCoverageObservationRelistRow {
   return {
     canonicalUrl: row.canonical_url,
@@ -31,6 +35,8 @@ function mapRow(row: {
     relistCurrentStartDate: row.relist_current_start_date,
     relistCurrentEndDate: row.relist_current_end_date,
     needsDetailRefresh: row.needs_detail_refresh === true,
+    relistDetectedAt: row.relist_detected_at,
+    relistReason: row.relist_reason,
   }
 }
 

@@ -91,6 +91,34 @@ describe('buildYstmListSightObservationUpsert', () => {
     expect(upsert.discoveryPriority).toBe('cold')
   })
 
+  it('preserves pending needsDetailRefresh when expired metadata is unchanged on re-sight', () => {
+    const snapshot = baseSale({ startDate: '2026-06-27', endDate: '2026-06-28' })
+    const priorDetectedAt = '2026-06-16T08:00:00.000Z'
+    const upsert = buildYstmListSightObservationUpsert({
+      sale: snapshot,
+      city: 'Louisville',
+      state: 'KY',
+      configKey: 'KY|Louisville',
+      listSeenAt,
+      appearanceSource: 'fresh_discovery',
+      footprint,
+      existing: {
+        canonicalUrl: CANONICAL_URL,
+        ystmInvalidReason: 'expired',
+        lastDetailCheckedAt: detailCheckedAt,
+        listMetadataSnapshot: snapshot,
+        needsDetailRefresh: true,
+        relistDetectedAt: priorDetectedAt,
+        relistReason: 'start_date,end_date',
+      },
+    })
+
+    expect(upsert.needsDetailRefresh).toBe(true)
+    expect(upsert.relistDetectedAt).toBe(priorDetectedAt)
+    expect(upsert.relistReason).toBe('start_date,end_date')
+    expect(upsert.discoveryPriority).toBe('warm')
+  })
+
   it('uses list validity path for observations that were never expired', () => {
     const upsert = buildYstmListSightObservationUpsert({
       sale: baseSale(),
@@ -132,11 +160,15 @@ describe('buildYstmAuditUrlListUpsert', () => {
         relistPreviousEndDate: '2026-06-14',
         relistCurrentStartDate: '2026-06-27',
         relistCurrentEndDate: '2026-06-28',
+        relistDetectedAt: '2026-06-16T08:00:00.000Z',
+        relistReason: 'start_date,end_date',
       },
     })
 
     expect(upsert.needsDetailRefresh).toBe(true)
     expect(upsert.ystmInvalidReason).toBe('expired')
     expect(upsert.detailCheckedAt).toBe(detailCheckedAt)
+    expect(upsert.relistDetectedAt).toBe('2026-06-16T08:00:00.000Z')
+    expect(upsert.relistReason).toBe('start_date,end_date')
   })
 })

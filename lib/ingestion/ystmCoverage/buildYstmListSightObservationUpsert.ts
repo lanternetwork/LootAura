@@ -49,9 +49,14 @@ export function buildYstmListSightObservationUpsert(
   }
 
   if (relist.isExpiredObservation) {
+    const preservePendingRefresh =
+      !relist.needsDetailRefresh && input.existing?.needsDetailRefresh === true
+    const needsDetailRefresh = relist.needsDetailRefresh || preservePendingRefresh
+
     let discoveryPriority: YstmDiscoveryPriority | null = 'cold'
-    if (relist.needsDetailRefresh) {
-      discoveryPriority = input.hotDiscovery ? 'hot' : 'warm'
+    if (needsDetailRefresh) {
+      discoveryPriority =
+        relist.needsDetailRefresh && input.hotDiscovery ? 'hot' : 'warm'
     }
 
     return {
@@ -64,11 +69,13 @@ export function buildYstmListSightObservationUpsert(
       lootauraVisible: input.footprint.lootauraVisible,
       listSeenAt: input.listSeenAt,
       detailCheckedAt: relist.preserveDetailCheckedAt,
-      needsDetailRefresh: relist.needsDetailRefresh,
+      needsDetailRefresh,
       relistDetectedAt: relist.needsDetailRefresh
         ? (input.relistDetectedAt ?? input.listSeenAt)
-        : null,
-      relistReason: relist.relistReason,
+        : preservePendingRefresh
+          ? (input.existing?.relistDetectedAt ?? null)
+          : null,
+      relistReason: relist.relistReason ?? (preservePendingRefresh ? input.existing?.relistReason ?? null : null),
       relistPreviousStartDate: relist.previousStartDate,
       relistPreviousEndDate: relist.previousEndDate,
       relistCurrentStartDate: relist.currentStartDate,
@@ -139,13 +146,13 @@ export function buildYstmAuditUrlListUpsert(
       listSeenAt: input.listSeenAt,
       detailCheckedAt: input.existing.lastDetailCheckedAt,
       needsDetailRefresh: input.existing.needsDetailRefresh,
-      relistDetectedAt: null,
-      relistReason: null,
+      relistDetectedAt: input.existing.relistDetectedAt ?? null,
+      relistReason: input.existing.relistReason ?? null,
       relistPreviousStartDate: input.existing.relistPreviousStartDate ?? null,
       relistPreviousEndDate: input.existing.relistPreviousEndDate ?? null,
       relistCurrentStartDate: input.existing.relistCurrentStartDate ?? null,
       relistCurrentEndDate: input.existing.relistCurrentEndDate ?? null,
-      discoveryPriority: 'cold',
+      discoveryPriority: input.existing.needsDetailRefresh ? 'warm' : 'cold',
       appearanceSource: 'coverage_audit',
       ...footprintFields,
     }

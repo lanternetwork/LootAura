@@ -36,6 +36,13 @@ export type YstmCoverageObservationUpsert = {
   discoveryPriority?: YstmDiscoveryPriority | null
   appearanceSource?: string | null
   ystmListingPostedAt?: string | null
+  needsDetailRefresh?: boolean
+  relistDetectedAt?: string | null
+  relistReason?: string | null
+  relistPreviousStartDate?: string | null
+  relistPreviousEndDate?: string | null
+  relistCurrentStartDate?: string | null
+  relistCurrentEndDate?: string | null
 }
 
 export async function upsertYstmCoverageObservations(
@@ -64,6 +71,13 @@ export async function upsertYstmCoverageObservations(
     discovery_priority: r.discoveryPriority ?? null,
     appearance_source: r.appearanceSource ?? null,
     ystm_listing_posted_at: r.ystmListingPostedAt ?? null,
+    needs_detail_refresh: r.needsDetailRefresh ?? false,
+    relist_detected_at: r.relistDetectedAt ?? null,
+    relist_reason: r.relistReason ?? null,
+    relist_previous_start_date: r.relistPreviousStartDate ?? null,
+    relist_previous_end_date: r.relistPreviousEndDate ?? null,
+    relist_current_start_date: r.relistCurrentStartDate ?? null,
+    relist_current_end_date: r.relistCurrentEndDate ?? null,
     updated_at: now,
   }))
 

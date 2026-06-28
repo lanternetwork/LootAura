@@ -23,6 +23,11 @@ const mockBackfillCoverageVisibility = vi.hoisted(() => vi.fn())
 const mockBackfillScheduleWait = vi.hoisted(() => vi.fn())
 const mockBackfillUrlReuseExpiredInventory = vi.hoisted(() => vi.fn())
 const mockBackfillNeverCrawledLinkage = vi.hoisted(() => vi.fn())
+const mockRunRelistDetailRefresh = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/ingestion/ystmCoverage/runYstmRelistDetailRefresh', () => ({
+  runYstmRelistDetailRefresh: mockRunRelistDetailRefresh,
+}))
 
 vi.mock('@/lib/ingestion/ystmCoverage/backfillExpiredListFastObservationInvalidation', () => ({
   backfillExpiredListFastObservationInvalidation: mockBackfillExpired,
@@ -176,6 +181,15 @@ describe('runYstmMissingUrlIngestionCron', () => {
     mockBackfillScheduleWait.mockReset()
     mockBackfillUrlReuseExpiredInventory.mockReset()
     mockBackfillNeverCrawledLinkage.mockReset()
+    mockRunRelistDetailRefresh.mockReset()
+
+    mockRunRelistDetailRefresh.mockResolvedValue({
+      candidatesClaimed: 0,
+      detailRefreshesAttempted: 0,
+      relistedSuccessfully: 0,
+      relistedStillExpired: 0,
+      relistDetailFetchFailed: 0,
+    })
 
     mockAcquireLease.mockResolvedValue({
       acquired: true,

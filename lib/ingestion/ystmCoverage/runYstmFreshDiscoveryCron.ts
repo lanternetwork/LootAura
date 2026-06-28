@@ -9,11 +9,11 @@ import {
   partitionCrawlableExternalCityConfigs,
   type ExternalCityConfigRow,
 } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
-import { classifyYstmListMetadataAsValidActive } from '@/lib/ingestion/ystmCoverage/classifyYstmListMetadataAsValidActive'
+import { buildYstmListSightObservationUpsert } from '@/lib/ingestion/ystmCoverage/buildYstmListSightObservationUpsert'
 import {
   extractYstmListMetadataSales,
-  hashYstmListMetadataSnapshot,
 } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
+import { loadYstmCoverageObservationsForRelist } from '@/lib/ingestion/ystmCoverage/loadYstmCoverageObservationsForRelist'
 import { loadYstmCoverageLootAuraMatchIndex } from '@/lib/ingestion/ystmCoverage/loadYstmCoverageLootAuraMatchIndex'
 import { matchYstmCoverageLootAuraFootprint } from '@/lib/ingestion/ystmCoverage/matchYstmCoverageLootAuraFootprint'
 import { resolveYstmStrategicMetroRegistry } from '@/lib/ingestion/ystmCoverage/resolveYstmStrategicMetroRegistry'
@@ -47,6 +47,8 @@ export type YstmFreshDiscoveryCronTelemetry = {
   inlineIngested: number
   inlineFailed: number
   inlineSkippedDuplicate: number
+  expiredObsSeenAgain: number
+  expiredObsRefreshScheduled: number
 }
 
 export type YstmFreshDiscoveryCronResult = {
@@ -115,6 +117,8 @@ export async function runYstmFreshDiscoveryCron(
         inlineIngested: 0,
         inlineFailed: 0,
         inlineSkippedDuplicate: 0,
+        expiredObsSeenAgain: 0,
+        expiredObsRefreshScheduled: 0,
       },
     }
   }
@@ -132,6 +136,8 @@ export async function runYstmFreshDiscoveryCron(
   let inlineIngested = 0
   let inlineFailed = 0
   let inlineSkippedDuplicate = 0
+  let expiredObsSeenAgain = 0
+  let expiredObsRefreshScheduled = 0
 
   try {
     const matchIndex = await loadYstmCoverageLootAuraMatchIndex(admin)
@@ -184,9 +190,12 @@ export async function runYstmFreshDiscoveryCron(
           const sales = extractYstmListMetadataSales(html, pageUrl).slice(0, budgets.maxUrlsPerListPage)
           metadataSalesDiscovered += sales.length
           const configKey = buildConfigKey(config.city ?? '', config.state ?? '')
+          const existingByUrl = await loadYstmCoverageObservationsForRelist(
+            admin,
+            sales.map((sale) => sale.canonicalUrl)
+          )
 
           for (const sale of sales) {
-            const validity = classifyYstmListMetadataAsValidActive(sale)
             const footprint = matchYstmCoverageLootAuraFootprint(matchIndex, {
               canonicalUrl: sale.canonicalUrl,
               saleInstanceKey: null,
@@ -196,36 +205,39 @@ export async function runYstmFreshDiscoveryCron(
               dateEnd: sale.endDate,
               identity: null,
             })
-            const validActive = validity.valid
-            if (validActive) validActiveFromList += 1
+            const existing = existingByUrl.get(sale.canonicalUrl) ?? null
+            if (existing?.ystmInvalidReason === 'expired') {
+              expiredObsSeenAgain += 1
+            }
+
+            const upsert = buildYstmListSightObservationUpsert({
+              sale,
+              city: config.city ?? '',
+              state: config.state ?? '',
+              configKey,
+              listSeenAt,
+              appearanceSource: 'fresh_discovery',
+              footprint,
+              existing,
+              relistDetectedAt: listSeenAt,
+              hotDiscovery: isHotDiscovery(listSeenAt, startedMs),
+            })
+
+            if (upsert.needsDetailRefresh) {
+              expiredObsRefreshScheduled += 1
+            }
+            if (upsert.ystmValidActive) {
+              validActiveFromList += 1
+            }
 
             const hot =
-              validActive &&
+              upsert.ystmValidActive === true &&
+              !upsert.needsDetailRefresh &&
               !footprint.lootauraVisible &&
-              isHotDiscovery(listSeenAt, startedMs)
+              upsert.discoveryPriority === 'hot'
             if (hot) hotMarked += 1
 
-            pendingUpserts.push({
-              canonicalUrl: sale.canonicalUrl,
-              state: config.state ?? '',
-              city: config.city ?? '',
-              configKey,
-              ystmValidActive: validActive,
-              ystmInvalidReason: validActive ? null : validity.reason,
-              lootauraVisible: footprint.lootauraVisible,
-              listSeenAt,
-              detailCheckedAt: null,
-              sourceListingId: footprint.sourceListingId,
-              saleInstanceKey: footprint.saleInstanceKey,
-              matchedIngestedSaleId: footprint.matchedIngestedSaleId,
-              matchedSaleId: footprint.matchedSaleId,
-              matchMethod: footprint.matchMethod,
-              listMetadataSnapshot: sale,
-              listMetadataHash: hashYstmListMetadataSnapshot(sale),
-              discoveryPriority: hot ? 'hot' : validActive ? 'warm' : null,
-              appearanceSource: 'fresh_discovery',
-              ystmListingPostedAt: sale.postedAt,
-            })
+            pendingUpserts.push(upsert)
 
             if (hot && inlineIngestAttempts < budgets.maxInlineIngestPerRun) {
               inlineCandidates.push({ sale, city: config.city ?? '', state: config.state ?? '', configKey })
@@ -290,6 +302,8 @@ export async function runYstmFreshDiscoveryCron(
         inlineIngested,
         inlineFailed,
         inlineSkippedDuplicate,
+        expiredObsSeenAgain,
+        expiredObsRefreshScheduled,
       },
     }
   } catch (err) {

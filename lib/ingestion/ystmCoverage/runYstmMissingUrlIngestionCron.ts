@@ -49,6 +49,7 @@ import { backfillPublishedNotVisibleMatchingReconciliation } from '@/lib/ingesti
 import { backfillTerminalDispositionObservationInvalidation } from '@/lib/ingestion/ystmCoverage/backfillTerminalDispositionObservationInvalidation'
 import type { MissingIngestionFailureDetails } from '@/lib/ingestion/ystmCoverage/listFastInsertFailureDiagnosticTypes'
 import { findPrimaryIngestedSaleBySourceUrl, pickPrimaryIngestedSaleBySourceUrl } from '@/lib/ingestion/identity/ingestedSaleSourceUrlLookup'
+import { runYstmRelistDetailRefresh, type YstmRelistDetailRefreshTelemetry } from '@/lib/ingestion/ystmCoverage/runYstmRelistDetailRefresh'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 
@@ -92,6 +93,11 @@ export type YstmMissingUrlIngestionCronTelemetry = {
   scheduleWaitReconciliationUpdated: number
   urlReuseExpiredInventoryReclassificationUpdated: number
   neverCrawledLinkageReconciliationUpdated: number
+  relistDetailRefreshCandidatesClaimed: number
+  relistDetailRefreshesAttempted: number
+  relistedSuccessfully: number
+  relistedStillExpired: number
+  relistDetailFetchFailed: number
 }
 
 export function computeReservedHotBudget(
@@ -152,7 +158,31 @@ function emptyMissingIngestTelemetry(
     scheduleWaitReconciliationUpdated: 0,
     urlReuseExpiredInventoryReclassificationUpdated: 0,
     neverCrawledLinkageReconciliationUpdated: 0,
+    relistDetailRefreshCandidatesClaimed: 0,
+    relistDetailRefreshesAttempted: 0,
+    relistedSuccessfully: 0,
+    relistedStillExpired: 0,
+    relistDetailFetchFailed: 0,
     ...partial,
+  }
+}
+
+function relistDetailRefreshTelemetry(
+  relist: YstmRelistDetailRefreshTelemetry
+): Pick<
+  YstmMissingUrlIngestionCronTelemetry,
+  | 'relistDetailRefreshCandidatesClaimed'
+  | 'relistDetailRefreshesAttempted'
+  | 'relistedSuccessfully'
+  | 'relistedStillExpired'
+  | 'relistDetailFetchFailed'
+> {
+  return {
+    relistDetailRefreshCandidatesClaimed: relist.candidatesClaimed,
+    relistDetailRefreshesAttempted: relist.detailRefreshesAttempted,
+    relistedSuccessfully: relist.relistedSuccessfully,
+    relistedStillExpired: relist.relistedStillExpired,
+    relistDetailFetchFailed: relist.relistDetailFetchFailed,
   }
 }
 
@@ -272,6 +302,11 @@ export async function runYstmMissingUrlIngestionCron(
   const processedCanonicalUrls = new Set<string>()
 
   try {
+    const relistDetailRefresh = await runYstmRelistDetailRefresh(admin, {
+      startedMs,
+      maxRuntimeMs: budgets.maxRuntimeMs,
+    })
+
     const publishedIndex = await loadLootAuraPublishedYstmIndex(admin)
     hotQueueTotal = await countHotMissingQueueTotal(admin)
     coldQueueTotal = await countColdMissingQueueTotal(admin)
@@ -319,6 +354,7 @@ export async function runYstmMissingUrlIngestionCron(
             urlReuseExpiredInventoryReclassification.updated,
           neverCrawledLinkageReconciliationUpdated:
             neverCrawledLinkageReconciliation.updated,
+          ...relistDetailRefreshTelemetry(relistDetailRefresh),
         }),
       }
     }
@@ -591,6 +627,7 @@ export async function runYstmMissingUrlIngestionCron(
           urlReuseExpiredInventoryReclassification.updated,
         neverCrawledLinkageReconciliationUpdated:
           neverCrawledLinkageReconciliation.updated,
+        ...relistDetailRefreshTelemetry(relistDetailRefresh),
       },
     }
   } catch (err) {

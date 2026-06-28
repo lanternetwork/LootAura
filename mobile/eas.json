@@ -4,7 +4,6 @@
   },
   "build": {
     "preview": {
-      "developmentClient": true,
       "distribution": "internal",
       "node": "20.18.1",
       "android": {
@@ -24,7 +23,8 @@
         "autoIncrement": true
       },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "autoIncrement": true
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://lootaura.com",
@@ -32,7 +32,6 @@
       }
     },
     "development": {
-      "developmentClient": true,
       "distribution": "internal",
       "node": "20.18.1",
       "android": {

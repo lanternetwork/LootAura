@@ -53,6 +53,8 @@ describe('buildYstmListSightObservationUpsert', () => {
         lastDetailCheckedAt: detailCheckedAt,
         listMetadataSnapshot: baseSale({ startDate: '2026-06-14', endDate: '2026-06-14' }),
         needsDetailRefresh: false,
+        relistDetectedAt: null,
+        relistReason: null,
       },
       relistDetectedAt: listSeenAt,
       hotDiscovery: true,
@@ -83,6 +85,8 @@ describe('buildYstmListSightObservationUpsert', () => {
         lastDetailCheckedAt: detailCheckedAt,
         listMetadataSnapshot: snapshot,
         needsDetailRefresh: false,
+        relistDetectedAt: null,
+        relistReason: null,
       },
     })
 

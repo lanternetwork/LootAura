@@ -1,7 +1,7 @@
 /** Maximum URLs per listing sitemap chunk (Google limit is 50k; keep chunks conservative). */
 export const SEO_LISTING_SITEMAP_CHUNK_SIZE = 1000
 
-/** Max listings rendered on a metro city page (CITY_PAGE_PERFORMANCE_REPAIR_V1). */
+/** Default max listings on metro city/weekend pages when geography row has no inventory_limit. */
 export const SEO_METRO_INVENTORY_PAGE_LIMIT = 250
 
 /** Canonical metro inventory surface path prefix (single surface per spec). */

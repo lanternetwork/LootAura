@@ -6,7 +6,7 @@ import {
   type SaleSeoIndexEligibilityInput,
 } from '@/lib/seo/isSaleSeoIndexEligible'
 import { getSeoBaseUrl, SEO_LISTING_PATH_PREFIX } from '@/lib/seo/constants'
-import { assignMetroSlug } from '@/lib/seo/metroAssignment'
+import { listMetroSlugsWithinRadius } from '@/lib/seo/metroRadiusMembership'
 import { resolveSeoMetroForSale } from '@/lib/seo/metroCatalog'
 import { loadAllSeoMetroGeography } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import { applyPhase4PublicPublishedSaleReadFilters } from '@/lib/sales/phase4PublicPublishedSaleReadFilters'
@@ -266,14 +266,16 @@ export async function fetchPublishedListingInventoryForSnapshot(
 
 /**
  * Full metro inventory cohort for seo_metro_inventory snapshot (cron only).
- * Public discovery cohort: Phase 4 + markers-style date_end + assignMetroSlug().
- * Does not apply YSTM, isSaleSeoIndexEligible, ingested flags, or canonical dedupe.
+ * Public discovery cohort: Phase 4 + markers-style date_end + geographic radius.
+ * A sale may appear in multiple metros. No assignment or city-name ownership.
  */
 export async function fetchPublishedMetroInventoryForSnapshot(
   now: Date = new Date()
 ): Promise<SeoMetroInventoryBuildRow[]> {
   const admin = getAdminDb()
   const geography = await loadAllSeoMetroGeography(admin)
+  if (geography.length === 0) return []
+
   const geographyBySlug = new Map(geography.map((row) => [row.slug, row]))
   const todayStr = now.toISOString().split('T')[0]!
   const out: SeoMetroInventoryBuildRow[] = []
@@ -298,29 +300,27 @@ export async function fetchPublishedMetroInventoryForSnapshot(
       if (row.lat == null || row.lng == null) continue
       if (!row.city?.trim() || !row.state?.trim() || !row.date_start?.trim()) continue
 
-      const metroSlug = assignMetroSlug(
-        { city: row.city, state: row.state, lat: row.lat, lng: row.lng },
-        geography
-      )
-      if (!metroSlug) continue
-      const metro = geographyBySlug.get(metroSlug)
-      if (!metro) continue
+      const metroSlugs = listMetroSlugsWithinRadius(row.lat, row.lng, geography)
+      for (const metroSlug of metroSlugs) {
+        const metro = geographyBySlug.get(metroSlug)
+        if (!metro) continue
 
-      out.push({
-        metro_slug: metro.slug,
-        sale_id: row.id,
-        canonical_url: resolveMetroInventoryCanonicalUrl(row.id, row.external_source_url),
-        title: row.title?.trim() || 'Yard Sale',
-        city: row.city.trim(),
-        state: row.state.trim().toUpperCase(),
-        starts_at: row.date_start.trim(),
-        ends_at: row.date_end?.trim() || null,
-        latitude: row.lat,
-        longitude: row.lng,
-        updated_at: row.updated_at,
-        address: row.address?.trim() || null,
-        cover_image_url: row.cover_image_url ?? null,
-      })
+        out.push({
+          metro_slug: metro.slug,
+          sale_id: row.id,
+          canonical_url: resolveMetroInventoryCanonicalUrl(row.id, row.external_source_url),
+          title: row.title?.trim() || 'Yard Sale',
+          city: row.city.trim(),
+          state: row.state.trim().toUpperCase(),
+          starts_at: row.date_start.trim(),
+          ends_at: row.date_end?.trim() || null,
+          latitude: row.lat,
+          longitude: row.lng,
+          updated_at: row.updated_at,
+          address: row.address?.trim() || null,
+          cover_image_url: row.cover_image_url ?? null,
+        })
+      }
     }
 
     if (chunk.length < PAGE_SIZE) break

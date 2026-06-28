@@ -3,6 +3,7 @@ import { buildInventorySummary } from '@/lib/seo/inventorySummary'
 import type { MetroInventoryResult } from '@/lib/seo/fetchMetroInventory'
 import { SEO_SNAPSHOT_MAX_AGE_MS } from '@/lib/seo/snapshots/constants'
 import { isEnablementSnapshotFresh } from '@/lib/seo/snapshots/loadSeoEnablementSnapshot'
+import { loadSeoMetroGeographyBySlug } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import type { SeoMetroInventoryRow } from '@/lib/seo/snapshots/types'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import type { Sale } from '@/lib/types'
@@ -92,13 +93,16 @@ export async function loadMetroInventoryFromSnapshot(
     return { sales: [], summary: { ...EMPTY_SUMMARY } }
   }
 
+  const geography = await loadSeoMetroGeographyBySlug(metroSlug, admin)
+  const pageLimit = geography?.inventory_limit ?? SEO_METRO_INVENTORY_PAGE_LIMIT
+
   const { data, error } = await fromBase(admin, 'seo_metro_inventory')
     .select(
       'metro_slug, sale_id, canonical_url, title, city, state, starts_at, ends_at, latitude, longitude, updated_at'
     )
     .eq('metro_slug', metroSlug)
     .order('starts_at', { ascending: true })
-    .limit(SEO_METRO_INVENTORY_PAGE_LIMIT)
+    .limit(pageLimit)
 
   if (error) {
     console.error('[SEO_METRO_INVENTORY] snapshot read failed:', metroSlug, error.message)

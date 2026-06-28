@@ -10,6 +10,7 @@ export const TEST_GEO_CHICAGO: SeoMetroGeographyRow = {
   center_lat: 41.8781,
   center_lng: -87.6298,
   radius_miles: 15,
+  inventory_limit: 250,
   qualified_override: true,
   updated_at: BASE_UPDATED_AT,
 }
@@ -22,6 +23,7 @@ export const TEST_GEO_DALLAS: SeoMetroGeographyRow = {
   center_lat: 32.7767,
   center_lng: -96.797,
   radius_miles: 15,
+  inventory_limit: 250,
   qualified_override: true,
   updated_at: BASE_UPDATED_AT,
 }
@@ -33,7 +35,8 @@ export const TEST_GEO_LOUISVILLE: SeoMetroGeographyRow = {
   timezone: 'America/New_York',
   center_lat: 38.2527,
   center_lng: -85.7585,
-  radius_miles: 10,
+  radius_miles: 25,
+  inventory_limit: 250,
   qualified_override: true,
   updated_at: BASE_UPDATED_AT,
 }
@@ -46,6 +49,7 @@ export const TEST_GEO_HOUSTON: SeoMetroGeographyRow = {
   center_lat: 29.7604,
   center_lng: -95.3698,
   radius_miles: 15,
+  inventory_limit: 250,
   qualified_override: true,
   updated_at: BASE_UPDATED_AT,
 }
@@ -58,6 +62,7 @@ export const TEST_GEO_PHOENIX: SeoMetroGeographyRow = {
   center_lat: 33.4484,
   center_lng: -112.074,
   radius_miles: 15,
+  inventory_limit: 250,
   qualified_override: false,
   updated_at: BASE_UPDATED_AT,
 }
@@ -70,6 +75,7 @@ export const TEST_GEO_ATLANTA: SeoMetroGeographyRow = {
   center_lat: 33.749,
   center_lng: -84.388,
   radius_miles: 15,
+  inventory_limit: 250,
   qualified_override: true,
   updated_at: BASE_UPDATED_AT,
 }
@@ -82,6 +88,7 @@ export const TEST_GEO_AUSTIN: SeoMetroGeographyRow = {
   center_lat: 30.2672,
   center_lng: -97.7431,
   radius_miles: 12,
+  inventory_limit: 250,
   qualified_override: true,
   updated_at: BASE_UPDATED_AT,
 }

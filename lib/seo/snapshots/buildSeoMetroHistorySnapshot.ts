@@ -1,4 +1,4 @@
-import { assignMetroSlug } from '@/lib/seo/metroAssignment'
+import { listMetroSlugsWithinRadius } from '@/lib/seo/metroRadiusMembership'
 import { applyPublishedSaleCityStateFootprint } from '@/lib/seo/publishedSaleCityStateQuery'
 import { loadAllSeoMetroGeography } from '@/lib/seo/snapshots/loadSeoMetroGeography'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
@@ -19,7 +19,7 @@ const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000
 
 /**
  * 90-day published sale footprint per metro (existence-only cohort).
- * Not isSaleSeoIndexEligible — used only for page existence tier 3.
+ * Geographic radius model — a sale may count toward multiple metros.
  */
 export async function buildSeoMetroHistorySnapshot(
   now: Date = new Date()
@@ -37,9 +37,11 @@ export async function buildSeoMetroHistorySnapshot(
   let offset = 0
   for (;;) {
     const { data, error } = await applyPublishedSaleCityStateFootprint(
-      fromBase(admin, T.sales).select('city, state, lat, lng, updated_at')
+      fromBase(admin, T.sales).select('lat, lng, updated_at')
     )
       .gte('updated_at', cutoff)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
       .order('id', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)
 
@@ -50,34 +52,32 @@ export async function buildSeoMetroHistorySnapshot(
 
     const chunk = data ?? []
     for (const row of chunk) {
-      const city = (row as { city?: string }).city
-      const state = (row as { state?: string }).state
       const lat = (row as { lat?: number | null }).lat
       const lng = (row as { lng?: number | null }).lng
       const updated = (row as { updated_at?: string }).updated_at
-      if (!updated?.trim()) continue
+      if (lat == null || lng == null || !updated?.trim()) continue
 
-      const metroSlug = assignMetroSlug({ city, state, lat, lng }, geography)
-      if (!metroSlug) continue
+      const metroSlugs = listMetroSlugsWithinRadius(lat, lng, geography)
+      for (const metroSlug of metroSlugs) {
+        const metro = geographyBySlug.get(metroSlug)
+        if (!metro) continue
 
-      const metro = geographyBySlug.get(metroSlug)
-      if (!metro) continue
+        const existing = bySlug.get(metro.slug)
+        if (!existing) {
+          bySlug.set(metro.slug, {
+            city: metro.city,
+            state: metro.state,
+            timezone: metro.timezone,
+            count: 1,
+            lastSeen: updated,
+          })
+          continue
+        }
 
-      const existing = bySlug.get(metro.slug)
-      if (!existing) {
-        bySlug.set(metro.slug, {
-          city: metro.city,
-          state: metro.state,
-          timezone: metro.timezone,
-          count: 1,
-          lastSeen: updated,
-        })
-        continue
-      }
-
-      existing.count += 1
-      if (!existing.lastSeen || updated > existing.lastSeen) {
-        existing.lastSeen = updated
+        existing.count += 1
+        if (!existing.lastSeen || updated > existing.lastSeen) {
+          existing.lastSeen = updated
+        }
       }
     }
 

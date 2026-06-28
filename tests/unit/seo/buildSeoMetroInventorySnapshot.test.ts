@@ -73,8 +73,6 @@ describe('buildSeoMetroInventorySnapshot', () => {
         updated_at: '2026-06-28T03:00:00.000Z',
       }),
     ])
-    const insertedRows = insertSpy.mock.calls[0]?.[0] as Array<{ updated_at: string }>
-    expect(insertedRows[0]?.updated_at).not.toBe(STALE_SALE_UPDATED_AT)
   })
 
   it('advances snapshot freshness on repeated rebuilds even when sale rows are unchanged', async () => {

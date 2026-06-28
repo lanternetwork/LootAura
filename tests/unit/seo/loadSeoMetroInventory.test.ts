@@ -85,4 +85,45 @@ describe('loadMetroInventoryFromSnapshot', () => {
     expect(result.sales[0]?.cover_image_url).toBe('https://cdn.example/cover.jpg')
     expect(result.sales[0]?.address).toBe('123 Main St')
   })
+
+  it('loads inventory when snapshot updated_at reflects a recent cron rebuild', async () => {
+    const snapshotRefreshTime = new Date().toISOString()
+    let inventoryCall = 0
+    fromBaseMock.mockImplementation((_admin: unknown, table: string) => {
+      if (table === 'seo_metro_geography') {
+        return chainMock({ data: { inventory_limit: 250 }, error: null })
+      }
+      inventoryCall += 1
+      if (inventoryCall === 1) {
+        return chainMock({ data: { updated_at: snapshotRefreshTime }, error: null })
+      }
+      return chainMock({
+        data: [
+          {
+            metro_slug: 'chicago-il',
+            sale_id: 'sale-1',
+            canonical_url: 'https://lootaura.app/sales/sale-1',
+            title: 'Garage Sale',
+            city: 'Chicago',
+            state: 'IL',
+            starts_at: '2026-06-20',
+            ends_at: '2026-06-21',
+            latitude: 41.88,
+            longitude: -87.63,
+            updated_at: snapshotRefreshTime,
+            cover_image_url: null,
+            address: null,
+          },
+        ],
+        error: null,
+      })
+    })
+
+    const { loadMetroInventoryFromSnapshot } = await import('@/lib/seo/snapshots/loadSeoMetroInventory')
+    const result = await loadMetroInventoryFromSnapshot('chicago-il')
+
+    expect(result.sales).toHaveLength(1)
+    expect(result.summary.activeListingCount).toBe(1)
+    expect(result.summary.lastUpdatedAt).toBe(snapshotRefreshTime)
+  })
 })

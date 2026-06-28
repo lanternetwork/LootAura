@@ -18,6 +18,12 @@ import {
 } from '@/lib/ingestion/ystmCoverage/selectYstmCoverageAuditConfigs'
 import { extractYstmListingUrlsFromListHtml } from '@/lib/ingestion/ystmCoverage/extractYstmListingUrlsFromListHtml'
 import {
+  buildYstmAuditUrlListUpsert,
+  buildYstmListSightObservationUpsert,
+} from '@/lib/ingestion/ystmCoverage/buildYstmListSightObservationUpsert'
+import { extractYstmListMetadataSales } from '@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales'
+import { loadYstmCoverageObservationsForRelist } from '@/lib/ingestion/ystmCoverage/loadYstmCoverageObservationsForRelist'
+import {
   aggregateYstmCoverageObservations,
   loadYstmCoverageConfigStalenessHoursByKey,
   upsertYstmCoverageObservations,
@@ -70,6 +76,8 @@ export type YstmCoverageAuditCronTelemetry = {
   coveragePct: number | null
   observationCount: number
   overlapPrevented: boolean
+  expiredObsSeenAgain: number
+  expiredObsRefreshScheduled: number
   postAuditReconcile: Awaited<ReturnType<typeof runPostAuditCoverageReconcile>> | null
 }
 
@@ -195,6 +203,8 @@ function emptyAuditTelemetry(
     coveragePct: null,
     observationCount: 0,
     overlapPrevented: false,
+    expiredObsSeenAgain: 0,
+    expiredObsRefreshScheduled: 0,
     postAuditReconcile: null,
     ...partial,
   }
@@ -411,8 +421,17 @@ export async function runYstmCoverageAuditCron(
       state: string
       configKey: string
     }> = []
-    const listOnlyUpserts: YstmCoverageObservationUpsert[] = []
+    const pendingListEntries: Array<{
+      canonicalUrl: string
+      sourceUrl: string
+      city: string
+      state: string
+      configKey: string
+      metadata: import('@/lib/ingestion/ystmCoverage/extractYstmListMetadataSales').YstmListMetadataSale | null
+    }> = []
     const configEvents: YstmCoverageAuditConfigEventInsert[] = []
+    let expiredObsSeenAgain = 0
+    let expiredObsRefreshScheduled = 0
 
     let configsProcessed = 0
     let orderIndex = 0
@@ -482,37 +501,34 @@ export async function runYstmCoverageAuditCron(
           })
           listPagesFetched += 1
           fetchCompleted = true
+          const metadataSales = extractYstmListMetadataSales(html, pageUrl).slice(
+            0,
+            budgets.maxUrlsPerListPage
+          )
+          const metadataByUrl = new Map(metadataSales.map((sale) => [sale.canonicalUrl, sale]))
           const extracted = extractYstmListingUrlsFromListHtml(html, pageUrl).slice(
             0,
             budgets.maxUrlsPerListPage
           )
           listingUrlsDiscovered += extracted.length
           urlsExtractedForConfig += extracted.length
+          const configKey = buildConfigKey(config.city, config.state)
 
           for (const item of extracted) {
-            const listMatch = buildListFootprintMatch(matchIndex, item.canonicalUrl)
-            listOnlyUpserts.push({
+            pendingListEntries.push({
               canonicalUrl: item.canonicalUrl,
-              state: config.state,
+              sourceUrl: item.sourceUrl,
               city: config.city,
-              configKey: buildConfigKey(config.city, config.state),
-              ystmValidActive: false,
-              ystmInvalidReason: null,
-              lootauraVisible: listMatch.lootauraVisible,
-              listSeenAt,
-              detailCheckedAt: null,
-              sourceListingId: listMatch.sourceListingId,
-              saleInstanceKey: listMatch.saleInstanceKey,
-              matchedIngestedSaleId: listMatch.matchedIngestedSaleId,
-              matchedSaleId: listMatch.matchedSaleId,
-              matchMethod: listMatch.matchMethod,
+              state: config.state,
+              configKey,
+              metadata: metadataByUrl.get(item.canonicalUrl) ?? null,
             })
             detailQueue.push({
               canonicalUrl: item.canonicalUrl,
               sourceUrl: item.sourceUrl,
               city: config.city,
               state: config.state,
-              configKey: buildConfigKey(config.city, config.state),
+              configKey,
             })
           }
         } catch (err) {
@@ -560,8 +576,55 @@ export async function runYstmCoverageAuditCron(
         ? (configCursorBefore + configsProcessed) % catalogSize
         : configCursorBefore
 
-    const dedupedListUpserts = dedupeDetailQueueByCanonical(listOnlyUpserts)
+    const dedupedPendingListEntries = dedupeDetailQueueByCanonical(pendingListEntries)
     const dedupedDetailQueue = dedupeDetailQueueByCanonical(detailQueue)
+    const existingByUrl = await loadYstmCoverageObservationsForRelist(
+      admin,
+      dedupedPendingListEntries.map((entry) => entry.canonicalUrl)
+    )
+
+    const listOnlyUpserts: YstmCoverageObservationUpsert[] = []
+    for (const entry of dedupedPendingListEntries) {
+      const listMatch = buildListFootprintMatch(matchIndex, entry.canonicalUrl)
+      const existing = existingByUrl.get(entry.canonicalUrl) ?? null
+      if (existing?.ystmInvalidReason === 'expired') {
+        expiredObsSeenAgain += 1
+      }
+
+      if (entry.metadata) {
+        const upsert = buildYstmListSightObservationUpsert({
+          sale: entry.metadata,
+          city: entry.city,
+          state: entry.state,
+          configKey: entry.configKey,
+          listSeenAt,
+          appearanceSource: 'coverage_audit',
+          footprint: listMatch,
+          existing,
+          relistDetectedAt: listSeenAt,
+          hotDiscovery: false,
+        })
+        if (upsert.needsDetailRefresh) {
+          expiredObsRefreshScheduled += 1
+        }
+        listOnlyUpserts.push(upsert)
+        continue
+      }
+
+      listOnlyUpserts.push(
+        buildYstmAuditUrlListUpsert({
+          canonicalUrl: entry.canonicalUrl,
+          city: entry.city,
+          state: entry.state,
+          configKey: entry.configKey,
+          listSeenAt,
+          footprint: listMatch,
+          existing,
+        })
+      )
+    }
+
+    const dedupedListUpserts = dedupeDetailQueueByCanonical(listOnlyUpserts)
 
     if (dedupedListUpserts.length > 0) {
       await upsertYstmCoverageObservations(admin, dedupedListUpserts)
@@ -695,6 +758,8 @@ export async function runYstmCoverageAuditCron(
         missingValidYstmUrls: agg.missingValidYstmUrls,
         coveragePct,
         observationCount: agg.observationCount,
+        expiredObsSeenAgain,
+        expiredObsRefreshScheduled,
         postAuditReconcile,
       }),
     }

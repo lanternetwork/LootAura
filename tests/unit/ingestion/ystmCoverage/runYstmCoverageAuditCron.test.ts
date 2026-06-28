@@ -152,6 +152,13 @@ describe('runYstmCoverageAuditCron', () => {
           insert: () => Promise.resolve({ error: null }),
         }
       }
+      if (table === 'ystm_coverage_observations') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }
+      }
       throw new Error(`unexpected table ${table}`)
     })
   })
@@ -258,6 +265,13 @@ describe('runYstmCoverageAuditCron', () => {
       if (table === 'ystm_coverage_audit_config_events') {
         return {
           insert: () => Promise.resolve({ error: null }),
+        }
+      }
+      if (table === 'ystm_coverage_observations') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [], error: null }),
+          }),
         }
       }
       throw new Error(`unexpected table ${table}`)

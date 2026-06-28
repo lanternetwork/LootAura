@@ -4,8 +4,9 @@ import type { Metadata } from 'next'
 import MetroHelpfulContent from '@/components/metro/MetroHelpfulContent'
 import MetroMapSection from '@/components/metro/MetroMapSection'
 import MetroPageFaq from '@/components/metro/MetroPageFaq'
-import MetroPageHero, { metroFreshnessLabel } from '@/components/metro/MetroPageHero'
+import MetroPageHero from '@/components/metro/MetroPageHero'
 import MetroPageMapCta from '@/components/metro/MetroPageMapCta'
+import MetroPageStatsStrip from '@/components/metro/MetroPageStatsStrip'
 import SeoSaleListItem from '@/components/seo/SeoSaleListItem'
 import { createCityPageMetadata } from '@/lib/seo/metadata'
 import { loadMetroPageContext } from '@/lib/seo/snapshots/loadMetroPageContext'
@@ -69,11 +70,14 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
     inventoryCount === 0
       ? buildCityPageH1(metro, summary, 'This Weekend', { stableTitleWhenEmpty: true })
       : buildMetroHeroHeadline(metro)
-  const heroSubtitle = buildMetroHeroSubtitle({
-    activeListingCount: inventoryCount,
-    radiusMiles,
-    city: metro.city,
-  })
+  const tagline =
+    inventoryCount > 0
+      ? buildMetroHeroSubtitle({
+          activeListingCount: inventoryCount,
+          radiusMiles,
+          city: metro.city,
+        })
+      : undefined
   const supportingCopy =
     inventoryCount === 0
       ? buildCityPageEmptyInventoryMessage()
@@ -109,9 +113,9 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
         />
       ))}
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <p className="text-sm text-gray-500">
-          <Link href="/sales" className="text-purple-700 hover:text-purple-900">
+          <Link href="/sales" className="font-medium text-[#3A2268] hover:text-[#2f1a52]">
             Interactive map
           </Link>
         </p>
@@ -119,24 +123,39 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
         <div className="mt-4">
           <MetroPageHero
             headline={headline}
-            subtitle={heroSubtitle}
-            freshnessLabel={metroFreshnessLabel(summary.lastUpdatedAt, inventoryCount)}
+            activeListingCount={inventoryCount}
+            radiusMiles={radiusMiles}
+            city={metro.city}
+            lastUpdatedAt={summary.lastUpdatedAt}
             interactiveMapHref={interactiveMapHref}
+            tagline={tagline}
           />
         </div>
+
+        <MetroPageStatsStrip
+          activeListingCount={inventoryCount}
+          radiusMiles={radiusMiles}
+          lastUpdatedAt={summary.lastUpdatedAt}
+          nearbyMetros={nearbyMetros}
+        />
 
         <SeoGeoDiscoveryLinks links={geoLinks} />
 
         {mapViewport && (
-          <MetroMapSection pins={mapPins} viewport={mapViewport} heading={`${metro.city} yard sales map`} />
+          <MetroMapSection
+            pins={mapPins}
+            viewport={mapViewport}
+            heading={`${metro.city} yard sales map`}
+            listingCount={inventoryCount}
+          />
         )}
 
-        <section className="mt-10" aria-labelledby="active-listings-heading">
-          <h2 id="active-listings-heading" className="text-2xl font-bold text-gray-900">
+        <section className="mt-8 lg:mt-10" aria-labelledby="active-listings-heading">
+          <h2 id="active-listings-heading" className="text-xl font-bold text-gray-900 sm:text-2xl">
             Active listings
           </h2>
           {sales.length === 0 ? (
-            <div className="mt-6 rounded-xl border border-gray-200 bg-white px-6 py-10 text-center text-gray-600">
+            <div className="mt-5 rounded-2xl border border-gray-200 bg-white px-5 py-10 text-center text-gray-600 sm:mt-6 sm:px-6">
               {buildCityPageEmptyInventoryMessage()
                 .split('\n\n')
                 .map((paragraph) => (
@@ -146,7 +165,7 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
                 ))}
             </div>
           ) : (
-            <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="mt-5 grid grid-cols-1 gap-5 sm:mt-6 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
               {sales.map((sale) => (
                 <SeoSaleListItem key={sale.id} sale={sale} />
               ))}
@@ -158,7 +177,7 @@ export default async function YardSalesMetroPage({ params }: PageProps) {
           <>
             <MetroPageMapCta href={interactiveMapHref} />
             <MetroHelpfulContent paragraphs={helpfulParagraphs} interactiveMapHref={interactiveMapHref} />
-            <section className="prose prose-sm mt-10 max-w-none text-gray-700">
+            <section className="mt-10 space-y-4 text-base leading-relaxed text-gray-700 lg:mt-12">
               {supportingCopy.split('\n\n').map((paragraph) => (
                 <p key={paragraph.slice(0, 48)}>{paragraph}</p>
               ))}

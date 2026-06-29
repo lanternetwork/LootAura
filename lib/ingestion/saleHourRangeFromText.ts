@@ -79,7 +79,7 @@ export function extractStandaloneSaleStartTimeFromText(text: string): string | n
   if (!source.trim()) return null
 
   const re = new RegExp(
-    `(?:start\\s*time|starts?\\s+at|begins?\\s+at|sale\\s+starts?)\\s*:?\\s*${SALE_HOUR_TIME_FRAGMENT}`,
+    `(?:\\bstart\\s*time\\b|\\bstarts?\\s+at\\b|\\bbegins?\\s+at\\b|\\bsale\\s+starts\\b)\\s*:?\\s*${SALE_HOUR_TIME_FRAGMENT}`,
     'gi'
   )
   let last: string | null = null

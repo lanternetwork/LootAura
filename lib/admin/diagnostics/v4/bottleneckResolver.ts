@@ -1,7 +1,6 @@
 import { INSUFFICIENT_DRAIN_QUEUE_MIN } from '@/lib/admin/diagnostics/v4/constants'
 import {
   buildBacklogSnapshot,
-  buildCatalogRepairSnapshot,
   buildDuplicateHealthSnapshot,
   buildVisibilitySnapshot,
   exceedsVisibleDuplicateThreshold,
@@ -46,7 +45,7 @@ function queueCandidates(
   coverage: YstmCoverageMetricsResponse | null
 ): QueueCandidate[] {
   const backlogs = buildBacklogSnapshot(metrics, coverage)
-  return [
+  const candidates: QueueCandidate[] = [
     {
       id: 'catalog_repair',
       label: 'Catalog repair',
@@ -89,7 +88,8 @@ function queueCandidates(
       count: backlogs.refreshStale,
       oldestAgeMs: null,
     },
-  ].filter((row) => row.count > 0)
+  ]
+  return candidates.filter((row) => row.count > 0)
 }
 
 function hasInsufficientDrain(count: number, metrics: IngestionMetricsResponse): boolean {
@@ -113,7 +113,7 @@ function blockingSloBottleneck(
     id: first.id,
     label: first.label,
     reason: `Blocking SLO failure: ${first.label}`,
-    domain: domainMap[first.id] ?? 'slos',
+    domain: domainMap[first.id] ?? 'system_health',
     rawBottleneck: first.id,
   }
 }
@@ -185,9 +185,13 @@ export function resolvePrimaryBottleneck(
           ? 'geocoding'
           : raw === 'publish'
             ? 'publishing'
-            : raw === 'address_enrichment'
-              ? 'catalog_repair'
-              : 'pipeline',
+            : raw === 'discovery'
+              ? 'discovery'
+              : raw === 'reconciliation'
+                ? 'visibility_coverage'
+                : raw === 'db_provider_pressure'
+                  ? 'external_providers'
+                  : 'pipeline',
     rawBottleneck: raw,
   }
 }

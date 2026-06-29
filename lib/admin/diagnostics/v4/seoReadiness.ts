@@ -1,11 +1,11 @@
-import { evaluateSeoEnablementMetricGate } from '@/lib/seo/evaluateSeoEnablementGate'
-import type { SeoReadinessSnapshot } from '@/lib/admin/diagnostics/v4/types'
-import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import {
+  evaluateSeoEnablementMetricGate,
   SEO_ENABLEMENT_COVERAGE_MIN_PCT,
   SEO_ENABLEMENT_EFFECTIVE_MISSING_MAX,
   SEO_ENABLEMENT_PUBLISHED_ACTIVE_MIN,
 } from '@/lib/seo/evaluateSeoEnablementGate'
+import type { SeoReadinessSnapshot } from '@/lib/admin/diagnostics/v4/types'
+import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 
 export function buildSeoReadinessSnapshot(
   coverage: YstmCoverageMetricsResponse | null

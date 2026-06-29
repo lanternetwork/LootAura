@@ -1,6 +1,4 @@
-import type { SystemHealthLevel } from '@/lib/admin/diagnostics/v4/types'
-import type { SloEvaluationRow } from '@/lib/admin/diagnostics/v4/types'
-import type { ComputedAlert } from '@/lib/admin/diagnostics/v4/types'
+import type { ComputedAlert, SloEvaluationRow, SystemHealthLevel } from '@/lib/admin/diagnostics/v4/types'
 import { PUBLISH_FAILED_SLO_MAX } from '@/lib/admin/diagnostics/v4/constants'
 
 export function deriveSystemHealthLevel(
@@ -23,7 +21,6 @@ export function deriveSystemHealthLevel(
   }
 
   const warningAlerts = alerts.filter((a) => a.severity === 'warning')
-  const sloFailures = alerts.filter((a) => a.id.startsWith('slo_'))
   if (warningAlerts.length >= 2 || catalogRepairQueue >= 200) {
     return 'critical'
   }

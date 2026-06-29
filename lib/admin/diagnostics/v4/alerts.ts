@@ -1,7 +1,6 @@
 import { buildOperationalPriorities } from '@/lib/admin/ingestionDashboardOverview'
 import { getRegistryEntry } from '@/lib/admin/diagnostics/v4/registry'
-import type { ComputedAlert, OperatorAction } from '@/lib/admin/diagnostics/v4/types'
-import type { SloEvaluationRow } from '@/lib/admin/diagnostics/v4/types'
+import type { ComputedAlert, OperatorAction, SloEvaluationRow } from '@/lib/admin/diagnostics/v4/types'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
 import {

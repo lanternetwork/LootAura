@@ -83,6 +83,15 @@ describe('extractYstmDetailSaleHoursFromText', () => {
     expect(extractYstmDetailSaleHoursFromText('Lots of furniture. Open at 8am for early birds.')).toBeNull()
   })
 
+  it('does not treat Neighborhood Sale title plus Start time as sale starts', () => {
+    expect(
+      extractYstmDetailSaleHoursFromText('Neighborhood Sale\n6/28 - 6/28\nStart time: 8am')
+    ).toEqual({
+      timeStart: '08:00:00',
+      timeEnd: null,
+    })
+  })
+
   it('uses the last standalone start phrase when several appear', () => {
     expect(extractYstmDetailSaleHoursFromText('Start time: 8am. Starts at 9:30am')).toEqual({
       timeStart: '09:30:00',

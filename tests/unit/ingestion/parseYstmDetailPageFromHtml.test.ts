@@ -51,7 +51,7 @@ describe('parseYstmDetailPageFromHtml', () => {
   it('parses standalone Start time when no hour range is present', () => {
     const html = `<html><body>
 <div class="listing">
-<h1 class="content">Neighborhood Sale</h1>
+<h1 class="content">Big Yard Sale</h1>
 <div class="content" style="margin-top:2em">
 <div>6/28 - 6/28<br/>Start time: 8am</div>
 <div id="address">123 Main St, Chicago, IL 60601, USA</div>

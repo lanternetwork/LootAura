@@ -70,6 +70,17 @@ export function extractAuthoritativeSaleHourRangeFromText(
   return last
 }
 
+const STANDALONE_TIME_CAPTURE =
+  '(\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)|\\d{1,2}(?::\\d{2})?(?:am|pm))'
+
+const STANDALONE_START_PATTERNS: readonly RegExp[] = [
+  new RegExp(`\\bstart\\s*time\\s*:\\s*${STANDALONE_TIME_CAPTURE}`, 'gi'),
+  new RegExp(`\\bstart\\s*time\\s+${STANDALONE_TIME_CAPTURE}`, 'gi'),
+  new RegExp(`\\bstarts?\\s+at\\s+${STANDALONE_TIME_CAPTURE}`, 'gi'),
+  new RegExp(`\\bbegins?\\s+at\\s+${STANDALONE_TIME_CAPTURE}`, 'gi'),
+  new RegExp(`\\bsale\\s+starts\\s+${STANDALONE_TIME_CAPTURE}`, 'gi'),
+]
+
 /**
  * Last explicit standalone sale start phrase (e.g. `Start time: 8am`) when no hour range exists.
  * Ignores bare `at 8am` prose so sign-in / door copy does not become the sale start.
@@ -78,15 +89,14 @@ export function extractStandaloneSaleStartTimeFromText(text: string): string | n
   const source = String(text || '')
   if (!source.trim()) return null
 
-  const re = new RegExp(
-    `(?:\\bstart\\s*time(?:\\s*:\\s*|\\s+)|\\bstarts?\\s+at\\s+|\\bbegins?\\s+at\\s+|\\bsale\\s+starts\\s+)${SALE_HOUR_TIME_FRAGMENT}`,
-    'gi'
-  )
   let last: string | null = null
-  let m: RegExpExecArray | null
-  while ((m = re.exec(source)) !== null) {
-    const parsed = parseUs12hFragmentToDbTime(m[1])
-    if (parsed) last = parsed
+  for (const pattern of STANDALONE_START_PATTERNS) {
+    pattern.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = pattern.exec(source)) !== null) {
+      const parsed = parseUs12hFragmentToDbTime(m[1])
+      if (parsed) last = parsed
+    }
   }
   return last
 }

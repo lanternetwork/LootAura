@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom'
 import { extractYstmDetailMediaStrFromHtml } from '@/lib/ingestion/images/extractYstmDetailMediaStr'
-import { extractAuthoritativeSaleHourRangeFromText } from '@/lib/ingestion/saleHourRangeFromText'
+import { extractYstmDetailSaleHoursFromText } from '@/lib/ingestion/saleHourRangeFromText'
 import {
   resolveYstmDetailPageAddress,
   type YstmDetailAddressSource,
@@ -110,7 +110,7 @@ export function parseYstmDetailPageFromHtml(input: {
   const nativeCoords = extractYstmNativeCoordinatesFromHtml(html)
 
   const hourSource = [description, title, addressRaw, fullText].filter(Boolean).join('\n')
-  const hourRange = extractAuthoritativeSaleHourRangeFromText(hourSource)
+  const hourRange = extractYstmDetailSaleHoursFromText(hourSource)
 
   if (!title?.trim() && !addressRaw?.trim() && !nativeCoords) {
     return null
@@ -129,6 +129,6 @@ export function parseYstmDetailPageFromHtml(input: {
     nativeCoords,
     cityConflict: authority.cityConflict,
     detailTimeStart: hourRange?.timeStart,
-    detailTimeEnd: hourRange?.timeEnd,
+    detailTimeEnd: hourRange?.timeEnd ?? undefined,
   }
 }

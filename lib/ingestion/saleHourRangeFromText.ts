@@ -69,3 +69,42 @@ export function extractAuthoritativeSaleHourRangeFromText(
   }
   return last
 }
+
+/**
+ * Last explicit standalone sale start phrase (e.g. `Start time: 8am`) when no hour range exists.
+ * Ignores bare `at 8am` prose so sign-in / door copy does not become the sale start.
+ */
+export function extractStandaloneSaleStartTimeFromText(text: string): string | null {
+  const source = String(text || '')
+  if (!source.trim()) return null
+
+  const re = new RegExp(
+    `(?:start\\s*time|starts?\\s+at|begins?\\s+at|sale\\s+starts?)\\s*:?\\s*${SALE_HOUR_TIME_FRAGMENT}`,
+    'gi'
+  )
+  let last: string | null = null
+  let m: RegExpExecArray | null
+  while ((m = re.exec(source)) !== null) {
+    const parsed = parseUs12hFragmentToDbTime(m[1])
+    if (parsed) last = parsed
+  }
+  return last
+}
+
+/**
+ * YSTM detail-page schedule: explicit hour range first, then standalone start phrases.
+ * `timeEnd` is null when only a standalone start time was found.
+ */
+export function extractYstmDetailSaleHoursFromText(
+  text: string
+): { readonly timeStart: string; readonly timeEnd: string | null } | null {
+  const range = extractAuthoritativeSaleHourRangeFromText(text)
+  if (range) {
+    return { timeStart: range.timeStart, timeEnd: range.timeEnd }
+  }
+  const standaloneStart = extractStandaloneSaleStartTimeFromText(text)
+  if (standaloneStart) {
+    return { timeStart: standaloneStart, timeEnd: null }
+  }
+  return null
+}

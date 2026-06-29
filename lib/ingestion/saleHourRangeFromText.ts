@@ -11,6 +11,14 @@ const SALE_HOUR_RANGE_RE = new RegExp(
   'gi'
 )
 
+/** Collapse whitespace and split digit→letter joins from `<br>`-collapsed YSTM detail copy. */
+function normalizeSaleHourSourceText(text: string): string {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .replace(/(\d)(?=[A-Za-z])/g, '$1 ')
+    .trim()
+}
+
 /** True when the whole line is only a sale-hour window (preserve during description sanitization). */
 export function isStandaloneSaleHourRangeLine(line: string): boolean {
   const normalized = String(line || '')
@@ -52,8 +60,8 @@ export function parseUs12hFragmentToDbTime(fragment: string): string | null {
 export function extractAuthoritativeSaleHourRangeFromText(
   text: string
 ): { readonly timeStart: string; readonly timeEnd: string } | null {
-  const source = String(text || '')
-  if (!source.trim()) return null
+  const source = normalizeSaleHourSourceText(text)
+  if (!source) return null
 
   const re = new RegExp(
     `${SALE_HOUR_TIME_FRAGMENT}\\s*(?:to|[-–—])\\s*${SALE_HOUR_TIME_FRAGMENT}`,
@@ -87,8 +95,8 @@ const STANDALONE_START_PATTERNS: readonly RegExp[] = [
  * Ignores bare `at 8am` prose so sign-in / door copy does not become the sale start.
  */
 export function extractStandaloneSaleStartTimeFromText(text: string): string | null {
-  const source = String(text || '')
-  if (!source.trim()) return null
+  const source = normalizeSaleHourSourceText(text)
+  if (!source) return null
 
   let last: string | null = null
   for (const pattern of STANDALONE_START_PATTERNS) {

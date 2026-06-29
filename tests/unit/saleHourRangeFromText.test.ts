@@ -64,6 +64,13 @@ describe('extractYstmDetailSaleHoursFromText', () => {
     })
   })
 
+  it('parses standalone Start time after br-collapsed date line', () => {
+    expect(extractYstmDetailSaleHoursFromText('6/28 - 6/28Start time: 8am')).toEqual({
+      timeStart: '08:00:00',
+      timeEnd: null,
+    })
+  })
+
   it.each([
     ['Start time 8 AM', '08:00:00'],
     ['Starts at 8am', '08:00:00'],

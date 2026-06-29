@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   extractAuthoritativeSaleHourRangeFromText,
+  extractStandaloneSaleStartTimeFromText,
+  extractYstmDetailSaleHoursFromText,
   isStandaloneSaleHourRangeLine,
   textContainsSaleHourRange,
 } from '@/lib/ingestion/saleHourRangeFromText'
@@ -42,6 +44,65 @@ describe('saleHourRangeFromText', () => {
     expect(extractAuthoritativeSaleHourRangeFromText(text)).toEqual({
       timeStart: '09:00:00',
       timeEnd: '15:00:00',
+    })
+  })
+})
+
+describe('extractYstmDetailSaleHoursFromText', () => {
+  it('prefers explicit range over standalone start time', () => {
+    const text = 'Start time: 8am\n9:00 am - 3:00 pm'
+    expect(extractYstmDetailSaleHoursFromText(text)).toEqual({
+      timeStart: '09:00:00',
+      timeEnd: '15:00:00',
+    })
+  })
+
+  it('parses standalone Start time: 8am', () => {
+    expect(extractYstmDetailSaleHoursFromText('Sun 6/28\nStart time: 8am')).toEqual({
+      timeStart: '08:00:00',
+      timeEnd: null,
+    })
+  })
+
+  it('parses standalone Start time after br-collapsed date line', () => {
+    expect(extractYstmDetailSaleHoursFromText('6/28 - 6/28Start time: 8am')).toEqual({
+      timeStart: '08:00:00',
+      timeEnd: null,
+    })
+  })
+
+  it.each([
+    ['Start time 8 AM', '08:00:00'],
+    ['Starts at 8am', '08:00:00'],
+    ['Begins at 8:30 AM', '08:30:00'],
+    ['Sale starts 7:00am', '07:00:00'],
+    ['Start time:  8am', '08:00:00'],
+    ['START TIME: 8AM', '08:00:00'],
+  ] as const)('parses standalone pattern %s', (text, timeStart) => {
+    expect(extractYstmDetailSaleHoursFromText(text)).toEqual({
+      timeStart,
+      timeEnd: null,
+    })
+  })
+
+  it('does not treat unrelated at-8am prose as a sale start', () => {
+    expect(extractStandaloneSaleStartTimeFromText('front door at 8am each sale day')).toBeNull()
+    expect(extractYstmDetailSaleHoursFromText('Lots of furniture. Open at 8am for early birds.')).toBeNull()
+  })
+
+  it('does not treat Neighborhood Sale title plus Start time as sale starts', () => {
+    expect(
+      extractYstmDetailSaleHoursFromText('Neighborhood Sale\n6/28 - 6/28\nStart time: 8am')
+    ).toEqual({
+      timeStart: '08:00:00',
+      timeEnd: null,
+    })
+  })
+
+  it('uses the last standalone start phrase when several appear', () => {
+    expect(extractYstmDetailSaleHoursFromText('Start time: 8am. Starts at 9:30am')).toEqual({
+      timeStart: '09:30:00',
+      timeEnd: null,
     })
   })
 })

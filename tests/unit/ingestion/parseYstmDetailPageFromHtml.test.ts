@@ -48,6 +48,31 @@ describe('parseYstmDetailPageFromHtml', () => {
     expect(parsed!.detailTimeEnd).toBeTruthy()
   })
 
+  it('parses standalone Start time when no hour range is present', () => {
+    const html = `<html><body>
+<div class="listing">
+<h1 class="content">Big Yard Sale</h1>
+<div class="content" style="margin-top:2em">
+<div>6/28 - 6/28<br/>Start time: 8am</div>
+<div id="address">123 Main St, Chicago, IL 60601, USA</div>
+</div>
+</div>
+<script>const lat = 41.88; const lng = -87.63;</script>
+</body></html>`
+    const parsed = parseYstmDetailPageFromHtml({
+      html,
+      sourceUrl:
+        'https://yardsaletreasuremap.com/US/Illinois/Chicago/123-Main-St/999/userlisting.html',
+      configCity: 'Chicago',
+      configState: 'IL',
+    })
+
+    expect(parsed).not.toBeNull()
+    expect(parsed!.startDate).toBe('2026-06-28')
+    expect(parsed!.detailTimeStart).toBe('08:00:00')
+    expect(parsed!.detailTimeEnd).toBeUndefined()
+  })
+
   it('parses Park Ridge / Chicago hub fixture with images and date range', () => {
     const html = readFileSync(
       join(process.cwd(), 'tests/fixtures/ystm/detail-park-ridge-chicago.html'),

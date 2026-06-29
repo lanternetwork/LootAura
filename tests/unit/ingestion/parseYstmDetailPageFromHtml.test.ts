@@ -9,6 +9,9 @@ const LOUISVILLE_URL =
 const CHICAGO_URL =
   'https://yardsaletreasuremap.com/US/Illinois/Chicago/6519-N-Oliphant-Ave/2439464/userlisting.html'
 
+const LAFAYETTE_URL =
+  'https://yardsaletreasuremap.com/US/Indiana/Lafayette/2141-S-4th-St/999/userlisting.html'
+
 describe('parseYstmDetailPageFromHtml', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -71,6 +74,45 @@ describe('parseYstmDetailPageFromHtml', () => {
     expect(parsed!.startDate).toBe('2026-06-28')
     expect(parsed!.detailTimeStart).toBe('08:00:00')
     expect(parsed!.detailTimeEnd).toBeUndefined()
+  })
+
+  it('prefers authoritative schedule block over promotional July 10-12 prose (LEGO)', () => {
+    const html = readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-lego-lafayette-july3.html'),
+      'utf8'
+    )
+    const parsed = parseYstmDetailPageFromHtml({
+      html,
+      sourceUrl: LAFAYETTE_URL,
+      configCity: 'Lafayette',
+      configState: 'IN',
+    })
+
+    expect(parsed).not.toBeNull()
+    expect(parsed!.startDate).toBe('2026-07-03')
+    expect(parsed!.endDate).toBe('2026-07-03')
+    expect(parsed!.detailTimeStart).toBe('11:00:00')
+    expect(parsed!.detailTimeEnd).toBe('17:30:00')
+    expect(parsed!.description).toContain('July 10-12')
+    expect(parsed!.description).not.toMatch(/\b7\/3\b/)
+  })
+
+  it('keeps promo-only lines in description when schedule block is peeled (Louisville)', () => {
+    const html = readFileSync(
+      join(process.cwd(), 'tests/fixtures/ystm/detail-louisville-devondale.html'),
+      'utf8'
+    )
+    const parsed = parseYstmDetailPageFromHtml({
+      html,
+      sourceUrl: LOUISVILLE_URL,
+      configCity: 'Louisville',
+      configState: 'KY',
+    })
+
+    expect(parsed).not.toBeNull()
+    expect(parsed!.description).toContain('downsizing')
+    expect(parsed!.description).not.toContain('8:00 am')
+    expect(parsed!.description).not.toContain('5/23')
   })
 
   it('parses Park Ridge / Chicago hub fixture with images and date range', () => {

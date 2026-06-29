@@ -76,12 +76,19 @@ export function splitYstmContentLinesIntoScheduleAndDescription(lines: readonly 
   return { scheduleLines, descriptionLines }
 }
 
+function insertNewlinesForBlockBreaks(root: HTMLElement): void {
+  const doc = root.ownerDocument
+  for (const br of [...root.querySelectorAll('br')]) {
+    br.replaceWith(doc.createTextNode('\n'))
+  }
+  for (const p of [...root.querySelectorAll('p')]) {
+    p.append(doc.createTextNode('\n'))
+  }
+}
+
 export function extractLinesFromYstmContentElement(container: HTMLElement): string[] {
-  const html = container.innerHTML
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+  insertNewlinesForBlockBreaks(container)
+  return (container.textContent ?? '')
     .split('\n')
     .map((line) => line.replace(/\s+/g, ' ').trim())
 }

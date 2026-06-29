@@ -11,6 +11,11 @@ import {
 } from '@/lib/ingestion/spatial/extractYstmNativeCoordinates'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 import { extractFallbackAddressAndDates } from '@/lib/ingestion/adapters/externalPageSource'
+import {
+  extractYstmDetailDatesFromJsonLd,
+  extractYstmDetailScheduleFromDocument,
+  parseYstmScheduleBlockSlashDates,
+} from '@/lib/ingestion/acquisition/ystmDetailScheduleBlock'
 
 export type { YstmDetailAddressSource } from '@/lib/ingestion/acquisition/ystmDetailPageAddressResolver'
 
@@ -46,7 +51,7 @@ function extractTitleFromDetailDocument(document: Document): string | null {
   return title && title.length > 0 ? title : null
 }
 
-function extractDescriptionFromDetailDocument(document: Document): string | null {
+function extractLegacyDescriptionFromDetailDocument(document: Document): string | null {
   const addressEl = document.getElementById('address')
   const contentBlock =
     addressEl?.closest('.content') ??
@@ -87,7 +92,10 @@ export function parseYstmDetailPageFromHtml(input: {
   const { document } = dom.window
 
   const title = extractTitleFromDetailDocument(document)
-  const description = extractDescriptionFromDetailDocument(document)
+  const scheduleExtraction = extractYstmDetailScheduleFromDocument(document)
+  const description = scheduleExtraction.hasScheduleBlock
+    ? scheduleExtraction.descriptionText?.trim() || null
+    : extractLegacyDescriptionFromDetailDocument(document)
   const fullText = document.body?.textContent ?? ''
 
   const { addressRaw, addressSource } = resolveYstmDetailPageAddress({
@@ -102,17 +110,42 @@ export function parseYstmDetailPageFromHtml(input: {
   const city = authority.resolvedCity ?? cityHint
   const state = authority.resolvedState ?? stateHint
 
-  const fromBody = extractFallbackAddressAndDates(fullText, cityHint, stateHint)
-  const startDate = fromBody.start
-  const endDate = fromBody.end
+  let startDate: string | undefined
+  let endDate: string | undefined
+  let hourRange: ReturnType<typeof extractYstmDetailSaleHoursFromText> = null
+  let scheduleSourceUsed = false
+
+  if (scheduleExtraction.hasScheduleBlock && scheduleExtraction.scheduleText) {
+    const scheduleDates = parseYstmScheduleBlockSlashDates(scheduleExtraction.scheduleText)
+    const scheduleHours = extractYstmDetailSaleHoursFromText(scheduleExtraction.scheduleText)
+    if (scheduleDates.start || scheduleDates.end || scheduleHours) {
+      scheduleSourceUsed = true
+      startDate = scheduleDates.start
+      endDate = scheduleDates.end
+      hourRange = scheduleHours
+    }
+  }
+
+  if (!scheduleSourceUsed) {
+    const jsonLdDates = extractYstmDetailDatesFromJsonLd(html)
+    if (jsonLdDates.start || jsonLdDates.end) {
+      startDate = jsonLdDates.start
+      endDate = jsonLdDates.end
+    } else {
+      const fallbackSource = description?.trim() ? description : fullText
+      const fromBody = extractFallbackAddressAndDates(fallbackSource, cityHint, stateHint)
+      startDate = fromBody.start
+      endDate = fromBody.end
+    }
+
+    const combinedHourSource = [description, title, addressRaw, fullText].filter(Boolean).join('\n')
+    hourRange =
+      (description?.trim() ? extractYstmDetailSaleHoursFromText(description) : null) ??
+      extractYstmDetailSaleHoursFromText(combinedHourSource)
+  }
 
   const media = extractYstmDetailMediaStrFromHtml(html, input.sourceUrl)
   const nativeCoords = extractYstmNativeCoordinatesFromHtml(html)
-
-  const combinedHourSource = [description, title, addressRaw, fullText].filter(Boolean).join('\n')
-  const hourRange =
-    (description?.trim() ? extractYstmDetailSaleHoursFromText(description) : null) ??
-    extractYstmDetailSaleHoursFromText(combinedHourSource)
 
   if (!title?.trim() && !addressRaw?.trim() && !nativeCoords) {
     return null

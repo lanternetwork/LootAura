@@ -32,7 +32,8 @@ export function textContainsSaleHourRange(text: string): boolean {
 export function parseUs12hFragmentToDbTime(fragment: string): string | null {
   const t = String(fragment || '').trim()
   const m =
-    t.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i) ?? t.match(/^(\d{1,2})(?::(\d{2}))?(am|pm)$/i)
+    t.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i) ??
+    t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i)
   if (!m) return null
   let hour = Number.parseInt(m[1], 10)
   const minute = m[2] != null && m[2] !== '' ? Number.parseInt(m[2], 10) : 0

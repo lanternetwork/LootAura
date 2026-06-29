@@ -109,8 +109,10 @@ export function parseYstmDetailPageFromHtml(input: {
   const media = extractYstmDetailMediaStrFromHtml(html, input.sourceUrl)
   const nativeCoords = extractYstmNativeCoordinatesFromHtml(html)
 
-  const hourSource = [description, title, addressRaw, fullText].filter(Boolean).join('\n')
-  const hourRange = extractYstmDetailSaleHoursFromText(hourSource)
+  const combinedHourSource = [description, title, addressRaw, fullText].filter(Boolean).join('\n')
+  const hourRange =
+    (description?.trim() ? extractYstmDetailSaleHoursFromText(description) : null) ??
+    extractYstmDetailSaleHoursFromText(combinedHourSource)
 
   if (!title?.trim() && !addressRaw?.trim() && !nativeCoords) {
     return null

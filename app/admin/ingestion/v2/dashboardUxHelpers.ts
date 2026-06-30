@@ -39,6 +39,22 @@ export const TONE_TEXT: Record<StatusTone, string> = {
   blue: 'text-indigo-900',
 }
 
+export const TONE_BORDER_STRONG: Record<StatusTone, string> = {
+  green: 'border-2 border-emerald-500',
+  yellow: 'border-2 border-amber-500',
+  red: 'border-2 border-red-600',
+  gray: 'border-2 border-gray-400',
+  blue: 'border-2 border-indigo-500',
+}
+
+export const SLO_ROW_BG: Record<StatusTone, string> = {
+  green: 'bg-emerald-50/80',
+  yellow: 'bg-amber-50/80',
+  red: 'bg-red-50/80',
+  gray: '',
+  blue: '',
+}
+
 export function healthTone(level: SystemHealthLevel): StatusTone {
   switch (level) {
     case 'healthy':
@@ -73,6 +89,43 @@ export function findSlo(model: IngestionDiagnosticsModel, id: string): SloEvalua
 
 export function findDomain(model: IngestionDiagnosticsModel, id: string) {
   return model.domainHealth.find((domain) => domain.id === id)
+}
+
+export function healthStatusEmoji(level: SystemHealthLevel): string {
+  switch (level) {
+    case 'healthy':
+      return '🟢'
+    case 'degraded':
+      return '🟡'
+    case 'critical':
+      return '🔴'
+  }
+}
+
+export function statusLabelForTone(tone: StatusTone): string {
+  switch (tone) {
+    case 'green':
+      return 'Healthy'
+    case 'yellow':
+      return 'Needs Attention'
+    case 'red':
+      return 'Critical'
+    case 'gray':
+      return 'Monitoring'
+    case 'blue':
+      return 'Info'
+  }
+}
+
+/** Presentation-only: capitalize and soften common passive phrasing. */
+export function formatRecommendationDisplay(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed) return trimmed
+  let result = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+  if (/^address\b/i.test(result)) {
+    result = `Review${result.slice(7)}`
+  }
+  return result
 }
 
 export function resolveTopRecommendation(model: IngestionDiagnosticsModel): string {
@@ -125,6 +178,16 @@ export function pipelineCardMetric(model: IngestionDiagnosticsModel): string {
   return `Parser ${parserActual} · Publish failed ${publishActual}`
 }
 
+export function pipelineCardPrimaryMetric(model: IngestionDiagnosticsModel): string {
+  const parser = findSlo(model, 'parser_success_24h')
+  return `Parser ${parser?.actual ?? '—'}`
+}
+
+export function pipelineCardSupportingMetric(model: IngestionDiagnosticsModel): string {
+  const publish = findSlo(model, 'publish_failed_terminal')
+  return `Publish failures: ${publish?.actual ?? '—'}`
+}
+
 export function pipelineCardThreshold(model: IngestionDiagnosticsModel): string {
   const parser = findSlo(model, 'parser_success_24h')
   const publish = findSlo(model, 'publish_failed_terminal')
@@ -158,4 +221,52 @@ export function formatPayloadBytes(bytes: number | null | undefined): string {
   if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(2)} MB`
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${bytes.toLocaleString()} B`
+}
+
+export function countAlertsBySeverity(
+  alerts: IngestionDiagnosticsModel['alerts']
+): { critical: number; warning: number; info: number } {
+  return alerts.reduce(
+    (acc, alert) => {
+      acc[alert.severity] += 1
+      return acc
+    },
+    { critical: 0, warning: 0, info: 0 }
+  )
+}
+
+/** One-line operational summary — distinct from hero health reason. */
+export function composeCurrentStatusSentence(model: IngestionDiagnosticsModel): string {
+  const parts: string[] = []
+  const heroReason = model.healthReasons[0]?.label?.trim() ?? ''
+
+  if (model.systemHealth === 'healthy') {
+    parts.push('Pipeline operating normally.')
+  } else {
+    parts.push(`${model.primaryBottleneck.label}.`)
+  }
+
+  const trend = model.trendSummary.trim()
+  if (trend && !trend.startsWith('Trend unavailable')) {
+    const trendSentence = trend.endsWith('.') ? trend : `${trend}.`
+    if (!heroReason || !trendSentence.toLowerCase().includes(heroReason.toLowerCase().slice(0, 12))) {
+      parts.push(trendSentence)
+    }
+  }
+
+  const inventory = resolveInventorySubtitle(model)
+  if (inventory !== 'Inventory flowing normally') {
+    parts.push(inventory.endsWith('.') ? inventory : `${inventory}.`)
+  }
+
+  const recommendation = formatRecommendationDisplay(resolveTopRecommendation(model))
+  if (
+    recommendation &&
+    recommendation !== heroReason &&
+    !parts.some((part) => part.toLowerCase().includes(recommendation.toLowerCase().slice(0, 16)))
+  ) {
+    parts.push(recommendation.endsWith('.') ? recommendation : `${recommendation}.`)
+  }
+
+  return parts.slice(0, 3).join(' ') || 'Review operational health cards for detail.'
 }

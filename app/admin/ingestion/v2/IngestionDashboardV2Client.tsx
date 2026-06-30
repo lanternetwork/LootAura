@@ -26,11 +26,21 @@ const COPY_LABEL: Record<CopyMode, string> = {
   full: 'Full Diagnostics',
 }
 
+function formatLastRefreshed(date: Date): string {
+  return date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+}
+
 export default function IngestionDashboardV2Client() {
   const [model, setModel] = useState<IngestionDiagnosticsModel | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<CopyMode | 'error' | null>(null)
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,6 +51,7 @@ export default function IngestionDashboardV2Client() {
         throw new Error(json.message || `HTTP ${res.status}`)
       }
       setModel(json.model)
+      setLastRefreshedAt(new Date())
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -70,8 +81,12 @@ export default function IngestionDashboardV2Client() {
 
   if (loading && !model) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 text-center text-gray-600">
-        Loading diagnostics model…
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 py-8 text-gray-600">
+        <span
+          className="mb-3 inline-block h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600"
+          aria-hidden
+        />
+        <p className="text-sm font-medium">Building diagnostics…</p>
       </div>
     )
   }
@@ -90,12 +105,17 @@ export default function IngestionDashboardV2Client() {
   if (!model) return null
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 text-gray-900">
+    <div className="min-h-screen bg-gray-50 py-8 text-gray-900">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Ingestion Operations</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Ingestion Operations</h1>
             <p className="mt-1 text-sm text-gray-600">Enterprise operations dashboard (v2)</p>
+            {lastRefreshedAt ? (
+              <p className="mt-2 text-xs text-gray-500">
+                Last refreshed: {formatLastRefreshed(lastRefreshedAt)}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {(['operations', 'engineering', 'full'] as const).map((mode) => (
@@ -103,7 +123,8 @@ export default function IngestionDashboardV2Client() {
                 key={mode}
                 type="button"
                 onClick={() => void copyReport(mode)}
-                className="rounded-md border border-indigo-400 bg-white px-3 py-1.5 text-sm font-medium text-indigo-900 shadow-sm hover:bg-indigo-50"
+                disabled={loading}
+                className="rounded-md border border-indigo-400 bg-white px-3 py-1.5 text-sm font-medium text-indigo-900 shadow-sm hover:bg-indigo-50 disabled:opacity-50"
               >
                 {copyState === mode
                   ? 'Copied'
@@ -121,18 +142,29 @@ export default function IngestionDashboardV2Client() {
             <button
               type="button"
               onClick={() => void load()}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-50"
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Refresh
+              {loading ? (
+                <>
+                  <span
+                    className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600"
+                    aria-hidden
+                  />
+                  Building diagnostics…
+                </>
+              ) : (
+                'Refresh'
+              )}
             </button>
           </div>
         </header>
 
         <LiveOperationsSummary model={model} />
-        <CurrentSnapshotRow model={model} />
         <OperationalHealthCards model={model} />
         <SloScoreboard model={model} />
         <ActiveAlertsSection model={model} />
+        <CurrentSnapshotRow model={model} />
         <EngineeringDetailsSection model={model} />
       </div>
     </div>

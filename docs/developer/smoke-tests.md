@@ -14,7 +14,7 @@ Smoke tests are quick, critical-path checks to ensure basic functionality works 
 ## Pre-Deployment Checklist
 
 Before running smoke tests, verify:
-- [ ] All required environment variables are set (see `docs/PRODUCTION_ENV.md`)
+- [ ] All required environment variables are set (see [docs/developer/env.md](./env.md))
 - [ ] Database migrations are applied (if applicable)
 - [ ] Vercel deployment completed successfully
 - [ ] Build logs show no critical errors
@@ -204,7 +204,6 @@ curl https://lootaura.com/api/health
 
 ## Related Documentation
 
-- **Production ENV**: See `docs/PRODUCTION_ENV.md` for environment variable checklist
-- **Operations**: See `docs/OPERATIONS.md` for monitoring and troubleshooting
-- **Images**: See `docs/IMAGES.md` for image upload and validation details
+- **Environment variables**: See [docs/developer/env.md](./env.md)
+- **Images**: See [docs/user/images.md](../user/images.md) for image upload and validation details
 

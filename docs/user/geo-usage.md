@@ -15,7 +15,7 @@
   - `lib/geocode.ts` (line 43)
   - `app/api/geocoding/zip/route.ts` (line 66)
 - **Validation**: Email format validated in `lib/env.ts` (Zod schema)
-- **Documentation**: Listed in `env.example` (line 69) and `docs/PRODUCTION_ENV.md`
+- **Documentation**: Listed in `env.example` and [docs/developer/env.md](./env.md)
 
 **Note**: Two different defaults exist in codebase - should be standardized to single default.
 

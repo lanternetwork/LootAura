@@ -20,7 +20,7 @@ npm run ios
 
 ## Documentation
 
-See [docs/mobile_apps.md](../../docs/mobile_apps.md) for complete documentation including:
+See [docs/user/mobile-apps.md](../../docs/user/mobile-apps.md) for complete documentation including:
 - Architecture overview
 - Configuration details
 - Testing instructions
@@ -55,7 +55,7 @@ The following assets are required in `assets/`:
 - `splash.png` (1242x2436) - Splash screen
 - `favicon.png` (48x48) - Web favicon
 
-See [docs/mobile_apps.md](../../docs/mobile_apps.md) for details on generating these assets.
+See [docs/user/mobile-apps.md](../../docs/user/mobile-apps.md) for details on generating these assets.
 
 ## EAS Build & Submit
 

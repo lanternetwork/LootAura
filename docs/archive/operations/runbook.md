@@ -316,6 +316,6 @@ Access at `/admin/tools` when debug mode enabled:
 
 ## Related Documentation
 
-- **Environment Variables**: See [docs/env.md](docs/env.md)
-- **Rate Limiting**: See [docs/OPERATIONS.md](docs/OPERATIONS.md) for detailed rate limiting guide
-- **Image Management**: See [docs/IMAGES.md](docs/IMAGES.md)
+- **Environment Variables**: See [docs/developer/env.md](../../developer/env.md)
+- **Rate Limiting**: See [OPERATIONS.md](./OPERATIONS.md) for detailed rate limiting guide
+- **Image Management**: See [docs/user/images.md](../../user/images.md)

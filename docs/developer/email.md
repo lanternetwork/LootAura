@@ -601,7 +601,7 @@ Required for unsubscribe system:
 - `SUPABASE_SERVICE_ROLE_KEY`: Service role key for database access (server-only)
 - `NEXT_PUBLIC_SITE_URL`: Base URL for constructing unsubscribe links
 
-See [Production Environment Variables](./PRODUCTION_ENV.md) for full configuration details.
+See [Environment variables](./env.md) for full configuration details.
 
 ## Related Documentation
 

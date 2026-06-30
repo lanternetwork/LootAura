@@ -17,11 +17,13 @@ import {
   evaluateIngestionSlos,
   getBlockingSloFailures,
 } from '@/lib/admin/diagnostics/v4/sloEvaluation'
-import { deriveSystemHealthLevel } from '@/lib/admin/diagnostics/v4/systemHealth'
+import { deriveSystemHealthAssessment } from '@/lib/admin/diagnostics/v4/systemHealth'
 import { minimalMissingIngestCronHealth } from '@/tests/unit/admin/minimalMissingIngestCronHealth'
 import {
   diagnosticsV4Coverage,
   diagnosticsV4Metrics,
+  productionLikeCoverage,
+  productionLikeMetrics,
   publishedNotVisibleAudit,
 } from '@/tests/unit/admin/diagnosticsV4Fixtures'
 
@@ -100,14 +102,55 @@ describe('ingestion diagnostics v4', () => {
           ...diagnosticsV4Coverage().falseExclusionAudit,
           byPrimaryBucket: {
             ...diagnosticsV4Coverage().falseExclusionAudit.byPrimaryBucket,
-            published_not_visible: 100,
+            published_not_visible: 150,
           },
         },
       })
       const visibility = buildVisibilitySnapshot(metrics, coverage)
-      expect(visibility.observationStale).toBe(80)
-      expect(visibility.trueVisibilityFailure).toBe(10)
-      expect(visibility.publishedNotVisibleTotal).toBe(100)
+      expect(visibility.observationStaleCount).toBe(80)
+      expect(visibility.trueVisibilityFailureCount).toBe(7)
+      expect(visibility.publishedNotVisibleTotal).toBe(150)
+      expect(visibility.auditedCount).toBe(100)
+      expect(visibility.classificationMode).toBe('SAMPLE_ONLY')
+    })
+
+    it('does not double-count observation_stale as true failure in small sample', () => {
+      const metrics = diagnosticsV4Metrics({
+        publishedNotVisibleDistributionAnalysis: publishedNotVisibleAudit({
+          analysis: {
+            generatedAt: '2026-06-17T12:00:00.000Z',
+            cohortTotal: 3,
+            byBucket: {
+              VISIBLE_SALE: 0,
+              NO_MATCHED_SALE: 0,
+              MISMATCH: 3,
+              ARCHIVED: 0,
+              MODERATION_HIDDEN: 0,
+              EXPIRED: 0,
+              STALE_OBSERVATION: 0,
+              OTHER: 0,
+            },
+            byReconciliationClass: {},
+            visibilityFilterZombieCount: 0,
+            observationStaleTagCount: 3,
+            publishHookCount: 0,
+          },
+        }),
+      })
+      const coverage = diagnosticsV4Coverage({
+        falseExclusionAudit: {
+          ...diagnosticsV4Coverage().falseExclusionAudit,
+          byPrimaryBucket: {
+            ...diagnosticsV4Coverage().falseExclusionAudit.byPrimaryBucket,
+            published_not_visible: 148,
+          },
+        },
+      })
+      const visibility = buildVisibilitySnapshot(metrics, coverage)
+      expect(visibility.trueVisibilityFailureCount).toBe(0)
+      expect(visibility.observationStaleCount).toBe(3)
+      expect(visibility.classificationMode).toBe('SAMPLE_ONLY')
+      expect(visibility.classificationConfidence).toBe('LOW')
     })
   })
 
@@ -164,6 +207,20 @@ describe('ingestion diagnostics v4', () => {
       })
       const bottleneck = resolvePrimaryBottleneck(metrics, coverage, [])
       expect(bottleneck.id).toBe('catalog_repair')
+      expect(bottleneck.type).toBe('BACKLOG_PRESSURE')
+    })
+
+    it('classifies refresh stale as BACKLOG_PRESSURE', () => {
+      const metrics = diagnosticsV4Metrics({ published24h: 143 })
+      const coverage = diagnosticsV4Coverage({
+        pipelineBacklog: {
+          ...diagnosticsV4Coverage().pipelineBacklog,
+          existingRefreshStale: 31_697,
+        },
+      })
+      const bottleneck = resolvePrimaryBottleneck(metrics, coverage, [])
+      expect(bottleneck.id).toBe('refresh_stale')
+      expect(bottleneck.type).toBe('BACKLOG_PRESSURE')
     })
   })
 
@@ -194,6 +251,17 @@ describe('ingestion diagnostics v4', () => {
       })
       expect(model.systemHealth).toBe('healthy')
     })
+
+    it('returns degraded not critical when warnings stack without blocking SLOs', () => {
+      const model = buildIngestionDiagnosticsModel({
+        metrics: productionLikeMetrics(),
+        coverage: productionLikeCoverage(),
+        environment: 'production',
+      })
+      expect(model.systemHealth).toBe('degraded')
+      expect(model.systemHealth).not.toBe('critical')
+      expect(getBlockingSloFailures(model.slos)).toHaveLength(0)
+    })
   })
 
   describe('scheduler health', () => {
@@ -205,7 +273,7 @@ describe('ingestion diagnostics v4', () => {
           crashLoopDetected: false,
         }),
       })
-      const rows = buildSchedulerCronHealth(coverage)
+      const rows = buildSchedulerCronHealth(diagnosticsV4Metrics(), coverage)
       const missing = rows.find((r) => r.id === 'missing_ingest')
       expect(missing?.state).toBe('ok')
       expect(missing?.lastSuccessAt).toBe('2026-06-17T11:00:00.000Z')
@@ -225,8 +293,11 @@ describe('ingestion diagnostics v4', () => {
       })
       const coverage = diagnosticsV4Coverage()
       const blocking = getBlockingSloFailures(evaluateIngestionSlos(metrics, coverage))
-      const alerts = buildComputedAlerts(metrics, coverage, blocking)
-      expect(alerts.some((a) => a.id === 'slo_publish_failed_terminal')).toBe(true)
+      const nonBlocking = evaluateIngestionSlos(metrics, coverage).filter((s) => !s.pass && !s.blocking)
+      const alerts = buildComputedAlerts(metrics, coverage, blocking, nonBlocking)
+      expect(alerts.some((a) => a.id === 'slo_publish_failed_terminal' && a.blockingUserImpact)).toBe(
+        true
+      )
       const actions = buildOperatorActions(metrics, coverage, alerts)
       expect(actions.length).toBeGreaterThan(0)
       expect(actions.length).toBeLessThanOrEqual(3)
@@ -243,8 +314,9 @@ describe('ingestion diagnostics v4', () => {
       })
       const ops = buildDiagnosticsExport(model, 'operations')
       expect(ops).toContain('Ingestion Operations Report')
-      expect(ops).toContain('## SLO Status')
-      expect(ops).not.toContain('Legacy Engineering Detail')
+      expect(ops).toContain('## SLO SUMMARY')
+      expect(ops).not.toContain('LEGACY COMPATIBILITY')
+      expect(ops).toContain('authoritative_model: v4')
     })
 
     it('engineering report is superset of legacy clipboard', () => {
@@ -262,7 +334,8 @@ describe('ingestion diagnostics v4', () => {
         copiedAt: '2026-06-17T12:00:00.000Z',
         ystmCoverage: coverage,
       })
-      expect(engineering).toContain('Legacy Engineering Detail')
+      expect(engineering).toContain('LEGACY COMPATIBILITY SECTION (non-authoritative)')
+      expect(engineering).toContain('non-authoritative')
       expect(engineering).toContain(legacy.trim())
     })
 
@@ -273,7 +346,8 @@ describe('ingestion diagnostics v4', () => {
         environment: 'preview',
       })
       const full = buildDiagnosticsExport(model, 'full')
-      expect(full).toContain('Rollout Gates')
+      expect(full).toContain('APPENDIX — Engineering Rollout Gates')
+      expect(full).toContain('TABLE OF CONTENTS')
     })
   })
 
@@ -287,7 +361,39 @@ describe('ingestion diagnostics v4', () => {
       expect(model.diagnosticsModelVersion).toBe(DIAGNOSTICS_MODEL_VERSION)
       expect(model.registry.length).toBeGreaterThan(0)
       expect(model.pipeline.length).toBe(6)
-      expect(model.operatorActions.length).toBeLessThanOrEqual(3)
+      expect(model.domainHealth.length).toBe(11)
+      expect(model.healthReasons).toBeDefined()
+      expect(model.primaryBottleneck.type).toBeDefined()
+    })
+  })
+
+  describe('enterprise hardening', () => {
+    it('warning accumulation alone does not produce critical via assessment', () => {
+      const metrics = diagnosticsV4Metrics()
+      const coverage = diagnosticsV4Coverage({
+        publishedActiveLootAuraYstmUrls: 275,
+        falseExclusionSaleIdentity: {
+          ...diagnosticsV4Coverage().falseExclusionSaleIdentity,
+          duplicateVisibleSaleClusters24h: 6,
+        },
+      })
+      const visibility = buildVisibilitySnapshot(metrics, coverage)
+      const slos = evaluateIngestionSlos(metrics, coverage)
+      const blocking = getBlockingSloFailures(slos)
+      const nonBlocking = slos.filter((s) => !s.pass && !s.blocking)
+      const alerts = buildComputedAlerts(metrics, coverage, blocking, nonBlocking)
+      const assessment = deriveSystemHealthAssessment({
+        blockingSloFailures: blocking,
+        nonBlockingSloFailures: nonBlocking,
+        alerts,
+        catalogRepairQueue: 106,
+        refreshStale: 31_697,
+        metrics,
+        visibility,
+        publishedActiveInventory: 275,
+        schedulerCrons: buildSchedulerCronHealth(metrics, coverage),
+      })
+      expect(assessment.level).not.toBe('critical')
     })
   })
 })

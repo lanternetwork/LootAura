@@ -5,6 +5,7 @@ import type {
   DuplicateHealthSnapshot,
   PipelineStageSnapshot,
   VisibilitySnapshot,
+  AlertConfidence,
 } from '@/lib/admin/diagnostics/v4/types'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
@@ -92,28 +93,94 @@ export function buildVisibilitySnapshot(
   const publishedNotVisibleTotal =
     coverage?.falseExclusionAudit.byPrimaryBucket.published_not_visible ?? 0
   const audit = metrics.publishedNotVisibleDistributionAnalysis
+  const generatedAt = metrics.generatedAt
 
-  if (audit) {
-    const analysis = audit.analysis
-    const observationStale = analysis.observationStaleTagCount
-    const trueFailure =
-      analysis.byBucket.MISMATCH +
-      analysis.byBucket.NO_MATCHED_SALE +
-      analysis.byBucket.ARCHIVED +
-      analysis.byBucket.EXPIRED +
-      analysis.byBucket.MODERATION_HIDDEN +
-      analysis.byBucket.OTHER
+  const baseAttribution = {
+    source: 'coverage_scoreboard.false_exclusion_audit.byPrimaryBucket.published_not_visible',
+    computedBy: 'buildVisibilitySnapshot',
+    freshness: generatedAt,
+    confidence: 'HIGH' as const,
+  }
+
+  if (!audit) {
     return {
-      observationStale,
-      trueVisibilityFailure: trueFailure,
       publishedNotVisibleTotal,
+      auditedCount: 0,
+      auditedCoveragePct: null,
+      observationStaleCount: publishedNotVisibleTotal > 0 ? publishedNotVisibleTotal : 0,
+      trueVisibilityFailureCount: 0,
+      unknownUnclassifiedCount: publishedNotVisibleTotal,
+      classificationConfidence: 'LOW',
+      classificationMode: 'UNAVAILABLE',
+      attribution: {
+        ...baseAttribution,
+        source: 'coverage_scoreboard.false_exclusion (no distribution audit)',
+        confidence: 'MEDIUM',
+      },
+      observationStale: publishedNotVisibleTotal,
+      trueVisibilityFailure: 0,
     }
   }
 
+  const analysis = audit.analysis
+  const auditedCount = analysis.cohortTotal
+  const auditedCoveragePct =
+    publishedNotVisibleTotal > 0
+      ? Math.round((auditedCount / publishedNotVisibleTotal) * 1000) / 10
+      : auditedCount > 0
+        ? 100
+        : null
+
+  const observationStaleCount = analysis.observationStaleTagCount
+  const mismatchNonStale = Math.max(0, analysis.byBucket.MISMATCH - analysis.observationStaleTagCount)
+  const trueVisibilityFailureCount =
+    analysis.byBucket.NO_MATCHED_SALE +
+    analysis.byBucket.ARCHIVED +
+    analysis.byBucket.EXPIRED +
+    analysis.byBucket.MODERATION_HIDDEN +
+    analysis.byBucket.OTHER +
+    mismatchNonStale
+
+  const unknownUnclassifiedCount = Math.max(0, publishedNotVisibleTotal - auditedCount)
+
+  let classificationMode: VisibilitySnapshot['classificationMode'] = 'UNAVAILABLE'
+  if (auditedCount === 0 && publishedNotVisibleTotal === 0) {
+    classificationMode = 'FULL_POPULATION'
+  } else if (auditedCount >= publishedNotVisibleTotal && publishedNotVisibleTotal > 0) {
+    classificationMode = 'FULL_POPULATION'
+  } else if (auditedCount > 0) {
+    classificationMode = 'SAMPLE_ONLY'
+  }
+
+  let classificationConfidence: AlertConfidence = 'LOW'
+  if (classificationMode === 'FULL_POPULATION') {
+    classificationConfidence = 'HIGH'
+  } else if (
+    auditedCoveragePct != null &&
+    auditedCoveragePct >= 95
+  ) {
+    classificationConfidence = 'HIGH'
+  } else if (auditedCoveragePct != null && auditedCoveragePct >= 25) {
+    classificationConfidence = 'MEDIUM'
+  }
+
   return {
-    observationStale: publishedNotVisibleTotal,
-    trueVisibilityFailure: 0,
     publishedNotVisibleTotal,
+    auditedCount,
+    auditedCoveragePct,
+    observationStaleCount,
+    trueVisibilityFailureCount,
+    unknownUnclassifiedCount,
+    classificationConfidence,
+    classificationMode,
+    attribution: {
+      source: 'published_not_visible_distribution_analysis.sample',
+      computedBy: 'buildVisibilitySnapshot',
+      freshness: audit.generatedAt,
+      confidence: classificationConfidence,
+    },
+    observationStale: observationStaleCount,
+    trueVisibilityFailure: trueVisibilityFailureCount,
   }
 }
 

@@ -6,10 +6,9 @@ import {
   buildPipelineSnapshot,
   buildVisibilitySnapshot,
 } from '@/lib/admin/diagnostics/v4/buildDomainSnapshots'
+import { buildDomainHealth } from '@/lib/admin/diagnostics/v4/domainHealth'
 import { resolvePrimaryBottleneck } from '@/lib/admin/diagnostics/v4/bottleneckResolver'
-import {
-  DIAGNOSTICS_MODEL_VERSION,
-} from '@/lib/admin/diagnostics/v4/constants'
+import { DIAGNOSTICS_MODEL_VERSION } from '@/lib/admin/diagnostics/v4/constants'
 import { INGESTION_DIAGNOSTICS_REGISTRY } from '@/lib/admin/diagnostics/v4/registry'
 import { buildSchedulerCronHealth } from '@/lib/admin/diagnostics/v4/schedulerHealth'
 import { buildSeoReadinessSnapshot } from '@/lib/admin/diagnostics/v4/seoReadiness'
@@ -19,7 +18,7 @@ import {
 } from '@/lib/admin/diagnostics/v4/sloEvaluation'
 import {
   buildTrendSummary,
-  deriveSystemHealthLevel,
+  deriveSystemHealthAssessment,
 } from '@/lib/admin/diagnostics/v4/systemHealth'
 import type {
   BuildIngestionDiagnosticsModelInput,
@@ -35,13 +34,47 @@ export function buildIngestionDiagnosticsModel(
 
   const slos = evaluateIngestionSlos(metrics, coverage)
   const blockingSloFailures = getBlockingSloFailures(slos)
-  const alerts = buildComputedAlerts(metrics, coverage, blockingSloFailures)
+  const nonBlockingSloFailures = slos.filter((s) => !s.pass && !s.blocking)
   const catalogRepair = buildCatalogRepairSnapshot(metrics, coverage)
-  const systemHealth = deriveSystemHealthLevel(
+  const visibility = buildVisibilitySnapshot(metrics, coverage)
+  const duplicates = buildDuplicateHealthSnapshot(coverage)
+  const backlogs = buildBacklogSnapshot(metrics, coverage)
+  const schedulerCrons = buildSchedulerCronHealth(metrics, coverage)
+
+  const alerts = buildComputedAlerts(
+    metrics,
+    coverage,
     blockingSloFailures,
-    alerts,
-    catalogRepair.queueTotal
+    nonBlockingSloFailures
   )
+
+  const healthAssessment = deriveSystemHealthAssessment({
+    blockingSloFailures,
+    nonBlockingSloFailures,
+    alerts,
+    catalogRepairQueue: catalogRepair.queueTotal,
+    refreshStale: backlogs.refreshStale,
+    metrics,
+    visibility,
+    publishedActiveInventory: coverage?.publishedActiveLootAuraYstmUrls ?? 0,
+    schedulerCrons,
+  })
+
+  const domainHealth = buildDomainHealth({
+    metrics,
+    coverage,
+    alerts,
+    slos,
+    catalogRepair,
+    visibility,
+    duplicates,
+    schedulerCrons,
+    backlogs: {
+      refreshStale: backlogs.refreshStale,
+      geocodeEligible: backlogs.geocodeEligible,
+    },
+  })
+
   const primaryBottleneck = resolvePrimaryBottleneck(metrics, coverage, blockingSloFailures)
   const operatorActions = buildOperatorActions(metrics, coverage, alerts)
 
@@ -52,7 +85,9 @@ export function buildIngestionDiagnosticsModel(
     metrics,
     coverage,
     registry: INGESTION_DIAGNOSTICS_REGISTRY,
-    systemHealth,
+    systemHealth: healthAssessment.level,
+    healthReasons: healthAssessment.reasons,
+    domainHealth,
     primaryBottleneck,
     operatorActions,
     alerts,
@@ -61,10 +96,10 @@ export function buildIngestionDiagnosticsModel(
     trendSummary: buildTrendSummary(coverage),
     pipeline: buildPipelineSnapshot(metrics),
     catalogRepair,
-    visibility: buildVisibilitySnapshot(metrics, coverage),
-    duplicates: buildDuplicateHealthSnapshot(coverage),
-    backlogs: buildBacklogSnapshot(metrics, coverage),
-    schedulerCrons: buildSchedulerCronHealth(coverage),
+    visibility,
+    duplicates,
+    backlogs,
+    schedulerCrons,
     seoReadiness: buildSeoReadinessSnapshot(coverage),
   }
 }

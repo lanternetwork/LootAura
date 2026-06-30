@@ -24,6 +24,20 @@ export type OperationalDomain =
 
 export type SystemHealthLevel = 'healthy' | 'degraded' | 'critical'
 
+export type AlertConfidence = 'HIGH' | 'MEDIUM' | 'LOW'
+
+export type VisibilityClassificationMode = 'FULL_POPULATION' | 'SAMPLE_ONLY' | 'UNAVAILABLE'
+
+export type BottleneckType =
+  | 'HOT_PATH_BLOCKER'
+  | 'BACKLOG_PRESSURE'
+  | 'VISIBILITY_RECONCILIATION'
+  | 'DUPLICATE_REVIEW'
+  | 'CONVERGENCE_MATURITY'
+  | 'SEO_PRODUCT_GATE'
+  | 'ENGINEERING_ROLLOUT'
+  | 'UNKNOWN'
+
 export type TrendDirection = 'up' | 'down' | 'flat' | 'unavailable'
 
 export type DiagnosticRegistryEntry = {
@@ -48,12 +62,31 @@ export type SloEvaluationRow = {
   readonly blocking: boolean
 }
 
+export type SecondaryPressure = {
+  readonly id: string
+  readonly label: string
+  readonly count: number
+}
+
 export type ResolvedBottleneck = {
   readonly id: string
   readonly label: string
   readonly reason: string
   readonly domain: OperationalDomain
+  readonly type: BottleneckType
   readonly rawBottleneck: string
+  readonly secondaryPressures: readonly SecondaryPressure[]
+}
+
+export type HealthReason = {
+  readonly id: string
+  readonly label: string
+  readonly domain: OperationalDomain
+}
+
+export type SystemHealthAssessment = {
+  readonly level: SystemHealthLevel
+  readonly reasons: readonly HealthReason[]
 }
 
 export type OperatorAction = {
@@ -66,10 +99,35 @@ export type OperatorAction = {
 export type ComputedAlert = {
   readonly id: string
   readonly severity: 'critical' | 'warning' | 'info'
+  readonly domain: OperationalDomain
+  readonly trigger: string
   readonly reason: string
+  readonly currentValue: string
+  readonly threshold: string
+  readonly confidence: AlertConfidence
   readonly affectedMetricIds: readonly string[]
   readonly owner: string
   readonly recommendedAction: string
+  readonly blockingUserImpact: boolean
+}
+
+export type DomainHealthRow = {
+  readonly id: string
+  readonly label: string
+  readonly domain: OperationalDomain
+  readonly status: SystemHealthLevel
+  readonly primaryReason: string
+  readonly currentMetric: string
+  readonly threshold: string
+  readonly owner: string
+  readonly recommendedAction: string
+}
+
+export type MetricAttribution = {
+  readonly source: string
+  readonly computedBy: string
+  readonly freshness: string
+  readonly confidence: AlertConfidence
 }
 
 export type TrendSnapshot = {
@@ -78,16 +136,24 @@ export type TrendSnapshot = {
   readonly label7d: string
 }
 
+export type SchedulerCronState = 'ok' | 'late' | 'failed' | 'crash_loop' | 'unknown'
+
 export type SchedulerCronRow = {
   readonly id: string
   readonly displayName: string
   readonly owner: string
   readonly expectedCadenceMinutes: number | null
+  readonly lastStartedAt: string | null
+  readonly lastCompletedAt: string | null
   readonly lastSuccessAt: string | null
+  readonly lastErrorAt: string | null
+  readonly lastErrorCode: string | null
+  readonly durationMs: number | null
   readonly minutesSinceSuccess: number | null
-  readonly state: 'ok' | 'stale' | 'crash_loop' | 'unknown'
+  readonly state: SchedulerCronState
   readonly failureCount24h: number | null
   readonly crashLoopDetected: boolean
+  readonly telemetryUnavailableReason: string | null
 }
 
 export type PipelineStageSnapshot = {
@@ -108,9 +174,19 @@ export type CatalogRepairSnapshot = {
 }
 
 export type VisibilitySnapshot = {
-  readonly observationStale: number
-  readonly trueVisibilityFailure: number
   readonly publishedNotVisibleTotal: number
+  readonly auditedCount: number
+  readonly auditedCoveragePct: number | null
+  readonly observationStaleCount: number
+  readonly trueVisibilityFailureCount: number
+  readonly unknownUnclassifiedCount: number
+  readonly classificationConfidence: AlertConfidence
+  readonly classificationMode: VisibilityClassificationMode
+  readonly attribution: MetricAttribution
+  /** @deprecated use observationStaleCount */
+  readonly observationStale: number
+  /** @deprecated use trueVisibilityFailureCount */
+  readonly trueVisibilityFailure: number
 }
 
 export type DuplicateHealthSnapshot = {
@@ -146,6 +222,8 @@ export type IngestionDiagnosticsModel = {
   readonly coverage: YstmCoverageMetricsResponse | null
   readonly registry: readonly DiagnosticRegistryEntry[]
   readonly systemHealth: SystemHealthLevel
+  readonly healthReasons: readonly HealthReason[]
+  readonly domainHealth: readonly DomainHealthRow[]
   readonly primaryBottleneck: ResolvedBottleneck
   readonly operatorActions: readonly OperatorAction[]
   readonly alerts: readonly ComputedAlert[]

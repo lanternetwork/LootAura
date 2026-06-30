@@ -267,3 +267,118 @@ export function publishedNotVisibleAudit(
     ...overrides,
   }
 }
+
+export function productionLikeMetrics(): IngestionMetricsResponse {
+  return diagnosticsV4Metrics({
+    published24h: 143,
+    failureBreakdown: {
+      needs_check: 207,
+      publish_failed: 4,
+      expired: 0,
+      ready: 10,
+      publishing: 0,
+    },
+    publishedNotVisibleDistributionAnalysis: publishedNotVisibleAudit({
+      analysis: {
+        generatedAt: '2026-06-30T03:02:53.864Z',
+        cohortTotal: 3,
+        byBucket: {
+          VISIBLE_SALE: 0,
+          NO_MATCHED_SALE: 0,
+          MISMATCH: 3,
+          ARCHIVED: 0,
+          MODERATION_HIDDEN: 0,
+          EXPIRED: 0,
+          STALE_OBSERVATION: 0,
+          OTHER: 0,
+        },
+        byReconciliationClass: {},
+        visibilityFilterZombieCount: 0,
+        observationStaleTagCount: 3,
+        publishHookCount: 0,
+      },
+    }),
+    volume: {
+      ...diagnosticsV4Metrics().volume,
+      fetch: {
+        ...diagnosticsV4Metrics().volume.fetch,
+        crawlSkipTaxonomy24h: {
+          ...emptyCrawlSkipTaxonomyRollup(),
+          total: 14_728,
+          benign: 7_092,
+          suspicious: 5_798,
+          operational: 1_838,
+        },
+      },
+      publish: {
+        ...diagnosticsV4Metrics().volume.publish,
+        publishSucceeded24h: 113,
+        publishAttempted24h: 113,
+      },
+    },
+    funnel: {
+      ...diagnosticsV4Metrics().funnel,
+      '24h': {
+        ...diagnosticsV4Metrics().funnel['24h'],
+        stages: diagnosticsV4Metrics()
+          .funnel['24h'].stages.map((s) =>
+            s.id === 'published' ? { ...s, count: 113 } : s
+          ),
+        detailFirst: {
+          ...diagnosticsV4Metrics().funnel['24h'].detailFirst,
+          attempted: 12_961,
+          succeeded: 12_786,
+          providerGeocodeBypassRate: 0.987,
+        },
+      },
+    },
+  })
+}
+
+export function productionLikeCoverage(): YstmCoverageMetricsResponse {
+  return diagnosticsV4Coverage({
+    coveragePct: 97,
+    publishedActiveLootAuraYstmUrls: 275,
+    catalogRepair: {
+      ...diagnosticsV4Coverage().catalogRepair,
+      repairQueueTotal: 106,
+    },
+    pipelineBacklog: {
+      ...diagnosticsV4Coverage().pipelineBacklog,
+      catalogRepairQueue: 106,
+      existingRefreshStale: 31_697,
+    },
+    falseExclusionAudit: {
+      ...diagnosticsV4Coverage().falseExclusionAudit,
+      byPrimaryBucket: {
+        ...diagnosticsV4Coverage().falseExclusionAudit.byPrimaryBucket,
+        published_not_visible: 148,
+      },
+    },
+    falseExclusionSaleIdentity: {
+      ...diagnosticsV4Coverage().falseExclusionSaleIdentity,
+      duplicateVisibleSaleClusters24h: 6,
+    },
+    saleInstanceShadowReplay: {
+      ...diagnosticsV4Coverage().saleInstanceShadowReplay,
+      divergenceOldSuppressNewPublishCount: 55,
+    },
+    crossProviderConvergence: {
+      ...diagnosticsV4Coverage().crossProviderConvergence,
+      sloAttainment: {
+        requiredConsecutiveDays: 14,
+        consecutiveZeroDuplicateDays: 2,
+        latestDayQualifies: true,
+        programComplete: false,
+      },
+    },
+    canonicalSaleInstance: {
+      ...diagnosticsV4Coverage().canonicalSaleInstance,
+      canonicalCoveragePct: 92.8,
+    },
+    actionableMissingValid: {
+      ...diagnosticsV4Coverage().actionableMissingValid!,
+      effectiveMissingValidYstmUrls: 50,
+    },
+  })
+}

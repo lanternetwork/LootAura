@@ -237,7 +237,7 @@ All image URLs must:
 - Use HTTPS protocol
 - Not contain external domains
 
-See [docs/IMAGES.md](docs/IMAGES.md) for complete image management documentation.
+See [docs/user/images.md](../../user/images.md) for complete image management documentation.
 
 ## Sentry Monitoring
 

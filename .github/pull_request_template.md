@@ -23,9 +23,7 @@ Brief description of changes made.
 - [ ] No console.log statements left in code
 
 ## Documentation
-- [ ] plan.md updated (if applicable)
-- [ ] README.md updated (if applicable)
-- [ ] Code comments added/updated (if applicable)
+- [ ] Documentation updated if needed (see [docs/README.md](../README.md))
 
 ## Additional Notes
 Any additional information that reviewers should know.

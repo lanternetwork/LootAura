@@ -13,9 +13,9 @@ Operators monitor alerts, not tune the system daily.
 
 **Related docs**
 
-- Day-to-day cron budgets and scoreboard APIs: [`docs/OPERATIONS.md`](./OPERATIONS.md) — *external marketplace 90% product coverage*
+- Day-to-day cron budgets and scoreboard APIs: [`docs/archive/operations/OPERATIONS.md`](../operations/OPERATIONS.md) — *external marketplace 90% product coverage*
 - Long-form coverage spec (Phases 1–7 / G4): [`docs/EXTERNAL_SOURCE_COVERAGE_SPEC.md`](./EXTERNAL_SOURCE_COVERAGE_SPEC.md)
-- Cross-provider convergence (Phases A–E): [`docs/OPERATIONS.md`](./OPERATIONS.md) — *Cross-provider sale convergence*
+- Cross-provider convergence (Phases A–E): [`docs/archive/operations/OPERATIONS.md`](../operations/OPERATIONS.md) — *Cross-provider sale convergence*
 - Crawl-skip taxonomy and false-exclusion audit: [`docs/EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md`](./EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md)
 - Refresh backlog + needs_check policy runbook (Phases 6–7): [`docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md`](./YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md)
 

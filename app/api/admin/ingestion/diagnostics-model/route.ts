@@ -12,7 +12,7 @@ import {
   emptyCoveragePerformance,
 } from '@/lib/admin/diagnostics/v4/performance/buildDiagnosticsPerformance'
 import { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
-import { elapsedMs, timeAsync } from '@/lib/admin/diagnostics/v4/performance/timing'
+import { elapsedMs, monotonicNow, timeAsync } from '@/lib/admin/diagnostics/v4/performance/timing'
 import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +22,7 @@ function jsonError(status: number, code: string, message: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const apiRouteStart = performance.now()
+  const apiRouteStart = monotonicNow()
 
   try {
     await assertAdminOrThrow(request)
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const buildStart = performance.now()
+    const buildStart = monotonicNow()
     const writeCounter = new DiagnosticsWriteCounter()
     const coverageTimings = emptyCoveragePerformance()
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         timeAsync(() => buildIngestionCoreMetricsResponse()),
         timeAsync(() => buildIngestionDiagnosticsMetricsResponse()),
         (async () => {
-          const coverageStart = performance.now()
+          const coverageStart = monotonicNow()
           const board = await buildYstmCoverageScoreboard(getAdminDb(), {
             writeCounter,
             coverage: coverageTimings,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const coverageScoreboardDurationMs = coverageBoard.durationMs
 
-    const mergeStart = performance.now()
+    const mergeStart = monotonicNow()
     const metrics = mergeIngestionMetricsWithDiagnostics(core, diagnostics)
     const mergeDurationMs = elapsedMs(mergeStart)
 
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? request.nextUrl.hostname ?? 'unknown'
     const generatedAt = new Date().toISOString()
 
-    const modelBuildStart = performance.now()
+    const modelBuildStart = monotonicNow()
     const model = buildIngestionDiagnosticsModel({
       metrics,
       coverage,

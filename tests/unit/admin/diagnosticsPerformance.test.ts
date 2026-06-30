@@ -8,11 +8,9 @@ import {
   deriveSingleSpanSlowest,
 } from '@/lib/admin/diagnostics/v4/performance/deriveSlowestStage'
 import { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
-import { buildDiagnosticsPerformanceSection } from '@/lib/admin/diagnostics/v4/export/buildDiagnosticsPerformanceSection'
 import { buildDiagnosticsExport } from '@/lib/admin/diagnostics/v4/export/buildDiagnosticsExport'
+import { buildDiagnosticsPerformanceSection } from '@/lib/admin/diagnostics/v4/export/buildDiagnosticsPerformanceSection'
 import { buildIngestionDiagnosticsModel } from '@/lib/admin/diagnostics/v4/buildIngestionDiagnosticsModel'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { DiagnosticsPerformanceCard } from '@/app/admin/ingestion/v2/DiagnosticsPerformanceCard'
 import {
   diagnosticsV4Coverage,
   diagnosticsV4Metrics,
@@ -113,20 +111,23 @@ describe('diagnostics performance instrumentation', () => {
     })
   })
 
-  describe('DiagnosticsPerformanceCard', () => {
-    it('renders performance summary when data is present', () => {
-      const html = renderToStaticMarkup(
-        <DiagnosticsPerformanceCard performance={samplePerformance()} />
+  describe('DiagnosticsPerformanceCard content', () => {
+    it('operations performance section includes dashboard card fields', () => {
+      const section = buildDiagnosticsPerformanceSection(
+        {
+          ...buildIngestionDiagnosticsModel({
+            metrics: diagnosticsV4Metrics(),
+            coverage: diagnosticsV4Coverage(),
+            environment: 'preview',
+          }),
+          performance: samplePerformance(),
+        },
+        'operations'
       )
-      expect(html).toContain('Diagnostics Performance')
-      expect(html).toContain('4,800 ms')
-      expect(html).toContain('coverage_scoreboard')
-      expect(html).toContain('Write count')
-    })
-
-    it('renders unavailable state without performance', () => {
-      const html = renderToStaticMarkup(<DiagnosticsPerformanceCard performance={undefined} />)
-      expect(html).toContain('Timing data unavailable')
+      expect(section.join('\n')).toContain('total duration')
+      expect(section.join('\n')).toContain('4,800 ms')
+      expect(section.join('\n')).toContain('coverage_scoreboard')
+      expect(section.join('\n')).toContain('json payload size')
     })
   })
 

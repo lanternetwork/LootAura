@@ -100,7 +100,7 @@ import type { MissingIngestCronHealth } from '@/lib/admin/evaluateMissingIngestC
 import { loadMissingIngestCronHealth } from '@/lib/admin/loadMissingIngestCronHealth'
 import type { CoverageScoreboardPerformanceSink } from '@/lib/admin/diagnostics/v4/performance/scoreboardPerformanceSink'
 import { emptyCoveragePerformance } from '@/lib/admin/diagnostics/v4/performance/buildDiagnosticsPerformance'
-import { elapsedMs, timeAsync, timeSync } from '@/lib/admin/diagnostics/v4/performance/timing'
+import { elapsedMs, monotonicNow, timeAsync, timeSync } from '@/lib/admin/diagnostics/v4/performance/timing'
 import type { ShadowReplayPerformanceSink } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
 
 export type YstmCoverageTrendPoint = {
@@ -189,7 +189,7 @@ export async function buildYstmCoverageScoreboard(
   admin: ReturnType<typeof getAdminDb>,
   performanceSink?: CoverageScoreboardPerformanceSink
 ): Promise<YstmCoverageScoreboard> {
-  const scoreboardStart = performance.now()
+  const scoreboardStart = monotonicNow()
   const coveragePerf = performanceSink?.coverage ?? emptyCoveragePerformance()
   const writeCounter = performanceSink?.writeCounter
   const now = new Date()
@@ -216,7 +216,7 @@ export async function buildYstmCoverageScoreboard(
     computeDurationMs: 0,
     persistDurationMs: 0,
   }
-  const parallelStart = performance.now()
+  const parallelStart = monotonicNow()
   const [
     [agg, aggMs],
     publishedIndex,
@@ -354,7 +354,7 @@ export async function buildYstmCoverageScoreboard(
   )
   coveragePerf.false_exclusion_sale_identity_duration_ms = identityMs
 
-  const bootstrapStart = performance.now()
+  const bootstrapStart = monotonicNow()
   let coverageBootstrap = await fetchCoverageBootstrapState(admin)
   const exitCriteriaPreview = evaluateCoverageBootstrapExitCriteria({
     coveragePct,

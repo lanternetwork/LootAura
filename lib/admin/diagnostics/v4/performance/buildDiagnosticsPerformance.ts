@@ -19,7 +19,7 @@ export type BuildIngestionDiagnosticsPerformanceInput = {
   readonly mergeDurationMs: number
   readonly modelBuildDurationMs: number
   readonly jsonPayloadBytes: number | null
-  readonly coverage: IngestionDiagnosticsCoveragePerformance
+  readonly coverage: MutableCoveragePerformance
   readonly writeCounter: DiagnosticsWriteCounter
 }
 

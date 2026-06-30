@@ -10,7 +10,7 @@ import {
 } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
 import { fromBase, type getAdminDb } from '@/lib/supabase/clients'
 import type { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
-import { elapsedMs } from '@/lib/admin/diagnostics/v4/performance/timing'
+import { elapsedMs, monotonicNow } from '@/lib/admin/diagnostics/v4/performance/timing'
 
 type MissingObservationRow = {
   canonical_url: string
@@ -59,7 +59,7 @@ export async function buildSaleInstanceShadowReplayReport(
 ): Promise<SaleInstanceShadowReplayReport> {
   const nowIso = now.toISOString()
   const urls = missingRows.map((r) => r.canonical_url)
-  const computeStart = performance.now()
+  const computeStart = monotonicNow()
   const ingestedByUrl = await loadExtendedIngestedByUrls(admin, urls)
 
   const replayRows: SaleInstanceShadowReplayRow[] = []
@@ -103,7 +103,7 @@ export async function buildSaleInstanceShadowReplayReport(
   }
 
   const computeDurationMs = elapsedMs(computeStart)
-  const persistStart = performance.now()
+  const persistStart = monotonicNow()
   await persistSaleInstanceShadowReplays(admin, replayRows, options?.writeCounter)
   const persistDurationMs = elapsedMs(persistStart)
   if (options?.performance) {

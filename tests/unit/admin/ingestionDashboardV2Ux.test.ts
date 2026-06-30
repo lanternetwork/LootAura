@@ -5,11 +5,17 @@ import {
   diagnosticsV4Metrics,
 } from '@/tests/unit/admin/diagnosticsV4Fixtures'
 import {
+  composeCurrentStatusSentence,
+  countAlertsBySeverity,
+  formatRecommendationDisplay,
+  pipelineCardPrimaryMetric,
+  pipelineCardSupportingMetric,
   pipelineCardTone,
   resolveInventorySubtitle,
   resolveTopRecommendation,
   schedulerHealthyCount,
   sloTone,
+  statusLabelForTone,
 } from '@/app/admin/ingestion/v2/dashboardUxHelpers'
 
 describe('ingestion dashboard v2 UX helpers', () => {
@@ -82,6 +88,78 @@ describe('ingestion dashboard v2 UX helpers', () => {
   it('counts scheduler healthy rows', () => {
     const model = baseModel()
     expect(schedulerHealthyCount(model.schedulerCrons)).toBeGreaterThanOrEqual(0)
+  })
+
+  it('formats recommendation display with capitalization and softened address phrasing', () => {
+    expect(formatRecommendationDisplay('address catalog backlog')).toBe('Review catalog backlog')
+    expect(formatRecommendationDisplay('investigate queue')).toBe('Investigate queue')
+  })
+
+  it('maps status tone to human labels', () => {
+    expect(statusLabelForTone('green')).toBe('Healthy')
+    expect(statusLabelForTone('yellow')).toBe('Needs Attention')
+    expect(statusLabelForTone('red')).toBe('Critical')
+  })
+
+  it('splits pipeline card metrics into primary and supporting lines', () => {
+    const model = baseModel()
+    expect(pipelineCardPrimaryMetric(model)).toMatch(/^Parser /)
+    expect(pipelineCardSupportingMetric(model)).toMatch(/^Publish failures: /)
+  })
+
+  it('counts alerts by severity', () => {
+    const counts = countAlertsBySeverity([
+      {
+        id: 'a',
+        severity: 'critical' as const,
+        domain: 'catalog_repair' as const,
+        trigger: 't',
+        reason: 'r',
+        currentValue: '1',
+        threshold: '0',
+        confidence: 'HIGH' as const,
+        affectedMetricIds: [],
+        owner: 'o',
+        recommendedAction: 'act',
+        blockingUserImpact: true,
+      },
+      {
+        id: 'b',
+        severity: 'warning' as const,
+        domain: 'visibility_coverage' as const,
+        trigger: 't',
+        reason: 'r',
+        currentValue: '1',
+        threshold: '0',
+        confidence: 'MEDIUM' as const,
+        affectedMetricIds: [],
+        owner: 'o',
+        recommendedAction: 'act',
+        blockingUserImpact: false,
+      },
+      {
+        id: 'c',
+        severity: 'info' as const,
+        domain: 'data_quality' as const,
+        trigger: 't',
+        reason: 'r',
+        currentValue: '1',
+        threshold: '0',
+        confidence: 'LOW' as const,
+        affectedMetricIds: [],
+        owner: 'o',
+        recommendedAction: 'act',
+        blockingUserImpact: false,
+      },
+    ])
+    expect(counts).toEqual({ critical: 1, warning: 1, info: 1 })
+  })
+
+  it('composes current status sentence without duplicating hero reason', () => {
+    const model = baseModel()
+    const sentence = composeCurrentStatusSentence(model)
+    expect(sentence).toContain('Pipeline operating normally')
+    expect(sentence.length).toBeGreaterThan(0)
   })
 
   it('buildIngestionDiagnosticsModel semantics unchanged', () => {

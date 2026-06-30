@@ -3,12 +3,14 @@ import { OperationalHealthCard } from '@/app/admin/ingestion/v2/OperationalHealt
 import {
   findDomain,
   healthTone,
-  pipelineCardMetric,
+  pipelineCardPrimaryMetric,
+  pipelineCardSupportingMetric,
   pipelineCardSummary,
   pipelineCardThreshold,
   pipelineCardTone,
   schedulerCardTone,
   schedulerHealthyCount,
+  statusLabelForTone,
 } from '@/app/admin/ingestion/v2/dashboardUxHelpers'
 
 export function OperationalHealthCards({ model }: { model: IngestionDiagnosticsModel }) {
@@ -18,17 +20,18 @@ export function OperationalHealthCards({ model }: { model: IngestionDiagnosticsM
   const duplicates = findDomain(model, 'duplicate_detection')
   const scheduler = findDomain(model, 'scheduler')
 
+  const pipelineTone = pipelineCardTone(model)
+
   return (
-    <section className="mb-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">
-        Operational Health
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+    <section className="mb-6">
+      <h2 className="mb-4 text-base font-bold text-gray-900">Operational Health</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <OperationalHealthCard
           title="Pipeline"
-          subtitle="Hot-path ingestion"
-          tone={pipelineCardTone(model)}
-          metric={pipelineCardMetric(model)}
+          tone={pipelineTone}
+          statusLabel={statusLabelForTone(pipelineTone)}
+          primaryMetric={pipelineCardPrimaryMetric(model)}
+          supportingMetric={pipelineCardSupportingMetric(model)}
           threshold={pipelineCardThreshold(model)}
           summary={pipelineCardSummary(model)}
         />
@@ -36,8 +39,10 @@ export function OperationalHealthCards({ model }: { model: IngestionDiagnosticsM
           <OperationalHealthCard
             title="Catalog Repair"
             tone={healthTone(catalog.status)}
-            metric={catalog.currentMetric}
-            threshold={catalog.threshold}
+            statusLabel={statusLabelForTone(healthTone(catalog.status))}
+            primaryMetric={`${model.catalogRepair.queueTotal} queue`}
+            supportingMetric={`${model.catalogRepair.needsCheck} needs_check`}
+            threshold={`Target ${catalog.threshold}`}
             summary={catalog.primaryReason}
           />
         ) : null}
@@ -45,20 +50,24 @@ export function OperationalHealthCards({ model }: { model: IngestionDiagnosticsM
           <OperationalHealthCard
             title="Visibility"
             tone={healthTone(visibility.status)}
-            metric={`${model.visibility.trueVisibilityFailureCount} failures`}
-            threshold={visibility.threshold}
-            summary={`${model.visibility.classificationMode} · ${model.visibility.observationStaleCount} obs stale`}
+            statusLabel={statusLabelForTone(healthTone(visibility.status))}
+            primaryMetric={`${model.visibility.trueVisibilityFailureCount} failures`}
+            supportingMetric={`${model.visibility.observationStaleCount} obs stale`}
+            threshold={`Target ${visibility.threshold}`}
+            summary={visibility.primaryReason}
           />
         ) : null}
         {coverage ? (
           <OperationalHealthCard
             title="Coverage"
             tone={healthTone(coverage.status)}
-            metric={
+            statusLabel={statusLabelForTone(healthTone(coverage.status))}
+            primaryMetric={
               model.coverage?.coveragePct != null
                 ? `${model.coverage.coveragePct.toFixed(1)}%`
                 : coverage.currentMetric
             }
+            supportingMetric={`Target ${coverage.threshold}`}
             threshold={coverage.threshold}
             summary={coverage.primaryReason}
           />
@@ -67,17 +76,21 @@ export function OperationalHealthCards({ model }: { model: IngestionDiagnosticsM
           <OperationalHealthCard
             title="Duplicates"
             tone={healthTone(duplicates.status)}
-            metric={`Canonical ${model.duplicates.canonicalPublishClusters}`}
-            threshold={duplicates.threshold}
-            summary={`${model.duplicates.visibleDuplicateClusters} visible clusters`}
+            statusLabel={statusLabelForTone(healthTone(duplicates.status))}
+            primaryMetric={`${model.duplicates.canonicalPublishClusters} canonical`}
+            supportingMetric={`${model.duplicates.visibleDuplicateClusters} visible clusters`}
+            threshold={`Target ${duplicates.threshold}`}
+            summary={duplicates.primaryReason}
           />
         ) : null}
         {scheduler ? (
           <OperationalHealthCard
             title="Scheduler"
             tone={schedulerCardTone(model)}
-            metric={`${schedulerHealthyCount(model.schedulerCrons)} / ${model.schedulerCrons.length} Healthy`}
-            threshold={scheduler.threshold}
+            statusLabel={statusLabelForTone(schedulerCardTone(model))}
+            primaryMetric={`${schedulerHealthyCount(model.schedulerCrons)} / ${model.schedulerCrons.length} healthy`}
+            supportingMetric={scheduler.primaryReason}
+            threshold={`Target ${scheduler.threshold}`}
             summary={scheduler.primaryReason}
           />
         ) : null}

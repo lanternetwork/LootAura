@@ -1,5 +1,5 @@
 import type { IngestionDiagnosticsModel } from '@/lib/admin/diagnostics/v4/types'
-import { sloTone, TONE_TEXT } from '@/app/admin/ingestion/v2/dashboardUxHelpers'
+import { SLO_ROW_BG, sloTone, TONE_TEXT } from '@/app/admin/ingestion/v2/dashboardUxHelpers'
 
 function sloIcon(pass: boolean, blocking: boolean): string {
   if (pass) return '✔'
@@ -9,10 +9,8 @@ function sloIcon(pass: boolean, blocking: boolean): string {
 
 export function SloScoreboard({ model }: { model: IngestionDiagnosticsModel }) {
   return (
-    <section className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">
-        SLO Scoreboard
-      </h2>
+    <section className="mb-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-4 text-base font-bold text-gray-900">SLO Scoreboard</h2>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[36rem] text-sm">
           <thead>
@@ -28,14 +26,17 @@ export function SloScoreboard({ model }: { model: IngestionDiagnosticsModel }) {
             {model.slos.map((slo) => {
               const tone = sloTone(slo)
               return (
-                <tr key={slo.id} className="border-b border-gray-100">
-                  <td className={`py-2 pr-3 font-semibold ${TONE_TEXT[tone]}`}>
+                <tr
+                  key={slo.id}
+                  className={`border-b border-gray-100 ${SLO_ROW_BG[tone]}`.trim()}
+                >
+                  <td className={`py-2.5 pr-3 font-semibold ${TONE_TEXT[tone]}`}>
                     {sloIcon(slo.pass, slo.blocking)}
                   </td>
-                  <td className="py-2 pr-3">{slo.label}</td>
-                  <td className="py-2 pr-3 tabular-nums">{slo.actual}</td>
-                  <td className="py-2 pr-3 tabular-nums">{slo.target}</td>
-                  <td className="py-2">{slo.blocking ? 'Yes' : 'No'}</td>
+                  <td className="py-2.5 pr-3">{slo.label}</td>
+                  <td className="py-2.5 pr-3 tabular-nums">{slo.actual}</td>
+                  <td className="py-2.5 pr-3 tabular-nums">{slo.target}</td>
+                  <td className="py-2.5">{slo.blocking ? 'Yes' : 'No'}</td>
                 </tr>
               )
             })}

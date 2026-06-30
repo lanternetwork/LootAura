@@ -1,75 +1,72 @@
-import type { ReactNode } from 'react'
 import type { IngestionDiagnosticsModel } from '@/lib/admin/diagnostics/v4/types'
 import { formatSystemHealthLabel } from '@/lib/admin/diagnostics/v4/systemHealth'
 import {
   bottleneckCountLabel,
+  composeCurrentStatusSentence,
+  formatRecommendationDisplay,
+  healthStatusEmoji,
   healthTone,
-  resolveInventorySubtitle,
   resolveTopRecommendation,
   TONE_BG,
-  TONE_BORDER,
-  TONE_PILL,
+  TONE_BORDER_STRONG,
   TONE_TEXT,
 } from '@/app/admin/ingestion/v2/dashboardUxHelpers'
 
-function SummaryTile({
-  title,
-  tone,
-  children,
-}: {
-  title: string
-  tone: ReturnType<typeof healthTone>
-  children: ReactNode
-}) {
-  return (
-    <article className={`rounded-lg border p-4 shadow-sm ${TONE_BORDER[tone]} ${TONE_BG[tone]}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-600">{title}</h2>
-      <div className="mt-3">{children}</div>
-    </article>
-  )
-}
-
 export function LiveOperationsSummary({ model }: { model: IngestionDiagnosticsModel }) {
-  const healthToneValue = healthTone(model.systemHealth)
+  const tone = healthTone(model.systemHealth)
   const bottleneck = model.primaryBottleneck
   const countLabel = bottleneckCountLabel(model)
+  const heroSummary = model.healthReasons[0]?.label ?? 'System operating normally.'
+  const recommendation = formatRecommendationDisplay(resolveTopRecommendation(model))
 
   return (
-    <section className="mb-4 grid gap-4 lg:grid-cols-4">
-      <SummaryTile title="Overall Health" tone={healthToneValue}>
-        <span
-          className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${TONE_PILL[healthToneValue]}`}
-        >
-          {formatSystemHealthLabel(model.systemHealth)}
-        </span>
-        <p className={`mt-3 text-sm ${TONE_TEXT[healthToneValue]}`}>
-          {model.healthReasons[0]?.label ?? 'No active health warnings'}
-        </p>
-      </SummaryTile>
-
-      <SummaryTile title="Inventory Flow" tone={model.metrics.published24h > 0 ? 'green' : 'yellow'}>
-        <p className="text-3xl font-bold tabular-nums">{model.metrics.published24h.toLocaleString()}</p>
-        <p className="text-sm text-gray-600">Published (24h)</p>
-        <p className="mt-2 text-sm text-gray-700">{resolveInventorySubtitle(model)}</p>
-      </SummaryTile>
-
-      <SummaryTile
-        title="Primary Bottleneck"
-        tone={model.systemHealth === 'healthy' ? 'gray' : healthToneValue}
+    <section className="mb-6 space-y-4">
+      <article
+        className={`rounded-xl p-6 shadow-md ${TONE_BORDER_STRONG[tone]} ${TONE_BG[tone]}`}
+        aria-label="System status"
       >
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-          {bottleneck.type.replace(/_/g, ' ')}
-        </p>
-        <p className="mt-1 text-lg font-semibold">{bottleneck.label}</p>
-        {countLabel ? (
-          <p className="text-sm font-medium tabular-nums text-gray-800">{countLabel}</p>
-        ) : null}
-        <p className="mt-2 text-sm text-gray-700">{bottleneck.reason}</p>
-      </SummaryTile>
+        <p className="text-xs font-bold uppercase tracking-widest text-gray-600">System Status</p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <span className="text-4xl leading-none" aria-hidden>
+            {healthStatusEmoji(model.systemHealth)}
+          </span>
+          <span className={`text-3xl font-bold tracking-tight ${TONE_TEXT[tone]}`}>
+            {formatSystemHealthLabel(model.systemHealth)}
+          </span>
+        </div>
+        <p className={`mt-4 max-w-3xl text-lg leading-snug ${TONE_TEXT[tone]}`}>{heroSummary}</p>
+      </article>
 
-      <SummaryTile title="Top Recommendation" tone="blue">
-        <p className="text-sm leading-relaxed text-indigo-950">{resolveTopRecommendation(model)}</p>
-      </SummaryTile>
+      <div className="rounded-lg border-2 border-indigo-300 bg-indigo-50 px-5 py-4 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-wide text-indigo-800">Recommended action</p>
+        <p className="mt-2 text-base font-medium leading-snug text-indigo-950">{recommendation}</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">
+        <div>
+          <span className="font-semibold tabular-nums text-gray-900">
+            {model.metrics.published24h.toLocaleString()}
+          </span>
+          <span className="text-gray-600"> published (24h)</span>
+        </div>
+        <span className="hidden text-gray-300 sm:inline" aria-hidden>
+          |
+        </span>
+        <div>
+          <span className="font-semibold text-gray-900">{bottleneck.label}</span>
+          <span className="text-gray-600"> · primary bottleneck</span>
+          {countLabel ? (
+            <span className="text-gray-600"> · {countLabel}</span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Current Status</p>
+        <p className="mt-2 text-sm leading-relaxed text-gray-800">
+          {composeCurrentStatusSentence(model)}
+        </p>
+      </div>
     </section>
   )
 }

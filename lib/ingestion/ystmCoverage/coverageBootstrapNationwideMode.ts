@@ -5,6 +5,9 @@ import {
 } from '@/lib/ingestion/ystmCoverage/coverageBudgetProfiles'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import type { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
+
+const ORCHESTRATION_STATE_TABLE = 'ingestion_orchestration_state'
 
 export const COVERAGE_BOOTSTRAP_STATE_KEY = 'coverage_bootstrap_nationwide'
 
@@ -124,7 +127,8 @@ export async function setCoverageBootstrapEnabled(
     enabled: boolean
     reason: CoverageBootstrapDisabledReason
     at?: Date
-  }
+  },
+  writeCounter?: DiagnosticsWriteCounter
 ): Promise<CoverageBootstrapState> {
   const at = params.at ?? new Date()
   const iso = at.toISOString()
@@ -142,7 +146,7 @@ export async function setCoverageBootstrapEnabled(
     patch.coverage_bootstrap_disabled_reason = params.reason
   }
 
-  const { data: updated, error: updateError } = await fromBase(admin, 'ingestion_orchestration_state')
+  const { data: updated, error: updateError } = await fromBase(admin, ORCHESTRATION_STATE_TABLE)
     .update(patch)
     .eq('key', COVERAGE_BOOTSTRAP_STATE_KEY)
     .select(
@@ -167,10 +171,13 @@ export async function setCoverageBootstrapEnabled(
       insertRow.coverage_bootstrap_disabled_at = iso
       insertRow.coverage_bootstrap_disabled_reason = params.reason
     }
-    const { error: insertError } = await fromBase(admin, 'ingestion_orchestration_state').insert(insertRow)
+    const { error: insertError } = await fromBase(admin, ORCHESTRATION_STATE_TABLE).insert(insertRow)
     if (insertError) {
       throw new Error(insertError.message)
     }
+    writeCounter?.recordUpdate(ORCHESTRATION_STATE_TABLE)
+  } else {
+    writeCounter?.recordUpdate(ORCHESTRATION_STATE_TABLE)
   }
 
   logger.info('Coverage bootstrap nationwide mode updated', {
@@ -232,7 +239,8 @@ export function evaluateCoverageBootstrapFetchPressureDisable(
 
 export async function maybeAutoDisableCoverageBootstrap(
   admin: ReturnType<typeof getAdminDb>,
-  snapshot: CoverageBootstrapExitCriteriaSnapshot
+  snapshot: CoverageBootstrapExitCriteriaSnapshot,
+  writeCounter?: DiagnosticsWriteCounter
 ): Promise<{ disabled: boolean; reasons: string[] }> {
   const state = await fetchCoverageBootstrapState(admin)
   if (!state.enabled) {
@@ -242,11 +250,15 @@ export async function maybeAutoDisableCoverageBootstrap(
   const nowMs = snapshot.nowMs ?? Date.now()
 
   if (evaluateCoverageBootstrapFetchPressureDisable(snapshot.fetchFailureRate24h)) {
-    await setCoverageBootstrapEnabled(admin, {
-      enabled: false,
-      reason: 'fetch_pressure',
-      at: new Date(nowMs),
-    })
+    await setCoverageBootstrapEnabled(
+      admin,
+      {
+        enabled: false,
+        reason: 'fetch_pressure',
+        at: new Date(nowMs),
+      },
+      writeCounter
+    )
     return { disabled: true, reasons: ['fetchFailureRate24h > 5%'] }
   }
 
@@ -260,11 +272,15 @@ export async function maybeAutoDisableCoverageBootstrap(
     return { disabled: false, reasons: evaluation.reasons }
   }
 
-  await setCoverageBootstrapEnabled(admin, {
-    enabled: false,
-    reason: 'exit_criteria',
-    at: new Date(nowMs),
-  })
+  await setCoverageBootstrapEnabled(
+    admin,
+    {
+      enabled: false,
+      reason: 'exit_criteria',
+      at: new Date(nowMs),
+    },
+    writeCounter
+  )
 
   return { disabled: true, reasons: evaluation.reasons }
 }

@@ -214,6 +214,47 @@ export type SeoReadinessSnapshot = {
   readonly criteria: ReadonlyArray<{ label: string; pass: boolean; actual: string }>
 }
 
+export type SlowestStageKind = 'route_wall_clock' | 'single_span'
+
+export type IngestionDiagnosticsCoveragePerformance = {
+  readonly missing_valid_list_duration_ms: number
+  readonly false_exclusion_trace_duration_ms: number
+  readonly false_exclusion_persist_duration_ms: number
+  readonly false_exclusion_format_duration_ms: number
+  readonly coverage_parallel_block_duration_ms: number
+  readonly shadow_replay_duration_ms: number
+  readonly shadow_replay_persist_duration_ms: number
+  readonly coverage_observation_aggregate_duration_ms: number
+  readonly existing_refresh_aggregate_duration_ms: number
+  readonly catalog_repair_aggregate_duration_ms: number
+  readonly actionable_missing_aggregate_duration_ms: number
+  readonly false_exclusion_sale_identity_duration_ms: number
+  readonly bootstrap_checks_duration_ms: number
+  readonly coverage_unattributed_duration_ms: number
+}
+
+export type IngestionDiagnosticsPerformance = {
+  readonly total_duration_ms: number
+  readonly api_route_duration_ms: number
+  readonly core_metrics_duration_ms: number
+  readonly diagnostics_metrics_duration_ms: number
+  readonly coverage_scoreboard_duration_ms: number
+  readonly merge_duration_ms: number
+  readonly model_build_duration_ms: number
+  readonly json_payload_bytes: number | null
+  readonly cache_status: 'none'
+  readonly generated_at: string
+  readonly coverage: IngestionDiagnosticsCoveragePerformance
+  readonly write_count: number
+  readonly sequential_write_count: number
+  readonly write_tables: readonly string[]
+  readonly slowest_stage: string
+  readonly slowest_stage_duration_ms: number
+  readonly slowest_stage_kind: SlowestStageKind
+  readonly slowest_single_span: string
+  readonly slowest_single_span_duration_ms: number
+}
+
 export type IngestionDiagnosticsModel = {
   readonly diagnosticsModelVersion: string
   readonly generatedAt: string
@@ -237,6 +278,7 @@ export type IngestionDiagnosticsModel = {
   readonly backlogs: BacklogSnapshot
   readonly schedulerCrons: readonly SchedulerCronRow[]
   readonly seoReadiness: SeoReadinessSnapshot | null
+  readonly performance?: IngestionDiagnosticsPerformance
 }
 
 export type BuildIngestionDiagnosticsModelInput = {

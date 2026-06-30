@@ -6,6 +6,7 @@ import {
   formatExportHeader,
   formatExportNotes,
 } from '@/lib/admin/diagnostics/v4/export/exportMetadata'
+import { buildDiagnosticsPerformanceSection } from '@/lib/admin/diagnostics/v4/export/buildDiagnosticsPerformanceSection'
 
 export function buildOperationsReport(model: IngestionDiagnosticsModel): string {
   const metadata = buildExportMetadata(model, 'operations')
@@ -96,6 +97,7 @@ export function buildOperationsReport(model: IngestionDiagnosticsModel): string 
   lines.push(diagnosticBullet('geocode eligible', model.backlogs.geocodeEligible))
   lines.push(diagnosticBullet('missing ingest', model.backlogs.missingIngest))
 
+  lines.push('', ...buildDiagnosticsPerformanceSection(model, 'operations'))
   lines.push('', ...formatExportNotes())
 
   const report = lines.join('\n')

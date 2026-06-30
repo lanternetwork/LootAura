@@ -6,6 +6,7 @@ import type { IngestionDiagnosticsModel } from '@/lib/admin/diagnostics/v4/types
 import { formatSystemHealthLabel } from '@/lib/admin/diagnostics/v4/systemHealth'
 import { buildDiagnosticsExport } from '@/lib/admin/diagnostics/v4/export/buildDiagnosticsExport'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
+import { DiagnosticsPerformanceCard } from '@/app/admin/ingestion/v2/DiagnosticsPerformanceCard'
 
 type ModelResponse = {
   ok: boolean
@@ -151,6 +152,8 @@ export default function IngestionDashboardV2Client() {
             ))}
           </div>
         </section>
+
+        <DiagnosticsPerformanceCard performance={model.performance} />
 
         <Panel title="Domain Health" className="mb-6">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

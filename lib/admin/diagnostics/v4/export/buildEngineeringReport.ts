@@ -87,7 +87,14 @@ function buildV4OperationalSections(model: IngestionDiagnosticsModel): string {
 
   lines.push('', '### Duplicate Detection')
   lines.push(diagnosticBullet('canonical publish clusters', model.duplicates.canonicalPublishClusters))
-  lines.push(diagnosticBullet('visible duplicate rate', model.duplicates.visibleDuplicateRate))
+  lines.push(
+    diagnosticBullet(
+      'visible duplicate rate',
+      model.duplicates.visibleDuplicateRate == null
+        ? '—'
+        : `${(model.duplicates.visibleDuplicateRate * 100).toFixed(2)}%`
+    )
+  )
   lines.push(diagnosticBullet('shadow divergence', model.duplicates.shadowDivergenceCount))
 
   lines.push('', '### Scheduler & Cron Health')

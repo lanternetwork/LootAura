@@ -117,10 +117,20 @@ export default function IngestionDashboardV2Client() {
         <section className={`mb-6 rounded-lg border p-5 shadow-sm ${healthClass}`}>
           <h2 className="text-lg font-semibold">System Health</h2>
           <p className="mt-2 text-2xl font-bold">{formatSystemHealthLabel(model.systemHealth)}</p>
-          <p className="mt-1 text-sm">
-            Primary bottleneck: <strong>{model.primaryBottleneck.label}</strong> —{' '}
-            {model.primaryBottleneck.reason}
+          {model.healthReasons.length > 0 && (
+            <ul className="mt-2 list-disc pl-5 text-sm">
+              {model.healthReasons.map((r) => (
+                <li key={r.id}>{r.label}</li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-sm">
+            Primary bottleneck: <strong>{model.primaryBottleneck.label}</strong>{' '}
+            <span className="rounded bg-white/60 px-1.5 py-0.5 text-xs font-medium">
+              {model.primaryBottleneck.type}
+            </span>
           </p>
+          <p className="text-sm text-opacity-90">{model.primaryBottleneck.reason}</p>
           <p className="text-sm">Trend: {model.trendSummary}</p>
           <p className="text-xs opacity-70">Last refresh: {new Date(model.generatedAt).toLocaleString()}</p>
 
@@ -142,6 +152,23 @@ export default function IngestionDashboardV2Client() {
           </div>
         </section>
 
+        <Panel title="Domain Health" className="mb-6">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {model.domainHealth.map((domain) => (
+              <div
+                key={domain.id}
+                className="rounded border border-gray-200 bg-gray-50 p-3 text-sm"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{domain.label}</span>
+                  <span className="text-xs uppercase">{domain.status}</span>
+                </div>
+                <p className="mt-1 text-gray-600">{domain.primaryReason}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
         <div className="mb-6 grid gap-4 lg:grid-cols-2">
           <Panel title="Top Operator Actions">
             <ul className="list-disc space-y-2 pl-5 text-sm">
@@ -162,7 +189,11 @@ export default function IngestionDashboardV2Client() {
               <ul className="space-y-2 text-sm">
                 {model.alerts.map((alert) => (
                   <li key={alert.id} className="rounded border border-gray-200 bg-white p-2">
-                    <span className="font-medium uppercase">{alert.severity}</span>: {alert.reason}
+                    <span className="font-medium uppercase">{alert.severity}</span>
+                    <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs">
+                      {alert.confidence}
+                    </span>
+                    : {alert.trigger}
                     <p className="text-gray-600">{alert.recommendedAction}</p>
                   </li>
                 ))}
@@ -223,10 +254,16 @@ export default function IngestionDashboardV2Client() {
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <Panel title="Visibility (split)">
-            <Stat label="Observation stale" value={model.visibility.observationStale} />
-            <Stat label="True visibility failure" value={model.visibility.trueVisibilityFailure} />
+          <Panel title="Visibility (split + confidence)">
             <Stat label="published_not_visible total" value={model.visibility.publishedNotVisibleTotal} />
+            <Stat
+              label="Audited sample"
+              value={`${model.visibility.auditedCount} (${model.visibility.auditedCoveragePct ?? '—'}%)`}
+            />
+            <Stat label="Classification" value={model.visibility.classificationMode} />
+            <Stat label="Confidence" value={model.visibility.classificationConfidence} />
+            <Stat label="Observation stale" value={model.visibility.observationStaleCount} />
+            <Stat label="True visibility failure" value={model.visibility.trueVisibilityFailureCount} />
           </Panel>
 
           <Panel title="Duplicate Detection (split)">
@@ -263,6 +300,7 @@ export default function IngestionDashboardV2Client() {
                 <th className="py-2">State</th>
                 <th className="py-2">Last success</th>
                 <th className="py-2">Mins since</th>
+                <th className="py-2">Telemetry</th>
                 <th className="py-2">Owner</th>
               </tr>
             </thead>
@@ -275,6 +313,9 @@ export default function IngestionDashboardV2Client() {
                     {cron.lastSuccessAt ? new Date(cron.lastSuccessAt).toLocaleString() : '—'}
                   </td>
                   <td className="py-2 tabular-nums">{cron.minutesSinceSuccess ?? '—'}</td>
+                  <td className="py-2 max-w-[12rem] truncate text-xs text-gray-500">
+                    {cron.telemetryUnavailableReason ?? '—'}
+                  </td>
                   <td className="py-2">{cron.owner}</td>
                 </tr>
               ))}

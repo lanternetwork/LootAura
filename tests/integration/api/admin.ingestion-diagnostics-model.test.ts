@@ -67,7 +67,7 @@ describe('GET /api/admin/ingestion/diagnostics-model', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.ok).toBe(true)
-    expect(json.model.diagnosticsModelVersion).toBe('4.0.0')
+    expect(json.model.diagnosticsModelVersion).toBe('4.1.0')
     expect(json.model.slos.length).toBeGreaterThan(0)
     expect(mockCore).toHaveBeenCalledTimes(1)
     expect(mockDiagnostics).toHaveBeenCalledTimes(1)

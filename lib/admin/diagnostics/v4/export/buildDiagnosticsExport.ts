@@ -12,7 +12,7 @@ function buildRolloutGatesSection(model: IngestionDiagnosticsModel): string | nu
   if (!model.coverage) return null
   const gates = evaluateYstmSaleInstanceRolloutGates(model.coverage)
   const lines = [
-    '## Engineering — Rollout Gates',
+    '## APPENDIX — Engineering Rollout Gates',
     diagnosticBullet('enforcement ready', gates.enforcementReady ? 'yes' : 'no'),
     diagnosticBullet('observability ready', gates.observabilityReady ? 'yes' : 'no'),
     diagnosticBullet(
@@ -33,12 +33,26 @@ function buildRolloutGatesSection(model: IngestionDiagnosticsModel): string | nu
   return lines.join('\n')
 }
 
+function buildFullTableOfContents(): string[] {
+  return [
+    '## TABLE OF CONTENTS',
+    '1. Export metadata',
+    '2. Engineering Report (V4 authoritative + legacy compatibility)',
+    '3. Appendix — YSTM stabilization exit',
+    '4. Appendix — YSTM ingestion repair program',
+    '5. Appendix — Coverage internals',
+    '6. Appendix — Rollout gates',
+    '',
+  ]
+}
+
 export function buildFullDiagnosticsReport(model: IngestionDiagnosticsModel): string {
   const metadata = buildExportMetadata(model, 'full')
   const engineering = buildEngineeringReport(model)
 
   const parts: string[] = [
     ...formatExportHeader(metadata, 'Ingestion Full Diagnostics'),
+    ...buildFullTableOfContents(),
     engineering,
   ]
 
@@ -47,9 +61,15 @@ export function buildFullDiagnosticsReport(model: IngestionDiagnosticsModel): st
       '',
       '---',
       '',
+      '## APPENDIX — YSTM Stabilization Exit',
+      '',
       buildYstmStabilizationDiagnostics(model.metrics, model.coverage),
       '',
+      '## APPENDIX — YSTM Ingestion Repair Program',
+      '',
       buildYstmIngestionRepairDiagnostics(model.metrics, model.coverage),
+      '',
+      '## APPENDIX — Coverage Internals',
       '',
       buildYstmCoverageDiagnostics(model.coverage)
     )

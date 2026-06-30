@@ -1,5 +1,6 @@
 import { buildOperationalPriorities } from '@/lib/admin/ingestionDashboardOverview'
 import { getRegistryEntry } from '@/lib/admin/diagnostics/v4/registry'
+import { VISIBLE_DUPLICATE_RATE_MAX, ACTIONABLE_MISSING_SLO_MAX } from '@/lib/admin/diagnostics/v4/constants'
 import type { ComputedAlert, OperatorAction, SloEvaluationRow } from '@/lib/admin/diagnostics/v4/types'
 import type { IngestionMetricsResponse } from '@/lib/admin/ingestionMetricsTypes'
 import type { YstmCoverageMetricsResponse } from '@/lib/admin/ystmCoverageMetricsTypes'
@@ -13,72 +14,174 @@ import {
   exceedsVisibleDuplicateThreshold,
 } from '@/lib/admin/diagnostics/v4/buildDomainSnapshots'
 
+function alertRow(
+  partial: Omit<ComputedAlert, 'reason'> & { reason?: string }
+): ComputedAlert {
+  return {
+    reason: partial.trigger,
+    ...partial,
+  }
+}
+
 export function buildComputedAlerts(
   metrics: IngestionMetricsResponse,
   coverage: YstmCoverageMetricsResponse | null,
-  blockingSloFailures: readonly SloEvaluationRow[]
+  blockingSloFailures: readonly SloEvaluationRow[],
+  nonBlockingSloFailures: readonly SloEvaluationRow[]
 ): ComputedAlert[] {
   const alerts: ComputedAlert[] = []
 
   for (const slo of blockingSloFailures) {
     const entry = getRegistryEntry(slo.id)
-    alerts.push({
-      id: `slo_${slo.id}`,
-      severity: 'critical',
-      reason: slo.label,
-      affectedMetricIds: [slo.id],
-      owner: entry?.owner ?? 'ingestion ops',
-      recommendedAction: `Resolve blocking SLO: ${slo.label} (actual ${slo.actual}, target ${slo.target})`,
-    })
+    alerts.push(
+      alertRow({
+        id: `slo_${slo.id}`,
+        severity: 'critical',
+        domain: entry?.operationalDomain ?? 'slos',
+        trigger: slo.label,
+        currentValue: slo.actual,
+        threshold: slo.target,
+        confidence: 'HIGH',
+        affectedMetricIds: [slo.id],
+        owner: entry?.owner ?? 'ingestion ops',
+        recommendedAction: `Resolve blocking SLO: ${slo.label}`,
+        blockingUserImpact: true,
+      })
+    )
+  }
+
+  for (const slo of nonBlockingSloFailures) {
+    const entry = getRegistryEntry(slo.id)
+    alerts.push(
+      alertRow({
+        id: `slo_${slo.id}`,
+        severity: 'warning',
+        domain: entry?.operationalDomain ?? 'slos',
+        trigger: slo.label,
+        currentValue: slo.actual,
+        threshold: slo.target,
+        confidence: 'HIGH',
+        affectedMetricIds: [slo.id],
+        owner: entry?.owner ?? 'ingestion ops',
+        recommendedAction: `Address SLO miss: ${slo.label}`,
+        blockingUserImpact: false,
+      })
+    )
   }
 
   const duplicates = buildDuplicateHealthSnapshot(coverage)
   if (exceedsVisibleDuplicateThreshold(duplicates.visibleDuplicateRate)) {
-    alerts.push({
-      id: 'visible_duplicate_rate',
-      severity: 'warning',
-      reason: `Visible duplicate rate ${((duplicates.visibleDuplicateRate ?? 0) * 100).toFixed(2)}% exceeds threshold`,
-      affectedMetricIds: ['visible_duplicate_clusters'],
-      owner: 'manual review',
-      recommendedAction: 'Review visible duplicate clusters before enforcement.',
-    })
+    const rate = duplicates.visibleDuplicateRate ?? 0
+    alerts.push(
+      alertRow({
+        id: 'visible_duplicate_rate',
+        severity: 'warning',
+        domain: 'duplicate_detection',
+        trigger: 'Visible duplicate rate elevated',
+        currentValue: `${(rate * 100).toFixed(2)}%`,
+        threshold: `<${(VISIBLE_DUPLICATE_RATE_MAX * 100).toFixed(2)}%`,
+        confidence: 'HIGH',
+        affectedMetricIds: ['visible_duplicate_clusters'],
+        owner: 'manual review',
+        recommendedAction: 'Review visible duplicate clusters before enforcement.',
+        blockingUserImpact: false,
+      })
+    )
+  }
+
+  if (duplicates.shadowDivergenceCount > 0) {
+    alerts.push(
+      alertRow({
+        id: 'shadow_divergence',
+        severity: 'warning',
+        domain: 'duplicate_detection',
+        trigger: 'Shadow replay divergence pending review',
+        currentValue: duplicates.shadowDivergenceCount.toLocaleString(),
+        threshold: '0',
+        confidence: 'HIGH',
+        affectedMetricIds: ['rollout_gates'],
+        owner: 'engineering',
+        recommendedAction: 'Review legacy-suppress → new-publish divergences before enforcement.',
+        blockingUserImpact: false,
+      })
+    )
   }
 
   const visibility = buildVisibilitySnapshot(metrics, coverage)
-  if (visibility.trueVisibilityFailure > 0) {
-    alerts.push({
-      id: 'true_visibility_failure',
-      severity: 'warning',
-      reason: `${visibility.trueVisibilityFailure} true visibility failure(s) in published_not_visible cohort`,
-      affectedMetricIds: ['observation_stale'],
-      owner: 'observation refresh',
-      recommendedAction: 'Investigate ends_at, precision, moderation — no blind republish.',
-    })
+  if (visibility.trueVisibilityFailureCount > 0) {
+    alerts.push(
+      alertRow({
+        id: 'true_visibility_failure',
+        severity: 'warning',
+        domain: 'visibility_coverage',
+        trigger: 'True visibility failure(s) in published_not_visible cohort',
+        currentValue: `${visibility.trueVisibilityFailureCount} (${visibility.classificationMode})`,
+        threshold: '0',
+        confidence: visibility.classificationConfidence,
+        affectedMetricIds: ['observation_stale'],
+        owner: 'observation refresh',
+        recommendedAction: 'Investigate ends_at, precision, moderation — no blind republish.',
+        blockingUserImpact: false,
+      })
+    )
   }
 
-  if (visibility.observationStale > 0) {
-    alerts.push({
-      id: 'observation_stale',
-      severity: 'info',
-      reason: `${visibility.observationStale} observation stale row(s) (sale visible, obs stale)`,
-      affectedMetricIds: ['observation_stale'],
-      owner: 'observation refresh',
-      recommendedAction: 'Reconcile stale coverage observations; do not force-publish.',
-    })
+  if (visibility.observationStaleCount > 0) {
+    alerts.push(
+      alertRow({
+        id: 'observation_stale',
+        severity: 'info',
+        domain: 'visibility_coverage',
+        trigger: 'Observation stale rows (sale visible, observation stale)',
+        currentValue: visibility.observationStaleCount.toLocaleString(),
+        threshold: '0',
+        confidence: visibility.classificationConfidence,
+        affectedMetricIds: ['observation_stale'],
+        owner: 'observation refresh',
+        recommendedAction: 'Reconcile stale coverage observations; do not force-publish.',
+        blockingUserImpact: false,
+      })
+    )
+  }
+
+  const actionableMissing = coverage?.actionableMissingValid?.effectiveMissingValidYstmUrls
+  if (actionableMissing != null && actionableMissing > ACTIONABLE_MISSING_SLO_MAX) {
+    alerts.push(
+      alertRow({
+        id: 'actionable_missing_valid',
+        severity: 'warning',
+        domain: 'visibility_coverage',
+        trigger: 'Actionable missing valid URLs above SLO',
+        currentValue: actionableMissing.toLocaleString(),
+        threshold: `≤${ACTIONABLE_MISSING_SLO_MAX}`,
+        confidence: 'HIGH',
+        affectedMetricIds: ['actionable_missing_valid'],
+        owner: 'missing-ingest cron',
+        recommendedAction: 'Drive false-exclusion buckets in parallel with missing-ingest.',
+        blockingUserImpact: false,
+      })
+    )
   }
 
   const crawl = metrics.volume.fetch.crawlSkipTaxonomy24h
   if (crawl && crawl.total >= CRAWL_SKIP_TAXONOMY_MIN_SAMPLES) {
     const share = crawl.suspicious / crawl.total
     if (share >= CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING) {
-      alerts.push({
-        id: 'crawl_skip_suspicious_share',
-        severity: 'warning',
-        reason: `Suspicious crawl skips ${(share * 100).toFixed(1)}% of classified skips`,
-        affectedMetricIds: [],
-        owner: 'discovery ops',
-        recommendedAction: 'Sample url_match_dates_changed per crawl-skip triage runbook.',
-      })
+      alerts.push(
+        alertRow({
+          id: 'crawl_skip_suspicious_share',
+          severity: 'warning',
+          domain: 'discovery',
+          trigger: 'Suspicious crawl skip share elevated',
+          currentValue: `${(share * 100).toFixed(1)}% (${crawl.suspicious}/${crawl.total})`,
+          threshold: `≥${(CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING * 100).toFixed(0)}% when n≥${CRAWL_SKIP_TAXONOMY_MIN_SAMPLES}`,
+          confidence: 'HIGH',
+          affectedMetricIds: [],
+          owner: 'discovery ops',
+          recommendedAction: 'Sample url_match_dates_changed per crawl-skip triage runbook.',
+          blockingUserImpact: false,
+        })
+      )
     }
   }
 
@@ -90,9 +193,14 @@ export function buildOperatorActions(
   coverage: YstmCoverageMetricsResponse | null,
   alerts: readonly ComputedAlert[]
 ): OperatorAction[] {
-  const fromAlerts: OperatorAction[] = alerts.slice(0, 5).map((alert) => ({
+  const prioritized = [...alerts].sort((a, b) => {
+    const rank = { critical: 0, warning: 1, info: 2 }
+    return rank[a.severity] - rank[b.severity]
+  })
+
+  const fromAlerts: OperatorAction[] = prioritized.slice(0, 5).map((alert) => ({
     severity: alert.severity,
-    issue: alert.reason,
+    issue: alert.trigger,
     action: alert.recommendedAction,
     owner: alert.owner,
   }))
@@ -114,16 +222,6 @@ export function buildOperatorActions(
     if (!merged.some((m) => m.issue === row.issue)) {
       merged.push(row)
     }
-  }
-
-  while (merged.length < 3 && legacy.length > 0) {
-    merged.push({
-      severity: 'info',
-      issue: 'No additional elevated alerts',
-      action: 'Monitor queues and scheduler health.',
-      owner: 'ingestion ops',
-    })
-    break
   }
 
   return merged.slice(0, 3)

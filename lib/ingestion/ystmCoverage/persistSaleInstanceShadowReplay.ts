@@ -1,10 +1,14 @@
 import type { SaleInstanceShadowReplayRow } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
 import { fromBase, type getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
+import type { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
+
+const SHADOW_REPLAYS_TABLE = 'ystm_sale_instance_shadow_replays'
 
 export async function persistSaleInstanceShadowReplays(
   admin: ReturnType<typeof getAdminDb>,
-  rows: readonly SaleInstanceShadowReplayRow[]
+  rows: readonly SaleInstanceShadowReplayRow[],
+  writeCounter?: DiagnosticsWriteCounter
 ): Promise<void> {
   if (rows.length === 0) return
 
@@ -30,7 +34,7 @@ export async function persistSaleInstanceShadowReplays(
       sale_instance_key: row.comparison.saleInstanceKey,
     }))
 
-    const { error } = await fromBase(admin, 'ystm_sale_instance_shadow_replays').upsert(payload, {
+    const { error } = await fromBase(admin, SHADOW_REPLAYS_TABLE).upsert(payload, {
       onConflict: 'canonical_url',
     })
 
@@ -41,6 +45,8 @@ export async function persistSaleInstanceShadowReplays(
         message: error.message,
         chunkSize: chunk.length,
       })
+    } else {
+      writeCounter?.recordUpsertBatch(SHADOW_REPLAYS_TABLE, 1)
     }
   }
 }

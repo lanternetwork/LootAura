@@ -98,6 +98,10 @@ import {
 } from '@/lib/admin/loadYstm2HourIngestionDiagnostics'
 import type { MissingIngestCronHealth } from '@/lib/admin/evaluateMissingIngestCronHealth'
 import { loadMissingIngestCronHealth } from '@/lib/admin/loadMissingIngestCronHealth'
+import type { CoverageScoreboardPerformanceSink } from '@/lib/admin/diagnostics/v4/performance/scoreboardPerformanceSink'
+import { emptyCoveragePerformance } from '@/lib/admin/diagnostics/v4/performance/buildDiagnosticsPerformance'
+import { elapsedMs, timeAsync, timeSync } from '@/lib/admin/diagnostics/v4/performance/timing'
+import type { ShadowReplayPerformanceSink } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
 
 export type YstmCoverageTrendPoint = {
   completedAt: string
@@ -182,23 +186,46 @@ function topEntries(map: Record<string, number>, limit: number): Record<string, 
 }
 
 export async function buildYstmCoverageScoreboard(
-  admin: ReturnType<typeof getAdminDb>
+  admin: ReturnType<typeof getAdminDb>,
+  performanceSink?: CoverageScoreboardPerformanceSink
 ): Promise<YstmCoverageScoreboard> {
+  const scoreboardStart = performance.now()
+  const coveragePerf = performanceSink?.coverage ?? emptyCoveragePerformance()
+  const writeCounter = performanceSink?.writeCounter
   const now = new Date()
-  const missingRows = await listMissingValidObservations(admin)
-  const traceArtifacts = await traceMissingValidFalseExclusions(admin, now, missingRows)
-  await persistFalseExclusionTraces(admin, traceArtifacts.persistEntries, now.getTime())
-  const falseExclusionAudit = formatFalseExclusionAuditReport(traceArtifacts)
 
+  const [missingRows, listMs] = await timeAsync(() => listMissingValidObservations(admin))
+  coveragePerf.missing_valid_list_duration_ms = listMs
+
+  const [traceArtifacts, traceMs] = await timeAsync(() =>
+    traceMissingValidFalseExclusions(admin, now, missingRows)
+  )
+  coveragePerf.false_exclusion_trace_duration_ms = traceMs
+
+  const [, persistMs] = await timeAsync(() =>
+    persistFalseExclusionTraces(admin, traceArtifacts.persistEntries, now.getTime(), writeCounter)
+  )
+  coveragePerf.false_exclusion_persist_duration_ms = persistMs
+
+  const [falseExclusionAudit, formatMs] = timeSync(() =>
+    formatFalseExclusionAuditReport(traceArtifacts)
+  )
+  coveragePerf.false_exclusion_format_duration_ms = formatMs
+
+  const shadowReplayPerf: ShadowReplayPerformanceSink = {
+    computeDurationMs: 0,
+    persistDurationMs: 0,
+  }
+  const parallelStart = performance.now()
   const [
-    agg,
+    [agg, aggMs],
     publishedIndex,
     sourceExpansion,
     graphEnumeration,
     missingIngestion,
-    existingRefresh,
-    catalogRepair,
-    actionableMissingValid,
+    [existingRefresh, existingRefreshMs],
+    [catalogRepair, catalogRepairMs],
+    [actionableMissingValid, actionableMs],
     saleInstanceShadowReplay,
     saleInstanceIdentity,
     canonicalSaleInstance,
@@ -211,19 +238,24 @@ export async function buildYstmCoverageScoreboard(
     twoHourIngestion,
     missingIngestCronHealth,
   ] = await Promise.all([
-    aggregateYstmCoverageObservations(admin),
+    timeAsync(() => aggregateYstmCoverageObservations(admin)),
     loadLootAuraPublishedYstmIndex(admin, now),
     buildYstmSourceExpansionMetrics(admin, now.getTime()),
     buildYstmGraphEnumerationMetrics(admin, now.getTime()),
     aggregateYstmCoverageMissingIngestion(admin),
-    aggregateYstmExistingUrlRefresh(admin, now.getTime()),
-    aggregateYstmCatalogRepair(admin, now.getTime()),
-    buildActionableMissingValidAggregate(admin, {
-      traces: traceArtifacts.traces,
-      missingRows: traceArtifacts.missingRows,
-      now,
+    timeAsync(() => aggregateYstmExistingUrlRefresh(admin, now.getTime())),
+    timeAsync(() => aggregateYstmCatalogRepair(admin, now.getTime())),
+    timeAsync(() =>
+      buildActionableMissingValidAggregate(admin, {
+        traces: traceArtifacts.traces,
+        missingRows: traceArtifacts.missingRows,
+        now,
+      })
+    ),
+    buildSaleInstanceShadowReplayReport(admin, missingRows, now, {
+      writeCounter,
+      performance: shadowReplayPerf,
     }),
-    buildSaleInstanceShadowReplayReport(admin, missingRows, now),
     loadSaleInstanceIdentityMetrics(),
     loadCanonicalSaleInstanceMetrics(),
     loadCrossProviderShadowMetrics(now.getTime()),
@@ -241,6 +273,13 @@ export async function buildYstmCoverageScoreboard(
     loadYstm2HourIngestionDiagnostics(admin, now.getTime()),
     loadMissingIngestCronHealth(admin, now.getTime()),
   ])
+  coveragePerf.coverage_parallel_block_duration_ms = elapsedMs(parallelStart)
+  coveragePerf.coverage_observation_aggregate_duration_ms = aggMs
+  coveragePerf.existing_refresh_aggregate_duration_ms = existingRefreshMs
+  coveragePerf.catalog_repair_aggregate_duration_ms = catalogRepairMs
+  coveragePerf.actionable_missing_aggregate_duration_ms = actionableMs
+  coveragePerf.shadow_replay_duration_ms = shadowReplayPerf.computeDurationMs
+  coveragePerf.shadow_replay_persist_duration_ms = shadowReplayPerf.persistDurationMs
 
   if (runsResult.error) {
     throw new Error(runsResult.error.message)
@@ -301,17 +340,21 @@ export async function buildYstmCoverageScoreboard(
     nowMs: now.getTime(),
   })
 
-  const falseExclusionSaleIdentity = await buildYstmFalseExclusionSaleIdentityDashboard(
-    admin,
-    {
-      missingValidYstmUrls: agg.missingValidYstmUrls,
-      missingNeverAttempted: missingIngestion.missingIngestionNeverAttempted,
-      saleInstanceIdentity,
-      saleInstanceShadowReplay,
-    },
-    now
+  const [falseExclusionSaleIdentity, identityMs] = await timeAsync(() =>
+    buildYstmFalseExclusionSaleIdentityDashboard(
+      admin,
+      {
+        missingValidYstmUrls: agg.missingValidYstmUrls,
+        missingNeverAttempted: missingIngestion.missingIngestionNeverAttempted,
+        saleInstanceIdentity,
+        saleInstanceShadowReplay,
+      },
+      now
+    )
   )
+  coveragePerf.false_exclusion_sale_identity_duration_ms = identityMs
 
+  const bootstrapStart = performance.now()
   let coverageBootstrap = await fetchCoverageBootstrapState(admin)
   const exitCriteriaPreview = evaluateCoverageBootstrapExitCriteria({
     coveragePct,
@@ -325,16 +368,20 @@ export async function buildYstmCoverageScoreboard(
   })
 
   if (coverageBootstrap.enabled) {
-    await maybeAutoDisableCoverageBootstrap(admin, {
-      coveragePct,
-      missingValidYstmUrls: agg.missingValidYstmUrls,
-      validActiveYstmUrls: agg.validActiveYstmUrls,
-      catalogRepairQueue: catalogRepair.repairQueueTotal,
-      fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
-      blockRate24h: graphEnumeration.blockRate24h,
-      enabledAt: coverageBootstrap.enabledAt,
-      nowMs: now.getTime(),
-    })
+    await maybeAutoDisableCoverageBootstrap(
+      admin,
+      {
+        coveragePct,
+        missingValidYstmUrls: agg.missingValidYstmUrls,
+        validActiveYstmUrls: agg.validActiveYstmUrls,
+        catalogRepairQueue: catalogRepair.repairQueueTotal,
+        fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
+        blockRate24h: graphEnumeration.blockRate24h,
+        enabledAt: coverageBootstrap.enabledAt,
+        nowMs: now.getTime(),
+      },
+      writeCounter
+    )
     coverageBootstrap = await fetchCoverageBootstrapState(admin)
   }
 
@@ -349,12 +396,34 @@ export async function buildYstmCoverageScoreboard(
   })
 
   if (esnetBootstrap.enabled) {
-    await maybeAutoDisableEsnetCoverageBootstrap(admin, {
-      crawlableConfigCount: esnetCrawlableConfigCount,
-      fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
-      nowMs: now.getTime(),
-    })
+    await maybeAutoDisableEsnetCoverageBootstrap(
+      admin,
+      {
+        crawlableConfigCount: esnetCrawlableConfigCount,
+        fetchFailureRate24h: graphEnumeration.fetchFailureRate24h,
+        nowMs: now.getTime(),
+      },
+      writeCounter
+    )
     esnetBootstrap = await fetchEsnetBootstrapState(admin)
+  }
+  coveragePerf.bootstrap_checks_duration_ms = elapsedMs(bootstrapStart)
+
+  if (performanceSink) {
+    const serialMs =
+      coveragePerf.missing_valid_list_duration_ms +
+      coveragePerf.false_exclusion_trace_duration_ms +
+      coveragePerf.false_exclusion_persist_duration_ms +
+      coveragePerf.false_exclusion_format_duration_ms
+    const postParallelMs =
+      coveragePerf.false_exclusion_sale_identity_duration_ms +
+      coveragePerf.bootstrap_checks_duration_ms
+    const accountedMs =
+      serialMs + coveragePerf.coverage_parallel_block_duration_ms + postParallelMs
+    coveragePerf.coverage_unattributed_duration_ms = Math.max(
+      0,
+      elapsedMs(scoreboardStart) - accountedMs
+    )
   }
 
   return {

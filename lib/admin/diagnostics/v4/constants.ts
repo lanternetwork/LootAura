@@ -1,8 +1,8 @@
 /** Export envelope version (markdown reports). */
-export const DIAGNOSTICS_EXPORT_VERSION = '4.1.0'
+export const DIAGNOSTICS_EXPORT_VERSION = '4.2.0'
 
 /** Diagnostics model schema version (JSON + computed fields). */
-export const DIAGNOSTICS_MODEL_VERSION = '4.1.0'
+export const DIAGNOSTICS_MODEL_VERSION = '4.2.0'
 
 export const COVERAGE_SLO_MIN_PCT = 90
 export const CATALOG_REPAIR_SLO_MAX = 100

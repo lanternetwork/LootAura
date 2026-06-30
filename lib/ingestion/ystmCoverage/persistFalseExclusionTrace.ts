@@ -2,8 +2,10 @@ import { passesPhase4PublicVisibility } from '@/lib/admin/classifyPublishedNotVi
 import type { LinkedSaleVisibilitySnapshot } from '@/lib/ingestion/ystmCoverage/linkedSaleVisibilityFilter'
 import type { FalseExclusionUrlTrace } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import type { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
 
 const PERSIST_CHUNK = 100
+const OBSERVATIONS_TABLE = 'ystm_coverage_observations'
 
 export type FalseExclusionTracePersistContext = {
   ystmInvalidReason: string | null
@@ -40,7 +42,8 @@ export function shouldSkipPublishedNotVisibleTracePersist(
 export async function persistFalseExclusionTraces(
   admin: ReturnType<typeof getAdminDb>,
   entries: FalseExclusionTracePersistEntry[],
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  writeCounter?: DiagnosticsWriteCounter
 ): Promise<void> {
   if (entries.length === 0) return
 
@@ -63,12 +66,13 @@ export async function persistFalseExclusionTraces(
             updated_at: nowIso,
           }
 
-      const { error } = await fromBase(admin, 'ystm_coverage_observations')
+      const { error } = await fromBase(admin, OBSERVATIONS_TABLE)
         .update(patch)
         .eq('canonical_url', trace.canonicalUrl)
       if (error) {
         throw new Error(error.message)
       }
+      writeCounter?.recordUpdate(OBSERVATIONS_TABLE, { sequential: true })
     }
   }
 }

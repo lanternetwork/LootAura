@@ -9,6 +9,7 @@ import type {
 import { COVERAGE_BOOTSTRAP_MIN_ENABLED_HOURS } from '@/lib/ingestion/ystmCoverage/coverageBudgetProfiles'
 import { partitionCrawlableCityConfigsByPlatform } from '@/lib/ingestion/partitionCrawlableExternalConfigs'
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
+import type { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
 
 export type EsnetCoverageBootstrapExitSnapshot = {
   crawlableConfigCount: number
@@ -52,7 +53,8 @@ export function evaluateEsnetCoverageBootstrapExitCriteria(
 
 export async function maybeAutoDisableEsnetCoverageBootstrap(
   admin: ReturnType<typeof getAdminDb>,
-  snapshot: EsnetCoverageBootstrapExitSnapshot
+  snapshot: EsnetCoverageBootstrapExitSnapshot,
+  writeCounter?: DiagnosticsWriteCounter
 ): Promise<{ disabled: boolean; reasons: string[] }> {
   const state = await fetchEsnetBootstrapState(admin)
   if (!state.enabled) {
@@ -69,11 +71,15 @@ export async function maybeAutoDisableEsnetCoverageBootstrap(
     return { disabled: false, reasons: evaluation.reasons }
   }
 
-  await setEsnetBootstrapEnabled(admin, {
-    enabled: false,
-    reason: 'exit_criteria' satisfies CoverageBootstrapDisabledReason,
-    at: new Date(snapshot.nowMs ?? Date.now()),
-  })
+  await setEsnetBootstrapEnabled(
+    admin,
+    {
+      enabled: false,
+      reason: 'exit_criteria' satisfies CoverageBootstrapDisabledReason,
+      at: new Date(snapshot.nowMs ?? Date.now()),
+    },
+    writeCounter
+  )
 
   return { disabled: true, reasons: evaluation.reasons }
 }

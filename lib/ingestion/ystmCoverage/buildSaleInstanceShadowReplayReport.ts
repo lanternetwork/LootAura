@@ -9,6 +9,8 @@ import {
   type SaleInstanceShadowReplayRow,
 } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
 import { fromBase, type getAdminDb } from '@/lib/supabase/clients'
+import type { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
+import { elapsedMs } from '@/lib/admin/diagnostics/v4/performance/timing'
 
 type MissingObservationRow = {
   canonical_url: string
@@ -41,13 +43,23 @@ async function loadExtendedIngestedByUrls(
 /**
  * Phase 9: replay every missing valid YSTM URL through legacy URL gate vs new classifier.
  */
+export type ShadowReplayPerformanceSink = {
+  computeDurationMs: number
+  persistDurationMs: number
+}
+
 export async function buildSaleInstanceShadowReplayReport(
   admin: ReturnType<typeof getAdminDb>,
   missingRows: readonly MissingObservationRow[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  options?: {
+    writeCounter?: DiagnosticsWriteCounter
+    performance?: ShadowReplayPerformanceSink
+  }
 ): Promise<SaleInstanceShadowReplayReport> {
   const nowIso = now.toISOString()
   const urls = missingRows.map((r) => r.canonical_url)
+  const computeStart = performance.now()
   const ingestedByUrl = await loadExtendedIngestedByUrls(admin, urls)
 
   const replayRows: SaleInstanceShadowReplayRow[] = []
@@ -90,7 +102,14 @@ export async function buildSaleInstanceShadowReplayReport(
     })
   }
 
-  await persistSaleInstanceShadowReplays(admin, replayRows)
+  const computeDurationMs = elapsedMs(computeStart)
+  const persistStart = performance.now()
+  await persistSaleInstanceShadowReplays(admin, replayRows, options?.writeCounter)
+  const persistDurationMs = elapsedMs(persistStart)
+  if (options?.performance) {
+    options.performance.computeDurationMs = computeDurationMs
+    options.performance.persistDurationMs = persistDurationMs
+  }
 
   const divergences = replayRows
     .filter((r) => r.comparison.divergenceKind === 'old_suppress_new_publish')

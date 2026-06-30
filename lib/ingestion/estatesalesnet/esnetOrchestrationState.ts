@@ -1,5 +1,8 @@
 import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import type { CoverageBootstrapDisabledReason } from '@/lib/ingestion/ystmCoverage/coverageBootstrapNationwideMode'
+import type { DiagnosticsWriteCounter } from '@/lib/admin/diagnostics/v4/performance/writeCounter'
+
+const ORCHESTRATION_STATE_TABLE = 'ingestion_orchestration_state'
 
 export const ESNET_INGEST_STATE_KEY = 'esnet_ingest_enabled'
 export const ESNET_BOOTSTRAP_STATE_KEY = 'esnet_bootstrap_enabled'
@@ -185,7 +188,8 @@ export async function fetchEsnetBootstrapEnabled(admin: ReturnType<typeof getAdm
 
 export async function setEsnetBootstrapEnabled(
   admin: ReturnType<typeof getAdminDb>,
-  params: { enabled: boolean; reason: EsnetProviderDisabledReason; at?: Date }
+  params: { enabled: boolean; reason: EsnetProviderDisabledReason; at?: Date },
+  writeCounter?: DiagnosticsWriteCounter
 ): Promise<EsnetProviderRuntimeState> {
   const at = params.at ?? new Date()
   const iso = at.toISOString()
@@ -202,7 +206,7 @@ export async function setEsnetBootstrapEnabled(
     patch.coverage_bootstrap_disabled_reason = params.reason
   }
 
-  const { data: updated, error: updateError } = await fromBase(admin, 'ingestion_orchestration_state')
+  const { data: updated, error: updateError } = await fromBase(admin, ORCHESTRATION_STATE_TABLE)
     .update(patch)
     .eq('key', ESNET_BOOTSTRAP_STATE_KEY)
     .select(
@@ -227,10 +231,13 @@ export async function setEsnetBootstrapEnabled(
       insertRow.coverage_bootstrap_disabled_at = iso
       insertRow.coverage_bootstrap_disabled_reason = params.reason
     }
-    const { error: insertError } = await fromBase(admin, 'ingestion_orchestration_state').insert(insertRow)
+    const { error: insertError } = await fromBase(admin, ORCHESTRATION_STATE_TABLE).insert(insertRow)
     if (insertError) {
       throw new Error(insertError.message)
     }
+    writeCounter?.recordUpdate(ORCHESTRATION_STATE_TABLE)
+  } else {
+    writeCounter?.recordUpdate(ORCHESTRATION_STATE_TABLE)
   }
 
   return fetchEsnetBootstrapState(admin)

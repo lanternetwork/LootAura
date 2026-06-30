@@ -8,6 +8,7 @@ import {
   formatExportNotes,
 } from '@/lib/admin/diagnostics/v4/export/exportMetadata'
 import { buildMachineReadableBlocks } from '@/lib/admin/diagnostics/v4/export/buildMachineReadableBlocks'
+import { buildDiagnosticsPerformanceSection } from '@/lib/admin/diagnostics/v4/export/buildDiagnosticsPerformanceSection'
 
 function buildV4OperationalSections(model: IngestionDiagnosticsModel): string {
   const lines: string[] = [
@@ -117,6 +118,7 @@ function buildV4OperationalSections(model: IngestionDiagnosticsModel): string {
     }
   }
 
+  lines.push('', ...buildDiagnosticsPerformanceSection(model, 'engineering'))
   lines.push('', buildMachineReadableBlocks(model))
   lines.push('', ...formatExportNotes())
 

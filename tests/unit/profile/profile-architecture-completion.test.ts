@@ -13,16 +13,6 @@ describe('Profile architecture spec completion guards', () => {
     expect(dropLegacy).toEqual(['217_drop_legacy_public_profiles.sql'])
   })
 
-  it('Phase 8 drop script fails closed when only_public remains', () => {
-    const sql = readFileSync(
-      join(process.cwd(), 'scripts/audit/profile-drop-legacy-public-profiles.sql'),
-      'utf8'
-    )
-    expect(sql).toContain('only_public')
-    expect(sql).toContain('RAISE EXCEPTION')
-    expect(sql).toMatch(/DROP TABLE public\.profiles/)
-  })
-
   it('T table constant no longer exposes legacy profiles name', () => {
     const source = readFileSync(join(process.cwd(), 'lib/supabase/tables.ts'), 'utf8')
     expect(source).not.toMatch(/profiles:\s*['"]profiles['"]/)

@@ -44,9 +44,8 @@ export default function CrawlSkipTaxonomySection({
       <p className="mt-2 max-w-3xl text-sm text-slate-600">
         During nationwide <strong>coverage bootstrap</strong>, elevated{' '}
         <code className="text-[11px]">url_match_dates_changed</code> plus benign{' '}
-        <code className="text-[11px]">url_match_refresh_queued</code> is expected. Triage only when bootstrap is OFF or
-        repair is draining and suspicious share stays high — see{' '}
-        <code className="text-[11px]">docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md</code>.
+        <code className="text-[11px]">url_match_refresh_queued</code> is expected. Triage when bootstrap is OFF or
+        repair is draining and suspicious share stays high.
       </p>
 
       {alerts.length > 0 && (

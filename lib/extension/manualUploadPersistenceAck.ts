@@ -1,6 +1,6 @@
 /**
  * Shared rules for extension manual upload acknowledgement (mirrors lootaura-content.js).
- * Used by unit tests; keep in sync with browser-extension/lootaura-content.js.
+ * Manual upload persistence acknowledgement rules (unit-tested).
  */
 
 export function evaluateManualUploadPersistenceAck(

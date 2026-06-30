@@ -7,9 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       csv_path:
-        description: 'Repository-relative path to city CSV/txt input file'
+        description: 'Repository-relative path to city CSV/txt input file (not stored in repo)'
         required: true
-        default: 'scripts/data/external-city-page-links.txt'
 
 jobs:
   seed-city-configs:

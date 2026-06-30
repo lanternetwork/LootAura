@@ -192,7 +192,7 @@ export function evaluateYstmIngestionRepairProgram(
           ? `Insufficient classified skips (n=${crawl.total})`
           : '—'
         : `${(suspiciousShare * 100).toFixed(1)}% suspicious of ${crawl.total.toLocaleString()} classified skips`,
-      'Sample 50× url_match_dates_changed per YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md; document benign bootstrap skips.',
+      'Sample url_match_dates_changed skips; document benign bootstrap skips when applicable.',
       suspiciousShare == null || suspiciousShare < CRAWL_SKIP_SUSPICIOUS_SHARE_WARNING
     ),
     workstream(

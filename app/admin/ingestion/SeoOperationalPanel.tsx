@@ -313,8 +313,7 @@ export default function SeoOperationalPanel({ metrics, coverage, publishedListin
         <p className="mt-1 text-slate-600">
           Run{' '}
           <code className="text-xs">GET /api/admin/seo/crawl-smoke?metroSlug=dallas-tx&amp;saleId=…</code>{' '}
-          then attest crawl validation above. See{' '}
-          <code className="text-xs">docs/SEO_PHASE5_CRAWL_VALIDATION.md</code>.
+          then attest crawl validation above.
         </p>
         {snapshot.rollout.qualifiedMetroSlugs.length > 0 && (
           <p className="mt-2 text-xs text-slate-600">

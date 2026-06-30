@@ -217,7 +217,7 @@ async function salesHandler(request: NextRequest) {
             })
           }
           
-          // Bbox-path distance reference = viewport center (see docs/NEARBY_SALES_CANONICAL_DISTANCE_SEMANTICS.md)
+          // Bbox-path distance reference = viewport center (see docs/developer/marketplace-distance-semantics.md)
           latitude = (validatedBbox.north + validatedBbox.south) / 2
           longitude = (validatedBbox.east + validatedBbox.west) / 2
           

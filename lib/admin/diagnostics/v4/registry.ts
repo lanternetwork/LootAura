@@ -11,7 +11,7 @@ export const INGESTION_DIAGNOSTICS_REGISTRY: readonly DiagnosticRegistryEntry[] 
     sloParticipation: true,
     blockingSlo: true,
     exportModes: ['operations', 'engineering', 'full'],
-    runbookReference: 'docs/YSTM_HANDS_OFF_STEADY_STATE_PROGRAM.md',
+    runbookReference: null,
   },
   {
     id: 'duplicate_convergence_streak',
@@ -59,7 +59,7 @@ export const INGESTION_DIAGNOSTICS_REGISTRY: readonly DiagnosticRegistryEntry[] 
     sloParticipation: true,
     blockingSlo: false,
     exportModes: ['operations', 'engineering', 'full'],
-    runbookReference: 'docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md',
+    runbookReference: null,
   },
   {
     id: 'publish_failed_terminal',
@@ -131,7 +131,7 @@ export const INGESTION_DIAGNOSTICS_REGISTRY: readonly DiagnosticRegistryEntry[] 
     sloParticipation: false,
     blockingSlo: false,
     exportModes: ['engineering', 'full'],
-    runbookReference: 'docs/SEO_FINAL_DEVELOPMENT_SPEC.md',
+    runbookReference: null,
   },
   {
     id: 'rollout_gates',

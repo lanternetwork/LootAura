@@ -1,7 +1,5 @@
 /**
- * Server-side mirror of the browser extension ZIP locality fixture used for
- * `zip_locality_authority` trust + tests. Keep fixture rows aligned with
- * `browser-extension/zipLocalityResolver.js` when that list changes.
+ * Server-side ZIP locality primary-authority list for `zip_locality_authority` trust + tests.
  *
  * `source_pages` on `ingestion_city_configs` remains optional crawl metadata;
  * this module is only for fail-closed primary-ZIP locality matching.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolveYstmListingCityAuthority } from '@/lib/ingestion/ystmListingCityAuthority'
 
-/** Expected to match `resolveYstmListingCityAuthorityJs` in `browser-extension/content-script.js`. */
+/** Listing city authority resolution for external page sources. */
 describe('resolveYstmListingCityAuthority', () => {
   it('prefers address tail when it conflicts with URL municipality and the street line is concrete', () => {
     const href =

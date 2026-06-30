@@ -310,7 +310,7 @@ Capture **confusion points** and **positive surprises** separately.
 
 ---
 
-## 9. Release sign-off gate
+## 9. Release criteria
 
 **Example blockers**
 
@@ -354,7 +354,7 @@ Run before sign-off on each candidate build:
 | Field | Value |
 |-------|--------|
 | Title | UX & QA Testing Plan — Play Store / Public User |
-| Location | `docs/QA_UX_TESTING_PLAN_PLAY_STORE.md` |
+| Location | `docs/developer/qa-play-store.md` |
 | Based on | Product architecture: WebView + lootaura.com, native splash & App Links |
 
 Update this document when major flows change (auth hosts, min Android version, seller/payments rollout).

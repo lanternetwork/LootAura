@@ -1,4 +1,4 @@
-# LootAura authentication flows
+# Authentication flows
 
 ## Password recovery (email OTP)
 

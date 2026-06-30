@@ -312,7 +312,7 @@ export function buildOperationalPriorities(
       severity: 'warning',
       issue: `Existing refresh stale backlog elevated (${queues.refreshStale.toLocaleString()} >12h)`,
       suggestedAction:
-        'Ensure /api/cron/ystm-existing-refresh is running; tune CRON_YSTM_EXISTING_REFRESH_MAX_* only after repair stabilizes. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
+        'Ensure /api/cron/ystm-existing-refresh is running; tune CRON_YSTM_EXISTING_REFRESH_MAX_* only after repair stabilizes.',
     })
   }
 
@@ -321,7 +321,7 @@ export function buildOperationalPriorities(
       severity: 'warning',
       issue: `Catalog repair queue elevated (${queues.catalogRepair.toLocaleString()})`,
       suggestedAction:
-        'Let repair cron drain; needs_check often represents gated address or non-publishable coordinate precision. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
+        'Let repair cron drain; needs_check often represents gated address or non-publishable coordinate precision.',
     })
   }
 
@@ -338,7 +338,7 @@ export function buildOperationalPriorities(
       severity: 'info',
       issue: `${queues.needsCheck.toLocaleString()} needs_check row(s) (review/terminal queue)`,
       suggestedAction:
-        'Treat needs_check as a bucket: address-gated listings and non-publishable precision park here; geocode cron can replay transient-provider dead-letter rows when 429 pressure is low. See docs/YSTM_REFRESH_AND_NEEDS_CHECK_RUNBOOK.md.',
+        'Treat needs_check as a bucket: address-gated listings and non-publishable precision park here; geocode cron can replay transient-provider dead-letter rows when 429 pressure is low.',
     })
   }
 
@@ -350,7 +350,7 @@ export function buildOperationalPriorities(
         severity: 'warning',
         issue: `Suspicious crawl skips ${(suspiciousShare * 100).toFixed(1)}% of classified skips`,
         suggestedAction:
-          'Debug → crawl skip taxonomy; sample url_match_dates_changed per docs/YSTM_CRAWL_SKIP_TRIAGE_RUNBOOK.md. Defer if bootstrap ON and mix is refresh-queued + date-change only.',
+          'Debug → crawl skip taxonomy; sample url_match_dates_changed. Defer if bootstrap ON and mix is refresh-queued + date-change only.',
       })
     }
   }

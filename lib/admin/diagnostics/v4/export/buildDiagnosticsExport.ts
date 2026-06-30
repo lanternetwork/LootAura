@@ -38,7 +38,7 @@ function buildFullTableOfContents(): string[] {
     '## TABLE OF CONTENTS',
     '1. Export metadata',
     '2. Engineering Report (V4 authoritative + legacy compatibility)',
-    '3. Appendix — YSTM stabilization exit',
+    '3. Appendix — ingestion stabilization metrics',
     '4. Appendix — YSTM ingestion repair program',
     '5. Appendix — Coverage internals',
     '6. Appendix — Rollout gates',

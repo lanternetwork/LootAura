@@ -1,8 +1,8 @@
-# Ingestion System v1 Architecture Note
+# Ingestion architecture
 
-This note captures locked implementation decisions for the LootAura ingestion system.
+This note captures locked implementation decisions for the ingestion system.
 
-## Locked Decisions
+## Locked decisions
 
 1. Ingestion publishes into `lootaura_v2.sales`.
 2. External data first lands in `ingested_sales`.
@@ -36,9 +36,8 @@ This note captures locked implementation decisions for the LootAura ingestion sy
 16. Scheduling is city-timezone aware using city config.
 17. Imported records must never bypass validation or dedupe.
 
-## Implementation Conventions to Preserve
+## Implementation conventions
 
 - Keep write paths aligned with schema-scoped base-table usage (`lootaura_v2.*`) and avoid write-through view behavior.
 - Reuse existing auth helpers and route conventions rather than introducing parallel auth patterns.
 - Preserve non-blocking, fail-closed behavior for ingestion state transitions (invalid/ambiguous records must stay staged).
-

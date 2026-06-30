@@ -548,9 +548,6 @@ export default function YstmCoverageScoreboardSection({
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-xs text-violet-800">
-                Runbook: <code className="text-xs">docs/EXTERNAL_SOURCE_ONE_WEEK_SPRINT.md</code>
-              </p>
             </div>
           )}
 
@@ -588,9 +585,6 @@ export default function YstmCoverageScoreboardSection({
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-xs text-slate-700">
-                Runbook: <code className="text-xs">docs/EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md</code> (Phase 14)
-              </p>
             </div>
           )}
 

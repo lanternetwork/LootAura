@@ -1,6 +1,6 @@
 /**
  * Phase 2: external crawl skip sub-reasons (observability only).
- * @see docs/EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md
+ * Crawl-skip sub-reason taxonomy for external page ingestion.
  */
 
 import { calendarDaysBetweenUtc } from '@/lib/ingestion/duplicateScoring'

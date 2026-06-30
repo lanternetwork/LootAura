@@ -1,6 +1,6 @@
 /**
  * Phase 1 false-exclusion audit: primary bucket per missing valid YSTM URL.
- * @see docs/EXTERNAL_SOURCE_FALSE_EXCLUSION_AUDIT.md
+ * False-exclusion trace classification for coverage replay.
  */
 
 export const FALSE_EXCLUSION_TRACE_BUCKETS = [

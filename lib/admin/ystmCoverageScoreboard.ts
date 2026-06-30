@@ -44,7 +44,10 @@ import { buildActionableMissingValidAggregate } from '@/lib/ingestion/ystmCovera
 import type { ActionableMissingValidAggregate } from '@/lib/ingestion/ystmCoverage/classifyMissingValidReconciliationTypes'
 import { persistFalseExclusionTraces } from '@/lib/ingestion/ystmCoverage/persistFalseExclusionTrace'
 import type { FalseExclusionAuditReport } from '@/lib/ingestion/ystmCoverage/falseExclusionTraceTypes'
-import { buildSaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
+import {
+  buildSaleInstanceShadowReplayReport,
+  type ShadowReplayPerformanceSink,
+} from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
 import type { SaleInstanceShadowReplayReport } from '@/lib/ingestion/ystmCoverage/saleInstanceShadowReplayTypes'
 import {
   loadSaleInstanceIdentityMetrics,
@@ -101,7 +104,6 @@ import { loadMissingIngestCronHealth } from '@/lib/admin/loadMissingIngestCronHe
 import type { CoverageScoreboardPerformanceSink } from '@/lib/admin/diagnostics/v4/performance/scoreboardPerformanceSink'
 import { emptyCoveragePerformance } from '@/lib/admin/diagnostics/v4/performance/buildDiagnosticsPerformance'
 import { elapsedMs, monotonicNow, timeAsync, timeSync } from '@/lib/admin/diagnostics/v4/performance/timing'
-import type { ShadowReplayPerformanceSink } from '@/lib/ingestion/ystmCoverage/buildSaleInstanceShadowReplayReport'
 
 export type YstmCoverageTrendPoint = {
   completedAt: string

@@ -53,7 +53,10 @@ export function LiveOperationsSummary({ model }: { model: IngestionDiagnosticsMo
         <p className="mt-2 text-sm text-gray-700">{resolveInventorySubtitle(model)}</p>
       </SummaryTile>
 
-      <SummaryTile title="Primary Bottleneck" tone={healthToneValue === 'healthy' ? 'gray' : healthToneValue}>
+      <SummaryTile
+        title="Primary Bottleneck"
+        tone={model.systemHealth === 'healthy' ? 'gray' : healthToneValue}
+      >
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
           {bottleneck.type.replace(/_/g, ' ')}
         </p>

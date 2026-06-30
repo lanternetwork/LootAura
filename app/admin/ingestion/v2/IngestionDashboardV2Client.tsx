@@ -1,12 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { IngestionDiagnosticsModel } from '@/lib/admin/diagnostics/v4/types'
-import { formatSystemHealthLabel } from '@/lib/admin/diagnostics/v4/systemHealth'
 import { buildDiagnosticsExport } from '@/lib/admin/diagnostics/v4/export/buildDiagnosticsExport'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
-import { DiagnosticsPerformanceCard } from '@/app/admin/ingestion/v2/DiagnosticsPerformanceCard'
+import { LiveOperationsSummary } from '@/app/admin/ingestion/v2/LiveOperationsSummary'
+import { OperationalHealthCards } from '@/app/admin/ingestion/v2/OperationalHealthCards'
+import { SloScoreboard } from '@/app/admin/ingestion/v2/SloScoreboard'
+import { ActiveAlertsSection } from '@/app/admin/ingestion/v2/ActiveAlertsSection'
+import { CurrentSnapshotRow } from '@/app/admin/ingestion/v2/CurrentSnapshotRow'
+import { EngineeringDetailsSection } from '@/app/admin/ingestion/v2/EngineeringDetailsSection'
 
 type ModelResponse = {
   ok: boolean
@@ -14,19 +18,18 @@ type ModelResponse = {
   message?: string
 }
 
-const HEALTH_STYLE = {
-  healthy: 'border-emerald-400 bg-emerald-50 text-emerald-950',
-  degraded: 'border-amber-400 bg-amber-50 text-amber-950',
-  critical: 'border-red-400 bg-red-50 text-red-950',
-} as const
-
 type CopyMode = 'operations' | 'engineering' | 'full'
+
+const COPY_LABEL: Record<CopyMode, string> = {
+  operations: 'Operations Report',
+  engineering: 'Engineering Report',
+  full: 'Full Diagnostics',
+}
 
 export default function IngestionDashboardV2Client() {
   const [model, setModel] = useState<IngestionDiagnosticsModel | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [engineeringOpen, setEngineeringOpen] = useState(false)
   const [copyState, setCopyState] = useState<CopyMode | 'error' | null>(null)
 
   const load = useCallback(async () => {
@@ -86,309 +89,52 @@ export default function IngestionDashboardV2Client() {
 
   if (!model) return null
 
-  const healthClass = HEALTH_STYLE[model.systemHealth]
-
   return (
-    <div className="min-h-screen bg-gray-50 py-8 text-gray-900">
+    <div className="min-h-screen bg-gray-50 py-6 text-gray-900">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Ingestion (v2)</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Production operations dashboard · model {model.diagnosticsModelVersion}
-            </p>
+            <h1 className="text-2xl font-bold">Ingestion Operations</h1>
+            <p className="mt-1 text-sm text-gray-600">Enterprise operations dashboard (v2)</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admin/ingestion"
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"
-            >
-              Legacy dashboard
-            </Link>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        <section className={`mb-6 rounded-lg border p-5 shadow-sm ${healthClass}`}>
-          <h2 className="text-lg font-semibold">System Health</h2>
-          <p className="mt-2 text-2xl font-bold">{formatSystemHealthLabel(model.systemHealth)}</p>
-          {model.healthReasons.length > 0 && (
-            <ul className="mt-2 list-disc pl-5 text-sm">
-              {model.healthReasons.map((r) => (
-                <li key={r.id}>{r.label}</li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-2 text-sm">
-            Primary bottleneck: <strong>{model.primaryBottleneck.label}</strong>{' '}
-            <span className="rounded bg-white/60 px-1.5 py-0.5 text-xs font-medium">
-              {model.primaryBottleneck.type}
-            </span>
-          </p>
-          <p className="text-sm text-opacity-90">{model.primaryBottleneck.reason}</p>
-          <p className="text-sm">Trend: {model.trendSummary}</p>
-          <p className="text-xs opacity-70">Last refresh: {new Date(model.generatedAt).toLocaleString()}</p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {(['operations', 'engineering', 'full'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => void copyReport(mode)}
-                className="rounded-md border border-indigo-400 bg-white px-3 py-1.5 text-sm font-medium text-indigo-900 hover:bg-indigo-50"
+                className="rounded-md border border-indigo-400 bg-white px-3 py-1.5 text-sm font-medium text-indigo-900 shadow-sm hover:bg-indigo-50"
               >
                 {copyState === mode
                   ? 'Copied'
                   : copyState === 'error'
                     ? 'Copy failed'
-                    : `Copy ${mode === 'operations' ? 'Operations' : mode === 'engineering' ? 'Engineering' : 'Full'} Report`}
+                    : COPY_LABEL[mode]}
               </button>
             ))}
+            <Link
+              href="/admin/ingestion"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-50"
+            >
+              Legacy
+            </Link>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-50"
+            >
+              Refresh
+            </button>
           </div>
-        </section>
+        </header>
 
-        <DiagnosticsPerformanceCard performance={model.performance} />
-
-        <Panel title="Domain Health" className="mb-6">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {model.domainHealth.map((domain) => (
-              <div
-                key={domain.id}
-                className="rounded border border-gray-200 bg-gray-50 p-3 text-sm"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{domain.label}</span>
-                  <span className="text-xs uppercase">{domain.status}</span>
-                </div>
-                <p className="mt-1 text-gray-600">{domain.primaryReason}</p>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <div className="mb-6 grid gap-4 lg:grid-cols-2">
-          <Panel title="Top Operator Actions">
-            <ul className="list-disc space-y-2 pl-5 text-sm">
-              {model.operatorActions.map((action) => (
-                <li key={action.issue}>
-                  <span className="font-medium uppercase">{action.severity}</span>: {action.issue}
-                  <br />
-                  <span className="text-gray-600">{action.action}</span> (owner: {action.owner})
-                </li>
-              ))}
-            </ul>
-          </Panel>
-
-          <Panel title="Active Alerts">
-            {model.alerts.length === 0 ? (
-              <p className="text-sm text-gray-600">No active alerts</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {model.alerts.map((alert) => (
-                  <li key={alert.id} className="rounded border border-gray-200 bg-white p-2">
-                    <span className="font-medium uppercase">{alert.severity}</span>
-                    <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs">
-                      {alert.confidence}
-                    </span>
-                    : {alert.trigger}
-                    <p className="text-gray-600">{alert.recommendedAction}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-        </div>
-
-        <Panel title="SLOs">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2">SLO</th>
-                <th className="py-2">Status</th>
-                <th className="py-2">Actual</th>
-                <th className="py-2">Target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {model.slos.map((slo) => (
-                <tr key={slo.id} className="border-b border-gray-100">
-                  <td className="py-2">{slo.label}</td>
-                  <td className="py-2">{slo.pass ? 'PASS' : 'FAIL'}</td>
-                  <td className="py-2 tabular-nums">{slo.actual}</td>
-                  <td className="py-2 tabular-nums">{slo.target}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Panel>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <Panel title="Pipeline (24h)">
-            <ul className="space-y-1 text-sm">
-              {model.pipeline.map((stage) => (
-                <li key={stage.stage} className="flex justify-between">
-                  <span>{stage.stage}</span>
-                  <span className="tabular-nums font-medium">{stage.count24h.toLocaleString()}</span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-
-          <Panel title="Catalog Repair">
-            <dl className="grid grid-cols-2 gap-2 text-sm">
-              <Stat label="Queue total" value={model.catalogRepair.queueTotal} />
-              <Stat label="needs_check" value={model.catalogRepair.needsCheck} />
-              <Stat label="needs_geocode" value={model.catalogRepair.needsGeocode} />
-              <Stat label="publish_failed" value={model.catalogRepair.publishFailed} />
-              <Stat label="repair_failed" value={model.catalogRepair.repairFailed} />
-              <Stat label="address enrichment" value={model.catalogRepair.addressEnrichment} />
-            </dl>
-            <p className="mt-2 text-sm">
-              Dominant blocker: {model.catalogRepair.dominantBlocker ?? '—'}
-            </p>
-            <p className="text-sm text-gray-600">{model.catalogRepair.recommendation}</p>
-          </Panel>
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <Panel title="Visibility (split + confidence)">
-            <Stat label="published_not_visible total" value={model.visibility.publishedNotVisibleTotal} />
-            <Stat
-              label="Audited sample"
-              value={`${model.visibility.auditedCount} (${model.visibility.auditedCoveragePct ?? '—'}%)`}
-            />
-            <Stat label="Classification" value={model.visibility.classificationMode} />
-            <Stat label="Confidence" value={model.visibility.classificationConfidence} />
-            <Stat label="Observation stale" value={model.visibility.observationStaleCount} />
-            <Stat label="True visibility failure" value={model.visibility.trueVisibilityFailureCount} />
-          </Panel>
-
-          <Panel title="Duplicate Detection (split)">
-            <Stat label="Canonical clusters" value={model.duplicates.canonicalPublishClusters} />
-            <Stat
-              label="Convergence streak"
-              value={`${model.duplicates.convergenceStreakDays} / ${model.duplicates.convergenceStreakTargetDays}`}
-            />
-            <Stat label="Visible duplicate clusters" value={model.duplicates.visibleDuplicateClusters} />
-            <Stat
-              label="Shadow divergence"
-              value={model.duplicates.shadowDivergenceCount}
-            />
-          </Panel>
-        </div>
-
-        <Panel title="Backlog & Queues" className="mt-6">
-          <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            <Stat label="Catalog repair" value={model.backlogs.catalogRepair} />
-            <Stat label="Geocode eligible" value={model.backlogs.geocodeEligible} />
-            <Stat label="Address enrichment" value={model.backlogs.addressEnrichment} />
-            <Stat label="Refresh stale" value={model.backlogs.refreshStale} />
-            <Stat label="Missing ingest" value={model.backlogs.missingIngest} />
-            <Stat label="Image backlog" value={model.backlogs.imageBacklog} />
-            <Stat label="Publish failed" value={model.backlogs.publishFailed} />
-          </dl>
-        </Panel>
-
-        <Panel title="Scheduler & Cron Health" className="mt-6">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2">Job</th>
-                <th className="py-2">State</th>
-                <th className="py-2">Last success</th>
-                <th className="py-2">Mins since</th>
-                <th className="py-2">Telemetry</th>
-                <th className="py-2">Owner</th>
-              </tr>
-            </thead>
-            <tbody>
-              {model.schedulerCrons.map((cron) => (
-                <tr key={cron.id} className="border-b border-gray-100">
-                  <td className="py-2">{cron.displayName}</td>
-                  <td className="py-2">{cron.state}</td>
-                  <td className="py-2 font-mono text-xs">
-                    {cron.lastSuccessAt ? new Date(cron.lastSuccessAt).toLocaleString() : '—'}
-                  </td>
-                  <td className="py-2 tabular-nums">{cron.minutesSinceSuccess ?? '—'}</td>
-                  <td className="py-2 max-w-[12rem] truncate text-xs text-gray-500">
-                    {cron.telemetryUnavailableReason ?? '—'}
-                  </td>
-                  <td className="py-2">{cron.owner}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Panel>
-
-        {model.seoReadiness && (
-          <Panel title="SEO Readiness (separate from ingestion health)" className="mt-6">
-            <p className="mb-2 text-sm">
-              Metric gate: {model.seoReadiness.metricGatePass ? 'PASS' : 'FAIL'}
-            </p>
-            <ul className="space-y-1 text-sm">
-              {model.seoReadiness.criteria.map((row) => (
-                <li key={row.label}>
-                  [{row.pass ? 'PASS' : 'FAIL'}] {row.label}: {row.actual}
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        )}
-
-        <section className="mt-6 rounded-lg border border-slate-300 bg-slate-50 p-4">
-          <button
-            type="button"
-            onClick={() => setEngineeringOpen((v) => !v)}
-            className="text-sm font-semibold text-slate-900"
-          >
-            {engineeringOpen ? '▼' : '▶'} Engineering Diagnostics (lazy)
-          </button>
-          {engineeringOpen && (
-            <p className="mt-2 text-sm text-slate-700">
-              Use <strong>Copy Full Diagnostics</strong> for rollout gates, shadow replay, and legacy
-              forensic sections. Legacy dashboard remains at{' '}
-              <Link href="/admin/ingestion" className="text-indigo-700 underline">
-                /admin/ingestion
-              </Link>{' '}
-              until parity sign-off.
-            </p>
-          )}
-        </section>
+        <LiveOperationsSummary model={model} />
+        <CurrentSnapshotRow model={model} />
+        <OperationalHealthCards model={model} />
+        <SloScoreboard model={model} />
+        <ActiveAlertsSection model={model} />
+        <EngineeringDetailsSection model={model} />
       </div>
-    </div>
-  )
-}
-
-function Panel({
-  title,
-  children,
-  className = '',
-}: {
-  title: string
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <section
-      className={`rounded-lg border border-gray-200 bg-white p-4 shadow-sm ${className}`.trim()}
-    >
-      <h3 className="mb-3 text-base font-semibold">{title}</h3>
-      {children}
-    </section>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="text-lg font-semibold tabular-nums">{value}</dd>
     </div>
   )
 }

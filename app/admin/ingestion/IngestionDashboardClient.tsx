@@ -13,7 +13,8 @@ import {
   INGESTION_DIAGNOSTICS_POLL_MS,
 } from '@/lib/admin/ingestionDashboardPolling'
 import { mergeIngestionMetricsWithDiagnostics } from '@/lib/admin/ingestionMetricsMerge'
-import { buildIngestionDiagnostics } from '@/lib/admin/buildIngestionDiagnostics'
+import { buildEngineeringReport } from '@/lib/admin/diagnostics/v4/export/buildEngineeringReport'
+import { buildIngestionDiagnosticsModel } from '@/lib/admin/diagnostics/v4/buildIngestionDiagnosticsModel'
 import { copyTextToClipboard } from '@/lib/admin/copyTextToClipboard'
 import IngestionOverviewPanel from '@/app/admin/ingestion/IngestionOverviewPanel'
 import IngestionDebugPanel from '@/app/admin/ingestion/IngestionDebugPanel'
@@ -265,11 +266,14 @@ export default function IngestionDashboardClient() {
       process.env.NEXT_PUBLIC_VERCEL_ENV ??
       process.env.NODE_ENV ??
       (typeof window !== 'undefined' ? window.location.hostname : 'unknown')
-    const text = buildIngestionDiagnostics(metricsForCopy, {
+    const copiedAt = new Date().toISOString()
+    const model = buildIngestionDiagnosticsModel({
+      metrics: metricsForCopy,
+      coverage: freshCoverage,
       environment,
-      copiedAt: new Date().toISOString(),
-      ystmCoverage: freshCoverage,
+      generatedAt: copiedAt,
     })
+    const text = buildEngineeringReport(model)
     try {
       await copyTextToClipboard(text)
       setCopyState('copied')
@@ -308,6 +312,12 @@ export default function IngestionDashboardClient() {
             >
               Refresh now
             </button>
+            <Link
+              href="/admin/ingestion/v2"
+              className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 shadow-sm hover:bg-indigo-100"
+            >
+              v2 dashboard
+            </Link>
             <Link
               href="/admin/tools"
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50"

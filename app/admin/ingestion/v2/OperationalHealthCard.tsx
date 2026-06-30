@@ -1,5 +1,9 @@
-import type { StatusTone } from '@/app/admin/ingestion/v2/dashboardUxHelpers'
-import { TONE_BG, TONE_BORDER, TONE_TEXT } from '@/app/admin/ingestion/v2/dashboardUxHelpers'
+import {
+  type StatusTone,
+  TONE_BG,
+  TONE_BORDER,
+  TONE_TEXT,
+} from '@/app/admin/ingestion/v2/dashboardUxHelpers'
 
 const STATUS_DOT: Record<StatusTone, string> = {
   green: 'bg-emerald-500',

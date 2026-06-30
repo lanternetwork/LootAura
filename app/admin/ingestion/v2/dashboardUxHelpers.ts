@@ -1,9 +1,9 @@
 import type {
   IngestionDiagnosticsModel,
+  SchedulerCronRow,
   SloEvaluationRow,
   SystemHealthLevel,
 } from '@/lib/admin/diagnostics/v4/types'
-import type { SchedulerCronRow } from '@/lib/admin/diagnostics/v4/types'
 
 export type StatusTone = 'green' | 'yellow' | 'red' | 'gray' | 'blue'
 

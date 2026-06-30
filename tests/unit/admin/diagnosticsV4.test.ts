@@ -102,14 +102,15 @@ describe('ingestion diagnostics v4', () => {
           ...diagnosticsV4Coverage().falseExclusionAudit,
           byPrimaryBucket: {
             ...diagnosticsV4Coverage().falseExclusionAudit.byPrimaryBucket,
-            published_not_visible: 100,
+            published_not_visible: 150,
           },
         },
       })
       const visibility = buildVisibilitySnapshot(metrics, coverage)
       expect(visibility.observationStaleCount).toBe(80)
       expect(visibility.trueVisibilityFailureCount).toBe(7)
-      expect(visibility.publishedNotVisibleTotal).toBe(100)
+      expect(visibility.publishedNotVisibleTotal).toBe(150)
+      expect(visibility.auditedCount).toBe(100)
       expect(visibility.classificationMode).toBe('SAMPLE_ONLY')
     })
 
